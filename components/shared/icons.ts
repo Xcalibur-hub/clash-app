@@ -53,5 +53,7 @@ export { default as PaperPlaneIcon } from 'lucide-react-native/icons/send';
 // runtime file, which resolves in tsc yet breaks the Metro bundle.
 export { default as EditIcon } from 'lucide-react-native/icons/square-pen';
 export { default as EyeIcon } from 'lucide-react-native/icons/eye';
+export { default as BellIcon } from 'lucide-react-native/icons/bell';
+export { default as SearchIcon } from 'lucide-react-native/icons/search';
 export { default as PlusIcon } from 'lucide-react-native/icons/plus';
 export { default as CloseIcon } from 'lucide-react-native/icons/x';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { FlatList, Share, StyleSheet, View, type ListRenderItemInfo } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaFeedHeader } from '../../components/arena/ArenaFeedHeader';
 import { TakeCard } from '../../components/arena/TakeCard';
@@ -8,7 +8,7 @@ import { AuroraBackground } from '../../components/shared/AuroraBackground';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
 import { ArenaIcon } from '../../components/shared/icons';
-import { HOOD_LABEL } from '../../data/hoods';
+import { HOOD_LABEL, hoodById } from '../../data/hoods';
 import { useClock } from '../../hooks/useClock';
 import {
   reactToTake,
@@ -30,8 +30,15 @@ import { press as hapticPress } from '../../utils/haptics';
 export default function ArenaScreen(): React.JSX.Element {
   const { state, dispatch } = useClash();
   const router = useRouter();
+  const params = useLocalSearchParams<{ hood?: string | string[] }>();
   const insets = useSafeAreaInsets();
-  const [hood, setHood] = React.useState<HoodId>('for-you');
+  const initialHood: HoodId = React.useMemo(() => {
+    const raw = Array.isArray(params.hood) ? params.hood[0] : params.hood;
+    return raw != null && hoodById(raw as HoodId) != null ? (raw as HoodId) : 'for-you';
+    // The param seeds the first paint only; afterwards the pill is the owner.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [hood, setHood] = React.useState<HoodId>(initialHood);
   const now = useClock();
   const takes = React.useMemo(() => selectFeed(state, hood, now), [hood, now, state]);
 

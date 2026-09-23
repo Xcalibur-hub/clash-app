@@ -44,6 +44,8 @@ export default function RootLayout(): React.JSX.Element {
             <Stack.Screen name="creator/[creatorId]" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="campaign/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="sponsor/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="hoods" options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="notifications" options={{ animation: 'slide_from_bottom' }} />
           </Stack>
         </ClashProvider>
       </SafeAreaProvider>

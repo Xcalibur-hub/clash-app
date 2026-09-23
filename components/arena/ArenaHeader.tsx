@@ -5,7 +5,8 @@ import { selectViewer, useClash } from '../../store';
 import { accent, ink, radius, space, tint, typeScale } from '../../theme';
 import { Avatar } from '../shared/Avatar';
 import { CountUp } from '../shared/CountUp';
-import { CoinIcon, FlameIcon } from '../shared/icons';
+import { IconButton } from '../shared/IconButton';
+import { BellIcon, CoinIcon, FlameIcon } from '../shared/icons';
 import { tap as hapticTap } from '../../utils/haptics';
 
 /** Live balance chip: the number rolls up when a clash pays out (spec §11). */
@@ -49,17 +50,28 @@ export function ArenaHeader(): React.JSX.Element {
       <Text allowFontScaling={false} style={styles.brand}>
         CLASH
       </Text>
-      <Pressable
-        onPress={() => {
-          hapticTap();
-          router.push('/(tabs)/profile');
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={`Open your profile, @${viewer.handle}`}
-        style={styles.avatar}
-      >
-        <Avatar name={viewer.name} tint={viewer.tint} size={40} />
-      </Pressable>
+      <View style={styles.actions}>
+        <IconButton
+          icon={BellIcon}
+          onPress={() => {
+            hapticTap();
+            router.push('/notifications');
+          }}
+          label="Open notifications"
+          size={40}
+        />
+        <Pressable
+          onPress={() => {
+            hapticTap();
+            router.push('/(tabs)/profile');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Open your profile, @${viewer.handle}`}
+          style={styles.avatar}
+        >
+          <Avatar name={viewer.name} tint={viewer.tint} size={40} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -99,6 +111,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2.4,
   },
   avatar: { borderRadius: radius.pill },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   balanceRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   stat: {
     flexDirection: 'row',

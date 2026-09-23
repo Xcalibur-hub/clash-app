@@ -1,25 +1,37 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Hood } from '../../store';
-import { card, ink, radius, space, typeScale } from '../../theme';
+import { accent, card, ink, radius, space, typeScale } from '../../theme';
 import { formatReputation } from '../../utils/format';
 
 export interface HoodRowProps {
   position: number;
   hood: Hood;
+  /** When set, the row becomes a press target that opens the hood. */
+  onPress?: () => void;
+  label?: string;
+  /** Trending ribbon shown in the Hoods directory (reference screen 12). */
+  tag?: string;
 }
 
-/** One hood on the Hall of Fame hoods leaderboard. */
-export function HoodRow({ position, hood }: HoodRowProps): React.JSX.Element {
-  return (
-    <View style={styles.row}>
+/** One hood on the Hall of Fame hoods leaderboard (or the Hoods directory). */
+export function HoodRow({ position, hood, onPress, label, tag }: HoodRowProps): React.JSX.Element {
+  const content = (
+    <>
       <Text allowFontScaling={false} style={styles.position}>
         {`#${String(position).padStart(2, '0')}`}
       </Text>
       <View style={styles.info}>
-        <Text allowFontScaling={false} style={styles.name} numberOfLines={1}>
-          {hood.name}
-        </Text>
+        <View style={styles.nameRow}>
+          <Text allowFontScaling={false} style={styles.name} numberOfLines={1}>
+            {hood.name}
+          </Text>
+          {tag ? (
+            <Text allowFontScaling={false} style={styles.tag}>
+              {tag}
+            </Text>
+          ) : null}
+        </View>
         <Text allowFontScaling={false} style={styles.meta} numberOfLines={1}>
           {hood.tagline}
         </Text>
@@ -40,7 +52,21 @@ export function HoodRow({ position, hood }: HoodRowProps): React.JSX.Element {
           LIVE
         </Text>
       </View>
-    </View>
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.row}>{content}</View>;
+  }
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label ?? `Open ${hood.name}`}
+      style={styles.row}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -58,7 +84,9 @@ const styles = StyleSheet.create({
   },
   position: { ...typeScale.data, fontSize: 12, color: ink.quaternary },
   info: { flex: 1, gap: 1 },
-  name: { ...typeScale.label, color: ink.primary, fontWeight: '700' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  name: { ...typeScale.label, color: ink.primary, fontWeight: '700', flexShrink: 1 },
+  tag: { ...typeScale.caption, fontSize: 9, letterSpacing: 1, color: accent.gold },
   meta: { ...typeScale.meta, color: ink.tertiary },
   stat: { alignItems: 'flex-end', gap: 1 },
   value: { ...typeScale.data, fontSize: 12, color: ink.primary },
