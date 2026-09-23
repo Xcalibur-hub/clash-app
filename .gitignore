@@ -1,0 +1,15 @@
+node_modules/
+.expo/
+dist/
+.jury-check/
+web-build/
+expo-env.d.ts
+*.log
+npm-debug.*
+.DS_Store
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*

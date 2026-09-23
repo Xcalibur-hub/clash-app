@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "CLASH",
+    "slug": "clash",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "scheme": "clash",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#08080B",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.clash.v2",
+      "infoPlist": {
+        "UIUserInterfaceStyle": "Dark",
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+      }
+    },
+    "android": {
+      "package": "com.clash.v2",
+      "userInterfaceStyle": "dark",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

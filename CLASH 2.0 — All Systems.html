@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLASH 2.0</title>
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    --ink:#ece4cf; --ink-dim:#a49b85;
+    --paper:#15151f; --card:#23232f; --card-2:#191924;
+    --red:#ff6b48; --blue:#5b9cff; --yellow:#ffd455;
+    --green:#4cc98f; --purple:#a878d8; --pink:#ff87a3; --orange:#ffa94d;
+    --line:#3a3a4d; --shadow:5px 5px 0 rgba(0,0,0,.8); --tag-ink:#1a1a22;
+  }
+  html,body{ height:100%; }
+  body{
+    font-family:"Comic Neue","Comic Sans MS","Chalkboard SE","Segoe Print",cursive,sans-serif;
+    color:var(--ink); background-color:#100f16;
+    background-image:radial-gradient(rgba(236,228,207,.16) 1.3px,transparent 1.3px);
+    background-size:24px 24px; display:flex; align-items:center; justify-content:center;
+    min-height:100vh; overflow:hidden;
+  }
+  body::before{ content:""; position:fixed; inset:0; pointer-events:none; z-index:50;
+    background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.05),transparent 55%),
+               radial-gradient(120% 120% at 50% 110%,rgba(0,0,0,.5),transparent 60%); }
+  .app{
+    position:relative; width:100%; max-width:430px; height:100vh; height:100dvh;
+    background-color:var(--paper);
+    background-image:radial-gradient(rgba(236,228,207,.12) 1.2px,transparent 1.2px);
+    background-size:22px 22px; display:flex; flex-direction:column;
+    border-left:3px solid #000; border-right:3px solid #000;
+  }
+  @media(min-width:560px){
+    .app{ height:min(920px,94vh); border:3px solid #000; border-radius:34px 26px 38px 24px;
+      box-shadow:8px 8px 0 rgba(0,0,0,.9),0 0 60px rgba(168,120,216,.12); overflow:hidden; }
+  }
+  .screen{ display:none; flex-direction:column; flex:1; overflow:hidden; animation:fadeUp .4s ease; }
+  .screen.active{ display:flex; }
+  @keyframes fadeUp{ from{opacity:0;transform:translateY(12px) rotate(.5deg);} to{opacity:1;transform:none;} }
+  .brand{ font-size:32px; font-weight:900; letter-spacing:.04em; color:var(--red);
+    -webkit-text-stroke:1.8px var(--ink); text-shadow:3px 3px 0 rgba(0,0,0,.9); text-align:center; }
+  .btn{ cursor:pointer; font-weight:900; border:3px solid var(--ink); border-radius:16px 9px 17px 10px;
+    box-shadow:4px 4px 0 rgba(0,0,0,.8); transition:all .15s; font-family:inherit; }
+  .btn:hover{ transform:translate(-1px,-1px) rotate(-.6deg); }
+  .btn:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 rgba(0,0,0,.8); }
+  .btn-primary{ background:var(--yellow); color:var(--tag-ink); padding:14px; font-size:15px; }
+  .btn-ghost{ background:var(--card); color:var(--ink); padding:12px; font-size:13px; }
+  .input{ width:100%; background:var(--card-2); border:3px solid var(--ink); color:var(--ink);
+    font-family:inherit; font-weight:700; padding:13px 15px; border-radius:14px 8px 16px 9px; outline:none; font-size:14px; }
+  .input::placeholder{ color:var(--ink-dim); }
+  .tag{ font-size:10px; font-weight:900; letter-spacing:.1em; padding:4px 9px; color:var(--tag-ink);
+    background:var(--purple); border:2.5px solid var(--ink); border-radius:8px 5px 9px 4px;
+    box-shadow:2.5px 2.5px 0 rgba(0,0,0,.8); transform:rotate(-2deg); display:inline-block; }
+  .tag.hot{ background:var(--red); color:#fff; transform:rotate(2deg); }
+  .tag.bounty{ background:var(--yellow); transform:rotate(1.5deg); }
+  .av{ width:28px; height:28px; flex-shrink:0; display:grid; place-items:center; font-size:12px; font-weight:900;
+    color:var(--tag-ink); border:2.5px solid var(--ink); border-radius:52% 48% 54% 46%/48% 54% 46% 52%;
+    box-shadow:2px 2px 0 rgba(0,0,0,.8); }
+
+  /* ============ AUTH ============ */
+  #auth{ justify-content:center; align-items:center; padding:24px; gap:18px; text-align:center; }
+  .auth-card{ background:var(--card); border:3px solid var(--ink); border-radius:26px 14px 28px 16px;
+    box-shadow:var(--shadow); padding:28px 24px; width:100%; display:flex; flex-direction:column; gap:16px; transform:rotate(-.6deg); }
+  .auth-sub{ font-size:12.5px; color:var(--ink-dim); font-weight:700; line-height:1.5; }
+  .auth-toggle{ font-size:12.5px; font-weight:800; color:var(--ink-dim); }
+  .auth-toggle b{ color:var(--blue); cursor:pointer; text-decoration:underline wavy var(--blue); }
+
+  /* ============ ONBOARDING ============ */
+  #onboard{ padding:24px; overflow-y:auto; gap:18px; }
+  .cat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .cat-item{ background:var(--card); border:3px solid var(--ink); border-radius:18px 10px 20px 12px;
+    box-shadow:4px 4px 0 rgba(0,0,0,.8); padding:18px 12px; display:flex; flex-direction:column;
+    align-items:center; gap:8px; cursor:pointer; transition:all .18s; position:relative; }
+  .cat-item:nth-child(odd){ transform:rotate(-1.2deg); } .cat-item:nth-child(even){ transform:rotate(1.2deg); }
+  .cat-item:hover{ transform:translateY(-3px) rotate(0deg); }
+  .cat-item.sel{ background:var(--purple); color:#fff; border-color:var(--yellow); }
+  .cat-item.sel::after{ content:"✓"; position:absolute; top:-12px; right:-8px; width:30px; height:30px;
+    background:var(--green); color:#fff; border:2.5px solid var(--ink); border-radius:50%;
+    display:grid; place-items:center; font-size:14px; box-shadow:2px 2px 0 rgba(0,0,0,.8); transform:rotate(8deg); }
+  .cat-emoji{ font-size:30px; } .cat-name{ font-size:12.5px; font-weight:900; }
+
+  /* ============ MAIN ============ */
+  #main{ display:none; flex-direction:column; flex:1; overflow:hidden; }
+  #main.active{ display:flex; }
+  .top-bar{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px 4px; z-index:5; }
+  .streak{ font-size:11.5px; font-weight:800; color:var(--tag-ink); background:var(--yellow);
+    border:2.5px solid var(--ink); padding:4px 10px; border-radius:12px 8px 14px 7px;
+    box-shadow:2.5px 2.5px 0 rgba(0,0,0,.85); transform:rotate(2.5deg); white-space:nowrap; }
+  .coin-pill{ font-size:11.5px; font-weight:800; color:var(--tag-ink); background:var(--orange);
+    border:2.5px solid var(--ink); padding:4px 10px; border-radius:12px 8px 14px 7px;
+    box-shadow:2.5px 2.5px 0 rgba(0,0,0,.85); transform:rotate(-1.5deg); white-space:nowrap; }
+  .view{ display:none; flex:1; overflow-y:auto; padding:6px 16px 100px; scrollbar-width:thin; }
+  .view.active{ display:block; animation:fadeUp .3s ease; }
+  .view::-webkit-scrollbar{ width:8px; } .view::-webkit-scrollbar-thumb{ background:#3c3c50; border-radius:8px; border:2px solid var(--ink); }
+  .sec-title{ font-size:22px; font-weight:900; margin:8px 2px 12px; display:inline-block; position:relative; }
+  .sec-title span{ display:block; font-size:10.5px; font-weight:700; letter-spacing:.05em; color:var(--ink-dim); margin-top:3px; }
+
+  /* ---- MOOD FILTER ---- */
+  .mood-row{ display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; padding:2px; scrollbar-width:none; }
+  .mood-row::-webkit-scrollbar{ display:none; }
+  .mood-chip{ flex-shrink:0; cursor:pointer; font-size:11px; font-weight:900; font-family:inherit;
+    background:var(--card); color:var(--ink-dim); border:2.5px solid var(--ink); border-radius:999px;
+    padding:7px 14px; box-shadow:2.5px 2.5px 0 rgba(0,0,0,.8); transition:all .18s; display:flex; gap:6px; align-items:center; }
+  .mood-chip:hover{ transform:translate(-1px,-1px); }
+  .mood-chip.on{ color:#fff; }
+  .mood-chip.on[data-mood="chill"]{ background:var(--green); color:var(--tag-ink); }
+  .mood-chip.on[data-mood="heat"]{ background:var(--orange); color:var(--tag-ink); }
+  .mood-chip.on[data-mood="war"]{ background:var(--red); }
+
+  /* ---- FEED POST ---- */
+  .post{ background:var(--card); border:3px solid var(--ink); border-radius:240px 14px 220px 18px/16px 230px 14px 220px;
+    box-shadow:var(--shadow); margin-bottom:24px; padding:16px; position:relative; transform:rotate(.4deg); }
+  .post:nth-child(2n){ transform:rotate(-.5deg); }
+  .post.war{ border-color:var(--red); }
+  .post.chill{ border-color:var(--green); }
+  .post-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .post-head .av{ width:36px; height:36px; font-size:14px; }
+  .p-name{ font-size:13.5px; font-weight:900; } .p-meta{ font-size:10px; color:var(--ink-dim); font-weight:700; }
+  .p-caption{ font-size:15px; font-weight:800; line-height:1.4; margin-bottom:12px; }
+  .media-box{ height:160px; border:3px dashed var(--line); border-radius:18px 10px 20px 12px;
+    display:grid; place-items:center; font-size:46px; margin-bottom:12px; position:relative; overflow:hidden;
+    background:repeating-linear-gradient(45deg,#1c1c28 0 10px,#22222f 10px 20px); }
+  .media-badge{ position:absolute; top:10px; left:10px; background:var(--tag-ink); color:var(--yellow);
+    font-size:9px; font-weight:900; letter-spacing:.1em; border:2px solid var(--ink); padding:3px 8px; border-radius:8px; }
+  .bounty-strip{ display:flex; align-items:center; gap:8px; background:rgba(255,212,85,.12);
+    border:2.5px dashed var(--yellow); border-radius:10px 6px 12px 5px; padding:7px 11px; margin-bottom:12px; }
+  .bounty-strip span{ font-size:11.5px; font-weight:900; color:var(--yellow); }
+  .roast-box{ background:#1b1b26; border:3px solid var(--ink); border-left:6px dashed var(--red);
+    border-radius:6px 16px 18px 8px; padding:12px 14px; position:relative;
+    background-image:repeating-linear-gradient(#1b1b26,#1b1b26 22px,#2c2c3b 23px); margin-bottom:12px; }
+  .roast-head{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .roast-name{ font-size:12px; font-weight:900; } .roast-badge{ font-size:9px; color:var(--red); font-weight:900; }
+  .roast-text{ font-size:13.5px; line-height:1.5; color:#eee7d6; }
+  .post-foot{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .p-btn{ display:flex; align-items:center; gap:5px; cursor:pointer; font-size:11.5px; font-weight:900; color:var(--ink);
+    background:#191924; border:2.5px solid var(--ink); border-radius:12px 7px 13px 6px; padding:5px 10px;
+    box-shadow:2.5px 2.5px 0 rgba(0,0,0,.8); transition:transform .15s; }
+  .p-btn.on{ background:var(--orange); color:var(--tag-ink); } .p-btn.pop{ transform:scale(1.15) rotate(-3deg); }
+  .cd-mini{ margin-left:auto; font-size:10.5px; font-weight:900; color:var(--ink-dim); display:flex; align-items:center; gap:5px; }
+  .cd-mini.urgent{ color:var(--red); }
+  .expired-veil{ position:absolute; inset:0; z-index:6; display:none; place-items:center; text-align:center; padding:24px;
+    background:rgba(21,21,31,.86);
+    clip-path:polygon(0 6%,8% 0,22% 7%,38% 1%,55% 8%,72% 2%,88% 9%,100% 4%,96% 22%,100% 40%,94% 58%,99% 76%,93% 92%,100% 100%,78% 96%,60% 100%,42% 94%,24% 100%,8% 93%,0 97%,4% 70%,0 45%,6% 24%); }
+  .expired-veil.show{ display:grid; }
+  .expired-veil h4{ font-size:16px; font-weight:900; color:var(--red); margin-bottom:8px; transform:rotate(-2deg); }
+  .expired-veil p{ font-size:12.5px; color:var(--ink-dim); line-height:1.55; }
+
+  /* ---- HALL OF FAME ---- */
+  .fame-card{ background:linear-gradient(160deg,#2a2415,#1e1e2b); border:3px solid var(--yellow);
+    border-radius:240px 14px 220px 18px/16px 230px 14px 220px; box-shadow:5px 5px 0 rgba(255,212,85,.35);
+    margin-bottom:24px; padding:16px; position:relative; transform:rotate(-.6deg); }
+  .fame-card::before{ content:""; position:absolute; top:-12px; left:50%; transform:translateX(-50%) rotate(-3deg);
+    width:78px; height:22px; background:rgba(255,212,85,.28); border:1.5px dashed rgba(236,228,207,.45); z-index:3; }
+  .fame-banner{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .fame-banner h3{ font-size:14px; font-weight:900; color:var(--yellow); }
+
+  /* ---- ARENA / ASYNC DEBATES ---- */
+  .debate-card{ background:#20202d; border:3px solid var(--ink); border-radius:26px 14px 28px 16px;
+    box-shadow:7px 7px 0 rgba(0,0,0,.9); padding:18px 16px; margin-bottom:20px; position:relative;
+    background-image:radial-gradient(rgba(236,228,207,.1) 1.1px,transparent 1.1px); background-size:20px 20px; }
+  .live-pill{ display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:900; letter-spacing:.12em;
+    color:#fff; background:var(--red); border:2.5px solid var(--ink); padding:5px 11px; border-radius:999px;
+    box-shadow:2.5px 2.5px 0 rgba(0,0,0,.8); transform:rotate(-2deg); }
+  .async-pill{ display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:900; letter-spacing:.12em;
+    color:var(--tag-ink); background:var(--blue); border:2.5px solid var(--ink); padding:5px 11px; border-radius:999px;
+    box-shadow:2.5px 2.5px 0 rgba(0,0,0,.8); transform:rotate(-2deg); }
+  .dot{ width:8px; height:8px; border-radius:50%; background:#fff; border:1.5px solid var(--ink); animation:blink 1.1s infinite; }
+  @keyframes blink{ 50%{ opacity:.2; } }
+  .debate-topic{ font-size:18px; font-weight:900; line-height:1.3; margin:14px 0 16px; }
+  .debaters{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
+  .debater{ flex:1; text-align:center; padding:12px 4px; background:#191924; border:3px solid var(--ink);
+    border-radius:20px 10px 22px 12px; box-shadow:3px 3px 0 rgba(0,0,0,.8); transition:all .3s; }
+  .debater.red{ background:#2a1e26; } .debater.blue{ background:#1c2333; }
+  .debater.responded{ border-color:var(--green); }
+  .debater.waiting{ border-style:dashed; }
+  .face{ width:46px; height:46px; margin:0 auto 7px; display:block; }
+  .d-name{ font-weight:900; font-size:13px; } .d-side{ font-size:9.5px; font-weight:900; letter-spacing:.12em; color:var(--ink-dim); }
+  .vs{ font-weight:900; font-size:14px; color:var(--red); -webkit-text-stroke:.8px var(--ink); }
+  .vote-bar{ display:flex; height:36px; border:3px solid var(--ink); border-radius:14px 8px 16px 9px; overflow:hidden;
+    margin:16px 0 8px; box-shadow:3px 3px 0 rgba(0,0,0,.8); }
+  .v-seg{ display:grid; place-items:center; font-size:12px; font-weight:900; color:#fff; min-width:46px;
+    transition:width .8s cubic-bezier(.34,1.4,.5,1); }
+  .v-seg.red{ background-image:repeating-linear-gradient(45deg,#c94320 0 8px,rgba(255,107,72,.55) 8px 16px),linear-gradient(#e4572e,#c94320); }
+  .v-seg.blue{ background-image:repeating-linear-gradient(-45deg,#2b5fb5 0 8px,rgba(91,156,255,.55) 8px 16px),linear-gradient(#3a7bd5,#2b5fb5); }
+  .vote-meta{ font-size:11px; font-weight:700; color:var(--ink-dim); text-align:center; margin-bottom:12px; }
+  .vote-meta b{ color:var(--ink); }
+  .juror-weight{ font-size:10px; font-weight:900; color:var(--purple); text-align:center; margin-bottom:10px; }
+  .vote-actions{ display:flex; gap:10px; }
+  .vote-btn{ flex:1; padding:11px 6px; cursor:pointer; font-size:11.5px; font-weight:900; color:var(--ink);
+    background:#191924; border:3px solid var(--ink); border-radius:14px 8px 16px 9px; box-shadow:3px 3px 0 rgba(0,0,0,.8);
+    transition:all .18s; font-family:inherit; }
+  .vote-btn.red:hover{ background:#2a1e26; transform:translate(-1px,-1px) rotate(-1deg); }
+  .vote-btn.blue:hover{ background:#1c2333; transform:translate(-1px,-1px) rotate(1deg); }
+  .vote-btn.chosen.red{ background:var(--red); color:#fff; }
+  .vote-btn.chosen.blue{ background:var(--blue); color:#fff; }
+  .respond-btn{ width:100%; margin-top:10px; padding:12px; cursor:pointer; font-size:13px; font-weight:900;
+    color:var(--tag-ink); background:var(--green); border:3px solid var(--ink); border-radius:16px 9px 17px 10px;
+    box-shadow:3px 3px 0 rgba(0,0,0,.8); transition:all .18s; font-family:inherit; }
+  .respond-btn:hover{ transform:translate(-1px,-1px) rotate(-.6deg); }
+  .transcript{ max-height:200px; overflow-y:auto; padding-right:6px; scrollbar-width:thin; margin-bottom:10px; }
+  .transcript::-webkit-scrollbar{ width:6px; } .transcript::-webkit-scrollbar-thumb{ background:#3c3c50; border-radius:6px; }
+  .line{ display:flex; gap:10px; margin-bottom:12px; animation:lineIn .45s ease; }
+  @keyframes lineIn{ from{opacity:0;transform:translateY(10px) rotate(-1deg);} to{opacity:1;transform:none;} }
+  .line .av{ width:30px; height:30px; font-size:12px; }
+  .bubble{ background:#191924; border:2.5px solid var(--ink); border-radius:4px 16px 16px 16px;
+    padding:9px 12px; font-size:13px; line-height:1.5; box-shadow:2.5px 2.5px 0 rgba(0,0,0,.8); color:#eee7d6; }
+  .line.red .bubble{ border-left:6px solid var(--red); } .line.blue .bubble{ border-left:6px solid var(--blue); }
+
+  /* ---- VERDICT SHARE CARD ---- */
+  .verdict-modal{ position:absolute; inset:0; z-index:80; display:none; place-items:center; padding:24px;
+    background:rgba(10,9,15,.88); backdrop-filter:blur(3px); }
+  .verdict-modal.show{ display:grid; animation:fadeUp .4s ease; }
+  .verdict-card{ width:100%; background:var(--card); border:3px solid var(--yellow); border-radius:26px 14px 28px 16px;
+    box-shadow:8px 8px 0 rgba(255,212,85,.3); padding:24px; text-align:center; transform:rotate(-.8deg); }
+  .verdict-card h2{ font-size:20px; font-weight:900; color:var(--yellow); margin-bottom:4px; }
+  .verdict-card .v-sub{ font-size:11px; color:var(--ink-dim); font-weight:700; margin-bottom:16px; }
+  .verdict-players{ display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:16px; }
+  .vp{ text-align:center; } .vp .av{ width:48px; height:48px; font-size:18px; margin:0 auto 5px; }
+  .vp b{ font-size:13px; } .vp small{ display:block; font-size:10px; color:var(--ink-dim); font-weight:800; }
+  .verdict-pct{ font-size:34px; font-weight:900; color:var(--green); }
+  .verdict-share{ width:100%; margin-top:14px; padding:13px; cursor:pointer; font-size:13.5px; font-weight:900;
+    color:var(--tag-ink); background:var(--yellow); border:3px solid var(--ink); border-radius:16px 9px 17px 10px;
+    box-shadow:3px 3px 0 rgba(0,0,0,.8); font-family:inherit; }
+  .verdict-close{ width:100%; margin-top:8px; padding:10px; cursor:pointer; font-size:12px; font-weight:800;
+    color:var(--ink-dim); background:transparent; border:none; font-family:inherit; }
+
+  /* ---- COMMUNITIES ---- */
+  .comm-item{ display:flex; align-items:center; gap:12px; background:var(--card); border:3px solid var(--ink);
+    border-radius:18px 10px 20px 12px; box-shadow:4px 4px 0 rgba(0,0,0,.8); padding:12px 14px; margin-bottom:14px; transform:rotate(-.4deg); }
+  .comm-item:nth-child(2n){ transform:rotate(.6deg); }
+  .comm-icon{ width:44px; height:44px; flex-shrink:0; display:grid; place-items:center; font-size:20px;
+    background:#191924; border:2.5px solid var(--ink); border-radius:52% 48% 54% 46%/48% 54% 46% 52%; }
+  .comm-info{ flex:1; } .c-title{ font-size:14px; font-weight:900; }
+  .c-desc{ font-size:11px; color:var(--ink-dim); font-weight:700; margin-top:2px; }
+  .join-btn{ cursor:pointer; font-size:11px; font-weight:900; background:var(--blue); color:#fff;
+    border:2.5px solid var(--ink); border-radius:10px 6px 11px 5px; padding:6px 12px;
+    box-shadow:2.5px 2.5px 0 rgba(0,0,0,.8); transition:all .15s; font-family:inherit; }
+  .join-btn:hover{ transform:translate(-1px,-1px) rotate(-1.5deg); }
+  .join-btn.joined{ background:var(--green); color:var(--tag-ink); }
+
+  /* ---- UPLOAD ---- */
+  #view-upload{ justify-content:flex-start; align-items:stretch; padding:6px 16px 100px; overflow-y:auto; }
+  .drop-zone{ width:100%; min-height:180px; border:4px dashed var(--line); border-radius:24px 14px 26px 16px;
+    display:grid; place-items:center; text-align:center; cursor:pointer; padding:24px; gap:10px;
+    background:repeating-linear-gradient(-45deg,#1c1c28 0 10px,#22222f 10px 20px); transition:all .2s; margin-bottom:14px; }
+  .drop-zone:hover{ border-color:var(--yellow); }
+  .dz-emoji{ font-size:42px; } .dz-text{ font-size:12.5px; font-weight:800; color:var(--ink-dim); line-height:1.5; }
+  .bounty-row{ display:flex; align-items:center; gap:8px; margin:10px 0 14px; }
+  .bounty-chip{ flex:1; cursor:pointer; font-size:11.5px; font-weight:900; font-family:inherit;
+    background:var(--card); color:var(--ink-dim); border:2.5px solid var(--ink); border-radius:12px 7px 13px 6px;
+    padding:8px 4px; box-shadow:2.5px 2.5px 0 rgba(0,0,0,.8); transition:all .15s; text-align:center; }
+  .bounty-chip.on{ background:var(--yellow); color:var(--tag-ink); transform:rotate(-1.5deg); }
+
+  /* ---- PROFILE ---- */
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .stat-box{ border:3px solid var(--ink); border-radius:16px 9px 18px 10px; box-shadow:4px 4px 0 rgba(0,0,0,.85); padding:14px; }
+  .stat-box:nth-child(1){ transform:rotate(-1.5deg); background:#2a1e26; }
+  .stat-box:nth-child(2){ transform:rotate(1.2deg); background:#1c2333; }
+  .stat-box:nth-child(3){ transform:rotate(1deg); background:#2a2415; }
+  .stat-box:nth-child(4){ transform:rotate(-1.2deg); background:#15241c; }
+  .stat-box b{ display:block; font-size:24px; font-weight:900; }
+  .stat-box span{ font-size:10px; font-weight:800; color:var(--ink-dim); }
+  .badge-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+
+  /* ---- NAV ---- */
+  .nav{ flex-shrink:0; display:flex; gap:8px; padding:10px 14px calc(12px + env(safe-area-inset-bottom));
+    background:#100f16; border-top:3px dashed #3a3a4d; position:relative; z-index:5; }
+  .nav button{ flex:1; cursor:pointer; color:var(--ink-dim); font-size:9.5px; font-weight:900; letter-spacing:.03em;
+    background:#23232f; border:3px solid var(--ink); border-radius:14px 8px 16px 9px; box-shadow:3px 3px 0 rgba(0,0,0,.8);
+    padding:8px 0 9px; display:flex; flex-direction:column; align-items:center; gap:3px; transition:all .2s; font-family:inherit; }
+  .nav button .ico{ width:20px; height:20px; display:block; }
+  .nav button.active{ color:#fff; background:var(--red); transform:translateY(-3px) rotate(-1.5deg); box-shadow:4px 5px 0 rgba(0,0,0,.9); }
+  .nav button.upload-btn{ background:var(--yellow); color:var(--tag-ink); transform:translateY(-2px) rotate(1.5deg); }
+  .nav button.upload-btn .ico{ width:24px; height:24px; }
+  .nav button .badge{ position:absolute; top:-6px; right:-4px; background:var(--red); color:#fff; font-size:8px;
+    border:2px solid var(--ink); border-radius:50%; width:18px; height:18px; display:grid; place-items:center; }
+
+  /* ---- TOAST ---- */
+  .toast{ position:absolute; bottom:92px; left:50%; transform:translateX(-50%) translateY(14px); z-index:90;
+    background:var(--yellow); color:var(--tag-ink); border:3px solid var(--ink); padding:12px 18px 26px;
+    font-size:12.5px; font-weight:800; opacity:0; pointer-events:none; transition:all .3s;
+    box-shadow:4px 4px 0 rgba(0,0,0,.85); white-space:nowrap; max-width:92vw;
+    clip-path:polygon(0 0,100% 0,100% 68%,56% 68%,50% 100%,44% 68%,0 68%); }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 1.5c0 4 5 4.5 5 9.5 0 3.5-2.2 5.6-5 5.6s-5-2.1-5-5.6c0-3 2-4 1.5-7.5 2 1.5 3.5 1 3.5-2z" fill="#ffa94d" stroke="#ece4cf" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 12c1.5 0 2.4 1 2.4 2.4 0 1.6-1 2.6-2.4 2.6s-2.4-1-2.4-2.6c0-1 .6-1.7 1.4-2.2" fill="#ffd455"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10h-6v-6h-6v6H3z" fill="#4cc98f" stroke="#ece4cf" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-arena" viewBox="0 0 24 24"><path d="M14 2l7 7-3 1-1 3-7-7 1-3z" fill="#c9c9c9" stroke="#ece4cf" stroke-width="1.6" stroke-linejoin="round"/><path d="M11 9l-8 8v4h4l8-8" fill="#a878d8" stroke="#ece4cf" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" stroke="#1a1a22" stroke-width="3.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.6" fill="#ffd455" stroke="#ece4cf" stroke-width="1.6"/><path d="M3.5 21c.6-4.6 4.2-7 8.5-7s7.9 2.4 8.5 7" fill="#3aa676" stroke="#ece4cf" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M6 3h12v5a6 6 0 01-12 0z" fill="#ffd455" stroke="#ece4cf" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 4h2v4a2 2 0 01-2-2zM18 4h2v2a2 2 0 01-2 2zM9 15h6l1 6H8z" fill="#ffd455" stroke="#ece4cf" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.8-5 4.7 1.3 6.8L12 17.4 5.9 20.6 7.2 13.8l-5-4.7 6.9-.8z" fill="#ffd455" stroke="#ece4cf" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <!-- AUTH -->
+  <section class="screen active" id="auth">
+    <div>
+      <div class="brand">CLASH</div>
+      <svg width="100%" height="12" viewBox="0 0 200 12" preserveAspectRatio="none"><path d="M2 8 Q 30 2 60 7 T 120 6 T 198 5" fill="none" stroke="#ece4cf" stroke-width="2.6" stroke-linecap="round"/></svg>
+    </div>
+    <div class="auth-card">
+      <div class="tag hot" style="align-self:flex-start">⚡ 24H RULE APPLIES</div>
+      <h2 style="font-size:20px; font-weight:900;">Sign up to argue</h2>
+      <p class="auth-sub">Everything you post, roast, and win disappears at midnight. Your streak, badges, and rank are the only things that survive.</p>
+      <input class="input" id="emailIn" type="text" placeholder="📧 email or @handle">
+      <input class="input" id="passIn" type="password" placeholder="🔒 secret password">
+      <button class="btn btn-primary" id="authBtn">Create account →</button>
+      <p class="auth-toggle">Already a juror? <b id="flipAuth">Sign in</b></p>
+    </div>
+    <p class="auth-sub" style="max-width:300px;">By joining you agree to roast and be roasted, respectfully-ish.</p>
+  </section>
+
+  <!-- ONBOARDING -->
+  <section class="screen" id="onboard">
+    <div>
+      <div class="brand" style="font-size:26px;">PICK YOUR POISON</div>
+      <p class="auth-sub" style="margin-top:8px;">Choose 3 categories. We'll fill your feed with people who are wrong about them.</p>
+    </div>
+    <div class="cat-grid" id="catGrid"></div>
+    <button class="btn btn-primary" id="onboardBtn" disabled style="opacity:.4;">Select 3 to continue</button>
+  </section>
+
+  <!-- MAIN -->
+  <div id="main">
+    <header class="top-bar">
+      <div class="brand" style="font-size:24px; text-align:left;">CLASH</div>
+      <div style="display:flex; gap:8px;">
+        <div class="coin-pill" id="coinPill">🪙 250</div>
+        <div class="streak" id="streak">🔥 1-day</div>
+      </div>
+    </header>
+
+    <!-- FEED -->
+    <main class="view active" id="view-feed">
+      <div class="sec-title">The Feed<span>EPHEMERAL CHAOS · REFRESHES DAILY</span></div>
+      <div class="mood-row" id="moodRow">
+        <button class="mood-chip on" data-mood="all">🌍 ALL</button>
+        <button class="mood-chip" data-mood="chill">😎 CHILL BANTER</button>
+        <button class="mood-chip" data-mood="heat">🔥 HEATED DEBATE</button>
+        <button class="mood-chip" data-mood="war">☢️ WARZONE</button>
+      </div>
+      <div id="fameZone"></div>
+      <div id="feedList"></div>
+    </main>
+
+    <!-- ARENA -->
+    <main class="view" id="view-arena">
+      <div class="sec-title">The Arena<span>ASYNC + LIVE · YOU ARE THE JURY</span></div>
+      <div id="arenaList"></div>
+    </main>
+
+    <!-- COMMUNITIES -->
+    <main class="view" id="view-comms">
+      <div class="sec-title">Communities<span>JOIN THE WRONG CROWD</span></div>
+      <div id="commList"></div>
+    </main>
+
+    <!-- UPLOAD -->
+    <main class="view" id="view-upload" style="display:none;"></main>
+
+    <!-- PROFILE -->
+    <main class="view" id="view-prof">
+      <div class="sec-title">Your Record<span>GONE TOMORROW, SCORED TODAY</span></div>
+      <div style="background:var(--card); border:3px solid var(--ink); border-radius:18px 10px 20px 12px; box-shadow:var(--shadow); padding:16px; margin-bottom:14px; transform:rotate(-.5deg);">
+        <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:800; margin-bottom:11px;">
+          <span>Juror Rank: <b style="color:var(--purple)">Rookie Roaster</b></span><span style="color:var(--ink-dim)">120 / 1,000 XP</span></div>
+        <div style="height:14px; background:#101018; border:2.5px solid var(--ink); border-radius:999px; overflow:hidden;">
+          <div style="height:100%; width:12%; background-image:repeating-linear-gradient(45deg,#8e5db5 0 8px,#6b4a90 8px 16px);"></div></div>
+        <div style="margin-top:10px; font-size:11px; font-weight:900; color:var(--purple);">⚖️ JUROR WEIGHT: 1.2× — your vote counts more when you side with the majority.</div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-box"><b>1</b><span>DAY STREAK</span></div>
+        <div class="stat-box"><b id="statVotes">0</b><span>JURY VOTES</span></div>
+        <div class="stat-box"><b id="statRoasts">0</b><span>ROASTS GIVEN</span></div>
+        <div class="stat-box"><b id="statWins">0</b><span>ARENA WINS</span></div>
+      </div>
+      <div class="badge-row">
+        <span class="tag">🌱 FIRST BLOOD</span>
+        <span class="tag bounty">🪙 BOUNTY HUNTER I</span>
+        <span class="tag hot">🔥 STREAK KEEPER</span>
+      </div>
+    </main>
+
+    <nav class="nav">
+      <button data-view="feed" class="active"><svg class="ico"><use href="#i-home"/></svg>FEED</button>
+      <button data-view="arena"><svg class="ico"><use href="#i-arena"/></svg>ARENA<span class="badge" id="arenaBadge" style="display:none;">!</span></button>
+      <button data-view="upload" class="upload-btn"><svg class="ico"><use href="#i-plus"/></svg>POST</button>
+      <button data-view="comms"><svg class="ico" style="width:18px;height:18px;"><use href="#i-trophy"/></svg>HOODS</button>
+      <button data-view="prof"><svg class="ico"><use href="#i-user"/></svg>YOU</button>
+    </nav>
+  </div>
+
+  <!-- VERDICT MODAL -->
+  <div class="verdict-modal" id="verdictModal">
+    <div class="verdict-card">
+      <h2>THE JURY HAS SPOKEN</h2>
+      <div class="v-sub" id="verdictTopic">—</div>
+      <div class="verdict-players">
+        <div class="vp"><div class="av" style="background:var(--red)">M</div><b>Mia</b><small>CON</small></div>
+        <div style="font-size:20px; font-weight:900; color:var(--ink-dim);">VS</div>
+        <div class="vp"><div class="av" style="background:var(--blue)">J</div><b>Jordan</b><small>PRO</small></div>
+      </div>
+      <div class="verdict-pct" id="verdictPct">68% — 32%</div>
+      <p style="font-size:12px; font-weight:800; color:var(--green); margin-top:6px;" id="verdictWinner">Jordan wins the argument!</p>
+      <p style="font-size:11px; color:var(--ink-dim); font-weight:700; margin-top:10px;">+85 XP for siding with reason · Juror weight increased</p>
+      <button class="verdict-share" id="shareVerdict">📱 Share the verdict card</button>
+      <button class="verdict-close" id="closeVerdict">close</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+  const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
+  const toastEl = $('#toast'); let toastTimer;
+  function toast(msg){ toastEl.textContent=msg; toastEl.classList.add('show'); clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2400); }
+
+  /* ---------- state ---------- */
+  const STATE = { coins:250, votes:0, roasts:0, wins:0, weight:1.2, mood:'all', bountySel:0 };
+  function addCoins(n){ STATE.coins+=n; $('#coinPill').textContent=`🪙 ${STATE.coins}`; }
+  function addStat(k){ STATE[k]++; $(k==='votes'?'#statVotes':k==='roasts'?'#statRoasts':'#statWins').textContent=STATE[k]; }
+
+  /* ---------- flow ---------- */
+  function show(id){ $$('.screen').forEach(s=>s.classList.toggle('active', s.id===id)); }
+  let isSignup = true;
+  $('#flipAuth').addEventListener('click', ()=>{
+    isSignup=!isSignup;
+    $('#authBtn').textContent = isSignup?'Create account →':'Enter the arena →';
+    $('#flipAuth').textContent = isSignup?'Sign in':'Sign up';
+    $('#auth h2').textContent = isSignup?'Sign up to argue':'Welcome back, juror';
+  });
+  $('#authBtn').addEventListener('click', ()=>{
+    const e=$('#emailIn').value.trim()||'anon_goblin';
+    if(isSignup){ show('onboard'); toast(`Welcome @${e.split('@')[0]} — pick your battlegrounds.`); }
+    else { enterApp(); toast('⚡ The feed missed you.'); }
+  });
+
+  /* ---------- onboarding ---------- */
+  const cats=[{n:"Food Crimes",e:"🍕"},{n:"Tech Takes",e:"🤖"},{n:"Work Rants",e:"💼"},{n:"Dating Fails",e:"💔"},
+              {n:"Gaming Lore",e:"🎮"},{n:"Movie Opinions",e:"🎬"},{n:"Money Plays",e:"💸"},{n:"Life Hacks",e:"🛠️"}];
+  const sel=new Set();
+  $('#catGrid').innerHTML=cats.map((c,i)=>`<div class="cat-item" data-i="${i}"><div class="cat-emoji">${c.e}</div><div class="cat-name">${c.n}</div></div>`).join('');
+  $$('.cat-item').forEach(el=>el.addEventListener('click',()=>{
+    const i=el.dataset.i;
+    if(sel.has(i)){ sel.delete(i); el.classList.remove('sel'); }
+    else { if(sel.size>=3){ toast("Only 3! We don't want you overwhelmed."); return; } sel.add(i); el.classList.add('sel'); }
+    const b=$('#onboardBtn'); b.disabled=sel.size<3; b.style.opacity=sel.size<3?.4:1;
+  }));
+  $('#onboardBtn').addEventListener('click', ()=>{ enterApp(); toast("Hood joined. Everything dies at midnight. ⏳"); });
+
+  function enterApp(){
+    $('#main').classList.add('active');
+    $$('.screen').forEach(s=>s.classList.remove('active'));
+    renderAll(); startTimers();
+  }
+
+  /* ---------- data ---------- */
+  const posts=[
+    { user:"daria.k", av:"var(--orange)", tag:"FOOD CRIMES", mood:"chill", cap:"Pineapple pizza is a love language, actually.",
+      media:"🍕", type:"IMAGE", bounty:0, roast:{n:"marco_ux",t:"Sweet and salty predates Italy. The hate is colonialism with extra steps."}, hrs:14, likes:4.2 },
+    { user:"hr_rebel", av:"var(--blue)", tag:"WORK RANTS", mood:"heat", cap:"The 4-day week is coming and middle management is scared.",
+      media:"📊", type:"VIDEO", bounty:100, roast:{n:"fin_nerd",t:"You can't measure outcomes if your whole job is scheduling meetings about outcomes."}, hrs:2, likes:6.1 },
+    { user:"noor.txt", av:"var(--pink)", tag:"LIFE HACKS", mood:"chill", cap:"Group chats over 6 people are just slow-moving comment sections.",
+      media:"💬", type:"IMAGE", bounty:0, roast:{n:"pablo.r",t:"Seven people is a committee. You don't have friends, you have a forum."}, hrs:21, likes:1.4 },
+    { user:"goblin_tech", av:"var(--green)", tag:"TECH TAKES", mood:"war", cap:"AI won't replace artists. Artists with AI will replace artists without.",
+      media:"🤖", type:"VIDEO", bounty:250, roast:{n:"daria.k",t:"The camera didn't kill painting. A prompt box won't kill taste."}, hrs:8, likes:9.7 }
+  ];
+  const famePosts=[
+    { user:"legend_2009", av:"var(--purple)", tag:"LEGENDARY", cap:"The greatest roast in this app's short, violent history.",
+      media:"👑", roast:{n:"the_voices",t:"Certified Hall of Fame moment — this one survives the wipe."}, likes:48.2 }
+  ];
+  const comms=[
+    {i:"🍕",t:"r/PizzaCrimes",d:"4.2k members · 312 online",j:false},
+    {i:"🤖",t:"r/RobotOverlords",d:"9.1k members · 889 online",j:false},
+    {i:"💼",t:"r/CorporateSurvival",d:"12.4k members · 1.2k online",j:false},
+    {i:"💔",t:"r/DatingDisasters",d:"33.7k members · 2.4k online",j:false},
+    {i:"🎮",t:"r/Loremasters",d:"7.8k members · 640 online",j:false}
+  ];
+  const debates=[
+    { id:0, live:true, topic:"WFH: productivity paradise, or collaboration killer?",
+      a:{n:"Mia",side:"CON"}, b:{n:"Jordan",side:"PRO"},
+      aResp:"Offices didn't protect spontaneity — they replaced it with interruptions. Deep work needs a closed door.",
+      bResp:"", va:412, vb:468, userVote:null, finished:false },
+    { id:1, live:false, topic:"Is pineapple pizza actually a crime? (async — respond anytime)",
+      a:{n:"daria.k",side:"PRO"}, b:{n:"__challenger__",side:"CON"},
+      aResp:"Sweet + salty is a validated flavor profile. Fight me, or fight the Italians' own vesuvio.",
+      bResp:"", va:188, vb:203, userVote:null, finished:false }
+  ];
+
+  /* ---------- render feed ---------- */
+  let feedTimers=[];
+  function renderFeed(){
+    const list = STATE.mood==='all' ? posts : posts.filter(p=>p.mood===STATE.mood);
+    $('#fameZone').innerHTML = `<div class="fame-card">
+        <div class="fame-banner"><svg width="20" height="20"><use href="#i-trophy"/></svg><h3>HALL OF FAME — SURVIVES THE WIPE</h3></div>
+        <div class="post-head"><div class="av" style="background:${famePosts[0].av}">L</div>
+          <div><div class="p-name">${famePosts[0].user}</div><div class="p-meta">permanent · ${famePosts[0].tag}</div></div></div>
+        <div class="p-caption">${famePosts[0].cap}</div>
+        <div class="media-box" style="height:120px;">${famePosts[0].media}</div>
+        <div class="roast-box" style="border-left-color:var(--yellow);">
+          <div class="roast-head"><div class="av" style="background:var(--purple); width:22px; height:22px; font-size:10px;">T</div>
+            <div><span class="roast-name">${famePosts[0].roast.n}</span> <span class="roast-badge" style="color:var(--yellow);">· IMMORTAL ROAST 👑</span></div></div>
+          <div class="roast-text">"${famePosts[0].roast.t}"</div></div>
+        <div class="post-foot"><button class="p-btn on" style="cursor:default;">🔥 <span>${famePosts[0].likes}k</span></button>
+          <span class="cd-mini" style="color:var(--yellow);">♾️ PERMANENT</span></div>
+      </div>`;
+    $('#feedList').innerHTML = list.length ? list.map((p,i)=>`
+      <div class="post ${p.mood==='war'?'war':p.mood==='chill'?'chill':''}" data-pi="${posts.indexOf(p)}">
+        <div class="post-head">
+          <div class="av" style="background:${p.av}">${p.user[0].toUpperCase()}</div>
+          <div><div class="p-name">${p.user}</div><div class="p-meta">posted 2h ago · ${p.tag}</div></div>
+          <span class="cd-mini" data-cd="${posts.indexOf(p)}">⏳ <span class="cd-time">${p.hrs}h 00m</span></span>
+        </div>
+        <div class="p-caption">${p.cap}</div>
+        ${p.bounty?`<div class="bounty-strip">🪙 <span>BOUNTY: ${p.bounty} coins to the best roast</span></div>`:''}
+        <div class="media-box"><span class="media-badge">${p.type}</span>${p.media}</div>
+        <div class="roast-box">
+          <div class="roast-head"><div class="av" style="background:var(--purple); width:22px; height:22px; font-size:10px;">${p.roast.n[0].toUpperCase()}</div>
+            <div><span class="roast-name">${p.roast.n}</span> <span class="roast-badge">· WINNING ROAST 🔥</span></div></div>
+          <div class="roast-text">"${p.roast.t}"</div>
+        </div>
+        <div class="post-foot">
+          <button class="p-btn" data-likes="${p.likes}">🔥 <span>${p.likes}k</span></button>
+          <button class="p-btn">💬 <span>${Math.floor(p.likes*70)}</span></button>
+          <button class="p-btn">↗ <span>Send</span></button>
+        </div>
+        <div class="expired-veil"><div><h4>This take has vanished.</h4><p>The 24 hours are up. Only the Hall of Fame survives.</p></div></div>
+      </div>`).join('') : `<p style="text-align:center; color:var(--ink-dim); font-weight:800; padding:40px 0;">Nothing here in this mood. Try another vibe. 🌍</p>`;
+    $$('.p-btn').forEach(b=>b.addEventListener('click',()=>{
+      if(b.classList.contains('on'))return;
+      b.classList.add('on','pop'); setTimeout(()=>b.classList.remove('pop'),180);
+    }));
+    feedTimers = posts.map((p,i)=>({ remaining:p.hrs*3.6e6, idx:i }));
+  }
+  function tickFeed(){
+    feedTimers.forEach(t=>{
+      if(t.remaining<=0) return;
+      t.remaining-=1000;
+      const el=document.querySelector(`[data-cd="${t.idx}"]`);
+      if(!el) return;
+      const h=Math.floor(t.remaining/3.6e6), m=Math.floor(t.remaining%3.6e6/6e4), s=Math.floor(t.remaining%6e4/1e3);
+      if(t.remaining<=0){
+        const card=el.closest('.post');
+        if(card) card.querySelector('.expired-veil').classList.add('show');
+        el.innerHTML="VANISHED"; el.classList.add('urgent');
+        toast("💨 A take just vanished. Only its legend remains.");
+        return;
+      }
+      el.querySelector('.cd-time').textContent = h>0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m ${String(s).padStart(2,'0')}s`;
+      el.classList.toggle('urgent', h===0);
+    });
+  }
+
+  /* ---------- mood filter ---------- */
+  $$('.mood-chip').forEach(c=>c.addEventListener('click',()=>{
+    $$('.mood-chip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on'); STATE.mood=c.dataset.mood; renderFeed();
+  }));
+
+  /* ---------- arena ---------- */
+  function renderArena(){
+    $('#arenaList').innerHTML = debates.map((d,i)=>`
+      <div class="debate-card" data-debate="${i}">
+        <span class="${d.live?'live-pill':'async-pill'}"><span class="dot" style="${d.live?'':'background:var(--tag-ink);'}"></span>${d.live?'LIVE · ROUND 3':'ASYNC · RESPOND ANYTIME'}</span>
+        <div class="debate-topic">${d.topic}</div>
+        <div class="debaters">
+          <div class="debater red ${d.aResp?'responded':'waiting'}" id="dA${i}">
+            <svg class="face" viewBox="0 0 60 60"><circle cx="30" cy="32" r="21" fill="#3a2c3f" stroke="#ece4cf" stroke-width="2.6"/><path d="M11 26a19 19 0 0138 0z" fill="#ece4cf"/><circle cx="22" cy="32" r="2.6" fill="#ece4cf"/><circle cx="38" cy="32" r="2.6" fill="#ece4cf"/><path d="M21 43 Q30 36 39 43" fill="none" stroke="#ece4cf" stroke-width="2.6" stroke-linecap="round"/></svg>
+            <div class="d-name">${d.a.n}</div><div class="d-side">${d.a.side}</div></div>
+          <div class="vs">VS</div>
+          <div class="debater blue ${d.bResp?'responded':'waiting'}" id="dB${i}">
+            <svg class="face" viewBox="0 0 60 60"><circle cx="30" cy="32" r="21" fill="#2e3850" stroke="#ece4cf" stroke-width="2.6"/><path d="M9 26q5 -14 21 -14t21 14q-6 -6 -21 -6t-21 6z" fill="#ece4cf"/><circle cx="22" cy="32" r="2.6" fill="#ece4cf"/><circle cx="38" cy="32" r="2.6" fill="#ece4cf"/><path d="M21 41 Q30 48 39 41" fill="none" stroke="#ece4cf" stroke-width="2.6" stroke-linecap="round"/></svg>
+            <div class="d-name">${d.b.n==='__challenger__'?'???':d.b.n}</div><div class="d-side">${d.b.side}</div></div>
+        </div>
+        <div class="vote-bar" data-vbar="${i}">
+          <div class="v-seg red" style="width:${pct(d,i)[0]}%">${pct(d,i)[0]}%</div>
+          <div class="v-seg blue" style="width:${pct(d,i)[1]}%">${pct(d,i)[1]}%</div>
+        </div>
+        <div class="vote-meta"><b>${d.va+d.vb}</b> jury votes · your weight <b>${STATE.weight}×</b></div>
+        <div class="transcript" data-tr="${i}">
+          ${d.aResp?`<div class="line red"><div class="av" style="background:var(--red)">${d.a.n[0]}</div><div class="bubble"><b>${d.a.n}:</b> ${d.aResp}</div></div>`:''}
+          ${d.bResp?`<div class="line blue"><div class="av" style="background:var(--blue)">${d.b.n[0]}</div><div class="bubble"><b>${d.b.n}:</b> ${d.bResp}</div></div>`:''}
+        </div>
+        <div class="vote-actions">
+          <button class="vote-btn red" data-vote="${i}:a" ${d.userVote?'disabled':''}>${d.a.n} makes the better point</button>
+          <button class="vote-btn blue" data-vote="${i}:b" ${d.userVote?'disabled':''}>${d.b.n==='__challenger__'?'Opponent':d.b.n} makes the better point</button>
+        </div>
+        ${!d.live && !d.bResp ? `<button class="respond-btn" data-respond="${i}">⚡ Accept the challenge — record your response</button>`:''}
+      </div>`).join('');
+    $$('[data-vote]').forEach(b=>b.addEventListener('click',()=>{
+      const [i,side]=b.dataset.vote.split(':'); const d=debates[i];
+      if(d.userVote) return;
+      d.userVote=side;
+      if(side==='a') d.va+=Math.round(15*STATE.weight); else d.vb+=Math.round(15*STATE.weight);
+      addStat('votes');
+      b.classList.add('chosen');
+      toast(`⚖️ Vote locked (weight ${STATE.weight}×). XP incoming if you side with the majority.`);
+      renderArena();
+      if(d.live) scheduleVerdict(d);
+    }));
+    $$('[data-respond]').forEach(b=>b.addEventListener('click',()=>{
+      const d=debates[b.dataset.respond];
+      d.b.n='you'; d.bResp="You can't measure outcomes if your whole job is scheduling meetings about outcomes. Also, commute time is a tax on the poor.";
+      d.live=true;
+      toast("🎙️ Response locked — debate is now LIVE for the jury.");
+      renderArena();
+    }));
+  }
+  function pct(d,i){
+    const t=d.va+d.vb, a=Math.round(d.va/t*100); return [a,100-a];
+  }
+  function scheduleVerdict(d){
+    setTimeout(()=>{
+      d.finished=true;
+      const winner = d.va>d.vb ? d.a.n : d.b.n;
+      const wPct = Math.max(d.va,d.vb)/(d.va+d.vb)*100;
+      $('#verdictTopic').textContent=d.topic;
+      $('#verdictPct').textContent=`${Math.round(wPct)}% — ${Math.round(100-wPct)}%`;
+      $('#verdictWinner').textContent=`${winner} wins the argument!`;
+      $('#verdictModal').classList.add('show');
+      addStat('wins'); addCoins(85);
+    }, 6000);
+  }
+  $('#shareVerdict').addEventListener('click',()=>toast("📸 Verdict card copied to clipboard — go flex on Instagram."));
+  $('#closeVerdict').addEventListener('click',()=>$('#verdictModal').classList.remove('show'));
+
+  /* ---------- communities ---------- */
+  function renderComms(){
+    $('#commList').innerHTML=comms.map((c,i)=>`
+      <div class="comm-item"><div class="comm-icon">${c.i}</div>
+        <div class="comm-info"><div class="c-title">${c.t}</div><div class="c-desc">${c.d}</div></div>
+        <button class="join-btn" data-comm="${i}">${c.j?'JOINED ✓':'JOIN'}</button></div>`).join('');
+    $$('[data-comm]').forEach(b=>b.addEventListener('click',()=>{
+      const c=comms[b.dataset.comm]; c.j=!c.j;
+      b.textContent=c.j?'JOINED ✓':'JOIN'; b.classList.toggle('joined',c.j);
+      toast(c.j?`Welcome to ${c.t}. No take survives here.`:`Left ${c.t}. The bridge burns behind you.`);
+    }));
+  }
+
+  /* ---------- upload ---------- */
+  const mediaOpts=["🤳","🍕","🐈","🤖","📊","🎮"]; let mIdx=0;
+  const bountyOpts=[0,50,100,250];
+  $('#view-upload').innerHTML=`
+    <div class="sec-title">Post for Judgment<span>MAX 24H · NO TAKE SURVIVES</span></div>
+    <div class="drop-zone" id="dz"><div class="dz-emoji" id="dzEmoji">🤳</div>
+      <div class="dz-text">TAP TO CYCLE MEDIA<br>or drop your shame here</div></div>
+    <input class="input" id="capIn" placeholder="Write your hot take caption..." style="margin-bottom:10px;">
+    <div style="font-size:11px; font-weight:900; color:var(--yellow); margin:6px 0;">🪙 ATTACH A BOUNTY (optional)</div>
+    <div class="bounty-row" id="bountyRow">
+      ${bountyOpts.map(b=>`<button class="bounty-chip ${b===0?'on':''}" data-b="${b}">${b===0?'NONE':b+' 🪙'}</button>`).join('')}
+    </div>
+    <button class="btn btn-primary" id="postBtn" style="width:100%;">⚡ Release it to the jury</button>`;
+  $('#dz').addEventListener('click',()=>{
+    mIdx=(mIdx+1)%mediaOpts.length; $('#dzEmoji').textContent=mediaOpts[mIdx];
+    $('#dz').style.transform=`rotate(${(mIdx%2?1:-1)*1.5}deg)`;
+  });
+  $$('.bounty-chip').forEach(c=>c.addEventListener('click',()=>{
+    $$('.bounty-chip').forEach(x=>x.classList.remove('on')); c.classList.add('on');
+    STATE.bountySel=parseInt(c.dataset.b,10);
+  }));
+  $('#postBtn').addEventListener('click',()=>{
+    const cap=$('#capIn').value.trim();
+    if(!cap){ toast("Caption empty. Even bad takes need words."); return; }
+    const b=STATE.bountySel;
+    if(b>STATE.coins){ toast("Not enough coins for that bounty. Roast harder."); return; }
+    if(b>0) addCoins(-b);
+    posts.unshift({ user:"you", av:"var(--yellow)", tag:"FRESH POST", mood:"heat", cap, media:mediaOpts[mIdx],
+      type:"IMAGE", bounty:b, roast:{n:"the_jury",t:"No roasts yet — the vultures are circling."}, hrs:23.9, likes:0.1 });
+    renderFeed(); switchView('feed');
+    $('#capIn').value='';
+    toast(b>0?`🪙 ${b} coin bounty posted! Best roaster wins.`:"🚀 Posted! It dies in 24h. Make it count.");
+  });
+
+  /* ---------- nav ---------- */
+  function switchView(v){
+    $$('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));
+    $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
+  }
+  $$('.nav button').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
+
+  /* ---------- timers ---------- */
+  let mainTimer=null;
+  function startTimers(){ clearInterval(mainTimer); mainTimer=setInterval(()=>{ tickFeed(); driftLiveDebate(); },1000); }
+  function driftLiveDebate(){
+    const d=debates[0]; if(!d.live||d.finished) return;
+    d.va+=2+Math.floor(Math.random()*8); d.vb+=2+Math.floor(Math.random()*8);
+    const bar=document.querySelector('[data-vbar="0"]');
+    if(bar){ const [a,b]=pct(d,0);
+      bar.children[0].style.width=a+'%'; bar.children[0].textContent=a+'%';
+      bar.children[1].style.width=b+'%'; bar.children[1].textContent=b+'%'; }
+  }
+  function renderAll(){ renderFeed(); renderArena(); renderComms(); }
+</script>
+</body>
+</html>
