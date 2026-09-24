@@ -43,10 +43,10 @@ export const typeScale = {
   },
   section: {
     fontFamily: family.sans,
-    fontSize: 21,
-    lineHeight: 26,
+    fontSize: 19,
+    lineHeight: 24,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   cardTitle: {
     fontFamily: family.sans,
@@ -68,10 +68,18 @@ export const typeScale = {
    */
   quote: {
     fontFamily: family.sans,
-    fontSize: 22,
-    lineHeight: 30,
+    fontSize: 21,
+    lineHeight: 28,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
+  },
+  /** Take text in feed cards: 20-22px, weight 700, tight line height (28px). */
+  takeText: {
+    fontFamily: family.sans,
+    fontSize: 21,
+    lineHeight: 28,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   body: {
     fontFamily: family.sans,
@@ -96,10 +104,18 @@ export const typeScale = {
   },
   meta: {
     fontFamily: family.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+    letterSpacing: 0.1,
+  },
+  /** Subtitles/metadata with reduced opacity for secondary information. */
+  subtitle: {
+    fontFamily: family.sans,
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontWeight: '400',
+    letterSpacing: 0.1,
   },
   /** Monospaced data: countdowns, jury scores, XP. Keeps numerals aligned. */
   data: {

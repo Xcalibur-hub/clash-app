@@ -7,7 +7,7 @@ import { VaultIcon } from '../../components/shared/icons';
 import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
 import { color } from '../../theme';
 
-/** Arena realm navigation: feed, take creation, daily drop, hall of fame and profile. */
+/** Arena realm navigation: home, explore, create, notifications, and profile. */
 export default function TabsLayout(): React.JSX.Element {
   const { shifting, direction, shiftTo } = useRealmSwitch();
   return (
@@ -27,10 +27,10 @@ export default function TabsLayout(): React.JSX.Element {
           sceneStyle: { backgroundColor: color.bg },
         }}
       >
-        <Tabs.Screen name="index" options={{ title: 'The Arena' }} />
+        <Tabs.Screen name="index" options={{ title: 'Home' }} />
+        <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
         <Tabs.Screen name="create" options={{ title: 'Create' }} />
-        <Tabs.Screen name="daily-drop" options={{ title: 'Daily Drop' }} />
-        <Tabs.Screen name="hall-of-fame" options={{ title: 'Hall of Fame' }} />
+        <Tabs.Screen name="notifications" options={{ title: 'Activity' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
       {shifting ? <RealmPortal direction={direction} onDone={() => undefined} /> : null}

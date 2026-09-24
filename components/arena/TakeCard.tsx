@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Clash, Take, User } from '../../store';
 import { card, ink, layout, radius, space, typeScale } from '../../theme';
 import { TakeActions } from './TakeActions';
@@ -23,9 +23,8 @@ export interface TakeCardProps {
 }
 
 /**
- * The Arena's Take card (reference "Arena Home", screen 5): a matte obsidian plate
- * with 20px internal padding — author row, the take as a high-contrast quote, an
- * optional 16:9 preview, then the full-width CLASH pill.
+ * The Arena's Take card redesigned: native feel without heavy glass container.
+ * Layout: author row, large take text, clean media, meta line, primary CTA, subtle actions.
  */
 function TakeCardBase({
   take,
@@ -51,7 +50,7 @@ function TakeCardBase({
       style={styles.card}
     >
       <TakeCardHeader author={author} take={take} isViewer={isViewer} now={now} />
-      <Text allowFontScaling={false} style={styles.quote}>
+      <Text allowFontScaling={false} style={styles.takeText}>
         {take.text}
       </Text>
       {take.media ? <TakeMedia media={take.media} /> : null}
@@ -65,6 +64,7 @@ function TakeCardBase({
         onSave={onSave}
         onShare={onShare}
         onMore={onMore}
+        now={now}
       />
     </Pressable>
   );
@@ -72,14 +72,11 @@ function TakeCardBase({
 
 const styles = StyleSheet.create({
   card: {
-    gap: space.lg,
-    padding: layout.cardPadding,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    backgroundColor: card.solid,
-    borderColor: card.border,
+    gap: space.md,
+    paddingHorizontal: layout.screenX,
+    paddingVertical: space.md,
   },
-  quote: { ...typeScale.quote, color: ink.primary },
+  takeText: { ...typeScale.takeText, color: ink.primary },
 });
 
 /** Memoised so a single card action never re-renders the whole feed (§35). */

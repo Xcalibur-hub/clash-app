@@ -4,7 +4,7 @@ import { BlurView } from 'expo-blur';
 import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { glassBorder, ink, space, supportsBlur } from '../../theme';
+import { card, glass, ink, space, supportsBlur } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaHomeIcon } from '../shared/icons';
 import type { Realm } from '../../store';
@@ -30,9 +30,8 @@ export interface RealmTabBarProps extends BottomTabBarProps {
 }
 
 /**
- * The floating glass dock (reference screens 5 & 23). Icon-first — no labels compete
- * with the feed — with a gold glow on the active tab, an elevated "+" for Take
- * Creation, and a discreet realm key that swaps Arena ⇄ Vault.
+ * Native-feeling dark translucent bottom bar with clean icon-first presentation
+ * and subtle active indicator dots.
  */
 export function RealmTabBar({
   state,
@@ -77,13 +76,16 @@ export function RealmTabBar({
   const half = Math.ceil(others.length / 2);
 
   return (
-    <View style={[styles.wrap, { paddingBottom: insets.bottom + space.sm }]}>
+    <View style={[styles.wrap, { paddingBottom: insets.bottom }]}>
       <View style={styles.dock}>
         {supportsBlur ? (
           <BlurView intensity={BLUR} tint="dark" style={[StyleSheet.absoluteFill, styles.clip]} />
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.androidFill]} />
         )}
+
+        {/* Top hairline border */}
+        <View style={styles.topBorder} />
 
         {/* Mirrors the realm key so the dock's content stays symmetrical. */}
         <View style={styles.slot} />
@@ -108,23 +110,24 @@ export function RealmTabBar({
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: space.lg, paddingTop: space.sm, backgroundColor: 'transparent' },
+  wrap: { backgroundColor: 'transparent' },
   dock: {
     flexDirection: 'row',
     alignItems: 'center',
     height: DOCK_HEIGHT,
-    borderRadius: DOCK_RADIUS,
-    borderWidth: 1,
-    borderColor: glassBorder.regular,
-    backgroundColor: 'rgba(12,12,17,0.72)',
-    shadowColor: '#000',
-    shadowOpacity: 0.6,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 14,
+    backgroundColor: 'rgba(12,12,17,0.85)',
+    position: 'relative',
   },
-  clip: { borderRadius: DOCK_RADIUS, overflow: 'hidden' },
-  androidFill: { backgroundColor: 'rgba(14,14,20,0.88)', borderRadius: DOCK_RADIUS },
+  clip: { overflow: 'hidden' },
+  androidFill: { backgroundColor: 'rgba(14,14,20,0.92)' },
+  topBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: glass.border,
+  },
   slot: { width: REALM_SLOT },
   gap: { width: ELEVATED_SIZE + space.sm },
   realmKey: {

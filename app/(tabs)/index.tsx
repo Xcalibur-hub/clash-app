@@ -104,7 +104,6 @@ export default function ArenaScreen(): React.JSX.Element {
         ListHeaderComponent={header}
         ItemSeparatorComponent={Separator}
         contentContainerStyle={[
-          styles.content,
           { paddingTop: insets.top + space.md, paddingBottom: space.xxl },
         ]}
         showsVerticalScrollIndicator={false}
@@ -131,6 +130,6 @@ function Separator(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: layout.screenX },
+  content: { paddingHorizontal: 0 },
   separator: { height: layout.feedGap },
 });

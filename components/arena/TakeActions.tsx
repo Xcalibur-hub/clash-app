@@ -1,11 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Take } from '../../store';
-import { ink, space, typeScale } from '../../theme';
+import { action, card, ink, radius, space, typeScale } from '../../theme';
 import { compact } from '../../utils/format';
-import { GlowButton } from '../shared/GlowButton';
 import { IconButton } from '../shared/IconButton';
-import { ArenaIcon, BookmarkIcon, FlameIcon, MoreIcon, ShareIcon } from '../shared/icons';
+import { BookmarkIcon, FlameIcon, ShareIcon } from '../shared/icons';
+import { timeLeftLabel } from '../../utils/format';
 
 export interface TakeActionsProps {
   take: Take;
@@ -17,11 +17,11 @@ export interface TakeActionsProps {
   onSave: () => void;
   onShare: () => void;
   onMore: () => void;
+  now: number;
 }
 
 /**
- * Engagement line (`🔥 18 Clashes • 💬 243 Reactions`), the full-width CLASH pill
- * and the secondary card actions (reference "Arena Home", screen 5).
+ * Redesigned actions: subtle meta line, full-width solid white CTA, subtle bottom actions.
  */
 export function TakeActions({
   take,
@@ -33,56 +33,31 @@ export function TakeActions({
   onSave,
   onShare,
   onMore,
+  now,
 }: TakeActionsProps): React.JSX.Element {
   return (
     <View style={styles.wrap}>
-      <View style={styles.statsRow}>
-        <Text
-          allowFontScaling={false}
-          style={styles.stat}
-          accessibilityLabel={`${take.clashes} clashes`}
-        >
-          {'🔥 '}
-          <Text style={styles.statValue}>{compact(take.clashes)}</Text>
-          {' Clashes'}
-        </Text>
-        <Text allowFontScaling={false} style={styles.bullet}>
-          {'•'}
-        </Text>
-        <Text
-          allowFontScaling={false}
-          style={styles.stat}
-          accessibilityLabel={`${take.reactions} reactions`}
-        >
-          {'💬 '}
-          <Text style={styles.statValue}>{compact(take.reactions)}</Text>
-          {' Reactions'}
-        </Text>
-        <View style={styles.spacer} />
-        <IconButton
-          icon={MoreIcon}
-          onPress={onMore}
-          label={`More options for take ${take.id}`}
-          size={30}
-        />
-      </View>
+      <Text allowFontScaling={false} style={styles.meta}>
+        {`🔥 ${compact(take.clashes)} Clashes   ${timeLeftLabel(take.expiresAt, now)} left`}
+      </Text>
 
-      <GlowButton
-        label="CLASH"
-        icon={ArenaIcon}
-        tone="ink"
-        pill
+      <Pressable
         onPress={onClash}
         style={styles.cta}
+        accessibilityRole="button"
         accessibilityLabel="Clash on this take"
-      />
+      >
+        <Text allowFontScaling={false} style={styles.ctaText}>
+          CLASH
+        </Text>
+      </Pressable>
 
       <View style={styles.secondaryRow}>
         <IconButton
           icon={FlameIcon}
           onPress={onReact}
           label="React to this take"
-          size={34}
+          size={40}
           active={hasReacted}
           tone="a"
         />
@@ -90,29 +65,26 @@ export function TakeActions({
           icon={BookmarkIcon}
           onPress={onSave}
           label={isSaved ? 'Remove from saved' : 'Save this take'}
-          size={34}
+          size={40}
           active={isSaved}
           tone="gold"
         />
-        <IconButton icon={ShareIcon} onPress={onShare} label="Share this take" size={34} />
-        {challengerHandle ? (
-          <Text allowFontScaling={false} style={styles.versus}>
-            {`vs @${challengerHandle}`}
-          </Text>
-        ) : null}
+        <IconButton icon={ShareIcon} onPress={onShare} label="Share this take" size={40} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.md },
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  stat: { ...typeScale.data, fontSize: 11.5, color: ink.secondary },
-  statValue: { color: ink.primary },
-  bullet: { ...typeScale.data, fontSize: 11.5, color: ink.quaternary },
-  spacer: { flex: 1 },
-  cta: { alignSelf: 'stretch' },
-  secondaryRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  versus: { ...typeScale.meta, color: ink.quaternary, marginLeft: 'auto' },
+  wrap: { gap: space.sm },
+  meta: { ...typeScale.subtitle, color: ink.subtitle },
+  cta: {
+    backgroundColor: action.fill,
+    borderRadius: radius.pill,
+    paddingVertical: space.sm + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaText: { ...typeScale.button, color: action.text },
+  secondaryRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
 });

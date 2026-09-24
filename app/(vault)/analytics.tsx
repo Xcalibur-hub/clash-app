@@ -3,25 +3,19 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalyticsPaywall } from '../../components/vault/AnalyticsPaywall';
-import { CityDonut } from '../../components/vault/CityDonut';
 import { CreatorRow } from '../../components/vault/CreatorRow';
 import { OverviewGrid } from '../../components/vault/OverviewGrid';
-import { VaultHeader } from '../../components/vault/VaultHeader';
-import { sponsorRow, vault as s } from '../../components/vault/vaultStyles';
 import { AuroraBackground } from '../../components/shared/AuroraBackground';
 import { Chip } from '../../components/shared/Chip';
-import { GlassCard } from '../../components/shared/GlassCard';
-import { GlowButton } from '../../components/shared/GlowButton';
 import { Notice } from '../../components/shared/Notice';
-import { SectionHeading } from '../../components/shared/SectionHeading';
 import { AnalyticsIcon } from '../../components/shared/icons';
 import { gmvLabel, SIMULATED_LABEL } from '../../data/mockCampaigns';
 import { aggregateCities, sponsorOverview } from '../../services/vaultService';
 import { selectCampaigns, selectCreators, setAnalytics, useClash } from '../../store';
-import { accent, ink, radius, space, typeScale } from '../../theme';
+import { accent, card, ink, layout, radius, space, typeScale } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 
-/** Sponsor dashboard (spec §22) with the §21 premium geo paywall. */
+/** Sponsor dashboard with executive dashboard feel - pure black, gold highlights, white typography. */
 export default function AnalyticsScreen(): React.JSX.Element {
   const { state, dispatch } = useClash();
   const router = useRouter();
@@ -47,10 +41,20 @@ export default function AnalyticsScreen(): React.JSX.Element {
     <AuroraBackground tone="calm" doodles={false}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[s.content, { paddingTop: insets.top + space.md }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + space.md }]}
       >
-        <VaultHeader title="ANALYTICS" subtitle="Sponsor dashboard." count={campaigns.length} />
-        <View style={sponsorRow.tabs}>
+        {/* Executive header */}
+        <View style={styles.header}>
+          <Text allowFontScaling={false} style={styles.title}>
+            ANALYTICS
+          </Text>
+          <Text allowFontScaling={false} style={styles.subtitle}>
+            Sponsor dashboard · {campaigns.length} campaigns
+          </Text>
+        </View>
+
+        {/* Clean tabs */}
+        <View style={styles.tabs}>
           {(['overview', 'campaigns', 'creators', 'attribution'] as const).map((key) => (
             <Pressable
               key={key}
@@ -61,8 +65,14 @@ export default function AnalyticsScreen(): React.JSX.Element {
               accessibilityRole="tab"
               accessibilityState={{ selected: tab === key }}
               accessibilityLabel={`${key} tab`}
+              style={styles.tab}
             >
-              <Chip label={key.toUpperCase()} tone={tab === key ? 'gold' : 'neutral'} data />
+              <Text
+                allowFontScaling={false}
+                style={[styles.tabText, tab === key && styles.tabTextActive]}
+              >
+                {key.toUpperCase()}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -70,13 +80,15 @@ export default function AnalyticsScreen(): React.JSX.Element {
         {tab === 'overview' ? (
           <>
             <OverviewGrid overview={overview} creators={creators} />
-            <Text allowFontScaling={false} style={sponsorRow.sim}>{SIMULATED_LABEL}</Text>
+            <Text allowFontScaling={false} style={styles.simLabel}>{SIMULATED_LABEL}</Text>
           </>
         ) : null}
 
         {tab === 'campaigns' ? (
           <>
-            <SectionHeading eyebrow="CAMPAIGNS" title="Spend, measured" />
+            <Text allowFontScaling={false} style={styles.sectionTitle}>
+              CAMPAIGNS
+            </Text>
             {campaigns.map((campaign) => (
               <CreatorRow
                 key={campaign.id}
@@ -91,7 +103,9 @@ export default function AnalyticsScreen(): React.JSX.Element {
 
         {tab === 'creators' ? (
           <>
-            <SectionHeading eyebrow="CREATORS" title="Ranked by GMV" />
+            <Text allowFontScaling={false} style={styles.sectionTitle}>
+              CREATORS
+            </Text>
             {ranked.map((creator) => {
               const gmv = campaigns.filter((c) => c.creatorId === creator.id).reduce((sum, c) => sum + c.gmv, 0);
               return (
@@ -110,31 +124,49 @@ export default function AnalyticsScreen(): React.JSX.Element {
         {tab === 'attribution' ? (
           state.analyticsUnlocked ? (
             <>
-              <SectionHeading eyebrow="ADVANCED GEO ATTRIBUTION" title="City roll-up" />
-              <GlassCard level="regular" corner={radius.xl}>
-                <CityDonut cities={cities} orders={totalOrders} />
-              </GlassCard>
-              <Text allowFontScaling={false} style={sponsorRow.sim}>
+              <Text allowFontScaling={false} style={styles.sectionTitle}>
+                ADVANCED GEO ATTRIBUTION
+              </Text>
+              {/* Clean city distribution bars without visual noise */}
+              <View style={styles.citySection}>
+                {cities.slice(0, 5).map((city) => (
+                  <View key={city.city} style={styles.cityRow}>
+                    <Text allowFontScaling={false} style={styles.cityName}>
+                      {city.city}
+                    </Text>
+                    <View style={styles.cityBarContainer}>
+                      <View style={[styles.cityBar, { width: `${city.share}%` }]} />
+                    </View>
+                    <Text allowFontScaling={false} style={styles.cityPercentage}>
+                      {city.share}%
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text allowFontScaling={false} style={styles.simLabel}>
                 {`${SIMULATED_LABEL} · TOP CITY ${overview.topCity.toUpperCase()}`}
               </Text>
             </>
           ) : (
-            <GlassCard level="regular" corner={radius.xl} contentStyle={styles.locked}>
+            <View style={styles.locked}>
               <Text allowFontScaling={false} style={styles.lockedTitle}>ADVANCED GEO ATTRIBUTION</Text>
               <Text allowFontScaling={false} style={styles.lockedBody}>
                 City-level attribution, regional performance and exportable reports.
               </Text>
-              <GlowButton
-                label="UNLOCK ANALYTICS"
-                icon={AnalyticsIcon}
-                tone="gold"
+              <Pressable
                 onPress={() => {
                   hapticPress();
                   setPaywall(true);
                 }}
-              />
+                style={styles.unlockButton}
+              >
+                <Text allowFontScaling={false} style={styles.unlockText}>
+                  UNLOCK ANALYTICS
+                </Text>
+              </Pressable>
               <Chip label={SIMULATED_LABEL} tone="neutral" />
-            </GlassCard>          )
+            </View>
+          )
         ) : null}
       </ScrollView>
 
@@ -152,9 +184,106 @@ export default function AnalyticsScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  locked: { gap: space.md },
-  lockedTitle: { ...typeScale.cardTitle, color: accent.gold, letterSpacing: 0.6 },
-  lockedBody: { ...typeScale.body, color: ink.secondary },
+  content: { paddingHorizontal: layout.screenX, gap: space.xl },
+  header: {
+    paddingBottom: space.lg,
+  },
+  title: {
+    ...typeScale.title,
+    color: ink.primary,
+  },
+  subtitle: {
+    ...typeScale.body,
+    color: ink.secondary,
+    marginTop: space.xs,
+  },
+  tabs: {
+    flexDirection: 'row',
+    gap: space.md,
+    paddingBottom: space.lg,
+  },
+  tab: {
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+  },
+  tabText: {
+    ...typeScale.data,
+    color: ink.secondary,
+  },
+  tabTextActive: {
+    color: accent.gold,
+    fontWeight: '700',
+  },
+  sectionTitle: {
+    ...typeScale.section,
+    color: ink.primary,
+    marginTop: space.md,
+  },
+  simLabel: {
+    ...typeScale.caption,
+    color: ink.tertiary,
+    textAlign: 'center',
+  },
+  citySection: {
+    gap: space.md,
+  },
+  cityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+  },
+  cityName: {
+    ...typeScale.body,
+    color: ink.primary,
+    width: 80,
+  },
+  cityBarContainer: {
+    flex: 1,
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  cityBar: {
+    height: '100%',
+    backgroundColor: accent.gold,
+  },
+  cityPercentage: {
+    ...typeScale.data,
+    color: accent.gold,
+    width: 40,
+    textAlign: 'right',
+  },
+  locked: {
+    padding: space.xl,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: accent.gold,
+    backgroundColor: 'rgba(255,200,97,0.05)',
+    gap: space.md,
+    alignItems: 'center',
+  },
+  lockedTitle: {
+    ...typeScale.cardTitle,
+    color: accent.gold,
+    letterSpacing: 0.6,
+  },
+  lockedBody: {
+    ...typeScale.body,
+    color: ink.secondary,
+    textAlign: 'center',
+  },
+  unlockButton: {
+    paddingVertical: space.md,
+    paddingHorizontal: space.xl,
+    borderRadius: radius.pill,
+    backgroundColor: accent.gold,
+    marginTop: space.sm,
+  },
+  unlockText: {
+    ...typeScale.button,
+    color: ink.inverse,
+  },
 });
 
 

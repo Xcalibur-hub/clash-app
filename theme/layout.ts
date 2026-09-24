@@ -28,8 +28,8 @@ export const layout = {
   screenX: 18,
   /** Minimum accessible touch target. */
   hit: 44,
-  /** Vertical gap between Arena cards (reference design: 18px). */
-  feedGap: 18,
+  /** Vertical gap between Arena cards (24px as per redesign). */
+  feedGap: 24,
   /** Internal padding inside a feed card (reference design: 20px). */
   cardPadding: 20,
 } as const;

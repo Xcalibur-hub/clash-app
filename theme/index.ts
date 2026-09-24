@@ -8,3 +8,6 @@ export * from './glass';
 export * from './layout';
 export * from './motion';
 export * from './typography';
+
+// Re-export commonly used tokens for convenience
+export { card } from './colors';

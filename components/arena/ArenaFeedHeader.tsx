@@ -1,9 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { ArenaBalance, ArenaHeader } from './ArenaHeader';
-import { HoodSelector } from './HoodSelector';
-import { Chip } from '../shared/Chip';
-import { SectionHeading } from '../shared/SectionHeading';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
+import { ArenaHeader } from './ArenaHeader';
 import { HOOD_LABEL } from '../../data/hoods';
 import type { HoodId } from '../../store';
 import { ink, layout, space, typeScale } from '../../theme';
@@ -14,9 +11,11 @@ export interface ArenaFeedHeaderProps {
   onChangeHood: (hood: HoodId) => void;
 }
 
+const HOODS: HoodId[] = ['for-you', 'techtakes', 'campushustle', 'goatalk', 'movies', 'gaming'];
+
 /**
- * Masthead → hood pills → editorial feed title (reference "Arena Home", screen 5).
- * Pinned above the FlatList data.
+ * Masthead → clean horizontal hood scroll → simple feed title.
+ * Simplified header with crisp white text/underline for active hood.
  */
 export function ArenaFeedHeader({
   hood,
@@ -26,31 +25,87 @@ export function ArenaFeedHeader({
   return (
     <View style={styles.wrap}>
       <ArenaHeader />
-      <HoodSelector value={hood} onChange={onChangeHood} />
-      <SectionHeading
-        eyebrow={`${HOOD_LABEL[hood].toUpperCase()} · LIVE`}
-        title="Today's Takes"
-        editorial
-        marked
-        accessory={<Chip label={`${liveCount} LIVE`} tone="a" data />}
-      />
-      <View style={styles.metaRow}>
-        <Text allowFontScaling={false} style={styles.note}>
-          Every take dies in 24 hours.
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.hoodScroll}
+      >
+        {HOODS.map((hoodId) => (
+          <TouchableOpacity
+            key={hoodId}
+            onPress={() => onChangeHood(hoodId)}
+            style={styles.hoodTab}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: hoodId === hood }}
+          >
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.hoodText,
+                hoodId === hood ? styles.hoodTextActive : styles.hoodTextInactive,
+              ]}
+            >
+              {HOOD_LABEL[hoodId]}
+            </Text>
+            {hoodId === hood && <View style={styles.underline} />}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <View style={styles.titleRow}>
+        <Text allowFontScaling={false} style={styles.title}>
+          Today's Takes
         </Text>
-        <ArenaBalance />
+        <Text allowFontScaling={false} style={styles.liveCount}>
+          {liveCount} live
+        </Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.lg, paddingBottom: layout.feedGap },
-  metaRow: {
+  wrap: { gap: space.md, paddingBottom: layout.feedGap },
+  hoodScroll: {
+    paddingHorizontal: layout.screenX,
+    gap: space.lg,
+  },
+  hoodTab: {
+    position: 'relative',
+    paddingBottom: space.xs,
+  },
+  hoodText: {
+    ...typeScale.section,
+    fontSize: 16,
+  },
+  hoodTextActive: {
+    color: ink.primary,
+    fontWeight: '700',
+  },
+  hoodTextInactive: {
+    color: ink.subtitle,
+    fontWeight: '400',
+  },
+  underline: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: ink.primary,
+  },
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: space.md,
+    paddingHorizontal: layout.screenX,
+    paddingTop: space.sm,
   },
-  note: { ...typeScale.meta, color: ink.tertiary, flexShrink: 1 },
+  title: {
+    ...typeScale.section,
+    color: ink.primary,
+  },
+  liveCount: {
+    ...typeScale.subtitle,
+    color: ink.subtitle,
+  },
 });

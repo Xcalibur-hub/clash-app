@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 import type { Clash, ClashResult, Judgement, Take, User } from '../../store';
 import { HOOD_LABEL } from '../../data/hoods';
@@ -8,11 +8,10 @@ import { Chip } from '../shared/Chip';
 import { IconButton } from '../shared/IconButton';
 import { BackIcon, HashIcon } from '../shared/icons';
 import { ClashResult as ClashResultView } from './ClashResult';
-import { JudgementPicker } from './JudgementPicker';
 import { JuryPanel } from './JuryPanel';
 import { RecordedBanner } from './RecordedBanner';
 import { TakePanel } from './TakePanel';
-import { VersusHeader } from './VersusHeader';
+import { duel, ink, radius, space, typeScale } from '../../theme';
 
 export type ClashStage = 'battle' | 'recorded' | 'result';
 
@@ -32,7 +31,7 @@ export interface ClashBodyProps {
   onDone: () => void;
 }
 
-/** The duel itself: two takes, the 9-person jury, the ballot and the verdict. */
+/** The duel itself: centered debate focus with clean A/B buttons. */
 export function ClashBody({
   take,
   author,
@@ -73,43 +72,72 @@ export function ClashBody({
         <View style={s.topSlot} />
       </View>
 
-      <View style={s.contextRow}>
+      <View style={styles.contextRow}>
         <Chip label={HOOD_LABEL[take.hood].toUpperCase()} icon={HashIcon} tone="violet" />
         <Chip label={`${clash.engagement} WATCHING`} tone="neutral" data />
       </View>
 
-      <TakePanel
-        side="A"
-        author={author}
-        text={take.text}
-        label="TAKE A"
-        winner={revealed && winnerATake}
-        faded={revealed && !winnerATake}
-      />
-      <VersusHeader />
-      <TakePanel
-        side="B"
-        author={challenger}
-        text={clash.challengerText}
-        label="TAKE B"
-        winner={revealed && !winnerATake}
-        faded={revealed && winnerATake}
-      />
+      {/* Centered debate focus */}
+      <View style={styles.debateContainer}>
+        <View style={[styles.takePanel, { borderColor: duel.aLine }]}>
+          <Text allowFontScaling={false} style={styles.takeLabel}>
+            TAKE A
+          </Text>
+          <Text allowFontScaling={false} style={styles.authorHandle}>
+            @{author.handle}
+          </Text>
+          <Text allowFontScaling={false} style={styles.takeText}>
+            {take.text}
+          </Text>
+        </View>
 
-      <JuryPanel
-        jurors={clash.jurors}
-        reveal={revealed}
-      />
+        <View style={styles.vsCircle}>
+          <Text allowFontScaling={false} style={styles.vsText}>
+            VS
+          </Text>
+        </View>
 
+        <View style={[styles.takePanel, { borderColor: duel.bLine }]}>
+          <Text allowFontScaling={false} style={styles.takeLabel}>
+            TAKE B
+          </Text>
+          <Text allowFontScaling={false} style={styles.authorHandle}>
+            @{challenger.handle}
+          </Text>
+          <Text allowFontScaling={false} style={styles.takeText}>
+            {clash.challengerText}
+          </Text>
+        </View>
+      </View>
+
+      {/* Clean prompt and buttons */}
       {stage === 'battle' ? (
-        <Animated.View exiting={FadeOut.duration(200)}>
-          <JudgementPicker
-            handleA={author.handle}
-            handleB={challenger.handle}
-            chosen={judgement}
-            locked={false}
-            onChoose={onChoose}
-          />
+        <Animated.View exiting={FadeOut.duration(200)} style={styles.promptSection}>
+          <Text allowFontScaling={false} style={styles.prompt}>
+            WHICH ONE?
+          </Text>
+          <View style={styles.buttonRow}>
+            <Pressable
+              onPress={() => onChoose('A')}
+              style={[styles.choiceButton, judgement === 'A' && styles.choiceButtonActive]}
+              accessibilityRole="button"
+              accessibilityLabel="Vote for Take A"
+            >
+              <Text allowFontScaling={false} style={[styles.choiceText, judgement === 'A' && styles.choiceTextActive]}>
+                A
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onChoose('B')}
+              style={[styles.choiceButton, judgement === 'B' && styles.choiceButtonActive]}
+              accessibilityRole="button"
+              accessibilityLabel="Vote for Take B"
+            >
+              <Text allowFontScaling={false} style={[styles.choiceText, judgement === 'B' && styles.choiceTextActive]}>
+                B
+              </Text>
+            </Pressable>
+          </View>
         </Animated.View>
       ) : null}
 
@@ -118,6 +146,11 @@ export function ClashBody({
           <RecordedBanner />
         </Animated.View>
       ) : null}
+
+      <JuryPanel
+        jurors={clash.jurors}
+        reveal={revealed}
+      />
 
       {revealed && storedResult ? (
         <ClashResultView
@@ -130,4 +163,88 @@ export function ClashBody({
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  contextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginTop: space.md,
+  },
+  debateContainer: {
+    marginTop: space.xl,
+    gap: space.lg,
+  },
+  takePanel: {
+    padding: space.lg,
+    borderRadius: radius.card,
+    borderWidth: 2,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  takeLabel: {
+    ...typeScale.eyebrow,
+    color: ink.primary,
+    marginBottom: space.xs,
+  },
+  authorHandle: {
+    ...typeScale.label,
+    color: ink.secondary,
+    marginBottom: space.sm,
+  },
+  takeText: {
+    ...typeScale.takeText,
+    color: ink.primary,
+  },
+  vsCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: duel.aSoft,
+    borderWidth: 2,
+    borderColor: duel.aLine,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  vsText: {
+    ...typeScale.cardTitle,
+    color: ink.primary,
+    fontWeight: '800',
+  },
+  promptSection: {
+    marginTop: space.xl,
+    alignItems: 'center',
+  },
+  prompt: {
+    ...typeScale.section,
+    color: ink.primary,
+    marginBottom: space.lg,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: space.lg,
+  },
+  choiceButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choiceButtonActive: {
+    backgroundColor: duel.aSoft,
+    borderColor: duel.aLine,
+  },
+  choiceText: {
+    ...typeScale.title,
+    color: ink.primary,
+    fontSize: 28,
+  },
+  choiceTextActive: {
+    color: ink.primary,
+  },
+});
 

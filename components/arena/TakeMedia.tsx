@@ -2,7 +2,7 @@ import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 import type { TakeMedia as TakeMediaModel } from '../../store';
-import { glassBorder, ink, radius, space, typeScale } from '../../theme';
+import { card, ink, radius, space, typeScale } from '../../theme';
 import { Chip } from '../shared/Chip';
 import { ImageIcon, PlayIcon, VideoIcon } from '../shared/icons';
 
@@ -39,12 +39,12 @@ export function TakeMedia({ media }: { media: TakeMediaModel }): React.JSX.Eleme
 
 const styles = StyleSheet.create({
   wrap: {
-    /** 16:9 preview plate (reference "Arena Home"). */
+    /** 16:9 preview plate with clean border radius. */
     aspectRatio: 16 / 9,
-    borderRadius: radius.md,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: glassBorder.regular,
+    borderColor: card.border,
     justifyContent: 'flex-end',
     padding: space.md,
   },
@@ -73,5 +73,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.4)',
   },
-  caption: { ...typeScale.meta, color: ink.primary },
+  caption: { ...typeScale.subtitle, color: ink.primary },
 });

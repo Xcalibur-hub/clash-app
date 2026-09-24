@@ -36,7 +36,7 @@ const ITEMS: readonly NotificationItem[] = [
     title: 'Your Clash just entered the Daily Drop.',
     body: '“Placements matter less than your first two years of real work.” is #03 tonight.',
     time: '2h ago',
-    href: '/(tabs)/daily-drop',
+    href: '/(tabs)/explore',
   },
   {
     id: 'n-clash-won',
@@ -63,7 +63,7 @@ const ITEMS: readonly NotificationItem[] = [
     title: 'Your Take entered the Hall of Fame.',
     body: 'A 6–3 split sealed it. It now lives in the permanent archive.',
     time: 'Yesterday',
-    href: '/(tabs)/hall-of-fame',
+    href: '/(tabs)/explore',
   },
   {
     id: 'n-drop',
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: card.border,
-    backgroundColor: card.solid,
+    backgroundColor: card.native,
   },
   badge: {
     width: 40,

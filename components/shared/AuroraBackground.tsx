@@ -24,21 +24,26 @@ function Bloom({
   color: glowColor,
   style,
   opacity,
+  tone,
 }: {
   size: number;
   color: string;
   style: ViewStyle;
   opacity: number;
+  tone: GlowTone;
 }): React.JSX.Element {
   const center = size / 2;
   const id = `bloom-${glowColor.replace('#', '')}-${size}`;
+  // Reduced opacity for arena mode to provide barely perceptible ambient light
+  const stopOpacity = tone === 'arena' ? 0.18 : 0.55;
+  const midOpacity = tone === 'arena' ? 0.06 : 0.12;
   return (
     <View style={[styles.bloom, style, { width: size, height: size, opacity }]}>
       <Svg width={size} height={size}>
         <Defs>
           <RadialGradient id={id} cx={center} cy={center} r={center} gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor={glowColor} stopOpacity={0.55} />
-            <Stop offset="0.55" stopColor={glowColor} stopOpacity={0.12} />
+            <Stop offset="0" stopColor={glowColor} stopOpacity={stopOpacity} />
+            <Stop offset="0.55" stopColor={glowColor} stopOpacity={midOpacity} />
             <Stop offset="1" stopColor={glowColor} stopOpacity={0} />
           </RadialGradient>
         </Defs>
@@ -80,13 +85,17 @@ export function AuroraBackground({
     transform: [{ translateX: drift.value * -22 }, { translateY: drift.value * 14 }],
   }));
 
+  // Reduced opacity for arena mode to provide barely perceptible ambient light
+  const bloomOpacity = tone === 'arena' ? 0.3 : 0.5;
+  const bloomOpacitySecondary = tone === 'arena' ? 0.25 : 0.42;
+
   return (
     <View style={styles.root}>
       <Animated.View style={[styles.layer, topStyle]} pointerEvents="none">
-        <Bloom size={420} color={primary} opacity={0.5} style={{ top: -140, left: -120 }} />
+        <Bloom size={420} color={primary} opacity={bloomOpacity} style={{ top: -140, left: -120 }} tone={tone} />
       </Animated.View>
       <Animated.View style={[styles.layer, bottomStyle]} pointerEvents="none">
-        <Bloom size={460} color={secondary} opacity={0.42} style={{ bottom: -160, right: -140 }} />
+        <Bloom size={460} color={secondary} opacity={bloomOpacitySecondary} style={{ bottom: -160, right: -140 }} tone={tone} />
       </Animated.View>
       {doodles ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
