@@ -1,3 +1,4 @@
+import { COMMENTS } from '../data/mockComments';
 import { CAMPAIGNS } from '../data/mockCampaigns';
 import { CLASHES } from '../data/mockClashes';
 import { CREATORS } from '../data/mockCreators';
@@ -7,6 +8,7 @@ import { USER_BY_ID, VIEWER_SEED } from '../data/mockUsers';
 import { XP } from '../utils/reputation';
 import type {
   Campaign,
+  ChallengerComment,
   Clash,
   ClashResult,
   Creator,
@@ -14,6 +16,7 @@ import type {
   Judgement,
   Realm,
   Take,
+  ThemeMode,
   UnlockRecord,
   User,
 } from './types';
@@ -38,12 +41,16 @@ export interface ClashState {
   results: Readonly<Record<string, ClashResult>>;
   savedTakeIds: readonly string[];
   reactedTakeIds: readonly string[];
+  comments: readonly ChallengerComment[];
+  upvotedCommentIds: readonly string[];
   creators: readonly Creator[];
   drops: readonly Drop[];
   campaigns: readonly Campaign[];
   /** Exclusive-drop checkout state, keyed by drop id. */
   unlocks: Readonly<Record<string, UnlockRecord>>;
   analyticsUnlocked: boolean;
+  /** Appearance preference — drives system chrome (toggle pass). */
+  themeMode: ThemeMode;
   notice: Notice | null;
   noticeSeq: number;
 }
@@ -55,8 +62,11 @@ export type ClashAction =
   | { type: 'take/save'; takeId: string }
   | { type: 'take/react'; takeId: string }
   | { type: 'take/create'; take: Take }
+  | { type: 'comment/create'; comment: ChallengerComment }
+  | { type: 'comment/upvote'; commentId: string }
   | { type: 'vault/unlock'; dropId: string }
   | { type: 'vault/analytics'; unlocked: boolean }
+  | { type: 'theme/mode'; mode: ThemeMode }
   | { type: 'ui/notice'; message: string | null };
 
 export function createInitialState(): ClashState {
@@ -71,11 +81,14 @@ export function createInitialState(): ClashState {
     results: {},
     savedTakeIds: [],
     reactedTakeIds: [],
+    comments: COMMENTS,
+    upvotedCommentIds: [],
     creators: CREATORS,
     drops: DROPS,
     campaigns: CAMPAIGNS,
     unlocks: {},
     analyticsUnlocked: false,
+    themeMode: 'system',
     notice: null,
     noticeSeq: 0,
   };
@@ -168,6 +181,33 @@ export function clashReducer(state: ClashState, action: ClashAction): ClashState
       );
     }
 
+    case 'comment/create': {
+      const viewer: User = {
+        ...state.viewer,
+        reputation: state.viewer.reputation + XP.participate,
+      };
+      return withNotice(
+        { ...state, viewer, comments: [action.comment, ...state.comments] },
+        `Rebuttal posted · +${XP.participate} XP`,
+      );
+    }
+
+    case 'comment/upvote': {
+      const upvoted = state.upvotedCommentIds.includes(action.commentId);
+      const delta = upvoted ? -1 : 1;
+      return {
+        ...state,
+        upvotedCommentIds: upvoted
+          ? state.upvotedCommentIds.filter((id) => id !== action.commentId)
+          : [...state.upvotedCommentIds, action.commentId],
+        comments: state.comments.map((comment) =>
+          comment.id === action.commentId
+            ? { ...comment, upvotes: Math.max(0, comment.upvotes + delta) }
+            : comment,
+        ),
+      };
+    }
+
     case 'vault/unlock': {
       // One purchase per drop: a second dispatch is a no-op, mirroring §19.
       if (state.unlocks[action.dropId]?.status === 'unlocked') return state;
@@ -190,6 +230,9 @@ export function clashReducer(state: ClashState, action: ClashAction): ClashState
         action.unlocked ? 'Pro Analytics unlocked.' : 'Pro Analytics locked.',
       );
     }
+
+    case 'theme/mode':
+      return action.mode === state.themeMode ? state : { ...state, themeMode: action.mode };
 
     case 'ui/notice':
       return action.message === null

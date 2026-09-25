@@ -1,10 +1,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { Take, User } from '../../store';
-import { ink, layout, space, typeScale } from '../../theme';
+import { selectAuthor, useClash, type Take, type User } from '../../store';
+import { apple, ink, radius, space, typeScale } from '../../theme';
+import { RepliesSheet } from './RepliesSheet';
 import { TakeActions } from './TakeActions';
 import { TakeCardHeader } from './TakeCardHeader';
 import { TakeMedia } from './TakeMedia';
+import { TopChallengerSnippet } from './TopChallengerSnippet';
 
 export interface TakeCardProps {
   take: Take;
@@ -41,6 +43,13 @@ function TakeCardBase({
   onShare,
   onMore,
 }: TakeCardProps): React.JSX.Element {
+  const { state } = useClash();
+  const [repliesOpen, setRepliesOpen] = React.useState(false);
+  const comments = state.comments.filter((c) => c.takeId === take.id);
+  const topComment = comments.length > 0
+    ? comments.reduce((best, next) => (next.upvotes > best.upvotes ? next : best), comments[0] as (typeof comments)[number])
+    : undefined;
+  const topAuthor = topComment ? selectAuthor(state, topComment.authorId) : undefined;
   return (
     <View style={styles.card}>
       <TakeCardHeader author={author} take={take} isViewer={isViewer} now={now} />
@@ -66,9 +75,16 @@ function TakeCardBase({
           <TakeMedia media={take.media} />
         </Pressable>
       ) : null}
-      
+
+      <TopChallengerSnippet
+        topComment={topComment}
+        author={topAuthor}
+        onPress={() => setRepliesOpen(true)}
+      />
+
       <TakeActions
         take={take}
+        commentCount={comments.length}
         isSaved={isSaved}
         hasReacted={hasReacted}
         onClash={onOpenClash}
@@ -76,8 +92,10 @@ function TakeCardBase({
         onSave={onSave}
         onShare={onShare}
         onMore={onMore}
+        onComment={() => setRepliesOpen(true)}
         now={now}
       />
+      {repliesOpen ? <RepliesSheet takeId={take.id} onClose={() => setRepliesOpen(false)} /> : null}
     </View>
   );
 }
@@ -85,7 +103,13 @@ function TakeCardBase({
 const styles = StyleSheet.create({
   card: {
     gap: space.md,
-    paddingHorizontal: layout.screenX,
+    marginHorizontal: space.md,
+    padding: space.lg,
+    borderRadius: radius.xl,
+    backgroundColor: apple.card,
+    borderWidth: 1,
+    borderColor: apple.cardBorder,
+    overflow: 'hidden',
   },
   textContainer: { paddingVertical: space.xs },
   takeText: { ...typeScale.takeText, color: ink.primary },

@@ -3,7 +3,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { action, card, ink, radius, space } from '../../theme';
+import { action, apple, card, ink, radius, space } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaHomeIcon } from '../shared/icons';
 import type { Realm } from '../../store';
@@ -22,7 +22,7 @@ export interface RealmTabBarProps extends BottomTabBarProps {
  * muted otherwise. No glow, no gold dots, no elevation; the Create button is a
  * plain white circle so it reads as familiar chrome, not a floating effect.
  */
-export function RealmTabBar({ state, navigation, realm }: RealmTabBarProps): React.JSX.Element {
+export function RealmTabBar({ state, navigation, realm, onShiftRealm, shiftLabel, ShiftIcon }: RealmTabBarProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const tabs = realm === 'vault' ? VAULT_TABS : ARENA_TABS;
   const activeKey = state.routes[state.index]?.key;
@@ -76,22 +76,42 @@ export function RealmTabBar({ state, navigation, realm }: RealmTabBarProps): Rea
     );
   };
 
+  const shiftTarget: Realm = realm === 'vault' ? 'arena' : 'vault';
+
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom }]}>
-      <View style={styles.dock}>{state.routes.map(renderTab)}</View>
+      <View style={styles.dock}>
+        {state.routes.map(renderTab)}
+        <Pressable
+          onPress={() => {
+            hapticTap();
+            onShiftRealm(shiftTarget);
+          }}
+          style={styles.shift}
+          accessibilityRole="button"
+          accessibilityLabel={realm === 'vault' ? 'Return to Arena' : 'Open The Vault'}
+        >
+          <ShiftIcon size={24} color={ink.tertiary} strokeWidth={2} />
+          <Text allowFontScaling={false} style={styles.tabLabel}>
+            {shiftLabel}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: 'transparent' },
+  wrap: { backgroundColor: 'transparent', paddingHorizontal: space.md },
   dock: {
     flexDirection: 'row',
     alignItems: 'center',
     height: DOCK_HEIGHT,
-    backgroundColor: card.native,
-    borderTopWidth: 1,
-    borderTopColor: card.border,
+    backgroundColor: apple.dock,
+    borderWidth: 1,
+    borderColor: apple.cardBorder,
+    borderRadius: 28,
+    paddingHorizontal: space.xs,
   },
   tab: {
     flex: 1,
@@ -107,6 +127,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: action.fill,
+  },
+  shift: {
+    width: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: space.xs,
+    borderLeftWidth: 1,
+    borderLeftColor: card.border,
   },
   tabLabel: { fontSize: 10, color: ink.tertiary, fontWeight: '500' },
   tabLabelActive: { color: ink.primary, fontWeight: '600' },

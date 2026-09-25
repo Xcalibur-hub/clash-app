@@ -4,9 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import {
+  apple,
   blurIntensity,
-  glassBorder,
-  glassFill,
   gradient,
   radius,
   scale,
@@ -52,9 +51,9 @@ export function GlassCard({
 
   const surface: ViewStyle = {
     borderRadius: corner,
-    backgroundColor: glassFill[level],
+    backgroundColor: apple.card,
     borderWidth: 1,
-    borderColor: glassBorder[level],
+    borderColor: apple.cardBorder,
     overflow: 'hidden',
   };
 

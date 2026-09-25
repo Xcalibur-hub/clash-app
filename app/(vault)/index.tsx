@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AudienceBars } from '../../components/vault/AudienceBars';
+import { ArenaPill } from '../../components/vault/ArenaPill';
 import { CreatorRow } from '../../components/vault/CreatorRow';
 import { DropRow } from '../../components/vault/DropRow';
 import { VaultHero } from '../../components/vault/VaultHero';
@@ -44,7 +45,10 @@ export default function VaultHome(): React.JSX.Element {
         contentContainerStyle={[h.content, { paddingTop: insets.top + space.md }]}
       >
         <View style={h.head}>
-          <Text allowFontScaling={false} style={h.brand}>VAULT</Text>
+          <View style={h.headRow}>
+            <Text allowFontScaling={false} style={h.brand}>VAULT</Text>
+            <ArenaPill />
+          </View>
           <Text allowFontScaling={false} style={h.title}>Your creator business</Text>
         </View>
 

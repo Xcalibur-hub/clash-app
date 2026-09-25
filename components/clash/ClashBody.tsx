@@ -20,6 +20,7 @@ export interface ClashBodyProps {
   take: Take;
   author: User;
   challenger: User;
+  challengerText?: string;
   clash: Clash;
   storedResult: ClashResult | undefined;
   revealed: boolean;
@@ -45,6 +46,7 @@ export function ClashBody({
   take,
   author,
   challenger,
+  challengerText,
   clash,
   storedResult,
   revealed,
@@ -98,7 +100,7 @@ export function ClashBody({
         <TakePanel
           side="B"
           author={challenger}
-          text={clash.challengerText}
+          text={challengerText ?? clash.challengerText}
           label="TAKE B"
           winner={verdictShown && winnerSide === 'B'}
           faded={verdictShown && winnerSide !== 'B'}

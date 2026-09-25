@@ -5,12 +5,13 @@ import type { Take } from '../../store';
 import { action, duel, ink, radius, space, typeScale } from '../../theme';
 import { compact, timeLeftLabel } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
-import { BookmarkIcon, FlameIcon, MoreIcon, ShareIcon, ZapIcon } from '../shared/icons';
+import { BookmarkIcon, CommentIcon, FlameIcon, MoreIcon, ShareIcon, ZapIcon } from '../shared/icons';
 import { UtilityAction } from './UtilityAction';
 
 export interface TakeActionsProps {
   take: Take;
   challengerHandle?: string;
+  commentCount?: number;
   isSaved: boolean;
   hasReacted: boolean;
   onClash: () => void;
@@ -18,12 +19,14 @@ export interface TakeActionsProps {
   onSave: () => void;
   onShare: () => void;
   onMore: () => void;
+  onComment?: () => void;
   now: number;
 }
 
 /** Explicit Take actions: one unmistakable CLASH target, then quiet utilities. */
 export function TakeActions({
   take,
+  commentCount = 0,
   isSaved,
   hasReacted,
   onClash,
@@ -31,6 +34,7 @@ export function TakeActions({
   onSave,
   onShare,
   onMore,
+  onComment,
   now,
 }: TakeActionsProps): React.JSX.Element {
   const pressed = useSharedValue(0);
@@ -68,6 +72,13 @@ export function TakeActions({
       </Animated.View>
 
       <View style={styles.secondaryRow}>
+        <UtilityAction
+          icon={CommentIcon}
+          label={commentCount > 0 ? `${compact(commentCount)}` : 'Replies'}
+          color={ink.tertiary}
+          selected={false}
+          onPress={withTap(onComment ?? onMore)}
+        />
         <UtilityAction
           icon={FlameIcon}
           label="React"

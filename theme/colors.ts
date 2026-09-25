@@ -21,6 +21,17 @@ export const glass = {
   borderStrong: 'rgba(255,255,255,0.12)',
 } as const;
 
+/** Apple-reference card ramp: frosted obsidian plates with lit hairlines. */
+export const apple = {
+  card: 'rgba(20,20,24,0.72)',
+  cardSolid: '#131318',
+  cardBorder: 'rgba(255,255,255,0.09)',
+  cardSheen: 'rgba(255,255,255,0.16)',
+  dock: 'rgba(16,16,20,0.82)',
+  pill: '#F5F5F7',
+  pillText: '#0A0A0D',
+} as const;
+
 /** Text ramp tuned for high contrast on #08080B. */
 export const ink = {
   primary: '#F7F7FA',

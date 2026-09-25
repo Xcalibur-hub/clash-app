@@ -2,6 +2,8 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { RealmPortal } from '../../components/navigation/RealmPortal';
 import { RealmTabBar } from '../../components/navigation/RealmTabBar';
+import { AppSidebar } from '../../components/navigation/AppSidebar';
+import { SidebarProvider } from '../../components/navigation/SidebarContext';
 import { useRealmSwitch } from '../../components/navigation/useRealmSwitch';
 import { VaultIcon } from '../../components/shared/icons';
 import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
@@ -11,7 +13,7 @@ import { color } from '../../theme';
 export default function TabsLayout(): React.JSX.Element {
   const { shifting, first, direction, shiftTo } = useRealmSwitch();
   return (
-    <>
+    <SidebarProvider>
       <Tabs
         tabBar={(props) => (
           <RealmTabBar
@@ -33,8 +35,10 @@ export default function TabsLayout(): React.JSX.Element {
         <Tabs.Screen name="notifications" options={{ title: 'Activity' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
+      <AppSidebar />
       {shifting ? <RealmPortal direction={direction} first={first} onDone={() => undefined} /> : null}
-    </>
+    </SidebarProvider>
   );
 }
+
 

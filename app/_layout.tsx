@@ -1,11 +1,11 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet } from 'react-native';
+import { Appearance, StyleSheet, useColorScheme } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ClashProvider } from '../store';
+import { ClashProvider, selectThemeMode, useClash } from '../store';
 import { color } from '../theme';
 
 /**
@@ -19,6 +19,24 @@ import { color } from '../theme';
  * creator/* → Vault creator profiles (public vs exclusive drops)
  * campaign/*, sponsor/* → radar detail + sponsor dashboard
  */
+
+/**
+ * Applies the appearance preference to the OS: 'system' follows the device,
+ * 'light'/'dark' override it. In-app React surfaces keep the dark palette in
+ * this pass; only system chrome (keyboard, dialogs, native widgets) flips.
+ */
+function ThemeChrome(): null {
+  const { state } = useClash();
+  const mode = selectThemeMode(state);
+  const systemScheme = useColorScheme();
+
+  React.useEffect(() => {
+    Appearance.setColorScheme(mode === 'system' ? systemScheme : mode);
+  }, [mode, systemScheme]);
+
+  return null;
+}
+
 export default function RootLayout(): React.JSX.Element {
   React.useEffect(() => {
     void SystemUI.setBackgroundColorAsync(color.bg).catch(() => undefined);
@@ -28,6 +46,7 @@ export default function RootLayout(): React.JSX.Element {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <ClashProvider>
+          <ThemeChrome />
           <StatusBar style="light" />
           <Stack
             screenOptions={{

@@ -8,6 +8,7 @@ import { ink, space, typeScale } from '../../theme';
 import { compact } from '../../utils/format';
 import type { Creator } from '../../store/types';
 import { tap as hapticTap } from '../../utils/haptics';
+import { ArenaPill } from './ArenaPill';
 
 export interface ViewerChip {
   name: string;
@@ -48,6 +49,7 @@ export function VaultHeader({ title, subtitle, viewer, count, onOpenProfile }: V
           </Text>
         </View>
         <View style={styles.actions}>
+          <ArenaPill />
           {stat(viewer?.reputation ?? 0, 'reputation', FlameIcon, ink.secondary)}
           {stat(viewer?.coins ?? 0, 'clash coins', CoinIcon, ink.secondary)}
           {typeof count === 'number' ? <Chip label={`${count} LIVE`} tone="mint" data /> : null}

@@ -14,6 +14,7 @@ import {
   selectClashForTake,
   selectJudgement,
   selectResult,
+  selectTopComment,
   useClash,
   type Judgement,
 } from '../../store';
@@ -31,7 +32,10 @@ export default function ClashScreen(): React.JSX.Element {
   const take = state.takes.find((item) => item.id === takeId);
   const clash = take ? selectClashForTake(state, take.id) : undefined;
   const author = take ? selectAuthor(state, take.authorId) : undefined;
-  const challenger = clash ? selectAuthor(state, clash.challengerId) : undefined;
+  const topComment = take ? selectTopComment(state, take.id) : undefined;
+  const topAuthor = topComment ? selectAuthor(state, topComment.authorId) : undefined;
+  const challenger = topAuthor ?? (clash ? selectAuthor(state, clash.challengerId) : undefined);
+  const challengerText = topComment?.text ?? clash?.challengerText ?? '';
   const storedResult = clash ? selectResult(state, clash.id) : undefined;
 
   const [stage, setStage] = React.useState<ClashStage>(storedResult ? 'result' : 'battle');
@@ -122,6 +126,7 @@ export default function ClashScreen(): React.JSX.Element {
         take={take}
         author={author}
         challenger={challenger}
+        challengerText={challengerText}
         clash={clash}
         storedResult={storedResult}
         revealed={stage === 'result' && Boolean(storedResult)}

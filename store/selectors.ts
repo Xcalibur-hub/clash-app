@@ -1,6 +1,7 @@
 import type { ClashState } from './reducer';
 import type {
   Campaign,
+  ChallengerComment,
   Clash,
   ClashResult,
   Creator,
@@ -8,6 +9,7 @@ import type {
   HoodId,
   Judgement,
   Take,
+  ThemeMode,
   UnlockStatus,
   User,
 } from './types';
@@ -22,6 +24,10 @@ export interface WinEntry {
 
 export function selectViewer(state: ClashState): User {
   return state.viewer;
+}
+
+export function selectThemeMode(state: ClashState): ThemeMode {
+  return state.themeMode;
 }
 
 export function selectAuthor(state: ClashState, authorId: string): User | undefined {
@@ -61,6 +67,16 @@ export function selectResult(state: ClashState, clashId: string): ClashResult | 
 
 export function selectIsSaved(state: ClashState, takeId: string): boolean {
   return state.savedTakeIds.includes(takeId);
+}
+
+export function selectCommentsForTake(state: ClashState, takeId: string): ChallengerComment[] {
+  return state.comments.filter((comment) => comment.takeId === takeId);
+}
+
+export function selectTopComment(state: ClashState, takeId: string): ChallengerComment | undefined {
+  const list = selectCommentsForTake(state, takeId);
+  if (list.length === 0) return undefined;
+  return list.reduce((best, next) => (next.upvotes > best.upvotes ? next : best), list[0] as ChallengerComment);
 }
 
 export function selectHasReacted(state: ClashState, takeId: string): boolean {

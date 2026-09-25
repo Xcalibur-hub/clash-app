@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProfileArchive } from '../../components/profile/ProfileArchive';
 import { ProfileIdentity } from '../../components/profile/ProfileIdentity';
+import { AppearanceRow } from '../../components/profile/AppearanceRow';
 import { Notice } from '../../components/shared/Notice';
 import { HOF_ENTRIES } from '../../data/hofTakes';
 import { useClock } from '../../hooks/useClock';
@@ -42,6 +43,7 @@ export default function ProfileScreen(): React.JSX.Element {
         ]}
       >
         <ProfileIdentity viewer={viewer} takesCount={allTakes.length} onEdit={editProfile} />
+        <AppearanceRow />
         <ProfileArchive state={state} takes={takes} wins={wins} immortal={immortal} now={now} />
       </ScrollView>
       <Notice offset={0} />

@@ -4,7 +4,7 @@ import { RealmPortal } from '../../components/navigation/RealmPortal';
 import { RealmTabBar } from '../../components/navigation/RealmTabBar';
 import { useRealmSwitch } from '../../components/navigation/useRealmSwitch';
 import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
-import { ArenaHomeIcon } from '../../components/shared/icons';
+import { ArenaIcon } from '../../components/shared/icons';
 import { color } from '../../theme';
 
 /** Vault tab group (spec §17–§23): Home · Creators · Radar · Analytics · Profile. */
@@ -19,7 +19,7 @@ export default function VaultLayout(): React.JSX.Element {
             realm="vault"
             onShiftRealm={(realm) => shiftTo(realm, REALM_ROUTES.arenaHome)}
             shiftLabel="ARENA"
-            ShiftIcon={ArenaHomeIcon}
+            ShiftIcon={ArenaIcon}
           />
         )}
         screenOptions={{

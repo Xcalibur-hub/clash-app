@@ -22,6 +22,9 @@ export interface Hood {
 /** The two product realms (spec §1, §16): the 24h Arena vs the premium Vault. */
 export type Realm = 'arena' | 'vault';
 
+/** Appearance preference: follow the OS or force a scheme. */
+export type ThemeMode = 'system' | 'light' | 'dark';
+
 /** Reputation ladder (spec §11). */
 export type RankName =
   | 'Rookie'
@@ -80,6 +83,16 @@ export interface Take {
   clashes: number;
   reactions: number;
   media?: TakeMedia;
+}
+
+/** Community rebuttal on a Take — feed for Top Comments. */
+export interface ChallengerComment {
+  id: string;
+  takeId: string;
+  authorId: string;
+  text: string;
+  upvotes: number;
+  createdAt: number;
 }
 
 /** The two duelling sides of a Clash. */

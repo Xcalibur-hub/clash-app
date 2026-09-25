@@ -6,6 +6,7 @@ export const home = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   content: { paddingHorizontal: layout.screenX, gap: space.lg, paddingBottom: space.xxl },
   head: { gap: space.xxs },
+  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { ...typeScale.caption, color: ink.tertiary },
   title: { ...typeScale.title, color: ink.primary },
   section: { ...typeScale.section, color: ink.primary, marginTop: space.xs },

@@ -1,13 +1,13 @@
 import { StyleSheet } from 'react-native';
-import { accent, card, ink, layout, radius, space, typeScale } from '../../theme';
+import { accent, apple, ink, layout, radius, space, typeScale } from '../../theme';
 
 /** Layout for the reusable clash snapshot card (Daily Drop). */
 export const clashSnapshotStyles = StyleSheet.create({
   card: {
-    backgroundColor: card.solid,
+    backgroundColor: apple.card,
     borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: card.border,
+    borderColor: apple.cardBorder,
     padding: layout.cardPadding,
     gap: space.md,
   },

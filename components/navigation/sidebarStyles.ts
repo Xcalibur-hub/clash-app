@@ -1,0 +1,62 @@
+import { StyleSheet } from 'react-native';
+import { accent, ink, radius, space, tint, typeScale } from '../../theme';
+
+/** Slide-out drawer surfaces: obsidian panel over a dimmed scrim. */
+export const sidebar = StyleSheet.create({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    flexDirection: 'row',
+  },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  scrimTouch: { flex: 1 },
+  panel: {
+    width: '80%',
+    maxWidth: 340,
+    height: '100%',
+    backgroundColor: '#0D0D12',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: space.lg,
+  },
+  scroll: { flexGrow: 1, gap: space.lg, paddingBottom: space.xl },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  menuTitle: { ...typeScale.caption, color: ink.tertiary },
+  identity: {
+    gap: space.sm,
+    paddingBottom: space.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  identityRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  name: { ...typeScale.bodyStrong, color: ink.primary },
+  handle: { ...typeScale.meta, color: ink.tertiary },
+  chipsRow: { flexDirection: 'row', gap: space.xs },
+  countersRow: { flexDirection: 'row', gap: space.md, marginTop: space.xs },
+  counter: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  counterText: { ...typeScale.data, color: ink.secondary },
+  section: { gap: space.xs },
+  sectionLabel: { ...typeScale.caption, color: ink.tertiary },
+  vaultCard: {
+    gap: 4,
+    padding: space.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,200,97,0.42)',
+    backgroundColor: tint.goldSoft,
+  },
+  vaultRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  vaultTitle: { ...typeScale.bodyStrong, color: accent.gold },
+  vaultSub: { ...typeScale.meta, color: ink.secondary },
+  pressed: { opacity: 0.72 },
+  link: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm },
+  linkTitle: { ...typeScale.label, color: ink.primary },
+  linkSub: { ...typeScale.meta, color: ink.tertiary, fontSize: 12 },
+  footer: { marginTop: 'auto', gap: space.sm },
+  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  settingsText: { ...typeScale.label, color: ink.secondary },
+  version: { ...typeScale.meta, color: ink.quaternary, fontSize: 12 },
+});

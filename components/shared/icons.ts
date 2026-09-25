@@ -50,3 +50,5 @@ export { default as SearchIcon } from 'lucide-react-native/icons/search';
 export { default as CompassIcon } from 'lucide-react-native/icons/compass';
 export { default as PlusIcon } from 'lucide-react-native/icons/plus';
 export { default as CloseIcon } from 'lucide-react-native/icons/x';
+export { default as MenuIcon } from 'lucide-react-native/icons/menu';
+export { default as SettingsIcon } from 'lucide-react-native/icons/settings';

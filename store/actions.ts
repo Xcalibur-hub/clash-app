@@ -1,4 +1,4 @@
-import type { ClashResult, Judgement, Realm, Take } from './types';
+import type { ChallengerComment, ClashResult, Judgement, Realm, Take, ThemeMode } from './types';
 import type { ClashAction } from './reducer';
 
 /** Typed action creators — screens never build action objects by hand. */
@@ -20,12 +20,24 @@ export const reactToTake = (takeId: string): ClashAction => ({ type: 'take/react
 /** Drop a brand-new Take (spec §7) — the store pays the +30 XP creation award. */
 export const createTake = (take: Take): ClashAction => ({ type: 'take/create', take });
 
+export const createComment = (comment: ChallengerComment): ClashAction => ({
+  type: 'comment/create',
+  comment,
+});
+
+export const toggleCommentUpvote = (commentId: string): ClashAction => ({
+  type: 'comment/upvote',
+  commentId,
+});
+
 export const unlockDrop = (dropId: string): ClashAction => ({ type: 'vault/unlock', dropId });
 
 export const setAnalytics = (unlocked: boolean): ClashAction => ({
   type: 'vault/analytics',
   unlocked,
 });
+
+export const setThemeMode = (mode: ThemeMode): ClashAction => ({ type: 'theme/mode', mode });
 
 export const showNotice = (message: string): ClashAction => ({ type: 'ui/notice', message });
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { ArenaFeedHeader } from '../../components/arena/ArenaFeedHeader';
 import { TakeCard } from '../../components/arena/TakeCard';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -60,10 +61,11 @@ export default function ArenaScreen(): React.JSX.Element {
   );
 
   const renderItem = React.useCallback(
-    ({ item }: ListRenderItemInfo<Take>) => {
+    ({ item, index }: ListRenderItemInfo<Take>) => {
       const author = selectAuthor(state, item.authorId);
       if (!author) return null;
       return (
+        <Animated.View entering={FadeInUp.delay(Math.min(index, 6) * 60).duration(420)}>
         <TakeCard
           take={item}
           author={author}
@@ -80,6 +82,7 @@ export default function ArenaScreen(): React.JSX.Element {
           }}
           onMore={() => dispatch(showNotice('Prototype: report & mute arrive with the backend.'))}
         />
+        </Animated.View>
       );
     },
     [dispatch, now, openClash, router, shareTake, state],

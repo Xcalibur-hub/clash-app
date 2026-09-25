@@ -5,20 +5,36 @@ import { selectViewer, useClash } from '../../store';
 import { ink, radius, space, typeScale } from '../../theme';
 import { Avatar } from '../shared/Avatar';
 import { IconButton } from '../shared/IconButton';
-import { BellIcon } from '../shared/icons';
+import { BellIcon, MenuIcon } from '../shared/icons';
+import { useSidebar } from '../navigation/SidebarContext';
 import { tap as hapticTap } from '../../utils/haptics';
 
 /**
- * Arena masthead (reference "Arena Home", screen 5): the CLASH wordmark on the
- * left, the viewer's avatar on the right. Nothing else competes for the eye.
+ * Arena masthead: menu button left, CLASH wordmark centred, activity right.
+ * The avatar moves into the slide-out sidebar identity block.
  */
 export function ArenaHeader(): React.JSX.Element {
   const { state } = useClash();
   const viewer = selectViewer(state);
+  const { open } = useSidebar();
   const router = useRouter();
 
   return (
     <View style={styles.wrap}>
+      <Pressable
+        onPress={() => {
+          hapticTap();
+          open();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Open menu"
+        style={styles.menu}
+      >
+        <Avatar name={viewer.name} tint={viewer.tint} size={40} />
+        <View pointerEvents="none" style={styles.menuBadge}>
+          <MenuIcon size={13} color={ink.primary} strokeWidth={2.6} />
+        </View>
+      </Pressable>
       <Text allowFontScaling={false} style={styles.brand}>
         CLASH
       </Text>
@@ -32,17 +48,6 @@ export function ArenaHeader(): React.JSX.Element {
           label="Open notifications"
           size={40}
         />
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            router.push('/(tabs)/profile');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Open your profile, @${viewer.handle}`}
-          style={styles.avatar}
-        >
-          <Avatar name={viewer.name} tint={viewer.tint} size={40} />
-        </Pressable>
       </View>
     </View>
   );
@@ -50,12 +55,25 @@ export function ArenaHeader(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  menu: { borderRadius: radius.pill },
+  menuBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0D0D12',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
   brand: {
     ...typeScale.title,
     fontSize: 25,
     color: ink.primary,
     letterSpacing: 2.4,
   },
-  avatar: { borderRadius: radius.pill },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
 });
