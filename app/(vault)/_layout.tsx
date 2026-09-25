@@ -9,7 +9,7 @@ import { color } from '../../theme';
 
 /** Vault tab group (spec §17–§23): Home · Creators · Radar · Analytics · Profile. */
 export default function VaultLayout(): React.JSX.Element {
-  const { shifting, direction, shiftTo } = useRealmSwitch();
+  const { shifting, first, direction, shiftTo } = useRealmSwitch();
   return (
     <>
       <Tabs
@@ -33,7 +33,7 @@ export default function VaultLayout(): React.JSX.Element {
         <Tabs.Screen name="analytics" options={{ title: 'Analytics' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
-      {shifting ? <RealmPortal direction={direction} onDone={() => undefined} /> : null}
+      {shifting ? <RealmPortal direction={direction} first={first} onDone={() => undefined} /> : null}
     </>
   );
 }

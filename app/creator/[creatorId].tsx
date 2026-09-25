@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckoutSheet } from '../../components/vault/CheckoutSheet';
 import { DropRow } from '../../components/vault/DropRow';
 import { vault as s } from '../../components/vault/vaultStyles';
-import { AuroraBackground } from '../../components/shared/AuroraBackground';
 import { Avatar } from '../../components/shared/Avatar';
 import { Chip } from '../../components/shared/Chip';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -39,28 +38,28 @@ export default function CreatorScreen(): React.JSX.Element {
 
   if (!creator) {
     return (
-      <AuroraBackground tone="calm">
+      <View style={s.root}>
         <View style={[styles.center, { paddingTop: insets.top }]}>
           <EmptyState
             icon={VaultIcon}
             title="Creator not found."
             body="This vault door leads nowhere. Head back to the trending list."
-            actionLabel="BACK TO VAULT"
+            actionLabel="Back to vault"
             onAction={() => router.back()}
           />
         </View>
-      </AuroraBackground>
+      </View>
     );
   }
 
   return (
-    <AuroraBackground tone="calm">
+    <View style={s.root}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[s.content, { paddingTop: insets.top + space.md }]}
       >
         <GlowButton
-          label="BACK"
+          label="Back"
           onPress={() => router.back()}
           icon={BackIcon}
           tone="glass"
@@ -73,13 +72,13 @@ export default function CreatorScreen(): React.JSX.Element {
           <Text allowFontScaling={false} style={styles.handle}>@{creator.handle}</Text>
           <Text allowFontScaling={false} style={styles.tagline}>{creator.tagline}</Text>
           <View style={styles.stats}>
-            <Chip label={`${compact(creator.followers)} FANS`} tone="violet" data />
+            <Chip label={`${compact(creator.followers)} FANS`} tone="neutral" data />
             <Chip label={`${publicDrops.length} PUBLIC`} tone="mint" data />
-            <Chip label={`${exclusiveDrops.length} EXCLUSIVE`} tone="gold" data />
+            <Chip label={`${exclusiveDrops.length} EXCLUSIVE`} tone="neutral" data />
           </View>
         </GlassCard>
 
-        <SectionHeading eyebrow="FREELY ACCESSIBLE" title="Public drops" />
+        <SectionHeading eyebrow="Freely accessible" title="Public drops" />
         {publicDrops.map((drop) => (
           <DropRow
             key={drop.id}
@@ -92,7 +91,7 @@ export default function CreatorScreen(): React.JSX.Element {
           <Text allowFontScaling={false} style={styles.note}>No public drops yet.</Text>
         ) : null}
 
-        <SectionHeading eyebrow="MEMBERS ONLY" title="Exclusive drops" />
+        <SectionHeading eyebrow="Members only" title="Exclusive drops" />
         {exclusiveDrops.map((drop) => {
           const locked = selectUnlockStatus(state, drop.id) !== 'unlocked';
           return (
@@ -120,7 +119,7 @@ export default function CreatorScreen(): React.JSX.Element {
         }}
       />
       <Notice offset={0} />
-    </AuroraBackground>
+    </View>
   );
 }
 

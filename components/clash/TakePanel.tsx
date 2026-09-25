@@ -34,7 +34,7 @@ export function TakePanel({
 
   return (
     <Animated.View
-      entering={(side === 'A' ? FadeInLeft : FadeInRight).duration(360)}
+      entering={(side === 'A' ? FadeInLeft : FadeInRight).duration(240)}
       style={[
         styles.card,
         {
@@ -102,5 +102,5 @@ const styles = StyleSheet.create({
   names: { flex: 1 },
   handle: { ...typeScale.label, color: ink.primary },
   rank: { ...typeScale.meta, color: ink.tertiary, fontSize: 11.5 },
-  text: { ...typeScale.quote, fontSize: 20, lineHeight: 27, color: ink.primary },
+  text: { ...typeScale.takeText, fontSize: 20, lineHeight: 27, color: ink.primary },
 });

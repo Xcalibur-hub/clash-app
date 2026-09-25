@@ -4,7 +4,7 @@ import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { GlassCard } from '../shared/GlassCard';
 import { GlowButton } from '../shared/GlowButton';
 import { AnalyticsIcon, KeyIcon } from '../shared/icons';
-import { accent, duration, ink, radius, space, typeScale } from '../../theme';
+import { duration, ink, radius, space, typeScale } from '../../theme';
 import { paySheet, sheet } from './vaultStyles';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -33,23 +33,23 @@ export function AnalyticsPaywall({ visible, onClose, onUnlock }: AnalyticsPaywal
           <GlassCard level="strong" corner={radius.xxl} contentStyle={paySheet.card}>
             <View style={styles.body}>
               <View style={styles.head}>
-                <AnalyticsIcon size={16} color={accent.gold} strokeWidth={2.4} />
-                <Text allowFontScaling={false} style={styles.title}>PRO ANALYTICS</Text>
+                <AnalyticsIcon size={16} color={ink.secondary} strokeWidth={2.4} />
+                <Text allowFontScaling={false} style={styles.title}>Pro Analytics</Text>
               </View>
               <Text allowFontScaling={false} style={styles.price}>₹19,999 / month</Text>
               <View style={styles.perks}>
                 {PERKS.map((perk) => (
                   <View key={perk} style={styles.perk}>
-                    <KeyIcon size={12} color={accent.mint} strokeWidth={2.6} />
+                    <KeyIcon size={12} color={ink.tertiary} strokeWidth={2.6} />
                     <Text allowFontScaling={false} style={styles.perkText}>{perk}</Text>
                   </View>
                 ))}
               </View>
               <GlowButton
-                label="UNLOCK ANALYTICS"
+                label="Unlock analytics"
                 onPress={() => { hapticTap(); onUnlock(); }}
                 icon={AnalyticsIcon}
-                tone="gold"
+                tone="light"
               />
               <Text allowFontScaling={false} style={styles.mock}>Mock paywall — no billing in the prototype.</Text>
             </View>
@@ -63,8 +63,8 @@ export function AnalyticsPaywall({ visible, onClose, onUnlock }: AnalyticsPaywal
 const styles = StyleSheet.create({
   body: { gap: space.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  title: { ...typeScale.cardTitle, color: ink.primary, letterSpacing: 0.8 },
-  price: { ...typeScale.title, color: accent.gold },
+  title: { ...typeScale.cardTitle, color: ink.primary },
+  price: { ...typeScale.title, color: ink.primary },
   perks: { gap: space.sm },
   perk: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   perkText: { ...typeScale.body, color: ink.secondary, fontSize: 14 },

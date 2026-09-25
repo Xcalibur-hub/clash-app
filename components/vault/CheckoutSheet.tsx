@@ -5,7 +5,7 @@ import { GlassCard } from '../shared/GlassCard';
 import { GlowButton } from '../shared/GlowButton';
 import { Chip } from '../shared/Chip';
 import { LockIcon, ReceiptIcon, ShieldCheckIcon } from '../shared/icons';
-import { accent, duration, radius } from '../../theme';
+import { accent, duration, ink, radius } from '../../theme';
 import { checkout, paySheet, sheet } from './vaultStyles';
 import { PAY_METHODS, confirmPayment, createPayment, type PayMethod } from '../../services/vaultService';
 import type { Drop } from '../../store/types';
@@ -67,7 +67,7 @@ function DoneBody({ title }: { title: string }): React.JSX.Element {
       <View style={checkout.tick}>
         <ShieldCheckIcon size={30} color={accent.mint} strokeWidth={2.4} />
       </View>
-      <Text allowFontScaling={false} style={checkout.doneTitle}>✓ UNLOCKED</Text>
+      <Text allowFontScaling={false} style={checkout.doneTitle}>Unlocked</Text>
       <Text allowFontScaling={false} style={checkout.doneBody}>
         {title} is yours. Mock receipt saved — no real money moved.
       </Text>
@@ -82,8 +82,8 @@ function PayBody({ drop, method, stage, onMethod, onPay }: {
   return (
     <View style={paySheet.card}>
       <View style={checkout.head}>
-        <LockIcon size={16} color={accent.gold} strokeWidth={2.4} />
-        <Text allowFontScaling={false} style={checkout.title}>UNLOCK FOR ₹{drop.price}</Text>
+        <LockIcon size={16} color={ink.secondary} strokeWidth={2.4} />
+        <Text allowFontScaling={false} style={checkout.title}>Unlock for ₹{drop.price}</Text>
       </View>
       <Text allowFontScaling={false} style={checkout.dropTitle} numberOfLines={2}>{drop.title}</Text>
       <View style={checkout.methods}>
@@ -107,14 +107,14 @@ function PayBody({ drop, method, stage, onMethod, onPay }: {
         })}
       </View>
       <GlowButton
-        label={stage === 'paying' ? 'CONFIRMING…' : `PAY ₹${drop.price}`}
+        label={stage === 'paying' ? 'Confirming…' : `Pay ₹${drop.price}`}
         onPress={onPay}
         icon={ReceiptIcon}
-        tone="gold"
+        tone="light"
         disabled={stage === 'paying'}
       />
       <View style={checkout.mockRow}>
-        <Chip label="MOCK CHECKOUT" tone="gold" />
+        <Chip label="MOCK CHECKOUT" tone="neutral" />
         <Text allowFontScaling={false} style={checkout.mockText}>Simulated UPI — provider later.</Text>
       </View>
     </View>

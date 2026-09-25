@@ -1,11 +1,10 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RadarCard } from '../../components/vault/RadarCard';
 import { VaultHeader } from '../../components/vault/VaultHeader';
 import { vault as s } from '../../components/vault/vaultStyles';
-import { AuroraBackground } from '../../components/shared/AuroraBackground';
 import { Notice } from '../../components/shared/Notice';
 import { selectCampaigns, selectCreators, useClash } from '../../store';
 import { space } from '../../theme';
@@ -19,12 +18,12 @@ export default function RadarScreen(): React.JSX.Element {
   const creators = selectCreators(state);
 
   return (
-    <AuroraBackground tone="calm" doodles={false}>
+    <View style={s.root}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[s.content, { paddingTop: insets.top + space.md }]}
       >
-        <VaultHeader title="SPONSOR RADAR" subtitle="Clicks in, orders out." count={campaigns.length} />
+        <VaultHeader title="Sponsor Radar" subtitle="Clicks in, orders out." count={campaigns.length} />
         {campaigns.map((campaign) => (
           <RadarCard
             key={campaign.id}
@@ -35,6 +34,6 @@ export default function RadarScreen(): React.JSX.Element {
         ))}
       </ScrollView>
       <Notice offset={0} />
-    </AuroraBackground>
+    </View>
   );
 }

@@ -1,11 +1,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import type { Take } from '../../store';
-import { action, card, ink, radius, space, typeScale } from '../../theme';
-import { compact } from '../../utils/format';
-import { IconButton } from '../shared/IconButton';
-import { BookmarkIcon, FlameIcon, ShareIcon } from '../shared/icons';
-import { timeLeftLabel } from '../../utils/format';
+import { action, duel, ink, radius, space, typeScale } from '../../theme';
+import { compact, timeLeftLabel } from '../../utils/format';
+import { tap as hapticTap } from '../../utils/haptics';
+import { BookmarkIcon, FlameIcon, MoreIcon, ShareIcon, ZapIcon } from '../shared/icons';
+import { UtilityAction } from './UtilityAction';
 
 export interface TakeActionsProps {
   take: Take;
@@ -20,12 +21,9 @@ export interface TakeActionsProps {
   now: number;
 }
 
-/**
- * Redesigned actions: subtle meta line, full-width solid white CTA, subtle bottom actions.
- */
+/** Explicit Take actions: one unmistakable CLASH target, then quiet utilities. */
 export function TakeActions({
   take,
-  challengerHandle,
   isSaved,
   hasReacted,
   onClash,
@@ -35,56 +33,88 @@ export function TakeActions({
   onMore,
   now,
 }: TakeActionsProps): React.JSX.Element {
+  const pressed = useSharedValue(0);
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 - pressed.value * 0.02 }],
+  }));
+  const withTap = (actionHandler: () => void): (() => void) => () => {
+    hapticTap();
+    actionHandler();
+  };
+
   return (
     <View style={styles.wrap}>
       <Text allowFontScaling={false} style={styles.meta}>
-        {`🔥 ${compact(take.clashes)} Clashes   ${timeLeftLabel(take.expiresAt, now)} left`}
+        {`🔥 ${compact(take.clashes)} Clashes  ·  ${timeLeftLabel(take.expiresAt, now)} left`}
       </Text>
 
-      <Pressable
-        onPress={onClash}
-        style={styles.cta}
-        accessibilityRole="button"
-        accessibilityLabel="Clash on this take"
-      >
-        <Text allowFontScaling={false} style={styles.ctaText}>
-          CLASH
-        </Text>
-      </Pressable>
+      <Animated.View style={pressStyle}>
+        <Pressable
+          onPress={onClash}
+          onPressIn={() => {
+            pressed.value = withTiming(1, { duration: 80 });
+          }}
+          onPressOut={() => {
+            pressed.value = withTiming(0, { duration: 140 });
+          }}
+          style={styles.cta}
+          accessibilityRole="button"
+          accessibilityLabel="Clash on this take"
+        >
+          <ZapIcon size={17} color={duel.a} strokeWidth={2.6} />
+          <Text allowFontScaling={false} style={styles.ctaText}>CLASH</Text>
+          <ZapIcon size={17} color={duel.b} strokeWidth={2.6} />
+        </Pressable>
+      </Animated.View>
 
       <View style={styles.secondaryRow}>
-        <IconButton
+        <UtilityAction
           icon={FlameIcon}
-          onPress={onReact}
-          label="React to this take"
-          size={40}
-          active={hasReacted}
-          tone="a"
+          label="React"
+          color={hasReacted ? duel.b : ink.tertiary}
+          selected={hasReacted}
+          onPress={withTap(onReact)}
         />
-        <IconButton
+        <UtilityAction
           icon={BookmarkIcon}
-          onPress={onSave}
-          label={isSaved ? 'Remove from saved' : 'Save this take'}
-          size={40}
-          active={isSaved}
-          tone="gold"
+          label="Save"
+          color={isSaved ? ink.primary : ink.tertiary}
+          selected={isSaved}
+          onPress={withTap(onSave)}
         />
-        <IconButton icon={ShareIcon} onPress={onShare} label="Share this take" size={40} />
+        <UtilityAction
+          icon={ShareIcon}
+          label="Share"
+          color={ink.tertiary}
+          selected={false}
+          onPress={withTap(onShare)}
+        />
+        <UtilityAction
+          icon={MoreIcon}
+          label=""
+          color={ink.tertiary}
+          selected={false}
+          onPress={withTap(onMore)}
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.sm },
-  meta: { ...typeScale.subtitle, color: ink.subtitle },
+  wrap: { gap: space.md },
+  meta: { ...typeScale.meta, color: ink.secondary },
   cta: {
-    backgroundColor: action.fill,
-    borderRadius: radius.pill,
-    paddingVertical: space.sm + 2,
+    minHeight: 48,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: space.sm,
+    borderRadius: radius.sm,
+    backgroundColor: action.darkFill,
+    borderWidth: 1,
+    borderColor: duel.aLine,
   },
-  ctaText: { ...typeScale.button, color: action.text },
-  secondaryRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  ctaText: { ...typeScale.button, color: action.darkText, letterSpacing: 1.6 },
+  secondaryRow: { flexDirection: 'row', alignItems: 'center', gap: space.xl },
 });

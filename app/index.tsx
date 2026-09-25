@@ -47,7 +47,7 @@ export default function SplashScreen(): React.JSX.Element {
   const barStyle = useAnimatedStyle(() => ({ width: `${bar.value * 100}%` }));
 
   return (
-    <AuroraBackground doodles={false}>
+    <AuroraBackground>
       <View style={styles.wrap}>
         <Animated.View style={[styles.markWrap, markStyle]}>
           <Text allowFontScaling={false} style={styles.wordmark}>

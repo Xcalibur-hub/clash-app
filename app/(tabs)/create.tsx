@@ -85,7 +85,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
   }
 
   return (
-    <AuroraBackground tone="arena" doodles={false}>
+    <AuroraBackground tone="arena">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.root}

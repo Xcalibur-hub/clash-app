@@ -15,7 +15,7 @@ function Circle({ side, value, won }: { side: Side; value: number; won: boolean 
 
   return (
     <Animated.View
-      entering={ZoomIn.delay(side === 'A' ? 60 : 180).duration(420)}
+      entering={ZoomIn.delay(side === 'A' ? 40 : 110).duration(260)}
       accessibilityLabel={`Side ${side}: ${value} jurors`}
       style={[
         styles.circle,

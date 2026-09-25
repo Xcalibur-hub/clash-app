@@ -45,6 +45,8 @@ export interface User {
   /** Stored without the leading '@'. */
   handle: string;
   name: string;
+  /** One-line social bio rendered on the Profile (PRD §18). */
+  bio?: string;
   /** One of `accent` — drives the avatar gradient. */
   tint: string;
   hood: HoodId;

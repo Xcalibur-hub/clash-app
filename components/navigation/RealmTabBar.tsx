@@ -1,26 +1,13 @@
 import React from 'react';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { BlurView } from 'expo-blur';
 import type { LucideIcon } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { card, glass, ink, space, supportsBlur } from '../../theme';
+import { action, card, ink, radius, space } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaHomeIcon } from '../shared/icons';
 import type { Realm } from '../../store';
-import { DockElevated } from './DockElevated';
-import { DockTab } from './DockTab';
-import {
-  ARENA_TABS,
-  BLUR,
-  DOCK_HEIGHT,
-  DOCK_RADIUS,
-  ELEVATED_ROUTE,
-  ELEVATED_SIZE,
-  REALM_SLOT,
-  VAULT_TABS,
-  type TabRoute,
-} from './dockConfig';
+import { ARENA_TABS, DOCK_HEIGHT, VAULT_TABS, type TabRoute } from './dockConfig';
 
 export interface RealmTabBarProps extends BottomTabBarProps {
   realm: Realm;
@@ -30,17 +17,12 @@ export interface RealmTabBarProps extends BottomTabBarProps {
 }
 
 /**
- * Native-feeling dark translucent bottom bar with clean icon-first presentation
- * and subtle active indicator dots.
+ * The clean native-standard dock (PRD §13, §35): five slots — Home, Explore,
+ * a centred Create, Activity, Profile — icon over label, white when active and
+ * muted otherwise. No glow, no gold dots, no elevation; the Create button is a
+ * plain white circle so it reads as familiar chrome, not a floating effect.
  */
-export function RealmTabBar({
-  state,
-  navigation,
-  realm,
-  onShiftRealm,
-  shiftLabel,
-  ShiftIcon,
-}: RealmTabBarProps): React.JSX.Element {
+export function RealmTabBar({ state, navigation, realm }: RealmTabBarProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const tabs = realm === 'vault' ? VAULT_TABS : ARENA_TABS;
   const activeKey = state.routes[state.index]?.key;
@@ -60,51 +42,43 @@ export function RealmTabBar({
   const renderTab = (route: TabRoute): React.JSX.Element => {
     const entry = tabs[route.name] ?? { label: route.name, icon: ArenaHomeIcon };
     const focused = route.key === activeKey;
+    const Icon = entry.icon;
+    const centred = entry.label === '';
     return (
-      <DockTab
+      <Pressable
         key={route.key}
-        label={entry.label}
-        icon={entry.icon}
-        focused={focused}
         onPress={() => press(route, focused)}
-      />
+        style={styles.tab}
+        accessibilityRole={centred ? 'button' : 'tab'}
+        accessibilityState={centred ? undefined : { selected: focused }}
+        accessibilityLabel={centred ? 'Create a take' : entry.label}
+      >
+        {centred ? (
+          <View style={styles.create}>
+            <Icon size={20} color={action.text} strokeWidth={2.6} />
+          </View>
+        ) : (
+          <Icon
+            size={24}
+            color={focused ? ink.primary : ink.tertiary}
+            strokeWidth={focused ? 2.5 : 2}
+          />
+        )}
+        {entry.label ? (
+          <Text
+            allowFontScaling={false}
+            style={[styles.tabLabel, focused && styles.tabLabelActive]}
+          >
+            {entry.label}
+          </Text>
+        ) : null}
+      </Pressable>
     );
   };
 
-  const elevated = state.routes.find((route) => route.name === ELEVATED_ROUTE);
-  const others = state.routes.filter((route) => route.name !== ELEVATED_ROUTE);
-  const half = Math.ceil(others.length / 2);
-
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom }]}>
-      <View style={styles.dock}>
-        {supportsBlur ? (
-          <BlurView intensity={BLUR} tint="dark" style={[StyleSheet.absoluteFill, styles.clip]} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.androidFill]} />
-        )}
-
-        {/* Top hairline border */}
-        <View style={styles.topBorder} />
-
-        {/* Mirrors the realm key so the dock's content stays symmetrical. */}
-        <View style={styles.slot} />
-
-        {others.slice(0, half).map(renderTab)}
-        <View style={styles.gap} />
-        {others.slice(half).map(renderTab)}
-
-        <Pressable
-          onPress={() => onShiftRealm(realm === 'vault' ? 'arena' : 'vault')}
-          accessibilityRole="button"
-          accessibilityLabel={shiftLabel}
-          style={styles.realmKey}
-        >
-          <ShiftIcon size={19} color={ink.tertiary} strokeWidth={2.4} />
-        </Pressable>
-
-        {elevated ? <DockElevated onPress={() => press(elevated, false)} /> : null}
-      </View>
+      <View style={styles.dock}>{state.routes.map(renderTab)}</View>
     </View>
   );
 }
@@ -115,25 +89,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: DOCK_HEIGHT,
-    backgroundColor: 'rgba(12,12,17,0.85)',
-    position: 'relative',
+    backgroundColor: card.native,
+    borderTopWidth: 1,
+    borderTopColor: card.border,
   },
-  clip: { overflow: 'hidden' },
-  androidFill: { backgroundColor: 'rgba(14,14,20,0.92)' },
-  topBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: glass.border,
-  },
-  slot: { width: REALM_SLOT },
-  gap: { width: ELEVATED_SIZE + space.sm },
-  realmKey: {
-    width: REALM_SLOT,
-    height: DOCK_HEIGHT,
+  tab: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
+    paddingVertical: space.xs,
   },
+  create: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: action.fill,
+  },
+  tabLabel: { fontSize: 10, color: ink.tertiary, fontWeight: '500' },
+  tabLabelActive: { color: ink.primary, fontWeight: '600' },
 });

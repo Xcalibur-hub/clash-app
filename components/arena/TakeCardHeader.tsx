@@ -13,12 +13,12 @@ export interface TakeCardHeaderProps {
 }
 
 /**
- * Author row: Avatar (36px) + @handle + "· HoodName · 2h" in muted text.
+ * Author row: Avatar (32px) + @handle + "· HoodName" in muted text for 8pt system.
  */
 export function TakeCardHeader({ author, take, isViewer }: TakeCardHeaderProps): React.JSX.Element {
   return (
     <View style={styles.wrap}>
-      <Avatar name={author.name} tint={author.tint} size={36} />
+      <Avatar name={author.name} tint={author.tint} size={32} />
       <View style={styles.names}>
         <Text allowFontScaling={false} style={styles.handle} numberOfLines={1}>
           {`@${author.handle}`}
@@ -33,9 +33,9 @@ export function TakeCardHeader({ author, take, isViewer }: TakeCardHeaderProps):
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   names: { flex: 1, gap: 2 },
-  handle: { ...typeScale.subtitle, color: ink.primary, fontWeight: '600' },
+  handle: { ...typeScale.label, color: ink.primary, fontWeight: '600' },
   you: { ...typeScale.caption, color: accent.a },
-  meta: { ...typeScale.subtitle, color: ink.subtitle },
+  meta: { ...typeScale.meta, color: ink.tertiary },
 });

@@ -2,10 +2,9 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LockIcon } from '../shared/icons';
-import { accent, ink, radius, space, typeScale } from '../../theme';
+import { ink, radius, space, typeScale } from '../../theme';
 import type { Drop } from '../../store/types';
 import { compact } from '../../utils/format';
-import { withAlpha } from '../../utils/color';
 import { press as hapticPress } from '../../utils/haptics';
 
 export interface DropRowProps {
@@ -27,17 +26,17 @@ export function DropRow({ drop, locked, onOpen }: DropRowProps): React.JSX.Eleme
         <Text allowFontScaling={false} style={styles.title} numberOfLines={2}>{drop.title}</Text>
         <Text allowFontScaling={false} style={styles.blurb} numberOfLines={2}>{drop.blurb}</Text>
         <Text allowFontScaling={false} style={styles.meta}>
-          {exclusive ? `${compact(drop.unlocks)} unlocks · ★ ${drop.rating.toFixed(1)}` : 'FREE ACCESS'}
+          {exclusive ? `${compact(drop.unlocks)} unlocks · ★ ${drop.rating.toFixed(1)}` : 'Free access'}
         </Text>
       </View>
       {exclusive ? (
-        <View style={[styles.price, locked && { borderColor: withAlpha(accent.gold, 0.5) }]}>
-          {locked ? <LockIcon size={13} color={accent.gold} strokeWidth={2.6} /> : null}
-          <Text allowFontScaling={false} style={styles.priceText}>{locked ? `₹${drop.price}` : 'OPEN'}</Text>
+        <View style={[styles.price, locked && styles.priceLocked]}>
+          {locked ? <LockIcon size={13} color={ink.secondary} strokeWidth={2.6} /> : null}
+          <Text allowFontScaling={false} style={styles.priceText}>{locked ? `₹${drop.price}` : 'Open'}</Text>
         </View>
       ) : (
         <View style={styles.open}>
-          <Text allowFontScaling={false} style={styles.openText}>READ</Text>
+          <Text allowFontScaling={false} style={styles.openText}>Read</Text>
         </View>
       )}
     </Pressable>
@@ -69,16 +68,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,200,97,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  priceText: { ...typeScale.label, color: accent.gold },
+  priceLocked: { borderColor: 'rgba(255,255,255,0.34)' },
+  priceText: { ...typeScale.label, color: ink.primary },
   open: {
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(67,214,160,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(67,214,160,0.35)',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
-  openText: { ...typeScale.label, color: accent.mint, fontSize: 12 },
+  openText: { ...typeScale.label, color: ink.secondary, fontSize: 12 },
 });

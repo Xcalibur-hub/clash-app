@@ -5,7 +5,7 @@ import { Chip } from '../shared/Chip';
 import { GlassCard } from '../shared/GlassCard';
 import { CreatorMeta } from './VaultHeader';
 import { VerifiedIcon } from '../shared/icons';
-import { accent, ink, radius, space, typeScale } from '../../theme';
+import { ink, radius, space, typeScale } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
 import type { Creator } from '../../store/types';
 
@@ -34,7 +34,7 @@ export function CreatorCard({ creator, publicCount, exclusiveCount, rating = 4.8
             <Text allowFontScaling={false} style={styles.handle}>
               @{creator.handle}
             </Text>
-            <VerifiedIcon size={14} color={accent.mint} strokeWidth={2.6} />
+            <VerifiedIcon size={14} color={ink.tertiary} strokeWidth={2.6} />
           </View>
           <Text allowFontScaling={false} style={styles.tagline} numberOfLines={1}>
             {creator.tagline}

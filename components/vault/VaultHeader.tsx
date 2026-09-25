@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../shared/Avatar';
 import { Chip } from '../shared/Chip';
 import { CoinIcon, FlameIcon, VaultIcon } from '../shared/icons';
-import { accent, ink, space, typeScale } from '../../theme';
+import { ink, space, typeScale } from '../../theme';
 import { compact } from '../../utils/format';
 import type { Creator } from '../../store/types';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -32,7 +32,7 @@ export function VaultHeader({ title, subtitle, viewer, count, onOpenProfile }: V
     return (
       <View style={styles.stat} accessibilityLabel={`${value} ${label}`}>
         <Icon size={12} color={tint} strokeWidth={2.6} />
-        <Text allowFontScaling={false} style={[styles.statText, { color: tint }]}>
+        <Text allowFontScaling={false} style={styles.statText}>
           {compact(value)}
         </Text>
       </View>
@@ -42,15 +42,15 @@ export function VaultHeader({ title, subtitle, viewer, count, onOpenProfile }: V
     <View style={styles.wrap}>
       <View style={styles.top}>
         <View style={styles.brandRow}>
-          <VaultIcon size={20} color={accent.gold} strokeWidth={2.4} />
+          <VaultIcon size={20} color={ink.secondary} strokeWidth={2.4} />
           <Text allowFontScaling={false} style={styles.brand}>
             {title}
           </Text>
         </View>
         <View style={styles.actions}>
-          {stat(viewer?.reputation ?? 0, 'reputation', FlameIcon, accent.a)}
-          {stat(viewer?.coins ?? 0, 'clash coins', CoinIcon, accent.gold)}
-          {typeof count === 'number' ? <Chip label={`${count} LIVE`} tone="gold" data /> : null}
+          {stat(viewer?.reputation ?? 0, 'reputation', FlameIcon, ink.secondary)}
+          {stat(viewer?.coins ?? 0, 'clash coins', CoinIcon, ink.secondary)}
+          {typeof count === 'number' ? <Chip label={`${count} LIVE`} tone="mint" data /> : null}
           {viewer && onOpenProfile ? (
             <Pressable
               onPress={() => {
@@ -75,7 +75,7 @@ export function VaultHeader({ title, subtitle, viewer, count, onOpenProfile }: V
 export function CreatorMeta({ creator, rating }: { creator: Creator; rating?: number }): React.JSX.Element {
   return (
     <View style={styles.metaRow}>
-      <Chip label={`${compact(creator.followers)} FANS`} tone="gold" data />
+      <Chip label={`${compact(creator.followers)} FANS`} tone="neutral" data />
       <Text allowFontScaling={false} style={styles.metaText}>
         {compact(creator.reputation)} REP
       </Text>
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   wrap: { gap: space.md, paddingTop: space.sm },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  brand: { ...typeScale.title, fontSize: 22, letterSpacing: 2.6, color: ink.primary },
+  brand: { ...typeScale.title, fontSize: 22, color: ink.primary },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   stat: {
     flexDirection: 'row',
@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  statText: { fontFamily: 'Menlo', fontSize: 11.5, fontWeight: '700' },
-  headline: { ...typeScale.section, color: ink.secondary, fontStyle: 'italic' },
+  statText: { ...typeScale.data, fontSize: 11.5, color: ink.primary },
+  headline: { ...typeScale.meta, color: ink.secondary },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   metaText: { ...typeScale.meta, color: ink.tertiary },
 });

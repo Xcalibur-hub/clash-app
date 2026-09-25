@@ -7,12 +7,6 @@
 export const color = {
   /** Primary app background (spec). */
   bg: '#08080B',
-  /** Neutral dark surface for cards and containers. */
-  surface: '#111114',
-  /** Slightly lighter surface for lifted content. */
-  surfaceLight: '#16161C',
-  /** Deeper wells: tab bar, behind modal sheets. */
-  bgDeep: '#050507',
   /** Modal / overlay scrim. */
   scrim: 'rgba(6,6,9,0.72)',
 } as const;
@@ -22,12 +16,9 @@ export const glass = {
   fillSoft: 'rgba(255,255,255,0.020)',
   fill: 'rgba(255,255,255,0.040)',
   fillStrong: 'rgba(255,255,255,0.060)',
-  fillHeavy: 'rgba(255,255,255,0.080)',
   borderFaint: 'rgba(255,255,255,0.06)',
   border: 'rgba(255,255,255,0.08)',
   borderStrong: 'rgba(255,255,255,0.12)',
-  /** Bright top edge highlight — the "light catching the glass" cue. */
-  edge: 'rgba(255,255,255,0.20)',
 } as const;
 
 /** Text ramp tuned for high contrast on #08080B. */
@@ -36,8 +27,6 @@ export const ink = {
   secondary: 'rgba(247,247,250,0.66)',
   tertiary: 'rgba(247,247,250,0.44)',
   quaternary: 'rgba(247,247,250,0.26)',
-  /** Subtitles/metadata with reduced opacity. */
-  subtitle: 'rgba(245,245,247,0.45)',
   /** Text placed on a bright accent fill. */
   inverse: '#0A0A0D',
 } as const;
@@ -49,12 +38,10 @@ export const ink = {
 export const card = {
   /** Opaque plate fill - uses neutral surface. */
   solid: '#111114',
-  /** Slightly lighter surface for elevation. */
-  elevated: '#16161C',
-  /** Translucent alternative — lets the canvas glow bleed through. */
-  fill: 'rgba(255,255,255,0.03)',
   /** The hairline that draws the card edge. */
   border: 'rgba(255,255,255,0.06)',
+  /** Translucent alternative — lets the canvas bleed through. */
+  fill: 'rgba(255,255,255,0.03)',
   /** Native surface with subtle border. */
   native: '#111114',
 } as const;
@@ -74,12 +61,10 @@ export const action = {
 export const accent = {
   a: '#FF6A3D',
   b: '#3D8BFF',
-  ember: '#FF9A4D',
   gold: '#FFC861',
   violet: '#A580FF',
   mint: '#43D6A0',
   danger: '#FF4D5E',
-  neutral: '#98A0B0',
 } as const;
 
 /**
@@ -111,14 +96,12 @@ export const tint = {
 export type GradientColors = readonly [string, string, ...string[]];
 
 export const gradient: Record<
-  'sideA' | 'sideB' | 'gold' | 'glass' | 'sheen' | 'violet' | 'arenaGlow',
+  'sideA' | 'sideB' | 'gold' | 'glass' | 'violet',
   GradientColors
 > = {
   sideA: ['#FF8A4C', '#FF4D6A'],
   sideB: ['#57A0FF', '#7A6BFF'],
   gold: ['#FFE0A3', '#FFA53D'],
   glass: ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)'],
-  sheen: ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.00)'],
   violet: ['#B794FF', '#6C63FF'],
-  arenaGlow: ['rgba(255,106,61,0.08)', 'rgba(255,106,61,0.00)'],
 } as const;

@@ -9,7 +9,7 @@ import { color } from '../../theme';
 
 /** Arena realm navigation: home, explore, create, notifications, and profile. */
 export default function TabsLayout(): React.JSX.Element {
-  const { shifting, direction, shiftTo } = useRealmSwitch();
+  const { shifting, first, direction, shiftTo } = useRealmSwitch();
   return (
     <>
       <Tabs
@@ -33,7 +33,7 @@ export default function TabsLayout(): React.JSX.Element {
         <Tabs.Screen name="notifications" options={{ title: 'Activity' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
-      {shifting ? <RealmPortal direction={direction} onDone={() => undefined} /> : null}
+      {shifting ? <RealmPortal direction={direction} first={first} onDone={() => undefined} /> : null}
     </>
   );
 }

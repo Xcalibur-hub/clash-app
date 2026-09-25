@@ -8,6 +8,7 @@ export const VIEWER_SEED: User = {
   id: 'u-viewer',
   handle: 'aryan.dev',
   name: 'Aryan Dev',
+  bio: 'Final-year dev. Hot takes on placements, phones and monsoon traffic.',
   tint: '#FF6A3D',
   hood: 'campushustle',
   rank: 'Firestarter',

@@ -53,13 +53,13 @@ app/
   _layout.tsx          root Stack: splash → onboarding → tabs → vault → clash
   index.tsx            animated splash (§5)
   onboard.tsx          3-screen first-launch sequence (§5)
-  (tabs)/              Arena realm — the floating dock owns these five routes
-    _layout.tsx        tabs + the floating glass dock
+  (tabs)/              Arena realm — the native dock owns these five routes
+    _layout.tsx        tabs + RealmTabBar (native-standard dock)
     index.tsx          THE ARENA feed (§6)
+    explore.tsx        Explore: search, Daily Drop, Hoods, Hall of Fame (§15–§17)
     create.tsx         Take creation (§7)
-    daily-drop.tsx     9:00 PM Daily Drop (§12)
-    hall-of-fame.tsx   Hall of Fame archive (§13)
-    profile.tsx        Profile: rank, stats, badges, archive (§15)
+    notifications.tsx  Activity notifications
+    profile.tsx        Social profile: identity + content grid (§18–§19)
   (vault)/             Vault realm — the same viewer, premium surfaces (§17–§23)
   clash/[takeId].tsx   THE CLASH: battle → judgement recorded → result (§8–§10)
   creator/, campaign/, sponsor/   Vault detail + sponsor dashboards
@@ -68,16 +68,20 @@ components/
   arena/      ArenaHeader, ArenaFeedHeader, HoodSelector, TakeCard,
               TakeCardHeader, TakeMedia, TakeActions, MediaAttachRow,
               TakeComposerFields
-  clash/      ClashBody, TakePanel, VersusHeader, JudgementPicker, JuryPanel,
+  clash/      ClashBody, TakePanel, VersusHeader, JuryPanel,
               RecordedBanner, ClashResult, ScoreCircles, ResultRewards,
               RewardStrip, RewardLedger, RankXpBar, Particles, duelPalette
-  hof/        MuseumCard, CreatorRow, HoodRow
-  profile/    ProfileHero, ProfileArchive, ReputationBar, StatGrid, BadgeRow,
-              TakeMiniCard, WinCard
+  explore/    SearchResults, TrendingSection, HoodsSection, DailyDropSection,
+              FameSection, exploreStyles
+  hof/        MuseumCard, CreatorRow, HoodRow, SearchBar
+  profile/    ProfileIdentity, ProfileArchive, TakeGrid, WinGrid, ProfileHero,
+              ReputationBar, StatGrid, BadgeRow, TakeMiniCard, WinCard
   vault/      VaultHeader, CreatorCard, DropRow, RadarCard, CityDonut,
-              OverviewGrid, CheckoutSheet, AnalyticsPaywall
-  navigation/ RealmTabBar (floating dock), DockTab, DockElevated, dockConfig,
-              RealmPortal, useRealmSwitch
+              OverviewGrid, CheckoutSheet, AnalyticsPaywall, VaultHero,
+              AudienceBars, AttributionPanel, CreatorRow, vaultStyles,
+              vaultHomeStyles, analyticsStyles
+  navigation/ RealmTabBar (native standard tab bar), dockConfig,
+              RealmPortal (first-bloom → repeat-crossfade), useRealmSwitch
   onboarding/ OnboardSlide
   shared/     GlassCard, GlowButton, IconButton, SegmentedTabs, Chip, Avatar,
               Notice, EmptyState, SectionHeading, AuroraBackground,
@@ -85,7 +89,8 @@ components/
               Doodles, icons, buttonTones
 
 data/         mockUsers, mockTakes, mockClashes, mockJury, hoods, hofTakes,
-              dailyDrop, mockCreators, mockDrops, mockCampaigns, onboarding
+              dailyDrop, mockCreators, mockDrops, mockCampaigns, onboarding,
+              mockNotifications
 hooks/        useClock (shared 24h countdown tick)
 services/     juryService, clashService, reputationService
 store/        types, reducer, actions, selectors, ClashStore (context)
@@ -94,7 +99,7 @@ utils/        format, color, reputation, haptics
 ```
 
 **Design tokens** live in `theme/` only: primary background `#08080B`, the glass
-fill/border/edge ramp, the A/B duel accents, the §4 type ramp (display 34 → caption 11),
+fill/border ramp, the A/B duel accents, the §4 type ramp (display 34 → caption 11),
 the 4pt spacing scale, radii, motion durations and easings. Screens never hardcode colours.
 
 **State** is a typed reducer in `store/`. Screens dispatch small typed actions

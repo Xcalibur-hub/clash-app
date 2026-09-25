@@ -1,13 +1,13 @@
-/** 4pt spacing scale. */
+/** 8pt spacing scale for flat dark UI. */
 export const space = {
-  xxs: 2,
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 26,
-  xxxl: 34,
+  xxs: 4,
+  xs: 8,
+  sm: 12,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 40,
+  xxxl: 48,
 } as const;
 
 /** Large, softly rounded corners (spec §4). */
@@ -25,11 +25,11 @@ export const radius = {
 
 export const layout = {
   /** Horizontal screen padding. */
-  screenX: 18,
+  screenX: 16,
   /** Minimum accessible touch target. */
   hit: 44,
-  /** Vertical gap between Arena cards (24px as per redesign). */
-  feedGap: 24,
-  /** Internal padding inside a feed card (reference design: 20px). */
-  cardPadding: 20,
+  /** Vertical gap between Arena cards (32px for 8pt system). */
+  feedGap: 32,
+  /** Internal padding inside a feed card (16px for 8pt system). */
+  cardPadding: 16,
 } as const;

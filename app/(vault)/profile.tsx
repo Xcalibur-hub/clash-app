@@ -11,7 +11,6 @@ import { TakeMiniCard } from '../../components/profile/TakeMiniCard';
 import { WinCard } from '../../components/profile/WinCard';
 import { profileStyles as s } from '../../components/profile/profileStyles';
 import { VaultHeader } from '../../components/vault/VaultHeader';
-import { AuroraBackground } from '../../components/shared/AuroraBackground';
 import { Chip } from '../../components/shared/Chip';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { GlassCard } from '../../components/shared/GlassCard';
@@ -54,13 +53,13 @@ export default function VaultProfileScreen(): React.JSX.Element {
   };
 
   return (
-    <AuroraBackground tone="calm" doodles={false}>
+    <View style={s.root}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[s.content, { paddingTop: insets.top + space.md }]}
       >
         <VaultHeader
-          title="PROFILE"
+          title="Profile"
           subtitle="Your influence, itemised."
           viewer={{
             name: viewer.name,
@@ -78,8 +77,8 @@ export default function VaultProfileScreen(): React.JSX.Element {
 
         <StatGrid viewer={viewer} />
 
-        <SectionHeading eyebrow="THE VAULT SHELF" title="Unlocked drops" />
-        <Chip label={`${unlocked.length} UNLOCKED`} tone="gold" data />
+        <SectionHeading eyebrow="The vault shelf" title="Unlocked drops" />
+        <Chip label={`${unlocked.length} UNLOCKED`} tone="neutral" data />
         {unlocked.length === 0 ? (
           <Text style={{ color: 'rgba(247,247,250,0.44)' }}>
             Nothing unlocked yet — the Vault holds {state.drops.filter((d) => d.tier === 'exclusive').length}{' '}
@@ -87,7 +86,7 @@ export default function VaultProfileScreen(): React.JSX.Element {
           </Text>
         ) : null}
 
-        <SectionHeading eyebrow="EARNED IN THE ARENA" title="Badges" />
+        <SectionHeading eyebrow="Earned in the Arena" title="Badges" />
         <BadgeRow badges={viewer.badges} />
 
         <SegmentedTabs
@@ -118,13 +117,13 @@ export default function VaultProfileScreen(): React.JSX.Element {
               />
             ))}
         {tab === 'takes' && takes.length === 0 ? (
-          <EmptyState icon={ArenaIcon} title="No live takes." body="Everything you drop expires after 24 hours." actionLabel="OPEN THE ARENA" onAction={() => undefined} />
+          <EmptyState icon={ArenaIcon} title="No live takes." body="Everything you drop expires after 24 hours." actionLabel="Open the arena" onAction={() => undefined} />
         ) : null}
         {tab === 'wins' && wins.length === 0 ? (
-          <EmptyState icon={TrophyIcon} title="No wins yet." body="Judge a clash correctly and the verdict lands here." actionLabel="FIND A CLASH" onAction={() => undefined} />
+          <EmptyState icon={TrophyIcon} title="No wins yet." body="Judge a clash correctly and the verdict lands here." actionLabel="Find a clash" onAction={() => undefined} />
         ) : null}
       </ScrollView>
       <Notice offset={0} />
-    </AuroraBackground>
+    </View>
   );
 }

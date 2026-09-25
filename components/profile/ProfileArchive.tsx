@@ -2,15 +2,15 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { HofEntry } from '../../data/hofTakes';
+import type { ClashState, Take, WinEntry } from '../../store';
+import { space } from '../../theme';
+import { tap as hapticTap } from '../../utils/haptics';
 import { MuseumCard } from '../hof/MuseumCard';
 import { EmptyState } from '../shared/EmptyState';
 import { SegmentedTabs, type SegmentedTab } from '../shared/SegmentedTabs';
 import { ArenaIcon, TrophyIcon } from '../shared/icons';
-import { selectAuthor, type ClashState, type Take, type WinEntry } from '../../store';
-import { space } from '../../theme';
-import { tap as hapticTap } from '../../utils/haptics';
-import { TakeMiniCard } from './TakeMiniCard';
-import { WinCard } from './WinCard';
+import { TakeGrid } from './TakeGrid';
+import { WinGrid } from './WinGrid';
 
 export type ProfileTab = 'takes' | 'wins' | 'hall-of-fame';
 
@@ -29,7 +29,10 @@ export interface ProfileArchiveProps {
   now: number;
 }
 
-/** The viewer's own archive (reference screen 13): takes, wins, immortal records. */
+/**
+ * The viewer's archive (PRD §18–§19): segmented Takes / Wins / Hall of Fame.
+ * Takes and Wins render as grids; immortal records keep the museum card.
+ */
 export function ProfileArchive({
   state,
   takes,
@@ -40,85 +43,36 @@ export function ProfileArchive({
   const router = useRouter();
   const [tab, setTab] = React.useState<ProfileTab>('takes');
 
-  const openClash = (takeId: string): void => {
-    hapticTap();
-    router.push(`/clash/${takeId}`);
-  };
-
-  const takeText = (takeId: string): string =>
-    state.takes.find((item) => item.id === takeId)?.text ?? takeId;
-
-  const winnerHandle = (entry: WinEntry): string => {
-    const authorId =
-      entry.result.winningSide === 'A' ? entry.take.authorId : entry.clash.challengerId;
-    return selectAuthor(state, authorId)?.handle ?? 'unknown';
-  };
+  const openClash = (takeId: string): void => { hapticTap(); router.push(`/clash/${takeId}`); };
+  const takeText = (takeId: string): string => state.takes.find((item) => item.id === takeId)?.text ?? takeId;
 
   return (
     <View style={styles.wrap}>
       <SegmentedTabs value={tab} items={TABS} onChange={setTab} label="Profile sections" />
-
-      {tab === 'takes'
-        ? takes.map((take) => (
-            <TakeMiniCard key={take.id} take={take} now={now} onPress={() => openClash(take.id)} />
-          ))
-        : null}
-
-      {tab === 'wins'
-        ? wins.map((entry) => (
-            <WinCard
-              key={entry.result.clashId}
-              entry={entry}
-              winnerHandle={winnerHandle(entry)}
-              onPress={() => openClash(entry.take.id)}
-            />
-          ))
-        : null}
-
-      {tab === 'hall-of-fame'
+      {tab === 'takes' && takes.length > 0 ? <TakeGrid takes={takes} now={now} onPress={openClash} /> : null}
+      {tab === 'wins' && wins.length > 0 ? <WinGrid wins={wins} onPress={openClash} /> : null}
+      {tab === 'hall-of-fame' && immortal.length > 0
         ? immortal.map((entry) => (
-            <MuseumCard
-              key={entry.id}
-              entry={entry}
-              takeText={takeText(entry.takeId)}
-              onOpen={() => openClash(entry.takeId)}
-            />
+            <MuseumCard key={entry.id} entry={entry} takeText={takeText(entry.takeId)} onOpen={() => openClash(entry.takeId)} />
           ))
         : null}
-
       {tab === 'takes' && takes.length === 0 ? (
-        <EmptyState
-          icon={ArenaIcon}
-          title="No live takes."
+        <EmptyState icon={ArenaIcon} title="No live takes."
           body="Everything you drop expires after 24 hours. Your next take lands right here."
-          actionLabel="OPEN THE ARENA"
-          onAction={() => router.push('/(tabs)')}
-        />
+          actionLabel="OPEN THE ARENA" onAction={() => router.push('/(tabs)')} />
       ) : null}
-
       {tab === 'wins' && wins.length === 0 ? (
-        <EmptyState
-          icon={TrophyIcon}
-          title="No wins yet."
+        <EmptyState icon={TrophyIcon} title="No wins yet."
           body="Judge a clash correctly and the verdict, score and reputation land here."
-          actionLabel="FIND A CLASH"
-          onAction={() => router.push('/(tabs)')}
-        />
+          actionLabel="FIND A CLASH" onAction={() => router.push('/(tabs)')} />
       ) : null}
-
       {tab === 'hall-of-fame' && immortal.length === 0 ? (
-        <EmptyState
-          icon={TrophyIcon}
-          title="Nothing immortalized yet."
+        <EmptyState icon={TrophyIcon} title="Nothing immortalized yet."
           body="A take enters the Hall of Fame when its clash splits 6–3 and the jury writes it into the archive."
-          actionLabel="SEE THE ARCHIVE"
-          onAction={() => router.push('/(tabs)/hall-of-fame')}
-        />
+          actionLabel="SEE THE ARCHIVE" onAction={() => router.push('/(tabs)/explore')} />
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { gap: space.lg },
-});
+const styles = StyleSheet.create({ wrap: { gap: space.lg } });

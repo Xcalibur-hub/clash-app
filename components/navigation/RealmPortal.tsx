@@ -15,29 +15,45 @@ export type RealmDirection = 'arena-to-vault' | 'vault-to-arena';
 
 export interface RealmPortalProps {
   direction: RealmDirection;
+  /** Session-first shift renders the expressive bloom; later shifts crossfade (spec §14). */
+  first?: boolean;
   onDone: () => void;
 }
 
-const OUT_MS = 620;
-const IN_MS = 300;
+/** First shift: expressive bloom, 640ms total (spec §14 wants 500–700ms). */
+const FIRST_OUT_MS = 440;
+const FIRST_IN_MS = 200;
+/** Repeat shifts: simple veil crossfade, 240ms total (spec §14 wants 200–300ms). */
+const REPEAT_OUT_MS = 140;
+const REPEAT_IN_MS = 100;
+
+export const REALM_SHIFT_MS = FIRST_OUT_MS + FIRST_IN_MS;
+export const REALM_SHIFT_REPEAT_MS = REPEAT_OUT_MS + REPEAT_IN_MS;
 
 /**
- * Realm Shift portal (spec §16): the current realm contracts/fades while a
- * glass portal blooms open at ~620ms. Cleaner and calmer than the Arena —
- * entering another world, never a loading screen.
+ * Realm Shift (spec §14): the current realm contracts/fades while a glass
+ * portal blooms open — entering another world, never a loading screen.
+ * Only the session's first shift gets the bloom; repeats are a quiet crossfade
+ * so every Realm switch does not feel like a dramatic game transition.
  */
-export function RealmPortal({ direction, onDone }: RealmPortalProps): React.JSX.Element {
+export function RealmPortal({
+  direction,
+  first = true,
+  onDone,
+}: RealmPortalProps): React.JSX.Element {
   const progress = useSharedValue(0);
   const done = React.useRef(onDone);
   done.current = onDone;
+  const outMs = first ? FIRST_OUT_MS : REPEAT_OUT_MS;
+  const inMs = first ? FIRST_IN_MS : REPEAT_IN_MS;
 
   React.useEffect(() => {
     hapticPress();
     progress.value = withSequence(
-      withTiming(1, { duration: OUT_MS, easing: ease.inOut }),
-      withTiming(2, { duration: IN_MS, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: outMs, easing: first ? ease.inOut : Easing.out(Easing.quad) }),
+      withTiming(2, { duration: inMs, easing: Easing.out(Easing.quad) }),
     );
-    const timer = setTimeout(() => done.current(), OUT_MS + IN_MS + 40);
+    const timer = setTimeout(() => done.current(), outMs + inMs + 40);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -65,37 +81,39 @@ export function RealmPortal({ direction, onDone }: RealmPortalProps): React.JSX.
 
   return (
     <Animated.View style={[styles.root, veil]} pointerEvents="none">
-      <View style={StyleSheet.absoluteFill}>
-        <Svg width="100%" height="100%">
-          <Defs>
-            <RadialGradient id="realm-portal" cx="50%" cy="46%" r="46%">
-              <Stop offset="0" stopColor={tone} stopOpacity={0.5} />
-              <Stop offset="0.55" stopColor={tone} stopOpacity={0.12} />
-              <Stop offset="1" stopColor={tone} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#realm-portal)" />
-        </Svg>
-      </View>
-      <Animated.View style={[styles.ring, ring]}>
-        <View style={[styles.ringInner, { borderColor: tone }]} />
-      </Animated.View>
-      <Animated.View style={[styles.core, core]}>
-        <View style={[styles.coreInner, { backgroundColor: tone }]} />
-      </Animated.View>
-      <Animated.View style={[styles.word, word]}>
-        <Text allowFontScaling={false} style={styles.eyebrow}>
-          {direction === 'arena-to-vault' ? 'ENTERING' : 'RETURNING TO'}
-        </Text>
-        <Text allowFontScaling={false} style={styles.title}>
-          {title}
-        </Text>
-      </Animated.View>
+      {first ? (
+        <>
+          <View style={StyleSheet.absoluteFill}>
+            <Svg width="100%" height="100%">
+              <Defs>
+                <RadialGradient id="realm-portal" cx="50%" cy="46%" r="46%">
+                  <Stop offset="0" stopColor={tone} stopOpacity={0.5} />
+                  <Stop offset="0.55" stopColor={tone} stopOpacity={0.12} />
+                  <Stop offset="1" stopColor={tone} stopOpacity={0} />
+                </RadialGradient>
+              </Defs>
+              <Rect width="100%" height="100%" fill="url(#realm-portal)" />
+            </Svg>
+          </View>
+          <Animated.View style={[styles.ring, ring]}>
+            <View style={[styles.ringInner, { borderColor: tone }]} />
+          </Animated.View>
+          <Animated.View style={[styles.core, core]}>
+            <View style={[styles.coreInner, { backgroundColor: tone }]} />
+          </Animated.View>
+          <Animated.View style={[styles.word, word]}>
+            <Text allowFontScaling={false} style={styles.eyebrow}>
+              {direction === 'arena-to-vault' ? 'ENTERING' : 'RETURNING TO'}
+            </Text>
+            <Text allowFontScaling={false} style={styles.title}>
+              {title}
+            </Text>
+          </Animated.View>
+        </>
+      ) : null}
     </Animated.View>
   );
 }
-
-export const REALM_SHIFT_MS = OUT_MS + IN_MS;
 
 const styles = StyleSheet.create({
   root: {
@@ -113,5 +131,3 @@ const styles = StyleSheet.create({
   eyebrow: { ...typeScale.caption, color: ink.tertiary },
   title: { ...typeScale.display, color: ink.primary },
 });
-
-export { REALM_SHIFT_MS as REALM_PORTAL_MS };

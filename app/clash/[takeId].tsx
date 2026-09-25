@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ClashBody, type ClashStage } from '../../components/clash/ClashBody';
 import { clashStyles as s } from '../../components/clash/clashStyles';
-import { AuroraBackground } from '../../components/shared/AuroraBackground';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
 import { ShieldIcon } from '../../components/shared/icons';
@@ -19,9 +18,9 @@ import {
   type Judgement,
 } from '../../store';
 import { duration, space } from '../../theme';
-import { notify, tap as hapticTap } from '../../utils/haptics';
+import { judge as hapticJudge, notify, tap as hapticTap } from '../../utils/haptics';
 
-/** THE CLASH (spec §8–§10) — the hero screen of the product. */
+/** THE CLASH (PRD §9–§11) — the hero screen: decide in seconds, then loop. */
 export default function ClashScreen(): React.JSX.Element {
   const params = useLocalSearchParams<{ takeId: string }>();
   const takeId = typeof params.takeId === 'string' ? params.takeId : '';
@@ -41,6 +40,17 @@ export default function ClashScreen(): React.JSX.Element {
   );
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // "Next Clash" replaces the route, which can reuse this instance — re-derive
+  // the stage from the fresh param so a stale verdict never blocks the ballot.
+  // Keyed on the route param only: later dispatches (the resolve action) must
+  // not rewind the recorded → reveal beat that this effect would otherwise reset.
+  React.useEffect(() => {
+    const target = state.takes.find((item) => item.id === takeId);
+    const targetClash = target ? selectClashForTake(state, target.id) : undefined;
+    setJudgement(targetClash ? selectJudgement(state, targetClash.id) : undefined);
+    setStage(targetClash && selectResult(state, targetClash.id) ? 'result' : 'battle');
+  }, [takeId]);
+
   React.useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -59,6 +69,7 @@ export default function ClashScreen(): React.JSX.Element {
 
   const choose = (choice: Judgement): void => {
     if (!clash || stage !== 'battle') return;
+    hapticJudge();
     const result = resolveClash({
       clash,
       judgement: choice,
@@ -67,7 +78,7 @@ export default function ClashScreen(): React.JSX.Element {
     setJudgement(choice);
     setStage('recorded');
     dispatch(resolveClashAction(clash.id, choice, result));
-    // Suspense beat: the jury tally stays sealed for a moment (spec §8).
+    // The ballot is sealed; the jury tally stays hidden for one tight beat (§10).
     timer.current = setTimeout(() => {
       notify(
         result.alignment === 'majority'
@@ -80,24 +91,33 @@ export default function ClashScreen(): React.JSX.Element {
     }, duration.reveal);
   };
 
+  /** The retention loop (§11): jump straight into the next open clash. */
+  const nextClash = React.useCallback((): void => {
+    hapticTap();
+    const next = state.clashes.find((item) => {
+      if (item.takeId === takeId || selectResult(state, item.id)) return false;
+      const target = state.takes.find((entry) => entry.id === item.takeId);
+      return target !== undefined && target.expiresAt > Date.now();
+    });
+    router.replace(next ? `/clash/${next.takeId}` : '/(tabs)');
+  }, [router, state, takeId]);
+
   if (!take || !clash || !author || !challenger) {
     return (
-      <AuroraBackground>
-        <View style={[s.errorWrap, { paddingTop: insets.top }]}>
-          <EmptyState
-            icon={ShieldIcon}
-            title="This clash has closed."
-            body="Takes only survive 24 hours. Head back to the Arena for whatever is live right now."
-            actionLabel="BACK TO ARENA"
-            onAction={leave}
-          />
-        </View>
-      </AuroraBackground>
+      <View style={[s.root, s.errorWrap, { paddingTop: insets.top }]}>
+        <EmptyState
+          icon={ShieldIcon}
+          title="This clash has closed."
+          body="Takes only survive 24 hours. Head back to the Arena for whatever is live right now."
+          actionLabel="BACK TO ARENA"
+          onAction={leave}
+        />
+      </View>
     );
   }
 
   return (
-    <AuroraBackground tone="duel" doodles={false}>
+    <View style={s.root}>
       <ClashBody
         take={take}
         author={author}
@@ -112,8 +132,9 @@ export default function ClashScreen(): React.JSX.Element {
         onChoose={choose}
         onLeave={leave}
         onDone={() => router.replace('/(tabs)')}
+        onNextClash={nextClash}
       />
       <Notice offset={0} />
-    </AuroraBackground>
+    </View>
   );
 }

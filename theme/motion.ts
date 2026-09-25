@@ -1,14 +1,14 @@
 import { Easing } from 'react-native-reanimated';
 
-/** Motion tokens. Realm Shift targets 500–800ms (spec §16). */
+/** Motion tokens. Realm Shift: first shift ~640ms expressive, repeats ~240ms crossfade (spec §14). */
 export const duration = {
   instant: 120,
   fast: 200,
   base: 320,
   slow: 520,
   cinematic: 760,
-  /** "Your judgement has been recorded." hold before the jury reveal. */
-  reveal: 1250,
+  /** "Your judgement has been recorded." hold before the reveal — kept tight (PRD §9). */
+  reveal: 850,
 } as const;
 
 export const ease = {

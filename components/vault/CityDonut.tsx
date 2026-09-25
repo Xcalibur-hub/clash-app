@@ -1,8 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Defs, G, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, G } from 'react-native-svg';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
-import { accent, duration, ease, ink, space, typeScale } from '../../theme';
+import { duration, ease, ink, space, typeScale } from '../../theme';
 import type { CityName, CityShare } from '../../store/types';
 import { withAlpha } from '../../utils/color';
 
@@ -52,7 +52,7 @@ export function CityDonut({ cities, orders }: {
 }): React.JSX.Element {
   const sweep = useSharedValue(0);
   React.useEffect(() => {
-    sweep.value = withDelay(120, withTiming(1, { duration: duration.slow, easing: ease.out }));
+    sweep.value = withDelay(60, withTiming(1, { duration: duration.fast, easing: ease.out }));
   }, [sweep]);
   const spin = useAnimatedStyle(() => ({ opacity: sweep.value, transform: [{ scale: 0.94 + sweep.value * 0.06 }] }));
 
@@ -67,12 +67,6 @@ export function CityDonut({ cities, orders }: {
     <View style={styles.wrap}>
       <Animated.View style={spin}>
         <Svg width={180} height={180} viewBox="0 0 180 180">
-          <Defs>
-            <LinearGradient id="donut-sheen" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor="#fff" stopOpacity={0.25} />
-              <Stop offset="1" stopColor="#fff" stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
           <Circle cx={90} cy={90} r={RADIUS} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={14} />
           {slices}
         </Svg>
@@ -112,7 +106,7 @@ const styles = StyleSheet.create({
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   dot: { width: 8, height: 8, borderRadius: 4 },
   city: { ...typeScale.label, color: ink.primary },
-  share: { ...typeScale.data, color: accent.gold, position: 'absolute', right: 0 },
+  share: { ...typeScale.data, color: ink.primary, position: 'absolute', right: 0 },
   bar: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3 },
   count: { ...typeScale.meta, color: ink.tertiary },

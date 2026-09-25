@@ -1,10 +1,9 @@
 import React from 'react';
-import { FlatList, Share, StyleSheet, View, type ListRenderItemInfo } from 'react-native';
+import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaFeedHeader } from '../../components/arena/ArenaFeedHeader';
 import { TakeCard } from '../../components/arena/TakeCard';
-import { AuroraBackground } from '../../components/shared/AuroraBackground';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
 import { ArenaIcon } from '../../components/shared/icons';
@@ -13,7 +12,6 @@ import { useClock } from '../../hooks/useClock';
 import {
   reactToTake,
   selectAuthor,
-  selectClashForTake,
   selectFeed,
   selectHasReacted,
   selectIsSaved,
@@ -23,7 +21,7 @@ import {
   type HoodId,
   type Take,
 } from '../../store';
-import { layout, space } from '../../theme';
+import { color, layout, space } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
 
 /** THE ARENA (spec §6) — the live 24h feed of Takes. */
@@ -65,19 +63,16 @@ export default function ArenaScreen(): React.JSX.Element {
     ({ item }: ListRenderItemInfo<Take>) => {
       const author = selectAuthor(state, item.authorId);
       if (!author) return null;
-      const clash = selectClashForTake(state, item.id);
-      const challenger = clash ? selectAuthor(state, clash.challengerId) : undefined;
       return (
         <TakeCard
           take={item}
           author={author}
-          challenger={challenger}
           isViewer={author.id === state.viewer.id}
           isSaved={selectIsSaved(state, item.id)}
           hasReacted={selectHasReacted(state, item.id)}
-          clash={clash}
           now={now}
           onOpenClash={() => openClash(item.id)}
+          onOpenDetail={() => router.push(`/take/${item.id}`)}
           onReact={() => dispatch(reactToTake(item.id))}
           onSave={() => dispatch(toggleSave(item.id))}
           onShare={() => {
@@ -87,7 +82,7 @@ export default function ArenaScreen(): React.JSX.Element {
         />
       );
     },
-    [dispatch, now, openClash, shareTake, state],
+    [dispatch, now, openClash, router, shareTake, state],
   );
 
   const header = React.useMemo(
@@ -96,7 +91,7 @@ export default function ArenaScreen(): React.JSX.Element {
   );
 
   return (
-    <AuroraBackground>
+    <View style={styles.container}>
       <FlatList
         data={takes}
         keyExtractor={(take) => take.id}
@@ -104,7 +99,8 @@ export default function ArenaScreen(): React.JSX.Element {
         ListHeaderComponent={header}
         ItemSeparatorComponent={Separator}
         contentContainerStyle={[
-          { paddingTop: insets.top + space.md, paddingBottom: space.xxl },
+          { paddingTop: insets.top + space.md, paddingBottom: space.xxxl },
+          styles.list,
         ]}
         showsVerticalScrollIndicator={false}
         initialNumToRender={3}
@@ -121,7 +117,7 @@ export default function ArenaScreen(): React.JSX.Element {
         }
       />
       <Notice offset={0} />
-    </AuroraBackground>
+    </View>
   );
 }
 
@@ -130,6 +126,7 @@ function Separator(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 0 },
+  container: { flex: 1, backgroundColor: color.bg },
+  list: { flexGrow: 1 },
   separator: { height: layout.feedGap },
 });

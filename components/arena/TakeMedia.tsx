@@ -2,9 +2,8 @@ import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 import type { TakeMedia as TakeMediaModel } from '../../store';
-import { card, ink, radius, space, typeScale } from '../../theme';
-import { Chip } from '../shared/Chip';
-import { ImageIcon, PlayIcon, VideoIcon } from '../shared/icons';
+import { ink, radius, space, typeScale } from '../../theme';
+import { PlayIcon } from '../shared/icons';
 
 /**
  * Mock media plate. Real uploads (camera / picker) land in a later phase; the
@@ -13,7 +12,12 @@ import { ImageIcon, PlayIcon, VideoIcon } from '../shared/icons';
 export function TakeMedia({ media }: { media: TakeMediaModel }): React.JSX.Element {
   const isVideo = media.kind === 'video';
   return (
-    <View style={styles.wrap} accessibilityLabel={`${media.kind}: ${media.caption}`}>
+    <View
+      style={styles.wrap}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`${media.kind}: ${media.caption}`}
+    >
       <LinearGradient
         colors={media.colors}
         start={{ x: 0, y: 0 }}
@@ -21,13 +25,9 @@ export function TakeMedia({ media }: { media: TakeMediaModel }): React.JSX.Eleme
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.veil} pointerEvents="none" />
-      <View style={styles.topRow}>
-        <Chip label={isVideo ? 'VIDEO' : 'IMAGE'} icon={isVideo ? VideoIcon : ImageIcon} tone="neutral" />
-        {isVideo && media.duration ? <Chip label={media.duration} data tone="neutral" /> : null}
-      </View>
       {isVideo ? (
         <View style={styles.play}>
-          <PlayIcon size={20} color={ink.primary} strokeWidth={2.6} />
+          <PlayIcon size={20} color={ink.primary} strokeWidth={2.4} />
         </View>
       ) : null}
       <Text allowFontScaling={false} style={styles.caption}>
@@ -43,22 +43,13 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: card.border,
+    borderWidth: 0,
     justifyContent: 'flex-end',
     padding: space.md,
   },
   veil: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(8,8,11,0.34)',
-  },
-  topRow: {
-    position: 'absolute',
-    top: space.md,
-    left: space.md,
-    right: space.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: 'rgba(8,8,11,0.28)',
   },
   play: {
     position: 'absolute',
@@ -73,5 +64,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.4)',
   },
-  caption: { ...typeScale.subtitle, color: ink.primary },
+  caption: { ...typeScale.meta, color: ink.primary },
 });

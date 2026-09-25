@@ -9,14 +9,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { accent, color, ease } from '../../theme';
-import { ArrowMark, Burst, ScribbleCircle } from './Doodles';
 
-export type GlowTone = 'arena' | 'duel' | 'calm';
+/** Reserved backdrop (spec §3): onboarding, splash and Create only. */
+export type GlowTone = 'arena';
 
 const TONES: Record<GlowTone, readonly [string, string]> = {
   arena: [accent.a, accent.violet],
-  duel: [accent.a, accent.b],
-  calm: [accent.violet, accent.mint],
 };
 
 function Bloom({
@@ -24,26 +22,22 @@ function Bloom({
   color: glowColor,
   style,
   opacity,
-  tone,
 }: {
   size: number;
   color: string;
   style: ViewStyle;
   opacity: number;
-  tone: GlowTone;
 }): React.JSX.Element {
   const center = size / 2;
   const id = `bloom-${glowColor.replace('#', '')}-${size}`;
-  // Reduced opacity for arena mode to provide barely perceptible ambient light
-  const stopOpacity = tone === 'arena' ? 0.18 : 0.55;
-  const midOpacity = tone === 'arena' ? 0.06 : 0.12;
+  // Minimal opacity for flat dark UI - barely perceptible ambient light
   return (
     <View style={[styles.bloom, style, { width: size, height: size, opacity }]}>
       <Svg width={size} height={size}>
         <Defs>
           <RadialGradient id={id} cx={center} cy={center} r={center} gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor={glowColor} stopOpacity={stopOpacity} />
-            <Stop offset="0.55" stopColor={glowColor} stopOpacity={midOpacity} />
+            <Stop offset="0" stopColor={glowColor} stopOpacity={0.08} />
+            <Stop offset="0.55" stopColor={glowColor} stopOpacity={0.03} />
             <Stop offset="1" stopColor={glowColor} stopOpacity={0} />
           </RadialGradient>
         </Defs>
@@ -54,17 +48,15 @@ function Bloom({
 }
 
 /**
- * Arena backdrop: #08080B plus two slow drifting light blooms. The drift is
- * skipped entirely when the OS asks for reduced motion (spec §34).
+ * Arena backdrop: #08080B plus two slow drifting light blooms with minimal opacity for flat dark UI.
+ * The drift is skipped entirely when the OS asks for reduced motion (spec §34).
  */
 export function AuroraBackground({
   children,
   tone = 'arena',
-  doodles = true,
 }: {
   children: React.ReactNode;
   tone?: GlowTone;
-  doodles?: boolean;
 }): React.JSX.Element {
   const reduced = useReducedMotion();
   const drift = useSharedValue(0);
@@ -85,25 +77,14 @@ export function AuroraBackground({
     transform: [{ translateX: drift.value * -22 }, { translateY: drift.value * 14 }],
   }));
 
-  // Reduced opacity for arena mode to provide barely perceptible ambient light
-  const bloomOpacity = tone === 'arena' ? 0.3 : 0.5;
-  const bloomOpacitySecondary = tone === 'arena' ? 0.25 : 0.42;
-
   return (
     <View style={styles.root}>
       <Animated.View style={[styles.layer, topStyle]} pointerEvents="none">
-        <Bloom size={420} color={primary} opacity={bloomOpacity} style={{ top: -140, left: -120 }} tone={tone} />
+        <Bloom size={420} color={primary} opacity={0.15} style={{ top: -140, left: -120 }} />
       </Animated.View>
       <Animated.View style={[styles.layer, bottomStyle]} pointerEvents="none">
-        <Bloom size={460} color={secondary} opacity={bloomOpacitySecondary} style={{ bottom: -160, right: -140 }} tone={tone} />
+        <Bloom size={460} color={secondary} opacity={0.12} style={{ bottom: -160, right: -140 }} />
       </Animated.View>
-      {doodles ? (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <ScribbleCircle size={78} style={{ position: 'absolute', top: '18%', right: 22 }} />
-          <Burst size={26} style={{ position: 'absolute', top: '36%', left: 16 }} />
-          <ArrowMark size={40} style={{ position: 'absolute', bottom: '24%', left: 26 }} />
-        </View>
-      ) : null}
       <View style={styles.content}>{children}</View>
     </View>
   );

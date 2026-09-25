@@ -11,23 +11,23 @@ export const family = {
 } as const;
 
 /**
- * Type ramp from CLASH_SPEC.md §4:
- * display 32–40 · section 22–28 · card title 16–19 · body 14–16 · metadata 11–13.
+ * Type ramp for 8pt spacing system and flat dark UI:
+ * Display sizes use 8pt increments for consistency.
  */
 export const typeScale = {
   display: {
     fontFamily: family.sans,
-    fontSize: 34,
+    fontSize: 32,
     lineHeight: 40,
     fontWeight: '800',
-    letterSpacing: -0.9,
+    letterSpacing: -0.8,
   },
   title: {
     fontFamily: family.sans,
-    fontSize: 27,
+    fontSize: 24,
     lineHeight: 32,
     fontWeight: '800',
-    letterSpacing: -0.7,
+    letterSpacing: -0.6,
   },
   /**
    * Editorial italic headline — the reference design's section voice
@@ -35,85 +35,71 @@ export const typeScale = {
    */
   editorial: {
     fontFamily: family.sans,
-    fontSize: 29,
-    lineHeight: 35,
+    fontSize: 28,
+    lineHeight: 36,
     fontWeight: '700',
     fontStyle: 'italic',
-    letterSpacing: -0.8,
+    letterSpacing: -0.7,
   },
   section: {
     fontFamily: family.sans,
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 28,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   cardTitle: {
     fontFamily: family.sans,
-    fontSize: 17,
-    lineHeight: 23,
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
   take: {
     fontFamily: family.sans,
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: 24,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
   /**
-   * The Take itself — the single highest-contrast line on a feed card
-   * (reference "Arena Home").
+   * Take text in feed cards: 20-22px, weight 700, tight line height (28px).
+   * Also the Take itself on the take detail and duel panel — the single
+   * highest-contrast line on any Take surface.
    */
-  quote: {
-    fontFamily: family.sans,
-    fontSize: 21,
-    lineHeight: 28,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  /** Take text in feed cards: 20-22px, weight 700, tight line height (28px). */
   takeText: {
     fontFamily: family.sans,
-    fontSize: 21,
+    fontSize: 20,
     lineHeight: 28,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   body: {
     fontFamily: family.sans,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '400',
     letterSpacing: 0,
   },
   bodyStrong: {
     fontFamily: family.sans,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '600',
     letterSpacing: 0,
   },
   label: {
     fontFamily: family.sans,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '600',
     letterSpacing: 0.1,
   },
+  /** Subtitles/metadata with reduced opacity for secondary information. */
   meta: {
     fontFamily: family.sans,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '400',
-    letterSpacing: 0.1,
-  },
-  /** Subtitles/metadata with reduced opacity for secondary information. */
-  subtitle: {
-    fontFamily: family.sans,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '400',
     letterSpacing: 0.1,
   },
@@ -123,37 +109,37 @@ export const typeScale = {
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '700',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   dataLg: {
     fontFamily: family.mono,
-    fontSize: 19,
+    fontSize: 16,
     lineHeight: 24,
     fontWeight: '700',
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
   /** Small uppercase eyebrow labels. */
   caption: {
     fontFamily: family.mono,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '700',
-    letterSpacing: 1.6,
+    letterSpacing: 1.4,
   },
   /** Tracked uppercase mono eyebrow sitting above an editorial title. */
   eyebrow: {
     fontFamily: family.mono,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.8,
   },
   button: {
     fontFamily: family.sans,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
   },
 } as const satisfies Record<string, TextStyle>;
 

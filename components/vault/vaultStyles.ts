@@ -1,30 +1,12 @@
 import { StyleSheet } from 'react-native';
-import { accent, color, ink, radius, space, typeScale } from '../../theme';
+import { accent, color, ink, layout, radius, space, typeScale } from '../../theme';
 
-/** Vault screen chrome: shared padding + hero + premium section gaps. */
+/** Vault screen chrome (§21): flat canvas + 8pt content gaps, no aurora. */
 export const vault = StyleSheet.create({
-  content: { paddingHorizontal: 18, gap: 14, paddingBottom: 26 },
+  root: { flex: 1, backgroundColor: color.bg },
+  content: { paddingHorizontal: layout.screenX, gap: space.lg, paddingBottom: space.xl },
   hero: { gap: 4, paddingTop: 4 },
-  eyebrow: { ...typeScale.caption, color: accent.gold },
-  title: { ...typeScale.title, color: ink.primary, letterSpacing: -0.4 },
-  sub: { ...typeScale.body, color: ink.secondary, fontSize: 14 },
-});
-
-/** Sponsor dashboard (spec §22): tab row + simulated-data label. */
-export const sponsorRow = StyleSheet.create({
-  tabs: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  tab: {
-    ...typeScale.caption,
-    color: ink.tertiary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    overflow: 'hidden',
-  },
-  tabActive: { color: ink.primary, borderColor: 'rgba(255,200,97,0.55)' },
-  sim: { ...typeScale.meta, color: ink.tertiary },
+  sub: { ...typeScale.body, fontSize: 14, color: ink.secondary },
 });
 
 /** Bottom-sheet chrome shared by the mock checkout + analytics paywall. */
@@ -35,6 +17,18 @@ export const sheet = StyleSheet.create({
 
 export const paySheet = StyleSheet.create({
   card: { gap: space.md },
+});
+
+/** Sponsor deep-link screen styles (kept out of the screen for readability). */
+export const sponsorScreen = StyleSheet.create({
+  center: { flex: 1, paddingHorizontal: space.lg, justifyContent: 'center' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  brand: { ...typeScale.title, fontSize: 22, color: ink.primary },
+  tabs: { flexDirection: 'row', gap: space.xs, flexWrap: 'wrap' },
+  sim: { ...typeScale.meta, color: ink.tertiary },
+  locked: { gap: space.sm },
+  lockedTitle: { ...typeScale.cardTitle, color: ink.primary },
+  lockedBody: { ...typeScale.body, color: ink.secondary },
 });
 
 export const checkout = StyleSheet.create({
@@ -52,9 +46,9 @@ export const checkout = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     gap: 2,
   },
-  methodActive: { borderColor: 'rgba(255,200,97,0.55)', backgroundColor: 'rgba(255,200,97,0.10)' },
+  methodActive: { borderColor: 'rgba(255,255,255,0.45)', backgroundColor: 'rgba(255,255,255,0.08)' },
   methodLabel: { ...typeScale.label, color: ink.secondary },
-  on: { color: accent.gold },
+  on: { color: ink.primary },
   hint: { ...typeScale.meta, color: ink.tertiary, fontWeight: '400' },
   mockRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   mockText: { ...typeScale.meta, color: ink.tertiary, flex: 1, fontWeight: '400' },

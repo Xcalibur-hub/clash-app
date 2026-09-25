@@ -64,10 +64,13 @@ export function ArenaFeedHeader({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.md, paddingBottom: layout.feedGap },
+  wrap: { gap: space.md, paddingBottom: space.lg },
   hoodScroll: {
     paddingHorizontal: layout.screenX,
     gap: space.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    paddingBottom: space.md,
   },
   hoodTab: {
     position: 'relative',
@@ -82,7 +85,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   hoodTextInactive: {
-    color: ink.subtitle,
+    color: ink.tertiary,
     fontWeight: '400',
   },
   underline: {
@@ -98,14 +101,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: layout.screenX,
-    paddingTop: space.sm,
   },
   title: {
-    ...typeScale.section,
+    ...typeScale.title,
     color: ink.primary,
   },
   liveCount: {
-    ...typeScale.subtitle,
-    color: ink.subtitle,
+    ...typeScale.caption,
+    color: ink.tertiary,
   },
 });

@@ -1,10 +1,8 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import type { ClashResult as ClashResultModel } from '../../store';
-import { radius } from '../../theme';
 import { awardDescription } from '../../services/reputationService';
 import { Chip } from '../shared/Chip';
-import { GlassCard } from '../shared/GlassCard';
 import { TrophyIcon } from '../shared/icons';
 import { RankXpBar } from './RankXpBar';
 import { RewardLedger } from './RewardLedger';
@@ -41,7 +39,7 @@ export function ResultRewards({ result }: { result: ClashResultModel }): React.J
 
       <RewardLedger events={result.events} />
 
-      <GlassCard level="regular" corner={radius.card} style={s.rankCard}>
+      <View style={s.rankCard}>
         <RankXpBar
           rankName={result.rankAfter}
           rankTitle={result.rankTitle}
@@ -51,7 +49,7 @@ export function ResultRewards({ result }: { result: ClashResultModel }): React.J
           nextRankName={result.nextRankName}
           toNextRank={result.toNextRank}
         />
-      </GlassCard>
+      </View>
     </View>
   );
 }

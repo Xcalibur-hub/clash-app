@@ -136,6 +136,12 @@ const SEEDS: readonly TakeSeed[] = [
     ageMinutes: 660,
     clashes: 31,
     reactions: 240,
+    // Media so the Profile grid (PRD §19) renders both paths: grid + clean list.
+    media: {
+      kind: 'image',
+      caption: 'First offer vs fifth year — the real curve',
+      colors: gradient.gold,
+    },
   },
 ];
 

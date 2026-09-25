@@ -1,16 +1,15 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { ClashResult as ClashResultModel } from '../../store';
-import { accent } from '../../theme';
+import { accent, ink, space, typeScale } from '../../theme';
 import { Chip } from '../shared/Chip';
 import { GlowButton } from '../shared/GlowButton';
-import { GavelIcon, ZapIcon } from '../shared/icons';
+import { ArrowRightIcon, GavelIcon } from '../shared/icons';
 import { sideTone } from './duelPalette';
 import { Particles } from './Particles';
 import { ResultRewards } from './ResultRewards';
 import { ScoreCircles } from './ScoreCircles';
-import { resultStyles as s } from './resultStyles';
 
 export interface ClashResultProps {
   result: ClashResultModel;
@@ -18,58 +17,82 @@ export interface ClashResultProps {
   winnerHandle: string;
   winnerLabel: string;
   onDone: () => void;
+  onNextClash?: () => void;
 }
 
 /**
- * The payoff of the loop (spec §10, reference screen 9): "CLASH WON", the jury
- * score in the duel's own colours, the rewards the call earned, the rank bar, and
- * exactly one way out — back to the Arena.
+ * The verdict (PRD §12): expressive after the vote, but restrained — every
+ * entrance is a sub-200ms fade and the screen ends on the retention hook,
+ * "Next Clash →", with only a quiet link back to the Arena beside it.
  */
 export function ClashResult({
   result,
   winnerHandle,
   winnerLabel,
   onDone,
+  onNextClash,
 }: ClashResultProps): React.JSX.Element {
   return (
-    <View style={s.wrap}>
+    <View style={styles.wrap}>
       <Particles color={sideTone(result.winningSide).tone} trigger={result.resolvedAt} />
 
-      <Animated.View entering={FadeInDown.duration(340)} style={s.headline}>
-        <Text allowFontScaling={false} style={s.eyebrow}>
-          VERDICT FILED
+      <Animated.View entering={FadeInDown.duration(160)} style={styles.headline}>
+        <Text allowFontScaling={false} style={styles.eyebrow}>
+          THE JURY HAS SPOKEN
         </Text>
-        <Text allowFontScaling={false} style={s.title}>
-          CLASH WON
+        <Text allowFontScaling={false} style={styles.title}>
+          {`${winnerLabel} WON`}
         </Text>
-        <Text allowFontScaling={false} style={s.handle}>
-          {`${winnerLabel} · @${winnerHandle} takes the clash`}
+        <Text allowFontScaling={false} style={styles.handle}>
+          {`@${winnerHandle} takes the clash`}
         </Text>
       </Animated.View>
 
       <ScoreCircles score={result.score} winningSide={result.winningSide} />
 
-      <View style={s.scoreFooter}>
+      <View style={styles.scoreFooter}>
         <Chip label={result.verdict} icon={GavelIcon} tone="gold" />
       </View>
 
-      <ResultRewards result={result} />
-
-      <Animated.View entering={FadeInDown.delay(160).duration(360)} style={s.sparkRow}>
-        <ZapIcon size={14} color={accent.violet} strokeWidth={2.4} />
-        <Text allowFontScaling={false} style={s.sparkText}>
-          Streak updated. Return at 9:00 PM for the Daily Drop.
-        </Text>
+      <Animated.View entering={FadeInDown.delay(80).duration(180)}>
+        <ResultRewards result={result} />
       </Animated.View>
 
-      <GlowButton
-        label="Continue"
-        tone="ink"
-        pill
-        onPress={onDone}
-        style={s.continue}
-        accessibilityLabel="Continue back to the Arena"
-      />
+      <Animated.View entering={FadeInDown.delay(140).duration(180)} style={styles.actions}>
+        {onNextClash ? (
+          <GlowButton
+            label="Next Clash →"
+            icon={ArrowRightIcon}
+            tone="ink"
+            onPress={onNextClash}
+            style={styles.nextButton}
+            accessibilityLabel="Judge the next clash"
+          />
+        ) : null}
+        <Pressable
+          onPress={onDone}
+          accessibilityRole="button"
+          accessibilityLabel="Back to the Arena"
+          style={styles.back}
+        >
+          <Text allowFontScaling={false} style={styles.backText}>
+            BACK TO ARENA
+          </Text>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrap: { gap: space.lg, paddingBottom: space.xl },
+  headline: { alignItems: 'center', gap: space.xs },
+  eyebrow: { ...typeScale.eyebrow, color: accent.gold, letterSpacing: 1.8 },
+  title: { ...typeScale.title, fontSize: 32, fontWeight: '800', color: ink.primary },
+  handle: { ...typeScale.body, color: ink.secondary, textAlign: 'center' },
+  scoreFooter: { alignItems: 'center' },
+  actions: { gap: space.md },
+  nextButton: { alignSelf: 'stretch' },
+  back: { alignSelf: 'center', paddingVertical: space.xs, paddingHorizontal: space.md },
+  backText: { ...typeScale.button, fontSize: 12, color: ink.tertiary, letterSpacing: 1.4 },
+});
