@@ -15,6 +15,8 @@ export interface TakeComposerFieldsProps {
   hood: HoodId;
   onChangeHood: (hood: HoodId) => void;
   onAttach: (kind: 'image' | 'video') => void;
+  /** Real hoods only on the create screen; feeds keep the default scopes. */
+  hoods?: readonly HoodId[];
 }
 
 /**
@@ -31,6 +33,7 @@ export function TakeComposerFields({
   hood,
   onChangeHood,
   onAttach,
+  hoods,
 }: TakeComposerFieldsProps): React.JSX.Element {
   return (
     <>
@@ -62,7 +65,7 @@ export function TakeComposerFields({
       <Text allowFontScaling={false} style={styles.sectionLabel}>
         DROP INTO
       </Text>
-      <HoodSelector value={hood} onChange={onChangeHood} />
+      <HoodSelector value={hood} onChange={onChangeHood} hoods={hoods} />
     </>
   );
 }

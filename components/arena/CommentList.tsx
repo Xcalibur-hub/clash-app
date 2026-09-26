@@ -2,7 +2,9 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../shared/Avatar';
 import { CrownIcon } from '../shared/icons';
-import { selectAuthor, toggleCommentUpvote, useClash } from '../../store';
+import { selectAuthor, showNotice, syncCommentUpvote, toggleCommentUpvote, useClash } from '../../store';
+import { toggleUpvote } from '../../services/apiService';
+import { errorText } from '../../services/supabaseClient';
 import { accent, ink, typeScale } from '../../theme';
 import { compact } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -17,9 +19,44 @@ function timeAgo(createdAt: number, now: number): string {
 }
 
 /** Sorted comment rows with upvote toggle + reigning crown. Max 150 lines. */
-export function CommentList({ takeId, sort }: { takeId: string; sort: RepliesSort }): React.JSX.Element {
+export function CommentList({
+  takeId,
+  sort,
+  avatarSize = 28,
+}: {
+  takeId: string;
+  sort: RepliesSort;
+  avatarSize?: number;
+}): React.JSX.Element {
   const { state, dispatch } = useClash();
   const now = Date.now();
+
+  const commentsRef = React.useRef(state.comments);
+  React.useEffect(() => {
+    commentsRef.current = state.comments;
+  });
+
+  // Instant feedback first, server truth after: the optimistic flip lands the
+  // tap, then the RPC tally reconciles it — or rolls it back on failure. The
+  // rollback baseline is read from the mirrored comments, not the tapped row,
+  // so a concurrent server tally cannot poison the revert.
+  const toggleVote = React.useCallback(
+    async (commentId: string): Promise<void> => {
+      const baseline = commentsRef.current.find((item) => item.id === commentId);
+      const wasUpvoted = state.upvotedCommentIds.includes(commentId);
+      hapticTap();
+      dispatch(toggleCommentUpvote(commentId));
+      try {
+        const result = await toggleUpvote(commentId, state.viewer.id);
+        dispatch(syncCommentUpvote(result.commentId, result.upvoted, result.upvotesCount));
+      } catch (error) {
+        dispatch(syncCommentUpvote(commentId, wasUpvoted, baseline?.upvotes ?? 0));
+        dispatch(showNotice(errorText(error)));
+      }
+    },
+    [dispatch, state.upvotedCommentIds, state.viewer.id],
+  );
+
   const sorted = React.useMemo(() => {
     const list = state.comments.filter((c) => c.takeId === takeId);
     list.sort((a, b) => (sort === 'top' ? b.upvotes - a.upvotes : b.createdAt - a.createdAt));
@@ -34,7 +71,7 @@ export function CommentList({ takeId, sort }: { takeId: string; sort: RepliesSor
         const reigning = sort === 'top' && index === 0;
         return (
           <View key={item.id} style={styles.row}>
-            <Avatar name={user?.name ?? '?'} tint={user?.tint ?? '#888'} size={28} />
+            <Avatar name={user?.name ?? '?'} tint={user?.tint ?? '#888'} size={avatarSize} />
             <View style={styles.main}>
               <View style={styles.meta}>
                 <Text allowFontScaling={false} style={styles.handle} numberOfLines={1}>
@@ -50,7 +87,9 @@ export function CommentList({ takeId, sort }: { takeId: string; sort: RepliesSor
               <Text allowFontScaling={false} style={styles.body}>{item.text}</Text>
             </View>
             <Pressable
-              onPress={() => { hapticTap(); dispatch(toggleCommentUpvote(item.id)); }}
+              onPress={() => {
+                void toggleVote(item.id);
+              }}
               accessibilityRole="button"
               accessibilityState={{ selected: upvoted }}
               accessibilityLabel={`Upvote rebuttal, ${item.upvotes} upvotes`}

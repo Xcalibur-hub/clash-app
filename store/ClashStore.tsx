@@ -8,6 +8,8 @@ import React, {
   type ReactNode,
 } from 'react';
 import { clashReducer, createInitialState, type ClashAction, type ClashState } from './reducer';
+import { hydrateArena } from './actions';
+import { loadArena } from '../services/hydrationService';
 import type { User } from './types';
 
 interface ClashContextValue {
@@ -20,8 +22,10 @@ const ClashContext = createContext<ClashContextValue | null>(null);
 const NOTICE_MS = 2400;
 
 /**
- * Single store for the prototype. Phase 4 swaps the reducer wiring for
- * AsyncStorage hydration + Supabase sync; the context API stays identical.
+ * Single store for the prototype. The reducer boots from the bundled seed snapshot;
+ * on launch `hydrationService` swaps it for the live Arena. A failed or
+ * unconfigured backend keeps the seed data, so the app never needs the network.
+ * The context API stays identical either way.
  */
 export function ClashProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const [state, dispatch] = useReducer(clashReducer, undefined, createInitialState);
@@ -32,6 +36,18 @@ export function ClashProvider({ children }: { children: ReactNode }): React.JSX.
     const timer = setTimeout(() => dispatch({ type: 'ui/notice', message: null }), NOTICE_MS);
     return () => clearTimeout(timer);
   }, [noticeId]);
+
+  // One shot at mount: replace the bundled snapshot with the live database.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const snapshot = await loadArena();
+      if (!cancelled && snapshot) dispatch(hydrateArena(snapshot));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const value = useMemo<ClashContextValue>(() => ({ state, dispatch }), [state]);
 

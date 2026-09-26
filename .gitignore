@@ -13,3 +13,11 @@ npm-debug.*
 *.key
 *.mobileprovision
 *.orig.*
+
+# Supabase CLI scratch state (created by `supabase start` / `supabase link`)
+supabase/.temp/
+supabase/.branches/
+
+# Local secrets. EXPO_PUBLIC_* values are public by design (RLS guards the data),
+# but they are environment-specific: document them in README, not in git history.
+.env

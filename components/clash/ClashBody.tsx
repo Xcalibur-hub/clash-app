@@ -10,11 +10,12 @@ import { clashStyles as s, HEADER_SLOT } from './clashStyles';
 import { ChoiceButton } from './ChoiceButton';
 import { ClashResult as ClashResultView } from './ClashResult';
 import { JuryPanel } from './JuryPanel';
+import { LockedBanner } from './LockedBanner';
 import { RecordedBanner } from './RecordedBanner';
 import { TakePanel } from './TakePanel';
 import { VersusHeader } from './VersusHeader';
 
-export type ClashStage = 'battle' | 'recorded' | 'result';
+export type ClashStage = 'battle' | 'locked' | 'recorded' | 'result';
 
 export interface ClashBodyProps {
   take: Take;
@@ -26,6 +27,11 @@ export interface ClashBodyProps {
   revealed: boolean;
   stage: ClashStage;
   judgement: Judgement | undefined;
+  /** True when Take B is the community's top rebuttal (drives the winner note). */
+  challengerIsCommunity?: boolean;
+  /** The Take's end-of-day deadline — the jury files the verdict at expiry. */
+  expiresAt: number;
+  now: number;
   paddingTop: number;
   paddingBottom: number;
   onChoose: (judgement: Judgement) => void;
@@ -51,6 +57,10 @@ export function ClashBody({
   storedResult,
   revealed,
   stage,
+  judgement,
+  challengerIsCommunity = false,
+  expiresAt,
+  now,
   paddingTop,
   paddingBottom,
   onChoose,
@@ -65,6 +75,10 @@ export function ClashBody({
       ? author.handle
       : challenger.handle
     : '';
+  const winnerNote =
+    storedResult && winnerSide === 'B' && challengerIsCommunity
+      ? `Community rebuttal by @${challenger.handle} takes the clash`
+      : undefined;
 
   return (
     <ScrollView
@@ -119,6 +133,12 @@ export function ClashBody({
         </Animated.View>
       ) : null}
 
+      {stage === 'locked' && judgement && judgement !== 'UNDECIDED' ? (
+        <Animated.View exiting={FadeOut.duration(160)}>
+          <LockedBanner side={judgement} expiresAt={expiresAt} now={now} />
+        </Animated.View>
+      ) : null}
+
       {stage === 'recorded' ? (
         <Animated.View exiting={FadeOut.duration(160)}>
           <RecordedBanner />
@@ -130,6 +150,7 @@ export function ClashBody({
           result={storedResult}
           winnerHandle={winnerHandle}
           winnerLabel={`TAKE ${storedResult.winningSide}`}
+          winnerNote={winnerNote}
           onDone={onDone}
           onNextClash={onNextClash}
         />

@@ -9,16 +9,18 @@ import { Notice } from '../../components/shared/Notice';
 import { ShieldIcon } from '../../components/shared/icons';
 import { resolveClash } from '../../services/clashService';
 import {
-  resolveClashAction,
+  recordBallot,
   selectAuthor,
   selectClashForTake,
   selectJudgement,
   selectResult,
   selectTopComment,
+  settleClash,
   useClash,
   type Judgement,
 } from '../../store';
-import { duration, space } from '../../theme';
+import { space } from '../../theme';
+import { useClock } from '../../hooks/useClock';
 import { judge as hapticJudge, notify, tap as hapticTap } from '../../utils/haptics';
 
 /** THE CLASH (PRD §9–§11) — the hero screen: decide in seconds, then loop. */
@@ -37,30 +39,46 @@ export default function ClashScreen(): React.JSX.Element {
   const challenger = topAuthor ?? (clash ? selectAuthor(state, clash.challengerId) : undefined);
   const challengerText = topComment?.text ?? clash?.challengerText ?? '';
   const storedResult = clash ? selectResult(state, clash.id) : undefined;
+  const ballot = clash ? selectJudgement(state, clash.id) : undefined;
+  const live = take ? take.expiresAt > Date.now() : false;
+  const now = useClock();
 
-  const [stage, setStage] = React.useState<ClashStage>(storedResult ? 'result' : 'battle');
-  const [judgement, setJudgement] = React.useState<Judgement | undefined>(
-    clash ? selectJudgement(state, clash.id) : undefined,
-  );
-  const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The stage is fully derived from the store: a settled clash reveals, a
+  // recorded ballot locks and counts down to the drop, and a live debate
+  // accepts one ballot. Replacing the route ("Next Clash") re-derives
+  // automatically, so no stale verdict ever blocks a fresh ballot.
+  const stage: ClashStage = storedResult ? 'result' : ballot ? 'locked' : 'battle';
 
-  // "Next Clash" replaces the route, which can reuse this instance — re-derive
-  // the stage from the fresh param so a stale verdict never blocks the ballot.
-  // Keyed on the route param only: later dispatches (the resolve action) must
-  // not rewind the recorded → reveal beat that this effect would otherwise reset.
+  const settle = React.useCallback((): void => {
+    if (!clash || state.results[clash.id]) return;
+    const finalJudgement: Judgement = selectJudgement(state, clash.id) ?? 'UNDECIDED';
+    const result = resolveClash({
+      clash,
+      judgement: finalJudgement,
+      viewerReputation: state.viewer.reputation,
+    });
+    notify(
+      result.alignment === 'majority'
+        ? 'success'
+        : result.alignment === 'minority'
+          ? 'warning'
+          : 'error',
+    );
+    dispatch(settleClash(result));
+  }, [clash, dispatch, state]);
+
+  // The final judgement lands when the clock runs out: an expired clash settles
+  // on first view, and a live one settles the moment the countdown ends.
   React.useEffect(() => {
-    const target = state.takes.find((item) => item.id === takeId);
-    const targetClash = target ? selectClashForTake(state, target.id) : undefined;
-    setJudgement(targetClash ? selectJudgement(state, targetClash.id) : undefined);
-    setStage(targetClash && selectResult(state, targetClash.id) ? 'result' : 'battle');
-  }, [takeId]);
-
-  React.useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
+    if (!take || !clash || storedResult) return undefined;
+    const msLeft = take.expiresAt - Date.now();
+    if (msLeft <= 0) {
+      settle();
+      return undefined;
+    }
+    const timer = setTimeout(settle, msLeft + 250);
+    return () => clearTimeout(timer);
+  }, [clash, settle, storedResult, take]);
 
   const leave = React.useCallback((): void => {
     hapticTap();
@@ -72,27 +90,10 @@ export default function ClashScreen(): React.JSX.Element {
   }, [router]);
 
   const choose = (choice: Judgement): void => {
-    if (!clash || stage !== 'battle') return;
+    if (!clash || !live || stage !== 'battle') return;
     hapticJudge();
-    const result = resolveClash({
-      clash,
-      judgement: choice,
-      viewerReputation: state.viewer.reputation,
-    });
-    setJudgement(choice);
-    setStage('recorded');
-    dispatch(resolveClashAction(clash.id, choice, result));
-    // The ballot is sealed; the jury tally stays hidden for one tight beat (§10).
-    timer.current = setTimeout(() => {
-      notify(
-        result.alignment === 'majority'
-          ? 'success'
-          : result.alignment === 'minority'
-            ? 'warning'
-            : 'error',
-      );
-      setStage('result');
-    }, duration.reveal);
+    // The ballot is recorded; the jury files the verdict at the end of the day.
+    dispatch(recordBallot(clash.id, choice));
   };
 
   /** The retention loop (§11): jump straight into the next open clash. */
@@ -131,7 +132,10 @@ export default function ClashScreen(): React.JSX.Element {
         storedResult={storedResult}
         revealed={stage === 'result' && Boolean(storedResult)}
         stage={stage}
-        judgement={judgement}
+        judgement={ballot}
+        challengerIsCommunity={topComment != null}
+        expiresAt={take.expiresAt}
+        now={now}
         paddingTop={insets.top + space.sm}
         paddingBottom={insets.bottom + space.xxl}
         onChoose={choose}

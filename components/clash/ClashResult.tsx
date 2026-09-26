@@ -16,6 +16,8 @@ export interface ClashResultProps {
   /** Handle of the creator who won the clash. */
   winnerHandle: string;
   winnerLabel: string;
+  /** Overrides the default "@handle takes the clash" line. */
+  winnerNote?: string;
   onDone: () => void;
   onNextClash?: () => void;
 }
@@ -29,6 +31,7 @@ export function ClashResult({
   result,
   winnerHandle,
   winnerLabel,
+  winnerNote,
   onDone,
   onNextClash,
 }: ClashResultProps): React.JSX.Element {
@@ -38,13 +41,13 @@ export function ClashResult({
 
       <Animated.View entering={FadeInDown.duration(160)} style={styles.headline}>
         <Text allowFontScaling={false} style={styles.eyebrow}>
-          THE JURY HAS SPOKEN
+          FINAL VERDICT FILED
         </Text>
         <Text allowFontScaling={false} style={styles.title}>
           {`${winnerLabel} WON`}
         </Text>
         <Text allowFontScaling={false} style={styles.handle}>
-          {`@${winnerHandle} takes the clash`}
+          {winnerNote ?? `@${winnerHandle} takes the clash`}
         </Text>
       </Animated.View>
 

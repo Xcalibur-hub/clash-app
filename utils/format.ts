@@ -21,6 +21,16 @@ export function timeLeftLabel(expiresAt: number, now: number = Date.now()): stri
   return `${hours}h ${minutes % 60}m left`;
 }
 
+/** "2h 41m" / "41m" / "under a minute" — the final-judgement countdown. */
+export function durationLabel(expiresAt: number, now: number = Date.now()): string {
+  const remaining = expiresAt - now;
+  const minutes = Math.floor(Math.max(0, remaining) / 60_000);
+  if (minutes < 1) return 'under a minute';
+  const hours = Math.floor(minutes / 60);
+  if (hours < 1) return `${minutes}m`;
+  return `${hours}h ${minutes % 60}m`;
+}
+
 export function percent(part: number, total: number): number {
   if (total <= 0) return 0;
   return Math.round((part / total) * 100);

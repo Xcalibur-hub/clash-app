@@ -1,16 +1,37 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HOOD_LABEL } from '../../data/hoods';
-import { useClock } from '../../hooks/useClock';
-import { selectAuthor, useClash } from '../../store';
-import { action, color, duel, ink, radius, space, typeScale } from '../../theme';
-import { compact, timeLeftLabel } from '../../utils/format';
-import { press as hapticPress } from '../../utils/haptics';
+import { CommentList } from '../../components/arena/CommentList';
+import { DebateBanner } from '../../components/arena/DebateBanner';
+import { RebuttalInput } from '../../components/arena/RebuttalInput';
+import { ReigningBanner } from '../../components/arena/ReigningBanner';
+import { TakeMedia } from '../../components/arena/TakeMedia';
+import { SectionHeading } from '../../components/shared/SectionHeading';
+import { SegmentedTabs } from '../../components/shared/SegmentedTabs';
 import { Avatar } from '../../components/shared/Avatar';
 import { BackIcon, ZapIcon } from '../../components/shared/icons';
-import { TakeMedia } from '../../components/arena/TakeMedia';
+import { HOOD_LABEL } from '../../data/hoods';
+import { useClock } from '../../hooks/useClock';
+import { selectAuthor, selectTopComment, useClash } from '../../store';
+import { action, color, duel, ink, radius, space, typeScale } from '../../theme';
+import { compact } from '../../utils/format';
+import { press as hapticPress } from '../../utils/haptics';
+
+type SortKey = 'top' | 'recent';
+
+const SORTS: readonly { key: SortKey; label: string }[] = [
+  { key: 'top', label: 'Top' },
+  { key: 'recent', label: 'Recent' },
+];
 
 /** Flat, content-only Take detail target used by the Arena feed. */
 export default function TakeDetailScreen(): React.JSX.Element {
@@ -20,8 +41,12 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const now = useClock();
+  const [sort, setSort] = React.useState<SortKey>('top');
   const take = state.takes.find((item) => item.id === id);
   const author = take ? selectAuthor(state, take.authorId) : undefined;
+  const topComment = take ? selectTopComment(state, take.id) : undefined;
+  const topAuthor = topComment ? selectAuthor(state, topComment.authorId) : undefined;
+  const count = take ? state.comments.filter((c) => c.takeId === take.id).length : 0;
 
   if (!take || !author) {
     return (
@@ -42,6 +67,10 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.fill}
+      >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -73,11 +102,8 @@ export default function TakeDetailScreen(): React.JSX.Element {
         <Text style={styles.takeText}>{take.text}</Text>
         {take.media ? <TakeMedia media={take.media} /> : null}
 
-        <View style={styles.statsRow}>
-          <Text style={styles.stats}>{compact(take.clashes)} clashes</Text>
-          <Text style={styles.dot}>·</Text>
-          <Text style={styles.stats}>{timeLeftLabel(take.expiresAt, now)} left</Text>
-        </View>
+        <DebateBanner expiresAt={take.expiresAt} now={now} />
+        <ReigningBanner comment={topComment} author={topAuthor} />
 
         <Pressable
           onPress={openClash}
@@ -89,7 +115,25 @@ export default function TakeDetailScreen(): React.JSX.Element {
           <Text style={styles.clashText}>CLASH</Text>
           <ZapIcon size={18} color={duel.b} strokeWidth={2.6} />
         </Pressable>
+
+        <SectionHeading eyebrow="COMMUNITY REBUTTALS" title={`${compact(count)} replies`} />
+        <SegmentedTabs<SortKey>
+          value={sort}
+          items={SORTS}
+          onChange={setSort}
+          label="Sort rebuttals"
+        />
+        {count === 0 ? (
+          <Text style={styles.empty}>No rebuttals yet — drop the first one.</Text>
+        ) : (
+          <CommentList takeId={take.id} sort={sort} avatarSize={30} />
+        )}
       </ScrollView>
+
+      <View style={styles.inputBar}>
+        <RebuttalInput takeId={take.id} />
+      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -113,9 +157,15 @@ const styles = StyleSheet.create({
   handle: { ...typeScale.bodyStrong, color: ink.primary },
   meta: { ...typeScale.meta, color: ink.secondary },
   takeText: { ...typeScale.takeText, color: ink.primary },
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  stats: { ...typeScale.meta, color: ink.secondary },
-  dot: { ...typeScale.meta, color: ink.quaternary },
+  fill: { flex: 1 },
+  inputBar: {
+    paddingHorizontal: space.md,
+    paddingTop: space.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: color.bg,
+  },
+  empty: { ...typeScale.meta, color: ink.tertiary },
   clashButton: {
     minHeight: 52,
     flexDirection: 'row',

@@ -84,3 +84,16 @@ export const FEED_SCOPES: readonly HoodId[] = [
 export function hoodById(id: HoodId): Hood | undefined {
   return HOODS.find((hood) => hood.id === id);
 }
+
+/** Real hoods only — the set a Take can actually be dropped into (no feed scope). */
+export const HOOD_IDS: readonly Exclude<HoodId, 'for-you'>[] = HOODS.map((hood) => hood.id);
+
+/**
+ * The database stores real hoods only, so a viewer whose home hood is the For You
+ * feed still needs a concrete hood to publish into.
+ */
+export function toDbHood(hood: HoodId): Exclude<HoodId, 'for-you'> {
+  if (hood !== 'for-you') return hood;
+  const [fallback] = HOODS;
+  return fallback ? fallback.id : 'techtakes';
+}

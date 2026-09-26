@@ -43,6 +43,7 @@ Requires Node 20+ and Expo SDK 54 (React Native 0.81, React 19, Reanimated 4).
 | Blur / glass | `expo-blur` (iOS) + layered translucent fallback on Android  |
 | Gradients    | `expo-linear-gradient`, `react-native-svg` radial blooms     |
 | Haptics      | `expo-haptics` behind a safe wrapper (`utils/haptics.ts`)    |
+| Backend      | Supabase Postgres — RLS + column grants, typed client (`supabase/`, `services/apiService.ts`) |
 
 ---
 
@@ -61,14 +62,14 @@ app/
     notifications.tsx  Activity notifications
     profile.tsx        Social profile: identity + content grid (§18–§19)
   (vault)/             Vault realm — the same viewer, premium surfaces (§17–§23)
-  clash/[takeId].tsx   THE CLASH: battle → judgement recorded → result (§8–§10)
+  clash/[takeId].tsx   THE CLASH: battle → vote locked → final verdict (§8–§10)
   creator/, campaign/, sponsor/   Vault detail + sponsor dashboards
 
 components/
   arena/      ArenaHeader, ArenaFeedHeader, HoodSelector, TakeCard,
               TakeCardHeader, TakeMedia, TakeActions, MediaAttachRow,
-              TakeComposerFields
-  clash/      ClashBody, TakePanel, VersusHeader, JuryPanel,
+              DebateBanner, ReigningBanner, TakeComposerFields
+  clash/      ClashBody, TakePanel, VersusHeader, JuryPanel, LockedBanner,
               RecordedBanner, ClashResult, ScoreCircles, ResultRewards,
               RewardStrip, RewardLedger, RankXpBar, Particles, duelPalette
   explore/    SearchResults, TrendingSection, HoodsSection, DailyDropSection,
@@ -92,8 +93,10 @@ data/         mockUsers, mockTakes, mockClashes, mockJury, hoods, hofTakes,
               dailyDrop, mockCreators, mockDrops, mockCampaigns, onboarding,
               mockNotifications
 hooks/        useClock (shared 24h countdown tick)
-services/     juryService, clashService, reputationService
+services/     juryService, clashService, reputationService, vaultService,
+              apiService + supabaseClient (typed data layer)
 store/        types, reducer, actions, selectors, ClashStore (context)
+supabase/     schema.sql, seed.sql (Postgres + RLS), database.types.ts
 theme/        colors, typography, layout, glass, motion, index
 utils/        format, color, reputation, haptics
 ```
@@ -103,7 +106,7 @@ fill/border ramp, the A/B duel accents, the §4 type ramp (display 34 → captio
 the 4pt spacing scale, radii, motion durations and easings. Screens never hardcode colours.
 
 **State** is a typed reducer in `store/`. Screens dispatch small typed actions
-(`resolveClashAction`, `toggleSave`, `reactToTake`, …) and read through pure selectors,
+(`recordBallot`, `toggleSave`, `reactToTake`, …) and read through pure selectors,
 so a backend can replace the seed data without touching UI code.
 
 ---
@@ -114,10 +117,10 @@ so a backend can replace the seed data without touching UI code.
 
 - Arena feed ranked by heat, filtered by hood, with live 24h countdowns.
 - Take cards: react, save, share (native share sheet), more, plus Clash entry.
-- Clash flow: sealed 9-person jury → ballot (A / B / Undecided) → “your judgement has
-  been recorded” suspense beat → verdict reveal with tally, score, reputation count-up,
-  rank progress and haptics.
-- Judgement is single-shot; returning to a resolved Clash shows the stored verdict.
+- Clash flow: live debate → ballot (A / B) → "vote locked in" with a countdown to the
+  Final Judgement → verdict reveal with tally, score, reputation count-up, rank progress
+  and haptics. A verdict files when the 24-hour window closes, not on the tap.
+- Judgement is single-shot per Clash; a settled Clash always shows the stored verdict.
 - Reputation, coins, wins, streak and rank update in the store; the Wins tab fills up.
 
 **Simulated on purpose**
@@ -130,23 +133,80 @@ so a backend can replace the seed data without touching UI code.
 
 ---
 
-## 5. FUTURE PRODUCTION INFRASTRUCTURE
+## 5. Supabase backend (the Arena slice)
+
+The Arena has a real backend. The UI still renders from the typed store, so a device
+with no network behaves exactly as before; `services/apiService.ts` is the one seam a
+screen swaps a selector for a fetch through.
+
+| Piece | File | What it does |
+| --- | --- | --- |
+| Client | `services/supabaseClient.ts` | AsyncStorage session, refresh paused while backgrounded, `SupabaseError` for typed failures |
+| Schema | `supabase/schema.sql` | profiles · takes · comments · comment_upvotes, RLS, column grants, `toggle_comment_upvote` |
+| Seed | `supabase/seed.sql` | the same 11 people, 11 takes and 22 rebuttals the prototype ships |
+| Types | `supabase/database.types.ts` | hand-mirrored `Database` type — `supabase.from('takes')` returns `TakeRow[]`, still zero `any` |
+| Queries | `services/apiService.ts` | `fetchTakes` · `fetchComments` · `postTake` · `postComment` · `toggleUpvote` |
+
+### Setting it up
+
+1. `.env` holds `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Both are
+   baked into the bundle on purpose: the publishable key is governed by RLS.
+2. Paste `supabase/schema.sql`, then `supabase/seed.sql`, into the dashboard SQL Editor.
+   The seed ends with a verification row: **11 profiles · 11 takes · 11 live · 22
+   rebuttals · 3 votes**.
+3. `npm run typecheck` — the data layer is typed end to end.
+
+### How writes are locked down
+
+- **RLS** decides rows: reads are public (the Arena is a public feed); writes need a
+  session that owns the row. Hood moderators act only inside `moderated_hoods`.
+- **Column grants** decide columns: an API client can write words and media, never
+  `reputation`, `coins`, `rank`, `role`, counters or the 24-hour window. Those stay
+  server-owned, which is where the Clash economy belongs.
+- **Functions** own derived state: `toggle_comment_upvote` flips a vote and returns the
+  fresh tally inside one transaction, and a trigger keeps `comments.upvotes_count` in
+  step with `comment_upvotes`.
+
+### Letting the app write (one-time)
+
+Reads work immediately with the publishable key. Insert/update policies additionally
+need the seeded viewer linked to a real session — one statement, after the app has
+signed in once:
+
+```sql
+select id from auth.users order by created_at desc limit 1;   -- copy the uid
+update public.profiles set auth_user_id = '<uid>' where id = 'u-viewer';
+```
+
+`ensureSession()` signs in anonymously on the first write, so anonymous sign-ins must
+be enabled in Dashboard → Authentication → Providers. Nothing breaks if they are not:
+reads keep working and a refused write surfaces as a typed `SupabaseError`.
+
+### Still simulated
+
+Clashes, jurors and verdicts stay client-side (`services/juryService.ts`), as do the
+Vault and the sponsor campaigns. `supabase/schema.sql` lists the §29 tables that come
+next.
+
+---
+
+## 6. FUTURE PRODUCTION INFRASTRUCTURE
 
 > None of the following is implemented or implied by the UI copy. Each has a single
 > seam so it can be dropped in without rewriting screens.
 
 | Area | Seam today | Production plan |
 | --- | --- | --- |
-| **Backend / auth** | `store/reducer.ts` seeds from `data/*` | Supabase tables mirroring `store/types.ts`, auth provider above `ClashProvider`, reducer replaced by a server-synced store |
+| **Backend / auth** | `services/apiService.ts` over `supabase/schema.sql`; the reducer still seeds from `data/*` | Auth provider above `ClashProvider`, feed screens reading `apiService` instead of seed data, reducer replaced by a server-synced store |
 | **Anti-abuse** | `services/juryService.ts` (`selectJurors`, `submitJudgement`, `calculateResult`) | Server-side juror selection, one ballot per account/device, weighted jurors (`Juror.weight` already exists), signed verdicts |
 | **Payments** | none — coins are decorative | StoreKit / Play Billing for Exclusive Drops, receipt validation, entitlements |
 | **Sponsor attribution** | none (Phase 3) | Campaign + coupon tables, redemption codes, per-Hood and city-level attribution joins |
 | **Analytics** | none | Event stream derived from existing actions (judge, save, react, share) |
-| **Persistence** | in-memory store | `@react-native-async-storage/async-storage` hydration + optimistic sync |
+| **Persistence** | in-memory store; the auth session alone persists in AsyncStorage | Store hydration + optimistic sync on the same client |
 
 ---
 
-## 6. Accessibility & performance notes
+## 7. Accessibility & performance notes
 
 - Icon-only controls are labelled; ballots expose `accessibilityState`.
 - `useReducedMotion` disables the ambient bloom drift and the result particles.
@@ -157,7 +217,7 @@ so a backend can replace the seed data without touching UI code.
 
 ---
 
-## 7. Phase 1 file conventions
+## 8. Phase 1 file conventions
 
 - Max **150 lines** per component/screen file (`.clinerules`); screens compose
   components, they never grow into monoliths.

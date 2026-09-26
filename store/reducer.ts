@@ -27,6 +27,20 @@ export interface Notice {
   message: string;
 }
 
+/**
+ * One live Arena, straight from the database. `services/hydrationService.ts`
+ * builds it; the reducer applies it atomically so the feed can never show takes
+ * from one moment and rebuttals from another.
+ */
+export interface ArenaSnapshot {
+  takes: readonly Take[];
+  comments: readonly ChallengerComment[];
+  users: readonly User[];
+  /** Null when the viewer row is unreachable — the bundled snapshot then stays. */
+  viewer: User | null;
+  upvotedCommentIds: readonly string[];
+}
+
 export interface ClashState {
   hasOnboarded: boolean;
   /** Active product realm — drives which tab group owns the screen (spec §16). */
@@ -58,12 +72,15 @@ export interface ClashState {
 export type ClashAction =
   | { type: 'app/onboarded' }
   | { type: 'realm/switch'; realm: Realm }
-  | { type: 'clash/resolve'; clashId: string; judgement: Judgement; result: ClashResult }
+  | { type: 'data/hydrate'; snapshot: ArenaSnapshot }
+  | { type: 'clash/ballot'; clashId: string; judgement: Judgement }
+  | { type: 'clash/settle'; result: ClashResult }
   | { type: 'take/save'; takeId: string }
   | { type: 'take/react'; takeId: string }
   | { type: 'take/create'; take: Take }
   | { type: 'comment/create'; comment: ChallengerComment }
   | { type: 'comment/upvote'; commentId: string }
+  | { type: 'comment/upvote/sync'; commentId: string; upvoted: boolean; upvotes: number }
   | { type: 'vault/unlock'; dropId: string }
   | { type: 'vault/analytics'; unlocked: boolean }
   | { type: 'theme/mode'; mode: ThemeMode }
@@ -99,15 +116,13 @@ function withNotice(state: ClashState, message: string): ClashState {
   return { ...state, notice: { id, message }, noticeSeq: id };
 }
 
-function applyResult(
-  state: ClashState,
-  clashId: string,
-  judgement: Judgement,
-  result: ClashResult,
-): ClashState {
-  // One ballot per clash: a second dispatch for the same clash is ignored, so
-  // reputation can never be farmed by re-revealing a settled result (spec §8).
-  if (state.results[clashId]) return state;
+/**
+ * Settle a clash: the jury verdict is written and the economy pays out against
+ * the viewer's alignment. A missing ballot counts as an abstention, and a
+ * second settle is ignored so results can never be farmed (spec §8).
+ */
+function settleViewer(state: ClashState, result: ClashResult): ClashState {
+  if (state.results[result.clashId]) return state;
 
   const won = result.alignment === 'majority';
   const viewer: User = {
@@ -119,15 +134,14 @@ function applyResult(
     wins: state.viewer.wins + (won ? 1 : 0),
     streak: won ? state.viewer.streak + 1 : 0,
   };
-  return withNotice(
-    {
-      ...state,
-      viewer,
-      judgements: { ...state.judgements, [clashId]: judgement },
-      results: { ...state.results, [clashId]: result },
-    },
-    `Judgement filed · +${result.reputation} reputation`,
-  );
+  return {
+    ...state,
+    viewer,
+    judgements: state.judgements[result.clashId]
+      ? state.judgements
+      : { ...state.judgements, [result.clashId]: 'UNDECIDED' },
+    results: { ...state.results, [result.clashId]: result },
+  };
 }
 
 export function clashReducer(state: ClashState, action: ClashAction): ClashState {
@@ -138,8 +152,38 @@ export function clashReducer(state: ClashState, action: ClashAction): ClashState
     case 'realm/switch':
       return action.realm === state.realm ? state : { ...state, realm: action.realm };
 
-    case 'clash/resolve':
-      return applyResult(state, action.clashId, action.judgement, action.result);
+    case 'data/hydrate': {
+      // One atomic swap: takes, rebuttals, people and the viewer's own vote state
+      // land together, and nobody's id survives without its profile row.
+      const users: Readonly<Record<string, User>> = {
+        ...state.users,
+        ...Object.fromEntries(action.snapshot.users.map((user) => [user.id, user])),
+      };
+      return {
+        ...state,
+        users,
+        takes: action.snapshot.takes,
+        comments: action.snapshot.comments,
+        viewer: action.snapshot.viewer ?? state.viewer,
+        upvotedCommentIds: action.snapshot.upvotedCommentIds,
+      };
+    }
+
+    case 'clash/ballot': {
+      // One ballot per clash (spec §8). The ballot alone never settles anything —
+      // the jury files the verdict when the end-of-day clock runs out.
+      if (state.judgements[action.clashId]) return state;
+      return withNotice(
+        { ...state, judgements: { ...state.judgements, [action.clashId]: action.judgement } },
+        '✓ Your vote is locked in. The 9-person jury deliberates at 9:00 PM.',
+      );
+    }
+
+    case 'clash/settle':
+      return withNotice(
+        settleViewer(state, action.result),
+        `Final verdict filed · +${action.result.reputation} reputation`,
+      );
 
     case 'take/save': {
       const saved = state.savedTakeIds.includes(action.takeId);
@@ -204,6 +248,25 @@ export function clashReducer(state: ClashState, action: ClashAction): ClashState
           comment.id === action.commentId
             ? { ...comment, upvotes: Math.max(0, comment.upvotes + delta) }
             : comment,
+        ),
+      };
+    }
+
+    case 'comment/upvote/sync': {
+      // The server's word on a flip: idempotent, so an optimistic toggle followed
+      // by this reconcile always ends on the database tally — and a failed RPC can
+      // roll the optimistic flip straight back.
+      const already = state.upvotedCommentIds.includes(action.commentId);
+      return {
+        ...state,
+        upvotedCommentIds:
+          action.upvoted === already
+            ? state.upvotedCommentIds
+            : action.upvoted
+              ? [...state.upvotedCommentIds, action.commentId]
+              : state.upvotedCommentIds.filter((id) => id !== action.commentId),
+        comments: state.comments.map((comment) =>
+          comment.id === action.commentId ? { ...comment, upvotes: action.upvotes } : comment,
         ),
       };
     }

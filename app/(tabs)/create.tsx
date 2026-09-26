@@ -9,7 +9,11 @@ import { GlowButton } from '../../components/shared/GlowButton';
 import { IconButton } from '../../components/shared/IconButton';
 import { SectionHeading } from '../../components/shared/SectionHeading';
 import { CloseIcon } from '../../components/shared/icons';
+import { HOOD_IDS, toDbHood } from '../../data/hoods';
+import { postTake } from '../../services/apiService';
+import { errorText } from '../../services/supabaseClient';
 import { createTake, showNotice, useClash } from '../../store';
+import type { DbHood } from '../../supabase/database.types';
 import { space } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 
@@ -39,7 +43,8 @@ export default function CreateTakeScreen(): React.JSX.Element {
   const { state, dispatch } = useClash();
   const viewer = state.viewer;
   const [text, setText] = React.useState('');
-  const [hood, setHood] = React.useState<typeof viewer.hood>(viewer.hood);
+  const [hood, setHood] = React.useState<DbHood>(toDbHood(viewer.hood));
+  const [posting, setPosting] = React.useState(false);
   const placeholder = React.useMemo(suggestPrompt, []);
 
   const charsLeft = MAX_CHARS - text.length;
@@ -65,23 +70,22 @@ export default function CreateTakeScreen(): React.JSX.Element {
     );
   };
 
-  function drop(): void {
-    if (!canDrop) return;
+  async function drop(): Promise<void> {
+    if (!canDrop || posting) return;
     hapticPress();
-    dispatch(
-      createTake({
-        id: `take-${Date.now()}`,
-        authorId: viewer.id,
-        text: text.trim(),
-        hood,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-        clashes: 0,
-        reactions: 0,
-      }),
-    );
-    dispatch(showNotice('Take dropped · +30 XP. It self-destructs in 24 hours.'));
-    router.replace('/(tabs)');
+    setPosting(true);
+    try {
+      // The database stamps expiry and counters; the row it returns is the one the
+      // feed renders, whether the take was born on this device or another.
+      const take = await postTake(text.trim(), hood, undefined, viewer.id);
+      dispatch(createTake(take));
+      router.replace('/(tabs)');
+    } catch (error) {
+      // The draft stays put — a failed drop never loses the take.
+      dispatch(showNotice(errorText(error)));
+    } finally {
+      setPosting(false);
+    }
   }
 
   return (
@@ -115,8 +119,9 @@ export default function CreateTakeScreen(): React.JSX.Element {
             maxChars={MAX_CHARS}
             overLimit={overLimit}
             hood={hood}
-            onChangeHood={setHood}
+            onChangeHood={(next) => setHood(toDbHood(next))}
             onAttach={attach}
+            hoods={HOOD_IDS}
           />
 
           <View style={{ height: space.xxl }} />
@@ -124,11 +129,13 @@ export default function CreateTakeScreen(): React.JSX.Element {
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>
           <GlowButton
-            label="Drop It"
-            onPress={drop}
+            label={posting ? 'Dropping…' : 'Drop It'}
+            onPress={() => {
+              void drop();
+            }}
             tone="ink"
             pill
-            disabled={!canDrop}
+            disabled={!canDrop || posting}
             style={styles.cta}
             accessibilityLabel="Drop your take into the Arena"
             accessibilityHint="Publishes your take and awards 30 XP"

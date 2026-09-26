@@ -1,6 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { createComment, useClash } from '../../store';
+import { createComment, showNotice, useClash } from '../../store';
+import { postComment } from '../../services/apiService';
+import { errorText } from '../../services/supabaseClient';
 import { ink, typeScale } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
 
@@ -10,21 +12,23 @@ const MAX = 180;
 export function RebuttalInput({ takeId }: { takeId: string }): React.JSX.Element {
   const { state, dispatch } = useClash();
   const [draft, setDraft] = React.useState('');
+  const [pending, setPending] = React.useState(false);
 
-  const submit = (): void => {
+  async function submit(): Promise<void> {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || pending) return;
     hapticPress();
-    dispatch(createComment({
-      id: `c-${Date.now()}`,
-      takeId,
-      authorId: state.viewer.id,
-      text: text.slice(0, MAX),
-      upvotes: 0,
-      createdAt: Date.now(),
-    }));
-    setDraft('');
-  };
+    setPending(true);
+    try {
+      const comment = await postComment(takeId, text.slice(0, MAX), state.viewer.id);
+      dispatch(createComment(comment));
+      setDraft('');
+    } catch (error) {
+      dispatch(showNotice(errorText(error)));
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <View style={styles.row}>
@@ -38,13 +42,17 @@ export function RebuttalInput({ takeId }: { takeId: string }): React.JSX.Element
       />
       <Text allowFontScaling={false} style={styles.count}>{`${MAX - draft.length}`}</Text>
       <Pressable
-        onPress={submit}
-        disabled={!draft.trim()}
+        onPress={() => {
+          void submit();
+        }}
+        disabled={!draft.trim() || pending}
         accessibilityRole="button"
         accessibilityLabel="Send rebuttal"
-        style={[styles.send, !draft.trim() && styles.off]}
+        style={[styles.send, (!draft.trim() || pending) && styles.off]}
       >
-        <Text allowFontScaling={false} style={styles.sendText}>Send</Text>
+        <Text allowFontScaling={false} style={styles.sendText}>
+          {pending ? 'Sending' : 'Submit'}
+        </Text>
       </Pressable>
     </View>
   );

@@ -8,10 +8,12 @@ import { tap as hapticTap } from '../../utils/haptics';
 export interface HoodSelectorProps {
   value: HoodId;
   onChange: (hood: HoodId) => void;
+  /** Defaults to every feed scope; the composer passes the real hoods only. */
+  hoods?: readonly HoodId[];
 }
 
 /** Horizontal hood switcher. The active hood inverts to a solid pill. */
-export function HoodSelector({ value, onChange }: HoodSelectorProps): React.JSX.Element {
+export function HoodSelector({ value, onChange, hoods = FEED_SCOPES }: HoodSelectorProps): React.JSX.Element {
   return (
     <ScrollView
       horizontal
@@ -19,7 +21,7 @@ export function HoodSelector({ value, onChange }: HoodSelectorProps): React.JSX.
       contentContainerStyle={styles.row}
       accessibilityRole="tablist"
     >
-      {FEED_SCOPES.map((hood) => {
+      {hoods.map((hood) => {
         const active = hood === value;
         return (
           <Pressable

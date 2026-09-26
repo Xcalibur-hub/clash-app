@@ -4,7 +4,14 @@ import { useRouter } from 'expo-router';
 import { DAILY_DROP, dropNumber } from '../../data/dailyDrop';
 import { HOOD_LABEL } from '../../data/hoods';
 import { useClock } from '../../hooks/useClock';
-import { selectAuthor, useClash } from '../../store';
+import {
+  selectAuthor,
+  selectClashForTake,
+  selectFeed,
+  selectResult,
+  selectTopComment,
+  useClash,
+} from '../../store';
 import { compact, formatReputation, timeLeftLabel } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Chip } from '../shared/Chip';
@@ -39,10 +46,24 @@ export function DailyDropSection(): React.JSX.Element {
       const author = selectAuthor(state, take.authorId);
       const challenger = selectAuthor(state, clash.challengerId);
       if (!author || !challenger) continue;
-      return { entry, take, clash, author, challenger };
+      return { rank: entry.rank, take, clash, author, challenger };
+    }
+    // High-heat fallback: the hottest live debate leads when the curated shelf
+    // has no resolvable entry, so the drop always opens a real clash.
+    for (const take of selectFeed(state, 'for-you', now)) {
+      const clash = selectClashForTake(state, take.id);
+      const author = selectAuthor(state, take.authorId);
+      const challenger = clash ? selectAuthor(state, clash.challengerId) : undefined;
+      if (!clash || !author || !challenger) continue;
+      return { rank: 1, take, clash, author, challenger };
     }
     return null;
-  }, [state]);
+  }, [now, state]);
+
+  // The snapshot mirrors the live lifecycle: Take B is the community's top
+  // rebuttal, and the verdict only appears once the jury files it at expiry.
+  const storedResult = card ? selectResult(state, card.clash.id) : undefined;
+  const topComment = card ? selectTopComment(state, card.take.id) : undefined;
 
   const openClash = (takeId: string): void => {
     hapticTap();
@@ -61,15 +82,16 @@ export function DailyDropSection(): React.JSX.Element {
           take={card.take}
           author={card.author}
           challenger={card.challenger}
-          challengerText={card.clash.challengerText}
-          number={dropNumber(card.entry.rank)}
+          challengerText={topComment?.text ?? card.clash.challengerText}
+          number={dropNumber(card.rank)}
           title={HOOD_LABEL[card.take.hood].toUpperCase()}
           tag={`🔥 ${compact(card.take.reactions)} REACTIONS`}
           engagementLabel={`${formatReputation(card.clash.engagement)} watching`}
-          result={{
-            score: { a: card.entry.scoreA, b: card.entry.scoreB },
-            winningSide: card.entry.winningSide,
-          }}
+          result={
+            storedResult
+              ? { score: storedResult.score, winningSide: storedResult.winningSide }
+              : undefined
+          }
           onOpenClash={() => openClash(card.take.id)}
         />
       ) : (

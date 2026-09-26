@@ -2,7 +2,6 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { selectAuthor, useClash, type Take, type User } from '../../store';
 import { apple, ink, radius, space, typeScale } from '../../theme';
-import { RepliesSheet } from './RepliesSheet';
 import { TakeActions } from './TakeActions';
 import { TakeCardHeader } from './TakeCardHeader';
 import { TakeMedia } from './TakeMedia';
@@ -44,7 +43,6 @@ function TakeCardBase({
   onMore,
 }: TakeCardProps): React.JSX.Element {
   const { state } = useClash();
-  const [repliesOpen, setRepliesOpen] = React.useState(false);
   const comments = state.comments.filter((c) => c.takeId === take.id);
   const topComment = comments.length > 0
     ? comments.reduce((best, next) => (next.upvotes > best.upvotes ? next : best), comments[0] as (typeof comments)[number])
@@ -79,7 +77,7 @@ function TakeCardBase({
       <TopChallengerSnippet
         topComment={topComment}
         author={topAuthor}
-        onPress={() => setRepliesOpen(true)}
+        onPress={onOpenDetail}
       />
 
       <TakeActions
@@ -92,10 +90,9 @@ function TakeCardBase({
         onSave={onSave}
         onShare={onShare}
         onMore={onMore}
-        onComment={() => setRepliesOpen(true)}
+        onComment={onOpenDetail}
         now={now}
       />
-      {repliesOpen ? <RepliesSheet takeId={take.id} onClose={() => setRepliesOpen(false)} /> : null}
     </View>
   );
 }
