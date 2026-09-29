@@ -7,7 +7,7 @@ import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
 import { ArenaIcon } from '../../components/shared/icons';
 import { color } from '../../theme';
 
-/** Vault tab group (spec §17–§23): Home · Creators · Radar · Analytics · Profile. */
+/** Vault realm: your own creator Vault — Drops, Collections, and the premium Profile. */
 export default function VaultLayout(): React.JSX.Element {
   const { shifting, first, direction, shiftTo } = useRealmSwitch();
   return (
@@ -27,10 +27,8 @@ export default function VaultLayout(): React.JSX.Element {
           sceneStyle: { backgroundColor: color.bg },
         }}
       >
-        <Tabs.Screen name="index" options={{ title: 'Vault' }} />
-        <Tabs.Screen name="creators" options={{ title: 'Creators' }} />
-        <Tabs.Screen name="radar" options={{ title: 'Radar' }} />
-        <Tabs.Screen name="analytics" options={{ title: 'Analytics' }} />
+        <Tabs.Screen name="index" options={{ title: 'Drops' }} />
+        <Tabs.Screen name="collections" options={{ title: 'Collections' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
       {shifting ? <RealmPortal direction={direction} first={first} onDone={() => undefined} /> : null}

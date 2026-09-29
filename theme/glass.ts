@@ -29,24 +29,28 @@ export const glassBorder: Record<GlassLevel, string> = {
  */
 export const supportsBlur = Platform.OS === 'ios';
 
-/** Base glass recipe: rounded, translucent, hairline-bordered. */
-export function glassSurface(level: GlassLevel = 'regular', r: number = 28): ViewStyle {
+/** Base surface recipe: solid neutral fill + hairline border (no blur). */
+export function glassSurface(_level: GlassLevel = 'regular', r: number = 16): ViewStyle {
   return {
     borderRadius: r,
-    backgroundColor: glassFill[level],
+    backgroundColor: '#111113',
     borderWidth: 1,
-    borderColor: glassBorder[level],
+    borderColor: 'rgba(255,255,255,0.06)',
     overflow: 'hidden',
   };
 }
 
-/** Coloured bloom used for the Clash CTA, winner cards and the result reveal. */
-export function glow(color: string, blur = 22, offsetY = 8, opacity = 0.42): ViewStyle {
+/**
+ * Neutral elevation — no coloured bloom. Callers still pass a colour for
+ * compatibility, but it is ignored: surfaces get a plain dark shadow for depth,
+ * never a neon glow.
+ */
+export function glow(_color: string, blur = 12, offsetY = 3, _opacity = 0.42): ViewStyle {
   return {
-    shadowColor: color,
-    shadowOpacity: opacity,
+    shadowColor: '#000000',
+    shadowOpacity: 0.32,
     shadowRadius: blur,
     shadowOffset: { width: 0, height: offsetY },
-    elevation: 6,
+    elevation: 2,
   };
 }

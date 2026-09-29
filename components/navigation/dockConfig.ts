@@ -1,13 +1,11 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { LucideIcon } from 'lucide-react-native';
 import {
-  AnalyticsIcon,
   ArenaHomeIcon,
+  BookmarkIcon,
   CommentIcon,
   CompassIcon,
-  CreatorsIcon,
   PlusIcon,
-  RadarIcon,
   UserIcon,
   VaultIcon,
 } from '../shared/icons';
@@ -26,9 +24,7 @@ export const ARENA_TABS: Record<string, { label: string; icon: LucideIcon }> = {
 };
 
 export const VAULT_TABS: Record<string, { label: string; icon: LucideIcon }> = {
-  index: { label: 'Vault', icon: VaultIcon },
-  creators: { label: 'Creators', icon: CreatorsIcon },
-  radar: { label: 'Radar', icon: RadarIcon },
-  analytics: { label: 'Analytics', icon: AnalyticsIcon },
+  index: { label: 'Drops', icon: VaultIcon },
+  collections: { label: 'Collections', icon: BookmarkIcon },
   profile: { label: 'Profile', icon: UserIcon },
 };

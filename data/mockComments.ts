@@ -15,8 +15,8 @@ function row(
 }
 
 /**
- * Community rebuttals (2 per take). Top-voted comment per take mirrors
- * the challenger text in mockClashes.ts so Arena/Clash stay consistent.
+ * Community rebuttals (2 per take) — the guest/offline fallback the store starts
+ * from before `hydrationService` swaps in the live Arena.
  */
 export const COMMENTS: readonly ChallengerComment[] = [
   row('c-pixel-1', 't-pixel', 'u-liam', "Photos aren't the whole story. iPhone still dominates video.", 214, 3),

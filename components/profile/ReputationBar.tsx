@@ -1,7 +1,6 @@
 import React from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
-import { accent, gradient, ink, radius, space, typeScale } from '../../theme';
+import { accent, ink, radius, space, typeScale } from '../../theme';
 import { formatReputation } from '../../utils/format';
 import { rankProgress } from '../../utils/reputation';
 
@@ -24,12 +23,7 @@ export function ReputationBar({ reputation }: { reputation: number }): React.JSX
       </View>
 
       <View style={styles.track}>
-        <LinearGradient
-          colors={gradient.gold}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[styles.fill, { width: `${Math.max(ratio * 100, 3)}%` }]}
-        />
+        <View style={[styles.fill, { width: `${Math.max(ratio * 100, 3)}%` }]} />
       </View>
 
       <View style={styles.foot}>
@@ -57,7 +51,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
   },
-  fill: { height: 10, borderRadius: radius.pill },
+  fill: { height: 10, borderRadius: radius.pill, backgroundColor: ink.primary },
   foot: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   xp: { ...typeScale.data, fontSize: 12, color: ink.primary },
   caption: { ...typeScale.meta, color: ink.quaternary },

@@ -17,36 +17,35 @@ export const family = {
 export const typeScale = {
   display: {
     fontFamily: family.sans,
-    fontSize: 32,
-    lineHeight: 40,
-    fontWeight: '800',
-    letterSpacing: -0.8,
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   title: {
     fontFamily: family.sans,
-    fontSize: 24,
-    lineHeight: 32,
-    fontWeight: '800',
-    letterSpacing: -0.6,
-  },
-  /**
-   * Editorial italic headline — the reference design's section voice
-   * ("For You", "Today's Takes").
-   */
-  editorial: {
-    fontFamily: family.sans,
-    fontSize: 28,
-    lineHeight: 36,
-    fontWeight: '700',
-    fontStyle: 'italic',
-    letterSpacing: -0.7,
-  },
-  section: {
-    fontFamily: family.sans,
-    fontSize: 20,
+    fontSize: 22,
     lineHeight: 28,
     fontWeight: '700',
     letterSpacing: -0.3,
+  },
+  /**
+   * Section voice (formerly the editorial italic headline) — now a plain
+   * restrained title so headings read as mature social chrome.
+   */
+  editorial: {
+    fontFamily: family.sans,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  section: {
+    fontFamily: family.sans,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   cardTitle: {
     fontFamily: family.sans,
@@ -69,10 +68,10 @@ export const typeScale = {
    */
   takeText: {
     fontFamily: family.sans,
-    fontSize: 20,
-    lineHeight: 28,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   body: {
     fontFamily: family.sans,
@@ -118,28 +117,28 @@ export const typeScale = {
     fontWeight: '700',
     letterSpacing: -0.3,
   },
-  /** Small uppercase eyebrow labels. */
+  /** Small metadata labels (sans, no tracked mono). */
   caption: {
-    fontFamily: family.mono,
-    fontSize: 12,
+    fontFamily: family.sans,
+    fontSize: 11,
     lineHeight: 16,
-    fontWeight: '700',
-    letterSpacing: 1.4,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
-  /** Tracked uppercase mono eyebrow sitting above an editorial title. */
+  /** Small section label (sans, restrained). */
   eyebrow: {
-    fontFamily: family.mono,
+    fontFamily: family.sans,
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '700',
-    letterSpacing: 1.8,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   button: {
     fontFamily: family.sans,
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '600',
+    letterSpacing: 0,
   },
 } as const satisfies Record<string, TextStyle>;
 

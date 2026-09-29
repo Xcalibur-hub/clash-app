@@ -1,20 +1,25 @@
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   type Dispatch,
   type ReactNode,
 } from 'react';
 import { clashReducer, createInitialState, type ClashAction, type ClashState } from './reducer';
-import { hydrateArena } from './actions';
+import { arenaFailed, arenaLoading, hydrateArena } from './actions';
 import { loadArena } from '../services/hydrationService';
+import { isSupabaseConfigured } from '../services/supabaseClient';
 import type { User } from './types';
 
 interface ClashContextValue {
   state: ClashState;
   dispatch: Dispatch<ClashAction>;
+  /** Re-run Arena hydration (feed + comments + safety/reaction/upvote state). */
+  reloadArena: () => Promise<void>;
 }
 
 const ClashContext = createContext<ClashContextValue | null>(null);
@@ -22,14 +27,14 @@ const ClashContext = createContext<ClashContextValue | null>(null);
 const NOTICE_MS = 2400;
 
 /**
- * Single store for the prototype. The reducer boots from the bundled seed snapshot;
- * on launch `hydrationService` swaps it for the live Arena. A failed or
- * unconfigured backend keeps the seed data, so the app never needs the network.
- * The context API stays identical either way.
+ * Application store. When Supabase is configured, the Arena boots empty/loading
+ * and only shows server data. Hydration failures never fall back to mock Takes.
+ * Bundled fixtures load only in __DEV__ when Supabase is not configured.
  */
 export function ClashProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const [state, dispatch] = useReducer(clashReducer, undefined, createInitialState);
   const noticeId = state.notice?.id ?? null;
+  const reloadSeq = useRef(0);
 
   useEffect(() => {
     if (noticeId === null) return undefined;
@@ -37,19 +42,43 @@ export function ClashProvider({ children }: { children: ReactNode }): React.JSX.
     return () => clearTimeout(timer);
   }, [noticeId]);
 
-  // One shot at mount: replace the bundled snapshot with the live database.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const snapshot = await loadArena();
-      if (!cancelled && snapshot) dispatch(hydrateArena(snapshot));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  /**
+   * Rehydrates the live Arena. Sequence numbers drop stale in-flight responses.
+   * Configured backend failures surface as error/empty (or a soft notice after
+   * live data exists) — never as silent mock content.
+   */
+  const reloadArena = useCallback(async (): Promise<void> => {
+    const seq = ++reloadSeq.current;
 
-  const value = useMemo<ClashContextValue>(() => ({ state, dispatch }), [state]);
+    if (!isSupabaseConfigured) {
+      // Keep explicit __DEV__ fixtures; production-without-config stays on error.
+      if (typeof __DEV__ !== 'undefined' && __DEV__) return;
+      if (seq !== reloadSeq.current) return;
+      dispatch(arenaFailed("Couldn't load Arena."));
+      return;
+    }
+
+    dispatch(arenaLoading());
+    const result = await loadArena();
+    if (seq !== reloadSeq.current) return;
+
+    if (result.ok) {
+      dispatch(hydrateArena(result.snapshot));
+      return;
+    }
+
+    dispatch(arenaFailed(result.message));
+  }, [dispatch]);
+
+  // Cold start: attempt live hydrate when configured (or leave __DEV__ fixtures).
+  useEffect(() => {
+    void reloadArena();
+  }, [reloadArena]);
+
+  const value = useMemo<ClashContextValue>(
+    () => ({ state, dispatch, reloadArena }),
+    [state, reloadArena],
+  );
 
   return <ClashContext.Provider value={value}>{children}</ClashContext.Provider>;
 }

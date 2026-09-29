@@ -26,7 +26,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CLASH uses your location once when you publish a World Drop, and stores only an approximate area — never your exact position or continuous tracking."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

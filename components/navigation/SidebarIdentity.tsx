@@ -53,7 +53,7 @@ export function SidebarFooter(): React.JSX.Element {
   return (
     <View style={s.footer}>
       <Pressable
-        onPress={() => dispatch(showNotice('Prototype: settings arrive with the backend.'))}
+        onPress={() => dispatch(showNotice('Settings are not wired up yet.'))}
         accessibilityRole="button"
         accessibilityLabel="Open settings"
         style={s.settingsRow}

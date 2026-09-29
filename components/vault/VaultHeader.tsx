@@ -6,9 +6,7 @@ import { Chip } from '../shared/Chip';
 import { CoinIcon, FlameIcon, VaultIcon } from '../shared/icons';
 import { ink, space, typeScale } from '../../theme';
 import { compact } from '../../utils/format';
-import type { Creator } from '../../store/types';
 import { tap as hapticTap } from '../../utils/haptics';
-import { ArenaPill } from './ArenaPill';
 
 export interface ViewerChip {
   name: string;
@@ -49,7 +47,6 @@ export function VaultHeader({ title, subtitle, viewer, count, onOpenProfile }: V
           </Text>
         </View>
         <View style={styles.actions}>
-          <ArenaPill />
           {stat(viewer?.reputation ?? 0, 'reputation', FlameIcon, ink.secondary)}
           {stat(viewer?.coins ?? 0, 'clash coins', CoinIcon, ink.secondary)}
           {typeof count === 'number' ? <Chip label={`${count} LIVE`} tone="mint" data /> : null}
@@ -70,22 +67,6 @@ export function VaultHeader({ title, subtitle, viewer, count, onOpenProfile }: V
       <Text allowFontScaling={false} style={styles.headline}>
         {subtitle}
       </Text>
-    </View>
-  );
-}
-
-export function CreatorMeta({ creator, rating }: { creator: Creator; rating?: number }): React.JSX.Element {
-  return (
-    <View style={styles.metaRow}>
-      <Chip label={`${compact(creator.followers)} FANS`} tone="neutral" data />
-      <Text allowFontScaling={false} style={styles.metaText}>
-        {compact(creator.reputation)} REP
-      </Text>
-      {typeof rating === 'number' ? (
-        <Text allowFontScaling={false} style={styles.metaText}>
-          ★ {rating.toFixed(1)}
-        </Text>
-      ) : null}
     </View>
   );
 }

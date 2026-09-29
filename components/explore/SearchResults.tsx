@@ -1,31 +1,14 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { HOF_ENTRIES, type HofEntry } from '../../data/hofTakes';
-import { HOODS, HOOD_LABEL } from '../../data/hoods';
-import { selectAuthor, showNotice, useClash, type ClashState, type Hood, type Take, type User } from '../../store';
+import { HOOD_LABEL } from '../../data/hoods';
+import { searchAll, type SearchResults as Results } from '../../services/searchService';
+import { selectAuthor, useClash } from '../../store';
 import { accent, ink, space, typeScale } from '../../theme';
-import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
-import { HoodRow } from '../hof/HoodRow';
+import { tap as hapticTap } from '../../utils/haptics';
 import { EmptyState } from '../shared/EmptyState';
-import { FlameIcon, SearchIcon, TrophyIcon } from '../shared/icons';
+import { FlameIcon, HashIcon, SearchIcon } from '../shared/icons';
 import { SearchRow } from './SearchRow';
-
-interface QueryResults {
-  people: readonly User[];
-  hoods: readonly Hood[];
-  takes: readonly Take[];
-  fame: readonly HofEntry[];
-}
-
-function takeTextOf(state: ClashState, takeId: string): string {
-  return state.takes.find((item) => item.id === takeId)?.text ?? takeId;
-}
-
-function takeMeta(state: ClashState, take: Take): string {
-  const handle = selectAuthor(state, take.authorId)?.handle;
-  return `${handle ? `@${handle} · ` : ''}${HOOD_LABEL[take.hood]}`;
-}
 
 function Group({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
   return (
@@ -44,42 +27,75 @@ export interface SearchResultsProps {
   onClear: () => void;
 }
 
-/** Mock search (PRD §15): live-filters people, hoods, takes and Hall of Fame
- * entries on-device — backend search arrives later. */
+/**
+ * Real search (PRD §15): bounded, typed queries against the live Arena — people
+ * and takes over Postgres, Hoods over the fixed catalogue. No on-device mock.
+ */
 export function SearchResults({ query, onClear }: SearchResultsProps): React.JSX.Element {
-  const { state, dispatch } = useClash();
+  const { state } = useClash();
   const router = useRouter();
-  const needle = query.trim().toLowerCase();
+  const [results, setResults] = React.useState<Results | null>(null);
+  const [failed, setFailed] = React.useState(false);
 
-  const results = React.useMemo<QueryResults>(() => {
-    const match = (text: string): boolean => text.toLowerCase().includes(needle);
-    const people = [state.viewer, ...Object.values(state.users)]
-      .filter((user, index, all) => all.findIndex((item) => item.id === user.id) === index)
-      .filter((user) => match(user.handle) || match(user.name));
-    const hoods = HOODS.filter((hood) => match(hood.name) || match(hood.tagline));
-    const takes = state.takes.filter((take) => match(take.text));
-    const fame = HOF_ENTRIES.filter((entry) => match(takeTextOf(state, entry.takeId)));
-    return { people, hoods, takes, fame };
-  }, [needle, state]);
+  React.useEffect(() => {
+    let active = true;
+    setResults(null);
+    setFailed(false);
+    searchAll(query)
+      .then((rows) => {
+        if (active) setResults(rows);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [query]);
 
-  const openHood = (hoodId: string): void => { hapticTap(); router.push(`/(tabs)?hood=${hoodId}`); };
-  const openTake = (takeId: string): void => { hapticTap(); router.push(`/take/${takeId}`); };
-  const openClash = (takeId: string): void => { hapticTap(); router.push(`/clash/${takeId}`); };
-  const openProfile = (): void => { hapticPress(); dispatch(showNotice('Profile pages arrive with the backend.')); };
-  const { people, hoods, takes, fame } = results;
-  const total = people.length + hoods.length + takes.length + fame.length;
-
-  if (total === 0) {
+  if (failed) {
     return (
       <EmptyState
         icon={SearchIcon}
-        title={`No matches for “${query.trim()}”.`}
-        body="Search covers people, hoods, takes and the Hall of Fame — all on-device for now."
+        title="Search failed."
+        body="We could not reach the server. Try again."
         actionLabel="CLEAR SEARCH"
         onAction={onClear}
       />
     );
   }
+
+  if (results === null) {
+    return <ActivityIndicator color="#FFFFFF" style={styles.loading} />;
+  }
+
+  const { people, hoods, takes } = results;
+  const total = people.length + hoods.length + takes.length;
+
+  if (total === 0) {
+    return (
+      <EmptyState
+        icon={SearchIcon}
+        title={`No matches for "${query.trim()}".`}
+        body="Search covers people, hoods and live takes."
+        actionLabel="CLEAR SEARCH"
+        onAction={onClear}
+      />
+    );
+  }
+
+  const openProfile = (id: string): void => {
+    hapticTap();
+    router.push(`/profile/${id}`);
+  };
+  const openHood = (id: string): void => {
+    hapticTap();
+    router.push(`/(tabs)?hood=${id}`);
+  };
+  const openTake = (id: string): void => {
+    hapticTap();
+    router.push(`/take/${id}`);
+  };
 
   return (
     <View style={styles.results}>
@@ -92,19 +108,20 @@ export function SearchResults({ query, onClear }: SearchResultsProps): React.JSX
               title={`@${user.handle}`}
               meta={`${user.name} · ${user.rank}`}
               label={`Person ${user.handle}`}
-              onPress={openProfile}
+              onPress={() => openProfile(user.id)}
             />
           ))}
         </Group>
       ) : null}
       {hoods.length > 0 ? (
         <Group label={`HOODS · ${hoods.length}`}>
-          {hoods.map((hood, index) => (
-            <HoodRow
+          {hoods.slice(0, 6).map((hood) => (
+            <SearchRow
               key={hood.id}
-              position={index + 1}
-              hood={hood}
-              label={`Open ${hood.name}`}
+              icon={HashIcon}
+              title={hood.name}
+              meta={hood.tagline}
+              label={`Hood ${hood.name}`}
               onPress={() => openHood(hood.id)}
             />
           ))}
@@ -112,31 +129,20 @@ export function SearchResults({ query, onClear }: SearchResultsProps): React.JSX
       ) : null}
       {takes.length > 0 ? (
         <Group label={`TAKES · ${takes.length}`}>
-          {takes.slice(0, 6).map((take) => (
-            <SearchRow
-              key={take.id}
-              icon={FlameIcon}
-              title={take.text}
-              meta={takeMeta(state, take)}
-              label={`Take: ${take.text}`}
-              onPress={() => openTake(take.id)}
-            />
-          ))}
-        </Group>
-      ) : null}
-      {fame.length > 0 ? (
-        <Group label={`HALL OF FAME · ${fame.length}`}>
-          {fame.slice(0, 4).map((entry) => (
-            <SearchRow
-              key={entry.id}
-              icon={TrophyIcon}
-              iconColor={accent.gold}
-              title={`“${takeTextOf(state, entry.takeId)}”`}
-              meta={`${entry.scoreA}–${entry.scoreB} · ${entry.date}`}
-              label={`Hall of Fame take: ${takeTextOf(state, entry.takeId)}`}
-              onPress={() => openClash(entry.takeId)}
-            />
-          ))}
+          {takes.slice(0, 6).map((take) => {
+            const author = selectAuthor(state, take.authorId);
+            return (
+              <SearchRow
+                key={take.id}
+                icon={FlameIcon}
+                iconColor={accent.danger}
+                title={take.text}
+                meta={`@${author?.handle ?? 'unknown'} · ${HOOD_LABEL[take.hood]}`}
+                label={`Take by ${author?.handle ?? 'unknown'}`}
+                onPress={() => openTake(take.id)}
+              />
+            );
+          })}
         </Group>
       ) : null}
     </View>
@@ -144,6 +150,7 @@ export function SearchResults({ query, onClear }: SearchResultsProps): React.JSX
 }
 
 const styles = StyleSheet.create({
+  loading: { paddingVertical: space.xxl },
   results: { gap: space.lg },
   group: { gap: space.sm },
   groupLabel: { ...typeScale.eyebrow, color: ink.tertiary },

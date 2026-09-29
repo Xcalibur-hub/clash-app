@@ -1,6 +1,11 @@
 /**
- * Vault creators (spec §17, §26 — 6 creators, believable Indian handles).
- * Reputation / followers are status numbers; they never gate Arena content.
+ * Sponsor-prototype creator catalogue (spec §20–§22).
+ *
+ * These rows feed ONLY the prototype sponsor screens (`app/campaign/`,
+ * `app/sponsor/`) and their `OverviewGrid`. The Vault no longer reads this file:
+ * creator Vaults are real `creator_vaults` rows with real profiles, and the Vault
+ * UI speaks `services/vaultService.ts`. Kept isolated so nothing mock can mix
+ * with authenticated production Vault state. The sponsor phase replaces it.
  */
 import type { Creator } from '../store/types';
 

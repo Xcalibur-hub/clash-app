@@ -1,4 +1,4 @@
-import type { ChallengerComment, ClashResult, Judgement, Realm, Take, ThemeMode } from './types';
+import type { ChallengerComment, Realm, Take, ThemeMode, User } from './types';
 import type { ArenaSnapshot, ClashAction } from './reducer';
 
 /** Typed action creators — screens never build action objects by hand. */
@@ -7,24 +7,11 @@ export const markOnboarded = (): ClashAction => ({ type: 'app/onboarded' });
 
 export const switchRealm = (realm: Realm): ClashAction => ({ type: 'realm/switch', realm });
 
-/** Cast the viewer's ballot — the store records it; the jury settles later. */
-export const recordBallot = (clashId: string, judgement: Judgement): ClashAction => ({
-  type: 'clash/ballot',
-  clashId,
-  judgement,
-});
-
-/** File the final verdict once the end-of-day clock runs out. */
-export const settleClash = (result: ClashResult): ClashAction => ({
-  type: 'clash/settle',
-  result,
-});
-
 export const toggleSave = (takeId: string): ClashAction => ({ type: 'take/save', takeId });
 
 export const reactToTake = (takeId: string): ClashAction => ({ type: 'take/react', takeId });
 
-/** Drop a brand-new Take (spec §7) — the store pays the +30 XP creation award. */
+/** Drop a brand-new Take (spec §7) — reputation is server-authoritative. */
 export const createTake = (take: Take): ClashAction => ({ type: 'take/create', take });
 
 export const createComment = (comment: ChallengerComment): ClashAction => ({
@@ -49,14 +36,41 @@ export const syncCommentUpvote = (
   upvotes,
 });
 
+/** Land the server tally after `toggle_take_reaction` — or roll a flip back. */
+export const syncTakeReaction = (
+  takeId: string,
+  reacted: boolean,
+  reactions: number,
+): ClashAction => ({
+  type: 'take/reaction/sync',
+  takeId,
+  reacted,
+  reactions,
+});
+
 /** Swap the bundled snapshot for the live Arena built by `hydrationService`. */
 export const hydrateArena = (snapshot: ArenaSnapshot): ClashAction => ({
   type: 'data/hydrate',
   snapshot,
 });
 
-export const unlockDrop = (dropId: string): ClashAction => ({ type: 'vault/unlock', dropId });
+/** Cold-start Arena load begins (no-op for UI once live data exists). */
+export const arenaLoading = (): ClashAction => ({ type: 'arena/loading' });
 
+/** Arena hydrate failed — cold start clears feed; refresh keeps live data. */
+export const arenaFailed = (message: string): ClashAction => ({
+  type: 'arena/error',
+  message,
+});
+
+/** Swap the signed-in viewer (or back to the guest identity). */
+export const setViewer = (viewer: User): ClashAction => ({ type: 'viewer/set', viewer });
+
+/**
+ * Analytics is a local unlock stub: it flips a UI flag only. It deliberately
+ * grants no Vault content — entitlements live in `vault_subscriptions`, which the
+ * client cannot write (see `services/vaultService.ts`).
+ */
 export const setAnalytics = (unlocked: boolean): ClashAction => ({
   type: 'vault/analytics',
   unlocked,

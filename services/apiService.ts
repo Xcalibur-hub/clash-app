@@ -1,18 +1,18 @@
-import { VIEWER_SEED } from '../data/mockUsers';
-import type { ChallengerComment, HoodId, Take, User } from '../store/types';
-import type { DbHood } from '../supabase/database.types';
+import type { ChallengerComment, HoodId, MediaKind, Take, User } from '../store/types';
+import type { DbHood } from '../supabase/types';
 import {
   toComment,
-  toPostMedia,
   toTake,
+  toTakeReactionResult,
   toUpvoteResult,
   toUser,
-  type PostTakeMedia,
+  type TakeReactionResult,
   type UpvoteResult,
 } from './arenaMappers';
-import { currentUserId, ensureSession, requestError, requireSupabase } from './supabaseClient';
+import { currentUserId, requestError, requireSupabase, SupabaseError } from './supabaseClient';
+import { requireUserId } from './authService';
 
-export type { PostTakeMedia, UpvoteResult } from './arenaMappers';
+export type { TakeReactionResult, UpvoteResult } from './arenaMappers';
 
 /**
  * The Arena's data API: one function per query the app needs, each answering with
@@ -20,24 +20,29 @@ export type { PostTakeMedia, UpvoteResult } from './arenaMappers';
  * selector for a fetch without learning a second vocabulary. Rows never leak out —
  * `services/arenaMappers.ts` owns the snake_case → camelCase translation.
  *
- * Until auth ships, writes are attributed to the seeded viewer profile; linking it
- * to a session (`profiles.auth_user_id`) is what the RLS insert policies check.
+ * Writes resolve the author from the authenticated session
+ * (`requireViewerProfileId`) and never fall back to a seeded identity — a
+ * signed-out caller cannot write at all.
  */
-
-/** The seeded viewer: the author of anything written before auth lands. */
-const VIEWER_PROFILE_ID: string = VIEWER_SEED.id;
 
 /**
  * Live takes, hottest first (`for-you` is the whole live arena). The 24-hour
  * window is filtered in SQL by `expires_at`, never on the client — an expired
  * take cannot be rendered as live just because a device clock is wrong.
  */
-export async function fetchTakes(hoodId: HoodId = 'for-you'): Promise<Take[]> {
-  const live = requireSupabase()
+export async function fetchTakes(
+  hoodId: HoodId = 'for-you',
+  excludeAuthorIds: readonly string[] = [],
+): Promise<Take[]> {
+  let live = requireSupabase()
     .from('takes')
     .select('*')
     .eq('status', 'active')
     .gt('expires_at', new Date().toISOString());
+
+  if (excludeAuthorIds.length > 0) {
+    live = live.not('author_id', 'in', [...excludeAuthorIds]);
+  }
 
   const scoped = hoodId === 'for-you' ? live : live.eq('hood', hoodId);
   const { data, error } = await scoped
@@ -55,6 +60,15 @@ export async function fetchTakes(hoodId: HoodId = 'for-you'): Promise<Take[]> {
  */
 export async function fetchProfiles(): Promise<User[]> {
   const { data, error } = await requireSupabase().from('profiles').select('*').limit(200);
+
+  if (error) throw requestError(error);
+  return data.map(toUser);
+}
+
+/** A specific set of profiles, in id order — for follower/following/mute lists. */
+export async function fetchProfilesByIds(ids: readonly string[]): Promise<User[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await requireSupabase().from('profiles').select('*').in('id', [...ids]);
 
   if (error) throw requestError(error);
   return data.map(toUser);
@@ -92,22 +106,49 @@ export async function fetchCommentsForTakes(takeIds: readonly string[]): Promise
 }
 
 /**
- * The viewer's own profile: the row linked to this session when the account has
- * been claimed, otherwise the seeded viewer the demo still writes as. Null keeps
- * the bundled snapshot in play instead of failing the whole hydration.
+ * The profile id owned by the signed-in user — the single place writes learn who
+ * they act as. Throws when signed out or when the profile is missing, so a write
+ * can never fall back to a seeded identity or impersonate another user.
+ */
+export async function requireViewerProfileId(): Promise<string> {
+  const uid = await requireUserId();
+  const { data, error } = await requireSupabase()
+    .from('profiles')
+    .select('id')
+    .eq('auth_user_id', uid)
+    .maybeSingle();
+  if (error) throw requestError(error);
+  if (!data) throw new SupabaseError('Your profile is missing. Sign out and back in.', 'profile_missing');
+  return data.id;
+}
+
+/** The signed-in user's profile id, or null for a guest. Reads-only, never throws. */
+export async function currentViewerProfileId(): Promise<string | null> {
+  const uid = await currentUserId();
+  if (!uid) return null;
+  const { data, error } = await requireSupabase()
+    .from('profiles')
+    .select('id')
+    .eq('auth_user_id', uid)
+    .maybeSingle();
+  if (error) throw requestError(error);
+  return data?.id ?? null;
+}
+
+/**
+ * The viewer's own profile: the row linked to this session. Null for a signed-out
+ * guest, which keeps the demo snapshot in play for read-only browsing.
  */
 export async function fetchViewerProfile(): Promise<User | null> {
-  const client = requireSupabase();
   const uid = await currentUserId();
-  if (uid) {
-    const linked = await client.from('profiles').select('*').eq('auth_user_id', uid).maybeSingle();
-    if (linked.error) throw requestError(linked.error);
-    if (linked.data) return toUser(linked.data);
-  }
-
-  const seeded = await client.from('profiles').select('*').eq('id', VIEWER_PROFILE_ID).maybeSingle();
-  if (seeded.error) throw requestError(seeded.error);
-  return seeded.data ? toUser(seeded.data) : null;
+  if (!uid) return null;
+  const { data, error } = await requireSupabase()
+    .from('profiles')
+    .select('*')
+    .eq('auth_user_id', uid)
+    .maybeSingle();
+  if (error) throw requestError(error);
+  return data ? toUser(data) : null;
 }
 
 /**
@@ -128,37 +169,43 @@ export async function fetchViewerUpvoteIds(userId?: string): Promise<string[]> {
   return data.map((row) => row.comment_id);
 }
 
-/** Drops a take. `expires_at` and the counters are stamped by the database. */
+/** Media already uploaded to `media_objects` and ready to attach to a new Take. */
+export interface NewTakeMedia {
+  mediaObjectId: string;
+  /** Public rendering URL derived via `getPublicMediaUrl`. */
+  url: string;
+  kind: MediaKind;
+}
+
+/**
+ * Drops a Take through the server-authoritative `create_take` RPC. The author,
+ * 24-hour window, status and counters are stamped by the database; media (when
+ * supplied) must already be a completed, public object the caller owns.
+ */
 export async function postTake(
   text: string,
   hood: DbHood,
-  media?: PostTakeMedia,
-  authorId: string = VIEWER_PROFILE_ID,
+  media?: NewTakeMedia,
 ): Promise<Take> {
-  await ensureSession();
-  const { data, error } = await requireSupabase()
-    .from('takes')
-    .insert({
-      id: `take-${Date.now()}`,
-      author_id: authorId,
-      hood,
-      text,
-      ...toPostMedia(media),
-    })
-    .select('*')
-    .single();
+  const { data, error } = await requireSupabase().rpc('create_take', {
+    p_hood: hood,
+    p_text: text,
+    ...(media ? { p_media_object_id: media.mediaObjectId, p_media_url: media.url } : {}),
+  });
 
   if (error) throw requestError(error);
-  return toTake(data);
+  const row = data?.[0];
+  if (!row) throw new SupabaseError('create_take returned no row', 'bad_payload');
+  return toTake(row);
 }
 
-/** Posts a rebuttal on a take that is still live (the database enforces both). */
+/** Posts a rebuttal (or reply) on a take that is still live (the DB enforces it). */
 export async function postComment(
   takeId: string,
   text: string,
-  authorId: string = VIEWER_PROFILE_ID,
+  parentId?: string,
 ): Promise<ChallengerComment> {
-  await ensureSession();
+  const authorId = await requireViewerProfileId();
   const { data, error } = await requireSupabase()
     .from('comments')
     .insert({
@@ -166,6 +213,7 @@ export async function postComment(
       take_id: takeId,
       author_id: authorId,
       text,
+      ...(parentId ? { parent_comment_id: parentId } : {}),
     })
     .select('*')
     .single();
@@ -178,11 +226,8 @@ export async function postComment(
  * Flips one upvote through `toggle_comment_upvote`, so the tally is recalculated
  * inside a single transaction instead of being written from the client.
  */
-export async function toggleUpvote(
-  commentId: string,
-  userId: string = VIEWER_PROFILE_ID,
-): Promise<UpvoteResult> {
-  await ensureSession();
+export async function toggleUpvote(commentId: string): Promise<UpvoteResult> {
+  const userId = await requireViewerProfileId();
   const { data, error } = await requireSupabase().rpc('toggle_comment_upvote', {
     p_comment_id: commentId,
     p_user_id: userId,
@@ -190,5 +235,47 @@ export async function toggleUpvote(
 
   if (error) throw requestError(error);
   return toUpvoteResult(data);
+}
+
+/**
+ * Toggles the viewer's reaction on a Take through `toggle_take_reaction` — the
+ * server owns both the row and the aggregate, so the client never writes a count.
+ */
+export async function toggleTakeReaction(takeId: string): Promise<TakeReactionResult> {
+  const { data, error } = await requireSupabase().rpc('toggle_take_reaction', {
+    p_take_id: takeId,
+  });
+
+  if (error) throw requestError(error);
+  return toTakeReactionResult(data);
+}
+
+/**
+ * Take ids this viewer has reacted to. Empty for a guest — the seeded fallback
+ * must never stand in for a linked profile.
+ */
+export async function fetchMyTakeReactionIds(userId?: string): Promise<string[]> {
+  if (!userId) return [];
+  const { data, error } = await requireSupabase()
+    .from('take_reactions')
+    .select('take_id')
+    .eq('user_id', userId);
+
+  if (error) throw requestError(error);
+  return data.map((row) => row.take_id);
+}
+
+/** A single Take by id, regardless of live status (used for Clash context). */
+export async function fetchTakeById(takeId: string): Promise<Take | null> {
+  const { data, error } = await requireSupabase().from('takes').select('*').eq('id', takeId).maybeSingle();
+  if (error) throw requestError(error);
+  return data ? toTake(data) : null;
+}
+
+/** A single rebuttal by id (null when removed/unavailable via RLS). */
+export async function fetchCommentById(commentId: string): Promise<ChallengerComment | null> {
+  const { data, error } = await requireSupabase().from('comments').select('*').eq('id', commentId).maybeSingle();
+  if (error) throw requestError(error);
+  return data ? toComment(data) : null;
 }
 

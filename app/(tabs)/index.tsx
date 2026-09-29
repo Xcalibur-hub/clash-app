@@ -1,52 +1,173 @@
 import React from 'react';
-import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { FlatList, Share, StyleSheet, View, type ListRenderItemInfo } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInUp } from 'react-native-reanimated';
-import { ArenaFeedHeader } from '../../components/arena/ArenaFeedHeader';
-import { TakeCard } from '../../components/arena/TakeCard';
+import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
+import { FeedScopeTabs } from '../../components/arena/FeedScopeTabs';
+import { HoodStrip } from '../../components/arena/HoodStrip';
+import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
+import { TakeFeedItem } from '../../components/arena/TakeFeedItem';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
-import { ArenaIcon } from '../../components/shared/icons';
-import { HOOD_LABEL, hoodById } from '../../data/hoods';
+import { ArenaIcon, CompassIcon, UserIcon } from '../../components/shared/icons';
 import { useClock } from '../../hooks/useClock';
+import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { currentViewerProfileId, toggleTakeReaction } from '../../services/apiService';
+import { fetchFollowState, fetchFollowingIds } from '../../services/socialService';
+import { errorText } from '../../services/supabaseClient';
 import {
   reactToTake,
   selectAuthor,
-  selectFeed,
+  selectCommentsForTake,
+  selectFeedForScope,
   selectHasReacted,
   selectIsSaved,
+  selectTopComment,
   showNotice,
+  syncTakeReaction,
   toggleSave,
   useClash,
-  type HoodId,
+  type FeedScope,
   type Take,
+  type User,
 } from '../../store';
+import { useAuth } from '../../store/AuthProvider';
 import { color, layout, space } from '../../theme';
-import { press as hapticPress } from '../../utils/haptics';
+import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 
-/** THE ARENA (spec §6) — the live 24h feed of Takes. */
+const EMPTY_SET: ReadonlySet<string> = new Set<string>();
+
+/** The overflow sheet's target: one Take's author, resolved self/follow state. */
+interface FeedMenu {
+  target: User;
+  take: Take;
+  isSelf: boolean;
+  following: boolean;
+}
+
+/** THE ARENA — the live 24h feed, Reddit-like density with CLASH identity. */
 export default function ArenaScreen(): React.JSX.Element {
-  const { state, dispatch } = useClash();
+  const { state, dispatch, reloadArena } = useClash();
+  const { signedIn } = useAuth();
   const router = useRouter();
-  const params = useLocalSearchParams<{ hood?: string | string[] }>();
   const insets = useSafeAreaInsets();
-  const initialHood: HoodId = React.useMemo(() => {
-    const raw = Array.isArray(params.hood) ? params.hood[0] : params.hood;
-    return raw != null && hoodById(raw as HoodId) != null ? (raw as HoodId) : 'for-you';
-    // The param seeds the first paint only; afterwards the pill is the owner.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const [hood, setHood] = React.useState<HoodId>(initialHood);
-  const now = useClock();
-  const takes = React.useMemo(() => selectFeed(state, hood, now), [hood, now, state]);
+  const now = useClock(30_000);
+  const requireAuth = useRequireAuth();
+
+  const [scope, setScope] = React.useState<FeedScope>('for-you');
+  const [followingIds, setFollowingIds] = React.useState<ReadonlySet<string> | null>(null);
+  const [followingError, setFollowingError] = React.useState(false);
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [menu, setMenu] = React.useState<FeedMenu | null>(null);
+  /** Guards against double taps racing the reaction RPC for the same Take. */
+  const reactionInFlight = React.useRef<Set<string>>(new Set());
+
+  // Load the signed-in viewer's follow graph once per session (Following scope).
+  React.useEffect(() => {
+    if (!signedIn) {
+      setFollowingIds(EMPTY_SET);
+      setFollowingError(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setFollowingIds(null);
+    setFollowingError(false);
+    void (async () => {
+      try {
+        const profileId = await currentViewerProfileId();
+        if (cancelled) return;
+        const ids = profileId ? await fetchFollowingIds(profileId) : [];
+        if (!cancelled) setFollowingIds(new Set(ids));
+      } catch {
+        if (!cancelled) {
+          setFollowingError(true);
+          setFollowingIds(EMPTY_SET);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, refreshKey]);
+
+  const onRefresh = React.useCallback(async (): Promise<void> => {
+    setRefreshing(true);
+    // Re-resolve the Following graph and re-hydrate the live Arena.
+    setRefreshKey((k) => k + 1);
+    try {
+      await reloadArena();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reloadArena]);
+
+  /**
+   * Open the shared safety sheet for a Take's author. Follow state is fetched
+   * here — once per open, never per card — and discarded if the menu moved on.
+   */
+  const openMenu = React.useCallback(
+    async (take: Take): Promise<void> => {
+      const author = selectAuthor(state, take.authorId);
+      if (!author) return;
+      const isSelf = author.id === state.viewer.id;
+      setMenu({ target: author, take, isSelf, following: false });
+      if (isSelf || !signedIn) return;
+      try {
+        const followState = await fetchFollowState(author.id);
+        setMenu((current) =>
+          current && current.target.id === author.id
+            ? { ...current, following: followState.following }
+            : current,
+        );
+      } catch {
+        /* follow state is best-effort */
+      }
+    },
+    [state, signedIn],
+  );
+
+  const feed = React.useMemo(
+    () => selectFeedForScope(state, scope, 'all', now, followingIds ?? EMPTY_SET),
+    [state, scope, now, followingIds],
+  );
 
   const openClash = React.useCallback(
     (takeId: string): void => {
+      if (!requireAuth()) return;
       hapticPress();
       router.push(`/clash/${takeId}`);
     },
+    [requireAuth, router],
+  );
+
+  const openDetail = React.useCallback(
+    (takeId: string): void => router.push(`/take/${takeId}`),
     [router],
+  );
+
+  // Reaction authority is `toggle_take_reaction`: tap → optimistic flip → RPC →
+  // reconcile (or roll back), with an in-flight guard so double taps can't race.
+  const toggleReaction = React.useCallback(
+    async (take: Take): Promise<void> => {
+      if (reactionInFlight.current.has(take.id)) return;
+      const wasReacted = selectHasReacted(state, take.id);
+      const baseline = take.reactions;
+      if (!requireAuth()) return;
+      reactionInFlight.current.add(take.id);
+      hapticTap();
+      dispatch(reactToTake(take.id));
+      try {
+        const result = await toggleTakeReaction(take.id);
+        dispatch(syncTakeReaction(result.takeId, result.reacted, result.reactionsCount));
+      } catch (error) {
+        dispatch(syncTakeReaction(take.id, wasReacted, baseline));
+        dispatch(showNotice(errorText(error)));
+      } finally {
+        reactionInFlight.current.delete(take.id);
+      }
+    },
+    [dispatch, requireAuth, state],
   );
 
   const shareTake = React.useCallback(
@@ -61,63 +182,152 @@ export default function ArenaScreen(): React.JSX.Element {
   );
 
   const renderItem = React.useCallback(
-    ({ item, index }: ListRenderItemInfo<Take>) => {
+    ({ item }: ListRenderItemInfo<Take>) => {
       const author = selectAuthor(state, item.authorId);
       if (!author) return null;
+      const topComment = selectTopComment(state, item.id);
+      const topCommentAuthor = topComment ? selectAuthor(state, topComment.authorId) : undefined;
       return (
-        <Animated.View entering={FadeInUp.delay(Math.min(index, 6) * 60).duration(420)}>
-        <TakeCard
+        <TakeFeedItem
           take={item}
           author={author}
           isViewer={author.id === state.viewer.id}
           isSaved={selectIsSaved(state, item.id)}
           hasReacted={selectHasReacted(state, item.id)}
-          now={now}
+          commentCount={selectCommentsForTake(state, item.id).length}
+          topComment={topComment}
+          topCommentAuthor={topCommentAuthor}
+          onOpenDetail={() => openDetail(item.id)}
           onOpenClash={() => openClash(item.id)}
-          onOpenDetail={() => router.push(`/take/${item.id}`)}
-          onReact={() => dispatch(reactToTake(item.id))}
-          onSave={() => dispatch(toggleSave(item.id))}
+          onReact={() => {
+            void toggleReaction(item);
+          }}
+          onSave={() => {
+            if (requireAuth()) dispatch(toggleSave(item.id));
+          }}
           onShare={() => {
             void shareTake(item, author.handle);
           }}
-          onMore={() => dispatch(showNotice('Prototype: report & mute arrive with the backend.'))}
+          onMore={() => {
+            void openMenu(item);
+          }}
         />
-        </Animated.View>
       );
     },
-    [dispatch, now, openClash, router, shareTake, state],
+    [dispatch, openClash, openDetail, openMenu, requireAuth, shareTake, state, toggleReaction],
   );
 
   const header = React.useMemo(
-    () => <ArenaFeedHeader hood={hood} liveCount={takes.length} onChangeHood={setHood} />,
-    [hood, takes.length],
+    () => (
+      <View>
+        <FeedScopeTabs value={scope} onChange={setScope} />
+        <HoodStrip />
+      </View>
+    ),
+    [scope],
   );
+
+  const empty = React.useMemo(() => {
+    if (state.arenaStatus === 'loading') {
+      return <FeedSkeleton />;
+    }
+    if (state.arenaStatus === 'error') {
+      return (
+        <EmptyState
+          icon={ArenaIcon}
+          title="Couldn't load Arena."
+          body="Check your connection and try again."
+          actionLabel="TRY AGAIN"
+          onAction={() => {
+            void reloadArena();
+          }}
+        />
+      );
+    }
+    if (scope === 'following') {
+      if (!signedIn) {
+        return (
+          <EmptyState
+            icon={UserIcon}
+            title="Follow people to build your feed"
+            body="Following shows Takes from people you follow. Sign in to get a personalized feed."
+            actionLabel="SIGN IN"
+            onAction={() => router.push('/auth')}
+          />
+        );
+      }
+      if (followingError) {
+        return (
+          <EmptyState
+            icon={ArenaIcon}
+            title="Couldn't load your follows"
+            body="Check your connection and try again."
+            actionLabel="RETRY"
+            onAction={() => setRefreshKey((k) => k + 1)}
+          />
+        );
+      }
+      if (followingIds === null) {
+        return <FeedSkeleton />;
+      }
+      return (
+        <EmptyState
+          icon={CompassIcon}
+          title="Your Following feed is empty"
+          body="Follow creators and communities to fill this feed."
+          actionLabel="EXPLORE"
+          onAction={() => router.push('/explore')}
+        />
+      );
+    }
+    return (
+      <EmptyState
+        icon={ArenaIcon}
+        title="No live takes right now"
+        body="Every take expires after 24 hours. Try another community or check back soon."
+      />
+    );
+  }, [
+    state.arenaStatus,
+    scope,
+    signedIn,
+    followingIds,
+    followingError,
+    router,
+    reloadArena,
+  ]);
+
+  // Cold-start failure: no mock content underneath — only the error empty state.
+  const listData = state.arenaStatus === 'error' || state.arenaStatus === 'loading' ? [] : feed;
 
   return (
     <View style={styles.container}>
+      <ArenaTopBar paddingTop={insets.top} />
       <FlatList
-        data={takes}
+        data={listData}
         keyExtractor={(take) => take.id}
         renderItem={renderItem}
         ListHeaderComponent={header}
         ItemSeparatorComponent={Separator}
-        contentContainerStyle={[
-          { paddingTop: insets.top + space.md, paddingBottom: space.xxxl },
-          styles.list,
-        ]}
+        ListEmptyComponent={empty}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + space.xl }]}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={3}
-        maxToRenderPerBatch={4}
-        windowSize={7}
-        ListEmptyComponent={
-          <EmptyState
-            icon={ArenaIcon}
-            title={`No live takes in ${HOOD_LABEL[hood]}.`}
-            body="Every take self-destructs after 24 hours. Switch hoods or wait for the next drop."
-            actionLabel="BACK TO FOR YOU"
-            onAction={() => setHood('for-you')}
-          />
-        }
+        refreshing={refreshing}
+        onRefresh={() => {
+          void onRefresh();
+        }}
+        initialNumToRender={6}
+        maxToRenderPerBatch={8}
+        windowSize={9}
+      />
+      <PostActionsSheet
+        visible={menu !== null}
+        target={menu?.target ?? null}
+        isSelf={menu?.isSelf ?? false}
+        following={menu?.following ?? false}
+        reportTarget={menu ? { kind: 'take', id: menu.take.id } : null}
+        onClose={() => setMenu(null)}
+        onMutated={() => setRefreshKey((k) => k + 1)}
       />
       <Notice offset={0} />
     </View>
@@ -128,8 +338,33 @@ function Separator(): React.JSX.Element {
   return <View style={styles.separator} />;
 }
 
+function FeedSkeleton(): React.JSX.Element {
+  return (
+    <View style={skeletonStyles.wrap}>
+      {[0, 1, 2].map((row) => (
+        <View key={row} style={skeletonStyles.row}>
+          <View style={skeletonStyles.avatar} />
+          <View style={skeletonStyles.lines}>
+            <View style={[skeletonStyles.bar, { width: '55%' }]} />
+            <View style={[skeletonStyles.bar, { width: '92%' }]} />
+            <View style={[skeletonStyles.bar, { width: '40%' }]} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: color.bg },
   list: { flexGrow: 1 },
-  separator: { height: layout.feedGap },
+  separator: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
+});
+
+const skeletonStyles = StyleSheet.create({
+  wrap: { paddingHorizontal: layout.screenX, gap: space.xl, paddingVertical: space.lg },
+  row: { flexDirection: 'row', gap: space.md },
+  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.06)' },
+  lines: { flex: 1, gap: space.xs },
+  bar: { height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)' },
 });

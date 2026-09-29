@@ -1,52 +1,43 @@
 import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { ink, space, typeScale } from '../../theme';
-import { Underline } from './Doodles';
 
 export interface SectionHeadingProps {
   eyebrow: string;
   title: string;
-  /** Draws a hand-drawn underline beneath the title. */
+  /** Kept for compatibility — no longer draws a hand-drawn underline. */
   marked?: boolean;
-  /** Renders the title in the editorial italic voice (reference design). */
+  /** Kept for compatibility — no longer italicises. */
   editorial?: boolean;
   accessory?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
-/** Eyebrow + title pair used to open every block of content. */
+/** Eyebrow + title pair used to open every block of content (plain, restrained). */
 export function SectionHeading({
   eyebrow,
   title,
-  marked = false,
-  editorial = false,
   accessory,
   style,
 }: SectionHeadingProps): React.JSX.Element {
   return (
     <View style={[styles.wrap, style]}>
       <View style={styles.row}>
-        <Text allowFontScaling={false} style={[styles.eyebrow, editorial && styles.eyebrowEditorial]}>
+        <Text allowFontScaling={false} style={styles.eyebrow}>
           {eyebrow}
         </Text>
         {accessory}
       </View>
-      <View>
-        <Text allowFontScaling={false} style={[styles.title, editorial && styles.editorialTitle]}>
-          {title}
-        </Text>
-        {marked ? <Underline size={118} style={styles.mark} /> : null}
-      </View>
+      <Text allowFontScaling={false} style={styles.title}>
+        {title}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.xs + 2 },
+  wrap: { gap: space.xxs + 2 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow: { ...typeScale.caption, color: ink.tertiary },
-  eyebrowEditorial: { ...typeScale.eyebrow },
   title: { ...typeScale.section, color: ink.primary },
-  editorialTitle: { ...typeScale.editorial },
-  mark: { position: 'absolute', bottom: -8, left: -4 },
 });

@@ -19,9 +19,7 @@ import { SectionHeading } from '../../components/shared/SectionHeading';
 import { ArenaIcon, TrophyIcon } from '../../components/shared/icons';
 import {
   selectAuthor,
-  selectUnlockedDropIds,
   selectViewerTakes,
-  selectViewerWins,
   useClash,
   type WinEntry,
 } from '../../store';
@@ -43,8 +41,15 @@ export default function VaultProfileScreen(): React.JSX.Element {
   const router = useRouter();
   const viewer = state.viewer;
   const takes = React.useMemo(() => selectViewerTakes(state), [state]);
-  const wins = React.useMemo(() => selectViewerWins(state), [state]);
-  const unlocked = React.useMemo(() => selectUnlockedDropIds(state), [state]);
+  // The mock local Clash results were removed: verdicts and rewards are
+  // server-authoritative now, so this stays empty until the Wins tab is rebuilt
+  // on the server's Clash history (Vault-phase work).
+  const wins: readonly WinEntry[] = [];
+  // Nothing is unlocked yet, and nothing local could be: an entitlement is a
+  // `vault_subscriptions` row the client has no write grant for (migration 0016).
+  // Phase 3 Step 2 rebuilds this from `fetchSubscriptionState` +
+  // `fetchAccessibleDrops` rather than from anything cached on the device.
+  const unlocked: readonly string[] = [];
 
   const winnerHandle = (entry: WinEntry): string => {
     const authorId =
@@ -81,8 +86,7 @@ export default function VaultProfileScreen(): React.JSX.Element {
         <Chip label={`${unlocked.length} UNLOCKED`} tone="neutral" data />
         {unlocked.length === 0 ? (
           <Text style={{ color: 'rgba(247,247,250,0.44)' }}>
-            Nothing unlocked yet — the Vault holds {state.drops.filter((d) => d.tier === 'exclusive').length}{' '}
-            exclusive drops.
+            Nothing unlocked yet — your subscriber Drops will appear here.
           </Text>
         ) : null}
 

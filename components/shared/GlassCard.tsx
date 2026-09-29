@@ -1,46 +1,34 @@
 import React from 'react';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import {
-  apple,
-  blurIntensity,
-  gradient,
-  radius,
-  scale,
-  space,
-  supportsBlur,
-  type GlassLevel,
-} from '../../theme';
+import { card, radius, scale, space, type GlassLevel } from '../../theme';
 
 export interface GlassCardProps {
   children: React.ReactNode;
   level?: GlassLevel;
-  /** Corner radius; defaults to the large Apple-style radius. */
+  /** Corner radius; defaults to a restrained card radius. */
   corner?: number;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
-  /** Thin bright line along the top edge — the "light catching glass" cue. */
-  edge?: boolean
-  ;
+  /** Thin top edge (de-emphasised; off by default). */
+  edge?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
 }
 
 /**
- * The core Liquid Glass surface: blurred layer + translucent fill + hairline
- * border + optional top sheen. Pressable variant adds a springless scale press.
+ * A neutral solid surface with a hairline border — no blur, no gradient, no
+ * sheen. `level` is accepted for compatibility but no longer changes the fill;
+ * real blur belongs only to modals/sheets via a native overlay.
  */
 export function GlassCard({
   children,
-  level = 'regular',
-  corner = radius.xl,
+  corner = radius.lg,
   onPress,
   style,
   contentStyle,
-  edge = true,
+  edge = false,
   accessibilityLabel,
   accessibilityHint,
 }: GlassCardProps): React.JSX.Element {
@@ -51,24 +39,14 @@ export function GlassCard({
 
   const surface: ViewStyle = {
     borderRadius: corner,
-    backgroundColor: apple.card,
+    backgroundColor: card.solid,
     borderWidth: 1,
-    borderColor: apple.cardBorder,
+    borderColor: card.border,
     overflow: 'hidden',
   };
 
   const inner = (
     <>
-      {supportsBlur ? (
-        <BlurView intensity={blurIntensity[level]} tint="dark" style={StyleSheet.absoluteFill} />
-      ) : (
-        <LinearGradient
-          colors={gradient.glass}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0.8, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
       {edge ? <View style={styles.edge} pointerEvents="none" /> : null}
       <View style={[styles.content, contentStyle]}>{children}</View>
     </>
@@ -106,7 +84,7 @@ const styles = StyleSheet.create({
     left: space.lg,
     right: space.lg,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  content: { padding: space.lg },
+  content: { padding: space.md },
 });

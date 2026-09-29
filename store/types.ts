@@ -15,6 +15,8 @@ export interface Hood {
   id: Exclude<HoodId, 'for-you'>;
   name: string;
   tagline: string;
+  description: string;
+  rules: readonly string[];
   members: number;
   liveClashes: number;
 }
@@ -64,11 +66,13 @@ export interface User {
 
 export type MediaKind = 'image' | 'video';
 
-/** Mock media: a gradient plate + caption stands in for a real asset. */
+/** Media on a Take: a real upload renders its URL, a seed row renders a gradient plate. */
 export interface TakeMedia {
   kind: MediaKind;
   caption: string;
   colors: GradientColors;
+  /** Permanent public URL for an uploaded asset; absent for the seeded gradient plate. */
+  url?: string;
   duration?: string;
 }
 
@@ -85,7 +89,19 @@ export interface Take {
   media?: TakeMedia;
 }
 
-/** Community rebuttal on a Take — feed for Top Comments. */
+/** Arena home feed scopes (Phase 2): the sort/scope selector. */
+export type FeedScope = 'for-you' | 'following' | 'popular' | 'new';
+
+/** Community filter for the feed — "all" plus the real Hoods. */
+export type HoodFilter = 'all' | Exclude<HoodId, 'for-you'>;
+
+/** Hood page sorting. */
+export type HoodSort = 'hot' | 'new' | 'top';
+
+/** Take thread sorting. */
+export type CommentSort = 'best' | 'new';
+
+/** Community rebuttal on a Take — feed for Top Comments and threaded discussion. */
 export interface ChallengerComment {
   id: string;
   takeId: string;
@@ -93,13 +109,12 @@ export interface ChallengerComment {
   text: string;
   upvotes: number;
   createdAt: number;
+  /** Parent rebuttal id (null for a top-level rebuttal). */
+  parentId?: string;
 }
 
 /** The two duelling sides of a Clash. */
 export type Side = 'A' | 'B';
-
-/** A viewer's ballot: A, B, or abstain. */
-export type Judgement = Side | 'UNDECIDED';
 
 export interface Juror {
   id: string;
@@ -137,6 +152,10 @@ export interface XpEvent {
 }
 
 // ── Vault domain (spec §17–§22) ───────────────────────────────
+// PROTOTYPE sponsor-catalogue shapes. The Vault UI now speaks the production
+// types in `services/vaultMappers.ts`; what remains here — `Creator`, `Campaign`,
+// `CityShare`, `SponsorOverview` — is rendered only by the prototype sponsor
+// screens (`campaign/`, `sponsor/`), which a later sponsor phase replaces.
 
 /** Premium creator selling drops inside the Vault. */
 export interface Creator {
@@ -149,19 +168,6 @@ export interface Creator {
   followers: number;
   /** Share of followers in the creator's home city (0..100). */
   homeShare: number;
-}
-
-/** A Vault drop: public = free, exclusive = mock-unlock. */
-export interface Drop {
-  id: string;
-  creatorId: string;
-  title: string;
-  blurb: string;
-  tier: 'public' | 'exclusive';
-  /** Mock INR price for exclusive drops. */
-  price: number;
-  unlocks: number;
-  rating: number;
 }
 
 export type CampaignStatus = 'ACTIVE' | 'ENDED';
@@ -184,20 +190,22 @@ export interface Campaign {
   period: string;
 }
 
+export type CityName = 'Goa' | 'Mumbai' | 'Bangalore' | 'Delhi' | 'Other';
+
 /** One slice of the city distribution (spec §20 dataset). */
 export interface CityShare {
   city: CityName;
   share: number;
 }
 
-export type CityName = 'Goa' | 'Mumbai' | 'Bangalore' | 'Delhi' | 'Other';
-
-/** Mock checkout state for a single exclusive drop. */
-export type UnlockStatus = 'locked' | 'paying' | 'unlocked';
-
-export interface UnlockRecord {
-  dropId: string;
-  status: UnlockStatus;
+/** A rolled-up view of every campaign in scope (spec §22). Prototype-only. */
+export interface SponsorOverview {
+  revenue: number;
+  orders: number;
+  redemptions: number;
+  conversion: string;
+  topCreatorId: string;
+  topCity: string;
 }
 
 export interface ClashResult {

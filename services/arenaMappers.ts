@@ -1,5 +1,5 @@
-import type { ChallengerComment, MediaKind, Take, TakeMedia, User } from '../store/types';
-import type { Json, TableInsert, TableRow } from '../supabase/database.types';
+import type { ChallengerComment, Take, TakeMedia, User } from '../store/types';
+import type { Json, TableRow } from '../supabase/types';
 import { gradient, type GradientColors } from '../theme';
 import { SupabaseError } from './supabaseClient';
 
@@ -10,15 +10,6 @@ import { SupabaseError } from './supabaseClient';
  * is `store/types.ts`. This file is the only place the two meet, so timestamps,
  * media and gradients are handled once, in one direction, with no casts.
  */
-
-/** Media attached to a new take — a URL plus the plate the app renders. */
-export interface PostTakeMedia {
-  url: string;
-  kind: MediaKind;
-  caption?: string;
-  colors?: GradientColors;
-  duration?: string;
-}
 
 /** `expo-linear-gradient` needs two stops; anything shorter falls back to violet. */
 function toGradient(colors: string[] | null): GradientColors {
@@ -32,6 +23,7 @@ function toMedia(row: TableRow<'takes'>): TakeMedia | undefined {
     kind: row.media_kind,
     caption: row.media_caption ?? '',
     colors: toGradient(row.media_colors),
+    ...(row.media_url ? { url: row.media_url } : {}),
     ...(row.media_duration ? { duration: row.media_duration } : {}),
   };
 }
@@ -59,18 +51,7 @@ export function toComment(row: TableRow<'comments'>): ChallengerComment {
     text: row.text,
     upvotes: row.upvotes_count,
     createdAt: Date.parse(row.created_at),
-  };
-}
-
-/** Only the media columns, so an insert never carries server-owned values. */
-export function toPostMedia(media: PostTakeMedia | undefined): Partial<TableInsert<'takes'>> {
-  if (!media) return {};
-  return {
-    media_url: media.url,
-    media_kind: media.kind,
-    media_caption: media.caption ?? null,
-    media_colors: media.colors ? [...media.colors] : null,
-    media_duration: media.duration ?? null,
+    ...(row.parent_comment_id ? { parentId: row.parent_comment_id } : {}),
   };
 }
 
@@ -116,4 +97,25 @@ export function toUpvoteResult(payload: Json | null): UpvoteResult {
     }
   }
   throw new SupabaseError('toggle_comment_upvote returned an unexpected payload', 'bad_payload');
+}
+
+/** What `toggle_take_reaction` hands back once the reaction has been flipped. */
+export interface TakeReactionResult {
+  takeId: string;
+  reacted: boolean;
+  reactionsCount: number;
+}
+
+/** The RPC answers with jsonb, so the shape is proven before it is trusted. */
+export function toTakeReactionResult(payload: Json | null): TakeReactionResult {
+  if (payload !== null && typeof payload === 'object' && !Array.isArray(payload)) {
+    const record = payload as { [key: string]: Json | undefined };
+    const id = record.take_id;
+    const reacted = record.reacted;
+    const count = record.reactions_count;
+    if (typeof id === 'string' && typeof reacted === 'boolean' && typeof count === 'number') {
+      return { takeId: id, reacted, reactionsCount: count };
+    }
+  }
+  throw new SupabaseError('toggle_take_reaction returned an unexpected payload', 'bad_payload');
 }

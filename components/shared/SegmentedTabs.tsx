@@ -61,9 +61,9 @@ const styles = StyleSheet.create({
   segment: {
     flexDirection: 'row',
     padding: 4,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.10)',
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
   item: {
@@ -72,9 +72,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: space.sm,
     paddingHorizontal: space.xs,
-    borderRadius: radius.pill,
+    borderRadius: radius.xs,
   },
-  itemOn: { backgroundColor: 'rgba(255,255,255,0.12)' },
+  itemOn: { backgroundColor: 'rgba(255,255,255,0.10)' },
   label: { ...typeScale.label, color: ink.tertiary },
-  labelOn: { color: ink.primary, fontWeight: '800' },
+  labelOn: { color: ink.primary, fontWeight: '700' },
 });

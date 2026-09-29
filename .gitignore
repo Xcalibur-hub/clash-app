@@ -19,5 +19,8 @@ supabase/.temp/
 supabase/.branches/
 
 # Local secrets. EXPO_PUBLIC_* values are public by design (RLS guards the data),
-# but they are environment-specific: document them in README, not in git history.
+# but they are environment-specific: document them in `.env.example`, not in git.
+# `.env.example` is the only environment file that belongs in the repository.
 .env
+.env.*
+!.env.example

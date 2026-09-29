@@ -1,38 +1,46 @@
 import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import type { TakeMedia as TakeMediaModel } from '../../store';
 import { ink, radius, space, typeScale } from '../../theme';
 import { PlayIcon } from '../shared/icons';
 
 /**
- * Mock media plate. Real uploads (camera / picker) land in a later phase; the
- * gradient stands in so the card composition is honest and final.
+ * Media plate. A real image upload renders its URL; videos (and seed rows without
+ * a URL) fall back to the gradient plate — video playback is deferred until a
+ * player is wired in, so the play affordance stays honest about what it is.
  */
 export function TakeMedia({ media }: { media: TakeMediaModel }): React.JSX.Element {
   const isVideo = media.kind === 'video';
+  const hasImage = media.kind === 'image' && Boolean(media.url);
   return (
     <View
       style={styles.wrap}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={`${media.kind}: ${media.caption}`}
+      accessibilityLabel={`${media.kind}${media.caption ? `: ${media.caption}` : ''}`}
     >
-      <LinearGradient
-        colors={media.colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      {hasImage ? (
+        <Image source={{ uri: media.url as string }} resizeMode="cover" style={StyleSheet.absoluteFill} />
+      ) : (
+        <LinearGradient
+          colors={media.colors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       <View style={styles.veil} pointerEvents="none" />
       {isVideo ? (
         <View style={styles.play}>
           <PlayIcon size={20} color={ink.primary} strokeWidth={2.4} />
         </View>
       ) : null}
-      <Text allowFontScaling={false} style={styles.caption}>
-        {media.caption}
-      </Text>
+      {media.caption ? (
+        <Text allowFontScaling={false} style={styles.caption}>
+          {media.caption}
+        </Text>
+      ) : null}
     </View>
   );
 }

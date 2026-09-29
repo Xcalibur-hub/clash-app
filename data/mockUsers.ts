@@ -1,8 +1,8 @@
 import type { User } from '../store/types';
 
 /**
- * Mock people. The viewer (u-viewer) is seeded here and then owned by the store
- * so reputation, coins and streak can mutate during a session.
+ * Mock people for __DEV__ fixtures only. Never used as a silent production
+ * Arena fallback (see `store/ClashStore.tsx` + `createInitialState`).
  */
 export const VIEWER_SEED: User = {
   id: 'u-viewer',
@@ -23,6 +23,26 @@ export const VIEWER_SEED: User = {
     { id: 'b-early', label: 'EARLY ADOPTER', tier: 'early' },
     { id: 'b-jury', label: 'JURY FAVOURITE', tier: 'jury' },
   ],
+};
+
+/**
+ * Signed-out identity for the live app. Not a fake social profile — browse-only
+ * until the user signs in.
+ */
+export const GUEST_VIEWER: User = {
+  id: 'guest',
+  handle: 'guest',
+  name: 'Guest',
+  bio: '',
+  tint: '#8A8A93',
+  hood: 'techtakes',
+  rank: 'Rookie',
+  reputation: 0,
+  coins: 0,
+  clashes: 0,
+  wins: 0,
+  streak: 0,
+  badges: [],
 };
 
 export const USERS: readonly User[] = [

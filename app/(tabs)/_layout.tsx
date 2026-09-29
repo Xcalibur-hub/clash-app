@@ -5,6 +5,7 @@ import { RealmTabBar } from '../../components/navigation/RealmTabBar';
 import { AppSidebar } from '../../components/navigation/AppSidebar';
 import { SidebarProvider } from '../../components/navigation/SidebarContext';
 import { useRealmSwitch } from '../../components/navigation/useRealmSwitch';
+import { NotificationUnreadProvider } from '../../store/NotificationUnreadProvider';
 import { VaultIcon } from '../../components/shared/icons';
 import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
 import { color } from '../../theme';
@@ -14,27 +15,29 @@ export default function TabsLayout(): React.JSX.Element {
   const { shifting, first, direction, shiftTo } = useRealmSwitch();
   return (
     <SidebarProvider>
-      <Tabs
-        tabBar={(props) => (
-          <RealmTabBar
-            {...props}
-            realm="arena"
-            onShiftRealm={(realm) => shiftTo(realm, REALM_ROUTES.vaultHome)}
-            shiftLabel="VAULT"
-            ShiftIcon={VaultIcon}
-          />
-        )}
-        screenOptions={{
-          headerShown: false,
-          sceneStyle: { backgroundColor: color.bg },
-        }}
-      >
-        <Tabs.Screen name="index" options={{ title: 'Home' }} />
-        <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
-        <Tabs.Screen name="create" options={{ title: 'Create' }} />
-        <Tabs.Screen name="notifications" options={{ title: 'Activity' }} />
-        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
-      </Tabs>
+      <NotificationUnreadProvider>
+        <Tabs
+          tabBar={(props) => (
+            <RealmTabBar
+              {...props}
+              realm="arena"
+              onShiftRealm={(realm) => shiftTo(realm, REALM_ROUTES.vaultHome)}
+              shiftLabel="VAULT"
+              ShiftIcon={VaultIcon}
+            />
+          )}
+          screenOptions={{
+            headerShown: false,
+            sceneStyle: { backgroundColor: color.bg },
+          }}
+        >
+          <Tabs.Screen name="index" options={{ title: 'Home' }} />
+          <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
+          <Tabs.Screen name="create" options={{ title: 'Create' }} />
+          <Tabs.Screen name="notifications" options={{ title: 'Activity' }} />
+          <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+        </Tabs>
+      </NotificationUnreadProvider>
       <AppSidebar />
       {shifting ? <RealmPortal direction={direction} first={first} onDone={() => undefined} /> : null}
     </SidebarProvider>

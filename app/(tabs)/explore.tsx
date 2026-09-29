@@ -1,24 +1,31 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DailyDropSection } from '../../components/explore/DailyDropSection';
-import { FameSection } from '../../components/explore/FameSection';
 import { HoodsSection } from '../../components/explore/HoodsSection';
+import { PeopleSection } from '../../components/explore/PeopleSection';
+import { PopularTakesSection } from '../../components/explore/PopularTakesSection';
 import { SearchResults } from '../../components/explore/SearchResults';
-import { TrendingSection } from '../../components/explore/TrendingSection';
+import { WorldSection } from '../../components/explore/WorldSection';
 import { exploreStyles as shelf } from '../../components/explore/exploreStyles';
 import { SearchBar } from '../../components/hof/SearchBar';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useClash } from '../../store';
+import { useAuth } from '../../store/AuthProvider';
 import { color, space } from '../../theme';
 
 /**
- * EXPLORE (PRD §15) — one search field over the existing mock data, then the
- * four discovery shelves: Trending, Popular in your Hoods, Daily Drop (§16)
- * and Hall of Fame (§17). Flat #08080B canvas: content carries the colour.
+ * EXPLORE (PRD §15) — one debounced search field over the live Arena, then three
+ * honest discovery shelves: Popular takes, Hoods (real membership) and Active
+ * people. Flat #08080B canvas: content carries the colour.
  */
 export default function ExploreScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const { signedIn } = useAuth();
+  const { state } = useClash();
   const [query, setQuery] = React.useState('');
-  const searching = query.trim().length > 0;
+  const debounced = useDebouncedValue(query, 250);
+  const searching = debounced.trim().length > 0;
+  const profileId = signedIn ? state.viewer.id : null;
 
   return (
     <View style={styles.container}>
@@ -32,13 +39,13 @@ export default function ExploreScreen(): React.JSX.Element {
       >
         <SearchBar value={query} onChange={setQuery} placeholder="Search CLASH" />
         {searching ? (
-          <SearchResults query={query} onClear={() => setQuery('')} />
+          <SearchResults query={debounced} onClear={() => setQuery('')} />
         ) : (
           <View style={styles.shelves}>
-            <TrendingSection />
-            <HoodsSection />
-            <DailyDropSection />
-            <FameSection />
+            <WorldSection />
+            <PopularTakesSection />
+            <HoodsSection profileId={profileId} signedIn={signedIn} />
+            <PeopleSection />
           </View>
         )}
       </ScrollView>
@@ -50,3 +57,4 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: color.bg },
   shelves: { gap: space.xl },
 });
+

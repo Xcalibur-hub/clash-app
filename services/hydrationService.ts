@@ -1,36 +1,77 @@
+/**
+ * Assembles one live Arena snapshot from Supabase.
+ *
+ * Never swallows failures into an ambiguous null that would leave mock seed
+ * content looking "live". Callers get a typed success or failure.
+ */
+
 import {
   fetchCommentsForTakes,
+  fetchMyTakeReactionIds,
   fetchProfiles,
   fetchTakes,
   fetchViewerProfile,
   fetchViewerUpvoteIds,
 } from './apiService';
+import { fetchViewerSafetyState } from './safetyService';
 import { isSupabaseConfigured } from './supabaseClient';
+import { logger } from './logger';
 import type { ArenaSnapshot } from '../store/reducer';
 
+export type ArenaHydrationFailureReason = 'not_configured' | 'backend';
+
+export type ArenaHydrationResult =
+  | { ok: true; snapshot: ArenaSnapshot }
+  | {
+      ok: false;
+      reason: ArenaHydrationFailureReason;
+      /** Calm, user-facing copy — never a raw PostgREST message. */
+      message: string;
+    };
+
+const ARENA_LOAD_ERROR = "Couldn't load Arena.";
+
 /**
- * Assembles one live Arena snapshot: active takes, their rebuttals, the people
- * behind them, the viewer's own profile and vote state. Reads fan out once takes
- * are known; the vote lookup follows the viewer because upvote rows are keyed by
- * the resolved profile id, not the seeded one.
- *
- * Returns null when the backend is unconfigured or unreachable — the provider
- * then keeps the bundled seed snapshot and the app stays fully usable offline.
+ * Load the live Arena. Empty `takes` with `ok: true` means a real empty feed,
+ * not a failure. Failures never return mock fixtures.
  */
-export async function loadArena(): Promise<ArenaSnapshot | null> {
-  if (!isSupabaseConfigured) return null;
+export async function loadArena(): Promise<ArenaHydrationResult> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, reason: 'not_configured', message: ARENA_LOAD_ERROR };
+  }
+
   try {
-    const takes = await fetchTakes();
-    const [comments, users, viewer] = await Promise.all([
+    const viewer = await fetchViewerProfile();
+    const safety = await fetchViewerSafetyState(viewer?.id ?? null);
+    const hidden = new Set<string>([
+      ...safety.blockedProfileIds,
+      ...safety.blockingProfileIds,
+      ...safety.mutedProfileIds,
+    ]);
+
+    const takes = await fetchTakes('for-you', [...hidden]);
+    const [comments, users] = await Promise.all([
       fetchCommentsForTakes(takes.map((take) => take.id)),
       fetchProfiles(),
-      fetchViewerProfile(),
     ]);
-    // Votes are keyed by profile id, so this runs after the viewer resolves —
-    // the seeded-viewer default would query the wrong row for a linked account.
+    const visibleComments = comments.filter((comment) => !hidden.has(comment.authorId));
+
     const upvotedCommentIds = await fetchViewerUpvoteIds(viewer?.id);
-    return { takes, comments, users, viewer, upvotedCommentIds };
-  } catch {
-    return null;
+    const reactedTakeIds = await fetchMyTakeReactionIds(viewer?.id);
+
+    return {
+      ok: true,
+      snapshot: {
+        takes,
+        comments: visibleComments,
+        users,
+        viewer,
+        upvotedCommentIds,
+        reactedTakeIds,
+      },
+    };
+  } catch (error) {
+    logger.captureException(error, { source: 'loadArena' });
+    return { ok: false, reason: 'backend', message: ARENA_LOAD_ERROR };
   }
 }

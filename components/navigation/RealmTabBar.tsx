@@ -3,10 +3,11 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { action, apple, card, ink, radius, space } from '../../theme';
+import { action, accent, card, ink, radius, space } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaHomeIcon } from '../shared/icons';
 import type { Realm } from '../../store';
+import { useNotificationUnread } from '../../store/NotificationUnreadProvider';
 import { ARENA_TABS, DOCK_HEIGHT, VAULT_TABS, type TabRoute } from './dockConfig';
 
 export interface RealmTabBarProps extends BottomTabBarProps {
@@ -24,6 +25,7 @@ export interface RealmTabBarProps extends BottomTabBarProps {
  */
 export function RealmTabBar({ state, navigation, realm, onShiftRealm, shiftLabel, ShiftIcon }: RealmTabBarProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const { unread } = useNotificationUnread();
   const tabs = realm === 'vault' ? VAULT_TABS : ARENA_TABS;
   const activeKey = state.routes[state.index]?.key;
 
@@ -44,6 +46,7 @@ export function RealmTabBar({ state, navigation, realm, onShiftRealm, shiftLabel
     const focused = route.key === activeKey;
     const Icon = entry.icon;
     const centred = entry.label === '';
+    const showBadge = route.name === 'notifications' && unread > 0;
     return (
       <Pressable
         key={route.key}
@@ -58,11 +61,20 @@ export function RealmTabBar({ state, navigation, realm, onShiftRealm, shiftLabel
             <Icon size={20} color={action.text} strokeWidth={2.6} />
           </View>
         ) : (
-          <Icon
-            size={24}
-            color={focused ? ink.primary : ink.tertiary}
-            strokeWidth={focused ? 2.5 : 2}
-          />
+          <View style={styles.iconWrap}>
+            <Icon
+              size={24}
+              color={focused ? ink.primary : ink.tertiary}
+              strokeWidth={focused ? 2.5 : 2}
+            />
+            {showBadge ? (
+              <View style={styles.badge} pointerEvents="none">
+                <Text allowFontScaling={false} style={styles.badgeText}>
+                  {unread > 99 ? '99+' : String(unread)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         )}
         {entry.label ? (
           <Text
@@ -102,15 +114,14 @@ export function RealmTabBar({ state, navigation, realm, onShiftRealm, shiftLabel
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: 'transparent', paddingHorizontal: space.md },
+  wrap: { backgroundColor: '#0E0E10' },
   dock: {
     flexDirection: 'row',
     alignItems: 'center',
     height: DOCK_HEIGHT,
-    backgroundColor: apple.dock,
-    borderWidth: 1,
-    borderColor: apple.cardBorder,
-    borderRadius: 28,
+    backgroundColor: '#0E0E10',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
     paddingHorizontal: space.xs,
   },
   tab: {
@@ -128,6 +139,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: action.fill,
   },
+  iconWrap: { position: 'relative' },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: accent.danger,
+    borderWidth: 1.5,
+    borderColor: '#0E0E10',
+  },
+  badgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800', lineHeight: 12 },
   shift: {
     width: 64,
     alignItems: 'center',

@@ -1,0 +1,38 @@
+Setting up Edge Functions runtime...
+2026-09-27T14:27:55.978095646Z Warning Implicitly using latest version (0.224.0) for https://deno.land/std/path/posix/mod.ts
+2026-09-27T14:27:56.076011326Z Warning Implicitly using latest version (0.224.0) for https://deno.land/std/http/status.ts
+2026-09-27T14:29:15.604486234Z Error: Missing authorization header
+2026-09-27T14:29:15.604750469Z     at getAuthToken (file:///var/tmp/sb-compile-edge-runtime/root/index.ts:83:11)
+2026-09-27T14:29:15.604770810Z     at Object.handler (file:///var/tmp/sb-compile-edge-runtime/root/index.ts:124:23)
+2026-09-27T14:29:15.604779987Z     at mapped (ext:runtime/http.js:231:42)
+2026-09-27T14:29:15.604788028Z     at respond (ext:runtime/http.js:340:14)
+2026-09-27T14:29:15.604796354Z     at handleHttp (ext:runtime/http.js:160:9)
+2026-09-27T14:29:15.604805341Z     at eventLoopTick (ext:core/01_core.js:175:7)
+2026-09-27T14:29:15.748541879Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:29:16.892765551Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:29:16.930337465Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:29:17.238927175Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:30:00.505891077Z Error: Missing authorization header
+2026-09-27T14:30:00.506022289Z     at getAuthToken (file:///var/tmp/sb-compile-edge-runtime/root/index.ts:83:11)
+2026-09-27T14:30:00.506033539Z     at Object.handler (file:///var/tmp/sb-compile-edge-runtime/root/index.ts:124:23)
+2026-09-27T14:30:00.506038549Z     at mapped (ext:runtime/http.js:231:42)
+2026-09-27T14:30:00.506042803Z     at respond (ext:runtime/http.js:340:14)
+2026-09-27T14:30:00.506046962Z     at handleHttp (ext:runtime/http.js:160:9)
+2026-09-27T14:30:00.506051500Z     at eventLoopTick (ext:core/01_core.js:175:7)
+2026-09-27T14:30:00.559428450Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:30:00.654825433Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:30:00.685286060Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:30:00.945921135Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:32:47.062836451Z wall clock duration warning: isolate: ee250ed6-3192-4726-9292-ae6b45e3ed2f
+2026-09-27T14:32:47.076465489Z early termination has been triggered: isolate: ee250ed6-3192-4726-9292-ae6b45e3ed2f
+2026-09-27T14:36:32.793251755Z Error: Missing authorization header
+2026-09-27T14:36:32.793422393Z     at getAuthToken (file:///var/tmp/sb-compile-edge-runtime/root/index.ts:83:11)
+2026-09-27T14:36:32.793461153Z     at Object.handler (file:///var/tmp/sb-compile-edge-runtime/root/index.ts:124:23)
+2026-09-27T14:36:32.793467109Z     at mapped (ext:runtime/http.js:231:42)
+2026-09-27T14:36:32.793471552Z     at respond (ext:runtime/http.js:340:14)
+2026-09-27T14:36:32.793477035Z     at handleHttp (ext:runtime/http.js:160:9)
+2026-09-27T14:36:32.793482046Z     at eventLoopTick (ext:core/01_core.js:175:7)
+2026-09-27T14:36:32.888865590Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:36:33.055287499Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:36:33.082207186Z serving the request with supabase/functions/vault-media-access
+2026-09-27T14:36:33.342818361Z serving the request with supabase/functions/vault-media-access

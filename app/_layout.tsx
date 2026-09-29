@@ -6,6 +6,8 @@ import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ClashProvider, selectThemeMode, useClash } from '../store';
+import { AuthProvider } from '../store/AuthProvider';
+import { AuthHydrator } from '../store/AuthHydrator';
 import { color } from '../theme';
 
 /**
@@ -45,9 +47,11 @@ export default function RootLayout(): React.JSX.Element {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <ClashProvider>
-          <ThemeChrome />
-          <StatusBar style="light" />
+        <AuthProvider>
+          <ClashProvider>
+            <AuthHydrator />
+            <ThemeChrome />
+            <StatusBar style="light" />
           <Stack
             screenOptions={{
               headerShown: false,
@@ -57,16 +61,26 @@ export default function RootLayout(): React.JSX.Element {
           >
             <Stack.Screen name="index" />
             <Stack.Screen name="onboard" />
+            <Stack.Screen name="auth" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(vault)" />
             <Stack.Screen name="clash/[takeId]" options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="creator/[creatorId]" options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="vault/[creatorId]" options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="vault/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="vault/compose" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="campaign/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="sponsor/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="take/[takeId]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="profile/[profileId]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="hood/[hoodId]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="hood/game/[gameId]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="world/index" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="world/compose" options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="world/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
 
           </Stack>
-        </ClashProvider>
+          </ClashProvider>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

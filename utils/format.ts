@@ -55,3 +55,14 @@ export function clamp(value: number, min: number, max: number): number {
 export function formatReputation(value: number): string {
   return value.toLocaleString('en-US');
 }
+
+/** "now" / "12m" / "3h" / "2d" — a compact relative timestamp for feed items. */
+export function timeAgo(createdAt: number, now: number = Date.now()): string {
+  const minutes = Math.floor(Math.max(0, now - createdAt) / 60_000);
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+}

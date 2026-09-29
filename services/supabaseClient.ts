@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, type AppStateStatus } from 'react-native';
 import { createClient, type PostgrestError, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../supabase/database.types';
+import { logger } from './logger';
 
 /**
  * The single Supabase client for CLASH.
@@ -33,7 +34,7 @@ export class SupabaseError extends Error {
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-/** False when `.env` is missing — the app then keeps running on seed data. */
+/** False when `.env` is missing — live Arena stays empty/error (never silent mocks). */
 export const isSupabaseConfigured: boolean = url.length > 0 && anonKey.length > 0;
 
 /** Postgres codes worth explaining rather than echoing verbatim. */
@@ -41,6 +42,7 @@ const RLS_REFUSED = '42501';
 
 /** Turns a raw PostgREST failure into the typed error the UI shows. */
 export function requestError(error: PostgrestError): SupabaseError {
+  logger.warn('supabase request failed', { code: error.code });
   const hint =
     error.code === RLS_REFUSED
       ? ' — refused by row level security. Is this profile linked to your session?'
@@ -77,12 +79,10 @@ function buildClient(): ClashSupabaseClient | null {
 /** Null when the environment variables are absent. Prefer `requireSupabase()`. */
 export const supabase: ClashSupabaseClient | null = buildClient();
 
-/** One anonymous sign-in attempt per app launch (see `ensureSession`). */
-let anonymousAttempted = false;
-
 /** The configured client, or a typed error explaining what is missing. */
 export function requireSupabase(): ClashSupabaseClient {
   if (!supabase) {
+    logger.error('supabase client is not configured');
     throw new SupabaseError(
       'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env and restart the bundler.',
       'not_configured',
@@ -92,9 +92,9 @@ export function requireSupabase(): ClashSupabaseClient {
 }
 
 /**
- * The signed-in user id, or null — reads-only, never creates a session
- * (unlike `ensureSession`). Use it when a query needs the uid but a write
- * must not mint a throwaway user, e.g. resolving the linked profile at launch.
+ * The signed-in user id, or null. Reads the current session without ever creating
+ * one, so a guest stays genuinely signed out. Use it for queries that key on the
+ * auth uid, e.g. resolving the linked profile after sign-in.
  */
 export async function currentUserId(): Promise<string | null> {
   if (!supabase) return null;
@@ -106,25 +106,6 @@ export async function currentUserId(): Promise<string | null> {
   }
 }
 
-/**
- * Returns the signed-in user's id, signing in anonymously when the app has no
- * session. RLS grants writes to `authenticated` only, so this is what makes the
- * insert policies reachable while CLASH still has no login screen. Returns null
- * when anonymous sign-in is disabled on the project — reads keep working.
- */
-export async function ensureSession(): Promise<string | null> {
-  if (!supabase) return null;
-  try {
-    const existing = await currentUserId();
-    if (existing) return existing;
-    // Anonymous sign-in needs to be enabled in the dashboard; try once per launch
-    // so a disabled project does not pay a round trip on every write.
-    if (anonymousAttempted) return null;
-    anonymousAttempted = true;
-    const { data: created, error } = await supabase.auth.signInAnonymously();
-    if (error) return null;
-    return created.user?.id ?? null;
-  } catch {
-    return null;
-  }
-}
+// No anonymous bootstrap here any more: writes resolve ownership from a real
+// session via `services/authService.ts` (`requireUserId`), and a guest never
+// signs in anonymously. See `services/apiService.ts` (`requireViewerProfileId`).

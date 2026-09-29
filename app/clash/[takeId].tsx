@@ -1,149 +1,244 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ClashBody, type ClashStage } from '../../components/clash/ClashBody';
-import { clashStyles as s } from '../../components/clash/clashStyles';
+import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
+import { ClashResultView } from '../../components/clash/ClashResultView';
+import { ClashSide as ClashSideView } from '../../components/clash/ClashSide';
+import { ClashStatus, type ClashStatusKind } from '../../components/clash/ClashStatus';
+import { JudgementPanel, LockedJudgement } from '../../components/clash/JudgementPanel';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { GlowButton } from '../../components/shared/GlowButton';
 import { Notice } from '../../components/shared/Notice';
-import { ShieldIcon } from '../../components/shared/icons';
-import { resolveClash } from '../../services/clashService';
-import {
-  recordBallot,
-  selectAuthor,
-  selectClashForTake,
-  selectJudgement,
-  selectResult,
-  selectTopComment,
-  settleClash,
-  useClash,
-  type Judgement,
-} from '../../store';
-import { space } from '../../theme';
+import { ArenaIcon, BackIcon, ShareIcon } from '../../components/shared/icons';
 import { useClock } from '../../hooks/useClock';
-import { judge as hapticJudge, notify, tap as hapticTap } from '../../utils/haptics';
+import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { currentViewerProfileId } from '../../services/apiService';
+import {
+  fetchClashViewForTake,
+  fetchReputationEvents,
+  settleClash,
+  submitJudgement,
+  type ClashParticipant,
+  type ClashView,
+} from '../../services/clashEngineService';
+import { errorText, SupabaseError } from '../../services/supabaseClient';
+import { showNotice, useClash, type Side, type User } from '../../store';
+import { useAuth } from '../../store/AuthProvider';
+import { color, ink, space, typeScale } from '../../theme';
+import { judge as hapticJudge, tap as hapticTap } from '../../utils/haptics';
 
-/** THE CLASH (PRD §9–§11) — the hero screen: decide in seconds, then loop. */
+function asUser(participant: ClashParticipant): User {
+  return {
+    id: participant.id,
+    handle: participant.handle,
+    name: participant.name,
+    tint: participant.tint,
+    hood: 'for-you',
+    rank: 'Rookie',
+    reputation: 0,
+    coins: 0,
+    clashes: 0,
+    wins: 0,
+    streak: 0,
+    badges: [],
+  };
+}
+
+function clashErrorMessage(error: unknown): string {
+  if (error instanceof SupabaseError) {
+    switch (error.code) {
+      case '42501': return 'Sign in to judge.';
+      case 'P0003': return 'This Clash is no longer open for judging.';
+      case 'P0004': return 'Judging has closed.';
+      case 'P0005': return "You can't judge your own Clash.";
+      default: return error.message;
+    }
+  }
+  return 'Something went wrong. Please try again.';
+}
+
+/** THE CLASH — standard or blind, identities only when the server reveals them. */
 export default function ClashScreen(): React.JSX.Element {
-  const params = useLocalSearchParams<{ takeId: string }>();
-  const takeId = typeof params.takeId === 'string' ? params.takeId : '';
-  const { state, dispatch } = useClash();
+  const { takeId } = useLocalSearchParams<{ takeId: string | string[] }>();
+  const id = Array.isArray(takeId) ? takeId[0] : takeId;
+  const { dispatch } = useClash();
+  const { signedIn } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const requireAuth = useRequireAuth();
+  const now = useClock(30_000);
 
-  const take = state.takes.find((item) => item.id === takeId);
-  const clash = take ? selectClashForTake(state, take.id) : undefined;
-  const author = take ? selectAuthor(state, take.authorId) : undefined;
-  const topComment = take ? selectTopComment(state, take.id) : undefined;
-  const topAuthor = topComment ? selectAuthor(state, topComment.authorId) : undefined;
-  const challenger = topAuthor ?? (clash ? selectAuthor(state, clash.challengerId) : undefined);
-  const challengerText = topComment?.text ?? clash?.challengerText ?? '';
-  const storedResult = clash ? selectResult(state, clash.id) : undefined;
-  const ballot = clash ? selectJudgement(state, clash.id) : undefined;
-  const live = take ? take.expiresAt > Date.now() : false;
-  const now = useClock();
+  const [view, setView] = React.useState<ClashView | null | undefined>(undefined);
+  const [reputation, setReputation] = React.useState(0);
+  const [coins, setCoins] = React.useState(0);
+  const [error, setError] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const settlingRef = React.useRef(false);
 
-  // The stage is fully derived from the store: a settled clash reveals, a
-  // recorded ballot locks and counts down to the drop, and a live debate
-  // accepts one ballot. Replacing the route ("Next Clash") re-derives
-  // automatically, so no stale verdict ever blocks a fresh ballot.
-  const stage: ClashStage = storedResult ? 'result' : ballot ? 'locked' : 'battle';
+  const load = React.useCallback(async (): Promise<void> => {
+    setError(null);
+    try {
+      const next = await fetchClashViewForTake(id);
+      setView(next);
+      if (!next) return;
+      const me = await currentViewerProfileId();
+      if (me) {
+        const events = await fetchReputationEvents(me);
+        const mine = events.filter((event) => event.clashId === next.clashId);
+        setReputation(mine.reduce((sum, event) => sum + event.reputationDelta, 0));
+        setCoins(mine.reduce((sum, event) => sum + event.coinsDelta, 0));
+      }
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }, [id]);
 
-  const settle = React.useCallback((): void => {
-    if (!clash || state.results[clash.id]) return;
-    const finalJudgement: Judgement = selectJudgement(state, clash.id) ?? 'UNDECIDED';
-    const result = resolveClash({
-      clash,
-      judgement: finalJudgement,
-      viewerReputation: state.viewer.reputation,
-    });
-    notify(
-      result.alignment === 'majority'
-        ? 'success'
-        : result.alignment === 'minority'
-          ? 'warning'
-          : 'error',
-    );
-    dispatch(settleClash(result));
-  }, [clash, dispatch, state]);
-
-  // The final judgement lands when the clock runs out: an expired clash settles
-  // on first view, and a live one settles the moment the countdown ends.
   React.useEffect(() => {
-    if (!take || !clash || storedResult) return undefined;
-    const msLeft = take.expiresAt - Date.now();
-    if (msLeft <= 0) {
-      settle();
-      return undefined;
-    }
-    const timer = setTimeout(settle, msLeft + 250);
-    return () => clearTimeout(timer);
-  }, [clash, settle, storedResult, take]);
+    void load();
+  }, [load]);
 
-  const leave = React.useCallback((): void => {
-    hapticTap();
-    if (router.canGoBack()) {
-      router.back();
-      return;
+  React.useEffect(() => {
+    if (view && view.status === 'open' && view.closesAt <= Date.now() && !view.verdict && !settlingRef.current) {
+      settlingRef.current = true;
+      void (async () => {
+        try {
+          await settleClash(view.clashId);
+        } catch {
+          /* no ballots / not due — ignore */
+        }
+        await load();
+        settlingRef.current = false;
+      })();
     }
-    router.replace('/(tabs)');
-  }, [router]);
+  }, [view, load]);
 
-  const choose = (choice: Judgement): void => {
-    if (!clash || !live || stage !== 'battle') return;
+  const judge = async (side: Side): Promise<void> => {
+    if (!view || busy || view.hasJudged) return;
+    if (!requireAuth()) return;
     hapticJudge();
-    // The ballot is recorded; the jury files the verdict at the end of the day.
-    dispatch(recordBallot(clash.id, choice));
+    setBusy(true);
+    try {
+      await submitJudgement(view.clashId, side);
+      await load();
+    } catch (e) {
+      dispatch(showNotice(clashErrorMessage(e)));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  /** The retention loop (§11): jump straight into the next open clash. */
-  const nextClash = React.useCallback((): void => {
+  const leave = (): void => {
     hapticTap();
-    const next = state.clashes.find((item) => {
-      if (item.takeId === takeId || selectResult(state, item.id)) return false;
-      const target = state.takes.find((entry) => entry.id === item.takeId);
-      return target !== undefined && target.expiresAt > Date.now();
-    });
-    router.replace(next ? `/clash/${next.takeId}` : '/(tabs)');
-  }, [router, state, takeId]);
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
 
-  if (!take || !clash || !author || !challenger) {
+  const share = (): void => {
+    if (!view) return;
+    const blindHidden = view.mode === 'BLIND' && !view.revealed;
+    void Share.share({
+      message: blindHidden ? 'Judge this Blind Clash on CLASH' : `Judge this Clash on CLASH — "${view.sideAText}"`,
+    });
+  };
+
+  if (error) {
     return (
-      <View style={[s.root, s.errorWrap, { paddingTop: insets.top }]}>
-        <EmptyState
-          icon={ShieldIcon}
-          title="This clash has closed."
-          body="Takes only survive 24 hours. Head back to the Arena for whatever is live right now."
-          actionLabel="BACK TO ARENA"
-          onAction={leave}
-        />
+      <View style={[styles.root, { paddingTop: insets.top + space.md }]}>
+        <EmptyState icon={ArenaIcon} title="Couldn't load this Clash" body={error} actionLabel="BACK" onAction={leave} />
       </View>
     );
   }
 
+  if (view === undefined) {
+    return <View style={styles.root}><Text style={styles.loading}>Loading…</Text></View>;
+  }
+
+  if (view === null) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top + space.md }]}>
+        <EmptyState icon={ArenaIcon} title="No Clash here yet" body="A Clash starts when someone challenges this Take with a rebuttal." actionLabel="VIEW TAKE" onAction={() => router.replace(`/take/${id}`)} />
+      </View>
+    );
+  }
+
+  const settled = view.status === 'settled';
+  const cancelled = view.status === 'cancelled';
+  const closed = view.status === 'open' && view.closesAt <= now;
+  const statusKind: ClashStatusKind = settled ? 'settled' : cancelled ? 'cancelled' : closed ? 'closed' : 'open';
+  const blind = view.mode === 'BLIND';
+  const sideA = view.sideA ? asUser(view.sideA) : null;
+  const sideB = view.sideB ? asUser(view.sideB) : null;
+
   return (
-    <View style={s.root}>
-      <ClashBody
-        take={take}
-        author={author}
-        challenger={challenger}
-        challengerText={challengerText}
-        clash={clash}
-        storedResult={storedResult}
-        revealed={stage === 'result' && Boolean(storedResult)}
-        stage={stage}
-        judgement={ballot}
-        challengerIsCommunity={topComment != null}
-        expiresAt={take.expiresAt}
-        now={now}
-        paddingTop={insets.top + space.sm}
-        paddingBottom={insets.bottom + space.xxl}
-        onChoose={choose}
-        onLeave={leave}
-        onDone={() => router.replace('/(tabs)')}
-        onNextClash={nextClash}
-      />
+    <View style={styles.root}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + space.sm, paddingBottom: insets.bottom + space.xl }]}
+        accessibilityLabel={
+          blind && !view.revealed
+            ? 'Blind Clash. Side A. Side B. Participant identities hidden until judgement.'
+            : blind
+              ? 'Blind Clash'
+              : 'Clash'
+        }
+      >
+        <View style={styles.topRow}>
+          <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} style={styles.headerBtn}>
+            <BackIcon size={20} color={ink.primary} />
+          </Pressable>
+          <Text allowFontScaling={false} style={styles.eyebrow}>{blind ? 'BLIND CLASH' : 'CLASH'}</Text>
+          <Pressable onPress={share} accessibilityRole="button" accessibilityLabel="Share this Clash" hitSlop={8} style={styles.headerBtn}>
+            <ShareIcon size={20} color={ink.primary} />
+          </Pressable>
+        </View>
+
+        <ClashStatus kind={statusKind} closesAt={view.closesAt} now={now} />
+
+        <ClashSideView side="A" author={sideA} text={view.sideAText} winner={settled && view.verdict?.winnerSide === 'A'} faded={settled && view.verdict?.winnerSide === 'B'} />
+        <View style={styles.vsRow}>
+          <Text allowFontScaling={false} style={styles.vsText}>vs</Text>
+        </View>
+        <ClashSideView side="B" author={sideB} text={view.sideBText || '[rebuttal unavailable]'} winner={settled && view.verdict?.winnerSide === 'B'} faded={settled && view.verdict?.winnerSide === 'A'} />
+
+        <MindshiftPanel takeId={view.takeId} offerFinal={view.hasJudged || settled} />
+
+        {settled && view.verdict ? (
+          <ClashResultView verdict={view.verdict} reputationDelta={reputation} coinsDelta={coins} />
+        ) : cancelled ? (
+          <View style={styles.noticeBox}><Text style={styles.noticeText}>No community verdict was reached for this Clash.</Text></View>
+        ) : closed ? (
+          <View style={styles.noticeBox}><Text style={styles.noticeText}>Judging closed · result pending…</Text></View>
+        ) : view.isParticipant ? (
+          <View style={styles.noticeBox}><Text style={styles.noticeText}>Participants can't judge their own Clash.</Text></View>
+        ) : view.hasJudged && view.myBallot ? (
+          <LockedJudgement side={view.myBallot} />
+        ) : !signedIn ? (
+          <GlowButton label="Sign in to judge" tone="light" onPress={() => router.push('/auth')} style={styles.guestCta} />
+        ) : (
+          <JudgementPanel
+            sideAHandle={view.revealed ? view.sideA?.handle ?? null : null}
+            sideBHandle={view.revealed ? view.sideB?.handle ?? null : null}
+            busy={busy}
+            onJudge={(s) => void judge(s)}
+          />
+        )}
+      </ScrollView>
       <Notice offset={0} />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.bg },
+  content: { paddingHorizontal: space.md, gap: space.md },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
+  eyebrow: { ...typeScale.caption, color: ink.tertiary },
+  loading: { ...typeScale.meta, color: ink.tertiary, paddingTop: 200, textAlign: 'center' },
+  vsRow: { alignItems: 'center' },
+  vsText: { ...typeScale.caption, color: ink.quaternary, letterSpacing: 1 },
+  noticeBox: { padding: space.md, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(255,255,255,0.03)' },
+  noticeText: { ...typeScale.meta, color: ink.tertiary },
+  guestCta: { alignSelf: 'stretch' },
+});

@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { GlassCard } from '../shared/GlassCard';
 import { gmvLakhs } from '../../data/mockCampaigns';
 import { CREATOR_BY_ID } from '../../data/mockCreators';
-import type { SponsorOverview } from '../../services/vaultService';
+import type { SponsorOverview } from '../../store/types';
 import type { Creator } from '../../store/types';
 import { ink, radius, space, typeScale } from '../../theme';
 import { atHandle } from '../../utils/format';

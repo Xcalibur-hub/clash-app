@@ -4,13 +4,14 @@ import type {
   ChallengerComment,
   Clash,
   ClashResult,
+  CommentSort,
   Creator,
-  Drop,
+  FeedScope,
+  HoodFilter,
   HoodId,
-  Judgement,
+  HoodSort,
   Take,
   ThemeMode,
-  UnlockStatus,
   User,
 } from './types';
 
@@ -53,16 +54,90 @@ export function selectFeed(state: ClashState, hood: HoodId, now: number = Date.n
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
-export function selectClashForTake(state: ClashState, takeId: string): Clash | undefined {
-  return state.clashes.find((clash) => clash.takeId === takeId);
+/** The Hood page feed: Hot (heat), New (created_at) or Top (engagement). */
+export function selectHoodFeed(
+  state: ClashState,
+  hood: Exclude<HoodId, 'for-you'>,
+  sort: HoodSort,
+  now: number = Date.now(),
+): Take[] {
+  const live = selectLiveTakes(state, now).filter((take) => take.hood === hood);
+  if (sort === 'new') return live.slice().sort((a, b) => b.createdAt - a.createdAt);
+  if (sort === 'top') return live.slice().sort((a, b) => engagement(b) - engagement(a));
+  return live.slice().sort((a, b) => heat(b) - heat(a));
 }
 
-export function selectJudgement(state: ClashState, clashId: string): Judgement | undefined {
-  return state.judgements[clashId];
+/** A node in the threaded rebuttal tree. */
+export interface CommentNode {
+  comment: ChallengerComment;
+  children: CommentNode[];
 }
 
-export function selectResult(state: ClashState, clashId: string): ClashResult | undefined {
-  return state.results[clashId];
+/**
+ * Builds the thread tree. Children are ordered oldest-first; top-level rebuttals
+ * are ordered by the chosen sort. A reply whose parent is unavailable (removed)
+ * is promoted to top-level so its descendants are never orphaned.
+ */
+export function buildCommentTree(
+  comments: readonly ChallengerComment[],
+  sort: CommentSort,
+): CommentNode[] {
+  const byId = new Map<string, ChallengerComment>();
+  for (const comment of comments) byId.set(comment.id, comment);
+
+  const children = new Map<string, ChallengerComment[]>();
+  for (const comment of comments) {
+    if (!comment.parentId || !byId.has(comment.parentId)) continue;
+    const list = children.get(comment.parentId) ?? [];
+    list.push(comment);
+    children.set(comment.parentId, list);
+  }
+
+  const build = (comment: ChallengerComment): CommentNode => {
+    const kids = (children.get(comment.id) ?? []).slice().sort((a, b) => a.createdAt - b.createdAt);
+    return { comment, children: kids.map(build) };
+  };
+
+  const tops = comments.filter((comment) => !comment.parentId || !byId.has(comment.parentId));
+  tops.sort((a, b) =>
+    sort === 'new' ? b.createdAt - a.createdAt : b.upvotes - a.upvotes || b.createdAt - a.createdAt,
+  );
+  return tops.map(build);
+}
+
+/** "Popular" ranks by total engagement; clashes stay slightly weighted. */
+function engagement(take: Take): number {
+  return take.clashes * 2 + take.reactions;
+}
+
+/**
+ * The Arena home feed for a given scope + community filter.
+ *   for-you    → heat (clash-weighted relevance)
+ *   following  → live takes from followed authors, newest first
+ *   popular    → engagement-weighted live takes
+ *   new        → newest live takes first
+ */
+export function selectFeedForScope(
+  state: ClashState,
+  scope: FeedScope,
+  hood: HoodFilter,
+  now: number = Date.now(),
+  followingIds: ReadonlySet<string>,
+): Take[] {
+  const live = selectLiveTakes(state, now);
+  const inScope = hood === 'all' ? live : live.filter((take) => take.hood === hood);
+
+  if (scope === 'following') {
+    return inScope
+      .filter((take) => followingIds.has(take.authorId))
+      .slice()
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  const list = inScope.slice();
+  if (scope === 'new') return list.sort((a, b) => b.createdAt - a.createdAt);
+  if (scope === 'popular') return list.sort((a, b) => engagement(b) - engagement(a));
+  return list.sort((a, b) => heat(b) - heat(a));
 }
 
 export function selectIsSaved(state: ClashState, takeId: string): boolean {
@@ -89,18 +164,6 @@ export function selectViewerTakes(state: ClashState): Take[] {
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** Clashes the viewer called correctly — the Profile "Wins" tab. */
-export function selectViewerWins(state: ClashState): WinEntry[] {
-  const entries: WinEntry[] = [];
-  for (const result of Object.values(state.results)) {
-    if (result.alignment !== 'majority') continue;
-    const clash = state.clashes.find((item) => item.id === result.clashId);
-    const take = clash ? state.takes.find((item) => item.id === clash.takeId) : undefined;
-    if (clash && take) entries.push({ clash, take, result });
-  }
-  return entries.sort((a, b) => b.result.resolvedAt - a.result.resolvedAt);
-}
-
 // ── Vault selectors (spec §17–§22) ────────────────────────────
 
 export function selectCreators(state: ClashState): readonly Creator[] {
@@ -113,28 +176,6 @@ export function selectCreator(state: ClashState, creatorId: string): Creator | u
 
 export function selectTrendingCreators(state: ClashState, limit = 3): Creator[] {
   return [...state.creators].sort((a, b) => b.followers - a.followers).slice(0, limit);
-}
-
-export function selectDrops(state: ClashState): readonly Drop[] {
-  return state.drops;
-}
-
-export function selectDropsForCreator(state: ClashState, creatorId: string): Drop[] {
-  return state.drops.filter((drop) => drop.creatorId === creatorId);
-}
-
-export function selectExclusiveDrops(state: ClashState): Drop[] {
-  return state.drops.filter((drop) => drop.tier === 'exclusive');
-}
-
-export function selectUnlockStatus(state: ClashState, dropId: string): UnlockStatus {
-  return state.unlocks[dropId]?.status ?? 'locked';
-}
-
-export function selectUnlockedDropIds(state: ClashState): string[] {
-  return Object.values(state.unlocks)
-    .filter((record) => record.status === 'unlocked')
-    .map((record) => record.dropId);
 }
 
 export function selectCampaigns(state: ClashState): readonly Campaign[] {

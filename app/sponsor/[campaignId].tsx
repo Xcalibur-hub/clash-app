@@ -11,7 +11,7 @@ import { GlassCard } from '../../components/shared/GlassCard';
 import { Notice } from '../../components/shared/Notice';
 import { StoreIcon } from '../../components/shared/icons';
 import { conversionPct, gmvLakhs, SIMULATED_LABEL } from '../../data/mockCampaigns';
-import { sponsorOverview } from '../../services/vaultService';
+import { sponsorOverview } from '../../services/vaultPrototypeService';
 import { selectCampaigns, selectCreators, useClash } from '../../store';
 import { ink, radius, space, typeScale } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -122,7 +122,7 @@ export default function SponsorScreen(): React.JSX.Element {
                 title={`@${row.creator.handle}`}
                 sub={row.creator.name}
                 value={gmvLakhs(row.gmv)}
-                onPress={() => router.push(`/creator/${row.creator.id}`)}
+                onPress={() => router.push(`/vault/${row.creator.id}`)}
               />
             ))
           : null}

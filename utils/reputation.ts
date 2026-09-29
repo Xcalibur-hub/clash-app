@@ -1,4 +1,4 @@
-import type { RankName } from '../store/types';
+import type { Alignment, RankName } from '../store/types';
 
 /** Reputation awarded per interaction (spec §11). */
 export const XP = {
@@ -16,6 +16,13 @@ export const XP = {
 
 /** "Winning Clash: +120 XP" — participation plus the win bonus. */
 export const CLASH_WIN_TOTAL = XP.participate + XP.winBonus;
+
+/** Human label for how a ballot compared to the settled winner (display only). */
+export function awardDescription(alignment: Alignment): string {
+  if (alignment === 'majority') return 'Your judgement matched the jury';
+  if (alignment === 'minority') return 'You backed the losing side — dissent logged';
+  return 'You abstained, so the jury decided';
+}
 
 
 export interface RankStep {
