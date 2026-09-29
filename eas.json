@@ -11,11 +11,15 @@
       }
     },
     "preview": {
-      "distribution": "internal",
-      "env": {
-        "APP_VARIANT": "preview"
-      }
-    },
+  "distribution": "internal",
+  "environment": "preview",
+  "android": {
+    "buildType": "apk"
+  },
+  "env": {
+    "APP_VARIANT": "preview"
+  }
+},
     "production": {
       "autoIncrement": true,
       "env": {

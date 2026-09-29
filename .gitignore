@@ -24,3 +24,6 @@ supabase/.branches/
 .env
 .env.*
 !.env.example
+# Expo generated native projects
+/android/
+/ios/
