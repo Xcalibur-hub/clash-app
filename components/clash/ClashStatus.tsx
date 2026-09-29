@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { ink, radius, space, typeScale } from '../../theme';
+import { accent, ink, radius, space, typeScale } from '../../theme';
 import { durationLabel } from '../../utils/format';
 
 export type ClashStatusKind = 'open' | 'closed' | 'settled' | 'cancelled';
@@ -13,8 +13,9 @@ export interface ClashStatusProps {
 
 /** Compact status line for the Clash: open countdown, closed, settled or cancelled. */
 export function ClashStatus({ kind, closesAt, now }: ClashStatusProps): React.JSX.Element {
+  const open = kind === 'open';
   const label =
-    kind === 'open'
+    open
       ? `Closes in ${durationLabel(closesAt, now)}`
       : kind === 'closed'
         ? 'Judging closed · result pending'
@@ -22,8 +23,12 @@ export function ClashStatus({ kind, closesAt, now }: ClashStatusProps): React.JS
           ? 'Settled'
           : 'No community verdict';
   return (
-    <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={styles.label} accessibilityLiveRegion="polite">
+    <View style={[styles.wrap, open && styles.open, kind === 'settled' && styles.settled]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.label, open && styles.labelOpen]}
+        accessibilityLiveRegion="polite"
+      >
         {label}
       </Text>
     </View>
@@ -31,6 +36,22 @@ export function ClashStatus({ kind, closesAt, now }: ClashStatusProps): React.JS
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignSelf: 'flex-start', paddingHorizontal: space.sm, paddingVertical: 5, borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(255,255,255,0.03)' },
-  label: { ...typeScale.meta, fontSize: 12, color: ink.secondary },
+  wrap: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: space.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  open: {
+    borderColor: 'rgba(201,169,106,0.35)',
+    backgroundColor: 'rgba(201,169,106,0.08)',
+  },
+  settled: {
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  label: { ...typeScale.meta, fontSize: 12, color: ink.secondary, fontVariant: ['tabular-nums'] },
+  labelOpen: { color: accent.gold, fontWeight: '600' },
 });

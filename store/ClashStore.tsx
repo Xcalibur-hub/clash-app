@@ -10,9 +10,10 @@ import React, {
   type ReactNode,
 } from 'react';
 import { clashReducer, createInitialState, type ClashAction, type ClashState } from './reducer';
-import { arenaFailed, arenaLoading, hydrateArena } from './actions';
+import { arenaFailed, arenaLoading, hydrateArena, setThemeMode } from './actions';
 import { loadArena } from '../services/hydrationService';
 import { isSupabaseConfigured } from '../services/supabaseClient';
+import { loadThemeMode, saveThemeMode } from '../services/themePreference';
 import type { User } from './types';
 
 interface ClashContextValue {
@@ -35,6 +36,23 @@ export function ClashProvider({ children }: { children: ReactNode }): React.JSX.
   const [state, dispatch] = useReducer(clashReducer, undefined, createInitialState);
   const noticeId = state.notice?.id ?? null;
   const reloadSeq = useRef(0);
+
+  // Restore appearance preference before paint settles — local only, no auth.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const saved = await loadThemeMode();
+      if (!cancelled && saved) dispatch(setThemeMode(saved));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist every Appearance change so System/Light/Dark survive restarts.
+  useEffect(() => {
+    void saveThemeMode(state.themeMode);
+  }, [state.themeMode]);
 
   useEffect(() => {
     if (noticeId === null) return undefined;

@@ -18,13 +18,14 @@ import {
   type ProfileClash,
   type ProfileReply,
 } from '../../services/profileService';
-import { color, layout, space } from '../../theme';
+import { layout, space, useThemeColors } from '../../theme';
 import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { EmptyState } from '../shared/EmptyState';
 import { GlowButton } from '../shared/GlowButton';
 import { UserIcon, VaultIcon } from '../shared/icons';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfileClashRow, ProfileReplyItem, ProfileTakeItem } from './ProfileLists';
+import { AppearanceRow } from './AppearanceRow';
 import { EditProfileSheet } from './EditProfileSheet';
 import { SignOutSheet } from './SignOutSheet';
 import { PostActionsSheet } from '../arena/PostActionsSheet';
@@ -49,6 +50,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   const { signedIn } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useThemeColors();
 
   const viewerId = signedIn ? state.viewer.id : null;
   const self = viewerId !== null && viewerId === profileId;
@@ -177,7 +179,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
 
   if (notFound) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
         <EmptyState icon={UserIcon} title="Profile not found" body="This profile no longer exists or is unavailable." />
       </View>
     );
@@ -185,7 +187,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
 
   if (blocked) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
         <EmptyState icon={UserIcon} title="You blocked this user" body="Their profile and content are hidden." />
       </View>
     );
@@ -193,18 +195,18 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
 
   if (!profile || !follow) {
     return (
-      <View style={[styles.screen, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator color="#FFFFFF" />
+      <View style={[styles.screen, styles.centered, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+        <ActivityIndicator color={theme.textPrimary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor="#FFFFFF" />}
-        contentContainerStyle={[styles.content, { paddingTop: hideSafeTop ? space.md : insets.top + space.md, paddingBottom: insets.bottom + space.xxl }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.textPrimary} />}
+        contentContainerStyle={[styles.content, { paddingTop: hideSafeTop ? space.md : insets.top + space.md, paddingBottom: insets.bottom + 96 }]}
       >
         <ProfileHeader
           profile={profile}
@@ -220,6 +222,8 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
             else setActionsOpen(true);
           }}
         />
+
+        {self ? <AppearanceRow /> : null}
 
         {hasVault !== null && (hasVault || self) ? (
           <GlowButton
@@ -324,7 +328,7 @@ function Spinner(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg },
+  screen: { flex: 1 },
   centered: { justifyContent: 'center', alignItems: 'center' },
   content: { paddingHorizontal: layout.screenX, gap: space.lg },
   spinner: { paddingVertical: space.xxl, alignItems: 'center' },

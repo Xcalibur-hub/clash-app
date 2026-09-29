@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ChallengerComment } from '../../store';
 import { selectAuthor, useClash, type CommentNode } from '../../store';
-import { ink, space, typeScale } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { compact, timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
@@ -10,6 +10,7 @@ import { ArenaIcon, ArrowBigUpIcon, CommentIcon, MoreIcon } from '../shared/icon
 
 export interface CommentThreadProps {
   nodes: CommentNode[];
+  takeAuthorId?: string;
   onUpvote: (comment: ChallengerComment) => void;
   onReply: (comment: ChallengerComment) => void;
   onClash: (comment: ChallengerComment) => void;
@@ -17,11 +18,27 @@ export interface CommentThreadProps {
 }
 
 /** Threaded rebuttal list — recursive, with per-branch collapse and depth capping. */
-export function CommentThread({ nodes, onUpvote, onReply, onClash, onMore }: CommentThreadProps): React.JSX.Element {
+export function CommentThread({
+  nodes,
+  takeAuthorId,
+  onUpvote,
+  onReply,
+  onClash,
+  onMore,
+}: CommentThreadProps): React.JSX.Element {
   return (
     <View style={styles.list}>
       {nodes.map((node) => (
-        <CommentItem key={node.comment.id} node={node} depth={0} onUpvote={onUpvote} onReply={onReply} onClash={onClash} onMore={onMore} />
+        <CommentItem
+          key={node.comment.id}
+          node={node}
+          depth={0}
+          takeAuthorId={takeAuthorId}
+          onUpvote={onUpvote}
+          onReply={onReply}
+          onClash={onClash}
+          onMore={onMore}
+        />
       ))}
     </View>
   );
@@ -30,115 +47,211 @@ export function CommentThread({ nodes, onUpvote, onReply, onClash, onMore }: Com
 interface CommentItemProps {
   node: CommentNode;
   depth: number;
+  takeAuthorId?: string;
   onUpvote: (comment: ChallengerComment) => void;
   onReply: (comment: ChallengerComment) => void;
   onClash: (comment: ChallengerComment) => void;
   onMore: (comment: ChallengerComment) => void;
 }
 
-function CommentItem({ node, depth, onUpvote, onReply, onClash, onMore }: CommentItemProps): React.JSX.Element {
+function CommentItem({
+  node,
+  depth,
+  takeAuthorId,
+  onUpvote,
+  onReply,
+  onClash,
+  onMore,
+}: CommentItemProps): React.JSX.Element {
   const { state } = useClash();
+  const t = useThemeColors();
   const [collapsed, setCollapsed] = React.useState(false);
   const comment = node.comment;
   const author = selectAuthor(state, comment.authorId);
   const upvoted = state.upvotedCommentIds.includes(comment.id);
   const isViewer = comment.authorId === state.viewer.id;
+  const isOp = takeAuthorId !== undefined && comment.authorId === takeAuthorId;
   const parentRemoved = Boolean(comment.parentId) && !state.comments.some((c) => c.id === comment.parentId);
-  const indent = Math.min(depth, 4) * 14;
+  const indent = Math.min(depth, 4) * 16;
 
   return (
     <View>
       {parentRemoved ? (
-        <Text allowFontScaling={false} style={[styles.removedNote, { marginLeft: indent + space.sm }]}>
+        <Text allowFontScaling={false} style={[styles.removedNote, { marginLeft: indent + space.sm, color: t.textMuted }]}>
           {'\u21B3 [removed]'}
         </Text>
       ) : null}
-      <View style={[styles.item, { marginLeft: indent, borderLeftWidth: depth > 0 ? 1 : 0 }]}>
-        <Avatar name={author?.name ?? '?'} tint={author?.tint ?? '#888'} size={28} />
+      <View
+        style={[
+          styles.item,
+          {
+            marginLeft: indent,
+            borderLeftWidth: depth > 0 ? 2 : 0,
+            borderLeftColor: depth > 0 ? t.borderStrong : 'transparent',
+          },
+        ]}
+      >
+        <Avatar name={author?.name ?? '?'} tint={author?.tint ?? '#888'} size={depth === 0 ? 32 : 26} />
         <View style={styles.main}>
           <View style={styles.meta}>
-            <Text allowFontScaling={false} style={styles.handle} numberOfLines={1}>
-              {author?.name ?? 'ghost'} · @{author?.handle ?? 'ghost'} · {timeAgo(comment.createdAt)}
+            <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+              {author?.name ?? 'ghost'}
             </Text>
-            {isViewer ? <Text allowFontScaling={false} style={styles.you}>You</Text> : null}
+            {isOp ? (
+              <View style={[styles.opBadge, { backgroundColor: t.surfaceMuted }]}>
+                <Text allowFontScaling={false} style={[styles.opText, { color: t.textPrimary }]}>
+                  OP
+                </Text>
+              </View>
+            ) : null}
+            {isViewer ? (
+              <Text allowFontScaling={false} style={[styles.you, { color: t.textSecondary }]}>
+                You
+              </Text>
+            ) : null}
+            <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
+              @{author?.handle ?? 'ghost'} · {timeAgo(comment.createdAt)}
+            </Text>
           </View>
-          <Text allowFontScaling style={styles.body}>
+          <Text allowFontScaling style={[styles.body, { color: t.textPrimary }]}>
             {comment.text}
           </Text>
           <View style={styles.actions}>
             <Pressable
-              onPress={() => { hapticTap(); onUpvote(comment); }}
+              onPress={() => {
+                hapticTap();
+                onUpvote(comment);
+              }}
               accessibilityRole="button"
               accessibilityState={{ selected: upvoted }}
               accessibilityLabel={`Upvote reply, ${comment.upvotes} upvotes`}
               style={styles.action}
             >
-              <ArrowBigUpIcon size={16} color={upvoted ? ink.primary : ink.tertiary} strokeWidth={upvoted ? 2.4 : 2} />
-              <Text allowFontScaling={false} style={[styles.actionText, upvoted && styles.actionTextOn]}>
+              <ArrowBigUpIcon size={16} color={upvoted ? t.textPrimary : t.textMuted} strokeWidth={upvoted ? 2.4 : 2} />
+              <Text allowFontScaling={false} style={[styles.actionText, { color: upvoted ? t.textPrimary : t.textMuted }]}>
                 {compact(comment.upvotes)}
               </Text>
             </Pressable>
-            <Pressable onPress={() => { hapticTap(); onReply(comment); }} accessibilityRole="button" accessibilityLabel="Reply" style={styles.action}>
-              <CommentIcon size={15} color={ink.tertiary} strokeWidth={2} />
-              <Text allowFontScaling={false} style={styles.actionText}>Reply</Text>
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                onReply(comment);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Reply"
+              style={styles.action}
+            >
+              <CommentIcon size={15} color={t.textMuted} strokeWidth={2} />
+              <Text allowFontScaling={false} style={[styles.actionText, { color: t.textMuted }]}>
+                Reply
+              </Text>
             </Pressable>
             {isViewer ? (
-              <Pressable onPress={() => { hapticTap(); onClash(comment); }} accessibilityRole="button" accessibilityLabel="Challenge with this rebuttal" style={styles.clash}>
-                <ArenaIcon size={13} color={ink.primary} strokeWidth={2.4} />
-                <Text allowFontScaling={false} style={styles.clashText}>CLASH</Text>
+              <Pressable
+                onPress={() => {
+                  hapticTap();
+                  onClash(comment);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Challenge with this rebuttal"
+                style={[styles.clash, { backgroundColor: t.clashFill }]}
+              >
+                <ArenaIcon size={12} color={t.clashText} strokeWidth={2.6} />
+                <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
+                  CLASH
+                </Text>
               </Pressable>
             ) : null}
             {node.children.length > 0 ? (
-              <Pressable onPress={() => { hapticTap(); setCollapsed((c) => !c); }} accessibilityRole="button" accessibilityState={{ expanded: !collapsed }} accessibilityLabel={collapsed ? 'Expand replies' : 'Collapse replies'} style={styles.action}>
-                <Text allowFontScaling={false} style={styles.actionText}>
-                  {collapsed ? `[+] ${node.children.length}` : 'collapse'}
+              <Pressable
+                onPress={() => {
+                  hapticTap();
+                  setCollapsed((c) => !c);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: !collapsed }}
+                accessibilityLabel={collapsed ? 'Expand replies' : 'Collapse replies'}
+                style={styles.action}
+              >
+                <Text allowFontScaling={false} style={[styles.collapseText, { color: t.textSecondary }]}>
+                  {collapsed ? `Show ${node.children.length}` : 'Hide'}
                 </Text>
               </Pressable>
             ) : null}
             <View style={styles.spacer} />
-            <Pressable onPress={() => { hapticTap(); onMore(comment); }} accessibilityRole="button" accessibilityLabel="More actions" hitSlop={8} style={styles.more}>
-              <MoreIcon size={16} color={ink.tertiary} strokeWidth={2.2} />
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                onMore(comment);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="More actions"
+              hitSlop={8}
+              style={styles.more}
+            >
+              <MoreIcon size={16} color={t.textMuted} strokeWidth={2.2} />
             </Pressable>
           </View>
         </View>
       </View>
 
-      {collapsed ? null : node.children.map((child) => (
-        <CommentItem key={child.comment.id} node={child} depth={depth + 1} onUpvote={onUpvote} onReply={onReply} onClash={onClash} onMore={onMore} />
-      ))}
+      {collapsed
+        ? null
+        : node.children.map((child) => (
+            <CommentItem
+              key={child.comment.id}
+              node={child}
+              depth={depth + 1}
+              takeAuthorId={takeAuthorId}
+              onUpvote={onUpvote}
+              onReply={onReply}
+              onClash={onClash}
+              onMore={onMore}
+            />
+          ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { gap: space.sm },
+  list: { gap: space.md },
   item: {
     flexDirection: 'row',
     gap: space.sm,
     paddingLeft: space.sm,
-    borderLeftColor: 'rgba(255,255,255,0.10)',
+    paddingVertical: 2,
   },
-  main: { flex: 1, gap: 4 },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  handle: { ...typeScale.caption, fontSize: 11, color: ink.tertiary, flexShrink: 1 },
-  you: { ...typeScale.caption, fontSize: 10, color: ink.secondary },
-  body: { fontSize: 14, lineHeight: 20, color: ink.primary },
+  main: { flex: 1, gap: 5 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  name: { ...typeScale.label, fontSize: 13, fontWeight: '700' },
+  handle: { ...typeScale.caption, fontSize: 11, flexShrink: 1 },
+  you: { ...typeScale.caption, fontSize: 10, fontWeight: '600' },
+  opBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: radius.xs,
+  },
+  opText: { ...typeScale.caption, fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
+  body: { fontSize: 15, lineHeight: 21, fontWeight: '400' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.md, flexWrap: 'wrap', paddingTop: 2 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32 },
-  actionText: { ...typeScale.meta, fontSize: 12, color: ink.tertiary },
-  actionTextOn: { color: ink.primary },
+  actionText: { ...typeScale.meta, fontSize: 12 },
+  collapseText: { ...typeScale.meta, fontSize: 12, fontWeight: '600' },
   clash: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: space.sm,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    paddingVertical: 5,
+    borderRadius: radius.pill,
   },
-  clashText: { ...typeScale.caption, fontSize: 10, fontWeight: '700', letterSpacing: 0.3, color: ink.primary },
+  clashText: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
   spacer: { flex: 1 },
   more: { padding: 2 },
-  removedNote: { ...typeScale.caption, fontSize: 10, color: ink.quaternary, paddingTop: space.xs },
+  removedNote: { ...typeScale.caption, fontSize: 10, paddingTop: space.xs },
 });

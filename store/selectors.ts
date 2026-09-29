@@ -110,6 +110,19 @@ function engagement(take: Take): number {
   return take.clashes * 2 + take.reactions;
 }
 
+/** Media Takes ranked for the Arena featured stack (discovery, not a new ranking RPC). */
+export function selectFeaturedMediaTakes(
+  state: ClashState,
+  now: number = Date.now(),
+  limit = 8,
+): Take[] {
+  return selectLiveTakes(state, now)
+    .filter((take) => take.media != null)
+    .slice()
+    .sort((a, b) => engagement(b) - engagement(a) || b.createdAt - a.createdAt)
+    .slice(0, limit);
+}
+
 /**
  * The Arena home feed for a given scope + community filter.
  *   for-you    → heat (clash-weighted relevance)

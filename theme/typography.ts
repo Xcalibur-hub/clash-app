@@ -62,16 +62,16 @@ export const typeScale = {
     letterSpacing: -0.2,
   },
   /**
-   * Take text in feed cards: 20-22px, weight 700, tight line height (28px).
-   * Also the Take itself on the take detail and duel panel — the single
-   * highest-contrast line on any Take surface.
+   * Take text in feed cards and Take detail — the highest-contrast line on any
+   * Take surface. Kept heavier and larger than body so posts read as content,
+   * not chrome.
    */
   takeText: {
     fontFamily: family.sans,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: '600',
-    letterSpacing: -0.2,
+    letterSpacing: -0.25,
   },
   body: {
     fontFamily: family.sans,

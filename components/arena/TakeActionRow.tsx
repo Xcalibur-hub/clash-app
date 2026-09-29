@@ -1,10 +1,19 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { ink, radius, space, typeScale } from '../../theme';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { compact } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaIcon, ArrowBigUpIcon, BookmarkIcon, CommentIcon, ShareIcon } from '../shared/icons';
+import { PressableScale } from '../shared/PressableScale';
 
 export interface TakeActionRowProps {
   reactions: number;
@@ -24,6 +33,8 @@ interface MetaActionProps {
   active?: boolean;
   accessibilityLabel: string;
   onPress: () => void;
+  activeColor: string;
+  idleColor: string;
 }
 
 function MetaAction({
@@ -32,11 +43,25 @@ function MetaAction({
   active = false,
   accessibilityLabel,
   onPress,
+  activeColor,
+  idleColor,
 }: MetaActionProps): React.JSX.Element {
+  const reduced = useReducedMotion();
+  const bounce = useSharedValue(1);
+  const animated = useAnimatedStyle(() => ({
+    transform: [{ scale: bounce.value }],
+  }));
+
   return (
     <Pressable
       onPress={() => {
         hapticTap();
+        if (!reduced) {
+          bounce.value = withSequence(
+            withSpring(1.18, { damping: 12, stiffness: 400 }),
+            withSpring(1, { damping: 14, stiffness: 280 }),
+          );
+        }
         onPress();
       }}
       accessibilityRole="button"
@@ -44,9 +69,14 @@ function MetaAction({
       accessibilityState={active ? { selected: true } : undefined}
       style={styles.metaAction}
     >
-      <Icon size={19} color={active ? ink.primary : ink.tertiary} strokeWidth={active ? 2.4 : 2.1} />
+      <Animated.View style={animated}>
+        <Icon size={19} color={active ? activeColor : idleColor} strokeWidth={active ? 2.4 : 2.1} />
+      </Animated.View>
       {label ? (
-        <Text allowFontScaling={false} style={styles.metaLabel}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.metaLabel, { color: active ? activeColor : idleColor, fontWeight: active ? '600' : '400' }]}
+        >
           {label}
         </Text>
       ) : null}
@@ -54,10 +84,17 @@ function MetaAction({
   );
 }
 
-/** Compact social action row: upvote, rebuttals, CLASH … share, save. */
+/** Social action row — CLASH is the signature filled CTA (theme-aware). */
 export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
   const { reactions, commentCount, isSaved, hasReacted, onReact, onComment, onClash, onShare, onSave } =
     props;
+  const t = useThemeColors();
+  const reduced = useReducedMotion();
+  const clashPulse = useSharedValue(1);
+  const clashAnim = useAnimatedStyle(() => ({
+    transform: [{ scale: clashPulse.value }],
+  }));
+
   return (
     <View style={styles.row}>
       <MetaAction
@@ -66,35 +103,56 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
         active={hasReacted}
         accessibilityLabel="React to this take"
         onPress={onReact}
+        activeColor={t.textPrimary}
+        idleColor={t.textMuted}
       />
       <MetaAction
         icon={CommentIcon}
         label={commentCount > 0 ? compact(commentCount) : 'Replies'}
         accessibilityLabel="Open rebuttals"
         onPress={onComment}
+        activeColor={t.textPrimary}
+        idleColor={t.textMuted}
       />
-      <Pressable
+      <PressableScale
         onPress={() => {
           hapticTap();
+          if (!reduced) {
+            clashPulse.value = withSequence(
+              withTiming(0.94, { duration: 90 }),
+              withSpring(1, { damping: 14, stiffness: 320 }),
+            );
+          }
           onClash();
         }}
         accessibilityRole="button"
         accessibilityLabel="Clash on this take"
-        style={styles.clash}
+        style={[styles.clash, { backgroundColor: t.clashFill }]}
       >
-        <ArenaIcon size={15} color={ink.primary} strokeWidth={2.4} />
-        <Text allowFontScaling={false} style={styles.clashText}>
-          CLASH
-        </Text>
-      </Pressable>
+        <Animated.View style={[styles.clashInner, clashAnim]}>
+          <ArenaIcon size={14} color={t.clashText} strokeWidth={2.6} />
+          <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
+            CLASH
+          </Text>
+        </Animated.View>
+      </PressableScale>
       <View style={styles.spacer} />
-      <MetaAction icon={ShareIcon} label="" accessibilityLabel="Share this take" onPress={onShare} />
+      <MetaAction
+        icon={ShareIcon}
+        label=""
+        accessibilityLabel="Share this take"
+        onPress={onShare}
+        activeColor={t.textPrimary}
+        idleColor={t.textMuted}
+      />
       <MetaAction
         icon={BookmarkIcon}
         label=""
         active={isSaved}
         accessibilityLabel={isSaved ? 'Remove from saved' : 'Save this take'}
         onPress={onSave}
+        activeColor={t.textPrimary}
+        idleColor={t.textMuted}
       />
     </View>
   );
@@ -105,9 +163,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    paddingTop: space.xs,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    paddingTop: space.sm,
   },
   metaAction: {
     minHeight: 40,
@@ -118,18 +174,23 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 2,
   },
-  metaLabel: { ...typeScale.meta, fontSize: 13, color: ink.tertiary },
+  metaLabel: { ...typeScale.meta, fontSize: 13 },
   clash: {
-    minHeight: 36,
+    minHeight: 34,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    justifyContent: 'center',
+  },
+  clashInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: space.md,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    gap: 5,
   },
-  clashText: { ...typeScale.label, fontSize: 13, fontWeight: '700', letterSpacing: 0.4, color: ink.primary },
+  clashText: {
+    ...typeScale.label,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
   spacer: { flex: 1 },
 });

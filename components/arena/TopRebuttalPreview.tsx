@@ -12,7 +12,7 @@ export interface TopRebuttalPreviewProps {
   onOpen: () => void;
 }
 
-/** Quiet preview of the leading rebuttal — a compact inset row, not a nested card. */
+/** Leading rebuttal teaser — left rail mark, denser quote hierarchy. */
 export function TopRebuttalPreview({
   comment,
   author,
@@ -29,10 +29,10 @@ export function TopRebuttalPreview({
       accessibilityLabel={`Top rebuttal by @${author?.handle ?? 'challenger'}`}
       style={styles.wrap}
     >
-      <CommentIcon size={14} color={ink.tertiary} strokeWidth={2.2} />
+      <CommentIcon size={13} color={ink.quaternary} strokeWidth={2.2} />
       <View style={styles.body}>
         <Text allowFontScaling={false} style={styles.meta} numberOfLines={1}>
-          @{author?.handle ?? 'challenger'} · {compact(comment.upvotes)}
+          Top reply · @{author?.handle ?? 'challenger'} · {compact(comment.upvotes)}
         </Text>
         <Text allowFontScaling={false} style={styles.quote} numberOfLines={2}>
           {comment.text}
@@ -47,11 +47,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: space.xs,
+    paddingVertical: space.xs,
     paddingLeft: space.sm,
     borderLeftWidth: 2,
-    borderLeftColor: 'rgba(255,255,255,0.12)',
+    borderLeftColor: 'rgba(255,255,255,0.16)',
   },
-  body: { flex: 1, gap: 2 },
-  meta: { ...typeScale.meta, fontSize: 12, color: ink.tertiary },
-  quote: { fontSize: 14, lineHeight: 19, color: ink.secondary, fontWeight: '400' },
+  body: { flex: 1, gap: 3 },
+  meta: { ...typeScale.meta, fontSize: 11, color: ink.tertiary, letterSpacing: 0.2 },
+  quote: { fontSize: 14, lineHeight: 20, color: ink.secondary, fontWeight: '500' },
 });

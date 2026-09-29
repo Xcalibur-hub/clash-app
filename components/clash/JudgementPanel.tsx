@@ -1,8 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { Side } from '../../store';
 import { ink, radius, space, typeScale } from '../../theme';
 import { VerifiedIcon } from '../shared/icons';
+import { PressableScale } from '../shared/PressableScale';
 import { sideTone } from './duelPalette';
 
 export interface JudgementPanelProps {
@@ -40,7 +41,7 @@ function JudgeButton({
 }): React.JSX.Element {
   const { tone, soft } = sideTone(side);
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
@@ -59,7 +60,7 @@ function JudgeButton({
           Side {side}
         </Text>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -67,7 +68,7 @@ function JudgeButton({
 export function LockedJudgement({ side }: { side: Side }): React.JSX.Element {
   const { tone } = sideTone(side);
   return (
-    <View style={styles.locked}>
+    <View style={[styles.locked, { borderColor: tone }]}>
       <VerifiedIcon size={18} color={tone} strokeWidth={2.4} />
       <Text allowFontScaling={false} style={styles.lockedTitle}>
         Judgement locked
@@ -81,23 +82,29 @@ export function LockedJudgement({ side }: { side: Side }): React.JSX.Element {
 
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
-  prompt: { ...typeScale.body, color: ink.secondary },
+  prompt: { ...typeScale.body, color: ink.secondary, fontWeight: '500' },
   row: { flexDirection: 'row', gap: space.sm },
   btn: {
     flex: 1,
-    minHeight: 64,
-    paddingVertical: space.sm,
+    minHeight: 72,
+    paddingVertical: space.md,
     paddingHorizontal: space.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 4,
   },
   busy: { opacity: 0.5 },
-  btnLabel: { ...typeScale.label, fontWeight: '700' },
+  btnLabel: { ...typeScale.label, fontWeight: '800', letterSpacing: 0.4 },
   btnHandle: { ...typeScale.meta, fontSize: 12, color: ink.tertiary },
-  locked: { gap: space.xs, padding: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(255,255,255,0.03)' },
+  locked: {
+    gap: space.xs,
+    padding: space.md,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
   lockedTitle: { ...typeScale.label, color: ink.primary, fontWeight: '700' },
   lockedBody: { ...typeScale.meta, color: ink.tertiary },
 });

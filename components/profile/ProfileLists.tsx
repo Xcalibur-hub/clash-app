@@ -3,11 +3,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Take, User } from '../../store';
 import type { ProfileClash, ProfileReply } from '../../services/profileService';
 import { HOOD_LABEL } from '../../data/hoods';
-import { accent, ink, space, typeScale } from '../../theme';
+import { accent, card, duel, ink, radius, space, typeScale } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { timeAgo } from '../../utils/format';
 
-/** Compact authored Take — flat Arena language, no giant cards. */
+/** Compact authored Take — soft plate, stronger text hierarchy. */
 export function ProfileTakeItem({ take, onOpen }: { take: Take; onOpen: () => void }): React.JSX.Element {
   return (
     <Pressable
@@ -17,7 +17,7 @@ export function ProfileTakeItem({ take, onOpen }: { take: Take; onOpen: () => vo
       }}
       accessibilityRole="button"
       accessibilityLabel={`Take: ${take.text}`}
-      style={styles.row}
+      style={styles.plate}
     >
       <Text style={styles.body} numberOfLines={3}>
         {take.text}
@@ -39,7 +39,7 @@ export function ProfileReplyItem({ reply, onOpen }: { reply: ProfileReply; onOpe
       }}
       accessibilityRole="button"
       accessibilityLabel={`Reply: ${reply.comment.text}`}
-      style={styles.row}
+      style={styles.plate}
     >
       <Text style={styles.body} numberOfLines={3}>
         {reply.comment.text}
@@ -78,6 +78,9 @@ export function ProfileClashRow({
         ? 'No verdict'
         : 'Cancelled';
 
+  const sideTint =
+    clash.outcome === 'won' ? duel.aSoft : clash.outcome === 'lost' ? 'rgba(229,72,77,0.08)' : card.fill;
+
   return (
     <Pressable
       onPress={() => {
@@ -86,7 +89,7 @@ export function ProfileClashRow({
       }}
       accessibilityRole="button"
       accessibilityLabel={`Clash ${result}${opponent ? ` against ${opponent.name}` : ''}`}
-      style={styles.row}
+      style={[styles.plate, { backgroundColor: sideTint }]}
     >
       <View style={styles.clashHead}>
         <Text allowFontScaling={false} style={styles.clashOpponent} numberOfLines={1}>
@@ -119,18 +122,21 @@ export function ProfileClashRow({
 }
 
 const styles = StyleSheet.create({
-  row: {
-    paddingVertical: space.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.10)',
+  plate: {
+    padding: space.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: card.border,
+    backgroundColor: card.fill,
     gap: space.xs,
+    marginBottom: space.sm,
   },
-  body: { ...typeScale.body, color: ink.primary },
+  body: { ...typeScale.body, color: ink.primary, fontWeight: '500', fontSize: 15, lineHeight: 21 },
   context: { ...typeScale.meta, color: ink.tertiary },
   meta: { ...typeScale.meta, fontSize: 12, color: ink.quaternary },
   clashHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
-  clashOpponent: { ...typeScale.label, color: ink.primary, flex: 1 },
-  result: { ...typeScale.meta, color: ink.secondary },
+  clashOpponent: { ...typeScale.label, color: ink.primary, flex: 1, fontWeight: '700' },
+  result: { ...typeScale.meta, color: ink.secondary, fontWeight: '700' },
   won: { color: accent.mint },
   lost: { color: accent.danger },
 });

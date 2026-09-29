@@ -37,6 +37,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name: isDevelopment ? 'CLASH (Dev)' : 'CLASH',
     slug: isDevelopment ? 'clash-dev' : 'clash',
     scheme: isDevelopment ? 'clash-dev' : 'clash',
+    plugins: [...(config.plugins ?? []), 'expo-video'],
     ios: {
       ...config.ios,
       bundleIdentifier: applicationId,

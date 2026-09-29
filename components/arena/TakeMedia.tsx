@@ -2,7 +2,7 @@ import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { TakeMedia as TakeMediaModel } from '../../store';
-import { ink, radius, space, typeScale } from '../../theme';
+import { ink, space, typeScale } from '../../theme';
 import { PlayIcon } from '../shared/icons';
 
 /**
@@ -10,12 +10,19 @@ import { PlayIcon } from '../shared/icons';
  * a URL) fall back to the gradient plate — video playback is deferred until a
  * player is wired in, so the play affordance stays honest about what it is.
  */
-export function TakeMedia({ media }: { media: TakeMediaModel }): React.JSX.Element {
+export function TakeMedia({
+  media,
+  edge = false,
+}: {
+  media: TakeMediaModel;
+  /** Edge-to-edge feed treatment — square-ish crop, no radius. */
+  edge?: boolean;
+}): React.JSX.Element {
   const isVideo = media.kind === 'video';
   const hasImage = media.kind === 'image' && Boolean(media.url);
   return (
     <View
-      style={styles.wrap}
+      style={[styles.wrap, edge ? styles.edge : styles.inset]}
       accessible
       accessibilityRole="image"
       accessibilityLabel={`${media.kind}${media.caption ? `: ${media.caption}` : ''}`}
@@ -47,17 +54,21 @@ export function TakeMedia({ media }: { media: TakeMediaModel }): React.JSX.Eleme
 
 const styles = StyleSheet.create({
   wrap: {
-    /** 16:9 preview plate with clean border radius. */
-    aspectRatio: 16 / 9,
-    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 0,
     justifyContent: 'flex-end',
     padding: space.md,
   },
+  inset: {
+    aspectRatio: 16 / 9,
+    borderRadius: 14,
+  },
+  edge: {
+    aspectRatio: 4 / 5,
+    borderRadius: 0,
+  },
   veil: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(8,8,11,0.28)',
+    backgroundColor: 'rgba(8,8,11,0.22)',
   },
   play: {
     position: 'absolute',

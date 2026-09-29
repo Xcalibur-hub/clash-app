@@ -195,11 +195,27 @@ export default function ClashScreen(): React.JSX.Element {
 
         <ClashStatus kind={statusKind} closesAt={view.closesAt} now={now} />
 
-        <ClashSideView side="A" author={sideA} text={view.sideAText} winner={settled && view.verdict?.winnerSide === 'A'} faded={settled && view.verdict?.winnerSide === 'B'} />
+        <ClashSideView
+          side="A"
+          author={sideA}
+          text={view.sideAText}
+          winner={settled && view.verdict?.winnerSide === 'A'}
+          faded={settled && view.verdict?.winnerSide === 'B'}
+          enterDelay={0}
+        />
         <View style={styles.vsRow}>
-          <Text allowFontScaling={false} style={styles.vsText}>vs</Text>
+          <View style={styles.vsLine} />
+          <Text allowFontScaling={false} style={styles.vsText}>VS</Text>
+          <View style={styles.vsLine} />
         </View>
-        <ClashSideView side="B" author={sideB} text={view.sideBText || '[rebuttal unavailable]'} winner={settled && view.verdict?.winnerSide === 'B'} faded={settled && view.verdict?.winnerSide === 'A'} />
+        <ClashSideView
+          side="B"
+          author={sideB}
+          text={view.sideBText || '[rebuttal unavailable]'}
+          winner={settled && view.verdict?.winnerSide === 'B'}
+          faded={settled && view.verdict?.winnerSide === 'A'}
+          enterDelay={120}
+        />
 
         <MindshiftPanel takeId={view.takeId} offerFinal={view.hasJudged || settled} />
 
@@ -234,10 +250,11 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: space.md, gap: space.md },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
-  eyebrow: { ...typeScale.caption, color: ink.tertiary },
+  eyebrow: { ...typeScale.caption, color: ink.primary, fontWeight: '800', letterSpacing: 1.2 },
   loading: { ...typeScale.meta, color: ink.tertiary, paddingTop: 200, textAlign: 'center' },
-  vsRow: { alignItems: 'center' },
-  vsText: { ...typeScale.caption, color: ink.quaternary, letterSpacing: 1 },
+  vsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 2 },
+  vsLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.14)' },
+  vsText: { ...typeScale.caption, color: ink.tertiary, letterSpacing: 2, fontWeight: '800', fontSize: 11 },
   noticeBox: { padding: space.md, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(255,255,255,0.03)' },
   noticeText: { ...typeScale.meta, color: ink.tertiary },
   guestCta: { alignSelf: 'stretch' },

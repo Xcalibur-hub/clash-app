@@ -3,6 +3,7 @@ import { FlatList, Share, StyleSheet, View, type ListRenderItemInfo } from 'reac
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
+import { ArenaFeaturedStack } from '../../components/arena/ArenaFeaturedStack';
 import { FeedScopeTabs } from '../../components/arena/FeedScopeTabs';
 import { HoodStrip } from '../../components/arena/HoodStrip';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
@@ -19,6 +20,7 @@ import {
   reactToTake,
   selectAuthor,
   selectCommentsForTake,
+  selectFeaturedMediaTakes,
   selectFeedForScope,
   selectHasReacted,
   selectIsSaved,
@@ -32,7 +34,7 @@ import {
   type User,
 } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
-import { color, layout, space } from '../../theme';
+import { layout, space, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 
 const EMPTY_SET: ReadonlySet<string> = new Set<string>();
@@ -53,6 +55,7 @@ export default function ArenaScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const now = useClock(30_000);
   const requireAuth = useRequireAuth();
+  const theme = useThemeColors();
 
   const [scope, setScope] = React.useState<FeedScope>('for-you');
   const [followingIds, setFollowingIds] = React.useState<ReadonlySet<string> | null>(null);
@@ -131,6 +134,23 @@ export default function ArenaScreen(): React.JSX.Element {
     () => selectFeedForScope(state, scope, 'all', now, followingIds ?? EMPTY_SET),
     [state, scope, now, followingIds],
   );
+
+  const featuredItems = React.useMemo(() => {
+    if (state.arenaStatus !== 'ready') return [];
+    return selectFeaturedMediaTakes(state, now, 8)
+      .map((take) => {
+        const author = selectAuthor(state, take.authorId);
+        if (!author) return null;
+        return {
+          take,
+          author,
+          commentCount: selectCommentsForTake(state, take.id).length,
+          isSaved: selectIsSaved(state, take.id),
+          hasReacted: selectHasReacted(state, take.id),
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [state, now]);
 
   const openClash = React.useCallback(
     (takeId: string): void => {
@@ -222,9 +242,31 @@ export default function ArenaScreen(): React.JSX.Element {
       <View>
         <FeedScopeTabs value={scope} onChange={setScope} />
         <HoodStrip />
+        <ArenaFeaturedStack
+          items={featuredItems}
+          loading={state.arenaStatus === 'loading'}
+          onOpen={openDetail}
+          onReact={(take) => {
+            void toggleReaction(take);
+          }}
+          onComment={openDetail}
+          onClash={openClash}
+          onSave={(takeId) => {
+            if (requireAuth()) dispatch(toggleSave(takeId));
+          }}
+        />
       </View>
     ),
-    [scope],
+    [
+      dispatch,
+      featuredItems,
+      openClash,
+      openDetail,
+      requireAuth,
+      scope,
+      state.arenaStatus,
+      toggleReaction,
+    ],
   );
 
   const empty = React.useMemo(() => {
@@ -301,7 +343,7 @@ export default function ArenaScreen(): React.JSX.Element {
   const listData = state.arenaStatus === 'error' || state.arenaStatus === 'loading' ? [] : feed;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ArenaTopBar paddingTop={insets.top} />
       <FlatList
         data={listData}
@@ -310,7 +352,7 @@ export default function ArenaScreen(): React.JSX.Element {
         ListHeaderComponent={header}
         ItemSeparatorComponent={Separator}
         ListEmptyComponent={empty}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + space.xl }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 96 }]}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={() => {
@@ -335,19 +377,21 @@ export default function ArenaScreen(): React.JSX.Element {
 }
 
 function Separator(): React.JSX.Element {
-  return <View style={styles.separator} />;
+  const theme = useThemeColors();
+  return <View style={[styles.separator, { backgroundColor: theme.border }]} />;
 }
 
 function FeedSkeleton(): React.JSX.Element {
+  const theme = useThemeColors();
   return (
     <View style={skeletonStyles.wrap}>
       {[0, 1, 2].map((row) => (
         <View key={row} style={skeletonStyles.row}>
-          <View style={skeletonStyles.avatar} />
+          <View style={[skeletonStyles.avatar, { backgroundColor: theme.surfaceMuted }]} />
           <View style={skeletonStyles.lines}>
-            <View style={[skeletonStyles.bar, { width: '55%' }]} />
-            <View style={[skeletonStyles.bar, { width: '92%' }]} />
-            <View style={[skeletonStyles.bar, { width: '40%' }]} />
+            <View style={[skeletonStyles.bar, { width: '55%', backgroundColor: theme.surfaceMuted }]} />
+            <View style={[skeletonStyles.bar, { width: '92%', backgroundColor: theme.surfaceMuted }]} />
+            <View style={[skeletonStyles.bar, { width: '40%', backgroundColor: theme.surfaceMuted }]} />
           </View>
         </View>
       ))}
@@ -356,15 +400,15 @@ function FeedSkeleton(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: color.bg },
+  container: { flex: 1 },
   list: { flexGrow: 1 },
-  separator: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
+  separator: { height: StyleSheet.hairlineWidth, marginVertical: 4 },
 });
 
 const skeletonStyles = StyleSheet.create({
   wrap: { paddingHorizontal: layout.screenX, gap: space.xl, paddingVertical: space.lg },
   row: { flexDirection: 'row', gap: space.md },
-  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.06)' },
+  avatar: { width: 34, height: 34, borderRadius: 17 },
   lines: { flex: 1, gap: space.xs },
-  bar: { height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)' },
+  bar: { height: 12, borderRadius: 6 },
 });

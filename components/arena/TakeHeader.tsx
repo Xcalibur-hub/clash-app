@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { HOOD_LABEL } from '../../data/hoods';
 import type { Take, User } from '../../store';
-import { ink, space, typeScale } from '../../theme';
-import { timeAgo } from '../../utils/format';
+import { space, typeScale, useThemeColors } from '../../theme';
+import { timeAgo, timeLeftLabel } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
 import { MoreIcon } from '../shared/icons';
@@ -16,12 +16,13 @@ export interface TakeHeaderProps {
   onMore: () => void;
 }
 
-/**
- * Author row: avatar, name · Hood, then @handle · relative time. A single
- * overflow menu on the right — no oversized follow button per post.
- */
+/** Author row with Hood + expiry urgency — theme-aware. */
 export function TakeHeader({ author, take, isViewer, onMore }: TakeHeaderProps): React.JSX.Element {
   const router = useRouter();
+  const t = useThemeColors();
+  const left = timeLeftLabel(take.expiresAt);
+  const urgent = left === 'EXPIRED' || left.startsWith('under') || /^\d+m left/.test(left);
+
   return (
     <View style={styles.row}>
       <Pressable
@@ -33,22 +34,27 @@ export function TakeHeader({ author, take, isViewer, onMore }: TakeHeaderProps):
         accessibilityLabel={`Open ${author.name}'s profile`}
         hitSlop={6}
       >
-        <Avatar name={author.name} tint={author.tint} size={34} />
+        <Avatar name={author.name} tint={author.tint} size={36} />
       </Pressable>
       <View style={styles.names}>
-        <Text allowFontScaling={false} style={styles.primary} numberOfLines={1}>
+        <Text allowFontScaling={false} style={[styles.primary, { color: t.textPrimary }]} numberOfLines={1}>
           {author.name}
           <Text
-            style={styles.hood}
+            style={{ color: t.textSecondary, fontWeight: '600' }}
             suppressHighlighting
             onPress={() => router.push(`/hood/${take.hood}`)}
           >
-            {'  · '}{HOOD_LABEL[take.hood]}
+            {'  · '}
+            {HOOD_LABEL[take.hood]}
           </Text>
         </Text>
-        <Text allowFontScaling={false} style={styles.secondary} numberOfLines={1}>
+        <Text allowFontScaling={false} style={[styles.secondary, { color: t.textMuted }]} numberOfLines={1}>
           @{author.handle} · {timeAgo(take.createdAt)}
           {isViewer ? ' · You' : ''}
+          {' · '}
+          <Text style={{ color: urgent ? t.accent : t.textMuted, fontWeight: urgent ? '600' : '400' }}>
+            {left}
+          </Text>
         </Text>
       </View>
       <Pressable
@@ -61,7 +67,7 @@ export function TakeHeader({ author, take, isViewer, onMore }: TakeHeaderProps):
         hitSlop={8}
         style={styles.more}
       >
-        <MoreIcon size={20} color={ink.tertiary} strokeWidth={2.2} />
+        <MoreIcon size={20} color={t.textMuted} strokeWidth={2.2} />
       </Pressable>
     </View>
   );
@@ -69,9 +75,8 @@ export function TakeHeader({ author, take, isViewer, onMore }: TakeHeaderProps):
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  names: { flex: 1, gap: 1 },
-  primary: { ...typeScale.label, color: ink.primary, fontWeight: '600' },
-  hood: { color: ink.secondary, fontWeight: '600' },
-  secondary: { ...typeScale.meta, color: ink.tertiary, fontSize: 13 },
+  names: { flex: 1, gap: 2 },
+  primary: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
+  secondary: { ...typeScale.meta, fontSize: 12 },
   more: { padding: space.xs, marginRight: -space.xs },
 });

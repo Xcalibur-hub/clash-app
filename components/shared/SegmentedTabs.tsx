@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { ink, radius, space, typeScale } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 
 export interface SegmentedTab<T extends string> {
@@ -16,19 +16,20 @@ export interface SegmentedTabsProps<T extends string> {
   label: string;
 }
 
-/**
- * The app's single segmented control (reference screens 13 & 14). Each screen
- * declares its own segments, so the Profile, the Vault profile and the Hall of
- * Fame filters all feel identical without sharing a tab union.
- */
+/** Theme-aware segmented control used by Profile Appearance and archive tabs. */
 export function SegmentedTabs<T extends string>({
   value,
   items,
   onChange,
   label,
 }: SegmentedTabsProps<T>): React.JSX.Element {
+  const t = useThemeColors();
   return (
-    <View style={styles.segment} accessibilityRole="tablist" accessibilityLabel={label}>
+    <View
+      style={[styles.segment, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}
+      accessibilityRole="tablist"
+      accessibilityLabel={label}
+    >
       {items.map((item) => {
         const active = item.key === value;
         return (
@@ -41,11 +42,19 @@ export function SegmentedTabs<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={item.label}
-            style={[styles.item, active ? styles.itemOn : null]}
+            style={[
+              styles.item,
+              active && {
+                backgroundColor: t.scheme === 'light' ? t.surface : 'rgba(255,255,255,0.10)',
+              },
+            ]}
           >
             <Text
               allowFontScaling={false}
-              style={[styles.label, active ? styles.labelOn : null]}
+              style={[
+                styles.label,
+                { color: active ? t.textPrimary : t.textMuted, fontWeight: active ? '700' : '500' },
+              ]}
               numberOfLines={1}
             >
               {item.label}
@@ -62,9 +71,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 4,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: StyleSheet.hairlineWidth,
   },
   item: {
     flex: 1,
@@ -74,7 +81,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.xs,
     borderRadius: radius.xs,
   },
-  itemOn: { backgroundColor: 'rgba(255,255,255,0.10)' },
-  label: { ...typeScale.label, color: ink.tertiary },
-  labelOn: { color: ink.primary, fontWeight: '700' },
+  label: { ...typeScale.label },
 });

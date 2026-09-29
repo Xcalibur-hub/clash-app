@@ -2,9 +2,10 @@ import React from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { selectViewer, useClash } from '../../store';
-import { ink, space, typeScale } from '../../theme';
+import { space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
+import { Underline } from '../shared/Doodles';
 import { SearchIcon } from '../shared/icons';
 import { useSidebar } from '../navigation/SidebarContext';
 
@@ -12,21 +13,22 @@ export interface ArenaTopBarProps {
   paddingTop: number;
 }
 
-/**
- * Arena masthead: restrained CLASH wordmark, a search shortcut and the viewer
- * avatar (which opens the slide-out menu). Flat, no glow, no chrome.
- */
+/** Arena masthead — theme-aware wordmark with a sparse underline accent. */
 export function ArenaTopBar({ paddingTop }: ArenaTopBarProps): React.JSX.Element {
   const { state } = useClash();
   const viewer = selectViewer(state);
   const { open } = useSidebar();
   const router = useRouter();
+  const t = useThemeColors();
 
   return (
     <View style={[styles.wrap, { paddingTop: paddingTop + space.xs }]}>
-      <Text allowFontScaling={false} style={styles.brand}>
-        CLASH
-      </Text>
+      <View style={styles.brandWrap}>
+        <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+          CLASH
+        </Text>
+        <Underline size={72} opacity={0.35} color={t.textPrimary} style={styles.underline} />
+      </View>
       <View style={styles.actions}>
         <Pressable
           onPress={() => {
@@ -38,7 +40,7 @@ export function ArenaTopBar({ paddingTop }: ArenaTopBarProps): React.JSX.Element
           hitSlop={8}
           style={styles.icon}
         >
-          <SearchIcon size={22} color={ink.primary} strokeWidth={2.2} />
+          <SearchIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
         <Pressable
           onPress={() => {
@@ -64,12 +66,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingBottom: space.xs,
   },
+  brandWrap: { position: 'relative', paddingBottom: 4 },
   brand: {
     ...typeScale.title,
-    fontSize: 20,
-    letterSpacing: 0.4,
-    color: ink.primary,
+    fontSize: 22,
+    letterSpacing: 0.8,
+    fontWeight: '800',
   },
+  underline: { position: 'absolute', bottom: -2, left: 0 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   icon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
 });

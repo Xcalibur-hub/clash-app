@@ -1,7 +1,7 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { FeedScope } from '../../store';
-import { ink, layout, space, typeScale } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 
 const SCOPES: readonly { key: FeedScope; label: string }[] = [
@@ -16,10 +16,18 @@ export interface FeedScopeTabsProps {
   onChange: (scope: FeedScope) => void;
 }
 
-/** The Arena's primary sort/scope selector — one feed, four scopes. */
+/** Compact premium pill scope selector — active = high contrast fill. */
 export function FeedScopeTabs({ value, onChange }: FeedScopeTabsProps): React.JSX.Element {
+  const t = useThemeColors();
+
   return (
-    <View style={styles.row} accessibilityRole="tablist" accessibilityLabel="Feed scope">
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.row}
+      accessibilityRole="tablist"
+      accessibilityLabel="Feed scope"
+    >
       {SCOPES.map((scope) => {
         const active = scope.key === value;
         return (
@@ -31,40 +39,43 @@ export function FeedScopeTabs({ value, onChange }: FeedScopeTabsProps): React.JS
             }}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            style={styles.tab}
+            style={[
+              styles.pill,
+              {
+                backgroundColor: active ? t.pill : t.pillInactive,
+                borderColor: active ? t.pill : t.border,
+              },
+            ]}
           >
             <Text
               allowFontScaling={false}
-              style={[styles.label, active ? styles.labelActive : styles.labelInactive]}
+              style={[
+                styles.label,
+                { color: active ? t.pillText : t.pillInactiveText, fontWeight: active ? '700' : '500' },
+              ]}
             >
               {scope.label}
             </Text>
-            {active ? <View style={styles.underline} /> : null}
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: 'row',
     paddingHorizontal: layout.screenX,
-    gap: space.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: space.sm,
+    gap: space.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  tab: { paddingVertical: space.sm, paddingHorizontal: 2 },
-  label: { ...typeScale.label, fontSize: 15 },
-  labelActive: { color: ink.primary, fontWeight: '700' },
-  labelInactive: { color: ink.tertiary, fontWeight: '500' },
-  underline: {
-    position: 'absolute',
-    bottom: -1,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: ink.primary,
+  pill: {
+    paddingHorizontal: space.md,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
   },
+  label: { ...typeScale.label, fontSize: 13, letterSpacing: -0.1 },
 });

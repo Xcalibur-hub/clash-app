@@ -8,11 +8,12 @@ import { useRealmSwitch } from '../../components/navigation/useRealmSwitch';
 import { NotificationUnreadProvider } from '../../store/NotificationUnreadProvider';
 import { VaultIcon } from '../../components/shared/icons';
 import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
-import { color } from '../../theme';
+import { useThemeColors } from '../../theme';
 
 /** Arena realm navigation: home, explore, create, notifications, and profile. */
 export default function TabsLayout(): React.JSX.Element {
   const { shifting, first, direction, shiftTo } = useRealmSwitch();
+  const theme = useThemeColors();
   return (
     <SidebarProvider>
       <NotificationUnreadProvider>
@@ -28,7 +29,7 @@ export default function TabsLayout(): React.JSX.Element {
           )}
           screenOptions={{
             headerShown: false,
-            sceneStyle: { backgroundColor: color.bg },
+            sceneStyle: { backgroundColor: theme.background },
           }}
         >
           <Tabs.Screen name="index" options={{ title: 'Home' }} />
@@ -43,5 +44,3 @@ export default function TabsLayout(): React.JSX.Element {
     </SidebarProvider>
   );
 }
-
-

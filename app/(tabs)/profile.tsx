@@ -5,9 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../store/AuthProvider';
 import { useClash } from '../../store';
 import { ProfileScreen } from '../../components/profile/ProfileScreen';
+import { AppearanceRow } from '../../components/profile/AppearanceRow';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { UserIcon } from '../../components/shared/icons';
-import { color } from '../../theme';
+import { layout, space, useThemeColors } from '../../theme';
 
 /** Self profile tab — the signed-in viewer's social identity. */
 export default function ProfileTab(): React.JSX.Element {
@@ -15,12 +16,16 @@ export default function ProfileTab(): React.JSX.Element {
   const { signedIn, loading } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useThemeColors();
 
-  if (loading) return <View style={styles.screen} />;
+  if (loading) return <View style={[styles.screen, { backgroundColor: theme.background }]} />;
 
   if (!signedIn) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+        <View style={styles.guestAppearance}>
+          <AppearanceRow />
+        </View>
         <EmptyState
           icon={UserIcon}
           title="Your profile"
@@ -36,5 +41,10 @@ export default function ProfileTab(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg },
+  screen: { flex: 1 },
+  guestAppearance: {
+    paddingHorizontal: layout.screenX,
+    paddingTop: space.md,
+    paddingBottom: space.sm,
+  },
 });

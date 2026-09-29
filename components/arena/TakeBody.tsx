@@ -1,16 +1,19 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Take } from '../../store';
-import { ink, space } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { TakeMedia } from './TakeMedia';
 
 export interface TakeBodyProps {
   take: Take;
   onOpen: () => void;
+  /** When true, media bleeds edge-to-edge past the feed's horizontal padding. */
+  edgeMedia?: boolean;
 }
 
-/** The Take's core content: readable post text + optional media. */
-export function TakeBody({ take, onOpen }: TakeBodyProps): React.JSX.Element {
+/** Take content — typography-first for text, image-forward for media. */
+export function TakeBody({ take, onOpen, edgeMedia = false }: TakeBodyProps): React.JSX.Element {
+  const t = useThemeColors();
   return (
     <View style={styles.wrap}>
       <Pressable
@@ -19,7 +22,13 @@ export function TakeBody({ take, onOpen }: TakeBodyProps): React.JSX.Element {
         accessibilityLabel="Open take"
         style={styles.textHit}
       >
-        <Text allowFontScaling style={styles.text}>
+        <Text
+          allowFontScaling
+          style={[
+            take.media ? styles.textWithMedia : styles.textSolo,
+            { color: t.textPrimary },
+          ]}
+        >
           {take.text}
         </Text>
       </Pressable>
@@ -28,9 +37,9 @@ export function TakeBody({ take, onOpen }: TakeBodyProps): React.JSX.Element {
           onPress={onOpen}
           accessibilityRole="button"
           accessibilityLabel="Open take media"
-          style={styles.media}
+          style={edgeMedia ? styles.mediaBleed : styles.mediaInset}
         >
-          <TakeMedia media={take.media} />
+          <TakeMedia media={take.media} edge={edgeMedia} />
         </Pressable>
       ) : null}
     </View>
@@ -40,6 +49,21 @@ export function TakeBody({ take, onOpen }: TakeBodyProps): React.JSX.Element {
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
   textHit: { paddingVertical: 2 },
-  text: { fontSize: 16, lineHeight: 23, fontWeight: '500', color: ink.primary },
-  media: { borderRadius: 14, overflow: 'hidden' },
+  textSolo: {
+    ...typeScale.takeText,
+    fontSize: 19,
+    lineHeight: 27,
+    fontWeight: '600',
+  },
+  textWithMedia: {
+    ...typeScale.takeText,
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '600',
+  },
+  mediaInset: { borderRadius: 16, overflow: 'hidden' },
+  mediaBleed: {
+    marginHorizontal: -layout.screenX,
+    overflow: 'hidden',
+  },
 });

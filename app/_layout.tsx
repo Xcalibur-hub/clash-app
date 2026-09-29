@@ -1,14 +1,14 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Appearance, StyleSheet, useColorScheme } from 'react-native';
+import { StyleSheet } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ClashProvider, selectThemeMode, useClash } from '../store';
+import { ClashProvider } from '../store';
 import { AuthProvider } from '../store/AuthProvider';
 import { AuthHydrator } from '../store/AuthHydrator';
-import { color } from '../theme';
+import { ThemeProvider, useThemeColors } from '../theme';
 
 /**
  * Root shell.
@@ -22,63 +22,58 @@ import { color } from '../theme';
  * campaign/*, sponsor/* → radar detail + sponsor dashboard
  */
 
-/**
- * Applies the appearance preference to the OS: 'system' follows the device,
- * 'light'/'dark' override it. In-app React surfaces keep the dark palette in
- * this pass; only system chrome (keyboard, dialogs, native widgets) flips.
- */
-function ThemeChrome(): null {
-  const { state } = useClash();
-  const mode = selectThemeMode(state);
-  const systemScheme = useColorScheme();
+function ThemedChrome({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const colors = useThemeColors();
 
   React.useEffect(() => {
-    Appearance.setColorScheme(mode === 'system' ? systemScheme : mode);
-  }, [mode, systemScheme]);
+    void SystemUI.setBackgroundColorAsync(colors.background).catch(() => undefined);
+  }, [colors.background]);
 
-  return null;
+  return (
+    <>
+      <StatusBar style={colors.scheme === 'light' ? 'dark' : 'light'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        {children}
+      </Stack>
+    </>
+  );
 }
 
 export default function RootLayout(): React.JSX.Element {
-  React.useEffect(() => {
-    void SystemUI.setBackgroundColorAsync(color.bg).catch(() => undefined);
-  }, []);
-
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <AuthProvider>
           <ClashProvider>
-            <AuthHydrator />
-            <ThemeChrome />
-            <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              animation: 'fade',
-              contentStyle: { backgroundColor: color.bg },
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboard" />
-            <Stack.Screen name="auth" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="(vault)" />
-            <Stack.Screen name="clash/[takeId]" options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="vault/[creatorId]" options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="vault/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="vault/compose" options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="campaign/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="sponsor/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="take/[takeId]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="profile/[profileId]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="hood/[hoodId]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="hood/game/[gameId]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="world/index" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="world/compose" options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="world/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
-
-          </Stack>
+            <ThemeProvider>
+              <AuthHydrator />
+              <ThemedChrome>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="onboard" />
+                <Stack.Screen name="auth" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="(vault)" />
+                <Stack.Screen name="clash/[takeId]" options={{ animation: 'slide_from_bottom' }} />
+                <Stack.Screen name="vault/[creatorId]" options={{ animation: 'slide_from_bottom' }} />
+                <Stack.Screen name="vault/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="vault/compose" options={{ animation: 'slide_from_bottom' }} />
+                <Stack.Screen name="campaign/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
+                <Stack.Screen name="sponsor/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
+                <Stack.Screen name="take/[takeId]" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="profile/[profileId]" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="hood/[hoodId]" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="hood/game/[gameId]" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="world/index" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="world/compose" options={{ animation: 'slide_from_bottom' }} />
+                <Stack.Screen name="world/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
+              </ThemedChrome>
+            </ThemeProvider>
           </ClashProvider>
         </AuthProvider>
       </SafeAreaProvider>
@@ -87,5 +82,5 @@ export default function RootLayout(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
+  root: { flex: 1 },
 });

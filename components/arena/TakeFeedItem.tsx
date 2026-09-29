@@ -26,8 +26,7 @@ export interface TakeFeedItemProps {
 
 /**
  * A single Arena post embedded flat in the feed — header → content → leading
- * rebuttal → actions. The FlatList draws the separators; this item carries no
- * card chrome.
+ * rebuttal → actions. Media can bleed edge-to-edge; no card chrome.
  */
 function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
   const {
@@ -48,20 +47,26 @@ function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
   } = props;
   return (
     <View style={styles.item}>
-      <TakeHeader author={author} take={take} isViewer={isViewer} onMore={onMore} />
-      <TakeBody take={take} onOpen={onOpenDetail} />
-      <TopRebuttalPreview comment={topComment} author={topCommentAuthor} onOpen={onOpenDetail} />
-      <TakeActionRow
-        reactions={take.reactions}
-        commentCount={commentCount}
-        isSaved={isSaved}
-        hasReacted={hasReacted}
-        onReact={onReact}
-        onComment={onOpenDetail}
-        onClash={onOpenClash}
-        onShare={onShare}
-        onSave={onSave}
-      />
+      <View style={styles.padded}>
+        <TakeHeader author={author} take={take} isViewer={isViewer} onMore={onMore} />
+      </View>
+      <View style={styles.padded}>
+        <TakeBody take={take} onOpen={onOpenDetail} edgeMedia={Boolean(take.media)} />
+      </View>
+      <View style={styles.padded}>
+        <TopRebuttalPreview comment={topComment} author={topCommentAuthor} onOpen={onOpenDetail} />
+        <TakeActionRow
+          reactions={take.reactions}
+          commentCount={commentCount}
+          isSaved={isSaved}
+          hasReacted={hasReacted}
+          onReact={onReact}
+          onComment={onOpenDetail}
+          onClash={onOpenClash}
+          onShare={onShare}
+          onSave={onSave}
+        />
+      </View>
     </View>
   );
 }
@@ -71,8 +76,11 @@ export const TakeFeedItem = React.memo(TakeFeedItemBase);
 
 const styles = StyleSheet.create({
   item: {
-    paddingHorizontal: layout.screenX,
     paddingVertical: space.md,
+    gap: space.sm,
+  },
+  padded: {
+    paddingHorizontal: layout.screenX,
     gap: space.sm,
   },
 });

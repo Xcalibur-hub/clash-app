@@ -2,11 +2,12 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { HOODS } from '../../data/hoods';
-import { ink, layout, radius, space, typeScale } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 
-/** A restrained horizontal community selector — tapping opens the Hood page. */
+/** Horizontally scrollable Hood pills — soft neutral, no thick borders. */
 export function HoodStrip(): React.JSX.Element {
   const router = useRouter();
+  const t = useThemeColors();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
       {HOODS.map((hood) => (
@@ -15,9 +16,15 @@ export function HoodStrip(): React.JSX.Element {
           onPress={() => router.push(`/hood/${hood.id}`)}
           accessibilityRole="button"
           accessibilityLabel={`Open ${hood.name}`}
-          style={styles.chip}
+          style={[
+            styles.chip,
+            {
+              backgroundColor: t.pillInactive,
+              borderColor: t.border,
+            },
+          ]}
         >
-          <Text allowFontScaling={false} style={styles.label}>
+          <Text allowFontScaling={false} style={[styles.label, { color: t.pillInactiveText }]}>
             {hood.name}
           </Text>
         </Pressable>
@@ -27,14 +34,12 @@ export function HoodStrip(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: layout.screenX, gap: space.xs, paddingVertical: space.sm },
+  scroll: { paddingHorizontal: layout.screenX, gap: space.xs, paddingBottom: space.xs },
   chip: {
     paddingHorizontal: space.md,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  label: { ...typeScale.meta, fontSize: 13, color: ink.secondary },
+  label: { ...typeScale.meta, fontSize: 13, fontWeight: '500' },
 });

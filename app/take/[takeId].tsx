@@ -35,8 +35,10 @@ import {
   type CommentSort,
   type User,
 } from '../../store';
-import { color, ink, space, typeScale } from '../../theme';
+import { space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
+import { timeLeftLabel } from '../../utils/format';
+import { Underline } from '../../components/shared/Doodles';
 
 const SORTS: readonly { key: CommentSort; label: string }[] = [
   { key: 'best', label: 'Best' },
@@ -59,6 +61,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const requireAuth = useRequireAuth();
   const react = useTakeReaction();
+  const theme = useThemeColors();
 
   const [sort, setSort] = React.useState<CommentSort>('best');
   const [replyTo, setReplyTo] = React.useState<{ comment: ChallengerComment; handle: string } | null>(null);
@@ -155,7 +158,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
   if (!take || !author) {
     return (
-      <View style={[styles.root, styles.missing, { paddingTop: insets.top + space.md }]}>
+      <View style={[styles.root, styles.missing, { backgroundColor: theme.background, paddingTop: insets.top + space.md }]}>
         <EmptyState icon={BackIcon} title="This take is no longer live" body="Every take expires after 24 hours." actionLabel="BACK" onAction={() => router.back()} />
       </View>
     );
@@ -171,7 +174,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fill}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -179,9 +182,12 @@ export default function TakeDetailScreen(): React.JSX.Element {
         >
           <View style={styles.topRow}>
             <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} style={styles.backBtn}>
-              <BackIcon size={20} color={ink.primary} />
+              <BackIcon size={20} color={theme.textPrimary} />
             </Pressable>
-            <Text allowFontScaling={false} style={styles.eyebrow}>TAKE</Text>
+            <View style={styles.eyebrowWrap}>
+              <Text allowFontScaling={false} style={[styles.eyebrow, { color: theme.textPrimary }]}>TAKE</Text>
+              <Underline size={48} opacity={0.28} color={theme.textPrimary} style={styles.eyebrowMark} />
+            </View>
             <Pressable
               onPress={() => setMenu({ target: author, isSelf: author.id === state.viewer.id, following: followingAuthor, reportTarget: { kind: 'take', id: take.id } })}
               accessibilityRole="button"
@@ -189,22 +195,28 @@ export default function TakeDetailScreen(): React.JSX.Element {
               hitSlop={8}
               style={styles.moreBtn}
             >
-              <MoreIcon size={20} color={ink.tertiary} strokeWidth={2.2} />
+              <MoreIcon size={20} color={theme.textMuted} strokeWidth={2.2} />
             </Pressable>
           </View>
 
           <View style={styles.authorRow}>
-            <Avatar name={author.name} tint={author.tint} size={36} />
+            <Avatar name={author.name} tint={author.tint} size={40} />
             <View style={styles.authorText}>
-              <Text allowFontScaling={false} style={styles.handle}>
+              <Text allowFontScaling={false} style={[styles.handle, { color: theme.textPrimary }]}>
                 {author.name} · {HOOD_LABEL[take.hood]}
               </Text>
-              <Text allowFontScaling={false} style={styles.meta}>@{author.handle}</Text>
+              <Text allowFontScaling={false} style={[styles.meta, { color: theme.textMuted }]}>
+                @{author.handle} · {timeLeftLabel(take.expiresAt)}
+              </Text>
             </View>
           </View>
 
-          <Text allowFontScaling style={styles.takeText}>{take.text}</Text>
-          {take.media ? <TakeMedia media={take.media} /> : null}
+          <Text allowFontScaling style={[styles.takeText, { color: theme.textPrimary }]}>{take.text}</Text>
+          {take.media ? (
+            <View style={[styles.media, take.media.kind === 'video' || take.media.url ? styles.mediaHero : null]}>
+              <TakeMedia media={take.media} edge={Boolean(take.media.url || take.media.kind === 'video')} />
+            </View>
+          ) : null}
 
           <MindshiftPanel takeId={take.id} />
 
@@ -222,19 +234,26 @@ export default function TakeDetailScreen(): React.JSX.Element {
             }}
           />
 
-          <View style={styles.threadHead}>
-            <Text allowFontScaling={false} style={styles.threadTitle}>{comments.length} replies</Text>
+          <View style={[styles.threadHead, { borderTopColor: theme.border }]}>
+            <Text allowFontScaling={false} style={[styles.threadTitle, { color: theme.textPrimary }]}>{comments.length} replies</Text>
             <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" />
           </View>
 
           {nodes.length === 0 ? (
-            <Text allowFontScaling={false} style={styles.empty}>No rebuttals yet — drop the first one.</Text>
+            <Text allowFontScaling={false} style={[styles.empty, { color: theme.textMuted }]}>No rebuttals yet — drop the first one.</Text>
           ) : (
-            <CommentThread nodes={nodes} onUpvote={upvote} onReply={reply} onClash={clashFromComment} onMore={more} />
+            <CommentThread
+              nodes={nodes}
+              takeAuthorId={author.id}
+              onUpvote={upvote}
+              onReply={reply}
+              onClash={clashFromComment}
+              onMore={more}
+            />
           )}
         </ScrollView>
 
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
           <RebuttalInput takeId={take.id} parentId={replyTo?.comment.id} replyingTo={replyTo?.handle} onDone={() => setReplyTo(null)} />
         </View>
       </KeyboardAvoidingView>
@@ -262,28 +281,30 @@ export default function TakeDetailScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
+  root: { flex: 1 },
   fill: { flex: 1 },
   content: { paddingHorizontal: space.md, gap: space.md },
   missing: { paddingHorizontal: space.lg },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
   moreBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'flex-end' },
-  eyebrow: { ...typeScale.caption, color: ink.tertiary },
+  eyebrowWrap: { alignItems: 'center', paddingBottom: 4 },
+  eyebrow: { ...typeScale.caption, fontWeight: '800', letterSpacing: 1.2 },
+  eyebrowMark: { marginTop: -2 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  authorText: { flex: 1, gap: 1 },
-  handle: { ...typeScale.label, color: ink.primary, fontWeight: '600' },
-  meta: { ...typeScale.meta, color: ink.tertiary },
-  takeText: { fontSize: 17, lineHeight: 24, fontWeight: '500', color: ink.primary },
-  threadHead: { gap: space.sm, paddingTop: space.sm },
-  threadTitle: { ...typeScale.section, color: ink.primary, fontSize: 17 },
-  empty: { ...typeScale.meta, color: ink.tertiary, paddingVertical: space.lg },
+  authorText: { flex: 1, gap: 2 },
+  handle: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
+  meta: { ...typeScale.meta },
+  takeText: { ...typeScale.takeText },
+  media: { borderRadius: 18, overflow: 'hidden' },
+  mediaHero: { marginHorizontal: -space.md, borderRadius: 0 },
+  threadHead: { gap: space.sm, paddingTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth },
+  threadTitle: { ...typeScale.section, fontSize: 17, fontWeight: '700' },
+  empty: { ...typeScale.meta, paddingVertical: space.lg },
   inputBar: {
     paddingHorizontal: space.md,
     paddingTop: space.sm,
     paddingBottom: space.xs,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: color.bg,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });
