@@ -34,6 +34,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      advertisers: {
+        Row: {
+          created_at: string
+          created_by_profile_id: string
+          id: string
+          name: string
+          slug: string
+          status: Database["public"]["Enums"]["advertiser_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_profile_id: string
+          id: string
+          name: string
+          slug: string
+          status?: Database["public"]["Enums"]["advertiser_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_profile_id?: string
+          id?: string
+          name?: string
+          slug?: string
+          status?: Database["public"]["Enums"]["advertiser_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advertisers_created_by_profile_id_fkey"
+            columns: ["created_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocks: {
         Row: {
           blocked_id: string
@@ -61,6 +99,51 @@ export type Database = {
           {
             foreignKeyName: "blocks_blocker_id_fkey"
             columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_creators: {
+        Row: {
+          campaign_id: string
+          commission_type: Database["public"]["Enums"]["commission_type"]
+          commission_value: number
+          created_at: string
+          creator_profile_id: string
+          id: string
+          status: Database["public"]["Enums"]["campaign_creator_status"]
+        }
+        Insert: {
+          campaign_id: string
+          commission_type?: Database["public"]["Enums"]["commission_type"]
+          commission_value?: number
+          created_at?: string
+          creator_profile_id: string
+          id: string
+          status?: Database["public"]["Enums"]["campaign_creator_status"]
+        }
+        Update: {
+          campaign_id?: string
+          commission_type?: Database["public"]["Enums"]["commission_type"]
+          commission_value?: number
+          created_at?: string
+          creator_profile_id?: string
+          id?: string
+          status?: Database["public"]["Enums"]["campaign_creator_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_creators_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_creators_creator_profile_id_fkey"
+            columns: ["creator_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -215,6 +298,277 @@ export type Database = {
             columns: ["take_id"]
             isOneToOne: false
             referencedRelation: "takes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversion_attributions: {
+        Row: {
+          attributed_at: string
+          attribution_method: Database["public"]["Enums"]["attribution_method"]
+          campaign_id: string
+          conversion_id: string
+          coupon_code_id: string | null
+          creator_profile_id: string | null
+          referral_link_id: string | null
+        }
+        Insert: {
+          attributed_at?: string
+          attribution_method: Database["public"]["Enums"]["attribution_method"]
+          campaign_id: string
+          conversion_id: string
+          coupon_code_id?: string | null
+          creator_profile_id?: string | null
+          referral_link_id?: string | null
+        }
+        Update: {
+          attributed_at?: string
+          attribution_method?: Database["public"]["Enums"]["attribution_method"]
+          campaign_id?: string
+          conversion_id?: string
+          coupon_code_id?: string | null
+          creator_profile_id?: string | null
+          referral_link_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversion_attributions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversion_attributions_conversion_id_fkey"
+            columns: ["conversion_id"]
+            isOneToOne: true
+            referencedRelation: "conversion_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversion_attributions_coupon_code_id_fkey"
+            columns: ["coupon_code_id"]
+            isOneToOne: false
+            referencedRelation: "coupon_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversion_attributions_creator_profile_id_fkey"
+            columns: ["creator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversion_attributions_referral_link_id_fkey"
+            columns: ["referral_link_id"]
+            isOneToOne: false
+            referencedRelation: "referral_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversion_events: {
+        Row: {
+          advertiser_id: string
+          campaign_id: string
+          conversion_type: Database["public"]["Enums"]["sponsor_conversion_type"]
+          created_at: string
+          currency: string
+          external_conversion_id: string
+          gross_amount_minor: number
+          id: string
+          occurred_at: string
+        }
+        Insert: {
+          advertiser_id: string
+          campaign_id: string
+          conversion_type: Database["public"]["Enums"]["sponsor_conversion_type"]
+          created_at?: string
+          currency?: string
+          external_conversion_id: string
+          gross_amount_minor: number
+          id: string
+          occurred_at?: string
+        }
+        Update: {
+          advertiser_id?: string
+          campaign_id?: string
+          conversion_type?: Database["public"]["Enums"]["sponsor_conversion_type"]
+          created_at?: string
+          currency?: string
+          external_conversion_id?: string
+          gross_amount_minor?: number
+          id?: string
+          occurred_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversion_events_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "advertisers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversion_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversion_geo_buckets: {
+        Row: {
+          coarse_bucket: string
+          conversion_id: string
+          created_at: string
+          distance_band: string | null
+          region_code: string
+          region_label: string
+        }
+        Insert: {
+          coarse_bucket: string
+          conversion_id: string
+          created_at?: string
+          distance_band?: string | null
+          region_code: string
+          region_label: string
+        }
+        Update: {
+          coarse_bucket?: string
+          conversion_id?: string
+          created_at?: string
+          distance_band?: string | null
+          region_code?: string
+          region_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversion_geo_buckets_conversion_id_fkey"
+            columns: ["conversion_id"]
+            isOneToOne: true
+            referencedRelation: "conversion_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupon_codes: {
+        Row: {
+          campaign_id: string
+          code: string
+          created_at: string
+          creator_profile_id: string
+          expires_at: string | null
+          id: string
+          max_redemptions: number | null
+          redemption_count: number
+          starts_at: string | null
+          status: Database["public"]["Enums"]["coupon_code_status"]
+        }
+        Insert: {
+          campaign_id: string
+          code: string
+          created_at?: string
+          creator_profile_id: string
+          expires_at?: string | null
+          id: string
+          max_redemptions?: number | null
+          redemption_count?: number
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["coupon_code_status"]
+        }
+        Update: {
+          campaign_id?: string
+          code?: string
+          created_at?: string
+          creator_profile_id?: string
+          expires_at?: string | null
+          id?: string
+          max_redemptions?: number | null
+          redemption_count?: number
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["coupon_code_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_codes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_codes_creator_profile_id_fkey"
+            columns: ["creator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_commission_ledger: {
+        Row: {
+          advertiser_id: string
+          amount_minor: number
+          campaign_id: string
+          conversion_id: string
+          created_at: string
+          creator_profile_id: string
+          currency: string
+          id: string
+          status: Database["public"]["Enums"]["commission_ledger_status"]
+        }
+        Insert: {
+          advertiser_id: string
+          amount_minor: number
+          campaign_id: string
+          conversion_id: string
+          created_at?: string
+          creator_profile_id: string
+          currency: string
+          id: string
+          status?: Database["public"]["Enums"]["commission_ledger_status"]
+        }
+        Update: {
+          advertiser_id?: string
+          amount_minor?: number
+          campaign_id?: string
+          conversion_id?: string
+          created_at?: string
+          creator_profile_id?: string
+          currency?: string
+          id?: string
+          status?: Database["public"]["Enums"]["commission_ledger_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_commission_ledger_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "advertisers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_commission_ledger_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_commission_ledger_conversion_id_fkey"
+            columns: ["conversion_id"]
+            isOneToOne: true
+            referencedRelation: "conversion_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_commission_ledger_creator_profile_id_fkey"
+            columns: ["creator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -740,6 +1094,89 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_clicks: {
+        Row: {
+          app_version: string | null
+          coarse_region: string | null
+          id: string
+          occurred_at: string
+          platform: string | null
+          referral_link_id: string
+          source: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          coarse_region?: string | null
+          id: string
+          occurred_at?: string
+          platform?: string | null
+          referral_link_id: string
+          source?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          coarse_region?: string | null
+          id?: string
+          occurred_at?: string
+          platform?: string | null
+          referral_link_id?: string
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_clicks_referral_link_id_fkey"
+            columns: ["referral_link_id"]
+            isOneToOne: false
+            referencedRelation: "referral_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_links: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          creator_profile_id: string
+          expires_at: string | null
+          id: string
+          status: Database["public"]["Enums"]["referral_link_status"]
+          token: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          creator_profile_id: string
+          expires_at?: string | null
+          id: string
+          status?: Database["public"]["Enums"]["referral_link_status"]
+          token: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          creator_profile_id?: string
+          expires_at?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["referral_link_status"]
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_links_creator_profile_id_fkey"
+            columns: ["creator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
           created_at: string
@@ -835,6 +1272,53 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_campaigns: {
+        Row: {
+          advertiser_id: string
+          campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at: string
+          description: string
+          ends_at: string | null
+          id: string
+          starts_at: string | null
+          status: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          advertiser_id: string
+          campaign_type?: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at?: string
+          description?: string
+          ends_at?: string | null
+          id: string
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          advertiser_id?: string
+          campaign_type?: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at?: string
+          description?: string
+          ends_at?: string | null
+          id?: string
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_campaigns_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "advertisers"
             referencedColumns: ["id"]
           },
         ]
@@ -1341,6 +1825,26 @@ export type Database = {
         Args: { p_collection_id: string; p_drop_id: string }
         Returns: undefined
       }
+      advertiser_campaign_geo_summary: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          coarse_bucket: string
+          conversion_count: number
+          gross_revenue_minor: number
+          region_label: string
+        }[]
+      }
+      advertiser_campaign_summary: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          attributed_conversions: number
+          campaign_id: string
+          clicks: number
+          conversions: number
+          creator_commission_minor: number
+          gross_revenue_minor: number
+        }[]
+      }
       assert_rate_limit: {
         Args: {
           p_action: string
@@ -1521,6 +2025,18 @@ export type Database = {
         }
         Returns: string
       }
+      creator_campaign_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          advertiser_name: string
+          approved_commission_minor: number
+          attributed_conversions: number
+          campaign_id: string
+          campaign_title: string
+          clicks: number
+          pending_commission_minor: number
+        }[]
+      }
       delete_media: {
         Args: { p_media_id: string }
         Returns: undefined
@@ -1560,6 +2076,10 @@ export type Database = {
       hood_game_view: {
         Args: { p_game_id: string }
         Returns: Json
+      }
+      is_advertiser_owner: {
+        Args: { p_advertiser_id: string }
+        Returns: boolean
       }
       is_hood_moderator: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
@@ -1631,6 +2151,51 @@ export type Database = {
         }
         Returns: Json
       }
+      record_referral_click: {
+        Args: {
+          p_app_version?: string
+          p_coarse_region?: string
+          p_platform?: string
+          p_source?: string
+          p_token: string
+        }
+        Returns: {
+          app_version: string | null
+          coarse_region: string | null
+          id: string
+          occurred_at: string
+          platform: string | null
+          referral_link_id: string
+          source: string | null
+        }
+      }
+      record_sponsor_conversion: {
+        Args: {
+          p_campaign_id: string
+          p_coarse_bucket?: string
+          p_conversion_type: Database["public"]["Enums"]["sponsor_conversion_type"]
+          p_coupon_code?: string
+          p_currency?: string
+          p_distance_band?: string
+          p_external_conversion_id: string
+          p_gross_amount_minor: number
+          p_occurred_at?: string
+          p_referral_token?: string
+          p_region_code?: string
+          p_region_label?: string
+        }
+        Returns: {
+          advertiser_id: string
+          campaign_id: string
+          conversion_type: Database["public"]["Enums"]["sponsor_conversion_type"]
+          created_at: string
+          currency: string
+          external_conversion_id: string
+          gross_amount_minor: number
+          id: string
+          occurred_at: string
+        }
+      }
       remove_drop_from_collection: {
         Args: { p_collection_id: string; p_drop_id: string }
         Returns: undefined
@@ -1654,6 +2219,32 @@ export type Database = {
       settle_due_clashes: {
         Args: { p_limit?: number }
         Returns: number
+      }
+      sponsor_calc_commission_minor: {
+        Args: {
+          p_commission_type: Database["public"]["Enums"]["commission_type"]
+          p_commission_value: number
+          p_gross_minor: number
+        }
+        Returns: number
+      }
+      sponsor_campaign_is_live: {
+        Args: {
+          p_campaign: Database["public"]["Tables"]["sponsor_campaigns"]["Row"]
+        }
+        Returns: boolean
+      }
+      sponsor_min_geo_aggregate_count: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      sponsor_new_referral_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      sponsor_normalize_coupon_code: {
+        Args: { p_code: string }
+        Returns: string
       }
       start_clash: {
         Args: {
@@ -1822,9 +2413,15 @@ export type Database = {
       }
     }
     Enums: {
+      advertiser_status: "DRAFT" | "ACTIVE" | "PAUSED" | "SUSPENDED"
+      attribution_method: "REFERRAL" | "COUPON" | "UNATTRIBUTED"
+      campaign_creator_status: "INVITED" | "ACTIVE" | "PAUSED" | "REMOVED"
       clash_mode: "STANDARD" | "BLIND"
       clash_side: "A" | "B"
       clash_status: "open" | "settled" | "cancelled"
+      commission_ledger_status: "PENDING" | "APPROVED" | "REJECTED" | "VOID"
+      commission_type: "FIXED_PER_CONVERSION" | "PERCENTAGE" | "NONE"
+      coupon_code_status: "ACTIVE" | "PAUSED" | "EXPIRED" | "REVOKED"
       hood_game_status: "DRAFT" | "OPEN" | "CLOSED" | "RESOLVED" | "CANCELLED"
       hood_game_type: "PREDICTION"
       hood_id:
@@ -1864,6 +2461,7 @@ export type Database = {
         | "Provocateur"
         | "Clash King"
         | "Legend"
+      referral_link_status: "ACTIVE" | "PAUSED" | "EXPIRED" | "REVOKED"
       report_reason:
         | "spam"
         | "harassment"
@@ -1883,6 +2481,22 @@ export type Database = {
         | "vault_drop"
         | "vault_subscription"
       reputation_kind: "clash_participation" | "clash_win" | "clash_dissent"
+      sponsor_campaign_status:
+        | "DRAFT"
+        | "ACTIVE"
+        | "PAUSED"
+        | "ENDED"
+        | "CANCELLED"
+      sponsor_campaign_type:
+        | "REFERRAL"
+        | "COUPON"
+        | "SPONSORED_CHALLENGE"
+        | "CREATOR_PROMO"
+      sponsor_conversion_type:
+        | "PURCHASE"
+        | "COUPON_REDEMPTION"
+        | "LEAD"
+        | "SIGNUP"
       take_stance: "AGREE" | "UNSURE" | "DISAGREE"
       take_status: "active" | "expired" | "removed"
       vault_drop_access: "free" | "subscriber"
@@ -2023,9 +2637,15 @@ export const Constants = {
   },
   public: {
     Enums: {
+      advertiser_status: ["DRAFT", "ACTIVE", "PAUSED", "SUSPENDED"],
+      attribution_method: ["REFERRAL", "COUPON", "UNATTRIBUTED"],
+      campaign_creator_status: ["INVITED", "ACTIVE", "PAUSED", "REMOVED"],
       clash_mode: ["STANDARD", "BLIND"],
       clash_side: ["A", "B"],
       clash_status: ["open", "settled", "cancelled"],
+      commission_ledger_status: ["PENDING", "APPROVED", "REJECTED", "VOID"],
+      commission_type: ["FIXED_PER_CONVERSION", "PERCENTAGE", "NONE"],
+      coupon_code_status: ["ACTIVE", "PAUSED", "EXPIRED", "REVOKED"],
       hood_game_status: ["DRAFT", "OPEN", "CLOSED", "RESOLVED", "CANCELLED"],
       hood_game_type: ["PREDICTION"],
       hood_id: [
@@ -2069,6 +2689,7 @@ export const Constants = {
         "Clash King",
         "Legend",
       ],
+      referral_link_status: ["ACTIVE", "PAUSED", "EXPIRED", "REVOKED"],
       report_reason: [
         "spam",
         "harassment",
@@ -2090,6 +2711,25 @@ export const Constants = {
         "vault_subscription",
       ],
       reputation_kind: ["clash_participation", "clash_win", "clash_dissent"],
+      sponsor_campaign_status: [
+        "DRAFT",
+        "ACTIVE",
+        "PAUSED",
+        "ENDED",
+        "CANCELLED",
+      ],
+      sponsor_campaign_type: [
+        "REFERRAL",
+        "COUPON",
+        "SPONSORED_CHALLENGE",
+        "CREATOR_PROMO",
+      ],
+      sponsor_conversion_type: [
+        "PURCHASE",
+        "COUPON_REDEMPTION",
+        "LEAD",
+        "SIGNUP",
+      ],
       take_stance: ["AGREE", "UNSURE", "DISAGREE"],
       take_status: ["active", "expired", "removed"],
       vault_drop_access: ["free", "subscriber"],

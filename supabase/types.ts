@@ -76,6 +76,22 @@ export type WorldDropStatus = Schema['Enums']['world_drop_status'];
 export type WorldMissionRow = Schema['Tables']['world_missions']['Row'];
 export type WorldDropRow = Schema['Tables']['world_drops']['Row'];
 
+// ── Sponsor attribution vocabulary (Phase 10 Step 1) ────────────────────────
+export type AdvertiserStatus = Schema['Enums']['advertiser_status'];
+export type SponsorCampaignStatus = Schema['Enums']['sponsor_campaign_status'];
+export type SponsorCampaignType = Schema['Enums']['sponsor_campaign_type'];
+export type CommissionType = Schema['Enums']['commission_type'];
+export type AttributionMethod = Schema['Enums']['attribution_method'];
+export type SponsorConversionType = Schema['Enums']['sponsor_conversion_type'];
+export type CommissionLedgerStatus = Schema['Enums']['commission_ledger_status'];
+
+export type AdvertiserRow = Schema['Tables']['advertisers']['Row'];
+export type SponsorCampaignRow = Schema['Tables']['sponsor_campaigns']['Row'];
+export type CampaignCreatorRow = Schema['Tables']['campaign_creators']['Row'];
+export type ReferralLinkRow = Schema['Tables']['referral_links']['Row'];
+export type ConversionEventRow = Schema['Tables']['conversion_events']['Row'];
+export type CreatorCommissionLedgerRow = Schema['Tables']['creator_commission_ledger']['Row'];
+
 /** What a select returns for a table, keyed by table name. */
 export type TableRow<K extends keyof Schema['Tables']> = Schema['Tables'][K]['Row'];
 

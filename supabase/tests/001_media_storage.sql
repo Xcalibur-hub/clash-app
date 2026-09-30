@@ -87,7 +87,14 @@ reset role;
 
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
-select is_empty($$ delete from storage.objects where bucket_id = 'public-media' and name = 't-bob/m-pub/m-pub.png' returning id $$, 'cannot delete another user object');
+-- Storage API now blocks direct DELETE on storage.objects (protect_delete trigger).
+-- Assert the protected path rejects client deletes rather than relying on RLS alone.
+select throws_ok(
+  $$ delete from storage.objects where bucket_id = 'public-media' and name = 't-bob/m-pub/m-pub.png' returning id $$,
+  null,
+  null,
+  'cannot delete storage objects via direct SQL'
+);
 select throws_ok($$ insert into storage.objects (bucket_id, name, owner) values ('public-media', 't-bob/x/y.png', '00000000-0000-0000-0000-000000000001') $$, '42501', null, 'cannot upload into another namespace');
 reset role;
 
