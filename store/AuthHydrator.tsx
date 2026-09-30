@@ -2,6 +2,7 @@ import React from 'react';
 import { GUEST_VIEWER } from '../data/mockUsers';
 import { fetchViewerProfile } from '../services/apiService';
 import { logger } from '../services/logger';
+import { setSentryUser } from '../services/sentry';
 import { setViewer } from './actions';
 import { useAuth } from './AuthProvider';
 import { useClash } from './ClashStore';
@@ -35,6 +36,8 @@ export function AuthHydrator(): null {
         }
       }
       if (cancelled) return;
+      // Opaque auth id only — never email or profile PII.
+      setSentryUser(uid);
       dispatch(setViewer(viewer));
       // Re-hydrate so the feed reflects the new identity's safety (block/mute),
       // reaction, upvote and viewer state — signing in mid-session filters the

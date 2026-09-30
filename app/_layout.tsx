@@ -5,10 +5,14 @@ import { StyleSheet } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SentryTestTrigger } from '../components/dev/SentryTestTrigger';
+import { initSentry, Sentry } from '../services/sentry';
 import { ClashProvider } from '../store';
 import { AuthProvider } from '../store/AuthProvider';
 import { AuthHydrator } from '../store/AuthHydrator';
 import { FontBootstrap, ThemeProvider, useThemeColors } from '../theme';
+
+initSentry();
 
 /**
  * Root shell.
@@ -45,7 +49,7 @@ function ThemedChrome({ children }: { children: React.ReactNode }): React.JSX.El
   );
 }
 
-export default function RootLayout(): React.JSX.Element {
+function RootLayout(): React.JSX.Element {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
@@ -74,6 +78,7 @@ export default function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="world/compose" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="world/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
                 </ThemedChrome>
+                <SentryTestTrigger />
               </FontBootstrap>
             </ThemeProvider>
           </ClashProvider>
@@ -82,6 +87,8 @@ export default function RootLayout(): React.JSX.Element {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(RootLayout);
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

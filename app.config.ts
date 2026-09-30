@@ -17,6 +17,9 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  * Supabase credentials are deliberately NOT read here: Expo inlines
  * `EXPO_PUBLIC_*` from the environment at build time, and keeping keys out of
  * this file means none can be baked into committed config.
+ *
+ * Sentry source-map upload (EAS): set `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and
+ * `SENTRY_PROJECT` as EAS secrets/env — never commit those values.
  */
 
 const VARIANTS = ['development', 'preview', 'production'] as const;
@@ -32,12 +35,28 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const isDevelopment = variant === 'development';
   const applicationId = isDevelopment ? 'com.clash.v2.dev' : 'com.clash.v2';
 
+  const sentryOrg = process.env.SENTRY_ORG?.trim();
+  const sentryProject = process.env.SENTRY_PROJECT?.trim();
+  const sentryPlugin: NonNullable<ExpoConfig['plugins']>[number] = [
+    '@sentry/react-native/expo',
+    {
+      url: 'https://sentry.io/',
+      note: 'Use SENTRY_AUTH_TOKEN env to authenticate with Sentry.',
+      ...(sentryOrg ? { organization: sentryOrg } : {}),
+      ...(sentryProject ? { project: sentryProject } : {}),
+    },
+  ];
+
   return {
     ...config,
     name: isDevelopment ? 'CLASH (Dev)' : 'CLASH',
     slug: isDevelopment ? 'clash-dev' : 'clash',
     scheme: isDevelopment ? 'clash-dev' : 'clash',
-    plugins: [...(config.plugins ?? []), 'expo-video'],
+    plugins: [...(config.plugins ?? []), 'expo-video', sentryPlugin],
+    extra: {
+      ...config.extra,
+      appVariant: variant,
+    },
     ios: {
       ...config.ios,
       bundleIdentifier: applicationId,
