@@ -5,28 +5,29 @@ import type { TakeMedia as TakeMediaModel } from '../../store';
 import { ink, radius, space, typeScale } from '../../theme';
 import { PlayIcon } from '../shared/icons';
 
+export type TakeMediaVariant = 'feed' | 'detail';
+
 /**
- * Bounded media plate for feed / detail.
- *
- * Feed (default): inset frame with rounded clipping and a fixed 4:5 aspect —
- * large, but never an uncontrolled full-bleed giant. Images use cover so
- * portrait and landscape both fill the frame without absurd height or tiny strips.
- *
- * `edge` is reserved for rare full-bleed contexts (e.g. detail hero); prefer inset.
+ * Bounded media plate.
+ * Feed: 5:4 inset. Detail: taller immersive frame, still aspect-capped (never stretch).
  */
 export function TakeMedia({
   media,
   edge = false,
+  variant = 'feed',
 }: {
   media: TakeMediaModel;
-  /** Full-bleed treatment — no horizontal radius, still aspect-capped. */
+  /** @deprecated Prefer variant="detail". Kept for older call sites. */
   edge?: boolean;
+  variant?: TakeMediaVariant;
 }): React.JSX.Element {
   const isVideo = media.kind === 'video';
   const hasImage = media.kind === 'image' && Boolean(media.url);
+  const detail = variant === 'detail' || edge;
+
   return (
     <View
-      style={[styles.wrap, edge ? styles.edge : styles.inset]}
+      style={[styles.wrap, detail ? styles.detail : styles.feed]}
       accessible
       accessibilityRole="image"
       accessibilityLabel={`${media.kind}${media.caption ? `: ${media.caption}` : ''}`}
@@ -63,19 +64,17 @@ const styles = StyleSheet.create({
     padding: space.md,
     width: '100%',
   },
-  /** Feed / default — controlled geometry inside screen margins. */
-  inset: {
+  feed: {
     aspectRatio: 5 / 4,
     borderRadius: radius.lg,
   },
-  /** Detail-style full bleed — still aspect-capped, never intrinsic image height. */
-  edge: {
+  detail: {
     aspectRatio: 4 / 5,
     borderRadius: 0,
   },
   veil: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(8,8,11,0.18)',
+    backgroundColor: 'rgba(8,8,11,0.12)',
   },
   play: {
     position: 'absolute',

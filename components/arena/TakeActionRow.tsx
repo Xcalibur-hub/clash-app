@@ -25,6 +25,8 @@ export interface TakeActionRowProps {
   onClash: () => void;
   onShare: () => void;
   onSave: () => void;
+  /** conversation = Take Detail — CLASH reads as the primary CTA. */
+  prominence?: 'feed' | 'conversation';
 }
 
 interface MetaActionProps {
@@ -70,7 +72,7 @@ function MetaAction({
       style={styles.metaAction}
     >
       <Animated.View style={animated}>
-        <Icon size={19} color={active ? activeColor : idleColor} strokeWidth={active ? 2.4 : 2.1} />
+        <Icon size={18} color={active ? activeColor : idleColor} strokeWidth={active ? 2.4 : 2.1} />
       </Animated.View>
       {label ? (
         <Text
@@ -84,16 +86,95 @@ function MetaAction({
   );
 }
 
-/** Social action row — CLASH is the signature filled CTA (theme-aware). */
+/** Social actions — CLASH is the signature filled CTA. */
 export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
-  const { reactions, commentCount, isSaved, hasReacted, onReact, onComment, onClash, onShare, onSave } =
-    props;
+  const {
+    reactions,
+    commentCount,
+    isSaved,
+    hasReacted,
+    onReact,
+    onComment,
+    onClash,
+    onShare,
+    onSave,
+    prominence = 'feed',
+  } = props;
   const t = useThemeColors();
   const reduced = useReducedMotion();
   const clashPulse = useSharedValue(1);
   const clashAnim = useAnimatedStyle(() => ({
     transform: [{ scale: clashPulse.value }],
   }));
+  const conversation = prominence === 'conversation';
+
+  const clashButton = (
+    <PressableScale
+      onPress={() => {
+        hapticTap();
+        if (!reduced) {
+          clashPulse.value = withSequence(
+            withTiming(0.94, { duration: 90 }),
+            withSpring(1, { damping: 14, stiffness: 320 }),
+          );
+        }
+        onClash();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Clash on this take"
+      style={[styles.clash, conversation && styles.clashProminent, { backgroundColor: t.clashFill }]}
+    >
+      <Animated.View style={[styles.clashInner, clashAnim]}>
+        <ArenaIcon size={conversation ? 14 : 13} color={t.clashText} strokeWidth={2.6} />
+        <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
+          CLASH
+        </Text>
+      </Animated.View>
+    </PressableScale>
+  );
+
+  if (conversation) {
+    return (
+      <View style={[styles.row, styles.rowConversation]}>
+        <MetaAction
+          icon={ArrowBigUpIcon}
+          label={compact(reactions)}
+          active={hasReacted}
+          accessibilityLabel="React to this take"
+          onPress={onReact}
+          activeColor={t.textPrimary}
+          idleColor={t.textMuted}
+        />
+        <MetaAction
+          icon={CommentIcon}
+          label={commentCount > 0 ? compact(commentCount) : ''}
+          accessibilityLabel="Jump to replies"
+          onPress={onComment}
+          activeColor={t.textPrimary}
+          idleColor={t.textMuted}
+        />
+        <MetaAction
+          icon={ShareIcon}
+          label=""
+          accessibilityLabel="Share this take"
+          onPress={onShare}
+          activeColor={t.textPrimary}
+          idleColor={t.textMuted}
+        />
+        <MetaAction
+          icon={BookmarkIcon}
+          label=""
+          active={isSaved}
+          accessibilityLabel={isSaved ? 'Remove from saved' : 'Save this take'}
+          onPress={onSave}
+          activeColor={t.textPrimary}
+          idleColor={t.textMuted}
+        />
+        <View style={styles.spacer} />
+        {clashButton}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.row}>
@@ -114,28 +195,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
         activeColor={t.textPrimary}
         idleColor={t.textMuted}
       />
-      <PressableScale
-        onPress={() => {
-          hapticTap();
-          if (!reduced) {
-            clashPulse.value = withSequence(
-              withTiming(0.94, { duration: 90 }),
-              withSpring(1, { damping: 14, stiffness: 320 }),
-            );
-          }
-          onClash();
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="Clash on this take"
-        style={[styles.clash, { backgroundColor: t.clashFill }]}
-      >
-        <Animated.View style={[styles.clashInner, clashAnim]}>
-          <ArenaIcon size={14} color={t.clashText} strokeWidth={2.6} />
-          <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
-            CLASH
-          </Text>
-        </Animated.View>
-      </PressableScale>
+      {clashButton}
       <View style={styles.spacer} />
       <MetaAction
         icon={ShareIcon}
@@ -165,13 +225,16 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingTop: space.sm,
   },
+  rowConversation: {
+    paddingVertical: space.xs,
+  },
   metaAction: {
     minHeight: 40,
-    minWidth: 40,
+    minWidth: 36,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
     paddingHorizontal: 2,
   },
   metaLabel: { ...typeScale.meta, fontSize: 13 },
@@ -180,6 +243,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: space.md,
     justifyContent: 'center',
+  },
+  clashProminent: {
+    minHeight: 40,
+    paddingHorizontal: space.lg,
   },
   clashInner: {
     flexDirection: 'row',
@@ -190,7 +257,7 @@ const styles = StyleSheet.create({
     ...typeScale.label,
     fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.7,
   },
   spacer: { flex: 1 },
 });

@@ -1,5 +1,14 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentThread } from '../../components/arena/CommentThread';
@@ -11,6 +20,7 @@ import { TakeMedia } from '../../components/arena/TakeMedia';
 import { Avatar } from '../../components/shared/Avatar';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { SegmentedTabs } from '../../components/shared/SegmentedTabs';
+import { Underline } from '../../components/shared/Doodles';
 import { BackIcon, MoreIcon } from '../../components/shared/icons';
 import { HOOD_LABEL } from '../../data/hoods';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
@@ -35,10 +45,9 @@ import {
   type CommentSort,
   type User,
 } from '../../store';
-import { space, typeScale, useThemeColors } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
-import { timeLeftLabel } from '../../utils/format';
-import { Underline } from '../../components/shared/Doodles';
+import { timeAgo, timeLeftLabel } from '../../utils/format';
 
 const SORTS: readonly { key: CommentSort; label: string }[] = [
   { key: 'best', label: 'Best' },
@@ -52,7 +61,10 @@ export interface MenuTarget {
   reportTarget: { kind: 'take' | 'comment'; id: string };
 }
 
-/** Flat, threaded Take detail / discussion target. */
+/**
+ * Take conversation — Arena visual language, continuous scroll:
+ * Take → stance → actions → discussion. Logic unchanged.
+ */
 export default function TakeDetailScreen(): React.JSX.Element {
   const { takeId } = useLocalSearchParams<{ takeId: string | string[] }>();
   const id = Array.isArray(takeId) ? takeId[0] : takeId;
@@ -151,21 +163,40 @@ export default function TakeDetailScreen(): React.JSX.Element {
     (comment: ChallengerComment): void => {
       const commentAuthor = selectAuthor(state, comment.authorId);
       if (!commentAuthor) return;
-      setMenu({ target: commentAuthor, isSelf: commentAuthor.id === state.viewer.id, following: false, reportTarget: { kind: 'comment', id: comment.id } });
+      setMenu({
+        target: commentAuthor,
+        isSelf: commentAuthor.id === state.viewer.id,
+        following: false,
+        reportTarget: { kind: 'comment', id: comment.id },
+      });
     },
     [state],
   );
 
   if (!take || !author) {
     return (
-      <View style={[styles.root, styles.missing, { backgroundColor: theme.background, paddingTop: insets.top + space.md }]}>
-        <EmptyState icon={BackIcon} title="This take is no longer live" body="Every take expires after 24 hours." actionLabel="BACK" onAction={() => router.back()} />
+      <View
+        style={[
+          styles.root,
+          styles.missing,
+          { backgroundColor: theme.background, paddingTop: insets.top + space.md },
+        ]}
+      >
+        <EmptyState
+          icon={BackIcon}
+          title="This take is no longer live"
+          body="Every take expires after 24 hours."
+          actionLabel="BACK"
+          onAction={() => router.back()}
+        />
       </View>
     );
   }
 
   const comments = selectCommentsForTake(state, take.id);
   const nodes = buildCommentTree(comments, sort);
+  const hasMedia = Boolean(take.media);
+  const shortText = take.text.trim().length < 48;
 
   const openClash = (): void => {
     if (!requireAuth()) return;
@@ -175,46 +206,85 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fill}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        style={styles.fill}
+        keyboardVerticalOffset={0}
+      >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.content, { paddingTop: insets.top + space.sm, paddingBottom: insets.bottom + space.xl }]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: insets.top + space.xs,
+              paddingBottom: space.xl,
+            },
+          ]}
         >
+          {/* Compact chrome */}
           <View style={styles.topRow}>
-            <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} style={styles.backBtn}>
+            <Pressable
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              hitSlop={8}
+              style={styles.iconHit}
+            >
               <BackIcon size={20} color={theme.textPrimary} />
             </Pressable>
-            <View style={styles.eyebrowWrap}>
-              <Text allowFontScaling={false} style={[styles.eyebrow, { color: theme.textPrimary }]}>TAKE</Text>
-              <Underline size={48} opacity={0.28} color={theme.textPrimary} style={styles.eyebrowMark} />
+            <View style={styles.hoodWrap}>
+              <Text allowFontScaling={false} style={[styles.hood, { color: theme.textMuted }]}>
+                {HOOD_LABEL[take.hood]}
+              </Text>
+              <Underline size={56} opacity={0.2} color={theme.textPrimary} style={styles.hoodMark} />
             </View>
             <Pressable
-              onPress={() => setMenu({ target: author, isSelf: author.id === state.viewer.id, following: followingAuthor, reportTarget: { kind: 'take', id: take.id } })}
+              onPress={() =>
+                setMenu({
+                  target: author,
+                  isSelf: author.id === state.viewer.id,
+                  following: followingAuthor,
+                  reportTarget: { kind: 'take', id: take.id },
+                })
+              }
               accessibilityRole="button"
               accessibilityLabel="More actions"
               hitSlop={8}
-              style={styles.moreBtn}
+              style={styles.iconHit}
             >
               <MoreIcon size={20} color={theme.textMuted} strokeWidth={2.2} />
             </Pressable>
           </View>
 
+          {/* Compact author */}
           <View style={styles.authorRow}>
-            <Avatar name={author.name} tint={author.tint} size={40} />
+            <Avatar name={author.name} tint={author.tint} size={34} />
             <View style={styles.authorText}>
-              <Text allowFontScaling={false} style={[styles.handle, { color: theme.textPrimary }]}>
-                {author.name} · {HOOD_LABEL[take.hood]}
+              <Text allowFontScaling={false} style={[styles.authorName, { color: theme.textPrimary }]} numberOfLines={1}>
+                {author.name}
               </Text>
-              <Text allowFontScaling={false} style={[styles.meta, { color: theme.textMuted }]}>
-                @{author.handle} · {timeLeftLabel(take.expiresAt)}
+              <Text allowFontScaling={false} style={[styles.authorMeta, { color: theme.textMuted }]} numberOfLines={1}>
+                @{author.handle} · {timeAgo(take.createdAt)} · {timeLeftLabel(take.expiresAt)}
               </Text>
             </View>
           </View>
 
-          <Text allowFontScaling style={[styles.takeText, { color: theme.textPrimary }]}>{take.text}</Text>
+          {/* Hero Take */}
+          <Text
+            allowFontScaling
+            style={[
+              hasMedia ? styles.takeWithMedia : shortText ? styles.takeShort : styles.takeLong,
+              { color: theme.textPrimary },
+            ]}
+          >
+            {take.text}
+          </Text>
+
           {take.media ? (
-            <View style={[styles.media, take.media.kind === 'video' || take.media.url ? styles.mediaHero : null]}>
-              <TakeMedia media={take.media} edge={Boolean(take.media.url || take.media.kind === 'video')} />
+            <View style={styles.mediaFrame}>
+              <TakeMedia media={take.media} variant="detail" />
             </View>
           ) : null}
 
@@ -232,15 +302,22 @@ export default function TakeDetailScreen(): React.JSX.Element {
             onSave={() => {
               if (requireAuth()) dispatch(toggleSave(take.id));
             }}
+            prominence="conversation"
           />
 
           <View style={[styles.threadHead, { borderTopColor: theme.border }]}>
-            <Text allowFontScaling={false} style={[styles.threadTitle, { color: theme.textPrimary }]}>{comments.length} replies</Text>
-            <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" />
+            <Text allowFontScaling={false} style={[styles.threadTitle, { color: theme.textPrimary }]}>
+              {comments.length === 0 ? 'Conversation' : `${comments.length} replies`}
+            </Text>
+            <View style={styles.sortWrap}>
+              <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" compact />
+            </View>
           </View>
 
           {nodes.length === 0 ? (
-            <Text allowFontScaling={false} style={[styles.empty, { color: theme.textMuted }]}>No rebuttals yet — drop the first one.</Text>
+            <Text allowFontScaling={false} style={[styles.empty, { color: theme.textMuted }]}>
+              No replies yet — add the first take on this take.
+            </Text>
           ) : (
             <CommentThread
               nodes={nodes}
@@ -253,8 +330,22 @@ export default function TakeDetailScreen(): React.JSX.Element {
           )}
         </ScrollView>
 
-        <View style={[styles.inputBar, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
-          <RebuttalInput takeId={take.id} parentId={replyTo?.comment.id} replyingTo={replyTo?.handle} onDone={() => setReplyTo(null)} />
+        <View
+          style={[
+            styles.inputBar,
+            {
+              borderTopColor: theme.border,
+              backgroundColor: theme.background,
+              paddingBottom: Math.max(insets.bottom, space.sm),
+            },
+          ]}
+        >
+          <RebuttalInput
+            takeId={take.id}
+            parentId={replyTo?.comment.id}
+            replyingTo={replyTo?.handle}
+            onDone={() => setReplyTo(null)}
+          />
         </View>
       </KeyboardAvoidingView>
 
@@ -267,7 +358,9 @@ export default function TakeDetailScreen(): React.JSX.Element {
         onClose={() => setMenu(null)}
         onMutated={() => {
           if (author && author.id !== state.viewer.id) {
-            void fetchFollowState(author.id).then((fs) => setFollowingAuthor(fs.following)).catch(() => undefined);
+            void fetchFollowState(author.id)
+              .then((fs) => setFollowingAuthor(fs.following))
+              .catch(() => undefined);
           }
         }}
       />
@@ -283,28 +376,83 @@ export default function TakeDetailScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fill: { flex: 1 },
-  content: { paddingHorizontal: space.md, gap: space.md },
+  content: {
+    paddingHorizontal: layout.screenX,
+    gap: space.md,
+  },
   missing: { paddingHorizontal: space.lg },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
-  moreBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'flex-end' },
-  eyebrowWrap: { alignItems: 'center', paddingBottom: 4 },
-  eyebrow: { ...typeScale.caption, fontWeight: '800', letterSpacing: 1.2 },
-  eyebrowMark: { marginTop: -2 },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+  },
+  iconHit: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  hoodWrap: { alignItems: 'center', paddingBottom: 2 },
+  hood: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  hoodMark: { marginTop: -1 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  authorText: { flex: 1, gap: 2 },
-  handle: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
-  meta: { ...typeScale.meta },
-  takeText: { ...typeScale.takeText },
-  media: { borderRadius: 18, overflow: 'hidden' },
-  mediaHero: { marginHorizontal: -space.md, borderRadius: 0 },
-  threadHead: { gap: space.sm, paddingTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth },
-  threadTitle: { ...typeScale.section, fontSize: 17, fontWeight: '700' },
-  empty: { ...typeScale.meta, paddingVertical: space.lg },
+  authorText: { flex: 1, gap: 1 },
+  authorName: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
+  authorMeta: { ...typeScale.meta, fontSize: 12 },
+  takeWithMedia: {
+    fontSize: 20,
+    lineHeight: 27,
+    fontWeight: '700',
+    letterSpacing: -0.35,
+  },
+  takeShort: {
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -0.9,
+    paddingVertical: space.sm,
+  },
+  takeLong: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  mediaFrame: {
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  threadHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  threadTitle: {
+    ...typeScale.section,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    flexShrink: 1,
+  },
+  sortWrap: { maxWidth: 148 },
+  empty: {
+    ...typeScale.meta,
+    fontSize: 14,
+    paddingVertical: space.lg,
+    lineHeight: 20,
+  },
   inputBar: {
-    paddingHorizontal: space.md,
+    paddingHorizontal: layout.screenX,
     paddingTop: space.sm,
-    paddingBottom: space.xs,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

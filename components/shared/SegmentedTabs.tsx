@@ -14,6 +14,8 @@ export interface SegmentedTabsProps<T extends string> {
   onChange: (next: T) => void;
   /** Screen-reader label for the whole group. */
   label: string;
+  /** Smaller control for Take Detail sort. */
+  compact?: boolean;
 }
 
 /** Theme-aware segmented control used by Profile Appearance and archive tabs. */
@@ -22,11 +24,16 @@ export function SegmentedTabs<T extends string>({
   items,
   onChange,
   label,
+  compact = false,
 }: SegmentedTabsProps<T>): React.JSX.Element {
   const t = useThemeColors();
   return (
     <View
-      style={[styles.segment, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}
+      style={[
+        styles.segment,
+        compact && styles.segmentCompact,
+        { borderColor: t.border, backgroundColor: t.surfaceMuted },
+      ]}
       accessibilityRole="tablist"
       accessibilityLabel={label}
     >
@@ -44,6 +51,7 @@ export function SegmentedTabs<T extends string>({
             accessibilityLabel={item.label}
             style={[
               styles.item,
+              compact && styles.itemCompact,
               active && {
                 backgroundColor: t.scheme === 'light' ? t.surface : 'rgba(255,255,255,0.10)',
               },
@@ -53,6 +61,7 @@ export function SegmentedTabs<T extends string>({
               allowFontScaling={false}
               style={[
                 styles.label,
+                compact && styles.labelCompact,
                 { color: active ? t.textPrimary : t.textMuted, fontWeight: active ? '700' : '500' },
               ]}
               numberOfLines={1}
@@ -73,6 +82,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  segmentCompact: {
+    padding: 2,
+    borderRadius: radius.sm,
+  },
   item: {
     flex: 1,
     alignItems: 'center',
@@ -81,5 +94,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.xs,
     borderRadius: radius.xs,
   },
+  itemCompact: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    flex: 0,
+  },
   label: { ...typeScale.label },
+  labelCompact: { fontSize: 12 },
 });
