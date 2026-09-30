@@ -20,7 +20,10 @@ import { WorldDropPreview } from '../../components/world/WorldDropPreview';
 import { WorldMissionBeacon } from '../../components/world/WorldMissionBeacon';
 import { Notice } from '../../components/shared/Notice';
 import { BackIcon, LocateIcon, PlusIcon, WorldIcon } from '../../components/shared/icons';
-import { WORLD_MAP_STYLE } from '../../components/world/worldMapStyle';
+import {
+  WORLD_MAP_STYLE_DARK,
+  WORLD_MAP_STYLE_LIGHT,
+} from '../../components/world/worldMapStyle';
 import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import {
@@ -38,8 +41,7 @@ import {
   type WorldMission,
 } from '../../services/worldService';
 import { showNotice, useClash } from '../../store';
-import { useAuth } from '../../store/AuthProvider';
-import { color, ink, radius, space, typeScale } from '../../theme';
+import { radius, space, typeScale, useTheme, useThemeColors } from '../../theme';
 import { clusterWorldDrops, regionMovedSignificantly } from '../../utils/worldCluster';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -48,7 +50,7 @@ type WorldFilter = 'nearby' | 'recent' | 'mission';
 const FILTERS: readonly { key: WorldFilter; label: string }[] = [
   { key: 'nearby', label: 'Nearby' },
   { key: 'recent', label: 'Recent' },
-  { key: 'mission', label: 'Mission' },
+  { key: 'mission', label: 'Missions' },
 ];
 
 /** Quiet default — coastal Goa — used when location is unavailable. */
@@ -65,6 +67,9 @@ const NEARBY_ZOOM: Region = {
   longitudeDelta: 0.08,
 };
 
+/** Estimated preview card height for gentle camera offset (not aggressive zoom). */
+const PREVIEW_CAMERA_BIAS = 0.16;
+
 /**
  * World map — CONTENT markers only.
  * One-shot location for camera/recenter. No live people. No continuous watch.
@@ -73,10 +78,12 @@ export default function WorldScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const requireAuth = useRequireAuth();
-  const { signedIn } = useAuth();
-  const { dispatch, state } = useClash();
+  const { dispatch } = useClash();
+  const { scheme } = useTheme();
+  const t = useThemeColors();
   const now = useClock(30_000);
   const mapRef = React.useRef<MapView | null>(null);
+  const light = scheme === 'light';
 
   const [missions, setMissions] = React.useState<WorldMission[]>([]);
   const [drops, setDrops] = React.useState<WorldDrop[]>([]);
@@ -96,6 +103,9 @@ export default function WorldScreen(): React.JSX.Element {
     () => (selectedId ? drops.find((d) => d.id === selectedId) ?? null : null),
     [drops, selectedId],
   );
+
+  const floatBg = light ? 'rgba(255,255,255,0.94)' : 'rgba(30,30,34,0.94)';
+  const floatBorder = light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
 
   // Close preview if the selected Drop vanished after a refresh (expire/block).
   React.useEffect(() => {
@@ -260,6 +270,19 @@ export default function WorldScreen(): React.JSX.Element {
     mapRef.current?.animateToRegion(next, 420);
   };
 
+  const selectDrop = (drop: WorldDrop): void => {
+    hapticTap();
+    setSelectedId(drop.id);
+    // Gentle bias so the marker sits above the floating preview — no aggressive zoom.
+    const next: Region = {
+      latitude: drop.approxLat - region.latitudeDelta * PREVIEW_CAMERA_BIAS,
+      longitude: drop.approxLng,
+      latitudeDelta: region.latitudeDelta,
+      longitudeDelta: region.longitudeDelta,
+    };
+    mapRef.current?.animateToRegion(next, 280);
+  };
+
   const participate = (): void => {
     if (!primaryMission) {
       dispatch(showNotice('No active Mission this week.'));
@@ -275,16 +298,19 @@ export default function WorldScreen(): React.JSX.Element {
   };
 
   const provider = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+  const mapStyle = light ? WORLD_MAP_STYLE_LIGHT : WORLD_MAP_STYLE_DARK;
+  const bottomPad = insets.bottom + space.md;
+  const midBottom = (selected ? 300 : 120) + insets.bottom;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: t.background }]}>
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={provider}
         initialRegion={FALLBACK_REGION}
-        customMapStyle={WORLD_MAP_STYLE}
-        userInterfaceStyle="dark"
+        customMapStyle={mapStyle}
+        userInterfaceStyle={light ? 'light' : 'dark'}
         showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={false}
@@ -315,10 +341,7 @@ export default function WorldScreen(): React.JSX.Element {
               key={item.id}
               drop={item.drop}
               selected={item.drop.id === selectedId}
-              onPress={(drop) => {
-                hapticTap();
-                setSelectedId(drop.id);
-              }}
+              onPress={selectDrop}
             />
           );
         })}
@@ -327,42 +350,82 @@ export default function WorldScreen(): React.JSX.Element {
             center={viewerDot}
             radius={140}
             strokeWidth={1}
-            strokeColor="rgba(255,255,255,0.28)"
-            fillColor="rgba(255,255,255,0.07)"
+            strokeColor={light ? 'rgba(17,17,19,0.22)' : 'rgba(255,255,255,0.28)'}
+            fillColor={light ? 'rgba(17,17,19,0.06)' : 'rgba(255,255,255,0.07)'}
           />
         ) : null}
       </MapView>
 
+      {/* Top floating World bar — not a conventional nav header */}
       <View style={[styles.topChrome, { paddingTop: insets.top + space.sm }]} pointerEvents="box-none">
-        <View style={styles.topRow}>
+        <View
+          style={[
+            styles.topBar,
+            {
+              backgroundColor: floatBg,
+              borderColor: floatBorder,
+              shadowColor: t.shadowColor,
+            },
+          ]}
+        >
           <Pressable
             onPress={() => {
               hapticTap();
               if (router.canGoBack()) router.back();
               else router.replace('/(tabs)/explore');
             }}
-            style={styles.iconBtn}
+            style={styles.barIcon}
             accessibilityRole="button"
             accessibilityLabel="Back"
+            hitSlop={8}
           >
-            <BackIcon size={20} color={ink.primary} />
+            <BackIcon size={20} color={t.textPrimary} />
           </Pressable>
-          <Text allowFontScaling={false} style={styles.brand}>WORLD</Text>
-          <Pressable
-            onPress={() => {
-              hapticTap();
-              if (signedIn) router.push('/(tabs)/profile');
-              else router.push('/auth');
-            }}
-            style={styles.avatar}
-            accessibilityRole="button"
-            accessibilityLabel="Profile"
-          >
-            <Text allowFontScaling={false} style={styles.avatarText}>
-              {(state.viewer.name || state.viewer.handle || '?').slice(0, 1).toUpperCase()}
-            </Text>
-          </Pressable>
+
+          <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+            World
+          </Text>
+
+          <View style={styles.barActions}>
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                setPrivacyOpen((v) => !v);
+              }}
+              style={styles.barIcon}
+              accessibilityRole="button"
+              accessibilityLabel="World privacy"
+              hitSlop={8}
+            >
+              <WorldIcon size={18} color={t.textSecondary} />
+            </Pressable>
+            <Pressable
+              onPress={() => void recenter()}
+              style={styles.barIcon}
+              accessibilityRole="button"
+              accessibilityLabel="Recenter map"
+              hitSlop={8}
+            >
+              <LocateIcon size={18} color={t.textPrimary} />
+            </Pressable>
+          </View>
         </View>
+
+        {privacyOpen ? (
+          <Text
+            allowFontScaling={false}
+            style={[
+              styles.privacy,
+              {
+                color: t.textSecondary,
+                backgroundColor: floatBg,
+                borderColor: floatBorder,
+              },
+            ]}
+          >
+            World shows approximate areas where content was posted. It does not show people's live locations.
+          </Text>
+        ) : null}
 
         {primaryMission ? (
           <WorldMissionBeacon
@@ -375,35 +438,72 @@ export default function WorldScreen(): React.JSX.Element {
         ) : null}
 
         {locationDenied ? (
-          <Text allowFontScaling={false} style={styles.banner}>
+          <Text
+            allowFontScaling={false}
+            style={[
+              styles.banner,
+              {
+                color: t.textSecondary,
+                backgroundColor: floatBg,
+                borderColor: floatBorder,
+              },
+            ]}
+          >
             Location off — browse Recent or Search this area.
           </Text>
         ) : null}
       </View>
 
-      <View style={[styles.midChrome, { bottom: (selected ? 280 : 108) + insets.bottom }]} pointerEvents="box-none">
+      <View style={[styles.midChrome, { bottom: midBottom }]} pointerEvents="box-none">
         {showSearchArea && filter === 'nearby' ? (
           <Pressable
             onPress={() => void searchThisArea()}
-            style={styles.searchArea}
+            style={[
+              styles.searchArea,
+              {
+                backgroundColor: light ? '#111113' : '#F5F5F7',
+                shadowColor: t.shadowColor,
+              },
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Search this area"
           >
-            <Text allowFontScaling={false} style={styles.searchAreaText}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.searchAreaText, { color: light ? '#F5F5F7' : '#111113' }]}
+            >
               {searching ? 'Searching…' : 'Search this area'}
             </Text>
           </Pressable>
         ) : null}
 
         {!loading && drops.length === 0 ? (
-          <View style={styles.empty}>
-            <Text allowFontScaling={false} style={styles.emptyTitle}>Nothing here yet.</Text>
-            <Text allowFontScaling={false} style={styles.emptyBody}>
+          <View
+            style={[
+              styles.empty,
+              {
+                backgroundColor: floatBg,
+                borderColor: floatBorder,
+                shadowColor: t.shadowColor,
+              },
+            ]}
+          >
+            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+              Nothing here yet
+            </Text>
+            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textSecondary }]}>
               Be the first to leave something worth finding.
             </Text>
             {primaryMission ? (
-              <Pressable onPress={participate} style={styles.emptyCta} accessibilityRole="button">
-                <Text allowFontScaling={false} style={styles.emptyCtaText}>
+              <Pressable
+                onPress={participate}
+                style={[styles.emptyCta, { backgroundColor: light ? '#111113' : '#F5F5F7' }]}
+                accessibilityRole="button"
+              >
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.emptyCtaText, { color: light ? '#F5F5F7' : '#111113' }]}
+                >
                   Join this week's Mission
                 </Text>
               </Pressable>
@@ -412,7 +512,7 @@ export default function WorldScreen(): React.JSX.Element {
         ) : null}
       </View>
 
-      <View style={[styles.bottomChrome, { paddingBottom: insets.bottom + space.sm }]} pointerEvents="box-none">
+      <View style={[styles.bottomChrome, { paddingBottom: bottomPad }]} pointerEvents="box-none">
         {selected ? (
           <WorldDropPreview
             drop={selected}
@@ -421,19 +521,40 @@ export default function WorldScreen(): React.JSX.Element {
           />
         ) : (
           <View style={styles.controls}>
-            <View style={styles.filters}>
+            <View
+              style={[
+                styles.filters,
+                {
+                  backgroundColor: floatBg,
+                  borderColor: floatBorder,
+                  shadowColor: t.shadowColor,
+                },
+              ]}
+            >
               {FILTERS.map((item) => {
                 const active = filter === item.key;
                 return (
                   <Pressable
                     key={item.key}
                     onPress={() => void onFilterChange(item.key)}
-                    style={[styles.filter, active && styles.filterOn]}
+                    style={[
+                      styles.filter,
+                      active && {
+                        backgroundColor: light ? '#111113' : 'rgba(255,255,255,0.14)',
+                      },
+                    ]}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
                     accessibilityLabel={item.label}
                   >
-                    <Text allowFontScaling={false} style={[styles.filterText, active && styles.filterTextOn]}>
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        styles.filterText,
+                        { color: active ? (light ? '#F5F5F7' : t.textPrimary) : t.textMuted },
+                        active && styles.filterTextOn,
+                      ]}
+                    >
                       {item.label}
                     </Text>
                   </Pressable>
@@ -441,48 +562,27 @@ export default function WorldScreen(): React.JSX.Element {
               })}
             </View>
 
-            <View style={styles.sideActions}>
-              <Pressable
-                onPress={() => {
-                  hapticTap();
-                  setPrivacyOpen((v) => !v);
-                }}
-                style={styles.iconBtn}
-                accessibilityRole="button"
-                accessibilityLabel="World privacy"
-              >
-                <WorldIcon size={18} color={ink.secondary} />
-              </Pressable>
-              <Pressable
-                onPress={() => void recenter()}
-                style={styles.iconBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Recenter map"
-              >
-                <LocateIcon size={18} color={ink.primary} />
-              </Pressable>
-              <Pressable
-                onPress={participate}
-                style={styles.create}
-                accessibilityRole="button"
-                accessibilityLabel="Create World Drop"
-              >
-                <PlusIcon size={20} color={ink.inverse} strokeWidth={2.4} />
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={participate}
+              style={[
+                styles.create,
+                {
+                  backgroundColor: light ? '#111113' : '#F5F5F7',
+                  shadowColor: t.shadowColor,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Create World Drop"
+            >
+              <PlusIcon size={20} color={light ? '#F5F5F7' : '#111113'} strokeWidth={2.4} />
+            </Pressable>
           </View>
         )}
-
-        {privacyOpen && !selected ? (
-          <Text allowFontScaling={false} style={styles.privacy}>
-            World shows approximate areas where content was posted. It does not show people's live locations.
-          </Text>
-        ) : null}
       </View>
 
       {loading ? (
-        <View style={styles.loading} pointerEvents="none">
-          <ActivityIndicator color={ink.primary} />
+        <View style={[styles.loading, { backgroundColor: light ? 'rgba(244,243,239,0.28)' : 'rgba(9,9,11,0.35)' }]} pointerEvents="none">
+          <ActivityIndicator color={t.textPrimary} />
         </View>
       ) : null}
 
@@ -492,47 +592,52 @@ export default function WorldScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
+  root: { flex: 1 },
   topChrome: {
     position: 'absolute',
     left: space.md,
     right: space.md,
     gap: space.sm,
   },
-  topRow: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    minHeight: 48,
+    paddingHorizontal: 6,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  brand: { ...typeScale.caption, color: ink.primary, letterSpacing: 1 },
-  iconBtn: {
+  brand: {
+    ...typeScale.section,
+    flex: 1,
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  barActions: { flexDirection: 'row', alignItems: 'center' },
+  barIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(12,12,15,0.88)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(12,12,15,0.88)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+  privacy: {
+    ...typeScale.meta,
+    padding: space.sm,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
-  avatarText: { ...typeScale.label, color: ink.primary, fontWeight: '700' },
   banner: {
     ...typeScale.meta,
-    color: ink.secondary,
     paddingHorizontal: space.sm,
-    paddingVertical: 6,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(12,12,15,0.88)',
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
   midChrome: {
@@ -544,31 +649,35 @@ const styles = StyleSheet.create({
   },
   searchArea: {
     paddingHorizontal: space.md,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(245,245,247,0.94)',
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
-  searchAreaText: { ...typeScale.label, color: ink.inverse, fontWeight: '700' },
+  searchAreaText: { ...typeScale.label, fontWeight: '600' },
   empty: {
     alignItems: 'center',
     gap: 6,
     padding: space.md,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(12,12,15,0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     maxWidth: 320,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  emptyTitle: { ...typeScale.label, color: ink.primary, fontWeight: '700' },
-  emptyBody: { ...typeScale.meta, color: ink.secondary, textAlign: 'center' },
+  emptyTitle: { ...typeScale.label, fontWeight: '600' },
+  emptyBody: { ...typeScale.meta, textAlign: 'center' },
   emptyCta: {
     marginTop: 4,
     paddingHorizontal: space.md,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.92)',
   },
-  emptyCtaText: { ...typeScale.meta, color: ink.inverse, fontWeight: '700' },
+  emptyCtaText: { ...typeScale.meta, fontWeight: '600' },
   bottomChrome: {
     position: 'absolute',
     left: 0,
@@ -584,42 +693,40 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   filters: {
+    flex: 1,
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
     padding: 4,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(12,12,15,0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   filter: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     borderRadius: radius.pill,
   },
-  filterOn: { backgroundColor: 'rgba(255,255,255,0.12)' },
-  filterText: { ...typeScale.meta, color: ink.tertiary },
-  filterTextOn: { color: ink.primary, fontWeight: '700' },
-  sideActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterText: { ...typeScale.meta },
+  filterTextOn: { fontWeight: '600' },
   create: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F5F7',
-  },
-  privacy: {
-    ...typeScale.meta,
-    color: ink.secondary,
-    padding: space.sm,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(12,12,15,0.92)',
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
   loading: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(9,9,11,0.35)',
   },
 });
