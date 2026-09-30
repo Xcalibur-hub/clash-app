@@ -11,7 +11,7 @@ import { Underline } from '../../components/shared/Doodles';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useClash } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
-import { DOCK_HEIGHT, DOCK_SCROLL_CLEARANCE } from '../../components/navigation/dockConfig';
+import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 
 /**
@@ -28,9 +28,6 @@ export default function ExploreScreen(): React.JSX.Element {
   const searching = debounced.trim().length > 0;
   const profileId = signedIn ? state.viewer.id : null;
 
-  // Dock height + float gap; insets.bottom applied separately.
-  const bottomClearance = Math.max(DOCK_SCROLL_CLEARANCE, DOCK_HEIGHT + 24);
-
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView
@@ -41,7 +38,7 @@ export default function ExploreScreen(): React.JSX.Element {
           styles.content,
           {
             paddingTop: insets.top + space.sm,
-            paddingBottom: insets.bottom + bottomClearance,
+            paddingBottom: dockBottomPadding(insets.bottom),
           },
         ]}
       >

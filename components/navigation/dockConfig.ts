@@ -11,14 +11,27 @@ import {
 } from '../shared/icons';
 
 /** Visual height of the floating capsule dock (icons + padding). */
-export const DOCK_HEIGHT = 52;
+export const DOCK_HEIGHT = 48;
+
+/**
+ * Breathing room above the dock top edge (not including safe-area inset).
+ * Scroll screens should use: insets.bottom + dockContentClearance()
+ */
+export const DOCK_TOP_GAP = 36;
 
 /**
  * Bottom clearance for scrollable tab screens so content clears the floating
- * dock + its outer margin. Use with safe-area bottom inset:
+ * dock. Pair with safe-area bottom inset:
  *   paddingBottom: insets.bottom + DOCK_SCROLL_CLEARANCE
+ *
+ * Equals dock height + gap above the dock.
  */
-export const DOCK_SCROLL_CLEARANCE = 80;
+export const DOCK_SCROLL_CLEARANCE = DOCK_HEIGHT + DOCK_TOP_GAP;
+
+/** Helper — full bottom padding including safe area. */
+export function dockBottomPadding(insetsBottom: number): number {
+  return insetsBottom + DOCK_SCROLL_CLEARANCE;
+}
 
 export type TabRoute = BottomTabBarProps['state']['routes'][number];
 

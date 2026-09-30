@@ -10,6 +10,7 @@ export * from './motion';
 export * from './typography';
 export * from './palettes';
 export { ThemeProvider, useTheme, useThemeColors } from './ThemeProvider';
+export { FontBootstrap } from './FontBootstrap';
 
 // Re-export commonly used tokens for convenience
 export { card } from './colors';

@@ -1,62 +1,119 @@
 import { StyleSheet } from 'react-native';
-import { accent, ink, radius, space, tint, typeScale } from '../../theme';
+import { typeScale } from '../../theme';
 
-/** Slide-out drawer surfaces: obsidian panel over a dimmed scrim. */
+/** Floating charcoal drawer — ChatGPT-quality density, CLASH destinations. */
+export const DRAWER_BG = '#2B2B2B';
+export const DRAWER_BG_ELEVATED = '#333333';
+export const DRAWER_TEXT = '#F5F5F5';
+export const DRAWER_TEXT_MUTED = 'rgba(245,245,245,0.55)';
+export const DRAWER_ICON = 'rgba(245,245,245,0.72)';
+export const DRAWER_ROW_ACTIVE = 'rgba(255,255,255,0.08)';
+
 export const sidebar = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 50,
-    flexDirection: 'row',
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   scrimTouch: { flex: 1 },
+  panelWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingLeft: 14,
+    paddingRight: 56,
+  },
   panel: {
-    width: '80%',
+    flex: 1,
     maxWidth: 340,
-    height: '100%',
-    backgroundColor: '#0D0D12',
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: space.lg,
+    width: '100%',
+    borderRadius: 28,
+    backgroundColor: DRAWER_BG,
+    paddingHorizontal: 14,
+    paddingTop: 18,
+    paddingBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 24,
+    overflow: 'hidden',
   },
-  scroll: { flexGrow: 1, gap: space.lg, paddingBottom: space.xl },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  menuTitle: { ...typeScale.caption, color: ink.tertiary },
+  scroll: {
+    flexGrow: 1,
+    gap: 8,
+    paddingBottom: 8,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingBottom: 14,
+  },
+  brand: {
+    ...typeScale.label,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: DRAWER_TEXT,
+  },
   identity: {
-    gap: space.sm,
-    paddingBottom: space.md,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginBottom: 8,
   },
-  identityRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  name: { ...typeScale.bodyStrong, color: ink.primary },
-  handle: { ...typeScale.meta, color: ink.tertiary },
-  chipsRow: { flexDirection: 'row', gap: space.xs },
-  countersRow: { flexDirection: 'row', gap: space.md, marginTop: space.xs },
-  counter: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  counterText: { ...typeScale.data, color: ink.secondary },
-  section: { gap: space.xs },
-  sectionLabel: { ...typeScale.caption, color: ink.tertiary },
-  vaultCard: {
+  identityText: { flex: 1, gap: 2 },
+  name: {
+    ...typeScale.bodyStrong,
+    fontSize: 15,
+    color: DRAWER_TEXT,
+  },
+  handle: {
+    ...typeScale.meta,
+    fontSize: 13,
+    color: DRAWER_TEXT_MUTED,
+  },
+  navBlock: { gap: 2 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    minHeight: 54,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+  },
+  rowActive: {
+    backgroundColor: DRAWER_ROW_ACTIVE,
+  },
+  rowLabel: {
+    ...typeScale.nav,
+    color: DRAWER_TEXT,
+    flexShrink: 1,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 10,
+    marginHorizontal: 10,
+  },
+  footer: {
+    marginTop: 'auto',
     gap: 4,
-    padding: space.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,200,97,0.42)',
-    backgroundColor: tint.goldSoft,
+    paddingTop: 8,
   },
-  vaultRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  vaultTitle: { ...typeScale.bodyStrong, color: accent.gold },
-  vaultSub: { ...typeScale.meta, color: ink.secondary },
+  version: {
+    ...typeScale.meta,
+    fontSize: 12,
+    color: DRAWER_TEXT_MUTED,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+  },
   pressed: { opacity: 0.72 },
-  link: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm },
-  linkTitle: { ...typeScale.label, color: ink.primary },
-  linkSub: { ...typeScale.meta, color: ink.tertiary, fontSize: 12 },
-  footer: { marginTop: 'auto', gap: space.sm },
-  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  settingsText: { ...typeScale.label, color: ink.secondary },
-  version: { ...typeScale.meta, color: ink.quaternary, fontSize: 12 },
 });

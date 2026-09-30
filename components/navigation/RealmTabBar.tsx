@@ -17,12 +17,12 @@ export interface RealmTabBarProps extends BottomTabBarProps {
   ShiftIcon: LucideIcon;
 }
 
-const DOCK_BG = '#111113';
-const DOCK_ICON = 'rgba(255,255,255,0.5)';
+const DOCK_BG = '#1A1A1C';
+const DOCK_ICON = 'rgba(255,255,255,0.48)';
 const DOCK_ICON_ON = '#111113';
 
 /**
- * Slim floating capsule — secondary to content, never competing with the hero.
+ * Compact floating capsule — reduced visual mass, consistent outline icons.
  */
 export function RealmTabBar({
   state,
@@ -67,15 +67,15 @@ export function RealmTabBar({
       >
         {centred ? (
           <View style={styles.create}>
-            <Icon size={18} color={DOCK_ICON_ON} strokeWidth={2.6} />
+            <Icon size={17} color={DOCK_ICON_ON} strokeWidth={2.4} />
           </View>
         ) : (
           <View style={styles.iconWrap}>
             <View style={[styles.activeHalo, focused && styles.activeHaloOn]}>
               <Icon
-                size={18}
+                size={20}
                 color={focused ? DOCK_ICON_ON : DOCK_ICON}
-                strokeWidth={focused ? 2.4 : 2}
+                strokeWidth={1.9}
               />
             </View>
             {showBadge ? (
@@ -94,7 +94,7 @@ export function RealmTabBar({
   const shiftTarget: Realm = realm === 'vault' ? 'arena' : 'vault';
 
   return (
-    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]} pointerEvents="box-none">
+    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 8) }]} pointerEvents="box-none">
       <View style={styles.dock}>
         {state.routes.map(renderTab)}
         <Pressable
@@ -106,7 +106,7 @@ export function RealmTabBar({
           accessibilityRole="button"
           accessibilityLabel={realm === 'vault' ? 'Return to Arena' : 'Open The Vault'}
         >
-          <ShiftIcon size={18} color={DOCK_ICON} strokeWidth={2} />
+          <ShiftIcon size={20} color={DOCK_ICON} strokeWidth={1.9} />
         </Pressable>
       </View>
       <Text style={styles.srOnly} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -122,24 +122,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 42,
+    paddingHorizontal: 48,
     backgroundColor: 'transparent',
     alignItems: 'center',
   },
   dock: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
+    height: 48,
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 300,
     borderRadius: 999,
     backgroundColor: DOCK_BG,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
   },
   tab: {
     flex: 1,
@@ -148,8 +148,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   create: {
-    width: 34,
-    height: 34,
+    width: 30,
+    height: 30,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -157,9 +157,9 @@ const styles = StyleSheet.create({
   },
   iconWrap: { position: 'relative' },
   activeHalo: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -179,9 +179,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: DOCK_BG,
   },
-  badgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '800', lineHeight: 10 },
+  badgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '700', lineHeight: 10 },
   shift: {
-    width: 36,
+    width: 34,
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',

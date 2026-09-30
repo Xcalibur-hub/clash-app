@@ -19,6 +19,7 @@ import {
   type ProfileReply,
 } from '../../services/profileService';
 import { layout, space, useThemeColors } from '../../theme';
+import { DOCK_SCROLL_CLEARANCE } from '../navigation/dockConfig';
 import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { EmptyState } from '../shared/EmptyState';
 import { GlowButton } from '../shared/GlowButton';
@@ -206,7 +207,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.textPrimary} />}
-        contentContainerStyle={[styles.content, { paddingTop: hideSafeTop ? space.md : insets.top + space.md, paddingBottom: insets.bottom + 96 }]}
+        contentContainerStyle={[styles.content, { paddingTop: hideSafeTop ? space.md : insets.top + space.md, paddingBottom: insets.bottom + DOCK_SCROLL_CLEARANCE }]}
       >
         <ProfileHeader
           profile={profile}
