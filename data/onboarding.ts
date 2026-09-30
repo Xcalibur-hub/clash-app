@@ -1,39 +1,25 @@
-import type { LucideIcon } from 'lucide-react-native';
-import { ArenaIcon, CommentIcon, CrownIcon } from '../components/shared/icons';
+/** Onboarding stage copy — short product demos, not essays. */
 
-export interface OnboardingSlide {
-  key: string;
-  icon: LucideIcon;
-  step: string;
-  title: string;
-  body: string;
-  tone: 'a' | 'b' | 'gold';
+export interface OnboardingStage {
+  key: 'say' | 'challenge' | 'judge';
+  headline: string;
+  support: string;
 }
 
-/** First-launch copy (spec §5). */
-export const ONBOARDING_SLIDES: readonly OnboardingSlide[] = [
+export const ONBOARDING_STAGES: readonly OnboardingStage[] = [
   {
     key: 'say',
-    icon: CommentIcon,
-    step: '01 — SAY IT',
-    title: 'Say what everyone is thinking.',
-    body: 'Drop a take in seconds. No essay, no thread, no warm-up. It lives for 24 hours and then it is gone.',
-    tone: 'a',
+    headline: 'SAY IT.',
+    support: 'Post the opinion everyone\nis already thinking.',
   },
   {
-    key: 'clash',
-    icon: ArenaIcon,
-    step: '02 — DISAGREE',
-    title: 'Clash with people who disagree.',
-    body: 'Anyone can challenge your take. Nine independent jurors read both sides and decide who actually won.',
-    tone: 'b',
+    key: 'challenge',
+    headline: 'CHALLENGE IT.',
+    support: "Think they're wrong?\nMake your case.",
   },
   {
-    key: 'rank',
-    icon: CrownIcon,
-    step: '03 — BUILD IT',
-    title: 'Build your reputation.',
-    body: 'Wins convert into reputation, coins and rank. Takes expire — your standing in the Arena does not.',
-    tone: 'gold',
+    key: 'judge',
+    headline: 'JUDGE IT.',
+    support: 'The community decides\nwhich argument holds up.',
   },
-];
+] as const;
