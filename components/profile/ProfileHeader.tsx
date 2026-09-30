@@ -2,8 +2,8 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { User } from '../../store';
 import { HOOD_LABEL } from '../../data/hoods';
-import { radius, space, typeScale, useThemeColors } from '../../theme';
-import { compact } from '../../utils/format';
+import { space, typeScale, useThemeColors } from '../../theme';
+import { compact, formatReputation } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
 import { GlowButton } from '../shared/GlowButton';
@@ -22,7 +22,11 @@ export interface ProfileHeaderProps {
   onMore?: () => void;
 }
 
-/** Identity first: avatar, name, handle, reputation, Clash record, social counts. */
+/**
+ * Editorial identity header — avatar, name, bio, follow, then reputation.
+ * Stats use only real social counts (followers / following).
+ * Clash record lives in the Clashes tab (User.clashes/wins are not hydrated).
+ */
 export function ProfileHeader({
   profile,
   isSelf,
@@ -34,131 +38,139 @@ export function ProfileHeader({
   onMore,
 }: ProfileHeaderProps): React.JSX.Element {
   const t = useThemeColors();
-  const winRate =
-    profile.clashes > 0 ? Math.round((profile.wins / profile.clashes) * 100) : null;
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.topRow}>
-        <Avatar name={profile.name} tint={profile.tint} size={80} />
-        <View style={styles.names}>
-          <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
-            {profile.name}
-          </Text>
-          <View style={styles.handleRow}>
-            <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
-              @{profile.handle}
-            </Text>
-            <Underline size={56} opacity={0.28} color={t.textPrimary} style={styles.handleMark} />
-          </View>
-          <Text allowFontScaling={false} style={[styles.rank, { color: t.accent }]}>
-            {profile.rank}
-            {profile.streak > 0 ? ` · ${profile.streak} streak` : ''}
-          </Text>
+      <View style={styles.identity}>
+        <View style={styles.avatarRow}>
+          <Avatar name={profile.name} tint={profile.tint} size={88} />
+          <Pressable
+            onPress={onMore}
+            accessibilityRole="button"
+            accessibilityLabel="More profile actions"
+            hitSlop={8}
+            style={styles.more}
+          >
+            <MoreIcon size={20} color={t.textMuted} strokeWidth={2.2} />
+          </Pressable>
         </View>
-        <Pressable
-          onPress={onMore}
-          accessibilityRole="button"
-          accessibilityLabel="More profile actions"
-          hitSlop={8}
-          style={styles.more}
-        >
-          <MoreIcon size={20} color={t.textMuted} strokeWidth={2.2} />
-        </Pressable>
-      </View>
 
-      {profile.bio ? <Text style={[styles.bio, { color: t.textPrimary }]}>{profile.bio}</Text> : null}
-      {profile.hood !== 'for-you' ? (
-        <Text style={[styles.hood, { color: t.textSecondary }]}>{HOOD_LABEL[profile.hood]}</Text>
-      ) : null}
-
-      <View style={[styles.record, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
-        <RecordCell label="Clashes" value={compact(profile.clashes)} valueColor={t.textPrimary} labelColor={t.textMuted} />
-        <RecordCell label="Wins" value={compact(profile.wins)} valueColor={t.accent} labelColor={t.textMuted} />
-        <RecordCell
-          label="Win rate"
-          value={winRate !== null ? `${winRate}%` : '—'}
-          valueColor={t.textPrimary}
-          labelColor={t.textMuted}
-        />
-        <RecordCell label="Rep" value={compact(profile.reputation)} valueColor={t.textPrimary} labelColor={t.textMuted} />
-      </View>
-
-      <ReputationBar reputation={profile.reputation} />
-
-      <View style={styles.counts}>
-        <Text allowFontScaling={false} style={[styles.count, { color: t.textMuted }]}>
-          <Text style={[styles.countValue, { color: t.textPrimary }]}>{compact(followerCount)}</Text> followers
+        <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={2}>
+          {profile.name}
         </Text>
-        <Text allowFontScaling={false} style={[styles.count, { color: t.textMuted }]}>
-          <Text style={[styles.countValue, { color: t.textPrimary }]}>{compact(followingCount)}</Text> following
-        </Text>
+
+        <View style={styles.handleRow}>
+          <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
+            @{profile.handle}
+          </Text>
+          <Underline size={64} opacity={0.22} color={t.textPrimary} style={styles.handleMark} />
+        </View>
+
+        {profile.bio ? (
+          <Text style={[styles.bio, { color: t.textPrimary }]}>{profile.bio}</Text>
+        ) : null}
+
+        {profile.hood !== 'for-you' ? (
+          <Text allowFontScaling={false} style={[styles.hood, { color: t.textSecondary }]}>
+            {HOOD_LABEL[profile.hood]}
+          </Text>
+        ) : null}
+
+        <View style={styles.actionRow}>
+          {isSelf ? (
+            <GlowButton
+              label="Edit profile"
+              tone="ink"
+              compact
+              onPress={onEdit ?? (() => undefined)}
+            />
+          ) : (
+            <GlowButton
+              label={following ? 'Following' : 'Follow'}
+              tone={following ? 'ink' : 'light'}
+              compact
+              onPress={() => {
+                hapticTap();
+                onToggleFollow?.();
+              }}
+            />
+          )}
+        </View>
       </View>
 
-      {isSelf ? (
-        <GlowButton label="Edit profile" tone="ink" compact onPress={onEdit ?? (() => undefined)} style={styles.action} />
-      ) : (
-        <GlowButton
-          label={following ? 'Following' : 'Follow'}
-          tone={following ? 'ink' : 'light'}
-          compact
-          onPress={() => {
-            hapticTap();
-            onToggleFollow?.();
-          }}
-          style={styles.action}
-        />
-      )}
-    </View>
-  );
-}
+      <ReputationBar reputation={profile.reputation} rank={profile.rank} streak={profile.streak} />
 
-function RecordCell({
-  label,
-  value,
-  valueColor,
-  labelColor,
-}: {
-  label: string;
-  value: string;
-  valueColor: string;
-  labelColor: string;
-}): React.JSX.Element {
-  return (
-    <View style={styles.cell} accessibilityLabel={`${label} ${value}`}>
-      <Text allowFontScaling={false} style={[styles.cellValue, { color: valueColor }]}>
-        {value}
-      </Text>
-      <Text allowFontScaling={false} style={[styles.cellLabel, { color: labelColor }]}>
-        {label}
-      </Text>
+      <View style={[styles.social, { borderTopColor: t.border }]}>
+        <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
+          <Text style={[styles.socialValue, { color: t.textPrimary }]}>{compact(followerCount)}</Text>
+          {'  followers'}
+        </Text>
+        <Text allowFontScaling={false} style={[styles.socialDot, { color: t.textMuted }]}>
+          ·
+        </Text>
+        <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
+          <Text style={[styles.socialValue, { color: t.textPrimary }]}>{compact(followingCount)}</Text>
+          {'  following'}
+        </Text>
+        {profile.reputation > 0 ? (
+          <>
+            <Text allowFontScaling={false} style={[styles.socialDot, { color: t.textMuted }]}>
+              ·
+            </Text>
+            <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
+              <Text style={[styles.socialValue, { color: t.textPrimary }]}>
+                {formatReputation(profile.reputation)}
+              </Text>
+              {'  rep'}
+            </Text>
+          </>
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.md },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  names: { flex: 1, gap: 3 },
-  name: { ...typeScale.title, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
-  handleRow: { position: 'relative', alignSelf: 'flex-start', paddingBottom: 4 },
-  handle: { ...typeScale.meta, fontSize: 14 },
-  handleMark: { position: 'absolute', bottom: -2, left: 0 },
-  rank: { ...typeScale.meta, fontSize: 13, fontWeight: '600' },
-  more: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'flex-end' },
-  bio: { ...typeScale.body },
-  hood: { ...typeScale.meta },
-  record: {
+  wrap: { gap: space.lg },
+  identity: { gap: space.sm, alignItems: 'flex-start' },
+  avatarRow: {
     flexDirection: 'row',
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: space.md,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    width: '100%',
   },
-  cell: { flex: 1, alignItems: 'center', gap: 2 },
-  cellValue: { ...typeScale.label, fontSize: 17, fontWeight: '800' },
-  cellLabel: { ...typeScale.caption, fontSize: 10, letterSpacing: 0.3 },
-  counts: { flexDirection: 'row', gap: space.lg },
-  count: { ...typeScale.meta },
-  countValue: { ...typeScale.label, fontWeight: '700' },
-  action: { alignSelf: 'flex-start', marginTop: space.xs },
+  more: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  name: {
+    ...typeScale.title,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.6,
+    marginTop: space.xs,
+  },
+  handleRow: {
+    position: 'relative',
+    alignSelf: 'flex-start',
+    paddingBottom: 5,
+  },
+  handle: { ...typeScale.meta, fontSize: 15 },
+  handleMark: { position: 'absolute', bottom: -1, left: 0 },
+  bio: { ...typeScale.body, marginTop: 2 },
+  hood: { ...typeScale.meta },
+  actionRow: { marginTop: space.xs },
+  social: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  socialText: { ...typeScale.meta },
+  socialValue: { ...typeScale.label, fontWeight: '600' },
+  socialDot: { ...typeScale.meta },
 });

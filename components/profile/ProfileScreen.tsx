@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Take, User } from '../../store';
@@ -18,11 +18,10 @@ import {
   type ProfileClash,
   type ProfileReply,
 } from '../../services/profileService';
-import { layout, space, useThemeColors } from '../../theme';
-import { DOCK_SCROLL_CLEARANCE } from '../navigation/dockConfig';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { dockBottomPadding } from '../navigation/dockConfig';
 import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { EmptyState } from '../shared/EmptyState';
-import { GlowButton } from '../shared/GlowButton';
 import { UserIcon, VaultIcon } from '../shared/icons';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfileClashRow, ProfileReplyItem, ProfileTakeItem } from './ProfileLists';
@@ -30,6 +29,7 @@ import { AppearanceRow } from './AppearanceRow';
 import { EditProfileSheet } from './EditProfileSheet';
 import { SignOutSheet } from './SignOutSheet';
 import { PostActionsSheet } from '../arena/PostActionsSheet';
+import { tap as hapticTap } from '../../utils/haptics';
 
 type ProfileTab = 'takes' | 'replies' | 'clashes';
 
@@ -45,7 +45,7 @@ export interface ProfileScreenProps {
   hideSafeTop?: boolean;
 }
 
-/** Full profile body — identity, follow counts, and the content archive. */
+/** Full profile body — continuous identity page, not a stack of cards. */
 export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenProps): React.JSX.Element {
   const { dispatch, state } = useClash();
   const { signedIn } = useAuth();
@@ -61,6 +61,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   const [blocked, setBlocked] = React.useState(false);
   const [hasVault, setHasVault] = React.useState<boolean | null>(null);
   const [notFound, setNotFound] = React.useState(false);
+  const [loadError, setLoadError] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
 
   const [tab, setTab] = React.useState<ProfileTab>('takes');
@@ -75,6 +76,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
 
   const load = React.useCallback(async (): Promise<void> => {
     try {
+      setLoadError(false);
       const [nextProfile, nextFollow, safety, nextVault] = await Promise.all([
         fetchProfileById(profileId),
         fetchFollowState(profileId),
@@ -91,6 +93,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
       setHasVault(nextVault !== null);
       setBlocked(safety.blockedProfileIds.includes(profileId));
     } catch (error) {
+      setLoadError(true);
       dispatch(showNotice(errorText(error)));
     }
   }, [profileId, viewerId, dispatch]);
@@ -136,6 +139,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     setFollow(null);
     setBlocked(false);
     setNotFound(false);
+    setLoadError(false);
     void load();
   }, [load]);
 
@@ -194,6 +198,20 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     );
   }
 
+  if (loadError && !profile) {
+    return (
+      <View style={[styles.screen, styles.centered, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+        <EmptyState
+          icon={UserIcon}
+          title="Couldn't load profile"
+          body="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => void load()}
+        />
+      </View>
+    );
+  }
+
   if (!profile || !follow) {
     return (
       <View style={[styles.screen, styles.centered, { backgroundColor: theme.background, paddingTop: insets.top }]}>
@@ -202,12 +220,26 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     );
   }
 
+  const vaultLabel = hasVault
+    ? self
+      ? 'Enter your Vault'
+      : `Enter ${profile.name.split(' ')[0]}'s Vault`
+    : 'Start your Vault';
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.textPrimary} />}
-        contentContainerStyle={[styles.content, { paddingTop: hideSafeTop ? space.md : insets.top + space.md, paddingBottom: insets.bottom + DOCK_SCROLL_CLEARANCE }]}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.textPrimary} />
+        }
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: hideSafeTop ? space.md : insets.top + space.md,
+            paddingBottom: dockBottomPadding(insets.bottom),
+          },
+        ]}
       >
         <ProfileHeader
           profile={profile}
@@ -227,12 +259,9 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
         {self ? <AppearanceRow /> : null}
 
         {hasVault !== null && (hasVault || self) ? (
-          <GlowButton
-            label={hasVault ? (self ? 'Manage Vault' : 'View Vault') : 'Start Vault'}
-            icon={VaultIcon}
-            tone={hasVault ? 'ink' : 'light'}
-            compact
+          <Pressable
             onPress={() => {
+              hapticTap();
               if (hasVault) {
                 if (self) router.replace('/(vault)');
                 else router.push(`/vault/${profileId}`);
@@ -240,21 +269,53 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
                 router.replace('/(vault)');
               }
             }}
-            style={styles.vaultEntry}
-          />
+            style={[
+              styles.vaultEntry,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.surfaceMuted,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={vaultLabel}
+          >
+            <View style={styles.vaultCopy}>
+              <Text allowFontScaling={false} style={[styles.vaultKicker, { color: theme.textMuted }]}>
+                VAULT
+              </Text>
+              <Text allowFontScaling={false} style={[styles.vaultTitle, { color: theme.textPrimary }]}>
+                {vaultLabel} →
+              </Text>
+            </View>
+            <VaultIcon size={18} color={theme.textMuted} strokeWidth={2.2} />
+          </Pressable>
         ) : null}
 
         <SegmentedTabs value={tab} items={TABS} onChange={setTab} label="Profile content" />
 
-        {tab === 'takes' ? <TakesList takes={takes} onOpen={(id) => router.push(`/take/${id}`)} /> : null}
-        {tab === 'replies' ? <RepliesList replies={replies} onOpen={(id) => router.push(`/take/${id}`)} /> : null}
+        {tab === 'takes' ? (
+          <TakesList takes={takes} isSelf={self} onOpen={(id) => router.push(`/take/${id}`)} />
+        ) : null}
+        {tab === 'replies' ? (
+          <RepliesList replies={replies} isSelf={self} onOpen={(id) => router.push(`/take/${id}`)} />
+        ) : null}
         {tab === 'clashes' ? (
-          <ClashesList clashes={clashes} opponents={opponents} onOpen={(id) => router.push(`/clash/${id}`)} />
+          <ClashesList
+            clashes={clashes}
+            opponents={opponents}
+            isSelf={self}
+            onOpen={(id) => router.push(`/clash/${id}`)}
+          />
         ) : null}
       </ScrollView>
 
       {self ? (
-        <EditProfileSheet visible={editOpen} profile={profile} onClose={() => setEditOpen(false)} onSaved={() => void load()} />
+        <EditProfileSheet
+          visible={editOpen}
+          profile={profile}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => void load()}
+        />
       ) : (
         <PostActionsSheet
           visible={actionsOpen}
@@ -271,9 +332,25 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   );
 }
 
-function TakesList({ takes, onOpen }: { takes: Take[] | null; onOpen: (id: string) => void }): React.JSX.Element {
+function TakesList({
+  takes,
+  isSelf,
+  onOpen,
+}: {
+  takes: Take[] | null;
+  isSelf: boolean;
+  onOpen: (id: string) => void;
+}): React.JSX.Element {
   if (takes === null) return <Spinner />;
-  if (takes.length === 0) return <EmptyState icon={UserIcon} title="No Takes yet" body="Their Takes will appear here." />;
+  if (takes.length === 0) {
+    return (
+      <EmptyState
+        icon={UserIcon}
+        title="No Takes yet"
+        body={isSelf ? 'Share an opinion in Arena.' : 'Their Takes will appear here.'}
+      />
+    );
+  }
   return (
     <View>
       {takes.map((take) => (
@@ -283,9 +360,25 @@ function TakesList({ takes, onOpen }: { takes: Take[] | null; onOpen: (id: strin
   );
 }
 
-function RepliesList({ replies, onOpen }: { replies: ProfileReply[] | null; onOpen: (id: string) => void }): React.JSX.Element {
+function RepliesList({
+  replies,
+  isSelf,
+  onOpen,
+}: {
+  replies: ProfileReply[] | null;
+  isSelf: boolean;
+  onOpen: (id: string) => void;
+}): React.JSX.Element {
   if (replies === null) return <Spinner />;
-  if (replies.length === 0) return <EmptyState icon={UserIcon} title="No replies yet" body="Their rebuttals will appear here." />;
+  if (replies.length === 0) {
+    return (
+      <EmptyState
+        icon={UserIcon}
+        title="No replies yet"
+        body={isSelf ? 'Join a conversation on a Take.' : 'Their rebuttals will appear here.'}
+      />
+    );
+  }
   return (
     <View>
       {replies.map((reply) => (
@@ -298,14 +391,24 @@ function RepliesList({ replies, onOpen }: { replies: ProfileReply[] | null; onOp
 function ClashesList({
   clashes,
   opponents,
+  isSelf,
   onOpen,
 }: {
   clashes: ProfileClash[] | null;
   opponents: Map<string, User>;
+  isSelf: boolean;
   onOpen: (id: string) => void;
 }): React.JSX.Element {
   if (clashes === null) return <Spinner />;
-  if (clashes.length === 0) return <EmptyState icon={UserIcon} title="No Clashes yet" body="Their Clash history will appear here." />;
+  if (clashes.length === 0) {
+    return (
+      <EmptyState
+        icon={UserIcon}
+        title="No Clashes yet"
+        body={isSelf ? 'Challenge a Take to start building a record.' : 'Their Clash history will appear here.'}
+      />
+    );
+  }
   return (
     <View>
       {clashes.map((clash) => (
@@ -321,9 +424,10 @@ function ClashesList({
 }
 
 function Spinner(): React.JSX.Element {
+  const theme = useThemeColors();
   return (
     <View style={styles.spinner}>
-      <ActivityIndicator color="#FFFFFF" />
+      <ActivityIndicator color={theme.textPrimary} />
     </View>
   );
 }
@@ -333,7 +437,16 @@ const styles = StyleSheet.create({
   centered: { justifyContent: 'center', alignItems: 'center' },
   content: { paddingHorizontal: layout.screenX, gap: space.lg },
   spinner: { paddingVertical: space.xxl, alignItems: 'center' },
-  vaultEntry: { alignSelf: 'flex-start' },
+  vaultEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingVertical: space.md,
+    paddingHorizontal: space.md,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  vaultCopy: { flex: 1, gap: 2 },
+  vaultKicker: { ...typeScale.caption, letterSpacing: 0.8 },
+  vaultTitle: { ...typeScale.label, fontWeight: '600' },
 });
-
-

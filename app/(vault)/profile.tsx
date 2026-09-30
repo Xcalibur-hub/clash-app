@@ -1,30 +1,23 @@
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { BadgeRow } from '../../components/profile/BadgeRow';
 import { ProfileHero } from '../../components/profile/ProfileHero';
 import { SegmentedTabs, type SegmentedTab } from '../../components/shared/SegmentedTabs';
 import { ReputationBar } from '../../components/profile/ReputationBar';
-import { StatGrid } from '../../components/profile/StatGrid';
 import { TakeMiniCard } from '../../components/profile/TakeMiniCard';
 import { WinCard } from '../../components/profile/WinCard';
-import { profileStyles as s } from '../../components/profile/profileStyles';
-import { VaultHeader } from '../../components/vault/VaultHeader';
-import { Chip } from '../../components/shared/Chip';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { GlassCard } from '../../components/shared/GlassCard';
 import { Notice } from '../../components/shared/Notice';
-import { SectionHeading } from '../../components/shared/SectionHeading';
 import { ArenaIcon, TrophyIcon } from '../../components/shared/icons';
+import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import {
   selectAuthor,
   selectViewerTakes,
   useClash,
   type WinEntry,
 } from '../../store';
-import { space } from '../../theme';
-import { dockBottomPadding } from '../../components/navigation/dockConfig';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
 
 type VaultProfileTab = 'takes' | 'wins';
@@ -34,23 +27,19 @@ const VAULT_TABS: readonly SegmentedTab<VaultProfileTab>[] = [
   { key: 'wins', label: 'Wins' },
 ];
 
-/** Vault PROFILE (spec §23): the same viewer, seen from the premium realm. */
+/**
+ * Vault PROFILE — same viewer identity, continuous editorial page.
+ * Wins stay empty until server Clash history is wired (no mocks).
+ */
 export default function VaultProfileScreen(): React.JSX.Element {
   const { state } = useClash();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = React.useState<VaultProfileTab>('takes');
   const router = useRouter();
+  const t = useThemeColors();
   const viewer = state.viewer;
   const takes = React.useMemo(() => selectViewerTakes(state), [state]);
-  // The mock local Clash results were removed: verdicts and rewards are
-  // server-authoritative now, so this stays empty until the Wins tab is rebuilt
-  // on the server's Clash history (Vault-phase work).
   const wins: readonly WinEntry[] = [];
-  // Nothing is unlocked yet, and nothing local could be: an entitlement is a
-  // `vault_subscriptions` row the client has no write grant for (migration 0016).
-  // Phase 3 Step 2 rebuilds this from `fetchSubscriptionState` +
-  // `fetchAccessibleDrops` rather than from anything cached on the device.
-  const unlocked: readonly string[] = [];
 
   const winnerHandle = (entry: WinEntry): string => {
     const authorId =
@@ -59,40 +48,20 @@ export default function VaultProfileScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={s.root}>
+    <View style={[styles.root, { backgroundColor: t.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[s.content, { paddingTop: insets.top + space.md, paddingBottom: dockBottomPadding(insets.bottom) }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + space.md,
+            paddingBottom: dockBottomPadding(insets.bottom),
+          },
+        ]}
       >
-        <VaultHeader
-          title="Profile"
-          subtitle="Your influence, itemised."
-          viewer={{
-            name: viewer.name,
-            tint: viewer.tint,
-            reputation: viewer.reputation,
-            coins: viewer.coins,
-          }}
-        />
-
         <ProfileHero viewer={viewer} />
 
-        <GlassCard level="soft" contentStyle={s.rep}>
-          <ReputationBar reputation={viewer.reputation} />
-        </GlassCard>
-
-        <StatGrid viewer={viewer} />
-
-        <SectionHeading eyebrow="The vault shelf" title="Unlocked drops" />
-        <Chip label={`${unlocked.length} UNLOCKED`} tone="neutral" data />
-        {unlocked.length === 0 ? (
-          <Text style={{ color: 'rgba(247,247,250,0.44)' }}>
-            Nothing unlocked yet — your subscriber Drops will appear here.
-          </Text>
-        ) : null}
-
-        <SectionHeading eyebrow="Earned in the Arena" title="Badges" />
-        <BadgeRow badges={viewer.badges} />
+        <ReputationBar reputation={viewer.reputation} rank={viewer.rank} streak={viewer.streak} />
 
         <SegmentedTabs
           value={tab}
@@ -122,13 +91,31 @@ export default function VaultProfileScreen(): React.JSX.Element {
               />
             ))}
         {tab === 'takes' && takes.length === 0 ? (
-          <EmptyState icon={ArenaIcon} title="No live takes." body="Everything you drop expires after 24 hours." actionLabel="Open the arena" onAction={() => undefined} />
+          <EmptyState
+            icon={ArenaIcon}
+            title="No Takes yet"
+            body="Share an opinion in Arena."
+            actionLabel="Open Arena"
+            onAction={() => router.replace('/(tabs)')}
+          />
         ) : null}
         {tab === 'wins' && wins.length === 0 ? (
-          <EmptyState icon={TrophyIcon} title="No wins yet." body="Judge a clash correctly and the verdict lands here." actionLabel="Find a clash" onAction={() => undefined} />
+          <EmptyState
+            icon={TrophyIcon}
+            title="No Clash wins yet"
+            body="Settled wins will appear here when available."
+          />
         ) : null}
       </ScrollView>
       <Notice offset={0} />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  content: {
+    paddingHorizontal: layout.screenX,
+    gap: space.lg,
+  },
+});
