@@ -1,5 +1,15 @@
 import React from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { showNotice, useClash } from '../../store';
@@ -10,7 +20,7 @@ import type { CreatorVault } from '../../services/vaultMappers';
 import { completeUpload, createUpload, failUpload, readPickedBytes, uploadFile } from '../../services/mediaService';
 import { errorText } from '../../services/supabaseClient';
 import type { MediaVisibility } from '../../supabase/types';
-import { color, ink, layout, radius, space, typeScale } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { GlowButton } from '../shared/GlowButton';
 import { BackIcon, ImageIcon, LockIcon, VideoIcon, VaultIcon } from '../shared/icons';
 
@@ -28,10 +38,8 @@ function mimeFor(media: PickedMedia): string {
 }
 
 /**
- * The Drop composer. Access level decides the bucket: Free → public media,
- * Subscriber → private media, and the backend re-checks it anyway. A Drop is
- * created as a draft and published explicitly — the 7-day window is stamped by
- * the server on publish, never chosen here.
+ * Drop composer — access level decides public vs private media.
+ * 7-day window stamped by server on publish.
  */
 export function DropComposer(): React.JSX.Element {
   const router = useRouter();
@@ -39,6 +47,7 @@ export function DropComposer(): React.JSX.Element {
   const { dispatch } = useClash();
   const { pickImage, pickVideo } = useMediaPicker();
   const requireAuth = useRequireAuth();
+  const t = useThemeColors();
 
   const [vault, setVault] = React.useState<CreatorVault | null | 'loading'>('loading');
   const [caption, setCaption] = React.useState('');
@@ -107,18 +116,30 @@ export function DropComposer(): React.JSX.Element {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor: t.background }]}
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + space.md }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + space.md,
+            paddingBottom: space.xxl,
+          },
+        ]}
       >
-        <BackButton onPress={() => router.back()} />
-        <Text allowFontScaling={false} style={styles.kicker}>YOUR VAULT</Text>
-        <Text allowFontScaling={false} style={styles.title}>New Drop</Text>
+        <GlowButton label="Back" icon={BackIcon} tone="ink" compact onPress={() => router.back()} style={styles.back} />
+        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          YOUR VAULT
+        </Text>
+        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          New Drop
+        </Text>
 
-        <Text allowFontScaling={false} style={styles.label}>Access</Text>
+        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+          Access
+        </Text>
         <View style={styles.segment} accessibilityRole="radiogroup" accessibilityLabel="Drop access level">
           {(['free', 'subscriber'] as const).map((level) => {
             const active = accessLevel === level;
@@ -130,46 +151,87 @@ export function DropComposer(): React.JSX.Element {
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`${level === 'free' ? 'Free' : 'Subscriber'} drop`}
-                style={[styles.segmentItem, active && styles.segmentItemOn]}
+                style={[
+                  styles.segmentItem,
+                  {
+                    borderColor: t.border,
+                    backgroundColor: active
+                      ? t.scheme === 'light'
+                        ? t.textPrimary
+                        : 'rgba(255,255,255,0.10)'
+                      : t.surfaceMuted,
+                  },
+                ]}
               >
-                <Icon size={15} color={active ? ink.primary : ink.tertiary} strokeWidth={2.4} />
-                <Text allowFontScaling={false} style={[styles.segmentLabel, active && styles.segmentLabelOn]}>
+                <Icon
+                  size={15}
+                  color={active ? (t.scheme === 'light' ? t.textInverse : t.textPrimary) : t.textMuted}
+                  strokeWidth={2.4}
+                />
+                <Text
+                  allowFontScaling={false}
+                  style={[
+                    styles.segmentLabel,
+                    {
+                      color: active
+                        ? t.scheme === 'light'
+                          ? t.textInverse
+                          : t.textPrimary
+                        : t.textMuted,
+                    },
+                  ]}
+                >
                   {level === 'free' ? 'Free' : 'Subscriber'}
                 </Text>
               </Pressable>
             );
           })}
         </View>
-        <Text allowFontScaling={false} style={styles.hint}>
+        <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
           {accessLevel === 'free'
-            ? 'A free Drop uses public media — anyone can open it.'
-            : 'A subscriber Drop uses private media — only entitled subscribers can open it.'}
+            ? 'Anyone can open this Drop. It disappears after 7 days.'
+            : 'Only entitled subscribers can open this. Private media stays private.'}
         </Text>
 
-        <Text allowFontScaling={false} style={styles.label}>Caption</Text>
+        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+          Caption
+        </Text>
         <TextInput
           value={caption}
           onChangeText={(next) => setCaption(next.slice(0, MAX_CAPTION))}
           multiline
           maxLength={MAX_CAPTION}
           placeholder="What is this Drop?"
-          placeholderTextColor={ink.quaternary}
+          placeholderTextColor={t.textMuted}
           accessibilityLabel="Drop caption"
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              color: t.textPrimary,
+              borderColor: t.border,
+              backgroundColor: t.inputBackground,
+            },
+          ]}
         />
-        <Text allowFontScaling={false} style={styles.counter}>{caption.length}/{MAX_CAPTION}</Text>
+        <Text allowFontScaling={false} style={[styles.counter, { color: t.textMuted }]}>
+          {caption.length}/{MAX_CAPTION}
+        </Text>
 
-        <Text allowFontScaling={false} style={styles.label}>Media</Text>
+        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+          Media
+        </Text>
         {media ? (
-          <View style={styles.preview}>
+          <View style={[styles.preview, { backgroundColor: t.surfaceMuted }]}>
             <Image source={{ uri: media.uri }} resizeMode="cover" style={StyleSheet.absoluteFill} />
             <Pressable
               onPress={() => setMedia(null)}
               accessibilityRole="button"
               accessibilityLabel="Remove media"
-              style={styles.removeMedia}
+              style={[styles.removeMedia, { backgroundColor: 'rgba(9,9,11,0.7)' }]}
             >
-              <Text allowFontScaling={false} style={styles.removeMediaText}>Remove</Text>
+              <Text allowFontScaling={false} style={styles.removeMediaText}>
+                Remove
+              </Text>
             </Pressable>
           </View>
         ) : (
@@ -180,26 +242,43 @@ export function DropComposer(): React.JSX.Element {
         )}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>
-        <GlowButton label={busy ? 'Working…' : 'Save draft'} onPress={() => void submit(false)} tone="ink" disabled={!canSubmit} style={styles.footerBtn} />
-        <GlowButton label={busy ? 'Working…' : 'Publish'} onPress={() => void submit(true)} tone="light" disabled={!canSubmit} style={styles.footerBtn} />
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: insets.bottom + space.md,
+            borderTopColor: t.border,
+            backgroundColor: t.background,
+          },
+        ]}
+      >
+        <GlowButton
+          label={busy ? 'Working…' : 'Save draft'}
+          onPress={() => void submit(false)}
+          tone="ink"
+          disabled={!canSubmit}
+          style={styles.footerBtn}
+        />
+        <GlowButton
+          label={busy ? 'Working…' : 'Publish'}
+          onPress={() => void submit(true)}
+          tone="light"
+          disabled={!canSubmit}
+          style={styles.footerBtn}
+        />
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-function BackButton({ onPress }: { onPress: () => void }): React.JSX.Element {
-  return <GlowButton label="Back" icon={BackIcon} tone="ink" compact onPress={onPress} style={styles.back} />;
-}
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg },
-  content: { paddingHorizontal: layout.screenX, gap: space.md, paddingBottom: space.xxl },
+  screen: { flex: 1 },
+  content: { paddingHorizontal: layout.screenX, gap: space.md },
   back: { alignSelf: 'flex-start' },
-  kicker: { ...typeScale.eyebrow, color: ink.tertiary },
-  title: { ...typeScale.title, color: ink.primary },
-  label: { ...typeScale.eyebrow, color: ink.tertiary },
-  hint: { ...typeScale.meta, color: ink.tertiary },
+  kicker: { ...typeScale.caption, letterSpacing: 0.8 },
+  title: { ...typeScale.title },
+  label: { ...typeScale.caption, letterSpacing: 0.4 },
+  hint: { ...typeScale.meta },
   segment: { flexDirection: 'row', gap: space.xs },
   segmentItem: {
     flex: 1,
@@ -208,32 +287,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: space.xs,
     paddingVertical: space.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  segmentItemOn: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.2)' },
-  segmentLabel: { ...typeScale.label, color: ink.tertiary },
-  segmentLabelOn: { color: ink.primary },
+  segmentLabel: { ...typeScale.label },
   input: {
     ...typeScale.body,
-    color: ink.primary,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     minHeight: 88,
     textAlignVertical: 'top',
   },
-  counter: { ...typeScale.meta, color: ink.quaternary, alignSelf: 'flex-end' },
+  counter: { ...typeScale.meta, alignSelf: 'flex-end' },
   pickRow: { flexDirection: 'row', gap: space.sm },
-  preview: { aspectRatio: 16 / 9, width: '100%', borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#18181B' },
-  removeMedia: { position: 'absolute', top: space.sm, right: space.sm, paddingHorizontal: space.sm, paddingVertical: 4, borderRadius: radius.sm, backgroundColor: 'rgba(9,9,11,0.7)' },
-  removeMediaText: { ...typeScale.caption, color: ink.primary },
-  footer: { flexDirection: 'row', gap: space.sm, paddingHorizontal: layout.screenX, paddingTop: space.sm },
+  preview: {
+    aspectRatio: 16 / 9,
+    width: '100%',
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  removeMedia: {
+    position: 'absolute',
+    top: space.sm,
+    right: space.sm,
+    paddingHorizontal: space.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  removeMediaText: { ...typeScale.caption, color: '#FAFAF8' },
+  footer: {
+    flexDirection: 'row',
+    gap: space.sm,
+    paddingHorizontal: layout.screenX,
+    paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   footerBtn: { flex: 1 },
 });
-

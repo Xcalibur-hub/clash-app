@@ -1,5 +1,14 @@
 import React from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { showNotice, useClash } from '../../store';
@@ -13,22 +22,21 @@ import {
 } from '../../services/vaultService';
 import type { CreatorVault, StorefrontDrop, VaultCollection } from '../../services/vaultMappers';
 import { errorText } from '../../services/supabaseClient';
-import { color, ink, layout, radius, space, typeScale } from '../../theme';
+import { duration, layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import { dockBottomPadding } from '../navigation/dockConfig';
 import { EmptyState } from '../shared/EmptyState';
-import { GlassCard } from '../shared/GlassCard';
 import { GlowButton } from '../shared/GlowButton';
 import { PlusIcon, VaultIcon } from '../shared/icons';
 
 type Phase = 'loading' | 'ready';
 
 /**
- * The creator's Collections tab: create a permanent Collection and curate Drops
- * into it. An expired Drop can be added on purpose — that is what permanence
- * means — and the backend remains the only authority.
+ * Creator Collections — permanent chapters. Backend remains authoritative.
  */
 export function CreatorCollections(): React.JSX.Element {
   const { dispatch } = useClash();
   const insets = useSafeAreaInsets();
+  const t = useThemeColors();
 
   const [phase, setPhase] = React.useState<Phase>('loading');
   const [vault, setVault] = React.useState<CreatorVault | null>(null);
@@ -97,16 +105,20 @@ export function CreatorCollections(): React.JSX.Element {
 
   if (phase === 'loading') {
     return (
-      <View style={[styles.screen, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator color="#FFFFFF" />
+      <View style={[styles.screen, styles.centered, { backgroundColor: t.background, paddingTop: insets.top }]}>
+        <ActivityIndicator color={t.textPrimary} />
       </View>
     );
   }
 
   if (!vault) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <EmptyState icon={VaultIcon} title="No Vault yet" body="Open your Vault before curating Collections." />
+      <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top }]}>
+        <EmptyState
+          icon={VaultIcon}
+          title="Open your Vault first"
+          body="Collections are permanent chapters inside your Vault."
+        />
       </View>
     );
   }
@@ -114,13 +126,23 @@ export function CreatorCollections(): React.JSX.Element {
   const pickerCollection = collections.find((collection) => collection.id === pickerFor) ?? null;
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: t.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + space.md }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + space.md,
+            paddingBottom: dockBottomPadding(insets.bottom),
+          },
+        ]}
       >
-        <Text allowFontScaling={false} style={styles.kicker}>YOUR VAULT</Text>
-        <Text allowFontScaling={false} style={styles.title}>Collections</Text>
+        <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+          Collections
+        </Text>
+        <Text allowFontScaling={false} style={[styles.tagline, { color: t.textSecondary }]}>
+          Permanent chapters. Drops expire — these stay.
+        </Text>
 
         <View style={styles.newRow}>
           <TextInput
@@ -128,50 +150,93 @@ export function CreatorCollections(): React.JSX.Element {
             onChangeText={setNewTitle}
             maxLength={80}
             placeholder="New Collection title"
-            placeholderTextColor={ink.quaternary}
+            placeholderTextColor={t.textMuted}
             accessibilityLabel="New Collection title"
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                color: t.textPrimary,
+                borderColor: t.border,
+                backgroundColor: t.inputBackground,
+              },
+            ]}
             onSubmitEditing={() => void create()}
           />
           <GlowButton label="Create" icon={PlusIcon} tone="light" compact onPress={() => void create()} />
         </View>
 
         {collections.length === 0 ? (
-          <EmptyState icon={VaultIcon} title="No Collections yet" body="Group your best Drops into permanent shelves." />
+          <EmptyState
+            icon={VaultIcon}
+            title="No Collections yet"
+            body="Group your best Drops into a lasting photo essay."
+          />
         ) : (
           <View style={styles.list}>
             {collections.map((collection) => {
               const drops = dropsFor(collection.id);
               return (
-                <GlassCard key={collection.id} corner={radius.lg} contentStyle={styles.card}>
+                <View
+                  key={collection.id}
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: t.surface,
+                      borderColor: t.border,
+                      shadowColor: t.shadowColor,
+                      shadowOpacity: t.scheme === 'light' ? 0.06 : 0,
+                    },
+                  ]}
+                >
                   <View style={styles.cardHead}>
                     <View style={styles.cardHeadText}>
-                      <Text allowFontScaling={false} style={styles.cardTitle} numberOfLines={1}>{collection.title}</Text>
-                      <Text allowFontScaling={false} style={styles.cardMeta}>{drops.length} drop{drops.length === 1 ? '' : 's'}</Text>
+                      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+                        COLLECTION
+                      </Text>
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.cardTitle, { color: t.textPrimary }]}
+                        numberOfLines={1}
+                      >
+                        {collection.title}
+                      </Text>
+                      <Text allowFontScaling={false} style={[styles.cardMeta, { color: t.textMuted }]}>
+                        {drops.length === 1 ? '1 moment' : `${drops.length} moments`}
+                      </Text>
                     </View>
-                    <GlowButton label="Add Drop" tone="ink" compact onPress={() => setPickerFor(collection.id)} />
+                    <GlowButton label="Add" tone="ink" compact onPress={() => setPickerFor(collection.id)} />
                   </View>
 
                   {drops.length > 0 ? (
                     <View style={styles.items}>
                       {drops.map((drop) => (
                         <View key={drop.id} style={styles.item}>
-                          <Text allowFontScaling={false} style={styles.itemText} numberOfLines={1}>{drop.caption}</Text>
+                          <Text
+                            allowFontScaling={false}
+                            style={[styles.itemText, { color: t.textSecondary }]}
+                            numberOfLines={1}
+                          >
+                            {drop.caption}
+                          </Text>
                           <Pressable
                             onPress={() => void remove(collection.id, drop.id)}
                             accessibilityRole="button"
                             accessibilityLabel="Remove from collection"
                             hitSlop={8}
                           >
-                            <Text allowFontScaling={false} style={styles.removeText}>Remove</Text>
+                            <Text allowFontScaling={false} style={[styles.removeText, { color: t.danger }]}>
+                              Remove
+                            </Text>
                           </Pressable>
                         </View>
                       ))}
                     </View>
                   ) : (
-                    <Text allowFontScaling={false} style={styles.empty}>Nothing saved yet.</Text>
+                    <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+                      Nothing saved yet.
+                    </Text>
                   )}
-                </GlassCard>
+                </View>
               );
             })}
           </View>
@@ -190,25 +255,49 @@ export function CreatorCollections(): React.JSX.Element {
   );
 }
 
-function AddDropSheet({ collectionTitle, drops, onAdd, onClose }: {
+function AddDropSheet({
+  collectionTitle,
+  drops,
+  onAdd,
+  onClose,
+}: {
   collectionTitle: string;
   drops: readonly StorefrontDrop[];
   onAdd: (dropId: string) => void;
   onClose: () => void;
 }): React.JSX.Element {
+  const t = useThemeColors();
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(160)} style={styles.scrim}>
+      <Animated.View entering={FadeIn.duration(duration.fast)} style={[styles.scrim, { backgroundColor: t.overlay }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
-        <Animated.View entering={FadeInUp.duration(220)} style={styles.box}>
-          <GlassCard corner={radius.xxl} contentStyle={styles.sheetCard}>
-            <Text allowFontScaling={false} style={styles.sheetTitle}>Add to {collectionTitle}</Text>
+        <Animated.View entering={FadeInUp.duration(duration.base)} style={styles.box}>
+          <View
+            style={[
+              styles.sheetCard,
+              {
+                backgroundColor: t.surfaceElevated,
+                borderColor: t.border,
+              },
+            ]}
+          >
+            <Text allowFontScaling={false} style={[styles.sheetTitle, { color: t.textPrimary }]}>
+              Add to {collectionTitle}
+            </Text>
             {drops.length === 0 ? (
-              <Text allowFontScaling={false} style={styles.empty}>No Drops left to add.</Text>
+              <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+                No Drops left to add.
+              </Text>
             ) : (
               drops.map((drop) => (
                 <View key={drop.id} style={styles.item}>
-                  <Text allowFontScaling={false} style={styles.itemText} numberOfLines={1}>{drop.caption}</Text>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.itemText, { color: t.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {drop.caption}
+                  </Text>
                   <Pressable
                     onPress={() => {
                       onAdd(drop.id);
@@ -218,12 +307,14 @@ function AddDropSheet({ collectionTitle, drops, onAdd, onClose }: {
                     accessibilityLabel={`Add ${drop.caption}`}
                     hitSlop={8}
                   >
-                    <Text allowFontScaling={false} style={styles.addText}>Add</Text>
+                    <Text allowFontScaling={false} style={[styles.addText, { color: t.textPrimary }]}>
+                      Add
+                    </Text>
                   </Pressable>
                 </View>
               ))
             )}
-          </GlassCard>
+          </View>
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -231,37 +322,48 @@ function AddDropSheet({ collectionTitle, drops, onAdd, onClose }: {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg },
-  centered: { justifyContent: 'center' },
-  content: { paddingHorizontal: layout.screenX, gap: space.md, paddingBottom: space.xxl },
-  kicker: { ...typeScale.eyebrow, color: ink.tertiary },
-  title: { ...typeScale.title, color: ink.primary },
-  newRow: { flexDirection: 'row', gap: space.sm },
+  screen: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  content: { paddingHorizontal: layout.screenX, gap: space.md },
+  brand: { ...typeScale.display },
+  tagline: { ...typeScale.body, marginTop: -4 },
+  newRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center' },
   input: {
     flex: 1,
     ...typeScale.body,
-    color: ink.primary,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
   },
   list: { gap: space.md },
-  card: { gap: space.sm },
+  card: {
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 1,
+  },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   cardHeadText: { flex: 1, gap: 2 },
-  cardTitle: { ...typeScale.cardTitle, color: ink.primary },
-  cardMeta: { ...typeScale.meta, color: ink.tertiary },
+  kicker: { ...typeScale.caption, letterSpacing: 0.8 },
+  cardTitle: { ...typeScale.section },
+  cardMeta: { ...typeScale.meta },
   items: { gap: space.xs },
   item: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  itemText: { ...typeScale.meta, color: ink.secondary, flex: 1 },
-  removeText: { ...typeScale.label, color: '#F18A92' },
-  addText: { ...typeScale.label, color: '#7BE3B8' },
-  empty: { ...typeScale.meta, color: ink.quaternary },
-  scrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: color.scrim },
+  itemText: { ...typeScale.meta, flex: 1 },
+  removeText: { ...typeScale.label },
+  addText: { ...typeScale.label, fontWeight: '600' },
+  empty: { ...typeScale.meta },
+  scrim: { flex: 1, justifyContent: 'flex-end' },
   box: { paddingHorizontal: space.md, paddingBottom: space.md },
-  sheetCard: { gap: space.sm, padding: space.xl },
-  sheetTitle: { ...typeScale.cardTitle, color: ink.primary },
+  sheetCard: {
+    gap: space.sm,
+    padding: space.xl,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  sheetTitle: { ...typeScale.section },
 });

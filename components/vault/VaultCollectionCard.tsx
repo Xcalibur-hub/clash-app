@@ -1,10 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import type { StorefrontDrop } from '../../services/vaultMappers';
-import { ink, radius, space, typeScale } from '../../theme';
-import { GlassCard } from '../shared/GlassCard';
-import { Chip } from '../shared/Chip';
-import { LockIcon, VaultIcon } from '../shared/icons';
+import { getPublicMediaUrl } from '../../services/mediaService';
+import { space, typeScale, useThemeColors } from '../../theme';
 
 export interface VaultCollectionCardProps {
   title: string;
@@ -13,62 +11,98 @@ export interface VaultCollectionCardProps {
 }
 
 /**
- * A permanent Collection with its contents. Expired drops stay here on purpose —
- * a Collection outlives the 7-day feed — so an archived Drop renders with its
- * badge rather than disappearing.
+ * Permanent Collection — chapter / album feel, distinct from ephemeral Drops.
+ * Cover derived only from accessible public free media; never private URLs.
  */
 export function VaultCollectionCard({ title, description, drops }: VaultCollectionCardProps): React.JSX.Element {
+  const t = useThemeColors();
+  const coverDrop = drops.find(
+    (drop) => drop.accessLevel === 'free' && drop.publicMedia?.kind === 'image' && drop.accessible,
+  );
+  const coverUrl = coverDrop?.publicMedia
+    ? getPublicMediaUrl(coverDrop.publicMedia.bucket, coverDrop.publicMedia.path)
+    : null;
+  const countLabel = drops.length === 1 ? '1 moment' : `${drops.length} moments`;
+
   return (
-    <GlassCard corner={radius.lg} contentStyle={styles.card} accessibilityLabel={`Collection: ${title}`}>
-      <View style={styles.head}>
-        <View style={styles.headText}>
-          <Text allowFontScaling={false} style={styles.title} numberOfLines={1}>
-            {title}
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: t.surface,
+          borderColor: t.border,
+          shadowColor: t.shadowColor,
+          shadowOpacity: t.scheme === 'light' ? 0.08 : 0,
+        },
+      ]}
+      accessibilityLabel={`Collection: ${title}`}
+    >
+      <View style={[styles.cover, { backgroundColor: t.surfaceMuted }]}>
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <Text allowFontScaling={false} style={[styles.coverMark, { color: t.textMuted }]}>
+            COLLECTION
           </Text>
-          {description ? (
-            <Text allowFontScaling={false} style={styles.description} numberOfLines={2}>
-              {description}
-            </Text>
-          ) : null}
-        </View>
-        <Chip label={`${drops.length}`} icon={VaultIcon} tone="neutral" data />
+        )}
       </View>
 
-      {drops.length > 0 ? (
-        <View style={styles.items}>
-          {drops.map((drop) => {
-            const locked = drop.accessLevel === 'subscriber' && !drop.accessible;
-            return (
-              <View key={drop.id} style={styles.item}>
-                {locked ? <LockIcon size={13} color={ink.tertiary} strokeWidth={2.4} /> : null}
-                <Text
-                  allowFontScaling={false}
-                  numberOfLines={1}
-                  style={[styles.itemText, locked && styles.itemLocked]}
-                >
-                  {drop.caption}
-                </Text>
-                {drop.status === 'expired' ? <Chip label="ARCHIVED" tone="neutral" /> : null}
-              </View>
-            );
-          })}
-        </View>
-      ) : (
-        <Text allowFontScaling={false} style={styles.empty}>Nothing saved yet.</Text>
-      )}
-    </GlassCard>
+      <View style={styles.body}>
+        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          COLLECTION
+        </Text>
+        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
+          {title}
+        </Text>
+        {description ? (
+          <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]} numberOfLines={2}>
+            {description}
+          </Text>
+        ) : null}
+        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          {drops.length === 0 ? 'Nothing saved yet' : `${countLabel} · permanent`}
+        </Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: space.sm },
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
-  headText: { flex: 1, gap: 2 },
-  title: { ...typeScale.cardTitle, color: ink.primary },
-  description: { ...typeScale.meta, color: ink.tertiary },
-  items: { gap: space.xs },
-  item: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  itemText: { ...typeScale.meta, color: ink.secondary, flex: 1 },
-  itemLocked: { color: ink.tertiary },
-  empty: { ...typeScale.meta, color: ink.quaternary },
+  card: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+  cover: {
+    aspectRatio: 16 / 9,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverMark: {
+    ...typeScale.caption,
+    letterSpacing: 1.2,
+  },
+  body: {
+    gap: 6,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+  },
+  kicker: {
+    ...typeScale.caption,
+    letterSpacing: 0.8,
+  },
+  title: {
+    ...typeScale.section,
+  },
+  description: {
+    ...typeScale.meta,
+  },
+  meta: {
+    ...typeScale.meta,
+    marginTop: 2,
+  },
 });

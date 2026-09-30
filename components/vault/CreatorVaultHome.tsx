@@ -15,7 +15,8 @@ import {
 } from '../../services/vaultService';
 import type { CreatorVault, StorefrontDrop } from '../../services/vaultMappers';
 import { errorText } from '../../services/supabaseClient';
-import { color, ink, layout, space, typeScale } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { dockBottomPadding } from '../navigation/dockConfig';
 import { EmptyState } from '../shared/EmptyState';
 import { GlowButton } from '../shared/GlowButton';
 import { EditIcon, PlusIcon, VaultIcon } from '../shared/icons';
@@ -25,14 +26,14 @@ import { VaultFormSheet } from './VaultFormSheet';
 type Phase = 'loading' | 'ready';
 
 /**
- * The creator's own Vault (the "Drops" tab). No Vault yet → a Create CTA; a
- * Vault → its title, a New Drop entry, and the owner's list of Drops with
- * publish/remove actions. Ownership and expiry stay server-authoritative.
+ * Creator Vault home (Drops tab) — intimate creator space, not a dashboard.
+ * Ownership and expiry stay server-authoritative.
  */
 export function CreatorVaultHome(): React.JSX.Element {
   const { dispatch } = useClash();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useThemeColors();
 
   const [phase, setPhase] = React.useState<Phase>('loading');
   const [profile, setProfile] = React.useState<User | null>(null);
@@ -102,46 +103,90 @@ export function CreatorVaultHome(): React.JSX.Element {
 
   if (phase === 'loading') {
     return (
-      <View style={[styles.screen, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator color="#FFFFFF" />
+      <View style={[styles.screen, styles.centered, { backgroundColor: t.background, paddingTop: insets.top }]}>
+        <ActivityIndicator color={t.textPrimary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: t.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + space.md }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + space.md,
+            paddingBottom: dockBottomPadding(insets.bottom),
+          },
+        ]}
       >
-        <Text allowFontScaling={false} style={styles.kicker}>YOUR VAULT</Text>
-        <Text allowFontScaling={false} style={styles.title}>
-          {vault ? vault.title : `Welcome, ${profile?.name ?? 'creator'}`}
+        <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+          Vault
         </Text>
-        {vault?.description ? (
-          <Text allowFontScaling={false} style={styles.description}>{vault.description}</Text>
-        ) : null}
+        <Text allowFontScaling={false} style={[styles.tagline, { color: t.textSecondary }]}>
+          Follow creators beyond the feed.
+        </Text>
 
         {vault ? (
           <>
-            <View style={styles.actions}>
-              <GlowButton label="New Drop" icon={PlusIcon} tone="light" compact onPress={() => router.push('/vault/compose')} />
-              <GlowButton
-                label="Edit"
-                icon={EditIcon}
-                tone="ink"
-                compact
-                onPress={() => {
-                  setFormMode('edit');
-                  setFormOpen(true);
-                }}
-              />
+            <View
+              style={[
+                styles.spaceCard,
+                {
+                  backgroundColor: t.surface,
+                  borderColor: t.border,
+                  shadowColor: t.shadowColor,
+                  shadowOpacity: t.scheme === 'light' ? 0.08 : 0,
+                },
+              ]}
+            >
+              <Text allowFontScaling={false} style={[styles.spaceKicker, { color: t.textMuted }]}>
+                YOUR SPACE
+              </Text>
+              <Text allowFontScaling={false} style={[styles.spaceTitle, { color: t.textPrimary }]}>
+                {vault.title}
+              </Text>
+              {vault.description ? (
+                <Text allowFontScaling={false} style={[styles.spaceBody, { color: t.textSecondary }]}>
+                  {vault.description}
+                </Text>
+              ) : null}
+
+              <View style={styles.actions}>
+                <GlowButton
+                  label="New Drop"
+                  icon={PlusIcon}
+                  tone="light"
+                  compact
+                  onPress={() => router.push('/vault/compose')}
+                />
+                <GlowButton
+                  label="Manage"
+                  icon={EditIcon}
+                  tone="ink"
+                  compact
+                  onPress={() => {
+                    setFormMode('edit');
+                    setFormOpen(true);
+                  }}
+                />
+              </View>
             </View>
 
             {drops.length === 0 ? (
-              <EmptyState icon={VaultIcon} title="No Drops yet" body="Create your first Drop to start your Vault." />
+              <EmptyState
+                icon={VaultIcon}
+                title="Your Vault is ready"
+                body={"Share something your followers won't find in Arena."}
+                actionLabel="Create first Drop"
+                onAction={() => router.push('/vault/compose')}
+              />
             ) : (
               <View style={styles.list}>
+                <Text allowFontScaling={false} style={[styles.sectionLabel, { color: t.textMuted }]}>
+                  Drops · disappear after 7 days
+                </Text>
                 {drops.map((drop) => (
                   <CreatorDropRow
                     key={drop.id}
@@ -158,7 +203,7 @@ export function CreatorVaultHome(): React.JSX.Element {
           <EmptyState
             icon={VaultIcon}
             title="Open your Vault"
-            body="A Vault is your own content space: free Drops, subscriber-only Drops, and permanent Collections."
+            body={"A private space for free moments, subscriber Drops, and permanent Collections."}
             actionLabel="Create Vault"
             onAction={() => {
               setFormMode('create');
@@ -166,6 +211,12 @@ export function CreatorVaultHome(): React.JSX.Element {
             }}
           />
         )}
+
+        {!vault && profile ? (
+          <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+            Visit creators from Explore or Profile to enter their Vaults.
+          </Text>
+        ) : null}
       </ScrollView>
 
       <VaultFormSheet
@@ -182,13 +233,26 @@ export function CreatorVaultHome(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg },
-  centered: { justifyContent: 'center' },
-  content: { paddingHorizontal: layout.screenX, gap: space.md, paddingBottom: space.xxl },
-  kicker: { ...typeScale.eyebrow, color: ink.tertiary },
-  title: { ...typeScale.title, color: ink.primary },
-  description: { ...typeScale.body, color: ink.secondary },
-  actions: { flexDirection: 'row', gap: space.sm },
-  list: { gap: space.md },
+  screen: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  content: { paddingHorizontal: layout.screenX, gap: space.md },
+  brand: { ...typeScale.display },
+  tagline: { ...typeScale.body, marginTop: -4 },
+  spaceCard: {
+    gap: space.sm,
+    padding: space.lg,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+    marginTop: space.sm,
+  },
+  spaceKicker: { ...typeScale.caption, letterSpacing: 0.8 },
+  spaceTitle: { ...typeScale.title },
+  spaceBody: { ...typeScale.body },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.xs },
+  list: { gap: space.md, marginTop: space.sm },
+  sectionLabel: { ...typeScale.meta },
+  hint: { ...typeScale.meta, textAlign: 'center', marginTop: space.md },
 });
-

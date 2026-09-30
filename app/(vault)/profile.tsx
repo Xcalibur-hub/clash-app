@@ -24,6 +24,7 @@ import {
   type WinEntry,
 } from '../../store';
 import { space } from '../../theme';
+import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { press as hapticPress } from '../../utils/haptics';
 
 type VaultProfileTab = 'takes' | 'wins';
@@ -61,7 +62,7 @@ export default function VaultProfileScreen(): React.JSX.Element {
     <View style={s.root}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[s.content, { paddingTop: insets.top + space.md }]}
+        contentContainerStyle={[s.content, { paddingTop: insets.top + space.md, paddingBottom: dockBottomPadding(insets.bottom) }]}
       >
         <VaultHeader
           title="Profile"

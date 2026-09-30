@@ -2,12 +2,11 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { StorefrontDrop } from '../../services/vaultMappers';
 import { getPublicMediaUrl } from '../../services/mediaService';
-import { card, ink, radius, space, typeScale } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { timeLeftLabel } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
-import { GlassCard } from '../shared/GlassCard';
-import { Chip } from '../shared/Chip';
-import { ClockIcon, LockIcon, PlayIcon, VaultIcon } from '../shared/icons';
+import { PressableScale } from '../shared/PressableScale';
+import { PlayIcon } from '../shared/icons';
 
 export interface VaultDropCardProps {
   drop: StorefrontDrop;
@@ -17,18 +16,15 @@ export interface VaultDropCardProps {
 }
 
 /**
- * One Drop on the storefront. Three shapes:
- *   · a free Drop shows its public media directly;
- *   · an accessible subscriber Drop shows a members-only card (its private media
- *     loads on demand in the reader, never here);
- *   · a locked subscriber Drop shows a lock + caption and a subscribe CTA, with no
- *     media and no URL of any kind.
- * An archived (expired-but-collected) Drop carries an explicit badge.
+ * Storefront Drop — media-first when public; elegant locked surface when not entitled.
+ * Never fetches or renders private media. Entitlement stays `drop.accessible`.
  */
 export function VaultDropCard({ drop, onOpen, onSubscribe }: VaultDropCardProps): React.JSX.Element {
+  const t = useThemeColors();
   const isSubscriber = drop.accessLevel === 'subscriber';
   const locked = isSubscriber && !drop.accessible;
   const archived = drop.status === 'expired';
+  const isVideo = drop.publicMedia?.kind === 'video';
 
   const mediaUrl =
     !isSubscriber && drop.publicMedia
@@ -40,38 +36,86 @@ export function VaultDropCard({ drop, onOpen, onSubscribe }: VaultDropCardProps)
     onOpen();
   };
 
+  const expiry =
+    drop.expiresAt && drop.status === 'published' ? timeLeftLabel(drop.expiresAt) : null;
+
   return (
-    <GlassCard
-      corner={radius.lg}
+    <PressableScale
       onPress={open}
-      contentStyle={styles.card}
+      style={[
+        styles.card,
+        {
+          backgroundColor: t.surface,
+          borderColor: t.border,
+          shadowColor: t.shadowColor,
+          shadowOpacity: t.scheme === 'light' ? 0.08 : 0,
+        },
+      ]}
       accessibilityLabel={`${isSubscriber ? 'Subscriber drop' : 'Drop'}: ${drop.caption}`}
       accessibilityHint={locked ? 'Subscription required' : 'Opens this drop'}
     >
       {mediaUrl ? (
-        <View style={styles.media} accessible accessibilityRole="image" accessibilityLabel={drop.caption}>
+        <View style={[styles.media, { backgroundColor: t.surfaceMuted }]}>
           <Image source={{ uri: mediaUrl }} resizeMode="cover" style={StyleSheet.absoluteFill} />
+          {isVideo ? (
+            <View style={styles.playBadge}>
+              <PlayIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
+            </View>
+          ) : null}
+          {!isSubscriber ? (
+            <View style={[styles.freeTag, { backgroundColor: 'rgba(9,9,11,0.55)' }]}>
+              <Text allowFontScaling={false} style={styles.freeTagText}>
+                Free
+              </Text>
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      ) : locked ? (
+        <View style={[styles.lockedMedia, { backgroundColor: t.surfaceMuted }]}>
+          <Text allowFontScaling={false} style={[styles.lockedKicker, { color: t.textMuted }]}>
+            SUBSCRIBERS
+          </Text>
+          <Text allowFontScaling={false} style={[styles.lockedHint, { color: t.textSecondary }]}>
+            Unlock with this Vault
+          </Text>
+        </View>
+      ) : isSubscriber ? (
+        <View style={[styles.lockedMedia, { backgroundColor: t.surfaceMuted }]}>
+          <PlayIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
+          <Text allowFontScaling={false} style={[styles.membersHint, { color: t.textMuted }]}>
+            Members
+          </Text>
+        </View>
+      ) : (
+        <View style={[styles.textDrop, { backgroundColor: t.surfaceMuted }]}>
+          <Text allowFontScaling={false} style={[styles.textDropMark, { color: t.textMuted }]}>
+            DROP
+          </Text>
+        </View>
+      )}
 
       <View style={styles.body}>
-        <View style={styles.metaRow}>
-          {isSubscriber ? (
-            <Chip
-              label={locked ? 'SUBSCRIBER DROP' : 'MEMBERS'}
-              icon={locked ? LockIcon : VaultIcon}
-              tone={locked ? 'violet' : 'mint'}
-            />
-          ) : null}
-          {archived ? <Chip label="ARCHIVED" tone="neutral" /> : null}
-          {!isSubscriber && drop.expiresAt ? (
-            <Chip label={timeLeftLabel(drop.expiresAt)} icon={ClockIcon} tone="neutral" data />
-          ) : null}
-        </View>
-
-        <Text allowFontScaling={false} style={styles.caption} numberOfLines={3}>
+        <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]} numberOfLines={3}>
           {drop.caption}
         </Text>
+
+        <View style={styles.metaRow}>
+          {isSubscriber && !locked ? (
+            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+              Subscriber
+            </Text>
+          ) : null}
+          {archived ? (
+            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+              Archived
+            </Text>
+          ) : null}
+          {expiry && !locked ? (
+            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+              {expiry}
+            </Text>
+          ) : null}
+        </View>
 
         {locked ? (
           <Pressable
@@ -81,39 +125,123 @@ export function VaultDropCard({ drop, onOpen, onSubscribe }: VaultDropCardProps)
             }}
             accessibilityRole="button"
             accessibilityLabel="Subscription options"
-            style={styles.subscribe}
+            style={[
+              styles.subscribe,
+              {
+                backgroundColor: t.scheme === 'light' ? t.textPrimary : t.surfaceElevated,
+                borderColor: t.border,
+              },
+            ]}
           >
-            <Text allowFontScaling={false} style={styles.subscribeText}>Subscribe to unlock</Text>
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.subscribeText,
+                { color: t.scheme === 'light' ? t.textInverse : t.textPrimary },
+              ]}
+            >
+              Subscriber Drop
+            </Text>
           </Pressable>
         ) : null}
-
-        {isSubscriber && !locked ? (
-          <View style={styles.openHint}>
-            <PlayIcon size={13} color={ink.tertiary} strokeWidth={2.4} />
-            <Text allowFontScaling={false} style={styles.openHintText}>Tap to watch</Text>
-          </View>
-        ) : null}
       </View>
-    </GlassCard>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 0 },
-  media: { aspectRatio: 16 / 9, width: '100%', backgroundColor: card.elevated },
-  body: { padding: space.md, gap: space.sm },
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
-  caption: { ...typeScale.takeText, color: ink.primary },
+  card: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+  media: {
+    aspectRatio: 4 / 5,
+    width: '100%',
+  },
+  playBadge: {
+    position: 'absolute',
+    right: space.sm,
+    bottom: space.sm,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  freeTag: {
+    position: 'absolute',
+    left: space.sm,
+    top: space.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  freeTagText: {
+    ...typeScale.caption,
+    color: '#FAFAF8',
+    fontSize: 10,
+  },
+  lockedMedia: {
+    aspectRatio: 16 / 10,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: space.lg,
+  },
+  lockedKicker: {
+    ...typeScale.caption,
+    letterSpacing: 0.8,
+  },
+  lockedHint: {
+    ...typeScale.meta,
+    textAlign: 'center',
+  },
+  membersHint: {
+    ...typeScale.caption,
+    letterSpacing: 0.4,
+  },
+  textDrop: {
+    aspectRatio: 16 / 9,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textDropMark: {
+    ...typeScale.caption,
+    letterSpacing: 1,
+  },
+  body: {
+    gap: 8,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+  },
+  caption: {
+    ...typeScale.takeText,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  meta: {
+    ...typeScale.meta,
+  },
   subscribe: {
     alignSelf: 'flex-start',
+    marginTop: 2,
     paddingHorizontal: space.md,
-    paddingVertical: space.xs,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(165,128,255,0.4)',
-    backgroundColor: 'rgba(165,128,255,0.12)',
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  subscribeText: { ...typeScale.label, color: '#C4B5FD' },
-  openHint: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  openHintText: { ...typeScale.meta, color: ink.tertiary },
+  subscribeText: {
+    ...typeScale.label,
+    fontWeight: '600',
+  },
 });

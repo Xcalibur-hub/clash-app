@@ -1,10 +1,9 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
-import { GlassCard } from '../shared/GlassCard';
 import { GlowButton } from '../shared/GlowButton';
-import { CloseIcon, VaultIcon } from '../shared/icons';
-import { color, duration, ink, radius, space, typeScale } from '../../theme';
+import { CloseIcon } from '../shared/icons';
+import { duration, radius, space, typeScale, useThemeColors } from '../../theme';
 
 export interface VaultFormSheetProps {
   visible: boolean;
@@ -16,7 +15,7 @@ export interface VaultFormSheetProps {
   onSubmit: (title: string, description: string) => void;
 }
 
-/** A single modal that both creates and edits a Vault's title and description. */
+/** Create / edit Vault title and description. */
 export function VaultFormSheet({
   visible,
   mode,
@@ -26,6 +25,7 @@ export function VaultFormSheet({
   onClose,
   onSubmit,
 }: VaultFormSheetProps): React.JSX.Element | null {
+  const t = useThemeColors();
   const [title, setTitle] = React.useState(initialTitle);
   const [description, setDescription] = React.useState(initialDescription);
 
@@ -42,43 +42,67 @@ export function VaultFormSheet({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(duration.fast)} style={styles.scrim}>
+      <Animated.View entering={FadeIn.duration(duration.fast)} style={[styles.scrim, { backgroundColor: t.overlay }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <Animated.View entering={FadeInUp.duration(duration.base)} style={styles.box}>
-          <GlassCard corner={radius.xxl} contentStyle={styles.card}>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: t.surfaceElevated,
+                borderColor: t.border,
+              },
+            ]}
+          >
             <View style={styles.head}>
-              <View style={styles.badge}>
-                <VaultIcon size={20} color={ink.secondary} strokeWidth={2} />
-              </View>
-              <Text allowFontScaling={false} style={styles.title}>
+              <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
                 {mode === 'create' ? 'Open your Vault' : 'Edit Vault'}
               </Text>
               <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
-                <CloseIcon size={20} color={ink.tertiary} strokeWidth={2.2} />
+                <CloseIcon size={20} color={t.textMuted} strokeWidth={2.2} />
               </Pressable>
             </View>
 
-            <Text allowFontScaling={false} style={styles.label}>Title</Text>
+            <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+              Title
+            </Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
               maxLength={60}
               placeholder="A name for your Vault"
-              placeholderTextColor={ink.quaternary}
+              placeholderTextColor={t.textMuted}
               accessibilityLabel="Vault title"
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  color: t.textPrimary,
+                  borderColor: t.border,
+                  backgroundColor: t.inputBackground,
+                },
+              ]}
             />
 
-            <Text allowFontScaling={false} style={styles.label}>Description</Text>
+            <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+              Description
+            </Text>
             <TextInput
               value={description}
               onChangeText={setDescription}
               maxLength={280}
               multiline
-              placeholder="What subscribers get"
-              placeholderTextColor={ink.quaternary}
+              placeholder="What belongs in this space"
+              placeholderTextColor={t.textMuted}
               accessibilityLabel="Vault description"
-              style={[styles.input, styles.textarea]}
+              style={[
+                styles.input,
+                styles.textarea,
+                {
+                  color: t.textPrimary,
+                  borderColor: t.border,
+                  backgroundColor: t.inputBackground,
+                },
+              ]}
             />
 
             <GlowButton
@@ -87,7 +111,7 @@ export function VaultFormSheet({
               disabled={!canSubmit}
               style={styles.cta}
             />
-          </GlassCard>
+          </View>
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -95,29 +119,21 @@ export function VaultFormSheet({
 }
 
 const styles = StyleSheet.create({
-  scrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: color.scrim },
+  scrim: { flex: 1, justifyContent: 'flex-end' },
   box: { paddingHorizontal: space.md, paddingBottom: space.md },
-  card: { gap: space.sm, padding: space.xl },
-  head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  badge: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+  card: {
+    gap: space.sm,
+    padding: space.xl,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  title: { ...typeScale.cardTitle, color: ink.primary, flex: 1 },
-  label: { ...typeScale.eyebrow, color: ink.tertiary },
+  head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  title: { ...typeScale.section, flex: 1 },
+  label: { ...typeScale.caption, letterSpacing: 0.4 },
   input: {
     ...typeScale.body,
-    color: ink.primary,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
   },

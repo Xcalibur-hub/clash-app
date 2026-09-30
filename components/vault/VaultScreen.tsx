@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { User } from '../../store';
@@ -15,15 +15,15 @@ import {
 } from '../../services/vaultService';
 import type { CreatorVault, StorefrontDrop, VaultCollection, VaultSubscriptionState } from '../../services/vaultMappers';
 import { errorText } from '../../services/supabaseClient';
-import { color, layout, space } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { EmptyState } from '../shared/EmptyState';
-import { GlowButton } from '../shared/GlowButton';
 import { BackIcon, VaultIcon } from '../shared/icons';
 import { VaultIdentityHeader } from './VaultIdentityHeader';
 import { VaultDropCard } from './VaultDropCard';
 import { VaultCollectionCard } from './VaultCollectionCard';
 import { SubscriptionInfoSheet } from './SubscriptionInfoSheet';
+import { tap as hapticTap } from '../../utils/haptics';
 
 type VaultTab = 'drops' | 'collections';
 
@@ -40,10 +40,11 @@ export interface VaultScreenProps {
   hideSafeTop?: boolean;
 }
 
-/** The public Vault — a creator's content space, media first, chrome-free. */
+/** Public creator Vault — entering their private content space. */
 export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useThemeColors();
 
   const [phase, setPhase] = React.useState<Phase>('loading');
   const [creator, setCreator] = React.useState<User | null>(null);
@@ -116,27 +117,41 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
     setFollow({ ...follow, following: !follow.following });
   };
 
-  if (phase === 'loading') return <Spinner padTop={hideSafeTop ? 0 : insets.top} />;
+  if (phase === 'loading') {
+    return (
+      <View style={[styles.screen, styles.centered, { backgroundColor: t.background, paddingTop: hideSafeTop ? 0 : insets.top }]}>
+        <ActivityIndicator color={t.textPrimary} />
+      </View>
+    );
+  }
 
   if (phase !== 'ready' || !creator || !vault) {
     const isNone = phase === 'none';
     const isBlocked = phase === 'blocked';
     return (
-      <View style={[styles.screen, { paddingTop: hideSafeTop ? 0 : insets.top }]}>
-        <BackButton onPress={() => router.back()} />
+      <View style={[styles.screen, { backgroundColor: t.background, paddingTop: hideSafeTop ? 0 : insets.top }]}>
+        <BackChip onPress={() => router.back()} />
         <EmptyState
           icon={VaultIcon}
-          title={isBlocked ? 'Vault unavailable' : isNone && isSelf ? 'You have no Vault yet' : isNone ? 'No Vault yet' : 'Vault unavailable'}
+          title={
+            isBlocked
+              ? 'Vault unavailable'
+              : isNone && isSelf
+                ? 'Your Vault is ready'
+                : isNone
+                  ? 'Nothing inside yet'
+                  : 'Vault unavailable'
+          }
           body={
             isBlocked
               ? "You can't see this Vault right now."
               : isNone && isSelf
-                ? 'Open your Vault to start dropping subscriber content.'
+                ? "Share something your followers won't find in Arena."
                 : isNone
-                  ? 'This creator has not opened a Vault.'
+                  ? `@${creator?.handle ?? 'creator'} hasn't opened this Vault yet.`
                   : 'This Vault could not be loaded.'
           }
-          actionLabel={isNone && isSelf ? 'Start your Vault' : undefined}
+          actionLabel={isNone && isSelf ? 'Create first Drop' : undefined}
           onAction={isNone && isSelf ? () => router.replace('/(vault)') : undefined}
         />
       </View>
@@ -147,12 +162,18 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
     storefront.filter((drop) => drop.collectionIds.includes(collectionId));
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: t.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingTop: (hideSafeTop ? 0 : insets.top) + space.md }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: (hideSafeTop ? 0 : insets.top) + space.md,
+            paddingBottom: insets.bottom + space.xxl,
+          },
+        ]}
       >
-        <BackButton onPress={() => router.back()} />
+        <BackChip onPress={() => router.back()} />
 
         <VaultIdentityHeader
           creator={creator}
@@ -169,9 +190,22 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
 
         {tab === 'drops' ? (
           storefront.length === 0 ? (
-            <EmptyState icon={VaultIcon} title="No Drops yet" body="New Drops appear here when this creator publishes." />
+            <EmptyState
+              icon={VaultIcon}
+              title={isSelf ? 'Your Vault is ready' : 'Nothing inside yet'}
+              body={
+                isSelf
+                  ? "Share something your followers won't find in Arena."
+                  : `@${creator.handle} hasn't posted a Drop yet.`
+              }
+              actionLabel={isSelf ? 'Create first Drop' : undefined}
+              onAction={isSelf ? () => router.push('/vault/compose') : undefined}
+            />
           ) : (
             <View style={styles.list}>
+              <Text allowFontScaling={false} style={[styles.ephemeral, { color: t.textMuted }]}>
+                Drops disappear after 7 days. Collections keep them.
+              </Text>
               {storefront.map((drop) => (
                 <VaultDropCard
                   key={drop.id}
@@ -183,7 +217,11 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
             </View>
           )
         ) : collections.length === 0 ? (
-          <EmptyState icon={VaultIcon} title="No Collections yet" body="Permanent Collections appear here." />
+          <EmptyState
+            icon={VaultIcon}
+            title="No Collections yet"
+            body="Permanent chapters of this Vault will appear here."
+          />
         ) : (
           <View style={styles.list}>
             {collections.map((collection) => (
@@ -203,23 +241,42 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
   );
 }
 
-function BackButton({ onPress }: { onPress: () => void }): React.JSX.Element {
-  return <GlowButton label="Back" icon={BackIcon} tone="ink" compact onPress={onPress} style={styles.back} />;
-}
-
-function Spinner({ padTop }: { padTop: number }): React.JSX.Element {
+function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
+  const t = useThemeColors();
   return (
-    <View style={[styles.screen, styles.centered, { paddingTop: padTop }]}>
-      <ActivityIndicator color="#FFFFFF" />
-    </View>
+    <Pressable
+      onPress={() => {
+        hapticTap();
+        onPress();
+      }}
+      style={[
+        styles.back,
+        {
+          backgroundColor: t.surface,
+          borderColor: t.border,
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+    >
+      <BackIcon size={18} color={t.textPrimary} strokeWidth={2.2} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg },
-  centered: { justifyContent: 'center' },
-  content: { paddingHorizontal: layout.screenX, gap: space.lg, paddingBottom: space.xxl },
+  screen: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  content: { paddingHorizontal: layout.screenX, gap: space.lg },
   list: { gap: space.md },
-  back: { alignSelf: 'flex-start' },
+  ephemeral: { ...typeScale.meta, marginBottom: 2 },
+  back: {
+    alignSelf: 'flex-start',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
 });
-

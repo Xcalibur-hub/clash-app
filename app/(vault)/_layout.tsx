@@ -5,11 +5,12 @@ import { RealmTabBar } from '../../components/navigation/RealmTabBar';
 import { useRealmSwitch } from '../../components/navigation/useRealmSwitch';
 import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
 import { ArenaIcon } from '../../components/shared/icons';
-import { color } from '../../theme';
+import { useThemeColors } from '../../theme';
 
-/** Vault realm: your own creator Vault — Drops, Collections, and the premium Profile. */
+/** Vault realm: creator Vault — Drops, Collections, Profile. */
 export default function VaultLayout(): React.JSX.Element {
   const { shifting, first, direction, shiftTo } = useRealmSwitch();
+  const t = useThemeColors();
   return (
     <>
       <Tabs
@@ -24,7 +25,7 @@ export default function VaultLayout(): React.JSX.Element {
         )}
         screenOptions={{
           headerShown: false,
-          sceneStyle: { backgroundColor: color.bg },
+          sceneStyle: { backgroundColor: t.background },
         }}
       >
         <Tabs.Screen name="index" options={{ title: 'Drops' }} />
