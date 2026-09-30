@@ -1281,6 +1281,7 @@ export type Database = {
           advertiser_id: string
           campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
           created_at: string
+          currency: string
           description: string
           ends_at: string | null
           id: string
@@ -1293,6 +1294,7 @@ export type Database = {
           advertiser_id: string
           campaign_type?: Database["public"]["Enums"]["sponsor_campaign_type"]
           created_at?: string
+          currency?: string
           description?: string
           ends_at?: string | null
           id: string
@@ -1305,6 +1307,7 @@ export type Database = {
           advertiser_id?: string
           campaign_type?: Database["public"]["Enums"]["sponsor_campaign_type"]
           created_at?: string
+          currency?: string
           description?: string
           ends_at?: string | null
           id?: string
