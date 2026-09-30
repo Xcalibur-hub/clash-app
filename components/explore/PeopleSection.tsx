@@ -1,21 +1,19 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { fetchActivePeople } from '../../services/searchService';
 import type { User } from '../../store';
-import { card, ink, radius, space, typeScale } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { formatReputation } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
-import { SectionHeading } from '../shared/SectionHeading';
-import { exploreStyles as s } from './exploreStyles';
+import { PressableScale } from '../shared/PressableScale';
+import { ExploreHeading } from './ExploreHeading';
 
-/**
- * Active people (PRD §15): real profiles ranked by reputation — an honest shelf,
- * not a fake "people you may know" list.
- */
+/** Active people shelf — real profiles by reputation. */
 export function PeopleSection(): React.JSX.Element | null {
   const router = useRouter();
+  const t = useThemeColors();
   const [people, setPeople] = React.useState<User[] | null>(null);
 
   React.useEffect(() => {
@@ -32,7 +30,16 @@ export function PeopleSection(): React.JSX.Element | null {
     };
   }, []);
 
-  if (!people || people.length === 0) return null;
+  if (people === null) {
+    return (
+      <View style={styles.section}>
+        <ExploreHeading title="Active people" />
+        <ActivityIndicator color={t.textMuted} style={styles.spinner} />
+      </View>
+    );
+  }
+
+  if (people.length === 0) return null;
 
   const open = (id: string): void => {
     hapticTap();
@@ -40,25 +47,33 @@ export function PeopleSection(): React.JSX.Element | null {
   };
 
   return (
-    <View style={s.section}>
-      <SectionHeading eyebrow="PEOPLE" title="Active people" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.shelf}>
+    <View style={styles.section}>
+      <ExploreHeading title="Active people" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
         {people.map((user) => (
-          <Pressable
+          <PressableScale
             key={user.id}
             onPress={() => open(user.id)}
             accessibilityRole="button"
             accessibilityLabel={`Open @${user.handle}`}
-            style={styles.card}
+            style={[
+              styles.card,
+              {
+                backgroundColor: t.surface,
+                borderColor: t.border,
+                shadowColor: t.shadowColor,
+                shadowOpacity: t.scheme === 'light' ? 0.07 : 0,
+              },
+            ]}
           >
             <Avatar name={user.name} tint={user.tint} size={48} />
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.handle}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[styles.handle, { color: t.textPrimary }]}>
               @{user.handle}
             </Text>
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.meta}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[styles.meta, { color: t.textMuted }]}>
               {formatReputation(user.reputation)} XP
             </Text>
-          </Pressable>
+          </PressableScale>
         ))}
       </ScrollView>
     </View>
@@ -66,16 +81,21 @@ export function PeopleSection(): React.JSX.Element | null {
 }
 
 const styles = StyleSheet.create({
+  section: { gap: space.md },
+  rail: { gap: 10, paddingRight: 4 },
   card: {
-    width: 132,
+    width: 128,
     alignItems: 'center',
     gap: space.xs,
-    padding: space.md,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: card.border,
-    backgroundColor: card.native,
+    paddingVertical: space.md,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
-  handle: { ...typeScale.label, color: ink.primary, fontWeight: '700', maxWidth: '100%' },
-  meta: { ...typeScale.meta, color: ink.tertiary },
+  handle: { ...typeScale.label, fontSize: 13, fontWeight: '700', maxWidth: '100%' },
+  meta: { ...typeScale.meta, fontSize: 11 },
+  spinner: { paddingVertical: space.lg },
 });

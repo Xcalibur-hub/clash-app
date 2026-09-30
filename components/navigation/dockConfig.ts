@@ -18,7 +18,7 @@ export const DOCK_HEIGHT = 52;
  * dock + its outer margin. Use with safe-area bottom inset:
  *   paddingBottom: insets.bottom + DOCK_SCROLL_CLEARANCE
  */
-export const DOCK_SCROLL_CLEARANCE = 78;
+export const DOCK_SCROLL_CLEARANCE = 80;
 
 export type TabRoute = BottomTabBarProps['state']['routes'][number];
 

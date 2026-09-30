@@ -1,24 +1,21 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { card, ink, radius, space, typeScale } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
 
 export interface SearchRowProps {
-  /** Initials avatar — used for people results. */
   avatar?: { name: string; tint: string };
-  /** Glyph tile — used for takes and Hall of Fame results. */
   icon?: LucideIcon;
   iconColor?: string;
   title: string;
   meta?: string;
-  /** Screen-reader label; the visible title may be truncated. */
   label: string;
   onPress: () => void;
 }
 
-/** One tappable line in the Explore search results (PRD §15). */
+/** Theme-aware search result row. */
 export function SearchRow({
   avatar,
   icon: Icon,
@@ -28,6 +25,7 @@ export function SearchRow({
   label,
   onPress,
 }: SearchRowProps): React.JSX.Element {
+  const t = useThemeColors();
   return (
     <Pressable
       onPress={() => {
@@ -36,20 +34,20 @@ export function SearchRow({
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={styles.row}
+      style={[styles.row, { backgroundColor: t.surface, borderColor: t.border }]}
     >
       {avatar ? <Avatar name={avatar.name} tint={avatar.tint} size={40} /> : null}
       {Icon ? (
-        <View style={styles.badge}>
-          <Icon size={16} color={iconColor ?? ink.tertiary} strokeWidth={2.2} />
+        <View style={[styles.badge, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
+          <Icon size={16} color={iconColor ?? t.textMuted} strokeWidth={2.2} />
         </View>
       ) : null}
       <View style={styles.body}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.title}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[styles.title, { color: t.textPrimary }]}>
           {title}
         </Text>
         {meta ? (
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.meta}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.meta, { color: t.textMuted }]}>
             {meta}
           </Text>
         ) : null}
@@ -64,22 +62,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.md,
     padding: space.sm,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: card.border,
-    backgroundColor: card.native,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   badge: {
     width: 40,
     height: 40,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: card.border,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: card.solid,
   },
   body: { flex: 1, gap: 2 },
-  title: { ...typeScale.label, color: ink.primary, fontWeight: '700' },
-  meta: { ...typeScale.meta, color: ink.tertiary },
+  title: { ...typeScale.label, fontWeight: '700' },
+  meta: { ...typeScale.meta },
 });
