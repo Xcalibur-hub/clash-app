@@ -10,8 +10,15 @@ import {
   VaultIcon,
 } from '../shared/icons';
 
-/** The dock's own geometry (reference screens 5 & 23). */
-export const DOCK_HEIGHT = 60;
+/** Visual height of the floating capsule dock (icons + padding). */
+export const DOCK_HEIGHT = 52;
+
+/**
+ * Bottom clearance for scrollable tab screens so content clears the floating
+ * dock + its outer margin. Use with safe-area bottom inset:
+ *   paddingBottom: insets.bottom + DOCK_SCROLL_CLEARANCE
+ */
+export const DOCK_SCROLL_CLEARANCE = 78;
 
 export type TabRoute = BottomTabBarProps['state']['routes'][number];
 

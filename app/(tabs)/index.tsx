@@ -1,15 +1,15 @@
 import React from 'react';
-import { FlatList, Share, StyleSheet, View, type ListRenderItemInfo } from 'react-native';
+import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
 import { ArenaFeaturedStack } from '../../components/arena/ArenaFeaturedStack';
-import { FeedScopeTabs } from '../../components/arena/FeedScopeTabs';
-import { HoodStrip } from '../../components/arena/HoodStrip';
+import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { TakeFeedItem } from '../../components/arena/TakeFeedItem';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
+import { Underline } from '../../components/shared/Doodles';
 import { ArenaIcon, CompassIcon, UserIcon } from '../../components/shared/icons';
 import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
@@ -34,8 +34,9 @@ import {
   type User,
 } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
-import { layout, space, useThemeColors } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
+import { DOCK_SCROLL_CLEARANCE } from '../../components/navigation/dockConfig';
 
 const EMPTY_SET: ReadonlySet<string> = new Set<string>();
 
@@ -152,6 +153,13 @@ export default function ArenaScreen(): React.JSX.Element {
       .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [state, now]);
 
+  /** Hero Takes stay in the stack only — don't immediately repeat under Fresh Takes. */
+  const listFeed = React.useMemo(() => {
+    if (featuredItems.length === 0) return feed;
+    const featuredIds = new Set(featuredItems.map((item) => item.take.id));
+    return feed.filter((take) => !featuredIds.has(take.id));
+  }, [feed, featuredItems]);
+
   const openClash = React.useCallback(
     (takeId: string): void => {
       if (!requireAuth()) return;
@@ -239,9 +247,8 @@ export default function ArenaScreen(): React.JSX.Element {
 
   const header = React.useMemo(
     () => (
-      <View>
-        <FeedScopeTabs value={scope} onChange={setScope} />
-        <HoodStrip />
+      <View style={styles.hero}>
+        <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         <ArenaFeaturedStack
           items={featuredItems}
           loading={state.arenaStatus === 'loading'}
@@ -255,6 +262,12 @@ export default function ArenaScreen(): React.JSX.Element {
             if (requireAuth()) dispatch(toggleSave(takeId));
           }}
         />
+        <View style={styles.freshHead}>
+          <Text allowFontScaling={false} style={[styles.freshTitle, { color: theme.textPrimary }]}>
+            Fresh Takes
+          </Text>
+          <Underline size={72} color={theme.textPrimary} opacity={0.2} style={styles.freshMark} />
+        </View>
       </View>
     ),
     [
@@ -265,6 +278,7 @@ export default function ArenaScreen(): React.JSX.Element {
       requireAuth,
       scope,
       state.arenaStatus,
+      theme.textPrimary,
       toggleReaction,
     ],
   );
@@ -340,7 +354,8 @@ export default function ArenaScreen(): React.JSX.Element {
   ]);
 
   // Cold-start failure: no mock content underneath — only the error empty state.
-  const listData = state.arenaStatus === 'error' || state.arenaStatus === 'loading' ? [] : feed;
+  // Featured hero Takes are filtered out so they don't duplicate under Fresh Takes.
+  const listData = state.arenaStatus === 'error' || state.arenaStatus === 'loading' ? [] : listFeed;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -350,9 +365,8 @@ export default function ArenaScreen(): React.JSX.Element {
         keyExtractor={(take) => take.id}
         renderItem={renderItem}
         ListHeaderComponent={header}
-        ItemSeparatorComponent={Separator}
         ListEmptyComponent={empty}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 96 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + DOCK_SCROLL_CLEARANCE }]}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={() => {
@@ -376,11 +390,6 @@ export default function ArenaScreen(): React.JSX.Element {
   );
 }
 
-function Separator(): React.JSX.Element {
-  const theme = useThemeColors();
-  return <View style={[styles.separator, { backgroundColor: theme.border }]} />;
-}
-
 function FeedSkeleton(): React.JSX.Element {
   const theme = useThemeColors();
   return (
@@ -402,7 +411,20 @@ function FeedSkeleton(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { flexGrow: 1 },
-  separator: { height: StyleSheet.hairlineWidth, marginVertical: 4 },
+  hero: { paddingBottom: space.xs, gap: 2 },
+  freshHead: {
+    paddingHorizontal: layout.screenX,
+    paddingTop: space.md,
+    paddingBottom: space.sm,
+    position: 'relative',
+  },
+  freshTitle: {
+    ...typeScale.section,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.35,
+  },
+  freshMark: { marginTop: 2 },
 });
 
 const skeletonStyles = StyleSheet.create({

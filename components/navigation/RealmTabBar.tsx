@@ -3,12 +3,12 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { radius, space, useThemeColors } from '../../theme';
+import { radius, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaHomeIcon } from '../shared/icons';
 import type { Realm } from '../../store';
 import { useNotificationUnread } from '../../store/NotificationUnreadProvider';
-import { ARENA_TABS, DOCK_HEIGHT, VAULT_TABS, type TabRoute } from './dockConfig';
+import { ARENA_TABS, VAULT_TABS, type TabRoute } from './dockConfig';
 
 export interface RealmTabBarProps extends BottomTabBarProps {
   realm: Realm;
@@ -17,9 +17,12 @@ export interface RealmTabBarProps extends BottomTabBarProps {
   ShiftIcon: LucideIcon;
 }
 
+const DOCK_BG = '#111113';
+const DOCK_ICON = 'rgba(255,255,255,0.5)';
+const DOCK_ICON_ON = '#111113';
+
 /**
- * Floating premium dock — soft elevated surface, clear active state,
- * large central create. Adapted for CLASH (not a travel-app clone).
+ * Slim floating capsule — secondary to content, never competing with the hero.
  */
 export function RealmTabBar({
   state,
@@ -63,25 +66,20 @@ export function RealmTabBar({
         accessibilityLabel={centred ? 'Create a take' : entry.label}
       >
         {centred ? (
-          <View style={[styles.create, { backgroundColor: t.clashFill }]}>
-            <Icon size={20} color={t.clashText} strokeWidth={2.6} />
+          <View style={styles.create}>
+            <Icon size={18} color={DOCK_ICON_ON} strokeWidth={2.6} />
           </View>
         ) : (
           <View style={styles.iconWrap}>
-            <View
-              style={[
-                styles.activeHalo,
-                focused && { backgroundColor: t.scheme === 'light' ? t.surfaceMuted : 'rgba(255,255,255,0.08)' },
-              ]}
-            >
+            <View style={[styles.activeHalo, focused && styles.activeHaloOn]}>
               <Icon
-                size={22}
-                color={focused ? t.textPrimary : t.textMuted}
-                strokeWidth={focused ? 2.5 : 2}
+                size={18}
+                color={focused ? DOCK_ICON_ON : DOCK_ICON}
+                strokeWidth={focused ? 2.4 : 2}
               />
             </View>
             {showBadge ? (
-              <View style={[styles.badge, { backgroundColor: t.danger, borderColor: t.tabBar }]} pointerEvents="none">
+              <View style={[styles.badge, { backgroundColor: t.danger }]} pointerEvents="none">
                 <Text allowFontScaling={false} style={styles.badgeText}>
                   {unread > 99 ? '99+' : String(unread)}
                 </Text>
@@ -89,14 +87,6 @@ export function RealmTabBar({
             ) : null}
           </View>
         )}
-        {entry.label ? (
-          <Text
-            allowFontScaling={false}
-            style={[styles.tabLabel, { color: focused ? t.textPrimary : t.textMuted, fontWeight: focused ? '600' : '500' }]}
-          >
-            {entry.label}
-          </Text>
-        ) : null}
       </Pressable>
     );
   };
@@ -105,33 +95,23 @@ export function RealmTabBar({
 
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]} pointerEvents="box-none">
-      <View
-        style={[
-          styles.dock,
-          {
-            backgroundColor: t.tabBar,
-            borderColor: t.tabBarBorder,
-            shadowColor: t.shadowColor,
-            shadowOpacity: t.shadowOpacity,
-          },
-        ]}
-      >
+      <View style={styles.dock}>
         {state.routes.map(renderTab)}
         <Pressable
           onPress={() => {
             hapticTap();
             onShiftRealm(shiftTarget);
           }}
-          style={[styles.shift, { borderLeftColor: t.border }]}
+          style={styles.shift}
           accessibilityRole="button"
           accessibilityLabel={realm === 'vault' ? 'Return to Arena' : 'Open The Vault'}
         >
-          <ShiftIcon size={22} color={t.textMuted} strokeWidth={2} />
-          <Text allowFontScaling={false} style={[styles.tabLabel, { color: t.textMuted }]}>
-            {shiftLabel}
-          </Text>
+          <ShiftIcon size={18} color={DOCK_ICON} strokeWidth={2} />
         </Pressable>
       </View>
+      <Text style={styles.srOnly} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {shiftLabel}
+      </Text>
     </View>
   );
 }
@@ -142,63 +122,69 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: space.md,
+    paddingHorizontal: 42,
     backgroundColor: 'transparent',
+    alignItems: 'center',
   },
   dock: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: DOCK_HEIGHT + 4,
-    borderRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: space.xs,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
+    height: 52,
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 999,
+    backgroundColor: DOCK_BG,
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    paddingVertical: space.xs,
+    height: '100%',
   },
   create: {
-    width: 44,
-    height: 44,
+    width: 34,
+    height: 34,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -10,
+    backgroundColor: '#F5F5F5',
   },
   iconWrap: { position: 'relative' },
   activeHalo: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  activeHaloOn: {
+    backgroundColor: '#FFFFFF',
   },
   badge: {
     position: 'absolute',
-    top: -2,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: 4,
-    borderRadius: 8,
+    top: -1,
+    right: -5,
+    minWidth: 14,
+    height: 14,
+    paddingHorizontal: 3,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
+    borderColor: DOCK_BG,
   },
-  badgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800', lineHeight: 12 },
+  badgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '800', lineHeight: 10 },
   shift: {
-    width: 58,
+    width: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    paddingVertical: space.xs,
-    borderLeftWidth: StyleSheet.hairlineWidth,
+    height: '100%',
   },
-  tabLabel: { fontSize: 10 },
+  srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 });

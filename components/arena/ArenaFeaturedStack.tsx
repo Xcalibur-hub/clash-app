@@ -1,5 +1,5 @@
 import React from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
@@ -10,20 +10,21 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 import { useIsFocused } from '@react-navigation/native';
 import type { Take, User } from '../../store';
-import { duration, ease, layout, space, spring, typeScale, useThemeColors } from '../../theme';
+import { spring, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaStackCard } from './ArenaStackCard';
 import { ArenaStackProgress } from './ArenaStackProgress';
 
-const CARD_ASPECT = 0.78;
+/** Front card width — leaves clear side peeks for the fan. */
+const FRONT_WIDTH_RATIO = 0.82;
+const CARD_ASPECT = 0.74;
 const MAX_VISIBLE = 3;
-const SWIPE_RATIO = 0.22;
-const VELOCITY = 780;
-const MAX_ROTATE_DEG = 2.6;
+const SWIPE_RATIO = 0.18;
+const VELOCITY = 680;
+const MAX_ROTATE_DEG = 4.5;
 
 export interface ArenaFeaturedItem {
   take: Take;
@@ -44,8 +45,8 @@ export interface ArenaFeaturedStackProps {
 }
 
 /**
- * Premium featured Take stack above the Arena feed.
- * Swipe navigates (not dismisses). Only the active card + two behind stay mounted.
+ * Signature CLASH featured deck — tactile fan + continuous gesture progress.
+ * Data/navigation contracts unchanged.
  */
 export function ArenaFeaturedStack({
   items,
@@ -57,8 +58,10 @@ export function ArenaFeaturedStack({
   onSave,
 }: ArenaFeaturedStackProps): React.JSX.Element | null {
   const { width: windowWidth } = useWindowDimensions();
-  const cardWidth = Math.min(windowWidth - layout.screenX * 2, 420);
+  const cardWidth = Math.round(windowWidth * FRONT_WIDTH_RATIO);
   const cardHeight = Math.round(cardWidth / CARD_ASPECT);
+  const stageWidth = windowWidth;
+  const stageHeight = cardHeight + 58;
   const screenFocused = useIsFocused();
   const reduced = useReducedMotion();
   const t = useThemeColors();
@@ -96,7 +99,7 @@ export function ArenaFeaturedStack({
         return;
       }
       const fly = direction * (cardWidth * 1.15);
-      dragX.value = withTiming(fly, { duration: reduced ? 1 : duration.base, easing: ease.out }, (done) => {
+      dragX.value = withSpring(fly, { damping: 22, stiffness: 180, mass: 0.85 }, (done) => {
         if (done) {
           runOnJS(goTo)(next);
           dragX.value = 0;
@@ -104,7 +107,7 @@ export function ArenaFeaturedStack({
         }
       });
     },
-    [animating, cardWidth, dragX, goTo, indexSV, itemCount, reduced],
+    [animating, cardWidth, dragX, goTo, indexSV, itemCount],
   );
 
   const cancelSwipe = React.useCallback((): void => {
@@ -116,8 +119,8 @@ export function ArenaFeaturedStack({
     () =>
       Gesture.Pan()
         .enabled(!reduced && itemCount > 1)
-        .activeOffsetX([-14, 14])
-        .failOffsetY([-18, 18])
+        .activeOffsetX([-10, 10])
+        .failOffsetY([-22, 22])
         .onBegin(() => {
           animating.value = 0;
         })
@@ -150,25 +153,16 @@ export function ArenaFeaturedStack({
     AccessibilityInfo.announceForAccessibility(label);
   }, []);
 
-  const onPrev = React.useCallback((): void => {
-    if (index <= 0) return;
-    goTo(index - 1);
-    announce(`Previous featured take, ${index} of ${items.length}`);
-  }, [announce, goTo, index, items.length]);
-
-  const onNext = React.useCallback((): void => {
-    if (index >= items.length - 1) return;
-    goTo(index + 1);
-    announce(`Next featured take, ${index + 2} of ${items.length}`);
-  }, [announce, goTo, index, items.length]);
-
   if (loading) {
     return (
       <View style={styles.section}>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary, alignSelf: 'flex-start', paddingHorizontal: layout.screenX }]}>
-          Trending now
-        </Text>
-        <StackSkeleton width={cardWidth} height={cardHeight} muted={t.surfaceMuted} border={t.border} />
+        <StackSkeleton
+          stageWidth={stageWidth}
+          stageHeight={stageHeight}
+          width={cardWidth}
+          height={cardHeight}
+          muted={t.surfaceMuted}
+        />
       </View>
     );
   }
@@ -179,51 +173,26 @@ export function ArenaFeaturedStack({
   const slots = Array.from({ length: visibleSlots }, (_, offset) => index + offset).reverse();
 
   return (
-    <View style={styles.section} accessibilityLabel="Trending Takes stack">
-      <View style={styles.titleRow}>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-          Trending now
-        </Text>
-        {items.length > 1 ? (
-          <View style={styles.nav}>
-            <Pressable
-              onPress={onPrev}
-              disabled={index === 0}
-              accessibilityRole="button"
-              accessibilityLabel="Previous featured take"
-              hitSlop={8}
-              style={[
-                styles.navBtn,
-                { borderColor: t.border, backgroundColor: t.surfaceMuted },
-                index === 0 && styles.navDisabled,
-              ]}
-            >
-              <Text allowFontScaling={false} style={[styles.navText, { color: t.textSecondary }]}>
-                Prev
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={onNext}
-              disabled={index >= items.length - 1}
-              accessibilityRole="button"
-              accessibilityLabel="Next featured take"
-              hitSlop={8}
-              style={[
-                styles.navBtn,
-                { borderColor: t.border, backgroundColor: t.surfaceMuted },
-                index >= items.length - 1 && styles.navDisabled,
-              ]}
-            >
-              <Text allowFontScaling={false} style={[styles.navText, { color: t.textSecondary }]}>
-                Next
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
-
+    <View
+      style={styles.section}
+      accessibilityLabel={`Trending Takes, card ${index + 1} of ${items.length}`}
+      accessibilityActions={[
+        ...(index > 0 ? [{ name: 'decrement' as const, label: 'Previous featured take' }] : []),
+        ...(index < items.length - 1 ? [{ name: 'increment' as const, label: 'Next featured take' }] : []),
+      ]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'decrement' && index > 0) {
+          goTo(index - 1);
+          announce(`Previous featured take, ${index} of ${items.length}`);
+        }
+        if (event.nativeEvent.actionName === 'increment' && index < items.length - 1) {
+          goTo(index + 1);
+          announce(`Next featured take, ${index + 2} of ${items.length}`);
+        }
+      }}
+    >
       <GestureDetector gesture={pan}>
-        <View style={[styles.stage, { width: cardWidth, height: cardHeight + 8 }]}>
+        <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
           {slots.map((slotIndex) => {
             const depth = slotIndex - index;
             const item = items[slotIndex];
@@ -235,6 +204,7 @@ export function ArenaFeaturedStack({
                 reduced={Boolean(reduced)}
                 cardWidth={cardWidth}
                 cardHeight={cardHeight}
+                stageWidth={stageWidth}
                 single={items.length === 1}
               >
                 <ArenaStackCard
@@ -245,6 +215,7 @@ export function ArenaFeaturedStack({
                   hasReacted={item.hasReacted}
                   active={depth === 0 && screenFocused}
                   screenFocused={screenFocused}
+                  depth={depth}
                   onOpen={() => onOpen(item.take.id)}
                   onReact={() => onReact(item.take)}
                   onComment={() => onComment(item.take.id)}
@@ -269,6 +240,7 @@ function StackLayer({
   reduced,
   cardWidth,
   cardHeight,
+  stageWidth,
   single,
 }: {
   children: React.ReactNode;
@@ -277,32 +249,51 @@ function StackLayer({
   reduced: boolean;
   cardWidth: number;
   cardHeight: number;
+  stageWidth: number;
   single: boolean;
 }): React.JSX.Element {
   const style = useAnimatedStyle(() => {
     const progress = Math.min(1, Math.abs(dragX.value) / (cardWidth * SWIPE_RATIO));
+    const centerX = (stageWidth - cardWidth) / 2;
+
     if (depth === 0) {
       const rotate = reduced ? 0 : (dragX.value / cardWidth) * MAX_ROTATE_DEG;
+      const lift = reduced ? 1 : 1 + Math.min(0.025, Math.abs(dragX.value) / cardWidth) * 0.035;
       return {
-        zIndex: 30,
+        zIndex: 40,
+        left: centerX,
         transform: [
           { translateX: dragX.value },
           { rotate: `${rotate}deg` },
-          { scale: 1 },
+          { scale: lift },
         ],
       };
     }
 
-    const restScale = depth === 1 ? 0.94 : 0.88;
-    const restY = depth === 1 ? 14 : 26;
-    const restX = depth === 1 ? 10 : 18;
-    const scale = single ? 1 : interpolate(progress, [0, 1], [restScale, depth === 1 ? 1 : 0.94], Extrapolation.CLAMP);
-    const translateY = single ? 0 : interpolate(progress, [0, 1], [restY, depth === 1 ? 0 : 14], Extrapolation.CLAMP);
-    const translateX = single ? 0 : interpolate(progress, [0, 1], [restX, depth === 1 ? 0 : 10], Extrapolation.CLAMP);
+    // Fan: second peeks right+down, third peeks left+further — media edges must read.
+    const restScale = depth === 1 ? 0.93 : 0.87;
+    const restY = depth === 1 ? 22 : 44;
+    const restX = depth === 1 ? 32 : -28;
+    const restRotate = depth === 1 ? 2 : -2.2;
+
+    const scale = single
+      ? 1
+      : interpolate(progress, [0, 1], [restScale, depth === 1 ? 1 : 0.93], Extrapolation.CLAMP);
+    const translateY = single
+      ? 0
+      : interpolate(progress, [0, 1], [restY, depth === 1 ? 0 : 22], Extrapolation.CLAMP);
+    const translateX = single
+      ? 0
+      : interpolate(progress, [0, 1], [restX, depth === 1 ? 0 : 32], Extrapolation.CLAMP);
+    const rotate = single
+      ? 0
+      : interpolate(progress, [0, 1], [restRotate, depth === 1 ? 0 : 2], Extrapolation.CLAMP);
+
     return {
-      zIndex: 30 - depth,
+      zIndex: 40 - depth,
+      left: centerX,
       opacity: depth > 2 ? 0 : 1,
-      transform: [{ translateX }, { translateY }, { scale }],
+      transform: [{ translateX }, { translateY }, { rotate: `${rotate}deg` }, { scale }],
     };
   });
 
@@ -317,81 +308,70 @@ function StackLayer({
 }
 
 function StackSkeleton({
+  stageWidth,
+  stageHeight,
   width,
   height,
   muted,
-  border,
 }: {
+  stageWidth: number;
+  stageHeight: number;
   width: number;
   height: number;
   muted: string;
-  border: string;
 }): React.JSX.Element {
+  const left = (stageWidth - width) / 2;
   return (
-    <View style={[styles.stage, { width, height: height + 8 }]}>
+    <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
       <View
         style={[
-          styles.skelBack,
-          { width, height, backgroundColor: muted, borderColor: border, transform: [{ scale: 0.92 }, { translateY: 18 }] },
+          styles.skel,
+          {
+            left: left - 20,
+            width,
+            height,
+            backgroundColor: muted,
+            transform: [{ scale: 0.88 }, { translateY: 38 }, { rotate: '-1.8deg' }],
+            opacity: 0.55,
+          },
         ]}
       />
-      <View style={[styles.skelFront, { width, height, backgroundColor: muted, borderColor: border }]} />
+      <View
+        style={[
+          styles.skel,
+          {
+            left: left + 22,
+            width,
+            height,
+            backgroundColor: muted,
+            transform: [{ scale: 0.94 }, { translateY: 18 }, { rotate: '1.6deg' }],
+            opacity: 0.78,
+          },
+        ]}
+      />
+      <View style={[styles.skel, { left, width, height, backgroundColor: muted }]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   section: {
-    paddingTop: space.md,
-    paddingBottom: space.sm,
-    gap: space.sm,
+    paddingTop: 2,
+    paddingBottom: 2,
+    gap: 8,
     alignItems: 'center',
   },
-  titleRow: {
-    width: '100%',
-    paddingHorizontal: layout.screenX,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    ...typeScale.section,
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  nav: { flexDirection: 'row', gap: space.sm },
-  navBtn: {
-    paddingHorizontal: space.sm,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  navDisabled: { opacity: 0.35 },
-  navText: { ...typeScale.meta, fontSize: 12, fontWeight: '600' },
   stage: {
     alignSelf: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   layer: {
     position: 'absolute',
-    left: 0,
     top: 0,
-    shadowColor: '#000',
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
   },
-  skelBack: {
+  skel: {
     position: 'absolute',
-    left: 0,
     top: 0,
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  skelFront: {
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 30,
   },
 });

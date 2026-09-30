@@ -1,12 +1,18 @@
 import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import { HOOD_LABEL } from '../../data/hoods';
 import type { Take, User } from '../../store';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { compact, timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
-import { Avatar } from '../shared/Avatar';
 import {
   ArenaIcon,
   ArrowBigUpIcon,
@@ -14,6 +20,7 @@ import {
   CommentIcon,
 } from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
+import { ScribbleCircle, Squiggle } from '../shared/Doodles';
 import { ArenaStackMedia } from './ArenaStackMedia';
 
 export interface ArenaStackCardProps {
@@ -24,6 +31,8 @@ export interface ArenaStackCardProps {
   hasReacted: boolean;
   active: boolean;
   screenFocused: boolean;
+  /** Stack depth — rear cards keep media visible, hide chrome. */
+  depth?: number;
   onOpen: () => void;
   onReact: () => void;
   onComment: () => void;
@@ -31,7 +40,7 @@ export interface ArenaStackCardProps {
   onSave: () => void;
 }
 
-/** Premium editorial discovery card — full-bleed media + compact overlay meta. */
+/** Cinematic featured surface — media-first, text-first when no media. */
 function ArenaStackCardBase({
   take,
   author,
@@ -40,6 +49,7 @@ function ArenaStackCardBase({
   hasReacted,
   active,
   screenFocused,
+  depth = 0,
   onOpen,
   onReact,
   onComment,
@@ -49,134 +59,155 @@ function ArenaStackCardBase({
   const t = useThemeColors();
   const media = take.media;
   const headline = take.text.trim();
+  const front = depth === 0;
+  const reduced = useReducedMotion();
+  const saveScale = useSharedValue(1);
+  const saveAnim = useAnimatedStyle(() => ({ transform: [{ scale: saveScale.value }] }));
 
   return (
     <View
       style={[
         styles.card,
         {
-          backgroundColor: t.surface,
-          borderColor: t.border,
+          backgroundColor: media ? '#0C0C10' : t.scheme === 'light' ? '#1A1714' : '#141418',
           shadowColor: t.shadowColor,
-          shadowOpacity: t.shadowOpacity,
+          shadowOpacity: front ? (t.scheme === 'light' ? 0.2 : 0.45) : 0.1,
+          elevation: front ? 12 : 4,
         },
       ]}
-      accessible
+      accessible={front}
       accessibilityRole="summary"
       accessibilityLabel={`Featured take by ${author.name} in ${HOOD_LABEL[take.hood]}. ${headline}`}
+      accessibilityActions={front ? [{ name: 'activate', label: 'Open take' }] : undefined}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'activate') onOpen();
+      }}
     >
-      <Pressable
-        onPress={onOpen}
-        accessibilityRole="button"
-        accessibilityLabel="Open take"
-        style={styles.mediaHit}
-      >
+      <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open take" style={styles.fill}>
         {media ? (
-          <ArenaStackMedia media={media} active={active} screenFocused={screenFocused} />
+          <ArenaStackMedia media={media} active={active && front} screenFocused={screenFocused} />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: t.surfaceMuted }]} />
+          <TextFirstSurface light={t.scheme === 'light'} />
         )}
         <LinearGradient
-          colors={[...t.mediaScrim]}
-          locations={[0.38, 0.62, 1]}
+          colors={
+            front
+              ? ['transparent', 'rgba(8,8,11,0.28)', 'rgba(8,8,11,0.9)']
+              : ['transparent', 'transparent', 'rgba(8,8,11,0.3)']
+          }
+          locations={[0.36, 0.6, 1]}
           style={styles.veil}
           pointerEvents="none"
         />
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            onSave();
-          }}
-          accessibilityRole="button"
-          accessibilityState={{ selected: isSaved }}
-          accessibilityLabel={isSaved ? 'Remove from saved' : 'Save take'}
-          hitSlop={8}
-          style={styles.saveBtn}
-        >
-          <BookmarkIcon size={18} color="#FFFFFF" strokeWidth={isSaved ? 2.6 : 2.1} />
-        </Pressable>
-        <View style={styles.meta} pointerEvents="box-none">
-          <Text allowFontScaling={false} style={styles.hood} numberOfLines={1}>
-            {HOOD_LABEL[take.hood]}
-          </Text>
-          <Text allowFontScaling style={styles.headline} numberOfLines={3}>
-            {headline}
-          </Text>
-          <View style={styles.authorRow}>
-            <Avatar name={author.name} tint={author.tint} size={24} />
-            <Text allowFontScaling={false} style={styles.author} numberOfLines={1}>
-              {author.name}
-            </Text>
-            <Text allowFontScaling={false} style={styles.time}>
-              · {timeAgo(take.createdAt)}
-            </Text>
-          </View>
-          <View style={styles.stats}>
-            <Text allowFontScaling={false} style={styles.stat}>
-              ↑ {compact(take.reactions)}
-            </Text>
-            <Text allowFontScaling={false} style={styles.stat}>
-              💬 {compact(commentCount)}
-            </Text>
-            {take.clashes > 0 ? (
-              <Text allowFontScaling={false} style={styles.stat}>
-                ⚔ {compact(take.clashes)}
-              </Text>
-            ) : null}
-          </View>
-        </View>
       </Pressable>
 
-      <View style={[styles.actions, { backgroundColor: t.surface, borderTopColor: t.border }]}>
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            onReact();
-          }}
-          accessibilityRole="button"
-          accessibilityState={{ selected: hasReacted }}
-          accessibilityLabel="React"
-          style={styles.action}
-        >
-          <ArrowBigUpIcon
-            size={18}
-            color={hasReacted ? t.textPrimary : t.textSecondary}
-            strokeWidth={hasReacted ? 2.5 : 2.1}
-          />
-          <Text allowFontScaling={false} style={[styles.actionLabel, { color: t.textSecondary }]}>
-            {compact(take.reactions)}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            onComment();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Open comments"
-          style={styles.action}
-        >
-          <CommentIcon size={17} color={t.textSecondary} strokeWidth={2.1} />
-          <Text allowFontScaling={false} style={[styles.actionLabel, { color: t.textSecondary }]}>
-            {commentCount > 0 ? compact(commentCount) : 'Reply'}
-          </Text>
-        </Pressable>
-        <PressableScale
-          onPress={() => {
-            hapticTap();
-            onClash();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Clash on this take"
-          style={[styles.clash, { backgroundColor: t.clashFill }]}
-        >
-          <ArenaIcon size={13} color={t.clashText} strokeWidth={2.6} />
-          <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
-            CLASH
-          </Text>
-        </PressableScale>
-        <View style={styles.spacer} />
-      </View>
+      {front ? (
+        <>
+          <Pressable
+            onPress={() => {
+              hapticTap();
+              if (!reduced) {
+                saveScale.value = withSequence(
+                  withSpring(1.22, { damping: 10, stiffness: 420 }),
+                  withSpring(1, { damping: 14, stiffness: 280 }),
+                );
+              }
+              onSave();
+            }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSaved }}
+            accessibilityLabel={isSaved ? 'Remove from saved' : 'Save take'}
+            hitSlop={8}
+            style={styles.saveBtn}
+          >
+            <Animated.View style={saveAnim}>
+              <BookmarkIcon size={15} color="#FFFFFF" strokeWidth={isSaved ? 2.6 : 2} />
+            </Animated.View>
+          </Pressable>
+
+          <View style={styles.meta} pointerEvents="box-none">
+            <Text allowFontScaling={false} style={styles.hood} numberOfLines={1}>
+              {HOOD_LABEL[take.hood]}
+            </Text>
+            <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open take">
+              <Text allowFontScaling style={[styles.headline, !media && styles.headlineTextOnly]} numberOfLines={media ? 3 : 5}>
+                {headline}
+              </Text>
+            </Pressable>
+            <Text allowFontScaling={false} style={styles.byline} numberOfLines={1}>
+              @{author.handle} · {timeAgo(take.createdAt)}
+            </Text>
+
+            <View style={styles.bottomRow}>
+              <View style={styles.stats}>
+                <Pressable
+                  onPress={() => {
+                    hapticTap();
+                    onReact();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: hasReacted }}
+                  accessibilityLabel="React"
+                  style={styles.statBtn}
+                >
+                  <ArrowBigUpIcon size={15} color="#FFFFFF" strokeWidth={hasReacted ? 2.6 : 2.1} />
+                  <Text allowFontScaling={false} style={styles.statText}>
+                    {compact(take.reactions)}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    hapticTap();
+                    onComment();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open comments"
+                  style={styles.statBtn}
+                >
+                  <CommentIcon size={14} color="#FFFFFF" strokeWidth={2.1} />
+                  <Text allowFontScaling={false} style={styles.statText}>
+                    {compact(commentCount)}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <PressableScale
+                onPress={() => {
+                  hapticTap();
+                  onClash();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Clash on this take"
+                style={[styles.clash, { backgroundColor: t.clashFill }]}
+              >
+                <ArenaIcon size={12} color={t.clashText} strokeWidth={2.6} />
+                <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
+                  CLASH
+                </Text>
+              </PressableScale>
+            </View>
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+/** Editorial text-only featured surface — abstract, no empty placeholder. */
+function TextFirstSurface({ light }: { light: boolean }): React.JSX.Element {
+  return (
+    <View style={[styles.textSurface, { backgroundColor: light ? '#1C1916' : '#16161A' }]}>
+      <LinearGradient
+        colors={
+          light
+            ? ['rgba(201,169,106,0.22)', 'transparent', 'rgba(8,8,11,0.5)']
+            : ['rgba(201,169,106,0.14)', 'transparent', 'rgba(0,0,0,0.45)']
+        }
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <ScribbleCircle size={130} color="#C9A96A" opacity={0.22} style={styles.doodleCircle} />
+      <Squiggle size={150} color="#FFFFFF" opacity={0.14} style={styles.doodleSquiggle} />
     </View>
   );
 }
@@ -186,27 +217,25 @@ export const ArenaStackCard = React.memo(ArenaStackCardBase);
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    borderRadius: 22,
+    borderRadius: 30,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowRadius: 22,
+    shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
-    elevation: 10,
   },
-  mediaHit: { flex: 1 },
+  fill: { ...StyleSheet.absoluteFillObject },
   veil: { ...StyleSheet.absoluteFillObject },
   saveBtn: {
     position: 'absolute',
     top: 14,
     right: 14,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(8,8,11,0.4)',
+    backgroundColor: 'rgba(8,8,11,0.36)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: 'rgba(255,255,255,0.26)',
   },
   meta: {
     position: 'absolute',
@@ -214,60 +243,61 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: space.md,
-    paddingBottom: space.md,
-    gap: 6,
+    paddingBottom: space.md + 2,
+    gap: 5,
   },
   hood: {
     ...typeScale.caption,
     fontSize: 11,
-    letterSpacing: 0.9,
+    letterSpacing: 1.1,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: 'rgba(255,255,255,0.88)',
     textTransform: 'uppercase',
-    opacity: 0.92,
   },
   headline: {
-    ...typeScale.takeText,
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 24,
+    lineHeight: 29,
     fontWeight: '800',
-    letterSpacing: -0.4,
+    letterSpacing: -0.55,
     color: '#FFFFFF',
   },
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  author: { ...typeScale.label, fontSize: 13, color: '#FFFFFF', fontWeight: '700', flexShrink: 1 },
-  time: { ...typeScale.meta, fontSize: 12, color: 'rgba(255,255,255,0.72)' },
-  stats: { flexDirection: 'row', gap: space.md, marginTop: 4 },
-  stat: { ...typeScale.meta, fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
-  actions: {
+  headlineTextOnly: {
+    fontSize: 26,
+    lineHeight: 31,
+  },
+  byline: {
+    ...typeScale.meta,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 2,
+  },
+  bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: space.sm,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 2,
   },
-  action: {
-    minHeight: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 2,
-  },
-  actionLabel: { ...typeScale.meta, fontSize: 13 },
+  stats: { flexDirection: 'row', alignItems: 'center', gap: space.md, flexShrink: 1 },
+  statBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32 },
+  statText: { ...typeScale.meta, fontSize: 13, color: '#FFFFFF', fontWeight: '600' },
   clash: {
     minHeight: 34,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: space.md,
+    paddingHorizontal: 14,
     borderRadius: radius.pill,
   },
   clashText: {
     ...typeScale.label,
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  spacer: { flex: 1 },
+  textSurface: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  doodleCircle: { position: 'absolute', top: 36, right: 18 },
+  doodleSquiggle: { position: 'absolute', top: '38%', left: 20 },
 });

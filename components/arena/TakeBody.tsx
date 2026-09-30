@@ -1,18 +1,19 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Take } from '../../store';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { space, typeScale, useThemeColors } from '../../theme';
 import { TakeMedia } from './TakeMedia';
 
 export interface TakeBodyProps {
   take: Take;
   onOpen: () => void;
-  /** When true, media bleeds edge-to-edge past the feed's horizontal padding. */
-  edgeMedia?: boolean;
 }
 
-/** Take content — typography-first for text, image-forward for media. */
-export function TakeBody({ take, onOpen, edgeMedia = false }: TakeBodyProps): React.JSX.Element {
+/**
+ * Take content — typography-first for text, bounded media plate when present.
+ * Media stays inside feed margins with rounded clipping (never edge bleed).
+ */
+export function TakeBody({ take, onOpen }: TakeBodyProps): React.JSX.Element {
   const t = useThemeColors();
   return (
     <View style={styles.wrap}>
@@ -37,9 +38,9 @@ export function TakeBody({ take, onOpen, edgeMedia = false }: TakeBodyProps): Re
           onPress={onOpen}
           accessibilityRole="button"
           accessibilityLabel="Open take media"
-          style={edgeMedia ? styles.mediaBleed : styles.mediaInset}
+          style={styles.mediaFrame}
         >
-          <TakeMedia media={take.media} edge={edgeMedia} />
+          <TakeMedia media={take.media} />
         </Pressable>
       ) : null}
     </View>
@@ -61,9 +62,8 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: '600',
   },
-  mediaInset: { borderRadius: 16, overflow: 'hidden' },
-  mediaBleed: {
-    marginHorizontal: -layout.screenX,
+  mediaFrame: {
+    borderRadius: 16,
     overflow: 'hidden',
   },
 });

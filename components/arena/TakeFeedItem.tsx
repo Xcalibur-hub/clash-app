@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { ChallengerComment, Take, User } from '../../store';
-import { layout, space } from '../../theme';
+import { layout, space, useThemeColors } from '../../theme';
 import { TakeActionRow } from './TakeActionRow';
 import { TakeBody } from './TakeBody';
 import { TakeHeader } from './TakeHeader';
@@ -25,8 +25,8 @@ export interface TakeFeedItemProps {
 }
 
 /**
- * A single Arena post embedded flat in the feed — header → content → leading
- * rebuttal → actions. Media can bleed edge-to-edge; no card chrome.
+ * Flat Fresh Take — typography + controlled media, no giant card chrome.
+ * Visually subordinate to the featured deck.
  */
 function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
   const {
@@ -45,13 +45,14 @@ function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
     onShare,
     onMore,
   } = props;
+  const t = useThemeColors();
   return (
     <View style={styles.item}>
       <View style={styles.padded}>
         <TakeHeader author={author} take={take} isViewer={isViewer} onMore={onMore} />
       </View>
       <View style={styles.padded}>
-        <TakeBody take={take} onOpen={onOpenDetail} edgeMedia={Boolean(take.media)} />
+        <TakeBody take={take} onOpen={onOpenDetail} />
       </View>
       <View style={styles.padded}>
         <TopRebuttalPreview comment={topComment} author={topCommentAuthor} onOpen={onOpenDetail} />
@@ -67,20 +68,26 @@ function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
           onSave={onSave}
         />
       </View>
+      <View style={[styles.rule, { backgroundColor: t.border }]} />
     </View>
   );
 }
 
-/** Memoised so a single card action never re-renders the whole feed. */
 export const TakeFeedItem = React.memo(TakeFeedItemBase);
 
 const styles = StyleSheet.create({
   item: {
-    paddingVertical: space.md,
+    paddingTop: space.md,
+    paddingBottom: space.sm,
     gap: space.sm,
   },
   padded: {
     paddingHorizontal: layout.screenX,
     gap: space.sm,
+  },
+  rule: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: space.sm,
+    marginHorizontal: layout.screenX,
   },
 });

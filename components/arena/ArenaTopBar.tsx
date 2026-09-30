@@ -13,7 +13,10 @@ export interface ArenaTopBarProps {
   paddingTop: number;
 }
 
-/** Arena masthead — theme-aware wordmark with a sparse underline accent. */
+/**
+ * Compact brand row + editorial Arena proposition.
+ * One composed hero opening — not a stacked dashboard.
+ */
 export function ArenaTopBar({ paddingTop }: ArenaTopBarProps): React.JSX.Element {
   const { state } = useClash();
   const viewer = selectViewer(state);
@@ -22,37 +25,42 @@ export function ArenaTopBar({ paddingTop }: ArenaTopBarProps): React.JSX.Element
   const t = useThemeColors();
 
   return (
-    <View style={[styles.wrap, { paddingTop: paddingTop + space.xs }]}>
-      <View style={styles.brandWrap}>
+    <View style={[styles.wrap, { paddingTop: paddingTop + 4 }]}>
+      <View style={styles.brandRow}>
         <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
           CLASH
         </Text>
-        <Underline size={72} opacity={0.35} color={t.textPrimary} style={styles.underline} />
+        <View style={styles.actions}>
+          <Pressable
+            onPress={() => {
+              hapticTap();
+              router.push('/explore');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Search CLASH"
+            hitSlop={8}
+            style={[styles.iconBtn, { backgroundColor: t.surface, borderColor: t.border }]}
+          >
+            <SearchIcon size={17} color={t.textPrimary} strokeWidth={2.2} />
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              hapticTap();
+              open();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
+            hitSlop={8}
+          >
+            <Avatar name={viewer.name} tint={viewer.tint} size={30} />
+          </Pressable>
+        </View>
       </View>
-      <View style={styles.actions}>
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            router.push('/explore');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Search CLASH"
-          hitSlop={8}
-          style={styles.icon}
-        >
-          <SearchIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            open();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Open menu"
-          hitSlop={8}
-        >
-          <Avatar name={viewer.name} tint={viewer.tint} size={30} />
-        </Pressable>
+      <View style={styles.headlineWrap}>
+        <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
+          What's everyone{'\n'}talking about?
+        </Text>
+        <Underline size={88} color={t.textPrimary} opacity={0.22} style={styles.mark} />
       </View>
     </View>
   );
@@ -60,20 +68,36 @@ export function ArenaTopBar({ paddingTop }: ArenaTopBarProps): React.JSX.Element
 
 const styles = StyleSheet.create({
   wrap: {
+    paddingHorizontal: space.md,
+    paddingBottom: space.xs,
+    gap: space.sm,
+  },
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: space.md,
-    paddingBottom: space.xs,
   },
-  brandWrap: { position: 'relative', paddingBottom: 4 },
   brand: {
-    ...typeScale.title,
-    fontSize: 22,
-    letterSpacing: 0.8,
+    ...typeScale.label,
+    fontSize: 14,
+    letterSpacing: 1.6,
     fontWeight: '800',
   },
-  underline: { position: 'absolute', bottom: -2, left: 0 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  icon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  headlineWrap: { position: 'relative', paddingBottom: 6 },
+  headline: {
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  mark: { position: 'absolute', left: 0, bottom: -2 },
 });

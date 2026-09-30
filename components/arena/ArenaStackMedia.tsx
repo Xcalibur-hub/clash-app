@@ -180,9 +180,9 @@ function ActiveVideo({
         style={styles.muteBtn}
       >
         {muted ? (
-          <VolumeXIcon size={16} color={ink.primary} strokeWidth={2.2} />
+          <VolumeXIcon size={14} color={ink.primary} strokeWidth={2.2} />
         ) : (
-          <Volume2Icon size={16} color={ink.primary} strokeWidth={2.2} />
+          <Volume2Icon size={14} color={ink.primary} strokeWidth={2.2} />
         )}
       </Pressable>
     </View>
@@ -200,26 +200,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playChip: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(8,8,11,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(8,8,11,0.45)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.28)',
   },
   muteBtn: {
     position: 'absolute',
-    right: 12,
+    left: 12,
     top: 12,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(8,8,11,0.55)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(8,8,11,0.42)',
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.22)',
   },
 });

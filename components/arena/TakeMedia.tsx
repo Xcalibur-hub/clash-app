@@ -2,20 +2,24 @@ import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { TakeMedia as TakeMediaModel } from '../../store';
-import { ink, space, typeScale } from '../../theme';
+import { ink, radius, space, typeScale } from '../../theme';
 import { PlayIcon } from '../shared/icons';
 
 /**
- * Media plate. A real image upload renders its URL; videos (and seed rows without
- * a URL) fall back to the gradient plate — video playback is deferred until a
- * player is wired in, so the play affordance stays honest about what it is.
+ * Bounded media plate for feed / detail.
+ *
+ * Feed (default): inset frame with rounded clipping and a fixed 4:5 aspect —
+ * large, but never an uncontrolled full-bleed giant. Images use cover so
+ * portrait and landscape both fill the frame without absurd height or tiny strips.
+ *
+ * `edge` is reserved for rare full-bleed contexts (e.g. detail hero); prefer inset.
  */
 export function TakeMedia({
   media,
   edge = false,
 }: {
   media: TakeMediaModel;
-  /** Edge-to-edge feed treatment — square-ish crop, no radius. */
+  /** Full-bleed treatment — no horizontal radius, still aspect-capped. */
   edge?: boolean;
 }): React.JSX.Element {
   const isVideo = media.kind === 'video';
@@ -57,18 +61,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'flex-end',
     padding: space.md,
+    width: '100%',
   },
+  /** Feed / default — controlled geometry inside screen margins. */
   inset: {
-    aspectRatio: 16 / 9,
-    borderRadius: 14,
+    aspectRatio: 5 / 4,
+    borderRadius: radius.lg,
   },
+  /** Detail-style full bleed — still aspect-capped, never intrinsic image height. */
   edge: {
     aspectRatio: 4 / 5,
     borderRadius: 0,
   },
   veil: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(8,8,11,0.22)',
+    backgroundColor: 'rgba(8,8,11,0.18)',
   },
   play: {
     position: 'absolute',

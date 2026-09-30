@@ -1,5 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { space, typeScale, useThemeColors } from '../../theme';
 
 export interface ArenaStackProgressProps {
@@ -7,29 +13,21 @@ export interface ArenaStackProgressProps {
   total: number;
 }
 
-/** Understated position cue for the featured stack. */
+/** Elegant stack position — active segment widens. */
 export function ArenaStackProgress({ index, total }: ArenaStackProgressProps): React.JSX.Element {
   const t = useThemeColors();
   if (total <= 1) return <View style={styles.spacer} />;
 
-  if (total <= 8) {
+  if (total <= 10) {
     return (
       <View
-        style={styles.dots}
+        style={styles.row}
         accessible
         accessibilityRole="text"
         accessibilityLabel={`Card ${index + 1} of ${total}`}
       >
         {Array.from({ length: total }, (_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.dot,
-              i === index
-                ? { backgroundColor: t.textPrimary, width: 16, borderRadius: 3 }
-                : { backgroundColor: t.borderStrong },
-            ]}
-          />
+          <ProgressSegment key={i} active={i === index} activeColor={t.textPrimary} idleColor={t.borderStrong} />
         ))}
       </View>
     );
@@ -46,16 +44,47 @@ export function ArenaStackProgress({ index, total }: ArenaStackProgressProps): R
   );
 }
 
+function ProgressSegment({
+  active,
+  activeColor,
+  idleColor,
+}: {
+  active: boolean;
+  activeColor: string;
+  idleColor: string;
+}): React.JSX.Element {
+  const reduced = useReducedMotion();
+  const width = useSharedValue(active ? 22 : 8);
+
+  React.useEffect(() => {
+    width.value = reduced
+      ? active
+        ? 22
+        : 8
+      : withSpring(active ? 22 : 8, { damping: 18, stiffness: 260 });
+  }, [active, reduced, width]);
+
+  const style = useAnimatedStyle(() => ({
+    width: width.value,
+    backgroundColor: active ? activeColor : idleColor,
+  }));
+
+  return <Animated.View style={[styles.seg, style]} />;
+}
+
 const styles = StyleSheet.create({
-  spacer: { height: 8 },
-  dots: {
+  spacer: { height: 6 },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: space.xs,
+    gap: 5,
+    paddingVertical: 4,
   },
-  dot: { width: 6, height: 6, borderRadius: 3 },
+  seg: {
+    height: 3,
+    borderRadius: 2,
+  },
   count: {
     ...typeScale.meta,
     fontSize: 12,

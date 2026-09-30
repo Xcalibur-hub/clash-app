@@ -110,17 +110,20 @@ function engagement(take: Take): number {
   return take.clashes * 2 + take.reactions;
 }
 
-/** Media Takes ranked for the Arena featured stack (discovery, not a new ranking RPC). */
+/** Featured stack candidates — media preferred, text Takes fill so the deck can fan. */
 export function selectFeaturedMediaTakes(
   state: ClashState,
   now: number = Date.now(),
   limit = 8,
 ): Take[] {
-  return selectLiveTakes(state, now)
-    .filter((take) => take.media != null)
+  const ranked = selectLiveTakes(state, now)
     .slice()
-    .sort((a, b) => engagement(b) - engagement(a) || b.createdAt - a.createdAt)
-    .slice(0, limit);
+    .sort((a, b) => engagement(b) - engagement(a) || b.createdAt - a.createdAt);
+  const media = ranked.filter((take) => take.media != null);
+  if (media.length >= limit) return media.slice(0, limit);
+  const mediaIds = new Set(media.map((take) => take.id));
+  const textFill = ranked.filter((take) => !mediaIds.has(take.id));
+  return [...media, ...textFill].slice(0, limit);
 }
 
 /**

@@ -18,15 +18,20 @@ export default function TabsLayout(): React.JSX.Element {
     <SidebarProvider>
       <NotificationUnreadProvider>
         <Tabs
-          tabBar={(props) => (
-            <RealmTabBar
-              {...props}
-              realm="arena"
-              onShiftRealm={(realm) => shiftTo(realm, REALM_ROUTES.vaultHome)}
-              shiftLabel="VAULT"
-              ShiftIcon={VaultIcon}
-            />
-          )}
+          tabBar={(props) => {
+            const focused = props.state.routes[props.state.index]?.name;
+            // Create is a focused composer — hide the floating dock so CTAs never collide.
+            if (focused === 'create') return null;
+            return (
+              <RealmTabBar
+                {...props}
+                realm="arena"
+                onShiftRealm={(realm) => shiftTo(realm, REALM_ROUTES.vaultHome)}
+                shiftLabel="VAULT"
+                ShiftIcon={VaultIcon}
+              />
+            );
+          }}
           screenOptions={{
             headerShown: false,
             sceneStyle: { backgroundColor: theme.background },

@@ -39,10 +39,10 @@ export interface SemanticTheme {
 /** Warm-white editorial light — not sterile pure white. */
 export const lightTheme: SemanticTheme = {
   scheme: 'light',
-  background: '#F7F7F5',
+  background: '#F4F3EF',
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
-  surfaceMuted: '#EFEFEE',
+  surfaceMuted: '#EBEAE6',
   textPrimary: '#111113',
   textSecondary: '#52525B',
   textMuted: '#71717A',
