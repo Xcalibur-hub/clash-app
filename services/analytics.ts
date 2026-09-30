@@ -12,7 +12,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import PostHog from 'posthog-react-native';
+import { PostHog } from 'posthog-react-native';
 import { redact } from './logRedact';
 
 const apiKey = (process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? '').trim();
