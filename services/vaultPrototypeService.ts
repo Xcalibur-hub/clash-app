@@ -1,11 +1,9 @@
 /**
- * PROTOTYPE-ONLY catalog helpers (spec §20–§22).
+ * PROTOTYPE-ONLY catalog helpers (legacy in-memory store).
  *
- * These read `data/mockCampaigns.ts` and the in-memory store — there is no
- * campaign or attribution backend yet, and this step deliberately does not build
- * one. They are isolated here so the production Vault API in
- * `services/vaultService.ts` contains nothing simulated: when the sponsor and
- * analytics surfaces get a real backend, this file is what disappears.
+ * Production Sponsor Studio uses `services/sponsorService.ts` RPCs.
+ * These helpers remain only for residual mock store seeds — not production
+ * advertiser screens.
  *
  * Nothing here grants access to anything, and nothing here is authority.
  */

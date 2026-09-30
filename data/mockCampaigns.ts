@@ -1,11 +1,9 @@
 /**
- * Sponsor campaigns (spec §20–§22, §26 — 5 campaigns, 4 sponsors).
+ * Simulated campaign fixtures for legacy in-memory store seeds only.
  *
- * The hero campaign NOVOCAINE20 uses the exact spec dataset:
- * 12,842 clicks · 1,281 redemptions · 1,034 orders · ₹8.4L GMV · 8.1% conv
- * Goa 34% · Mumbai 27% · Bangalore 18% · Delhi 9% · Other 12%.
- *
- * Everything here is SIMULATED CAMPAIGN DATA — never real transactions.
+ * Production Sponsor Studio (`app/sponsor/*`) uses live RPCs via
+ * `services/sponsorService.ts`. Do not wire these fixtures into production
+ * advertiser UI paths.
  */
 import type { Campaign, CityShare } from '../store/types';
 

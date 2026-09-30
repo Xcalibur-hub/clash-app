@@ -25,7 +25,7 @@ initAnalytics();
  * (vault)  → Vault + Creators + Radar + Analytics + Profile (premium realm)
  * clash/*  → the duel, pushed as a modal-feeling card
  * creator/* → Vault creator profiles (public vs exclusive drops)
- * campaign/*, sponsor/* → radar detail + sponsor dashboard
+ * campaign/*, sponsor/* → Sponsor Studio (advertiser dashboard)
  */
 
 function ThemedChrome({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -71,6 +71,8 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="vault/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="vault/compose" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="campaign/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
+                  <Stack.Screen name="sponsor/index" options={{ animation: 'slide_from_right' }} />
+                  <Stack.Screen name="sponsor/new" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="sponsor/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="take/[takeId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="profile/[profileId]" options={{ animation: 'slide_from_right' }} />

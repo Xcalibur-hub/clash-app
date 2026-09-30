@@ -22,11 +22,13 @@ import {
   CloseIcon,
   CompassIcon,
   SettingsIcon,
+  StoreIcon,
   UserIcon,
   VaultIcon,
   WorldIcon,
 } from '../shared/icons';
 import { selectViewer, showNotice, useClash } from '../../store';
+import { useAuth } from '../../store/AuthProvider';
 import { useRealmSwitch } from './useRealmSwitch';
 import { REALM_ROUTES } from './realmRoutes';
 import { useSidebar } from './SidebarContext';
@@ -55,6 +57,7 @@ export function AppSidebar(): React.JSX.Element | null {
   const { shiftTo } = useRealmSwitch();
   const { state, dispatch } = useClash();
   const viewer = selectViewer(state);
+  const { signedIn } = useAuth();
 
   React.useEffect(() => {
     if (isOpen) {
@@ -151,8 +154,8 @@ export function AppSidebar(): React.JSX.Element | null {
     [router, shiftTo],
   );
 
-  const secondary: NavItem[] = React.useMemo(
-    () => [
+  const secondary: NavItem[] = React.useMemo(() => {
+    const items: NavItem[] = [
       {
         key: 'profile',
         label: 'Profile',
@@ -160,19 +163,28 @@ export function AppSidebar(): React.JSX.Element | null {
         match: (path) => path.includes('profile'),
         onPress: (go) => go(() => router.push('/(tabs)/profile')),
       },
-      {
-        key: 'settings',
-        label: 'Settings',
-        icon: SettingsIcon,
-        match: () => false,
-        onPress: () => {
-          hapticTap();
-          dispatch(showNotice('Settings are not wired up yet.'));
-        },
+    ];
+    if (signedIn) {
+      items.push({
+        key: 'sponsor',
+        label: 'Sponsor Studio',
+        icon: StoreIcon,
+        match: (path) => path.includes('/sponsor'),
+        onPress: (go) => go(() => router.push('/sponsor')),
+      });
+    }
+    items.push({
+      key: 'settings',
+      label: 'Settings',
+      icon: SettingsIcon,
+      match: () => false,
+      onPress: () => {
+        hapticTap();
+        dispatch(showNotice('Settings are not wired up yet.'));
       },
-    ],
-    [dispatch, router],
-  );
+    });
+    return items;
+  }, [dispatch, router, signedIn]);
 
   if (!visible) return null;
 

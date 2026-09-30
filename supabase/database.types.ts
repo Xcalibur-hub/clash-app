@@ -1824,9 +1824,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activate_advertiser: {
+        Args: { p_advertiser_id: string }
+        Returns: {
+          created_at: string
+          created_by_profile_id: string
+          id: string
+          name: string
+          slug: string
+          status: Database["public"]["Enums"]["advertiser_status"]
+          updated_at: string
+        }
+      }
       add_drop_to_collection: {
         Args: { p_collection_id: string; p_drop_id: string }
         Returns: undefined
+      }
+      advertiser_campaign_creator_stats: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          assignment_status: Database["public"]["Enums"]["campaign_creator_status"]
+          attributed_conversions: number
+          clicks: number
+          commission_accrued_minor: number
+          commission_type: Database["public"]["Enums"]["commission_type"]
+          commission_value: number
+          creator_handle: string
+          creator_name: string
+          creator_profile_id: string
+        }[]
       }
       advertiser_campaign_geo_summary: {
         Args: { p_campaign_id: string }
@@ -1848,6 +1874,39 @@ export type Database = {
           gross_revenue_minor: number
         }[]
       }
+      advertiser_studio_overview: {
+        Args: { p_advertiser_id: string }
+        Returns: {
+          active_campaigns: number
+          advertiser_id: string
+          attributed_conversions: number
+          clicks: number
+          conversions: number
+          creator_commission_minor: number
+          gross_revenue_minor: number
+          total_campaigns: number
+        }[]
+      }
+      assert_advertiser_owner: {
+        Args: { p_advertiser_id: string }
+        Returns: string
+      }
+      assert_campaign_owner: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          advertiser_id: string
+          campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at: string
+          currency: string
+          description: string
+          ends_at: string | null
+          id: string
+          starts_at: string | null
+          status: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+          updated_at: string
+        }
+      }
       assert_rate_limit: {
         Args: {
           p_action: string
@@ -1856,6 +1915,23 @@ export type Database = {
           p_window: unknown
         }
         Returns: undefined
+      }
+      assign_creator_to_campaign: {
+        Args: {
+          p_campaign_id: string
+          p_commission_type?: Database["public"]["Enums"]["commission_type"]
+          p_commission_value?: number
+          p_creator_profile_id: string
+        }
+        Returns: {
+          campaign_id: string
+          commission_type: Database["public"]["Enums"]["commission_type"]
+          commission_value: number
+          created_at: string
+          creator_profile_id: string
+          id: string
+          status: Database["public"]["Enums"]["campaign_creator_status"]
+        }
       }
       block_profile: {
         Args: { p_target_id: string }
@@ -1919,6 +1995,56 @@ export type Database = {
         }
         Returns: undefined
       }
+      create_advertiser: {
+        Args: { p_name: string; p_slug: string }
+        Returns: {
+          created_at: string
+          created_by_profile_id: string
+          id: string
+          name: string
+          slug: string
+          status: Database["public"]["Enums"]["advertiser_status"]
+          updated_at: string
+        }
+      }
+      create_campaign_coupon: {
+        Args: {
+          p_campaign_id: string
+          p_code: string
+          p_creator_profile_id: string
+          p_expires_at?: string
+          p_max_redemptions?: number
+          p_starts_at?: string
+        }
+        Returns: {
+          campaign_id: string
+          code: string
+          created_at: string
+          creator_profile_id: string
+          expires_at: string | null
+          id: string
+          max_redemptions: number | null
+          redemption_count: number
+          starts_at: string | null
+          status: Database["public"]["Enums"]["coupon_code_status"]
+        }
+      }
+      create_campaign_referral_link: {
+        Args: {
+          p_campaign_id: string
+          p_creator_profile_id: string
+          p_expires_at?: string
+        }
+        Returns: {
+          campaign_id: string
+          created_at: string
+          creator_profile_id: string
+          expires_at: string | null
+          id: string
+          status: Database["public"]["Enums"]["referral_link_status"]
+          token: string
+        }
+      }
       create_collection: {
         Args: { p_description?: string; p_title: string; p_vault_id: string }
         Returns: {
@@ -1947,6 +2073,30 @@ export type Database = {
           p_question: string
         }
         Returns: string
+      }
+      create_sponsor_campaign: {
+        Args: {
+          p_advertiser_id: string
+          p_campaign_type?: Database["public"]["Enums"]["sponsor_campaign_type"]
+          p_currency?: string
+          p_description?: string
+          p_ends_at?: string
+          p_starts_at?: string
+          p_title: string
+        }
+        Returns: {
+          advertiser_id: string
+          campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at: string
+          currency: string
+          description: string
+          ends_at: string | null
+          id: string
+          starts_at: string | null
+          status: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+          updated_at: string
+        }
       }
       create_take: {
         Args: {
@@ -2084,6 +2234,10 @@ export type Database = {
         Args: { p_advertiser_id: string }
         Returns: boolean
       }
+      is_assigned_campaign_creator: {
+        Args: { p_campaign_id: string }
+        Returns: boolean
+      }
       is_hood_moderator: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: boolean
@@ -2100,6 +2254,50 @@ export type Database = {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: undefined
       }
+      list_campaign_coupons: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          campaign_id: string
+          code: string
+          created_at: string
+          creator_profile_id: string
+          expires_at: string | null
+          id: string
+          max_redemptions: number | null
+          redemption_count: number
+          starts_at: string | null
+          status: Database["public"]["Enums"]["coupon_code_status"]
+        }[]
+      }
+      list_campaign_referral_links: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          campaign_id: string
+          created_at: string
+          creator_profile_id: string
+          expires_at: string | null
+          id: string
+          status: Database["public"]["Enums"]["referral_link_status"]
+          token: string
+        }[]
+      }
+      list_my_sponsor_campaigns: {
+        Args: { p_advertiser_id: string }
+        Returns: {
+          attributed_conversions: number
+          campaign_id: string
+          campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
+          clicks: number
+          conversions: number
+          creator_commission_minor: number
+          currency: string
+          ends_at: string
+          gross_revenue_minor: number
+          starts_at: string
+          status: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+        }[]
+      }
       mindshift_stats: {
         Args: { p_take_id: string }
         Returns: Json
@@ -2112,9 +2310,29 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      owns_campaign_via_advertiser: {
+        Args: { p_campaign_id: string }
+        Returns: boolean
+      }
       owns_profile: {
         Args: { p_profile_id: string }
         Returns: boolean
+      }
+      pause_sponsor_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          advertiser_id: string
+          campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at: string
+          currency: string
+          description: string
+          ends_at: string | null
+          id: string
+          starts_at: string | null
+          status: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+          updated_at: string
+        }
       }
       profile_clash_list: {
         Args: { p_profile_id: string }
@@ -2199,6 +2417,18 @@ export type Database = {
           occurred_at: string
         }
       }
+      remove_creator_from_campaign: {
+        Args: { p_campaign_id: string; p_creator_profile_id: string }
+        Returns: {
+          campaign_id: string
+          commission_type: Database["public"]["Enums"]["commission_type"]
+          commission_value: number
+          created_at: string
+          creator_profile_id: string
+          id: string
+          status: Database["public"]["Enums"]["campaign_creator_status"]
+        }
+      }
       remove_drop_from_collection: {
         Args: { p_collection_id: string; p_drop_id: string }
         Returns: undefined
@@ -2211,9 +2441,44 @@ export type Database = {
         Args: { p_game_id: string; p_winning_option_id: string }
         Returns: Json
       }
+      resume_sponsor_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          advertiser_id: string
+          campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at: string
+          currency: string
+          description: string
+          ends_at: string | null
+          id: string
+          starts_at: string | null
+          status: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+          updated_at: string
+        }
+      }
       run_maintenance: {
         Args: { p_limit?: number }
         Returns: Json
+      }
+      set_sponsor_campaign_status: {
+        Args: {
+          p_campaign_id: string
+          p_status: Database["public"]["Enums"]["sponsor_campaign_status"]
+        }
+        Returns: {
+          advertiser_id: string
+          campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at: string
+          currency: string
+          description: string
+          ends_at: string | null
+          id: string
+          starts_at: string | null
+          status: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+          updated_at: string
+        }
       }
       settle_clash: {
         Args: { p_clash_id: string }
@@ -2304,6 +2569,47 @@ export type Database = {
       unmute_profile: {
         Args: { p_target_id: string }
         Returns: undefined
+      }
+      update_creator_commission: {
+        Args: {
+          p_campaign_id: string
+          p_commission_type: Database["public"]["Enums"]["commission_type"]
+          p_commission_value: number
+          p_creator_profile_id: string
+        }
+        Returns: {
+          campaign_id: string
+          commission_type: Database["public"]["Enums"]["commission_type"]
+          commission_value: number
+          created_at: string
+          creator_profile_id: string
+          id: string
+          status: Database["public"]["Enums"]["campaign_creator_status"]
+        }
+      }
+      update_sponsor_campaign: {
+        Args: {
+          p_campaign_id: string
+          p_clear_ends?: boolean
+          p_clear_starts?: boolean
+          p_description?: string
+          p_ends_at?: string
+          p_starts_at?: string
+          p_title?: string
+        }
+        Returns: {
+          advertiser_id: string
+          campaign_type: Database["public"]["Enums"]["sponsor_campaign_type"]
+          created_at: string
+          currency: string
+          description: string
+          ends_at: string | null
+          id: string
+          starts_at: string | null
+          status: Database["public"]["Enums"]["sponsor_campaign_status"]
+          title: string
+          updated_at: string
+        }
       }
       update_vault: {
         Args: { p_description?: string; p_title: string; p_vault_id: string }

@@ -55,7 +55,12 @@ export type AnalyticsEvent =
   | 'vault_opened'
   | 'vault_drop_opened'
   | 'vault_drop_created'
-  | 'profile_viewed';
+  | 'profile_viewed'
+  | 'sponsor_dashboard_viewed'
+  | 'sponsor_campaign_created'
+  | 'sponsor_creator_assigned'
+  | 'sponsor_referral_created'
+  | 'sponsor_coupon_created';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([

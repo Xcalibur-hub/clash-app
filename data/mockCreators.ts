@@ -1,11 +1,8 @@
 /**
- * Sponsor-prototype creator catalogue (spec §20–§22).
+ * Dev-only sponsor prototype creator catalogue.
  *
- * These rows feed ONLY the prototype sponsor screens (`app/campaign/`,
- * `app/sponsor/`) and their `OverviewGrid`. The Vault no longer reads this file:
- * creator Vaults are real `creator_vaults` rows with real profiles, and the Vault
- * UI speaks `services/vaultService.ts`. Kept isolated so nothing mock can mix
- * with authenticated production Vault state. The sponsor phase replaces it.
+ * Production Sponsor Studio uses live profile search + campaign_creators.
+ * Kept only for residual in-memory store seeds — not production paths.
  */
 import type { Creator } from '../store/types';
 
