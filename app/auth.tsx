@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../store/AuthProvider';
+import { analytics } from '../services/analytics';
 import { SupabaseError } from '../services/supabaseClient';
 import { layout, radius, space, typeScale, useThemeColors } from '../theme';
 
@@ -130,6 +131,8 @@ export default function AuthScreen(): React.JSX.Element {
     setError(null);
     try {
       await verifyOtp(email.trim(), code);
+      // Success only — identity attach happens in AuthHydrator.
+      analytics.track('auth_completed', { source: 'otp' });
     } catch (caught) {
       setError(authErrorMessage(caught));
     } finally {

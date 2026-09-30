@@ -15,6 +15,7 @@ import {
 } from '../../services/vaultService';
 import type { CreatorVault, StorefrontDrop, VaultCollection, VaultSubscriptionState } from '../../services/vaultMappers';
 import { errorText } from '../../services/supabaseClient';
+import { analytics } from '../../services/analytics';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { EmptyState } from '../shared/EmptyState';
@@ -99,6 +100,11 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       setStorefront(drops);
       setCollections(cols);
       setPhase('ready');
+      analytics.trackOnce(`vault_opened:${creatorId}`, 'vault_opened', {
+        realm: 'vault',
+        is_creator: me === creatorId,
+        is_guest: me === null,
+      });
     } catch (error) {
       void errorText(error);
       setPhase('error');

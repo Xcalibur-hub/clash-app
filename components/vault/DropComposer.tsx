@@ -19,6 +19,7 @@ import { fetchMyVault, createDrop, publishDrop } from '../../services/vaultServi
 import type { CreatorVault } from '../../services/vaultMappers';
 import { completeUpload, createUpload, failUpload, readPickedBytes, uploadFile } from '../../services/mediaService';
 import { errorText } from '../../services/supabaseClient';
+import { analytics } from '../../services/analytics';
 import type { MediaVisibility } from '../../supabase/types';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { GlowButton } from '../shared/GlowButton';
@@ -102,6 +103,12 @@ export function DropComposer(): React.JSX.Element {
       const mediaObjectId = media ? await uploadMedia(media, visibility) : undefined;
       const drop = await createDrop(vault.id, caption.trim(), accessLevel, mediaObjectId);
       if (publish) await publishDrop(drop.id);
+      analytics.track('vault_drop_created', {
+        realm: 'vault',
+        vault_access_type: accessLevel,
+        media_type: media ? (media.kind === 'video' ? 'video' : 'image') : 'none',
+        take_has_media: Boolean(media),
+      });
       dispatch(showNotice(publish ? 'Drop published.' : 'Draft saved.'));
       router.back();
     } catch (error) {

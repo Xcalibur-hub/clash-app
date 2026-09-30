@@ -13,6 +13,7 @@ import { CloseIcon } from '../../components/shared/icons';
 import { HOOD_IDS, toDbHood } from '../../data/hoods';
 import { useMediaPicker, type PickedMedia } from '../../hooks/useMediaPicker';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { analytics } from '../../services/analytics';
 import { postTake, type NewTakeMedia } from '../../services/apiService';
 import {
   completeUpload,
@@ -151,6 +152,12 @@ export default function CreateTakeScreen(): React.JSX.Element {
       }
       // create_take derives the author and stamps expiry/counters server-side.
       const take = await postTake(text.trim(), hood, newMedia);
+      analytics.track('take_created', {
+        realm: 'arena',
+        hood_id: hood,
+        take_has_media: Boolean(newMedia),
+        media_type: newMedia ? (media?.kind === 'video' ? 'video' : 'image') : 'none',
+      });
       dispatch(createTake(take));
       router.replace('/(tabs)');
     } catch (error) {

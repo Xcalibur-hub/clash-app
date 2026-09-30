@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { fetchHoodSummaries, joinHood, leaveHood, type HoodSummary } from '../../services/hoodService';
+import { analytics } from '../../services/analytics';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { compact } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -51,7 +52,10 @@ export function HoodsSection({ profileId, signedIn }: HoodsSectionProps): React.
     hapticTap();
     try {
       if (summary.joined) await leaveHood(summary.hood.id);
-      else await joinHood(summary.hood.id);
+      else {
+        await joinHood(summary.hood.id);
+        analytics.track('hood_joined', { hood_id: summary.hood.id, realm: 'arena', source: 'explore' });
+      }
       await load();
     } catch {
       /* leave shelf unchanged */

@@ -52,7 +52,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name: isDevelopment ? 'CLASH (Dev)' : 'CLASH',
     slug: isDevelopment ? 'clash-dev' : 'clash',
     scheme: isDevelopment ? 'clash-dev' : 'clash',
-    plugins: [...(config.plugins ?? []), 'expo-video', sentryPlugin],
+    plugins: [...(config.plugins ?? []), 'expo-video', 'expo-localization', sentryPlugin],
     extra: {
       ...config.extra,
       appVariant: variant,

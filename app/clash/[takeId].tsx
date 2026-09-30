@@ -22,6 +22,7 @@ import {
   type ClashParticipant,
   type ClashView,
 } from '../../services/clashEngineService';
+import { analytics } from '../../services/analytics';
 import { errorText, SupabaseError } from '../../services/supabaseClient';
 import { showNotice, useClash, type Side, type User } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
@@ -120,6 +121,10 @@ export default function ClashScreen(): React.JSX.Element {
     setBusy(true);
     try {
       await submitJudgement(view.clashId, side);
+      analytics.track('judgement_submitted', {
+        realm: 'arena',
+        clash_mode: view.mode,
+      });
       await load();
     } catch (e) {
       dispatch(showNotice(clashErrorMessage(e)));

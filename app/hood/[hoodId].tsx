@@ -24,6 +24,7 @@ import {
   type HoodGameView,
 } from '../../services/hoodGameService';
 import { fetchHoodOverview, joinHood, leaveHood, type HoodOverview } from '../../services/hoodService';
+import { analytics } from '../../services/analytics';
 import { fetchFollowState } from '../../services/socialService';
 import { errorText } from '../../services/supabaseClient';
 import {
@@ -185,7 +186,10 @@ export default function HoodScreen(): React.JSX.Element {
     setOverview((o) => (o ? { ...o, joined: !o.joined, memberCount: Math.max(0, o.memberCount + (o.joined ? -1 : 1)) } : o));
     try {
       if (wasJoined) await leaveHood(hood.id);
-      else await joinHood(hood.id);
+      else {
+        await joinHood(hood.id);
+        analytics.track('hood_joined', { hood_id: hood.id, realm: 'arena' });
+      }
       await load();
     } catch (error) {
       await load();

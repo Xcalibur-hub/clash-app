@@ -17,6 +17,7 @@ import {
   OnboardSayDemo,
 } from '../components/onboarding/OnboardDemos';
 import { ONBOARDING_STAGES } from '../data/onboarding';
+import { analytics } from '../services/analytics';
 import { markOnboarded, useClash } from '../store';
 import { space, typeScale, useThemeColors } from '../theme';
 import { Squiggle } from '../components/shared/Doodles';
@@ -35,6 +36,7 @@ export default function OnboardScreen(): React.JSX.Element {
 
   const finish = React.useCallback((): void => {
     dispatch(markOnboarded());
+    analytics.track('onboarding_completed');
     router.replace('/(tabs)');
   }, [dispatch, router]);
 

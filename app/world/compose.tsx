@@ -32,6 +32,7 @@ import {
   uploadFile,
 } from '../../services/mediaService';
 import { errorText } from '../../services/supabaseClient';
+import { analytics } from '../../services/analytics';
 import { createWorldDrop, fetchMission, type WorldMission } from '../../services/worldService';
 import { showNotice, useClash } from '../../store';
 import { card, color, ink, radius, space, typeScale } from '../../theme';
@@ -116,6 +117,10 @@ export default function WorldComposeScreen(): React.JSX.Element {
         caption: caption.trim(),
         latitude: point.latitude,
         longitude: point.longitude,
+      });
+      analytics.track('world_drop_created', {
+        realm: 'world',
+        media_type: media.kind === 'video' ? 'video' : 'image',
       });
       dispatch(showNotice('World Drop published'));
       router.replace('/world');

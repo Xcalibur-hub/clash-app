@@ -1,6 +1,7 @@
 import React from 'react';
 import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
 import { ArenaFeaturedStack } from '../../components/arena/ArenaFeaturedStack';
@@ -14,6 +15,7 @@ import { ArenaIcon, CompassIcon, UserIcon } from '../../components/shared/icons'
 import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { currentViewerProfileId, toggleTakeReaction } from '../../services/apiService';
+import { analytics } from '../../services/analytics';
 import { fetchFollowState, fetchFollowingIds } from '../../services/socialService';
 import { errorText } from '../../services/supabaseClient';
 import {
@@ -66,6 +68,15 @@ export default function ArenaScreen(): React.JSX.Element {
   const [menu, setMenu] = React.useState<FeedMenu | null>(null);
   /** Guards against double taps racing the reaction RPC for the same Take. */
   const reactionInFlight = React.useRef<Set<string>>(new Set());
+
+  useFocusEffect(
+    React.useCallback(() => {
+      analytics.track('arena_viewed', {
+        realm: 'arena',
+        is_guest: !signedIn,
+      });
+    }, [signedIn]),
+  );
 
   // Load the signed-in viewer's follow graph once per session (Following scope).
   React.useEffect(() => {

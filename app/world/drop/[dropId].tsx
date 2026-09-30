@@ -16,6 +16,7 @@ import { Notice } from '../../../components/shared/Notice';
 import { BackIcon, PlayIcon, WorldIcon } from '../../../components/shared/icons';
 import { useClock } from '../../../hooks/useClock';
 import { errorText } from '../../../services/supabaseClient';
+import { analytics } from '../../../services/analytics';
 import { fetchWorldDrop, type WorldDrop } from '../../../services/worldService';
 import { showNotice, useClash } from '../../../store';
 import { radius, space, typeScale, useThemeColors } from '../../../theme';
@@ -43,7 +44,16 @@ export default function WorldDropDetailScreen(): React.JSX.Element {
     (async () => {
       try {
         const next = await fetchWorldDrop(id);
-        if (!cancelled) setDrop(next);
+        if (!cancelled) {
+          setDrop(next);
+          if (next) {
+            analytics.trackOnce(`world_drop_opened:${next.id}`, 'world_drop_opened', {
+              realm: 'world',
+              world_distance_band: next.distanceBand ?? undefined,
+              media_type: next.media?.kind === 'video' ? 'video' : next.media ? 'image' : 'none',
+            });
+          }
+        }
       } catch (error) {
         if (!cancelled) {
           dispatch(showNotice(errorText(error)));

@@ -28,6 +28,7 @@ import { useTakeReaction } from '../../hooks/useTakeReaction';
 import { toggleUpvote } from '../../services/apiService';
 import { ClashModeSheet } from '../../components/clash/ClashModeSheet';
 import { startClash, type ClashMode } from '../../services/clashEngineService';
+import { analytics } from '../../services/analytics';
 import { fetchFollowState } from '../../services/socialService';
 import { errorText, SupabaseError } from '../../services/supabaseClient';
 import {
@@ -83,6 +84,16 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
   const take = state.takes.find((item) => item.id === id);
   const author = take ? selectAuthor(state, take.authorId) : undefined;
+
+  React.useEffect(() => {
+    if (!take || !author) return;
+    analytics.trackOnce(`take_opened:${take.id}`, 'take_opened', {
+      realm: 'arena',
+      hood_id: take.hood === 'for-you' ? undefined : take.hood,
+      take_has_media: Boolean(take.media),
+      media_type: take.media?.kind === 'video' ? 'video' : take.media ? 'image' : 'none',
+    });
+  }, [take, author]);
 
   const commentsRef = React.useRef(state.comments);
   React.useEffect(() => {
@@ -147,6 +158,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
       setClashComment(null);
       try {
         await startClash(take.id, commentId, mode);
+        analytics.track('clash_started', { realm: 'arena', clash_mode: mode });
         router.push(`/clash/${take.id}`);
       } catch (error) {
         if (error instanceof SupabaseError && error.code === 'P0005') {

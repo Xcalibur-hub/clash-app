@@ -6,6 +6,7 @@ import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SentryTestTrigger } from '../components/dev/SentryTestTrigger';
+import { initAnalytics } from '../services/analytics';
 import { initSentry, Sentry } from '../services/sentry';
 import { ClashProvider } from '../store';
 import { AuthProvider } from '../store/AuthProvider';
@@ -13,6 +14,7 @@ import { AuthHydrator } from '../store/AuthHydrator';
 import { FontBootstrap, ThemeProvider, useThemeColors } from '../theme';
 
 initSentry();
+initAnalytics();
 
 /**
  * Root shell.

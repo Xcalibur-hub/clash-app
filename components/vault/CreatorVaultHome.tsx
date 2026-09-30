@@ -15,6 +15,7 @@ import {
 } from '../../services/vaultService';
 import type { CreatorVault, StorefrontDrop } from '../../services/vaultMappers';
 import { errorText } from '../../services/supabaseClient';
+import { analytics } from '../../services/analytics';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { dockBottomPadding } from '../navigation/dockConfig';
 import { EmptyState } from '../shared/EmptyState';
@@ -50,6 +51,11 @@ export function CreatorVaultHome(): React.JSX.Element {
       setProfile(me);
       if (mine) setDrops(await fetchStorefront(mine.id));
       else setDrops([]);
+      analytics.trackOnce('vault_opened:self', 'vault_opened', {
+        realm: 'vault',
+        is_creator: true,
+        is_guest: false,
+      });
     } catch (error) {
       dispatch(showNotice(errorText(error)));
     } finally {

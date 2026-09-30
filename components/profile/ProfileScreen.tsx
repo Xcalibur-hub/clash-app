@@ -6,6 +6,7 @@ import type { Take, User } from '../../store';
 import { showNotice, useClash } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
 import { errorText } from '../../services/supabaseClient';
+import { analytics } from '../../services/analytics';
 import { fetchProfilesByIds } from '../../services/apiService';
 import { fetchFollowState, followUser, unfollowUser, type FollowState } from '../../services/socialService';
 import { fetchViewerSafetyState } from '../../services/safetyService';
@@ -92,6 +93,11 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
       setFollow(nextFollow);
       setHasVault(nextVault !== null);
       setBlocked(safety.blockedProfileIds.includes(profileId));
+      analytics.trackOnce(`profile_viewed:${profileId}`, 'profile_viewed', {
+        realm: 'profile',
+        is_self: viewerId !== null && viewerId === profileId,
+        is_guest: viewerId === null,
+      });
     } catch (error) {
       setLoadError(true);
       dispatch(showNotice(errorText(error)));

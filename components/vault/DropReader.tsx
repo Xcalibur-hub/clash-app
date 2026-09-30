@@ -8,6 +8,7 @@ import { fetchDrop, requestPrivateMediaAccess } from '../../services/vaultServic
 import type { StorefrontDrop } from '../../services/vaultMappers';
 import { getPublicMediaUrl } from '../../services/mediaService';
 import { errorText } from '../../services/supabaseClient';
+import { analytics } from '../../services/analytics';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { timeLeftLabel } from '../../utils/format';
 import { Avatar } from '../shared/Avatar';
@@ -70,9 +71,19 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
 
       if (!nextDrop.accessible) {
         setPhase('locked');
+        analytics.trackOnce(`vault_drop_opened:${dropId}`, 'vault_drop_opened', {
+          realm: 'vault',
+          vault_access_type: nextDrop.accessLevel,
+          accessible: false,
+        });
         return;
       }
       setPhase('ready');
+      analytics.trackOnce(`vault_drop_opened:${dropId}`, 'vault_drop_opened', {
+        realm: 'vault',
+        vault_access_type: nextDrop.accessLevel,
+        accessible: true,
+      });
       await resolveMedia(nextDrop);
     } catch {
       setPhase('error');

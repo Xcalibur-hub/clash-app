@@ -292,7 +292,7 @@ No function accepts a creator id as authority.
 | **Anti-abuse** | live — one ballot per account per Clash (`submit_judgement`), `rate_limit_events`, block / mute / report RPCs | Device-level fingerprinting (spec §9), weighted jurors, signed verdicts |
 | **Payments** | none — coins are decorative, and the Vault's `requestDropCheckout` reports that no provider is connected | Razorpay/UPI or StoreKit/Play Billing; the verified webhook activates the entitlement server-side through a `service_role` path shaped exactly like `vault_grant_test_subscription` |
 | **Sponsor attribution** | live surface (`app/sponsor/[campaignId].tsx`, `AttributionPanel`) over `data/mockCampaigns.ts` | Campaign + coupon tables, redemption codes, per-Hood and city-level attribution joins |
-| **Analytics** | local unlock stub (`analyticsUnlocked`) | Event stream derived from existing actions (judge, save, react, share) |
+| **Analytics** | PostHog via `services/analytics.ts` (see `docs/ANALYTICS.md`); Vault Pro unlock stub remains local | Retention dashboards; consent UI before public release |
 | **Persistence** | in-memory store; the auth session alone persists in AsyncStorage | Store hydration + optimistic sync on the same client |
 
 ---

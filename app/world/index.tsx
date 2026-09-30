@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import MapView, {
   Circle,
   type Region,
@@ -26,6 +27,7 @@ import {
 } from '../../components/world/worldMapStyle';
 import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { analytics } from '../../services/analytics';
 import {
   getForegroundPermission,
   getOneShotLocation,
@@ -78,6 +80,12 @@ export default function WorldScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const requireAuth = useRequireAuth();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      analytics.track('world_opened', { realm: 'world' });
+    }, []),
+  );
   const { dispatch } = useClash();
   const { scheme } = useTheme();
   const t = useThemeColors();

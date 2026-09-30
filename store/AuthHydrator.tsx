@@ -1,5 +1,6 @@
 import React from 'react';
 import { GUEST_VIEWER } from '../data/mockUsers';
+import { analytics } from '../services/analytics';
 import { fetchViewerProfile } from '../services/apiService';
 import { logger } from '../services/logger';
 import { setSentryUser } from '../services/sentry';
@@ -19,6 +20,14 @@ export function AuthHydrator(): null {
   const prevUid = React.useRef<string | null>(uid);
 
   React.useEffect(() => {
+    if (loading) return;
+    // Opaque auth id only — never email or profile PII.
+    setSentryUser(uid);
+    if (uid) analytics.identify(uid);
+    else analytics.reset();
+  }, [loading, uid]);
+
+  React.useEffect(() => {
     if (loading) return undefined;
     if (uid === prevUid.current) return undefined;
     prevUid.current = uid;
@@ -36,8 +45,6 @@ export function AuthHydrator(): null {
         }
       }
       if (cancelled) return;
-      // Opaque auth id only — never email or profile PII.
-      setSentryUser(uid);
       dispatch(setViewer(viewer));
       // Re-hydrate so the feed reflects the new identity's safety (block/mute),
       // reaction, upvote and viewer state — signing in mid-session filters the
