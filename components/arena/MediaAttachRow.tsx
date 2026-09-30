@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { glassBorder, glassFill, ink, layout, radius, space, typeScale } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ImageIcon, VideoIcon } from '../shared/icons';
 
@@ -13,8 +13,9 @@ const ITEMS = [
   { kind: 'video', label: 'Add video', icon: VideoIcon },
 ] as const;
 
-/** Glass attachment buttons for a new Take (reference screen 11). */
+/** Attachment buttons for a new Take. */
 export function MediaAttachRow({ onPick }: MediaAttachRowProps): React.JSX.Element {
+  const t = useThemeColors();
   return (
     <View style={styles.row}>
       {ITEMS.map(({ kind, label, icon: Icon }) => (
@@ -26,10 +27,16 @@ export function MediaAttachRow({ onPick }: MediaAttachRowProps): React.JSX.Eleme
           }}
           accessibilityRole="button"
           accessibilityLabel={label}
-          style={styles.button}
+          style={[
+            styles.button,
+            {
+              borderColor: t.border,
+              backgroundColor: t.surfaceMuted,
+            },
+          ]}
         >
-          <Icon size={16} color={ink.secondary} strokeWidth={2.4} />
-          <Text allowFontScaling={false} style={styles.label}>
+          <Icon size={16} color={t.textSecondary} strokeWidth={2.4} />
+          <Text allowFontScaling={false} style={[styles.label, { color: t.textSecondary }]}>
             {label}
           </Text>
         </Pressable>
@@ -47,9 +54,7 @@ const styles = StyleSheet.create({
     height: layout.hit - 4,
     paddingHorizontal: space.lg,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: glassBorder.regular,
-    backgroundColor: glassFill.soft,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  label: { ...typeScale.label, color: ink.secondary },
+  label: { ...typeScale.label },
 });

@@ -4,17 +4,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProfileScreen } from '../../components/profile/ProfileScreen';
 import { BackIcon } from '../../components/shared/icons';
-import { color, ink, layout, space, typeScale } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 
 /** Public profile route — any profile, self or other, shareable by id. */
 export default function PublicProfileRoute(): React.JSX.Element {
   const { profileId } = useLocalSearchParams<{ profileId?: string | string[] }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useThemeColors();
   const id = Array.isArray(profileId) ? profileId[0] : profileId;
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: t.background }]}>
       <View style={[styles.bar, { paddingTop: insets.top }]}>
         <Pressable
           onPress={() => router.back()}
@@ -23,9 +24,9 @@ export default function PublicProfileRoute(): React.JSX.Element {
           accessibilityLabel="Go back"
           style={styles.back}
         >
-          <BackIcon size={22} color={ink.primary} strokeWidth={2.2} />
+          <BackIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
-        <Text allowFontScaling={false} style={styles.title}>
+        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
           Profile
         </Text>
       </View>
@@ -35,7 +36,7 @@ export default function PublicProfileRoute(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg },
+  screen: { flex: 1 },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -43,6 +44,6 @@ const styles = StyleSheet.create({
     paddingBottom: space.sm,
     gap: space.md,
   },
-  back: { width: 40, height: 40, justifyContent: 'center' },
-  title: { ...typeScale.cardTitle, color: ink.primary },
+  back: { width: 44, height: 44, justifyContent: 'center' },
+  title: { ...typeScale.cardTitle },
 });

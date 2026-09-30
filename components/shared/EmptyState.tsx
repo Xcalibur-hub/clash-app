@@ -1,7 +1,7 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
-import { glassBorder, glassFill, ink, radius, space, typeScale } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { GlowButton } from './GlowButton';
 
 export interface EmptyStateProps {
@@ -13,8 +13,8 @@ export interface EmptyStateProps {
 }
 
 /**
- * Shared empty / error surface (spec §36). Copy stays human — raw errors are
- * never rendered to the user.
+ * Shared empty / error surface. Theme-aware so Light Mode stays readable.
+ * Copy stays human — raw errors are never rendered to the user.
  */
 export function EmptyState({
   icon: Icon,
@@ -23,15 +23,24 @@ export function EmptyState({
   actionLabel,
   onAction,
 }: EmptyStateProps): React.JSX.Element {
+  const t = useThemeColors();
   return (
     <View style={styles.wrap}>
-      <View style={styles.badge}>
-        <Icon size={26} color={ink.secondary} strokeWidth={2} />
+      <View
+        style={[
+          styles.badge,
+          {
+            backgroundColor: t.surfaceMuted,
+            borderColor: t.border,
+          },
+        ]}
+      >
+        <Icon size={26} color={t.textSecondary} strokeWidth={2} />
       </View>
-      <Text allowFontScaling={false} style={styles.title}>
+      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
         {title}
       </Text>
-      <Text allowFontScaling={false} style={styles.body}>
+      <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
         {body}
       </Text>
       {actionLabel && onAction ? (
@@ -57,12 +66,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: glassFill.strong,
-    borderWidth: 1,
-    borderColor: glassBorder.regular,
+    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: space.xs,
   },
-  title: { ...typeScale.cardTitle, color: ink.primary, textAlign: 'center' },
-  body: { ...typeScale.body, color: ink.tertiary, textAlign: 'center', maxWidth: 300 },
+  title: { ...typeScale.cardTitle, textAlign: 'center' },
+  body: { ...typeScale.body, textAlign: 'center', maxWidth: 300 },
   cta: { marginTop: space.sm },
 });

@@ -1,6 +1,15 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { card, color, ink, radius, space, typeScale } from '../../theme';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { GlowButton } from '../shared/GlowButton';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -25,6 +34,7 @@ export function PredictionComposerSheet({
   onClose,
   onPublish,
 }: PredictionComposerSheetProps): React.JSX.Element | null {
+  const t = useThemeColors();
   const [question, setQuestion] = React.useState('');
   const [options, setOptions] = React.useState<string[]>(['', '']);
   const [closesInHours, setClosesInHours] = React.useState(2);
@@ -48,98 +58,160 @@ export function PredictionComposerSheet({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.scrim}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
-        <View style={styles.sheet} accessibilityViewIsModal>
-          <Text allowFontScaling={false} style={styles.title}>Create Prediction</Text>
-          <TextInput
-            value={question}
-            onChangeText={setQuestion}
-            placeholder="Who scores first tonight?"
-            placeholderTextColor={ink.quaternary}
-            maxLength={140}
-            style={styles.input}
-            accessibilityLabel="Prediction question"
-          />
-          {options.map((option, index) => (
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.scrim, { backgroundColor: t.overlay }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
+          <View
+            style={[
+              styles.sheet,
+              {
+                borderColor: t.border,
+                backgroundColor: t.surfaceElevated,
+              },
+            ]}
+            accessibilityViewIsModal
+          >
+            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+              Create Prediction
+            </Text>
             <TextInput
-              key={`opt-${index}`}
-              value={option}
-              onChangeText={(text) => {
-                setOptions((prev) => prev.map((item, i) => (i === index ? text : item)));
-              }}
-              placeholder={`Option ${index + 1}`}
-              placeholderTextColor={ink.quaternary}
-              maxLength={60}
-              style={styles.input}
-              accessibilityLabel={`Option ${index + 1}`}
+              value={question}
+              onChangeText={setQuestion}
+              placeholder="Who scores first tonight?"
+              placeholderTextColor={t.textMuted}
+              maxLength={140}
+              style={[
+                styles.input,
+                {
+                  color: t.textPrimary,
+                  borderColor: t.border,
+                  backgroundColor: t.inputBackground,
+                },
+              ]}
+              accessibilityLabel="Prediction question"
             />
-          ))}
-          <View style={styles.row}>
-            {options.length < 4 ? (
-              <Pressable
-                onPress={() => {
-                  hapticTap();
-                  setOptions((prev) => [...prev, '']);
+            {options.map((option, index) => (
+              <TextInput
+                key={`opt-${index}`}
+                value={option}
+                onChangeText={(text) => {
+                  setOptions((prev) => prev.map((item, i) => (i === index ? text : item)));
                 }}
-                accessibilityRole="button"
-                accessibilityLabel="Add option"
-              >
-                <Text allowFontScaling={false} style={styles.link}>Add option</Text>
-              </Pressable>
-            ) : <View />}
-            {options.length > 2 ? (
-              <Pressable
-                onPress={() => {
-                  hapticTap();
-                  setOptions((prev) => prev.slice(0, -1));
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Remove last option"
-              >
-                <Text allowFontScaling={false} style={styles.link}>Remove</Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          <Text allowFontScaling={false} style={styles.label}>Closes in</Text>
-          <View style={styles.chips}>
-            {CLOSE_CHOICES.map((choice) => (
-              <Pressable
-                key={choice.hours}
-                onPress={() => {
-                  hapticTap();
-                  setClosesInHours(choice.hours);
-                }}
-                style={[styles.chip, closesInHours === choice.hours && styles.chipOn]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: closesInHours === choice.hours }}
-                accessibilityLabel={choice.label}
-              >
-                <Text allowFontScaling={false} style={[styles.chipText, closesInHours === choice.hours && styles.chipTextOn]}>
-                  {choice.label}
-                </Text>
-              </Pressable>
+                placeholder={`Option ${index + 1}`}
+                placeholderTextColor={t.textMuted}
+                maxLength={60}
+                style={[
+                  styles.input,
+                  {
+                    color: t.textPrimary,
+                    borderColor: t.border,
+                    backgroundColor: t.inputBackground,
+                  },
+                ]}
+                accessibilityLabel={`Option ${index + 1}`}
+              />
             ))}
-          </View>
+            <View style={styles.row}>
+              {options.length < 4 ? (
+                <Pressable
+                  onPress={() => {
+                    hapticTap();
+                    setOptions((prev) => [...prev, '']);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add option"
+                  hitSlop={8}
+                >
+                  <Text allowFontScaling={false} style={[styles.link, { color: t.textSecondary }]}>
+                    Add option
+                  </Text>
+                </Pressable>
+              ) : (
+                <View />
+              )}
+              {options.length > 2 ? (
+                <Pressable
+                  onPress={() => {
+                    hapticTap();
+                    setOptions((prev) => prev.slice(0, -1));
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove last option"
+                  hitSlop={8}
+                >
+                  <Text allowFontScaling={false} style={[styles.link, { color: t.textSecondary }]}>
+                    Remove
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
 
-          <GlowButton
-            label="Publish"
-            tone="light"
-            disabled={!canPublish || busy}
-            onPress={() => onPublish(question.trim(), trimmed, closesInHours)}
-          />
+            <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+              Closes in
+            </Text>
+            <View style={styles.chips}>
+              {CLOSE_CHOICES.map((choice) => {
+                const active = closesInHours === choice.hours;
+                return (
+                  <Pressable
+                    key={choice.hours}
+                    onPress={() => {
+                      hapticTap();
+                      setClosesInHours(choice.hours);
+                    }}
+                    style={[
+                      styles.chip,
+                      {
+                        borderColor: t.border,
+                        backgroundColor: active
+                          ? t.scheme === 'light'
+                            ? t.textPrimary
+                            : 'rgba(255,255,255,0.10)'
+                          : 'transparent',
+                      },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={choice.label}
+                  >
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        styles.chipText,
+                        {
+                          color: active
+                            ? t.scheme === 'light'
+                              ? t.textInverse
+                              : t.textPrimary
+                            : t.textMuted,
+                        },
+                      ]}
+                    >
+                      {choice.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <GlowButton
+              label="Publish"
+              tone="light"
+              disabled={!canPublish || busy}
+              onPress={() => onPublish(question.trim(), trimmed, closesInHours)}
+            />
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   scrim: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: color.scrim,
   },
   sheet: {
     marginHorizontal: space.md,
@@ -147,33 +219,28 @@ const styles = StyleSheet.create({
     padding: space.md,
     gap: space.sm,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: card.border,
-    backgroundColor: card.elevated,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  title: { ...typeScale.label, color: ink.primary, fontWeight: '700' },
+  title: { ...typeScale.label, fontWeight: '700' },
   input: {
     ...typeScale.body,
-    color: ink.primary,
-    borderWidth: 1,
-    borderColor: card.border,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
-    backgroundColor: card.solid,
+    minHeight: 48,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
-  link: { ...typeScale.meta, color: ink.secondary },
-  label: { ...typeScale.caption, color: ink.tertiary, marginTop: space.xs },
+  link: { ...typeScale.meta },
+  label: { ...typeScale.caption, marginTop: space.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
   chip: {
     paddingHorizontal: space.sm,
     paddingVertical: 6,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: card.border,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 36,
+    justifyContent: 'center',
   },
-  chipOn: { backgroundColor: 'rgba(255,255,255,0.10)' },
-  chipText: { ...typeScale.meta, color: ink.tertiary },
-  chipTextOn: { color: ink.primary },
+  chipText: { ...typeScale.meta },
 });

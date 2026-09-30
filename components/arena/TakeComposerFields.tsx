@@ -1,7 +1,7 @@
 import React from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HoodId } from '../../store';
-import { createTakeStyles as styles } from './createTakeStyles';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { HoodSelector } from './HoodSelector';
 import { MediaAttachRow } from './MediaAttachRow';
 
@@ -19,10 +19,7 @@ export interface TakeComposerFieldsProps {
   hoods?: readonly HoodId[];
 }
 
-/**
- * The take composer (reference screen 11): the large input with its live
- * counter, the glass attachment buttons and the hood picker.
- */
+/** Take composer fields — theme-aware for Light/Dark. */
 export function TakeComposerFields({
   text,
   onChangeText,
@@ -35,15 +32,23 @@ export function TakeComposerFields({
   onAttach,
   hoods,
 }: TakeComposerFieldsProps): React.JSX.Element {
+  const t = useThemeColors();
   return (
     <>
       <View style={styles.inputWrap}>
         <TextInput
-          style={[styles.input, overLimit && styles.inputOver]}
+          style={[
+            styles.input,
+            {
+              color: t.textPrimary,
+              borderColor: overLimit ? t.danger : t.border,
+              backgroundColor: t.inputBackground,
+            },
+          ]}
           value={text}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="rgba(247,247,250,0.38)"
+          placeholderTextColor={t.textMuted}
           multiline
           textAlignVertical="top"
           accessibilityLabel="Your take text"
@@ -52,7 +57,7 @@ export function TakeComposerFields({
         <View style={styles.counterRow}>
           <Text
             allowFontScaling={false}
-            style={[styles.counter, overLimit && styles.counterOver]}
+            style={[styles.counter, { color: overLimit ? t.danger : t.textMuted }]}
             accessibilityLabel={`${charsLeft} of ${maxChars} characters left`}
           >
             {`${charsLeft} / ${maxChars}`}
@@ -62,10 +67,26 @@ export function TakeComposerFields({
 
       <MediaAttachRow onPick={onAttach} />
 
-      <Text allowFontScaling={false} style={styles.sectionLabel}>
+      <Text allowFontScaling={false} style={[styles.sectionLabel, { color: t.textMuted }]}>
         DROP INTO
       </Text>
       <HoodSelector value={hood} onChange={onChangeHood} hoods={hoods} />
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  inputWrap: { gap: space.xs, marginTop: space.sm },
+  input: {
+    ...typeScale.take,
+    minHeight: 168,
+    padding: layout.cardPadding,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    textAlignVertical: 'top',
+    lineHeight: 26,
+  },
+  counterRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  counter: { ...typeScale.meta, fontSize: 12 },
+  sectionLabel: { ...typeScale.eyebrow, marginTop: space.xs },
+});

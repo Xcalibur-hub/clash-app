@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { ink, space, typeScale } from '../../theme';
+import { space, typeScale, useThemeColors } from '../../theme';
 
 export interface SectionHeadingProps {
   eyebrow: string;
@@ -13,22 +13,23 @@ export interface SectionHeadingProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Eyebrow + title pair used to open every block of content (plain, restrained). */
+/** Eyebrow + title pair used to open every block of content. */
 export function SectionHeading({
   eyebrow,
   title,
   accessory,
   style,
 }: SectionHeadingProps): React.JSX.Element {
+  const t = useThemeColors();
   return (
     <View style={[styles.wrap, style]}>
       <View style={styles.row}>
-        <Text allowFontScaling={false} style={styles.eyebrow}>
+        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
           {eyebrow}
         </Text>
         {accessory}
       </View>
-      <Text allowFontScaling={false} style={styles.title}>
+      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
         {title}
       </Text>
     </View>
@@ -38,6 +39,6 @@ export function SectionHeading({
 const styles = StyleSheet.create({
   wrap: { gap: space.xxs + 2 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  eyebrow: { ...typeScale.caption, color: ink.tertiary },
-  title: { ...typeScale.section, color: ink.primary },
+  eyebrow: { ...typeScale.caption },
+  title: { ...typeScale.section },
 });

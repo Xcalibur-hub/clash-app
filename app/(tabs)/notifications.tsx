@@ -16,8 +16,8 @@ import { NotificationRow } from '../../components/notifications/NotificationRow'
 import { EmptyState } from '../../components/shared/EmptyState';
 import { BellIcon } from '../../components/shared/icons';
 import type { User } from '../../store';
-import { color, ink, layout, space, typeScale } from '../../theme';
-import { DOCK_SCROLL_CLEARANCE } from '../../components/navigation/dockConfig';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { tap as hapticTap } from '../../utils/haptics';
 
 /** Activity inbox — real `notifications` rows, actor avatars, read state. */
@@ -26,6 +26,7 @@ export default function NotificationsTab(): React.JSX.Element {
   const { refresh: refreshUnread } = useNotificationUnread();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useThemeColors();
 
   const [items, setItems] = React.useState<AppNotification[] | null>(null);
   const [actors, setActors] = React.useState<Map<string, User>>(new Map());
@@ -96,12 +97,24 @@ export default function NotificationsTab(): React.JSX.Element {
   };
 
   const unreadCount = (items ?? []).filter((item) => item.readAt === null).length;
+  const bottomPad = dockBottomPadding(insets.bottom);
 
-  if (loading) return <View style={styles.screen} />;
+  if (loading) {
+    return <View style={[styles.screen, { backgroundColor: t.background }]} />;
+  }
 
   if (!signedIn) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.screen,
+          {
+            backgroundColor: t.background,
+            paddingTop: insets.top,
+            paddingBottom: bottomPad,
+          },
+        ]}
+      >
         <EmptyState
           icon={BellIcon}
           title="Your activity"
@@ -114,7 +127,7 @@ export default function NotificationsTab(): React.JSX.Element {
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: t.background }]}>
       <FlatList
         data={items ?? []}
         keyExtractor={(item) => item.id}
@@ -129,7 +142,7 @@ export default function NotificationsTab(): React.JSX.Element {
         ListEmptyComponent={
           items === null ? (
             <View style={styles.spinner}>
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={t.textPrimary} />
             </View>
           ) : (
             <EmptyState
@@ -141,7 +154,7 @@ export default function NotificationsTab(): React.JSX.Element {
         }
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + space.md, paddingBottom: insets.bottom + DOCK_SCROLL_CLEARANCE },
+          { paddingTop: insets.top + space.md, paddingBottom: bottomPad },
         ]}
         refreshing={refreshing}
         onRefresh={() => {
@@ -155,14 +168,15 @@ export default function NotificationsTab(): React.JSX.Element {
 }
 
 function Header({ unreadCount, onMarkAll }: { unreadCount: number; onMarkAll: () => void }): React.JSX.Element {
+  const t = useThemeColors();
   return (
     <View style={styles.header}>
       <View style={styles.headerTop}>
         <View>
-          <Text allowFontScaling={false} style={styles.eyebrow}>
+          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
             ACTIVITY
           </Text>
-          <Text allowFontScaling={false} style={styles.title}>
+          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
             Notifications
           </Text>
         </View>
@@ -174,9 +188,10 @@ function Header({ unreadCount, onMarkAll }: { unreadCount: number; onMarkAll: ()
             }}
             accessibilityRole="button"
             accessibilityLabel={`Mark all ${unreadCount} notifications as read`}
+            hitSlop={8}
             style={styles.markAll}
           >
-            <Text allowFontScaling={false} style={styles.markAllText}>
+            <Text allowFontScaling={false} style={[styles.markAllText, { color: t.textSecondary }]}>
               Mark all read
             </Text>
           </Pressable>
@@ -187,13 +202,13 @@ function Header({ unreadCount, onMarkAll }: { unreadCount: number; onMarkAll: ()
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg },
+  screen: { flex: 1 },
   content: { paddingHorizontal: layout.screenX },
   header: { paddingBottom: space.sm },
   headerTop: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  eyebrow: { ...typeScale.caption, fontSize: 10, letterSpacing: 1.4, color: ink.quaternary },
-  title: { ...typeScale.title, fontSize: 26, color: ink.primary },
-  markAll: { paddingVertical: space.xs, paddingHorizontal: space.sm },
-  markAllText: { ...typeScale.meta, color: ink.secondary },
+  eyebrow: { ...typeScale.caption, letterSpacing: 0.8 },
+  title: { ...typeScale.title },
+  markAll: { paddingVertical: space.xs, paddingHorizontal: space.sm, minHeight: 44, justifyContent: 'center' },
+  markAllText: { ...typeScale.meta },
   spinner: { paddingVertical: space.xxl, alignItems: 'center' },
 });

@@ -1,5 +1,14 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { GlowButton } from '../shared/GlowButton';
 import { CloseIcon } from '../shared/icons';
@@ -42,83 +51,86 @@ export function VaultFormSheet({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(duration.fast)} style={[styles.scrim, { backgroundColor: t.overlay }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
-        <Animated.View entering={FadeInUp.duration(duration.base)} style={styles.box}>
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: t.surfaceElevated,
-                borderColor: t.border,
-              },
-            ]}
-          >
-            <View style={styles.head}>
-              <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-                {mode === 'create' ? 'Open your Vault' : 'Edit Vault'}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Animated.View entering={FadeIn.duration(duration.fast)} style={[styles.scrim, { backgroundColor: t.overlay }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
+          <Animated.View entering={FadeInUp.duration(duration.base)} style={styles.box}>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: t.surfaceElevated,
+                  borderColor: t.border,
+                },
+              ]}
+            >
+              <View style={styles.head}>
+                <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+                  {mode === 'create' ? 'Open your Vault' : 'Edit Vault'}
+                </Text>
+                <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
+                  <CloseIcon size={20} color={t.textMuted} strokeWidth={2.2} />
+                </Pressable>
+              </View>
+
+              <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+                Title
               </Text>
-              <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
-                <CloseIcon size={20} color={t.textMuted} strokeWidth={2.2} />
-              </Pressable>
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                maxLength={60}
+                placeholder="A name for your Vault"
+                placeholderTextColor={t.textMuted}
+                accessibilityLabel="Vault title"
+                style={[
+                  styles.input,
+                  {
+                    color: t.textPrimary,
+                    borderColor: t.border,
+                    backgroundColor: t.inputBackground,
+                  },
+                ]}
+              />
+
+              <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+                Description
+              </Text>
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                maxLength={280}
+                multiline
+                placeholder="What belongs in this space"
+                placeholderTextColor={t.textMuted}
+                accessibilityLabel="Vault description"
+                style={[
+                  styles.input,
+                  styles.textarea,
+                  {
+                    color: t.textPrimary,
+                    borderColor: t.border,
+                    backgroundColor: t.inputBackground,
+                  },
+                ]}
+              />
+
+              <GlowButton
+                label={busy ? 'Saving…' : mode === 'create' ? 'Create Vault' : 'Save'}
+                onPress={() => onSubmit(title.trim(), description.trim())}
+                disabled={!canSubmit}
+                style={styles.cta}
+              />
             </View>
-
-            <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
-              Title
-            </Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              maxLength={60}
-              placeholder="A name for your Vault"
-              placeholderTextColor={t.textMuted}
-              accessibilityLabel="Vault title"
-              style={[
-                styles.input,
-                {
-                  color: t.textPrimary,
-                  borderColor: t.border,
-                  backgroundColor: t.inputBackground,
-                },
-              ]}
-            />
-
-            <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
-              Description
-            </Text>
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              maxLength={280}
-              multiline
-              placeholder="What belongs in this space"
-              placeholderTextColor={t.textMuted}
-              accessibilityLabel="Vault description"
-              style={[
-                styles.input,
-                styles.textarea,
-                {
-                  color: t.textPrimary,
-                  borderColor: t.border,
-                  backgroundColor: t.inputBackground,
-                },
-              ]}
-            />
-
-            <GlowButton
-              label={busy ? 'Saving…' : mode === 'create' ? 'Create Vault' : 'Save'}
-              onPress={() => onSubmit(title.trim(), description.trim())}
-              disabled={!canSubmit}
-              style={styles.cta}
-            />
-          </View>
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   scrim: { flex: 1, justifyContent: 'flex-end' },
   box: { paddingHorizontal: space.md, paddingBottom: space.md },
   card: {
@@ -136,6 +148,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
+    minHeight: 48,
   },
   textarea: { minHeight: 84, textAlignVertical: 'top' },
   cta: { marginTop: space.xs },

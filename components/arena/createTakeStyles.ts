@@ -23,7 +23,12 @@ export const createTakeStyles = StyleSheet.create({
   counter: { ...typeScale.data, fontSize: 12, color: ink.tertiary },
   counterOver: { color: accent.danger },
   sectionLabel: { ...typeScale.eyebrow, color: ink.tertiary, marginTop: space.xs },
-  footer: { gap: space.md, paddingTop: space.sm, alignItems: 'center' },
+  footer: {
+    gap: space.md,
+    paddingTop: space.sm,
+    paddingHorizontal: layout.screenX,
+    alignItems: 'center',
+  },
   cta: { alignSelf: 'stretch' },
   disclaimer: { ...typeScale.caption, color: ink.tertiary },
 });

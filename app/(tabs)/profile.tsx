@@ -9,6 +9,7 @@ import { AppearanceRow } from '../../components/profile/AppearanceRow';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { UserIcon } from '../../components/shared/icons';
 import { layout, space, useThemeColors } from '../../theme';
+import { dockBottomPadding } from '../../components/navigation/dockConfig';
 
 /** Self profile tab — the signed-in viewer's social identity. */
 export default function ProfileTab(): React.JSX.Element {
@@ -22,7 +23,16 @@ export default function ProfileTab(): React.JSX.Element {
 
   if (!signedIn) {
     return (
-      <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.screen,
+          {
+            backgroundColor: theme.background,
+            paddingTop: insets.top,
+            paddingBottom: dockBottomPadding(insets.bottom),
+          },
+        ]}
+      >
         <View style={styles.guestAppearance}>
           <AppearanceRow />
         </View>

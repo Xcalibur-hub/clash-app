@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { User } from '../../store';
 import type { AppNotification } from '../../services/notificationService';
-import { ink, space, typeScale } from '../../theme';
+import { space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { timeAgo } from '../../utils/format';
 import { Avatar } from '../shared/Avatar';
@@ -15,7 +15,7 @@ export interface NotificationRowProps {
 }
 
 function describe(notification: AppNotification, actor: User | undefined): { title: string; subtitle?: string } {
-  const who = actor ? `@${actor.handle}` : 'A Clash';
+  const who = actor ? `@${actor.handle}` : 'Someone';
   switch (notification.kind) {
     case 'new_follower':
       return { title: `${who} followed you` };
@@ -42,6 +42,7 @@ function describe(notification: AppNotification, actor: User | undefined): { tit
 
 /** One activity row: actor avatar, action text, relative time, read state. */
 export function NotificationRow({ notification, actor, onPress }: NotificationRowProps): React.JSX.Element {
+  const t = useThemeColors();
   const unread = notification.readAt === null;
   const { title, subtitle } = describe(notification, actor);
 
@@ -53,29 +54,40 @@ export function NotificationRow({ notification, actor, onPress }: NotificationRo
       }}
       accessibilityRole="button"
       accessibilityLabel={`${unread ? 'Unread. ' : ''}${title}`}
-      style={styles.row}
+      style={[styles.row, { borderBottomColor: t.border }]}
     >
       {actor ? (
         <Avatar name={actor.name} tint={actor.tint} size={40} />
       ) : (
-        <View style={styles.systemBadge}>
-          <BellIcon size={18} color={ink.secondary} strokeWidth={2.2} />
+        <View
+          style={[
+            styles.systemBadge,
+            { backgroundColor: t.surfaceMuted, borderColor: t.border },
+          ]}
+        >
+          <BellIcon size={18} color={t.textSecondary} strokeWidth={2.2} />
         </View>
       )}
       <View style={styles.body}>
-        <Text allowFontScaling={false} style={[styles.title, unread && styles.titleUnread]} numberOfLines={2}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: unread ? t.textPrimary : t.textMuted }, unread && styles.titleUnread]}
+          numberOfLines={2}
+        >
           {title}
         </Text>
         {subtitle ? (
-          <Text allowFontScaling={false} style={styles.subtitle} numberOfLines={1}>
+          <Text allowFontScaling={false} style={[styles.subtitle, { color: t.textMuted }]} numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={styles.time}>
+        <Text allowFontScaling={false} style={[styles.time, { color: t.textMuted }]}>
           {timeAgo(notification.createdAt)}
         </Text>
       </View>
-      {unread ? <View style={styles.dot} accessibilityLabel="Unread" accessible /> : null}
+      {unread ? (
+        <View style={[styles.dot, { backgroundColor: t.textPrimary }]} accessibilityLabel="Unread" accessible />
+      ) : null}
     </Pressable>
   );
 }
@@ -87,7 +99,6 @@ const styles = StyleSheet.create({
     gap: space.md,
     paddingVertical: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.10)',
   },
   systemBadge: {
     width: 40,
@@ -95,20 +106,17 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderWidth: StyleSheet.hairlineWidth,
   },
   body: { flex: 1, gap: 1 },
-  title: { ...typeScale.body, color: ink.tertiary },
-  titleUnread: { color: ink.primary, fontWeight: '600' },
-  subtitle: { ...typeScale.meta, color: ink.quaternary },
-  time: { ...typeScale.meta, fontSize: 12, color: ink.quaternary },
+  title: { ...typeScale.body },
+  titleUnread: { fontWeight: '600' },
+  subtitle: { ...typeScale.meta },
+  time: { ...typeScale.meta, fontSize: 12 },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#6E7BFF',
     alignSelf: 'flex-start',
     marginTop: space.sm,
   },

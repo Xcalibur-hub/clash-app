@@ -25,7 +25,7 @@ import {
 import { errorText } from '../../services/supabaseClient';
 import { createTake, showNotice, useClash } from '../../store';
 import type { DbHood } from '../../supabase/types';
-import { space } from '../../theme';
+import { space, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 
 const MAX_CHARS = 180;
@@ -74,6 +74,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
   const viewer = state.viewer;
   const { pickImage, pickVideo } = useMediaPicker();
   const requireAuth = useRequireAuth();
+  const theme = useThemeColors();
 
   const [text, setText] = React.useState('');
   const [hood, setHood] = React.useState<DbHood>(toDbHood(viewer.hood));
@@ -217,7 +218,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
             accessibilityLabel="Drop your take into the Arena"
             accessibilityHint="Publishes your take and awards 30 XP"
           />
-          <Text allowFontScaling={false} style={styles.disclaimer}>
+          <Text allowFontScaling={false} style={[styles.disclaimer, { color: theme.textMuted }]}>
             {canDrop ? 'Your take self-destructs after 24 hours.' : 'Write something first.'}
           </Text>
         </View>

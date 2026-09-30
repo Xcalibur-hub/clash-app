@@ -12,7 +12,7 @@ import { Notice } from '../../components/shared/Notice';
 import { SectionHeading } from '../../components/shared/SectionHeading';
 import { RadarIcon } from '../../components/shared/icons';
 import { conversionPct, gmvLakhs, SIMULATED_LABEL } from '../../data/mockCampaigns';
-import { selectCampaign, selectCreator, useClash } from '../../store';
+import { selectCampaign, selectCreator, showNotice, useClash } from '../../store';
 import { ink, radius, space, typeScale } from '../../theme';
 import { compact } from '../../utils/format';
 import { press as hapticPress } from '../../utils/haptics';
@@ -30,7 +30,7 @@ function Stat({ label, value }: { label: string; value: string }): React.JSX.Ele
 /** REGIONAL INFLUENCE (spec §21): city distribution, orders, redemptions. */
 export default function CampaignScreen(): React.JSX.Element {
   const { campaignId } = useLocalSearchParams<{ campaignId?: string }>();
-  const { state } = useClash();
+  const { state, dispatch } = useClash();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const campaign = selectCampaign(state, String(campaignId));
@@ -102,7 +102,7 @@ export default function CampaignScreen(): React.JSX.Element {
           value="Unlock"
           onPress={() => {
             hapticPress();
-            router.push('/(vault)/analytics');
+            dispatch(showNotice('Advanced analytics are not available in this build yet.'));
           }}
         />
         <Text allowFontScaling={false} style={styles.sim}>{SIMULATED_LABEL} · {compact(campaign.orders)} mock orders</Text>
