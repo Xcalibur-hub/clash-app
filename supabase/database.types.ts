@@ -2183,11 +2183,56 @@ export type Database = {
         Returns: {
           advertiser_name: string
           approved_commission_minor: number
+          assignment_status: Database["public"]["Enums"]["campaign_creator_status"]
           attributed_conversions: number
           campaign_id: string
+          campaign_status: Database["public"]["Enums"]["sponsor_campaign_status"]
           campaign_title: string
           clicks: number
+          commission_type: Database["public"]["Enums"]["commission_type"]
+          commission_value: number
+          currency: string
+          ends_at: string
           pending_commission_minor: number
+          rejected_commission_minor: number
+          starts_at: string
+          void_commission_minor: number
+        }[]
+      }
+      creator_earnings_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          approved_commission_minor: number
+          attributed_conversions: number
+          campaign_count: number
+          clicks: number
+          currency: string
+          pending_commission_minor: number
+          rejected_commission_minor: number
+          total_earned_minor: number
+          void_commission_minor: number
+        }[]
+      }
+      creator_my_coupons: {
+        Args: { p_campaign_id?: string }
+        Returns: {
+          campaign_id: string
+          code: string
+          created_at: string
+          id: string
+          max_redemptions: number
+          redemption_count: number
+          status: Database["public"]["Enums"]["coupon_code_status"]
+        }[]
+      }
+      creator_my_referral_links: {
+        Args: { p_campaign_id?: string }
+        Returns: {
+          campaign_id: string
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["referral_link_status"]
+          token: string
         }[]
       }
       delete_media: {

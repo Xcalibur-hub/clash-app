@@ -60,7 +60,11 @@ export type AnalyticsEvent =
   | 'sponsor_campaign_created'
   | 'sponsor_creator_assigned'
   | 'sponsor_referral_created'
-  | 'sponsor_coupon_created';
+  | 'sponsor_coupon_created'
+  | 'creator_earnings_viewed'
+  | 'creator_campaign_opened'
+  | 'creator_referral_shared'
+  | 'creator_coupon_shared';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([

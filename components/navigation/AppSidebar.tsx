@@ -23,6 +23,7 @@ import {
   CompassIcon,
   SettingsIcon,
   StoreIcon,
+  RupeeIcon,
   UserIcon,
   VaultIcon,
   WorldIcon,
@@ -165,6 +166,13 @@ export function AppSidebar(): React.JSX.Element | null {
       },
     ];
     if (signedIn) {
+      items.push({
+        key: 'earnings',
+        label: 'Earnings',
+        icon: RupeeIcon,
+        match: (path) => path.includes('/earnings'),
+        onPress: (go) => go(() => router.push('/earnings')),
+      });
       items.push({
         key: 'sponsor',
         label: 'Sponsor Studio',
