@@ -11,7 +11,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -33,6 +32,7 @@ import {
 } from '../../services/creatorEarningsService';
 import { showNotice, useClash } from '../../store';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import { copyTextToClipboard } from '../../utils/clipboard';
 import { tap as hapticTap } from '../../utils/haptics';
 
 export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
@@ -81,13 +81,17 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
   }, [load]);
 
   const copyText = async (value: string, successMessage: string): Promise<void> => {
-    try {
-      await Clipboard.setStringAsync(value);
-      hapticTap();
+    const result = await copyTextToClipboard(value);
+    hapticTap();
+    if (result === 'copied') {
       dispatch(showNotice(successMessage));
-    } catch {
-      dispatch(showNotice('Couldn’t copy to clipboard.'));
+      return;
     }
+    if (result === 'shared') {
+      dispatch(showNotice('Clipboard unavailable — use the share sheet to copy.'));
+      return;
+    }
+    dispatch(showNotice('Couldn’t copy to clipboard.'));
   };
 
   const shareText = async (
