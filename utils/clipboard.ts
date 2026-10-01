@@ -1,36 +1,31 @@
 /**
- * Clipboard helper that does not crash the JS bundle when the native
- * ExpoClipboard module is missing (stale/dev-client without a rebuild).
+ * Clipboard helper that never imports `expo-clipboard`.
+ *
+ * Stale/dev clients without a native rebuild lack ExpoClipboard; loading
+ * `expo-clipboard` throws at module init. We probe the native module optionally
+ * via expo-modules-core instead, and fall back to Share when it is absent.
  */
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Share } from 'react-native';
 
 export type ClipboardResult = 'copied' | 'shared' | 'failed';
 
-type ExpoClipboardModule = {
-  setStringAsync: (value: string) => Promise<boolean>;
+type NativeClipboard = {
+  setStringAsync?: (text: string, options?: Record<string, unknown>) => Promise<boolean>;
 };
-
-function loadExpoClipboard(): ExpoClipboardModule | null {
-  try {
-    // Lazy require so routes can load even when native module is absent.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('expo-clipboard') as ExpoClipboardModule;
-  } catch {
-    return null;
-  }
-}
 
 /** Copy to system clipboard; fall back to Share if native clipboard is unavailable. */
 export async function copyTextToClipboard(value: string): Promise<ClipboardResult> {
-  const clipboard = loadExpoClipboard();
-  if (clipboard) {
+  const native = requireOptionalNativeModule<NativeClipboard>('ExpoClipboard');
+  if (typeof native?.setStringAsync === 'function') {
     try {
-      await clipboard.setStringAsync(value);
+      await native.setStringAsync(value, {});
       return 'copied';
     } catch {
       /* fall through to Share */
     }
   }
+
   try {
     await Share.share({ message: value });
     return 'shared';
