@@ -1,5 +1,18 @@
+/**
+ * Standard vs Blind Clash picker.
+ *
+ * Always surfaces feedback: pressed → submitting → success (caller closes)
+ * or inline error + retry. Never unmounts itself mid-submit.
+ */
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ClashMode } from '../../services/clashEngineService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
@@ -9,21 +22,50 @@ export interface ClashModeSheetProps {
   visible: boolean;
   onClose: () => void;
   onChoose: (mode: ClashMode) => void;
+  /** Blocks mode buttons and dismiss while an RPC is in flight. */
+  submitting?: boolean;
+  /** Inline human-readable error; keep sheet open on failure. */
+  error?: string | null;
 }
 
 const SIDE_A = '#A580FF';
 const SIDE_B = '#3D8BFF';
 
-/** Compact Standard vs Blind picker — frames THIS TAKE vs CHALLENGER. */
-export function ClashModeSheet({ visible, onClose, onChoose }: ClashModeSheetProps): React.JSX.Element | null {
+export function ClashModeSheet({
+  visible,
+  onClose,
+  onChoose,
+  submitting = false,
+  error = null,
+}: ClashModeSheetProps): React.JSX.Element {
   const t = useThemeColors();
   const insets = useSafeAreaInsets();
-  if (!visible) return null;
+
+  const choose = (mode: ClashMode): void => {
+    if (submitting) return;
+    hapticTap();
+    onChoose(mode);
+  };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        if (!submitting) onClose();
+      }}
+    >
       <View style={[styles.scrim, { backgroundColor: t.overlay }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
+        {/* Dismiss target — sits behind the sheet; sheet captures its own touches. */}
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            if (!submitting) onClose();
+          }}
+          accessibilityLabel="Close"
+          disabled={submitting}
+        />
         <View
           style={[
             styles.sheet,
@@ -33,6 +75,9 @@ export function ClashModeSheet({ visible, onClose, onChoose }: ClashModeSheetPro
               marginBottom: Math.max(insets.bottom, space.lg),
             },
           ]}
+          // Claim the sheet hit region so the dismiss Pressable cannot steal taps
+          // from Standard / Blind on Android.
+          onStartShouldSetResponder={() => true}
           accessibilityViewIsModal
         >
           <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
@@ -62,13 +107,19 @@ export function ClashModeSheet({ visible, onClose, onChoose }: ClashModeSheetPro
           </View>
 
           <Pressable
-            onPress={() => {
-              hapticTap();
-              onChoose('STANDARD');
-            }}
+            onPress={() => choose('STANDARD')}
+            disabled={submitting}
             accessibilityRole="button"
             accessibilityLabel="Standard Clash"
-            style={[styles.option, { borderColor: t.border, backgroundColor: t.surface }]}
+            accessibilityState={{ busy: submitting, disabled: submitting }}
+            style={({ pressed }) => [
+              styles.option,
+              {
+                borderColor: t.border,
+                backgroundColor: t.surface,
+                opacity: submitting ? 0.55 : pressed ? 0.88 : 1,
+              },
+            ]}
           >
             <Text allowFontScaling={false} style={[styles.optionTitle, { color: t.textPrimary }]}>
               Standard Clash
@@ -77,14 +128,21 @@ export function ClashModeSheet({ visible, onClose, onChoose }: ClashModeSheetPro
               Identities are visible while judging.
             </Text>
           </Pressable>
+
           <Pressable
-            onPress={() => {
-              hapticTap();
-              onChoose('BLIND');
-            }}
+            onPress={() => choose('BLIND')}
+            disabled={submitting}
             accessibilityRole="button"
             accessibilityLabel="Blind Clash. Participants stay hidden until you judge."
-            style={[styles.option, { borderColor: t.border, backgroundColor: t.surface }]}
+            accessibilityState={{ busy: submitting, disabled: submitting }}
+            style={({ pressed }) => [
+              styles.option,
+              {
+                borderColor: t.border,
+                backgroundColor: t.surface,
+                opacity: submitting ? 0.55 : pressed ? 0.88 : 1,
+              },
+            ]}
           >
             <Text allowFontScaling={false} style={[styles.optionTitle, { color: t.textPrimary }]}>
               Blind Clash
@@ -93,6 +151,26 @@ export function ClashModeSheet({ visible, onClose, onChoose }: ClashModeSheetPro
               Participants stay hidden until you judge.
             </Text>
           </Pressable>
+
+          {submitting ? (
+            <View style={styles.statusRow} accessibilityLiveRegion="polite">
+              <ActivityIndicator size="small" color={t.textPrimary} />
+              <Text allowFontScaling={false} style={[styles.statusText, { color: t.textSecondary }]}>
+                Starting Clash…
+              </Text>
+            </View>
+          ) : null}
+
+          {error && !submitting ? (
+            <Text
+              allowFontScaling={false}
+              style={[styles.error, { color: t.danger, backgroundColor: t.surfaceMuted }]}
+              accessibilityLiveRegion="assertive"
+              accessibilityRole="alert"
+            >
+              {error}
+            </Text>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -110,6 +188,8 @@ const styles = StyleSheet.create({
     gap: space.sm,
     borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
+    zIndex: 2,
+    elevation: 8,
   },
   title: { ...typeScale.label, fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
   versus: {
@@ -138,7 +218,23 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 4,
+    minHeight: 64,
+    justifyContent: 'center',
   },
   optionTitle: { ...typeScale.label, fontWeight: '700' },
   optionBody: { ...typeScale.meta, fontSize: 12 },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingVertical: space.xs,
+  },
+  statusText: { ...typeScale.meta, fontWeight: '600' },
+  error: {
+    ...typeScale.meta,
+    fontWeight: '600',
+    padding: space.sm,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
 });

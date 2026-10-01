@@ -5,7 +5,6 @@ import { StyleSheet } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { SentryTestTrigger } from '../components/dev/SentryTestTrigger';
 import { initAnalytics } from '../services/analytics';
 import { initSentry, Sentry } from '../services/sentry';
 import { ClashProvider } from '../store';
@@ -23,9 +22,12 @@ initAnalytics();
  * onboard  → 3-screen first-launch sequence
  * (tabs)   → Arena + Profile behind the glass tab bar
  * (vault)  → Vault + Creators + Radar + Analytics + Profile (premium realm)
- * clash/*  → the duel, pushed as a modal-feeling card
+ * clash/*  → the duel, pushed as a full-screen immersive experience
  * creator/* → Vault creator profiles (public vs exclusive drops)
  * campaign/*, sponsor/* → Sponsor Studio (advertiser dashboard)
+ *
+ * SentryTestTrigger is intentionally NOT mounted here. Opt-in only via an
+ * explicit internal debug entry — never in ordinary app UI.
  */
 
 function ThemedChrome({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -91,7 +93,6 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="world/compose" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="world/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
                 </ThemedChrome>
-                <SentryTestTrigger />
               </FontBootstrap>
             </ThemeProvider>
           </ClashProvider>

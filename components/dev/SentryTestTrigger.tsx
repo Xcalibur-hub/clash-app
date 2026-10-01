@@ -1,8 +1,9 @@
 /**
- * DEV / explicit-test-only control that throws one error for Sentry verification.
+ * DEV-only Sentry smoke control.
  *
- * Visible ONLY when `EXPO_PUBLIC_SENTRY_TEST=1` is set on the build.
- * Never enabled by `__DEV__` alone — physical/dev-client builds must stay clean.
+ * NOT mounted by the app root. To use internally, temporarily mount from a
+ * debug screen AND set EXPO_PUBLIC_SENTRY_TEST=1 on that build.
+ * Never ship this in ordinary development / preview / production UI.
  */
 
 import React from 'react';

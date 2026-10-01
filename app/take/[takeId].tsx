@@ -29,8 +29,10 @@ import { toggleUpvote } from '../../services/apiService';
 import { ClashModeSheet } from '../../components/clash/ClashModeSheet';
 import { startClash, type ClashMode } from '../../services/clashEngineService';
 import { analytics } from '../../services/analytics';
+import { logger } from '../../services/logger';
 import { fetchFollowState } from '../../services/socialService';
 import { errorText, SupabaseError } from '../../services/supabaseClient';
+import { useAuth } from '../../store/AuthProvider';
 import {
   buildCommentTree,
   selectAuthor,
@@ -47,6 +49,11 @@ import {
   type User,
 } from '../../store';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import {
+  clashStartErrorMessage,
+  shouldOpenExistingClash,
+  validateClashStart,
+} from '../../utils/clashStart';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { timeAgo, timeLeftLabel } from '../../utils/format';
 
@@ -70,6 +77,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const { takeId } = useLocalSearchParams<{ takeId: string | string[] }>();
   const id = Array.isArray(takeId) ? takeId[0] : takeId;
   const { state, dispatch } = useClash();
+  const { signedIn, loading: authLoading } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const requireAuth = useRequireAuth();
@@ -81,9 +89,17 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const [menu, setMenu] = React.useState<MenuTarget | null>(null);
   const [followingAuthor, setFollowingAuthor] = React.useState(false);
   const [clashComment, setClashComment] = React.useState<ChallengerComment | null>(null);
+  const [clashStarting, setClashStarting] = React.useState(false);
+  const [clashStartError, setClashStartError] = React.useState<string | null>(null);
+  const clashCommentRef = React.useRef<ChallengerComment | null>(null);
+  const clashStartingRef = React.useRef(false);
 
   const take = state.takes.find((item) => item.id === id);
   const author = take ? selectAuthor(state, take.authorId) : undefined;
+
+  React.useEffect(() => {
+    clashCommentRef.current = clashComment;
+  }, [clashComment]);
 
   React.useEffect(() => {
     if (!take || !author) return;
@@ -144,31 +160,72 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
   const clashFromComment = React.useCallback(
     (comment: ChallengerComment): void => {
-      if (!take || !requireAuth()) return;
+      if (!take) return;
+      if (authLoading) {
+        dispatch(showNotice('Still signing in…'));
+        return;
+      }
+      if (!requireAuth()) return;
       hapticPress();
+      setClashStartError(null);
       setClashComment(comment);
     },
-    [take, requireAuth],
+    [take, authLoading, requireAuth, dispatch],
   );
 
   const startChosenClash = React.useCallback(
     async (mode: ClashMode): Promise<void> => {
-      if (!take || !clashComment) return;
-      const commentId = clashComment.id;
-      setClashComment(null);
-      try {
-        await startClash(take.id, commentId, mode);
-        analytics.track('clash_started', { realm: 'arena', clash_mode: mode });
-        router.push(`/clash/${take.id}`);
-      } catch (error) {
-        if (error instanceof SupabaseError && error.code === 'P0005') {
-          router.push(`/clash/${take.id}`);
-        } else {
-          dispatch(showNotice(errorText(error)));
+      const comment = clashCommentRef.current;
+      const validation = validateClashStart({
+        takeId: take?.id,
+        commentId: comment?.id,
+        signedIn,
+        authLoading,
+      });
+      if (validation) {
+        setClashStartError(validation);
+        if (!signedIn && !authLoading) {
+          router.push('/auth');
         }
+        return;
+      }
+      if (!take || !comment || clashStartingRef.current) return;
+
+      clashStartingRef.current = true;
+      setClashStarting(true);
+      setClashStartError(null);
+
+      try {
+        const clashId = await startClash(take.id, comment.id, mode);
+        analytics.track('clash_started', { realm: 'arena', clash_mode: mode });
+        // Close sheet only after success — unmounting Modal mid-flight was
+        // swallowing navigation on Android.
+        setClashComment(null);
+        setClashStarting(false);
+        clashStartingRef.current = false;
+        router.push(`/clash/${take.id}`);
+        if (!clashId) {
+          logger.warn('start_clash returned empty id', { takeId: take.id, mode });
+        }
+      } catch (error) {
+        logger.warn('start_clash failed', {
+          takeId: take.id,
+          mode,
+          code: error instanceof SupabaseError ? error.code : undefined,
+        });
+        if (shouldOpenExistingClash(error)) {
+          setClashComment(null);
+          setClashStarting(false);
+          clashStartingRef.current = false;
+          router.push(`/clash/${take.id}`);
+          return;
+        }
+        setClashStartError(clashStartErrorMessage(error));
+        setClashStarting(false);
+        clashStartingRef.current = false;
       }
     },
-    [take, clashComment, router, dispatch],
+    [take, router, signedIn, authLoading],
   );
 
   const more = React.useCallback(
@@ -378,7 +435,13 @@ export default function TakeDetailScreen(): React.JSX.Element {
       />
       <ClashModeSheet
         visible={clashComment !== null}
-        onClose={() => setClashComment(null)}
+        submitting={clashStarting}
+        error={clashStartError}
+        onClose={() => {
+          if (clashStartingRef.current) return;
+          setClashStartError(null);
+          setClashComment(null);
+        }}
         onChoose={(mode) => void startChosenClash(mode)}
       />
     </View>
