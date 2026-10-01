@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -79,7 +80,20 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
     void load();
   }, [load]);
 
-  const shareText = async (message: string, event: 'creator_referral_shared' | 'creator_coupon_shared') => {
+  const copyText = async (value: string, successMessage: string): Promise<void> => {
+    try {
+      await Clipboard.setStringAsync(value);
+      hapticTap();
+      dispatch(showNotice(successMessage));
+    } catch {
+      dispatch(showNotice('Couldn’t copy to clipboard.'));
+    }
+  };
+
+  const shareText = async (
+    message: string,
+    event: 'creator_referral_shared' | 'creator_coupon_shared',
+  ): Promise<void> => {
     try {
       await Share.share({ message });
       analytics.track(event, { source: 'earnings' });
@@ -206,7 +220,7 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
                     label="Copy"
                     compact
                     tone="glass"
-                    onPress={() => void shareText(link.shareUrl, 'creator_referral_shared')}
+                    onPress={() => void copyText(link.shareUrl, 'Link copied')}
                     accessibilityLabel="Copy referral link"
                   />
                   <Pressable
@@ -252,7 +266,7 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
                     label="Copy code"
                     compact
                     tone="glass"
-                    onPress={() => void shareText(c.code, 'creator_coupon_shared')}
+                    onPress={() => void copyText(c.code, 'Code copied')}
                     accessibilityLabel="Copy coupon code"
                   />
                   <Pressable
