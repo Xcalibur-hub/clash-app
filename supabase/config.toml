@@ -6,6 +6,8 @@
 #
 #   npm run supabase:start     boot the stack (Docker required)
 #   npm run supabase:reset     replay every migration, then supabase/seed.sql
+#                              + seeds/clash_dev_fixtures.sql (local Clash test data)
+#   npm run supabase:seed:clash-dev  re-apply Clash fixtures only (local Docker)
 #   npm run supabase:types     regenerate supabase/database.types.ts
 #   npm run supabase:stop      shut the stack down
 #
@@ -82,10 +84,12 @@ schema_paths = []
 # Seeded after the migrations on `supabase db reset`. DESTRUCTIVE: seed.sql
 # truncates the Arena tables and restores the demo rows — local demo data only.
 # Never point this at a database you care about.
+# clash_dev_fixtures.sql is LOCAL multi-user Clash test data (see CLASH_DEV_FIXTURES.md).
+# It is NOT a migration and is never applied by hosted `db push`.
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+sql_paths = ["./seed.sql", "./seeds/clash_dev_fixtures.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.

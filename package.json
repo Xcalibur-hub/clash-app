@@ -14,7 +14,8 @@
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset",
     "supabase:types": "supabase gen types typescript --local > supabase/database.types.ts",
-    "supabase:test": "supabase test db"
+    "supabase:test": "supabase test db",
+    "supabase:seed:clash-dev": "node scripts/seed-clash-dev.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/comic-neue": "^0.4.1",
