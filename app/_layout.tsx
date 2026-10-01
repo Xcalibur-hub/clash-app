@@ -66,7 +66,14 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="auth" />
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="(vault)" />
-                  <Stack.Screen name="clash/[takeId]" options={{ animation: 'slide_from_bottom' }} />
+                  <Stack.Screen
+                    name="clash/[takeId]"
+                    options={{
+                      animation: 'slide_from_bottom',
+                      presentation: 'fullScreenModal',
+                      gestureEnabled: true,
+                    }}
+                  />
                   <Stack.Screen name="vault/[creatorId]" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="vault/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="vault/compose" options={{ animation: 'slide_from_bottom' }} />

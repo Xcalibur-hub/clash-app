@@ -1,5 +1,5 @@
 /**
- * Primary judgement controls — JUDGE THIS CLASH.
+ * Accessible judgement controls — secondary to tapping Side cards.
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -28,9 +28,6 @@ export function ClashJudgeControls({
     <View style={styles.wrap}>
       <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
         Judge this Clash
-      </Text>
-      <Text allowFontScaling={false} style={[styles.prompt, { color: t.textSecondary }]}>
-        Which side made the stronger case?
       </Text>
       <View style={styles.row}>
         <JudgeButton
@@ -101,11 +98,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontWeight: '700',
   },
-  prompt: { ...typeScale.body, fontWeight: '500' },
   row: { flexDirection: 'row', gap: space.sm },
   btn: {
     flex: 1,
-    minHeight: 76,
+    minHeight: 64,
     paddingVertical: space.md,
     paddingHorizontal: space.sm,
     borderRadius: radius.lg,

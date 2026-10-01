@@ -85,8 +85,13 @@ export function VerdictReveal({
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
           Verdict
         </Text>
+        {!isDraw ? (
+          <Text allowFontScaling={false} style={[styles.sideWin, { color: tone }]}>
+            Side {verdict.winnerSide}
+          </Text>
+        ) : null}
         <Text allowFontScaling={false} style={[styles.headline, { color: tone }]}>
-          {isDraw ? 'DRAW' : `SIDE ${verdict.winnerSide} WINS`}
+          {isDraw ? 'Draw' : 'Wins'}
         </Text>
         {!isDraw ? (
           <Text allowFontScaling={false} style={[styles.label, { color: t.textSecondary }]}>
@@ -161,11 +166,12 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...typeScale.caption,
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
     fontWeight: '700',
   },
-  headline: { ...typeScale.title, fontWeight: '700', letterSpacing: -0.4 },
+  sideWin: { ...typeScale.title, fontWeight: '600', letterSpacing: -0.3 },
+  headline: { ...typeScale.display, fontSize: 44, lineHeight: 48, fontWeight: '700', letterSpacing: -1.2 },
   label: { ...typeScale.meta },
   scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm, marginTop: space.xs },
   pct: { ...typeScale.display, fontSize: 40, fontWeight: '700', letterSpacing: -1 },

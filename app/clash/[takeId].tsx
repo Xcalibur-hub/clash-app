@@ -1,14 +1,14 @@
 /**
- * Interactive Clash 2.0 — signature judging experience.
+ * Interactive Clash 2.1 — immersive judging stage.
  *
- * Server remains authoritative for judgement, settlement, reputation, Blind reveal.
- * No client-side scores, rewards, or live jury percentages before settlement.
+ * Distinct from Take detail. Server remains authoritative for judgement,
+ * settlement, reputation, and Blind reveal. No fabricated live aggregates.
  */
 import React from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
+import { ClashArguments } from '../../components/clash/interactive/ClashArguments';
 import { ClashCountdown, countdownUrgency } from '../../components/clash/interactive/ClashCountdown';
 import { ClashJudgeControls } from '../../components/clash/interactive/ClashJudgeControls';
 import { ClashMatchup } from '../../components/clash/interactive/ClashMatchup';
@@ -33,7 +33,14 @@ import {
   type ClashView,
 } from '../../services/clashEngineService';
 import { errorText, SupabaseError } from '../../services/supabaseClient';
-import { showNotice, useClash, type Side, type User } from '../../store';
+import {
+  selectAuthor,
+  selectCommentsForTake,
+  showNotice,
+  useClash,
+  type Side,
+  type User,
+} from '../../store';
 import { useAuth } from '../../store/AuthProvider';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { judge as hapticJudge, tap as hapticTap } from '../../utils/haptics';
@@ -78,7 +85,7 @@ function clashErrorMessage(error: unknown): string {
 export default function ClashScreen(): React.JSX.Element {
   const { takeId } = useLocalSearchParams<{ takeId: string | string[] }>();
   const id = Array.isArray(takeId) ? takeId[0] : takeId;
-  const { dispatch } = useClash();
+  const { state, dispatch } = useClash();
   const { signedIn } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -102,6 +109,19 @@ export default function ClashScreen(): React.JSX.Element {
   const tickMs =
     urgency === 'critical' || urgency === 'final' ? 1_000 : urgency === 'urgent' ? 5_000 : 30_000;
   const now = useClock(tickMs);
+
+  const take = state.takes.find((item) => item.id === id);
+  const sideAMedia = take?.media ?? null;
+
+  const argumentItems = React.useMemo(() => {
+    const comments = selectCommentsForTake(state, id)
+      .filter((c) => !c.parentId)
+      .slice(0, 12);
+    return comments.map((comment) => ({
+      comment,
+      author: selectAuthor(state, comment.authorId),
+    }));
+  }, [state, id]);
 
   const load = React.useCallback(async (): Promise<void> => {
     setError(null);
@@ -260,6 +280,13 @@ export default function ClashScreen(): React.JSX.Element {
   const sideB = view.sideB ? asUser(view.sideB) : null;
   const ballot = view.myBallot;
   const activeSelection = busy ? selectedSide : ballot;
+  const canJudge =
+    signedIn &&
+    !busy &&
+    !view.hasJudged &&
+    !view.isParticipant &&
+    view.status === 'open' &&
+    !closed;
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
@@ -269,7 +296,7 @@ export default function ClashScreen(): React.JSX.Element {
           styles.content,
           {
             paddingTop: insets.top + space.sm,
-            paddingBottom: insets.bottom + space.xl,
+            paddingBottom: insets.bottom + space.xxl,
           },
         ]}
         accessibilityLabel={
@@ -295,7 +322,7 @@ export default function ClashScreen(): React.JSX.Element {
               {blind ? 'Blind Clash' : 'Clash'}
             </Text>
             <Text allowFontScaling={false} style={[styles.context, { color: t.textMuted }]}>
-              {closed && !settled ? 'Settling' : settled ? 'Result' : 'Live judging'}
+              {closed && !settled ? 'Settling' : settled ? 'Result' : 'Choose a side'}
             </Text>
           </View>
           <Pressable
@@ -316,18 +343,24 @@ export default function ClashScreen(): React.JSX.Element {
           cancelled={cancelled}
         />
 
+        <Text allowFontScaling={false} style={[styles.prompt, { color: t.textSecondary }]}>
+          Which side made the stronger case?
+        </Text>
+
         <ClashMatchup
           sideAText={view.sideAText}
           sideBText={view.sideBText}
           sideA={sideA}
           sideB={sideB}
+          sideAMedia={sideAMedia}
           selectedSide={activeSelection}
           myBallot={ballot}
           settled={settled}
           winnerSide={view.verdict?.winnerSide ?? null}
+          canJudge={canJudge}
+          pendingSide={pendingSide}
+          onSelectSide={(s) => void judge(s)}
         />
-
-        <MindshiftPanel takeId={view.takeId} offerFinal={view.hasJudged || settled} />
 
         {settled && view.verdict ? (
           <>
@@ -381,7 +414,7 @@ export default function ClashScreen(): React.JSX.Element {
             onPress={() => router.push('/auth')}
             style={styles.fallbackBtn}
           />
-        ) : (
+        ) : canJudge ? (
           <ClashJudgeControls
             sideAHandle={view.revealed ? view.sideA?.handle ?? null : null}
             sideBHandle={view.revealed ? view.sideB?.handle ?? null : null}
@@ -389,7 +422,15 @@ export default function ClashScreen(): React.JSX.Element {
             pendingSide={pendingSide}
             onJudge={(s) => void judge(s)}
           />
-        )}
+        ) : null}
+
+        <ClashArguments
+          items={argumentItems}
+          onMakeArgument={() => {
+            hapticTap();
+            router.push(`/take/${id}`);
+          }}
+        />
 
         {error ? (
           <Text allowFontScaling={false} style={[styles.inlineError, { color: t.textSecondary }]}>
@@ -410,6 +451,7 @@ const styles = StyleSheet.create({
   titleBlock: { alignItems: 'center', gap: 2 },
   eyebrow: { ...typeScale.label, fontWeight: '700', letterSpacing: 0.4 },
   context: { ...typeScale.caption },
+  prompt: { ...typeScale.body, fontWeight: '500', marginTop: -4 },
   noticeBox: {
     padding: space.md,
     borderRadius: 16,

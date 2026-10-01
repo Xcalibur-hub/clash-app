@@ -1,11 +1,8 @@
 /**
  * DEV / explicit-test-only control that throws one error for Sentry verification.
  *
- * Visible when:
- *   - `__DEV__` is true, OR
- *   - `EXPO_PUBLIC_SENTRY_TEST=1` is set on the build (e.g. a one-off preview APK)
- *
- * Never enable `EXPO_PUBLIC_SENTRY_TEST` on store production builds.
+ * Visible ONLY when `EXPO_PUBLIC_SENTRY_TEST=1` is set on the build.
+ * Never enabled by `__DEV__` alone — physical/dev-client builds must stay clean.
  */
 
 import React from 'react';
@@ -16,7 +13,7 @@ const testFlag = process.env.EXPO_PUBLIC_SENTRY_TEST === '1';
 
 export function SentryTestTrigger(): React.JSX.Element | null {
   const insets = useSafeAreaInsets();
-  if (!__DEV__ && !testFlag) return null;
+  if (!testFlag) return null;
 
   return (
     <View

@@ -51,55 +51,62 @@ export function ClashCountdown({
 }: ClashCountdownProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
-  const urgency = settled
-    ? 'closed'
-    : cancelled
-      ? 'closed'
-      : countdownUrgency(closesAt, now);
+  const urgency = settled || cancelled ? 'closed' : countdownUrgency(closesAt, now);
   const scale = useSharedValue(1);
   const lastCriticalSec = React.useRef<number | null>(null);
+  const remSec = Math.max(0, Math.floor((closesAt - now) / 1000));
 
   React.useEffect(() => {
     if (urgency !== 'critical' || reduced) return;
-    const sec = Math.floor(Math.max(0, closesAt - now) / 1000);
-    if (lastCriticalSec.current !== sec && sec <= 10 && sec > 0) {
-      lastCriticalSec.current = sec;
+    if (lastCriticalSec.current !== remSec && remSec <= 10 && remSec > 0) {
+      lastCriticalSec.current = remSec;
       scale.value = withSequence(
-        withTiming(1.06, { duration: 80 }),
-        withTiming(1, { duration: 120 }),
+        withTiming(1.08, { duration: 70 }),
+        withTiming(1, { duration: 140 }),
       );
-      if (sec === 10 || sec <= 3) hapticTap();
+      if (remSec === 10 || remSec <= 3) hapticTap();
     }
-  }, [closesAt, now, reduced, scale, urgency]);
+  }, [closesAt, reduced, remSec, scale, urgency]);
 
   const pulse = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
+  if (urgency === 'critical' && !settled && !cancelled) {
+    return (
+      <Animated.View
+        style={[styles.criticalWrap, pulse]}
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={`${remSec} seconds remaining`}
+      >
+        <Text allowFontScaling={false} style={[styles.criticalNum, { color: t.textPrimary }]}>
+          {remSec}
+        </Text>
+        <Text allowFontScaling={false} style={[styles.criticalHint, { color: t.accent }]}>
+          Final seconds
+        </Text>
+      </Animated.View>
+    );
+  }
+
   let label: string;
   if (settled) label = 'Settled';
   else if (cancelled) label = 'No community verdict';
   else if (urgency === 'closed') label = 'Judging closed · result pending';
-  else if (urgency === 'final') label = 'FINAL MINUTE';
-  else if (urgency === 'critical') label = formatClock(closesAt, now);
+  else if (urgency === 'final') label = `FINAL MINUTE  ${formatClock(closesAt, now)}`;
   else label = formatClock(closesAt, now);
 
   const tone =
-    urgency === 'critical' || urgency === 'final'
-      ? t.accent
-      : urgency === 'urgent'
-        ? t.textPrimary
-        : t.textSecondary;
+    urgency === 'final' || urgency === 'urgent' ? t.accent : t.textSecondary;
 
   return (
-    <Animated.View
+    <View
       style={[
         styles.wrap,
         {
-          borderColor: urgency === 'calm' ? t.border : t.accent,
+          borderColor: urgency === 'calm' || urgency === 'closed' ? t.border : t.accent,
           backgroundColor: t.surfaceMuted,
         },
-        pulse,
       ]}
       accessibilityLiveRegion="polite"
       accessibilityLabel={
@@ -113,17 +120,12 @@ export function ClashCountdown({
       <Text allowFontScaling={false} style={[styles.label, { color: tone }]}>
         {label}
       </Text>
-      {!settled && !cancelled && urgency !== 'closed' && urgency !== 'final' ? (
+      {!settled && !cancelled && urgency === 'calm' ? (
         <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
           remaining
         </Text>
       ) : null}
-      {urgency === 'urgent' && !settled ? (
-        <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
-          closing soon
-        </Text>
-      ) : null}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -145,4 +147,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   hint: { ...typeScale.caption },
+  criticalWrap: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    paddingVertical: space.sm,
+    gap: 2,
+  },
+  criticalNum: {
+    ...typeScale.display,
+    fontSize: 56,
+    lineHeight: 60,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -1.5,
+  },
+  criticalHint: {
+    ...typeScale.caption,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+  },
 });

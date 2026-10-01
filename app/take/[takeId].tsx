@@ -283,6 +283,12 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </View>
           </View>
 
+          {take.media ? (
+            <View style={styles.mediaFrame}>
+              <TakeMedia media={take.media} variant="detail" />
+            </View>
+          ) : null}
+
           {/* Hero Take */}
           <Text
             allowFontScaling
@@ -293,12 +299,6 @@ export default function TakeDetailScreen(): React.JSX.Element {
           >
             {take.text}
           </Text>
-
-          {take.media ? (
-            <View style={styles.mediaFrame}>
-              <TakeMedia media={take.media} variant="detail" />
-            </View>
-          ) : null}
 
           <MindshiftPanel takeId={take.id} />
 
