@@ -22,6 +22,7 @@ initAnalytics();
  * index    → animated splash, then Arena (or onboarding on first run)
  * onboard  → 3-screen first-launch sequence
  * (tabs)   → Arena + Profile behind the glass tab bar
+ * arena/*  → the Live Daily Arena: today's Topic, then the room it places you in
  * (vault)  → Vault + Creators + Radar + Analytics + Profile (premium realm)
  * clash/*  → the duel, pushed as a full-screen immersive experience
  * creator/* → Vault creator profiles (public vs exclusive drops)
@@ -87,6 +88,8 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="sponsor/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="earnings/index" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="earnings/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
+                  <Stack.Screen name="arena/topic/[topicId]" options={{ animation: 'slide_from_right' }} />
+                  <Stack.Screen name="arena/room/[roomId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="take/[takeId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="profile/[profileId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="hood/[hoodId]" options={{ animation: 'slide_from_right' }} />

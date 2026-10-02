@@ -1,0 +1,410 @@
+import React from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { EvidenceComposerSheet } from '../../../components/liveArena/EvidenceComposerSheet';
+import { LiveEvidenceCard } from '../../../components/liveArena/LiveEvidenceCard';
+import { LiveRoomComposer } from '../../../components/liveArena/LiveRoomComposer';
+import { LiveRoomHeader } from '../../../components/liveArena/LiveRoomHeader';
+import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
+import { LiveRoomMessage } from '../../../components/liveArena/LiveRoomMessage';
+import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResultReveal';
+import { PostActionsSheet } from '../../../components/arena/PostActionsSheet';
+import { EmptyState } from '../../../components/shared/EmptyState';
+import { Notice } from '../../../components/shared/Notice';
+import { ArenaIcon } from '../../../components/shared/icons';
+import { useClock } from '../../../hooks/useClock';
+import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
+import { analytics } from '../../../services/analytics';
+import type { ArenaAuthor, ArenaMessage } from '../../../services/liveArenaService';
+import { showNotice, useClash, type User } from '../../../store';
+import type { ReportTarget } from '../../../supabase/types';
+import { layout, space, typeScale, useThemeColors } from '../../../theme';
+
+/** Width of a card in the horizontal evidence rail. */
+const EVIDENCE_CARD_WIDTH = 230;
+
+interface SafetyTarget {
+  user: User;
+  report: { kind: ReportTarget; id: string };
+}
+
+/** PostActionsSheet speaks the Arena's `User`; a room author card is a subset of it. */
+function asUser(author: ArenaAuthor): User {
+  return {
+    id: author.id,
+    handle: author.handle,
+    name: author.name,
+    tint: author.avatarTint,
+    hood: 'for-you',
+    rank: 'Rookie',
+    reputation: 0,
+    coins: 0,
+    clashes: 0,
+    wins: 0,
+    streak: 0,
+    badges: [],
+  };
+}
+
+/**
+ * The live room — one screen for every phase the server can put it in.
+ *
+ * OPEN / FINAL_ARGUMENTS  thread + composer + evidence rail
+ * JUDGING                 thread (read-only) + the two ballots
+ * SETTLED                 verdict, best argument, Mindshift, then the transcript
+ *
+ * The phase comes from `room.status`, which the scheduler owns. Nothing here
+ * advances a clock, and the composer being hidden is a reflection of the server
+ * state rather than the thing that enforces it.
+ */
+export default function LiveArenaRoomScreen(): React.JSX.Element {
+  const { roomId: raw } = useLocalSearchParams<{ roomId: string | string[] }>();
+  const roomId = Array.isArray(raw) ? raw[0] : raw;
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const t = useThemeColors();
+  const now = useClock(30_000);
+  const { state, dispatch } = useClash();
+
+  const viewerAuthor = React.useMemo<ArenaAuthor>(
+    () => ({
+      id: state.viewer.id,
+      handle: state.viewer.handle,
+      name: state.viewer.name,
+      avatarTint: state.viewer.tint,
+      rank: state.viewer.rank,
+    }),
+    [state.viewer],
+  );
+
+  const {
+    room,
+    messages,
+    evidence,
+    stats,
+    loading,
+    error,
+    threadLocked,
+    refreshing,
+    sending,
+    loadingOlder,
+    hasOlder,
+    refresh,
+    loadOlder,
+    send,
+    react,
+    addEvidence,
+    markUseful,
+    voteSide,
+    voteArgument,
+    recordFinal,
+  } = useLiveArenaRoom(roomId, viewerAuthor);
+
+  const [replyTo, setReplyTo] = React.useState<ArenaMessage | null>(null);
+  const [proofOpen, setProofOpen] = React.useState(false);
+  const [safety, setSafety] = React.useState<SafetyTarget | null>(null);
+  const [voting, setVoting] = React.useState(false);
+
+  const notify = React.useCallback(
+    (message: string) => dispatch(showNotice(message)),
+    [dispatch],
+  );
+
+  const byId = React.useMemo(() => {
+    const map = new Map<string, ArenaMessage>();
+    for (const message of messages) map.set(message.id, message);
+    return map;
+  }, [messages]);
+
+  const accepting = room?.status === 'OPEN' || room?.status === 'FINAL_ARGUMENTS';
+  const settled = room?.status === 'SETTLED';
+  const judging = room?.status === 'JUDGING';
+  const isMember = room?.viewer != null;
+
+  const openProfile = React.useCallback(
+    (profileId: string) => router.push(`/profile/${profileId}`),
+    [router],
+  );
+
+  const renderMessage = React.useCallback(
+    ({ item }: ListRenderItemInfo<ArenaMessage>) => (
+      <LiveRoomMessage
+        message={item}
+        now={now}
+        parent={item.parentMessageId ? (byId.get(item.parentMessageId) ?? null) : null}
+        canReply={accepting && isMember}
+        canReact={!settled && isMember}
+        onReply={setReplyTo}
+        onReact={(message, emoji) => void react(message.id, emoji)}
+        onOpenProfile={openProfile}
+        onReport={
+          item.author
+            ? (message) =>
+                setSafety({
+                  user: asUser(message.author as ArenaAuthor),
+                  report: { kind: 'arena_room_message', id: message.id },
+                })
+            : undefined
+        }
+      />
+    ),
+    [accepting, byId, isMember, now, openProfile, react, settled],
+  );
+
+  if (loading && !room) {
+    return (
+      <View style={[styles.root, styles.center, { backgroundColor: t.background }]}>
+        <ActivityIndicator color={t.textPrimary} />
+      </View>
+    );
+  }
+
+  if (!room) {
+    return (
+      <View style={[styles.root, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
+        <EmptyState
+          icon={ArenaIcon}
+          title="Room unavailable"
+          body={error ?? 'This Arena room may have closed or is not open to you.'}
+          actionLabel="BACK TO ARENA"
+          onAction={() => router.replace('/(tabs)')}
+        />
+        <Notice offset={0} />
+      </View>
+    );
+  }
+
+  const evidenceRail =
+    evidence.length > 0 ? (
+      <View style={styles.railWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rail}
+        >
+          {evidence.map((item) => (
+            <LiveEvidenceCard
+              key={item.id}
+              evidence={item}
+              width={EVIDENCE_CARD_WIDTH}
+              canMark={!settled && isMember}
+              onMarkUseful={(target) => void markUseful(target.id)}
+              onChallenge={
+                accepting && isMember
+                  ? (target) => {
+                      const anchor = target.messageId ? byId.get(target.messageId) : undefined;
+                      if (anchor) setReplyTo(anchor);
+                      else notify(`Answer "${target.title}" in your next argument.`);
+                    }
+                  : undefined
+              }
+              onReport={
+                item.author
+                  ? (target) =>
+                      setSafety({
+                        user: asUser(target.author as ArenaAuthor),
+                        report: { kind: 'arena_room_evidence', id: target.id },
+                      })
+                  : undefined
+              }
+            />
+          ))}
+        </ScrollView>
+      </View>
+    ) : null;
+
+  const thread = threadLocked ? (
+    <View style={styles.locked}>
+      <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
+        The transcript is only visible to people who argued in this room.
+      </Text>
+    </View>
+  ) : null;
+
+  const composer = (
+    <LiveRoomComposer
+      disabled={!accepting || !isMember}
+      disabledReason={
+        !isMember
+          ? 'You are reading this room, not arguing in it.'
+          : judging
+            ? 'Arguments are closed. Cast your votes above.'
+            : 'This room is settled.'
+      }
+      replyingTo={replyTo?.author?.name ?? null}
+      sending={sending}
+      onCancelReply={() => setReplyTo(null)}
+      onSend={async (argument) => {
+        const ok = await send({
+          body: argument.body,
+          parentMessageId: replyTo?.id ?? null,
+          ...(argument.media ? { media: argument.media } : {}),
+          ...(argument.gif ? { gif: argument.gif } : {}),
+        });
+        if (ok) {
+          setReplyTo(null);
+          analytics.track('arena_message_sent', {
+            realm: 'arena',
+            media_type: argument.gif ? 'gif' : (argument.media?.kind ?? 'none'),
+          });
+        }
+        return ok;
+      }}
+      onAddProof={() => setProofOpen(true)}
+      onError={notify}
+    />
+  );
+
+  return (
+    <View style={[styles.root, { backgroundColor: t.background }]}>
+      <LiveRoomHeader
+        room={room}
+        paddingTop={insets.top}
+        onBack={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/(tabs)');
+        }}
+      />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        {settled && room.result ? (
+          <FlatList
+            data={[...messages].reverse()}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
+            ListHeaderComponent={
+              <>
+                <LiveRoomResultReveal
+                  result={room.result}
+                  stats={stats}
+                  viewer={room.viewer}
+                  busy={voting}
+                  onRecordFinal={(stance) => {
+                    setVoting(true);
+                    void recordFinal(stance).finally(() => setVoting(false));
+                  }}
+                />
+                {evidenceRail}
+                {thread}
+              </>
+            }
+            contentContainerStyle={[
+              styles.list,
+              { paddingBottom: insets.bottom + space.xxl },
+            ]}
+            refreshing={refreshing}
+            onRefresh={() => void refresh()}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <>
+            {evidenceRail}
+            {thread}
+            {messages.length === 0 && !threadLocked ? (
+              <View style={styles.empty}>
+                <Text allowFontScaling={false} style={[styles.emptyText, { color: t.textMuted }]}>
+                  No arguments yet. Open the room.
+                </Text>
+              </View>
+            ) : null}
+            <FlatList
+              inverted
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              contentContainerStyle={styles.list}
+              style={styles.flex}
+              refreshing={refreshing}
+              onRefresh={() => void refresh()}
+              onEndReached={() => {
+                if (hasOlder) void loadOlder();
+              }}
+              onEndReachedThreshold={0.4}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              ListFooterComponent={
+                loadingOlder ? (
+                  <ActivityIndicator style={styles.older} size="small" color={t.textMuted} />
+                ) : null
+              }
+            />
+
+            {judging ? (
+              <ScrollView
+                style={styles.judgingScroll}
+                contentContainerStyle={styles.judgingContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <LiveRoomJudgingPanel
+                  room={room}
+                  messages={messages}
+                  busy={voting}
+                  onVoteSide={(side) => {
+                    setVoting(true);
+                    void voteSide(side).finally(() => setVoting(false));
+                  }}
+                  onVoteArgument={(messageId) => {
+                    setVoting(true);
+                    void voteArgument(messageId).finally(() => setVoting(false));
+                  }}
+                />
+              </ScrollView>
+            ) : null}
+
+            <View style={{ paddingBottom: insets.bottom }}>{composer}</View>
+          </>
+        )}
+      </KeyboardAvoidingView>
+
+      <EvidenceComposerSheet
+        visible={proofOpen}
+        onClose={() => setProofOpen(false)}
+        onSubmit={(input) => addEvidence(input)}
+        onError={notify}
+      />
+
+      <PostActionsSheet
+        visible={safety !== null}
+        target={safety?.user ?? null}
+        isSelf={safety?.user.id === state.viewer.id}
+        following={false}
+        reportTarget={safety?.report ?? null}
+        onClose={() => setSafety(null)}
+        onMutated={() => void refresh()}
+      />
+
+      <Notice offset={0} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  flex: { flex: 1 },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  list: { paddingHorizontal: layout.screenX, paddingVertical: space.xs, flexGrow: 1 },
+  railWrap: { paddingVertical: space.xs },
+  rail: { gap: space.xs, paddingHorizontal: layout.screenX },
+  locked: { paddingHorizontal: layout.screenX, paddingVertical: space.sm },
+  lockedText: { ...typeScale.caption, fontSize: 11, lineHeight: 16 },
+  empty: { paddingVertical: space.xxl, alignItems: 'center' },
+  emptyText: { ...typeScale.meta, fontSize: 13 },
+  older: { marginVertical: space.sm },
+  judgingScroll: { maxHeight: 340 },
+  judgingContent: { paddingBottom: space.xs },
+});

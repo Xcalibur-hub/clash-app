@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
 import { ArenaFeaturedStack } from '../../components/arena/ArenaFeaturedStack';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
+import { DailyArenaCard } from '../../components/liveArena/DailyArenaCard';
 import { FreshTakeCard, freshTakeVariant } from '../../components/arena/FreshTakeCard';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -16,6 +17,7 @@ import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { currentViewerProfileId, toggleTakeReaction } from '../../services/apiService';
 import { analytics } from '../../services/analytics';
+import { fetchLiveTopics, type LiveArenaTopic, type Stance } from '../../services/liveArenaService';
 import { fetchFollowState, fetchFollowingIds } from '../../services/socialService';
 import { errorText } from '../../services/supabaseClient';
 import {
@@ -65,6 +67,8 @@ export default function ArenaScreen(): React.JSX.Element {
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [refreshing, setRefreshing] = React.useState(false);
   const [menu, setMenu] = React.useState<FeedMenu | null>(null);
+  /** Today's live Topic(s). Empty when none is running — the card simply hides. */
+  const [liveTopics, setLiveTopics] = React.useState<LiveArenaTopic[]>([]);
   /** Guards against double taps racing the reaction RPC for the same Take. */
   const reactionInFlight = React.useRef<Set<string>>(new Set());
 
@@ -75,6 +79,27 @@ export default function ArenaScreen(): React.JSX.Element {
         is_guest: !signedIn,
       });
     }, [signedIn]),
+  );
+
+  /**
+   * The Live Arena card re-reads on every focus: the viewer may have joined,
+   * voted or watched the topic close while they were on another screen, and the
+   * card's state (Agree/Disagree vs "Enter your room") comes entirely from the
+   * server's view of their membership.
+   */
+  const loadLiveTopics = React.useCallback(async (): Promise<void> => {
+    try {
+      setLiveTopics(await fetchLiveTopics());
+    } catch {
+      // A missing Topic is an ordinary day, not an error worth a notice.
+      setLiveTopics([]);
+    }
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadLiveTopics();
+    }, [loadLiveTopics]),
   );
 
   // Load the signed-in viewer's follow graph once per session (Following scope).
@@ -110,11 +135,11 @@ export default function ArenaScreen(): React.JSX.Element {
     // Re-resolve the Following graph and re-hydrate the live Arena.
     setRefreshKey((k) => k + 1);
     try {
-      await reloadArena();
+      await Promise.all([reloadArena(), loadLiveTopics()]);
     } finally {
       setRefreshing(false);
     }
-  }, [reloadArena]);
+  }, [loadLiveTopics, reloadArena]);
 
   /**
    * Open the shared safety sheet for a Take's author. Follow state is fetched
@@ -182,6 +207,26 @@ export default function ArenaScreen(): React.JSX.Element {
   const openDetail = React.useCallback(
     (takeId: string): void => router.push(`/take/${takeId}`),
     [router],
+  );
+
+  // Joining a Topic is an account-owned write, so the gate runs before the push
+  // rather than letting the topic screen bounce a guest back out of the flow.
+  const openTopic = React.useCallback(
+    (topicId: string, stance?: Stance): void => {
+      if (!requireAuth()) return;
+      hapticPress();
+      router.push(stance ? `/arena/topic/${topicId}?stance=${stance}` : `/arena/topic/${topicId}`);
+    },
+    [requireAuth, router],
+  );
+
+  const openRoom = React.useCallback(
+    (roomId: string): void => {
+      if (!requireAuth()) return;
+      hapticPress();
+      router.push(`/arena/room/${roomId}`);
+    },
+    [requireAuth, router],
   );
 
   // Reaction authority is `toggle_take_reaction`: tap → optimistic flip → RPC →
@@ -270,6 +315,18 @@ export default function ArenaScreen(): React.JSX.Element {
             if (requireAuth()) dispatch(toggleSave(takeId));
           }}
         />
+        {liveTopics.length > 0 ? (
+          <DailyArenaCard
+            topic={liveTopics[0]}
+            onOpen={() => openTopic(liveTopics[0].id)}
+            onChoose={(stance) => openTopic(liveTopics[0].id, stance)}
+            onEnter={() => {
+              const roomId = liveTopics[0].viewerRoomId;
+              if (roomId) openRoom(roomId);
+              else openTopic(liveTopics[0].id);
+            }}
+          />
+        ) : null}
         <View style={styles.freshHead}>
           <Text allowFontScaling={false} style={[styles.freshTitle, { color: theme.textPrimary }]}>
             Fresh Takes
@@ -284,8 +341,11 @@ export default function ArenaScreen(): React.JSX.Element {
     [
       dispatch,
       featuredItems,
+      liveTopics,
       openClash,
       openDetail,
+      openRoom,
+      openTopic,
       requireAuth,
       scope,
       state.arenaStatus,

@@ -72,6 +72,511 @@ export type Database = {
           },
         ]
       }
+      arena_daily_topics: {
+        Row: {
+          closes_at: string
+          created_at: string
+          description: string | null
+          final_arguments_at: string
+          hood: Database["public"]["Enums"]["hood_id"] | null
+          id: string
+          judging_at: string
+          opens_at: string
+          status: Database["public"]["Enums"]["arena_topic_status"]
+          title: string
+        }
+        Insert: {
+          closes_at: string
+          created_at?: string
+          description?: string | null
+          final_arguments_at: string
+          hood?: Database["public"]["Enums"]["hood_id"] | null
+          id: string
+          judging_at: string
+          opens_at?: string
+          status?: Database["public"]["Enums"]["arena_topic_status"]
+          title: string
+        }
+        Update: {
+          closes_at?: string
+          created_at?: string
+          description?: string | null
+          final_arguments_at?: string
+          hood?: Database["public"]["Enums"]["hood_id"] | null
+          id?: string
+          judging_at?: string
+          opens_at?: string
+          status?: Database["public"]["Enums"]["arena_topic_status"]
+          title?: string
+        }
+        Relationships: []
+      }
+      arena_room_argument_votes: {
+        Row: {
+          created_at: string
+          message_id: string
+          profile_id: string
+          room_id: string
+        }
+        Insert: {
+          created_at?: string
+          message_id: string
+          profile_id: string
+          room_id: string
+        }
+        Update: {
+          created_at?: string
+          message_id?: string
+          profile_id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_argument_votes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "arena_room_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_argument_votes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_argument_votes_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_room_evidence: {
+        Row: {
+          author_id: string
+          created_at: string
+          hidden_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["arena_evidence_kind"]
+          media_object_id: string | null
+          media_url: string | null
+          message_id: string | null
+          room_id: string
+          source_url: string | null
+          title: string
+          topic_id: string
+          useful_count: number
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          hidden_at?: string | null
+          id: string
+          kind: Database["public"]["Enums"]["arena_evidence_kind"]
+          media_object_id?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          room_id: string
+          source_url?: string | null
+          title: string
+          topic_id: string
+          useful_count?: number
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["arena_evidence_kind"]
+          media_object_id?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          room_id?: string
+          source_url?: string | null
+          title?: string
+          topic_id?: string
+          useful_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_evidence_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_evidence_media_object_id_fkey"
+            columns: ["media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_evidence_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "arena_room_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_evidence_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_evidence_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "arena_daily_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_room_evidence_marks: {
+        Row: {
+          created_at: string
+          evidence_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          evidence_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_evidence_marks_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "arena_room_evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_evidence_marks_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_room_message_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          message_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string
+          message_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          message_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "arena_room_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_message_reactions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_room_messages: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          gif_external_id: string | null
+          gif_provider: string | null
+          hidden_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["arena_message_kind"]
+          media_kind: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id: string | null
+          media_url: string | null
+          parent_message_id: string | null
+          room_id: string
+        }
+        Insert: {
+          author_id: string
+          body?: string
+          created_at?: string
+          gif_external_id?: string | null
+          gif_provider?: string | null
+          hidden_at?: string | null
+          id: string
+          kind?: Database["public"]["Enums"]["arena_message_kind"]
+          media_kind?: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id?: string | null
+          media_url?: string | null
+          parent_message_id?: string | null
+          room_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          gif_external_id?: string | null
+          gif_provider?: string | null
+          hidden_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["arena_message_kind"]
+          media_kind?: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id?: string | null
+          media_url?: string | null
+          parent_message_id?: string | null
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_messages_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_messages_media_object_id_fkey"
+            columns: ["media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "arena_room_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_room_participants: {
+        Row: {
+          final_recorded_at: string | null
+          final_stance: Database["public"]["Enums"]["take_stance"] | null
+          initial_stance: Database["public"]["Enums"]["take_stance"]
+          joined_at: string
+          profile_id: string
+          role: Database["public"]["Enums"]["arena_participant_role"]
+          room_id: string
+          topic_id: string
+        }
+        Insert: {
+          final_recorded_at?: string | null
+          final_stance?: Database["public"]["Enums"]["take_stance"] | null
+          initial_stance: Database["public"]["Enums"]["take_stance"]
+          joined_at?: string
+          profile_id: string
+          role?: Database["public"]["Enums"]["arena_participant_role"]
+          room_id: string
+          topic_id: string
+        }
+        Update: {
+          final_recorded_at?: string | null
+          final_stance?: Database["public"]["Enums"]["take_stance"] | null
+          initial_stance?: Database["public"]["Enums"]["take_stance"]
+          joined_at?: string
+          profile_id?: string
+          role?: Database["public"]["Enums"]["arena_participant_role"]
+          room_id?: string
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_participants_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_participants_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "arena_daily_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_room_results: {
+        Row: {
+          agree_votes: number
+          best_argument_author_id: string | null
+          best_argument_message_id: string | null
+          disagree_votes: number
+          mindshift_changed_count: number
+          mindshift_completed_count: number
+          participant_count: number
+          room_id: string
+          settled_at: string
+          winning_side: Database["public"]["Enums"]["arena_winning_side"]
+        }
+        Insert: {
+          agree_votes?: number
+          best_argument_author_id?: string | null
+          best_argument_message_id?: string | null
+          disagree_votes?: number
+          mindshift_changed_count?: number
+          mindshift_completed_count?: number
+          participant_count?: number
+          room_id: string
+          settled_at?: string
+          winning_side: Database["public"]["Enums"]["arena_winning_side"]
+        }
+        Update: {
+          agree_votes?: number
+          best_argument_author_id?: string | null
+          best_argument_message_id?: string | null
+          disagree_votes?: number
+          mindshift_changed_count?: number
+          mindshift_completed_count?: number
+          participant_count?: number
+          room_id?: string
+          settled_at?: string
+          winning_side?: Database["public"]["Enums"]["arena_winning_side"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_results_best_argument_author_id_fkey"
+            columns: ["best_argument_author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_results_best_argument_message_id_fkey"
+            columns: ["best_argument_message_id"]
+            isOneToOne: false
+            referencedRelation: "arena_room_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_results_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: true
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_room_side_votes: {
+        Row: {
+          created_at: string
+          profile_id: string
+          room_id: string
+          side: Database["public"]["Enums"]["arena_winning_side"]
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+          room_id: string
+          side: Database["public"]["Enums"]["arena_winning_side"]
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+          room_id?: string
+          side?: Database["public"]["Enums"]["arena_winning_side"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_side_votes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_side_votes_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_rooms: {
+        Row: {
+          capacity: number
+          closes_at: string
+          created_at: string
+          id: string
+          opens_at: string
+          participant_count: number
+          status: Database["public"]["Enums"]["arena_room_status"]
+          topic_id: string
+        }
+        Insert: {
+          capacity?: number
+          closes_at: string
+          created_at?: string
+          id: string
+          opens_at?: string
+          participant_count?: number
+          status?: Database["public"]["Enums"]["arena_room_status"]
+          topic_id: string
+        }
+        Update: {
+          capacity?: number
+          closes_at?: string
+          created_at?: string
+          id?: string
+          opens_at?: string
+          participant_count?: number
+          status?: Database["public"]["Enums"]["arena_room_status"]
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_rooms_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "arena_daily_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocks: {
         Row: {
           blocked_id: string
@@ -1255,6 +1760,7 @@ export type Database = {
       }
       reputation_events: {
         Row: {
+          arena_room_id: string | null
           clash_id: string | null
           coins_delta: number
           created_at: string
@@ -1264,6 +1770,7 @@ export type Database = {
           reputation_delta: number
         }
         Insert: {
+          arena_room_id?: string | null
           clash_id?: string | null
           coins_delta?: number
           created_at?: string
@@ -1273,6 +1780,7 @@ export type Database = {
           reputation_delta: number
         }
         Update: {
+          arena_room_id?: string | null
           clash_id?: string | null
           coins_delta?: number
           created_at?: string
@@ -1282,6 +1790,13 @@ export type Database = {
           reputation_delta?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "reputation_events_arena_room_id_fkey"
+            columns: ["arena_room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "reputation_events_clash_id_fkey"
             columns: ["clash_id"]
@@ -1909,6 +2424,73 @@ export type Database = {
           total_campaigns: number
         }[]
       }
+      arena_actor_hidden: {
+        Args: { p_author: string; p_viewer: string }
+        Returns: boolean
+      }
+      arena_evidence_payload: {
+        Args: {
+          p_evidence: Database["public"]["Tables"]["arena_room_evidence"]["Row"]
+          p_viewer: string
+        }
+        Returns: Json
+      }
+      arena_evidence_room: {
+        Args: { p_evidence_id: string }
+        Returns: string
+      }
+      arena_is_room_member: {
+        Args: { p_room_id: string }
+        Returns: boolean
+      }
+      arena_message_payload: {
+        Args: {
+          p_message: Database["public"]["Tables"]["arena_room_messages"]["Row"]
+          p_reveal_votes?: boolean
+          p_viewer: string
+        }
+        Returns: Json
+      }
+      arena_message_room: {
+        Args: { p_message_id: string }
+        Returns: string
+      }
+      arena_profile_json: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
+      arena_result_payload: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      arena_room_mindshift_stats: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      arena_room_payload: {
+        Args: {
+          p_room: Database["public"]["Tables"]["arena_rooms"]["Row"]
+          p_viewer: string
+        }
+        Returns: Json
+      }
+      arena_topic_payload: {
+        Args: {
+          p_topic: Database["public"]["Tables"]["arena_daily_topics"]["Row"]
+          p_viewer: string
+        }
+        Returns: Json
+      }
+      arena_topic_phase: {
+        Args: {
+          p_closes_at: string
+          p_final_arguments_at: string
+          p_judging_at: string
+          p_opens_at: string
+          p_status: Database["public"]["Enums"]["arena_topic_status"]
+        }
+        Returns: string
+      }
       assert_advertiser_owner: {
         Args: { p_advertiser_id: string }
         Returns: string
@@ -2028,6 +2610,19 @@ export type Database = {
           status: Database["public"]["Enums"]["advertiser_status"]
           updated_at: string
         }
+      }
+      create_arena_daily_topic: {
+        Args: {
+          p_closes_at?: string
+          p_description?: string
+          p_final_arguments_at?: string
+          p_hood?: Database["public"]["Enums"]["hood_id"]
+          p_judging_at?: string
+          p_opens_at?: string
+          p_status?: Database["public"]["Enums"]["arena_topic_status"]
+          p_title: string
+        }
+        Returns: Json
       }
       create_campaign_coupon: {
         Args: {
@@ -2316,6 +2911,14 @@ export type Database = {
         Args: { p_target_id: string }
         Returns: undefined
       }
+      get_arena_room: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      get_arena_topic: {
+        Args: { p_topic_id: string }
+        Returns: Json
+      }
       hood_active_prediction: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: Json
@@ -2326,6 +2929,10 @@ export type Database = {
       }
       is_advertiser_owner: {
         Args: { p_advertiser_id: string }
+        Returns: boolean
+      }
+      is_allowed_http_url: {
+        Args: { p_url: string }
         Returns: boolean
       }
       is_allowed_tenor_media_url: {
@@ -2344,6 +2951,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      join_arena_topic: {
+        Args: {
+          p_role?: Database["public"]["Enums"]["arena_participant_role"]
+          p_stance: Database["public"]["Enums"]["take_stance"]
+          p_topic_id: string
+        }
+        Returns: Json
+      }
       join_hood: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: undefined
@@ -2351,6 +2966,14 @@ export type Database = {
       leave_hood: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: undefined
+      }
+      list_arena_room_evidence: {
+        Args: { p_limit?: number; p_room_id: string }
+        Returns: Json[]
+      }
+      list_arena_room_messages: {
+        Args: { p_before?: string; p_limit?: number; p_room_id: string }
+        Returns: Json[]
       }
       list_campaign_coupons: {
         Args: { p_campaign_id: string }
@@ -2379,6 +3002,10 @@ export type Database = {
           token: string
         }[]
       }
+      list_live_arena_topics: {
+        Args: Record<PropertyKey, never>
+        Returns: Json[]
+      }
       list_my_sponsor_campaigns: {
         Args: { p_advertiser_id: string }
         Returns: {
@@ -2396,6 +3023,10 @@ export type Database = {
           title: string
         }[]
       }
+      mark_arena_evidence_useful: {
+        Args: { p_evidence_id: string }
+        Returns: Json
+      }
       mindshift_stats: {
         Args: { p_take_id: string }
         Returns: Json
@@ -2406,6 +3037,10 @@ export type Database = {
       }
       my_profile_id: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      new_arena_id: {
+        Args: { p_prefix: string }
         Returns: string
       }
       owns_campaign_via_advertiser: {
@@ -2432,6 +3067,32 @@ export type Database = {
           updated_at: string
         }
       }
+      post_arena_room_message: {
+        Args: {
+          p_body: string
+          p_gif_external_id?: string
+          p_gif_provider?: string
+          p_media_object_id?: string
+          p_media_url?: string
+          p_parent_message_id?: string
+          p_room_id: string
+        }
+        Returns: {
+          author_id: string
+          body: string
+          created_at: string
+          gif_external_id: string | null
+          gif_provider: string | null
+          hidden_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["arena_message_kind"]
+          media_kind: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id: string | null
+          media_url: string | null
+          parent_message_id: string | null
+          room_id: string
+        }[]
+      }
       profile_clash_list: {
         Args: { p_profile_id: string }
         Returns: Json
@@ -2455,6 +3116,17 @@ export type Database = {
       rank_for_rep: {
         Args: { p_rep: number }
         Returns: Database["public"]["Enums"]["rank_name"]
+      }
+      react_arena_room_message: {
+        Args: { p_emoji?: string; p_message_id: string }
+        Returns: Json
+      }
+      record_arena_final_stance: {
+        Args: {
+          p_room_id: string
+          p_stance: Database["public"]["Enums"]["take_stance"]
+        }
+        Returns: Json
       }
       record_final_stance: {
         Args: {
@@ -2578,6 +3250,10 @@ export type Database = {
           updated_at: string
         }
       }
+      settle_arena_room: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
       settle_clash: {
         Args: { p_clash_id: string }
         Returns: Json
@@ -2620,6 +3296,28 @@ export type Database = {
         }
         Returns: string
       }
+      submit_arena_argument_vote: {
+        Args: { p_message_id: string; p_room_id: string }
+        Returns: Json
+      }
+      submit_arena_evidence: {
+        Args: {
+          p_kind: Database["public"]["Enums"]["arena_evidence_kind"]
+          p_media_object_id?: string
+          p_media_url?: string
+          p_room_id: string
+          p_source_url?: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      submit_arena_side_vote: {
+        Args: {
+          p_room_id: string
+          p_side: Database["public"]["Enums"]["arena_winning_side"]
+        }
+        Returns: Json
+      }
       submit_judgement: {
         Args: {
           p_clash_id: string
@@ -2655,6 +3353,10 @@ export type Database = {
       toggle_take_reaction: {
         Args: { p_take_id: string }
         Returns: Json
+      }
+      transition_due_arena_rooms: {
+        Args: { p_limit?: number }
+        Returns: number
       }
       unblock_profile: {
         Args: { p_target_id: string }
@@ -2821,6 +3523,17 @@ export type Database = {
     }
     Enums: {
       advertiser_status: "DRAFT" | "ACTIVE" | "PAUSED" | "SUSPENDED"
+      arena_evidence_kind: "image" | "video" | "link"
+      arena_message_kind: "text" | "media" | "gif" | "system"
+      arena_participant_role: "debater" | "spectator"
+      arena_room_status:
+        | "OPEN"
+        | "FINAL_ARGUMENTS"
+        | "JUDGING"
+        | "SETTLED"
+        | "CANCELLED"
+      arena_topic_status: "scheduled" | "live" | "closed"
+      arena_winning_side: "AGREE" | "DISAGREE" | "DRAW"
       attribution_method: "REFERRAL" | "COUPON" | "UNATTRIBUTED"
       campaign_creator_status: "INVITED" | "ACTIVE" | "PAUSED" | "REMOVED"
       clash_mode: "STANDARD" | "BLIND"
@@ -2887,7 +3600,16 @@ export type Database = {
         | "clash"
         | "vault_drop"
         | "vault_subscription"
-      reputation_kind: "clash_participation" | "clash_win" | "clash_dissent"
+        | "arena_room_message"
+        | "arena_room_evidence"
+      reputation_kind:
+        | "clash_participation"
+        | "clash_win"
+        | "clash_dissent"
+        | "arena_participation"
+        | "arena_winning_side"
+        | "arena_best_argument"
+        | "arena_useful_evidence"
       sponsor_campaign_status:
         | "DRAFT"
         | "ACTIVE"
@@ -3045,6 +3767,18 @@ export const Constants = {
   public: {
     Enums: {
       advertiser_status: ["DRAFT", "ACTIVE", "PAUSED", "SUSPENDED"],
+      arena_evidence_kind: ["image", "video", "link"],
+      arena_message_kind: ["text", "media", "gif", "system"],
+      arena_participant_role: ["debater", "spectator"],
+      arena_room_status: [
+        "OPEN",
+        "FINAL_ARGUMENTS",
+        "JUDGING",
+        "SETTLED",
+        "CANCELLED",
+      ],
+      arena_topic_status: ["scheduled", "live", "closed"],
+      arena_winning_side: ["AGREE", "DISAGREE", "DRAW"],
       attribution_method: ["REFERRAL", "COUPON", "UNATTRIBUTED"],
       campaign_creator_status: ["INVITED", "ACTIVE", "PAUSED", "REMOVED"],
       clash_mode: ["STANDARD", "BLIND"],
@@ -3116,8 +3850,18 @@ export const Constants = {
         "clash",
         "vault_drop",
         "vault_subscription",
+        "arena_room_message",
+        "arena_room_evidence",
       ],
-      reputation_kind: ["clash_participation", "clash_win", "clash_dissent"],
+      reputation_kind: [
+        "clash_participation",
+        "clash_win",
+        "clash_dissent",
+        "arena_participation",
+        "arena_winning_side",
+        "arena_best_argument",
+        "arena_useful_evidence",
+      ],
       sponsor_campaign_status: [
         "DRAFT",
         "ACTIVE",
