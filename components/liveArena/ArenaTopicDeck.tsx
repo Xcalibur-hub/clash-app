@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   Extrapolation,
   interpolate,
   runOnJS,
@@ -17,7 +18,9 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withRepeat,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { HOOD_LABEL } from '../../data/hoods';
 import type { LiveArenaTopic, Stance } from '../../services/liveArenaService';
@@ -377,9 +380,26 @@ function DeckLayer({
   activeWidth: number;
   stageWidth: number;
 }): React.JSX.Element {
+  const idle = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (reduced || single || depth === 0) {
+      idle.value = 0;
+      return;
+    }
+    const amp = depth === 1 ? 1 : -1;
+    idle.value = withRepeat(
+      withTiming(amp, { duration: 3400 + depth * 400, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+  }, [depth, idle, reduced, single]);
+
   const style = useAnimatedStyle(() => {
     const progress = Math.min(1, Math.abs(dragX.value) / (activeWidth * SWIPE_RATIO));
     const goingNext = dragX.value < 0;
+    const idleY = reduced || Math.abs(dragX.value) > 2 ? 0 : idle.value * 2.5;
+    const idleX = reduced || Math.abs(dragX.value) > 2 ? 0 : idle.value * 1.5;
 
     // Single topic: one centered hero — never invent background cards.
     if (single) {
@@ -415,12 +435,11 @@ function DeckLayer({
     if (depth === 1) {
       const from = layouts[1];
       const to = layouts[0];
-      // Morph toward active only when swiping forward (next).
       const p = goingNext ? progress : 0;
       return {
         zIndex: 30,
-        left: interpolate(p, [0, 1], [from.left, to.left], Extrapolation.CLAMP),
-        top: interpolate(p, [0, 1], [from.top, to.top], Extrapolation.CLAMP),
+        left: interpolate(p, [0, 1], [from.left, to.left], Extrapolation.CLAMP) + idleX,
+        top: interpolate(p, [0, 1], [from.top, to.top], Extrapolation.CLAMP) + idleY,
         width: interpolate(p, [0, 1], [from.width, to.width], Extrapolation.CLAMP),
         height: interpolate(p, [0, 1], [from.height, to.height], Extrapolation.CLAMP),
         opacity: interpolate(p, [0, 1], [0.96, 1], Extrapolation.CLAMP),
@@ -432,14 +451,13 @@ function DeckLayer({
       };
     }
 
-    // depth ≥ 2 → third slot advances toward next's rest pose.
     const from = layouts[2];
     const to = layouts[1];
     const p = goingNext ? progress : 0;
     return {
       zIndex: 20,
-      left: interpolate(p, [0, 1], [from.left, to.left], Extrapolation.CLAMP),
-      top: interpolate(p, [0, 1], [from.top, to.top], Extrapolation.CLAMP),
+      left: interpolate(p, [0, 1], [from.left, to.left], Extrapolation.CLAMP) + idleX,
+      top: interpolate(p, [0, 1], [from.top, to.top], Extrapolation.CLAMP) + idleY,
       width: interpolate(p, [0, 1], [from.width, to.width], Extrapolation.CLAMP),
       height: interpolate(p, [0, 1], [from.height, to.height], Extrapolation.CLAMP),
       opacity: interpolate(p, [0, 1], [0.88, 0.96], Extrapolation.CLAMP),
@@ -452,10 +470,7 @@ function DeckLayer({
   });
 
   return (
-    <Animated.View
-      pointerEvents="auto"
-      style={[styles.layer, style]}
-    >
+    <Animated.View pointerEvents="auto" style={[styles.layer, style]}>
       {children}
     </Animated.View>
   );

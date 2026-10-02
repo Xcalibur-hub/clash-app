@@ -9,6 +9,7 @@ export * from './layout';
 export * from './motion';
 export * from './typography';
 export * from './palettes';
+export * from './arenaAccents';
 export { ThemeProvider, useTheme, useThemeColors } from './ThemeProvider';
 export { FontBootstrap } from './FontBootstrap';
 

@@ -15,13 +15,19 @@ export interface LivePulseProps {
   /** Hide the wordmark and keep only the dot (tight headers). */
   dotOnly?: boolean;
   size?: number;
+  /** Optional tint — defaults to Live Arena red. */
+  color?: string;
 }
 
 /**
  * The one piece of motion in the Live Arena: a slow breathing dot.
  * Honours Reduce Motion by holding the dot steady rather than fading it out.
  */
-export function LivePulse({ dotOnly = false, size = 7 }: LivePulseProps): React.JSX.Element {
+export function LivePulse({
+  dotOnly = false,
+  size = 7,
+  color = LIVE_TINT,
+}: LivePulseProps): React.JSX.Element {
   const reduced = useReducedMotion();
   const pulse = useSharedValue(PULSE_MAX);
 
@@ -43,12 +49,12 @@ export function LivePulse({ dotOnly = false, size = 7 }: LivePulseProps): React.
     <View style={styles.row} accessibilityLabel="Live now">
       <Animated.View
         style={[
-          { width: size, height: size, borderRadius: size / 2, backgroundColor: LIVE_TINT },
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: color },
           animated,
         ]}
       />
       {dotOnly ? null : (
-        <Text allowFontScaling={false} style={[styles.label, { color: LIVE_TINT }]}>
+        <Text allowFontScaling={false} style={[styles.label, { color }]}>
           LIVE
         </Text>
       )}

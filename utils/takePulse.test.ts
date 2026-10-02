@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { takePulse } from './takePulse.ts';
+import { pulseLabel, takePulse } from './takePulse.ts';
 import type { Take } from '../store/types.ts';
 
 const NOW = 1_700_000_000_000;
@@ -20,8 +20,8 @@ function take(partial: Partial<Take>): Take {
 }
 
 describe('takePulse', () => {
-  it('marks CLASH LIVE only when clashes > 0', () => {
-    assert.equal(takePulse(take({ clashes: 1 }), NOW), 'live');
+  it('marks clash only when clashes > 0', () => {
+    assert.equal(takePulse(take({ clashes: 1 }), NOW), 'clash');
     assert.equal(takePulse(take({ clashes: 0, reactions: 20 }), NOW), 'hot');
   });
 
@@ -35,5 +35,10 @@ describe('takePulse', () => {
       takePulse(take({ createdAt: NOW - 30 * 60 * 1000, reactions: 1 }), NOW),
       'rising',
     );
+  });
+
+  it('never labels a 1v1 Clash as LIVE', () => {
+    assert.equal(pulseLabel('clash'), 'IN A CLASH');
+    assert.notEqual(pulseLabel('clash'), 'CLASH LIVE');
   });
 });

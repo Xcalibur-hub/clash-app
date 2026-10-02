@@ -1,9 +1,26 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { HOOD_LABEL } from '../../data/hoods';
 import type { LiveArenaTopic, Stance } from '../../services/liveArenaService';
 import type { HoodId } from '../../store/types';
-import { layout, radius, space, typeScale, useThemeColors, type SemanticTheme } from '../../theme';
+import {
+  arenaAccentForHood,
+  layout,
+  radius,
+  space,
+  typeScale,
+  useThemeColors,
+  type SemanticTheme,
+} from '../../theme';
 import { plural } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
@@ -29,7 +46,7 @@ export interface ArenaTopicDeckCardProps {
 
 /**
  * Editorial surface inside the Arena topic deck.
- * Active = full hierarchy + CTAs. Peek = LIVE · hood · title · count.
+ * ~85% calm plate + ~15% hood-derived accent (blob, LIVE tint, doodle).
  */
 export function ArenaTopicDeckCard({
   topic,
@@ -43,6 +60,7 @@ export function ArenaTopicDeckCard({
   onBringForward,
 }: ArenaTopicDeckCardProps): React.JSX.Element {
   const t = useThemeColors();
+  const accent = arenaAccentForHood(topic.hood, t.scheme, topic.id);
   const surface = deckSurface(t, tone);
   const closed = topic.phase === 'closed';
   const settled = topic.viewerRoomStatus === 'SETTLED';
@@ -73,16 +91,17 @@ export function ArenaTopicDeckCard({
           },
         ]}
       >
+        <View style={[styles.accentStrip, { backgroundColor: accent.ink }]} />
         <View style={styles.peekHead}>
           {closed ? (
             <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
               Closed
             </Text>
           ) : (
-            <LivePulse size={6} />
+            <LivePulse size={6} color={accent.ink} />
           )}
           {hood ? (
-            <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
+            <Text allowFontScaling={false} style={[styles.metaCaps, { color: accent.ink }]}>
               · {hood}
             </Text>
           ) : null}
@@ -120,6 +139,9 @@ export function ArenaTopicDeckCard({
         },
       ]}
     >
+      <AccentBlob color={accent.soft} />
+      <CardDoodle color={accent.ink} />
+
       <View style={styles.activeHead}>
         <View style={styles.peekHead}>
           {closed ? (
@@ -127,12 +149,14 @@ export function ArenaTopicDeckCard({
               Closed
             </Text>
           ) : (
-            <LivePulse />
+            <LivePulse color={accent.ink} />
           )}
           {hood ? (
-            <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
-              · {hood}
-            </Text>
+            <View style={[styles.hoodChip, { backgroundColor: accent.soft }]}>
+              <Text allowFontScaling={false} style={[styles.hoodChipText, { color: accent.ink }]}>
+                {hood}
+              </Text>
+            </View>
           ) : null}
         </View>
         <Text allowFontScaling={false} style={[styles.timeMeta, { color: t.textSecondary }]}>
@@ -186,7 +210,7 @@ export function ArenaTopicDeckCard({
               hitSlop={10}
               style={styles.watchLink}
             >
-              <Text allowFontScaling={false} style={[styles.watchText, { color: t.textSecondary }]}>
+              <Text allowFontScaling={false} style={[styles.watchText, { color: accent.ink }]}>
                 Watch →
               </Text>
             </Pressable>
@@ -196,6 +220,73 @@ export function ArenaTopicDeckCard({
         )}
       </View>
     </Pressable>
+  );
+}
+
+function AccentBlob({ color }: { color: string }): React.JSX.Element {
+  const reduced = useReducedMotion();
+  const drift = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (reduced) {
+      drift.value = 0;
+      return;
+    }
+    drift.value = withRepeat(
+      withTiming(1, { duration: 3800, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+  }, [drift, reduced]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: drift.value * 4 },
+      { translateY: drift.value * -3 },
+      { scale: 1 + drift.value * 0.03 },
+    ],
+  }));
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.blob, { backgroundColor: color }, style]} />
+  );
+}
+
+function CardDoodle({ color }: { color: string }): React.JSX.Element {
+  const reduced = useReducedMotion();
+  const drift = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (reduced) {
+      drift.value = 0;
+      return;
+    }
+    drift.value = withRepeat(
+      withTiming(1, { duration: 5200, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true,
+    );
+  }, [drift, reduced]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateX: drift.value * 3 }, { rotate: `${drift.value * 2}deg` }],
+    opacity: 0.22 + drift.value * 0.06,
+  }));
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.doodleWrap, style]}>
+      <Svg width={120} height={72} viewBox="0 0 120 72">
+        <Path
+          d="M14 48 C28 22 48 18 66 28 C84 38 98 18 112 24"
+          stroke={color}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          fill="none"
+        />
+        <Circle cx={22} cy={18} r={3.2} fill={color} opacity={0.55} />
+        <Circle cx={98} cy={52} r={2.4} fill={color} opacity={0.4} />
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -222,7 +313,7 @@ function hoodDisplayName(hood: string | null): string | null {
     startups: 'STARTUPS',
     football: 'SPORT',
   };
-  if (hood in short) return short[hood];
+  if (hood in short) return short[hood]!;
   if (hood in HOOD_LABEL) return HOOD_LABEL[hood as HoodId].toUpperCase();
   return hood.toUpperCase();
 }
@@ -308,6 +399,7 @@ function StancePill({
 const styles = StyleSheet.create({
   active: {
     flex: 1,
+    overflow: 'hidden',
     paddingHorizontal: space.lg,
     paddingTop: space.md + 2,
     paddingBottom: space.md,
@@ -319,6 +411,7 @@ const styles = StyleSheet.create({
   },
   peek: {
     flex: 1,
+    overflow: 'hidden',
     paddingHorizontal: space.md,
     paddingVertical: space.sm + 2,
     gap: 6,
@@ -328,17 +421,49 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     justifyContent: 'flex-start',
   },
+  accentStrip: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+  },
+  blob: {
+    position: 'absolute',
+    top: -36,
+    right: -28,
+    width: 168,
+    height: 168,
+    borderRadius: 84,
+  },
+  doodleWrap: {
+    position: 'absolute',
+    right: 8,
+    top: 72,
+  },
   activeHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: space.sm,
+    zIndex: 1,
   },
   peekHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     flexShrink: 1,
+  },
+  hoodChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  hoodChipText: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
   },
   metaCaps: {
     ...typeScale.caption,
@@ -357,6 +482,7 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     fontWeight: '700',
     letterSpacing: -0.4,
+    zIndex: 1,
   },
   peekTitle: {
     ...typeScale.editorial,
@@ -374,10 +500,12 @@ const styles = StyleSheet.create({
     ...typeScale.meta,
     fontSize: 14,
     marginTop: space.md,
+    zIndex: 1,
   },
   cta: {
     marginTop: 'auto',
     paddingTop: space.lg,
+    zIndex: 1,
   },
   joinedBlock: { gap: space.sm },
   youStance: {
@@ -420,7 +548,7 @@ const styles = StyleSheet.create({
   watchText: {
     ...typeScale.button,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   primary: {
     minHeight: layout.hit,

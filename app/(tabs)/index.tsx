@@ -4,14 +4,13 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
-import { ArenaFeaturedStack } from '../../components/arena/ArenaFeaturedStack';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
 import { ArenaTopicDeck } from '../../components/liveArena/ArenaTopicDeck';
-import { FreshTakeCard, freshTakeVariant } from '../../components/arena/FreshTakeCard';
+import { FreshTakesSection } from '../../components/arena/FreshTakesSection';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
+import { TakeFeedItem } from '../../components/arena/TakeFeedItem';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
-import { Underline } from '../../components/shared/Doodles';
 import { ArenaIcon, CompassIcon, UserIcon } from '../../components/shared/icons';
 import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
@@ -24,10 +23,10 @@ import {
   reactToTake,
   selectAuthor,
   selectCommentsForTake,
-  selectFeaturedMediaTakes,
   selectFeedForScope,
   selectHasReacted,
   selectIsSaved,
+  selectTopComment,
   showNotice,
   syncTakeReaction,
   toggleSave,
@@ -42,6 +41,9 @@ import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { DOCK_SCROLL_CLEARANCE } from '../../components/navigation/dockConfig';
 
 const EMPTY_SET: ReadonlySet<string> = new Set<string>();
+
+/** How many Takes sit in the editorial Fresh Takes magazine block. */
+const FRESH_TAKE_COUNT = 5;
 
 /** The overflow sheet's target: one Take's author, resolved self/follow state. */
 interface FeedMenu {
@@ -171,9 +173,11 @@ export default function ArenaScreen(): React.JSX.Element {
     [state, scope, now, followingIds],
   );
 
-  const featuredItems = React.useMemo(() => {
+  /** Editorial Fresh Takes block — first slice of the live feed. */
+  const freshItems = React.useMemo(() => {
     if (state.arenaStatus !== 'ready') return [];
-    return selectFeaturedMediaTakes(state, now, 8)
+    return feed
+      .slice(0, FRESH_TAKE_COUNT)
       .map((take) => {
         const author = selectAuthor(state, take.authorId);
         if (!author) return null;
@@ -186,14 +190,14 @@ export default function ArenaScreen(): React.JSX.Element {
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [state, now]);
+  }, [feed, state]);
 
-  /** Hero Takes stay in the stack only — don't immediately repeat under Fresh Takes. */
+  /** Remaining Takes become the calmer YOUR FEED list (no Fresh Takes duplicates). */
   const listFeed = React.useMemo(() => {
-    if (featuredItems.length === 0) return feed;
-    const featuredIds = new Set(featuredItems.map((item) => item.take.id));
-    return feed.filter((take) => !featuredIds.has(take.id));
-  }, [feed, featuredItems]);
+    if (freshItems.length === 0) return feed;
+    const freshIds = new Set(freshItems.map((item) => item.take.id));
+    return feed.filter((take) => !freshIds.has(take.id));
+  }, [feed, freshItems]);
 
   const openClash = React.useCallback(
     (takeId: string): void => {
@@ -265,21 +269,23 @@ export default function ArenaScreen(): React.JSX.Element {
   );
 
   const renderItem = React.useCallback(
-    ({ item, index }: ListRenderItemInfo<Take>) => {
+    ({ item }: ListRenderItemInfo<Take>) => {
       const author = selectAuthor(state, item.authorId);
       if (!author) return null;
+      const topComment = selectTopComment(state, item.id);
+      const topCommentAuthor = topComment ? selectAuthor(state, topComment.authorId) : undefined;
       return (
-        <FreshTakeCard
+        <TakeFeedItem
           take={item}
           author={author}
-          commentCount={selectCommentsForTake(state, item.id).length}
-          hasReacted={selectHasReacted(state, item.id)}
+          isViewer={author.id === state.viewer.id}
           isSaved={selectIsSaved(state, item.id)}
-          variant={freshTakeVariant(item, index)}
-          index={index}
-          now={now}
-          onOpen={() => openDetail(item.id)}
-          onClash={() => openClash(item.id)}
+          hasReacted={selectHasReacted(state, item.id)}
+          commentCount={selectCommentsForTake(state, item.id).length}
+          topComment={topComment}
+          topCommentAuthor={topCommentAuthor}
+          onOpenDetail={() => openDetail(item.id)}
+          onOpenClash={() => openClash(item.id)}
           onReact={() => {
             void toggleReaction(item);
           }}
@@ -295,26 +301,12 @@ export default function ArenaScreen(): React.JSX.Element {
         />
       );
     },
-    [dispatch, now, openClash, openDetail, openMenu, requireAuth, shareTake, state, toggleReaction],
+    [dispatch, openClash, openDetail, openMenu, requireAuth, shareTake, state, toggleReaction],
   );
 
   const header = React.useMemo(
     () => (
       <View style={styles.hero}>
-        <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
-        <ArenaFeaturedStack
-          items={featuredItems}
-          loading={state.arenaStatus === 'loading'}
-          onOpen={openDetail}
-          onReact={(take) => {
-            void toggleReaction(take);
-          }}
-          onComment={openDetail}
-          onClash={openClash}
-          onSave={(takeId) => {
-            if (requireAuth()) dispatch(toggleSave(takeId));
-          }}
-        />
         {liveTopics.length > 0 ? (
           <ArenaTopicDeck
             topics={liveTopics}
@@ -331,30 +323,48 @@ export default function ArenaScreen(): React.JSX.Element {
             }}
           />
         ) : null}
-        <View style={styles.freshHead}>
-          <Text allowFontScaling={false} style={[styles.freshTitle, { color: theme.textPrimary }]}>
-            Fresh Takes
+
+        <FreshTakesSection
+          items={freshItems}
+          now={now}
+          onOpen={openDetail}
+          onClash={openClash}
+          onReact={(take) => {
+            void toggleReaction(take);
+          }}
+          onSave={(takeId) => {
+            if (requireAuth()) dispatch(toggleSave(takeId));
+          }}
+          onShare={(take, handle) => {
+            void shareTake(take, handle);
+          }}
+          onMore={(take) => {
+            void openMenu(take);
+          }}
+        />
+
+        <View style={styles.feedHead}>
+          <Text allowFontScaling={false} style={[styles.feedTitle, { color: theme.textPrimary }]}>
+            Your Feed
           </Text>
-          <Text allowFontScaling={false} style={[styles.freshSub, { color: theme.textMuted }]}>
-            What people are arguing about now
-          </Text>
-          <Underline size={72} color={theme.textPrimary} opacity={0.2} style={styles.freshMark} />
+          <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         </View>
       </View>
     ),
     [
       dispatch,
-      featuredItems,
+      freshItems,
       liveTopics,
+      now,
       openClash,
       openDetail,
+      openMenu,
       openRoom,
       openTopic,
       requireAuth,
       scope,
-      state.arenaStatus,
+      shareTake,
       theme.textPrimary,
-      theme.textMuted,
       toggleReaction,
     ],
   );
@@ -488,24 +498,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { flexGrow: 1 },
   hero: { paddingBottom: space.xs, gap: 2 },
-  freshHead: {
+  feedHead: {
+    paddingTop: space.lg,
+    paddingBottom: space.xs,
+    gap: space.sm,
+  },
+  feedTitle: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
     paddingHorizontal: layout.screenX,
-    paddingTop: space.xl,
-    paddingBottom: space.sm,
-    position: 'relative',
   },
-  freshTitle: {
-    ...typeScale.section,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.35,
-  },
-  freshSub: {
-    ...typeScale.meta,
-    fontSize: 13,
-    marginTop: 4,
-  },
-  freshMark: { marginTop: 4 },
 });
 
 const skeletonStyles = StyleSheet.create({
