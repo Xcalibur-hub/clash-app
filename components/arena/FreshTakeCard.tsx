@@ -47,6 +47,8 @@ export interface FreshTakeCardProps {
   now: number;
   /** Compact grid cell — fills half width. */
   grid?: boolean;
+  /** Inside a stage layer — no outer padding; fills parent. */
+  embedded?: boolean;
   onOpen: () => void;
   onClash: () => void;
   onReact: () => void;
@@ -187,6 +189,7 @@ export function FreshTakeCard({
   index,
   now,
   grid = false,
+  embedded = false,
   onOpen,
   onClash,
   onReact,
@@ -198,16 +201,24 @@ export function FreshTakeCard({
   const reduced = useReducedMotion();
   const pulse = takePulse(take, now);
   const hoodAccent = arenaAccentForHood(take.hood, t.scheme, take.id);
-  const entering = reduced
-    ? undefined
-    : FadeInDown.delay(Math.min(index, 6) * 36)
-        .springify()
-        .damping(20)
-        .stiffness(240);
+  const entering =
+    reduced || embedded
+      ? undefined
+      : FadeInDown.delay(Math.min(index, 6) * 36)
+          .springify()
+          .damping(20)
+          .stiffness(240);
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
   const hasMedia = Boolean(take.media?.url);
   const isVideo = take.media?.kind === 'video';
   const mediaUrl = take.media?.url;
+  const wrapStyle = embedded
+    ? styles.embeddedWrap
+    : grid
+      ? styles.gridCell
+      : variant === 'lead'
+        ? styles.leadWrap
+        : styles.padX;
 
   const metaActions = (
     <View style={styles.metaActions}>
@@ -233,11 +244,17 @@ export function FreshTakeCard({
 
   if (variant === 'lead') {
     return (
-      <Animated.View entering={entering} style={styles.leadWrap}>
-        <PressableScale onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open take">
+      <Animated.View entering={entering} style={wrapStyle}>
+        <PressableScale
+          onPress={onOpen}
+          accessibilityRole="button"
+          accessibilityLabel="Open take"
+          style={embedded ? styles.embeddedPress : undefined}
+        >
           <View
             style={[
               styles.lead,
+              embedded && styles.leadFill,
               {
                 backgroundColor: t.surface,
                 borderColor: t.border,
@@ -250,7 +267,7 @@ export function FreshTakeCard({
               <FreshHeroMedia
                 url={mediaUrl}
                 isVideo={isVideo}
-                height={300}
+                height={embedded ? 220 : 300}
                 radiusPx={0}
                 overlay={
                   <View style={styles.leadOverlay}>
@@ -268,7 +285,7 @@ export function FreshTakeCard({
                 }
               />
             ) : (
-              <View style={styles.leadTextOnly}>
+              <View style={[styles.leadTextOnly, embedded && styles.leadTextFill]}>
                 <View style={styles.leadTextTop}>
                   <PulseChip pulse={pulse} />
                   <IconAction label="More take actions" onPress={onMore}>
@@ -328,11 +345,17 @@ export function FreshTakeCard({
   if (variant === 'clash') {
     const accent = pulseAccent('clash', t.scheme)!;
     return (
-      <Animated.View entering={entering} style={styles.padX}>
-        <PressableScale onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open take in Clash">
+      <Animated.View entering={entering} style={wrapStyle}>
+        <PressableScale
+          onPress={onOpen}
+          accessibilityRole="button"
+          accessibilityLabel="Open take in Clash"
+          style={embedded ? styles.embeddedPress : undefined}
+        >
           <View
             style={[
               styles.clashCard,
+              embedded && styles.leadFill,
               {
                 backgroundColor: t.surface,
                 borderColor: accent.ink,
@@ -380,16 +403,16 @@ export function FreshTakeCard({
 
   if (variant === 'compact') {
     return (
-      <Animated.View entering={entering} style={grid ? styles.gridCell : styles.padX}>
+      <Animated.View entering={entering} style={wrapStyle}>
         <PressableScale
           onPress={onOpen}
           accessibilityRole="button"
           accessibilityLabel="Open take"
-          style={grid ? styles.gridPress : undefined}
+          style={grid || embedded ? styles.gridPress : undefined}
         >
           <View
             style={[
-              grid ? styles.compactGrid : styles.compact,
+              grid || embedded ? styles.compactGrid : styles.compact,
               {
                 backgroundColor: t.surface,
                 borderColor: t.border,
@@ -399,7 +422,7 @@ export function FreshTakeCard({
           >
             <View style={[styles.compactAccent, { backgroundColor: hoodAccent.soft }]} />
             {hasMedia && mediaUrl ? (
-              <View style={[styles.compactThumb, grid && styles.compactThumbWide, { backgroundColor: t.surfaceMuted }]}>
+              <View style={[styles.compactThumb, (grid || embedded) && styles.compactThumbWide, { backgroundColor: t.surfaceMuted }]}>
                 <CompactThumb url={mediaUrl} isVideo={isVideo} />
               </View>
             ) : null}
@@ -408,7 +431,7 @@ export function FreshTakeCard({
               <Text
                 allowFontScaling
                 style={[styles.compactText, { color: t.textPrimary }]}
-                numberOfLines={grid ? 4 : 3}
+                numberOfLines={grid || embedded ? 4 : 3}
               >
                 {take.text}
               </Text>
@@ -424,11 +447,17 @@ export function FreshTakeCard({
 
   // media | text
   return (
-    <Animated.View entering={entering} style={styles.padX}>
-      <PressableScale onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open take">
+    <Animated.View entering={entering} style={wrapStyle}>
+      <PressableScale
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel="Open take"
+        style={embedded ? styles.embeddedPress : undefined}
+      >
         <View
           style={[
             styles.card,
+            embedded && styles.leadFill,
             {
               backgroundColor: t.surface,
               borderColor: t.border,
@@ -467,7 +496,7 @@ export function FreshTakeCard({
             <Squiggle size={72} color={hoodAccent.ink} opacity={0.22} style={styles.textSquiggle} />
           ) : null}
           {variant === 'media' && hasMedia && mediaUrl ? (
-            <FreshHeroMedia url={mediaUrl} isVideo={isVideo} height={180} radiusPx={radius.lg} />
+            <FreshHeroMedia url={mediaUrl} isVideo={isVideo} height={embedded ? 140 : 180} radiusPx={radius.lg} />
           ) : null}
           <View style={styles.leadActions}>
             <ActionStat
@@ -611,6 +640,8 @@ const styles = StyleSheet.create({
   padX: { paddingHorizontal: layout.screenX, marginBottom: space.md },
   gridCell: { flex: 1, marginBottom: space.md },
   gridPress: { flex: 1 },
+  embeddedWrap: { flex: 1 },
+  embeddedPress: { flex: 1 },
   lead: {
     borderRadius: 28,
     overflow: 'hidden',
@@ -620,6 +651,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
   },
+  leadFill: { flex: 1 },
+  leadTextFill: { flex: 1, minHeight: 0 },
   leadAccentBlob: {
     position: 'absolute',
     width: 160,
