@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
 import { ArenaFeaturedStack } from '../../components/arena/ArenaFeaturedStack';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
-import { DailyArenaCard } from '../../components/liveArena/DailyArenaCard';
+import { ArenaTopicDeck } from '../../components/liveArena/ArenaTopicDeck';
 import { FreshTakeCard, freshTakeVariant } from '../../components/arena/FreshTakeCard';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -316,14 +316,18 @@ export default function ArenaScreen(): React.JSX.Element {
           }}
         />
         {liveTopics.length > 0 ? (
-          <DailyArenaCard
-            topic={liveTopics[0]}
-            onOpen={() => openTopic(liveTopics[0].id)}
-            onChoose={(stance) => openTopic(liveTopics[0].id, stance)}
-            onEnter={() => {
-              const roomId = liveTopics[0].viewerRoomId;
+          <ArenaTopicDeck
+            topics={liveTopics}
+            onOpen={(topicId) => openTopic(topicId)}
+            onChoose={(topicId, stance) => openTopic(topicId, stance)}
+            onWatch={(topicId) => openTopic(topicId)}
+            onEnter={(topicId, roomId) => {
               if (roomId) openRoom(roomId);
-              else openTopic(liveTopics[0].id);
+              else openTopic(topicId);
+            }}
+            onJoinDebate={(topicId, roomId) => {
+              if (roomId) openRoom(roomId);
+              else openTopic(topicId);
             }}
           />
         ) : null}
