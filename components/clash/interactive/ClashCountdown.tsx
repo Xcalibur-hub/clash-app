@@ -1,5 +1,6 @@
 /**
  * Authoritative deadline display — client timer is display-only.
+ * Supports compact inline status under the Clash title.
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -41,6 +42,8 @@ export interface ClashCountdownProps {
   now: number;
   settled?: boolean;
   cancelled?: boolean;
+  /** Inline under the Clash title: LIVE · 21:35:48 */
+  compact?: boolean;
 }
 
 export function ClashCountdown({
@@ -48,6 +51,7 @@ export function ClashCountdown({
   now,
   settled = false,
   cancelled = false,
+  compact = false,
 }: ClashCountdownProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
@@ -73,6 +77,15 @@ export function ClashCountdown({
   }));
 
   if (urgency === 'critical' && !settled && !cancelled) {
+    if (compact) {
+      return (
+        <Animated.View style={pulse} accessibilityLiveRegion="polite" accessibilityLabel={`${remSec} seconds remaining`}>
+          <Text allowFontScaling={false} style={[styles.compact, { color: t.accent }]}>
+            Final · {remSec}
+          </Text>
+        </Animated.View>
+      );
+    }
     return (
       <Animated.View
         style={[styles.criticalWrap, pulse]}
@@ -86,6 +99,29 @@ export function ClashCountdown({
           Final seconds
         </Text>
       </Animated.View>
+    );
+  }
+
+  if (compact) {
+    let status: string;
+    if (settled) status = 'Settled';
+    else if (cancelled) status = 'No verdict';
+    else if (urgency === 'closed') status = 'Settling';
+    else if (urgency === 'final') status = `Final minute · ${formatClock(closesAt, now)}`;
+    else status = `Live · ${formatClock(closesAt, now)}`;
+
+    const tone =
+      urgency === 'final' || urgency === 'urgent' ? t.accent : t.textMuted;
+
+    return (
+      <Text
+        allowFontScaling={false}
+        style={[styles.compact, { color: tone }]}
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={status}
+      >
+        {status}
+      </Text>
     );
   }
 
@@ -120,11 +156,6 @@ export function ClashCountdown({
       <Text allowFontScaling={false} style={[styles.label, { color: tone }]}>
         {label}
       </Text>
-      {!settled && !cancelled && urgency === 'calm' ? (
-        <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
-          remaining
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -146,7 +177,13 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     letterSpacing: 0.3,
   },
-  hint: { ...typeScale.caption },
+  compact: {
+    ...typeScale.caption,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
   criticalWrap: {
     alignSelf: 'center',
     alignItems: 'center',

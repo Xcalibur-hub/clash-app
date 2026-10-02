@@ -1,5 +1,5 @@
 /**
- * Dominant matchup — asymmetric opposing cards (no giant VS).
+ * Dominant matchup — asymmetric opposing cards with a restrained VS.
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -47,8 +47,8 @@ export function ClashMatchup({
         text={sideAText}
         media={sideAMedia}
         enterDelay={40}
-        rotationDeg={-2.2}
-        offsetX={-6}
+        rotationDeg={-2.4}
+        offsetX={-8}
         emphasized={active === 'A' || (settled && winnerSide === 'A')}
         diminished={(active === 'B' && !settled) || (settled && winnerSide === 'B')}
         winner={settled && winnerSide === 'A'}
@@ -56,10 +56,14 @@ export function ClashMatchup({
         pending={pendingSide === 'A'}
         onSelect={canJudge && onSelectSide ? () => onSelectSide('A') : undefined}
       />
-      <View style={styles.bridge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View
+        style={styles.bridge}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         <View style={[styles.rule, { backgroundColor: t.borderStrong }]} />
         <Text allowFontScaling={false} style={[styles.bridgeLabel, { color: t.textMuted }]}>
-          or
+          VS
         </Text>
         <View style={[styles.rule, { backgroundColor: t.borderStrong }]} />
       </View>
@@ -67,8 +71,8 @@ export function ClashMatchup({
         side="B"
         author={sideB}
         text={sideBText || 'Rebuttal unavailable'}
-        enterDelay={140}
-        rotationDeg={2.4}
+        enterDelay={120}
+        rotationDeg={2.6}
         offsetX={10}
         emphasized={active === 'B' || (settled && winnerSide === 'B')}
         diminished={(active === 'A' && !settled) || (settled && winnerSide === 'A')}
@@ -82,15 +86,20 @@ export function ClashMatchup({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.md, paddingTop: space.xs },
+  wrap: { gap: space.md + 2, paddingTop: space.xs },
   bridge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.sm,
     paddingVertical: 2,
-    marginVertical: -4,
+    marginVertical: -6,
   },
-  rule: { flex: 1, height: StyleSheet.hairlineWidth, maxWidth: 48 },
-  bridgeLabel: { ...typeScale.caption, fontWeight: '600', letterSpacing: 1 },
+  rule: { flex: 1, height: StyleSheet.hairlineWidth, maxWidth: 40 },
+  bridgeLabel: {
+    ...typeScale.caption,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    fontSize: 11,
+  },
 });

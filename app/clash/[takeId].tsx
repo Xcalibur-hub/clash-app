@@ -116,12 +116,21 @@ export default function ClashScreen(): React.JSX.Element {
   const argumentItems = React.useMemo(() => {
     const comments = selectCommentsForTake(state, id)
       .filter((c) => !c.parentId)
-      .slice(0, 12);
-    return comments.map((comment) => ({
-      comment,
-      author: selectAuthor(state, comment.authorId),
-    }));
-  }, [state, id]);
+      .slice(0, 8);
+    const revealed = Boolean(view && (view.mode !== 'BLIND' || view.revealed));
+    const sideAId = revealed ? view?.sideA?.id : undefined;
+    const sideBId = revealed ? view?.sideB?.id : undefined;
+    return comments.map((comment) => {
+      let side: Side | null = null;
+      if (sideAId && comment.authorId === sideAId) side = 'A';
+      else if (sideBId && comment.authorId === sideBId) side = 'B';
+      return {
+        comment,
+        author: selectAuthor(state, comment.authorId),
+        side,
+      };
+    });
+  }, [state, id, view]);
 
   const load = React.useCallback(async (): Promise<void> => {
     setError(null);
@@ -321,9 +330,13 @@ export default function ClashScreen(): React.JSX.Element {
             <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textPrimary }]}>
               {blind ? 'Blind Clash' : 'Clash'}
             </Text>
-            <Text allowFontScaling={false} style={[styles.context, { color: t.textMuted }]}>
-              {closed && !settled ? 'Settling' : settled ? 'Result' : 'Choose a side'}
-            </Text>
+            <ClashCountdown
+              closesAt={view.closesAt}
+              now={now}
+              settled={settled}
+              cancelled={cancelled}
+              compact
+            />
           </View>
           <Pressable
             onPress={shareOpen}
@@ -335,17 +348,6 @@ export default function ClashScreen(): React.JSX.Element {
             <ShareIcon size={20} color={t.textPrimary} />
           </Pressable>
         </View>
-
-        <ClashCountdown
-          closesAt={view.closesAt}
-          now={now}
-          settled={settled}
-          cancelled={cancelled}
-        />
-
-        <Text allowFontScaling={false} style={[styles.prompt, { color: t.textSecondary }]}>
-          Which side made the stronger case?
-        </Text>
 
         <ClashMatchup
           sideAText={view.sideAText}
@@ -445,13 +447,16 @@ export default function ClashScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: layout.screenX, gap: space.md },
+  content: { paddingHorizontal: layout.screenX, gap: space.md + 2 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
-  titleBlock: { alignItems: 'center', gap: 2 },
-  eyebrow: { ...typeScale.label, fontWeight: '700', letterSpacing: 0.4 },
-  context: { ...typeScale.caption },
-  prompt: { ...typeScale.body, fontWeight: '500', marginTop: -4 },
+  titleBlock: { alignItems: 'center', gap: 3, flexShrink: 1, paddingHorizontal: space.sm },
+  eyebrow: {
+    ...typeScale.label,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    fontSize: 15,
+  },
   noticeBox: {
     padding: space.md,
     borderRadius: 16,

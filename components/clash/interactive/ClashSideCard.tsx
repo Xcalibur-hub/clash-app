@@ -1,6 +1,6 @@
 /**
  * Physical opposing Side Card — selectable, depth, restrained rotation.
- * Media dominates when present; typography is the hero for text-only.
+ * Opinion typography is the hero; side tint is a quiet edge cue.
  */
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
@@ -13,7 +13,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { Side, TakeMedia, User } from '../../../store';
-import { radius, space, spring, typeScale, useThemeColors } from '../../../theme';
+import { duration, radius, space, spring, typeScale, useThemeColors } from '../../../theme';
 import { Avatar } from '../../shared/Avatar';
 import { PressableScale } from '../../shared/PressableScale';
 import { useDuelSurface } from './clashTheme';
@@ -28,7 +28,6 @@ export interface ClashSideCardProps {
   winner?: boolean;
   enterDelay?: number;
   rotationDeg?: number;
-  /** Horizontal offset for asymmetric layout (px). */
   offsetX?: number;
   selectable?: boolean;
   onSelect?: () => void;
@@ -56,6 +55,7 @@ export function ClashSideCard({
   const progress = useSharedValue(reduced ? 1 : 0);
   const weight = useSharedValue(emphasized ? 1 : diminished ? -1 : 0);
   const reveal = useSharedValue(author ? 1 : 0);
+  const pressPulse = useSharedValue(1);
   const hidden = author === null;
   const hasImage = Boolean(media?.kind === 'image' && media.url);
   const mediaFirst = hasImage || Boolean(media && !media.url);
@@ -66,64 +66,69 @@ export function ClashSideCard({
       return;
     }
     const id = setTimeout(() => {
-      progress.value = withTiming(1, { duration: 480 });
+      progress.value = withTiming(1, { duration: duration.cinematic });
     }, enterDelay);
     return () => clearTimeout(id);
   }, [enterDelay, progress, reduced]);
 
   React.useEffect(() => {
-    weight.value = withSpring(emphasized ? 1 : diminished ? -1 : 0, spring.settle);
-  }, [diminished, emphasized, weight]);
+    weight.value = withSpring(emphasized ? 1 : diminished ? -1 : 0, {
+      ...spring.settle,
+      stiffness: 240,
+      damping: 20,
+    });
+    if (emphasized && !reduced) {
+      pressPulse.value = withSpring(1, spring.press);
+    }
+  }, [diminished, emphasized, pressPulse, reduced, weight]);
 
   React.useEffect(() => {
     if (reduced) {
       reveal.value = author ? 1 : 0;
       return;
     }
-    reveal.value = withTiming(author ? 1 : 0, { duration: 420 });
+    reveal.value = withTiming(author ? 1 : 0, { duration: duration.cinematic });
   }, [author, reduced, reveal]);
 
   const cardStyle = useAnimatedStyle(() => {
     const w = weight.value;
     return {
-      opacity: progress.value * (1 - Math.max(0, -w) * 0.42),
+      opacity: progress.value * (1 - Math.max(0, -w) * 0.38),
       transform: [
-        { translateY: (1 - progress.value) * 18 + (diminished ? 6 : 0) - (emphasized ? 4 : 0) },
-        { translateX: offsetX + w * (side === 'A' ? -8 : 8) },
-        { scale: 1 + w * 0.035 - Math.max(0, -w) * 0.045 },
-        { rotate: `${rotationDeg + w * (side === 'A' ? -0.8 : 0.8)}deg` },
+        { translateY: (1 - progress.value) * 16 + (diminished ? 8 : 0) - w * 6 },
+        { translateX: offsetX + w * (side === 'A' ? -6 : 6) },
+        { scale: (1 + w * 0.04 - Math.max(0, -w) * 0.05) * pressPulse.value },
+        {
+          rotate: `${rotationDeg * (1 - Math.max(0, w) * 0.55) + w * (side === 'A' ? -0.4 : 0.4)}deg`,
+        },
       ],
     };
   });
 
   const identityStyle = useAnimatedStyle(() => ({
-    opacity: 0.4 + reveal.value * 0.6,
+    opacity: 0.45 + reveal.value * 0.55,
   }));
+
+  const onMedia = mediaFirst;
+  const labelColor = onMedia ? 'rgba(245,242,236,0.78)' : tone;
+  const bodyColor = onMedia ? '#FAFAF8' : t.textPrimary;
+  const metaColor = onMedia ? 'rgba(245,242,236,0.62)' : t.textMuted;
 
   const head = (
     <View style={styles.head}>
-      <Text
-        allowFontScaling={false}
-        style={[styles.sideLabel, { color: mediaFirst ? '#F5F2EC' : tone }]}
-      >
+      <Text allowFontScaling={false} style={[styles.sideLabel, { color: labelColor }]}>
         Side {side}
       </Text>
       {winner ? (
-        <Text allowFontScaling={false} style={[styles.winner, { color: mediaFirst ? '#F5F2EC' : tone }]}>
+        <Text allowFontScaling={false} style={[styles.winner, { color: labelColor }]}>
           Wins
         </Text>
       ) : pending ? (
-        <Text
-          allowFontScaling={false}
-          style={[styles.pending, { color: mediaFirst ? 'rgba(245,242,236,0.7)' : t.textMuted }]}
-        >
-          Submitting…
+        <Text allowFontScaling={false} style={[styles.pending, { color: metaColor }]}>
+          Locking…
         </Text>
       ) : selectable ? (
-        <Text
-          allowFontScaling={false}
-          style={[styles.hint, { color: mediaFirst ? 'rgba(245,242,236,0.65)' : t.textMuted }]}
-        >
+        <Text allowFontScaling={false} style={[styles.hint, { color: metaColor }]}>
           Tap to judge
         </Text>
       ) : null}
@@ -133,21 +138,15 @@ export function ClashSideCard({
   const identity = (
     <Animated.View style={identityStyle}>
       {hidden ? (
-        <Text
-          allowFontScaling={false}
-          style={[
-            styles.hiddenName,
-            { color: mediaFirst ? 'rgba(245,242,236,0.85)' : t.textSecondary },
-          ]}
-        >
+        <Text allowFontScaling={false} style={[styles.hiddenName, { color: onMedia ? 'rgba(245,242,236,0.8)' : t.textSecondary }]}>
           Participant {side}
         </Text>
       ) : (
         <View style={styles.identity}>
-          <Avatar name={author.name} tint={author.tint} size={34} />
+          <Avatar name={author.name} tint={author.tint} size={32} />
           <Text
             allowFontScaling={false}
-            style={[styles.handle, { color: mediaFirst ? '#FAFAF8' : t.textPrimary }]}
+            style={[styles.handle, { color: bodyColor }]}
             numberOfLines={1}
           >
             @{author.handle}
@@ -158,13 +157,7 @@ export function ClashSideCard({
   );
 
   const statement = (
-    <Text
-      allowFontScaling
-      style={[
-        mediaFirst ? styles.textOnMedia : styles.text,
-        { color: mediaFirst ? '#FAFAF8' : t.textPrimary },
-      ]}
-    >
+    <Text allowFontScaling style={[onMedia ? styles.textOnMedia : styles.text, { color: bodyColor }]}>
       {text}
     </Text>
   );
@@ -179,11 +172,12 @@ export function ClashSideCard({
           backgroundColor: emphasized ? selectedFill : soft,
           borderLeftColor: tone,
           shadowColor: t.shadowColor,
-          shadowOpacity: emphasized || selectable ? t.shadowOpacity * 1.2 : t.shadowOpacity * 0.5,
-          shadowRadius: emphasized ? 16 : 10,
-          shadowOffset: { width: 0, height: emphasized ? 10 : 6 },
-          elevation: emphasized ? 6 : 2,
-          opacity: pending ? 0.85 : 1,
+          shadowOpacity:
+            emphasized || selectable ? Math.min(0.28, t.shadowOpacity * 1.35) : t.shadowOpacity * 0.45,
+          shadowRadius: emphasized ? 18 : 12,
+          shadowOffset: { width: 0, height: emphasized ? 12 : 7 },
+          elevation: emphasized ? 7 : selectable ? 3 : 2,
+          opacity: pending ? 0.88 : 1,
           overflow: 'hidden',
         },
         cardStyle,
@@ -206,8 +200,8 @@ export function ClashSideCard({
             />
           ) : null}
           <LinearGradient
-            colors={['rgba(8,8,11,0.15)', 'rgba(8,8,11,0.78)']}
-            locations={[0.35, 1]}
+            colors={['rgba(8,8,11,0.12)', 'rgba(8,8,11,0.82)']}
+            locations={[0.32, 1]}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
@@ -249,15 +243,15 @@ export function ClashSideCard({
 const styles = StyleSheet.create({
   card: {
     gap: space.sm,
-    paddingVertical: space.lg,
-    paddingHorizontal: space.md,
+    paddingVertical: space.lg + 2,
+    paddingHorizontal: space.md + 2,
     borderRadius: radius.xl,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderLeftWidth: 3,
-    minHeight: 148,
+    minHeight: 156,
   },
   cardMedia: {
-    minHeight: 220,
+    minHeight: 228,
     paddingVertical: 0,
     paddingHorizontal: 0,
   },
@@ -265,23 +259,34 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     gap: space.sm,
-    paddingVertical: space.lg,
-    paddingHorizontal: space.md,
-    minHeight: 220,
+    paddingVertical: space.lg + 2,
+    paddingHorizontal: space.md + 2,
+    minHeight: 228,
   },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sideLabel: { ...typeScale.caption, letterSpacing: 0.8, fontWeight: '700', fontSize: 11 },
-  winner: { ...typeScale.caption, letterSpacing: 0.4, fontWeight: '700', fontSize: 11 },
-  hint: { ...typeScale.caption },
+  sideLabel: {
+    ...typeScale.caption,
+    letterSpacing: 0.6,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  winner: { ...typeScale.caption, letterSpacing: 0.3, fontWeight: '700', fontSize: 11 },
+  hint: { ...typeScale.caption, fontSize: 12 },
   pending: { ...typeScale.caption, fontWeight: '600' },
   identity: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   handle: { ...typeScale.label, flexShrink: 1, fontWeight: '600' },
   hiddenName: { ...typeScale.label },
-  text: { ...typeScale.takeText, fontSize: 19, lineHeight: 28, letterSpacing: -0.2 },
+  text: {
+    ...typeScale.takeText,
+    fontSize: 20,
+    lineHeight: 29,
+    letterSpacing: -0.25,
+    fontWeight: '600',
+  },
   textOnMedia: {
     ...typeScale.takeText,
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: 19,
+    lineHeight: 27,
     letterSpacing: -0.2,
     fontWeight: '600',
   },

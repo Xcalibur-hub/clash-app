@@ -27,7 +27,7 @@ export function ClashJudgeControls({
   return (
     <View style={styles.wrap}>
       <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-        Judge this Clash
+        Or choose below
       </Text>
       <View style={styles.row}>
         <JudgeButton
@@ -81,7 +81,7 @@ function JudgeButton({
       ]}
     >
       <Text allowFontScaling={false} style={[styles.btnLabel, { color: tone }]}>
-        {pending ? 'Submitting…' : `Side ${side}`}
+        {pending ? 'Locking…' : `Side ${side}`}
       </Text>
       <Text allowFontScaling={false} style={[styles.btnHandle, { color: t.textMuted }]} numberOfLines={1}>
         {handle ? `@${handle}` : `Side ${side}`}
@@ -94,21 +94,21 @@ const styles = StyleSheet.create({
   wrap: { gap: space.sm },
   kicker: {
     ...typeScale.caption,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    fontWeight: '700',
+    letterSpacing: 0.4,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   row: { flexDirection: 'row', gap: space.sm },
   btn: {
     flex: 1,
-    minHeight: 64,
-    paddingVertical: space.md,
+    minHeight: 56,
+    paddingVertical: space.sm + 2,
     paddingHorizontal: space.sm,
     borderRadius: radius.lg,
-    borderWidth: 1.5,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 2,
   },
   btnLabel: { ...typeScale.label, fontWeight: '700', letterSpacing: 0.2 },
   btnHandle: { ...typeScale.meta, fontSize: 12 },
