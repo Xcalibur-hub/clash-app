@@ -175,6 +175,8 @@ export interface NewTakeMedia {
   /** Public rendering URL derived via `getPublicMediaUrl`. */
   url: string;
   kind: MediaKind;
+  /** Still poster for video — image URL only, never the video bytes. */
+  posterUrl?: string;
 }
 
 /**
@@ -190,7 +192,13 @@ export async function postTake(
   const { data, error } = await requireSupabase().rpc('create_take', {
     p_hood: hood,
     p_text: text,
-    ...(media ? { p_media_object_id: media.mediaObjectId, p_media_url: media.url } : {}),
+    ...(media
+      ? {
+          p_media_object_id: media.mediaObjectId,
+          p_media_url: media.url,
+          ...(media.posterUrl ? { p_media_poster_url: media.posterUrl } : {}),
+        }
+      : {}),
   });
 
   if (error) throw requestError(error);

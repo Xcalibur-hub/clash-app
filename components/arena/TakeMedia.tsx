@@ -8,6 +8,12 @@ import { MediaViewer } from '../shared/MediaViewer';
 
 export type TakeMediaVariant = 'feed' | 'detail';
 
+/** Image URL safe for <Image>. Never returns an mp4/mov/video URL. */
+function stillUrl(media: TakeMediaModel): string | undefined {
+  if (media.kind === 'video') return media.posterUrl;
+  return media.url;
+}
+
 /**
  * Bounded media plate.
  * Feed: editorial cover crop (5:4).
@@ -26,23 +32,29 @@ export function TakeMedia({
 }): React.JSX.Element {
   const t = useThemeColors();
   const isVideo = media.kind === 'video';
-  const hasUrl = Boolean(media.url);
+  const poster = stillUrl(media);
+  const hasStill = Boolean(poster);
+  const playUrl = media.url;
   const detail = variant === 'detail' || edge;
   const [frameRatio, setFrameRatio] = React.useState(detail ? 4 / 5 : 5 / 4);
   const [viewerOpen, setViewerOpen] = React.useState(false);
+  const [imageFailed, setImageFailed] = React.useState(false);
 
   React.useEffect(() => {
-    if (!detail || !hasUrl || !media.url) {
+    setImageFailed(false);
+  }, [poster]);
+
+  React.useEffect(() => {
+    if (!detail || !poster || imageFailed) {
       setFrameRatio(detail ? 3 / 4 : 5 / 4);
       return;
     }
     let cancelled = false;
     Image.getSize(
-      media.url,
+      poster,
       (w, h) => {
         if (cancelled || w <= 0 || h <= 0) return;
         const r = w / h;
-        // Clamp frame so extreme ratios still fit on screen without stretch.
         const clamped = Math.min(1.85, Math.max(0.55, r));
         setFrameRatio(clamped);
       },
@@ -53,9 +65,10 @@ export function TakeMedia({
     return () => {
       cancelled = true;
     };
-  }, [detail, hasUrl, media.url]);
+  }, [detail, imageFailed, poster]);
 
   const fitMode = detail ? 'contain' : 'cover';
+  const showImage = hasStill && !imageFailed;
 
   const plate = (
     <View
@@ -68,20 +81,22 @@ export function TakeMedia({
       accessibilityRole="image"
       accessibilityLabel={`${media.kind}${media.caption ? `: ${media.caption}` : ''}`}
     >
-      {hasUrl ? (
+      {showImage ? (
         <>
           {detail || fitMode === 'contain' ? (
             <Image
-              source={{ uri: media.url as string }}
+              source={{ uri: poster as string }}
               resizeMode="cover"
               blurRadius={24}
               style={[StyleSheet.absoluteFill, { opacity: 0.35 }]}
+              onError={() => setImageFailed(true)}
             />
           ) : null}
           <Image
-            source={{ uri: media.url as string }}
+            source={{ uri: poster as string }}
             resizeMode={fitMode}
             style={StyleSheet.absoluteFill}
+            onError={() => setImageFailed(true)}
           />
         </>
       ) : (
@@ -94,8 +109,13 @@ export function TakeMedia({
       )}
       {!detail ? <View style={styles.veil} pointerEvents="none" /> : null}
       {isVideo ? (
-        <View style={styles.play}>
+        <View style={styles.play} pointerEvents="none">
           <PlayIcon size={20} color="#FAFAF8" strokeWidth={2.4} />
+          {!showImage ? (
+            <Text allowFontScaling={false} style={styles.videoLabel}>
+              VIDEO
+            </Text>
+          ) : null}
         </View>
       ) : null}
       {media.caption ? (
@@ -106,7 +126,7 @@ export function TakeMedia({
     </View>
   );
 
-  if (detail && hasUrl) {
+  if (detail && playUrl) {
     return (
       <>
         <Pressable
@@ -118,9 +138,9 @@ export function TakeMedia({
         </Pressable>
         <MediaViewer
           visible={viewerOpen}
-          uri={media.url ?? null}
-          kind={isVideo ? 'video' : 'image'}
           onClose={() => setViewerOpen(false)}
+          uri={playUrl}
+          kind={media.kind === 'video' ? 'video' : 'image'}
         />
       </>
     );
@@ -132,18 +152,14 @@ export function TakeMedia({
 const styles = StyleSheet.create({
   wrap: {
     overflow: 'hidden',
-    justifyContent: 'flex-end',
-    padding: space.md,
-    width: '100%',
+    borderRadius: radius.lg,
+    backgroundColor: '#111113',
   },
   feed: {
     aspectRatio: 5 / 4,
-    borderRadius: radius.lg,
   },
   detail: {
-    borderRadius: radius.xxl,
-    maxHeight: 560,
-    minHeight: 220,
+    width: '100%',
   },
   veil: {
     ...StyleSheet.absoluteFillObject,
@@ -151,16 +167,31 @@ const styles = StyleSheet.create({
   },
   play: {
     position: 'absolute',
-    alignSelf: 'center',
-    top: '36%',
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    right: space.md,
+    bottom: space.md,
+    minWidth: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(8,8,11,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(8,8,11,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 10,
   },
-  caption: { ...typeScale.meta },
+  videoLabel: {
+    ...typeScale.caption,
+    color: '#FAFAF8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  caption: {
+    position: 'absolute',
+    left: space.md,
+    right: space.md,
+    bottom: space.md,
+    ...typeScale.caption,
+    fontWeight: '700',
+  },
 });

@@ -29,8 +29,8 @@ select is(has_column_privilege('authenticated', 'public.takes', 'media_kind', 'I
 select is(has_table_privilege('anon', 'public.takes', 'INSERT'), false, 'anon has no INSERT on takes');
 
 -- ── create_take stays executable by authenticated, not anon ─────────────────
-select is(has_function_privilege('authenticated', 'public.create_take(public.hood_id, text, text, text)', 'EXECUTE'), true, 'authenticated can call create_take');
-select is(has_function_privilege('anon', 'public.create_take(public.hood_id, text, text, text)', 'EXECUTE'), false, 'anon cannot call create_take');
+select is(has_function_privilege('authenticated', 'public.create_take(public.hood_id, text, text, text, text)', 'EXECUTE'), true, 'authenticated can call create_take');
+select is(has_function_privilege('anon', 'public.create_take(public.hood_id, text, text, text, text)', 'EXECUTE'), false, 'anon cannot call create_take');
 
 -- ── server-owned fields remain client non-writable ──────────────────────────
 select is(has_column_privilege('authenticated', 'public.takes', 'expires_at', 'INSERT'), false, 'expires_at is not client INSERT-able');

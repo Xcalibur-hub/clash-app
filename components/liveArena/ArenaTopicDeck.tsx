@@ -29,9 +29,10 @@ import { layout, radius, space, spring, typeScale, useThemeColors } from '../../
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaTopicDeckCard, type DeckCardTone } from './ArenaTopicDeckCard';
 import { ArenaTopicDeckPagination } from './ArenaTopicDeckPagination';
+import { useLiveTopicPreview } from '../../hooks/useLiveTopicPreview';
 
-/** Designed stage — tall enough for asymmetric peeks without crowding Fresh Takes. */
-const STAGE_HEIGHT = 412;
+/** Designed stage — tall enough for living argument preview + peeks. */
+const STAGE_HEIGHT = 488;
 const MAX_VISIBLE = 3;
 const SWIPE_RATIO = 0.18;
 const VELOCITY = 620;
@@ -95,6 +96,9 @@ export function ArenaTopicDeck({
   const itemCount = filtered.length;
   const single = filtered.length === 1;
   const itemKey = React.useMemo(() => filtered.map((topic) => topic.id).join('|'), [filtered]);
+  const activeTopic = filtered[index] ?? null;
+  const preview = useLiveTopicPreview(activeTopic?.id ?? null, Boolean(activeTopic));
+  const swordKey = activeTopic ? `${activeTopic.id}:${index}` : null;
 
   React.useEffect(() => {
     setIndex(0);
@@ -279,6 +283,11 @@ export function ArenaTopicDeck({
                       topic={topic}
                       active={depth === 0}
                       tone={depth === 0 ? 0 : tone === 0 ? 1 : tone}
+                      excerpts={depth === 0 ? preview.excerpts : undefined}
+                      presence={depth === 0 ? preview.presence : undefined}
+                      signals={depth === 0 ? preview.signals : undefined}
+                      burstText={depth === 0 ? preview.burstText : null}
+                      swordKey={depth === 0 ? swordKey : null}
                       onOpen={() => onOpen(topic.id)}
                       onChoose={(stance) => onChoose(topic.id, stance)}
                       onWatch={() => onWatch(topic.id)}

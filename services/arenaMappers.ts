@@ -24,6 +24,7 @@ function toMedia(row: TableRow<'takes'>): TakeMedia | undefined {
     caption: row.media_caption ?? '',
     colors: toGradient(row.media_colors),
     ...(row.media_url ? { url: row.media_url } : {}),
+    ...(row.media_poster_url ? { posterUrl: row.media_poster_url } : {}),
     ...(row.media_duration ? { duration: row.media_duration } : {}),
   };
 }

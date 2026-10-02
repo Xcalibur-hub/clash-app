@@ -23,6 +23,7 @@ import {
   readPickedBytes,
   uploadFile,
 } from '../../services/mediaService';
+import { generateVideoPosterUri } from '../../services/videoPoster';
 import { errorText } from '../../services/supabaseClient';
 import { createTake, showNotice, useClash } from '../../store';
 import type { DbHood } from '../../supabase/types';
@@ -132,7 +133,29 @@ export default function CreateTakeScreen(): React.JSX.Element {
         height: picked.height,
         ...(picked.durationMs ? { durationMs: picked.durationMs } : {}),
       });
-      return { mediaObjectId: plan.id, url: getPublicMediaUrl(plan.bucket, plan.path), kind: picked.kind };
+
+      let posterUrl: string | undefined;
+      if (picked.kind === 'video') {
+        const localPoster = await generateVideoPosterUri(picked.uri, picked.durationMs);
+        if (localPoster) {
+          try {
+            const posterPlan = await createUpload('image', 'image/jpeg', 'public');
+            const posterBytes = await readPickedBytes(localPoster);
+            await uploadFile(posterPlan, posterBytes, 'image/jpeg');
+            await completeUpload(posterPlan.id, posterBytes.byteLength);
+            posterUrl = getPublicMediaUrl(posterPlan.bucket, posterPlan.path);
+          } catch {
+            // Poster is best-effort — video Take still ships with gradient fallback.
+          }
+        }
+      }
+
+      return {
+        mediaObjectId: plan.id,
+        url: getPublicMediaUrl(plan.bucket, plan.path),
+        kind: picked.kind,
+        ...(posterUrl ? { posterUrl } : {}),
+      };
     } catch (error) {
       void failUpload(plan.id).catch(() => undefined);
       throw error;

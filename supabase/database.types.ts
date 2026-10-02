@@ -1952,6 +1952,7 @@ export type Database = {
           media_duration: string | null
           media_kind: Database["public"]["Enums"]["media_kind"] | null
           media_object_id: string | null
+          media_poster_url: string | null
           media_url: string | null
           reactions_count: number
           status: Database["public"]["Enums"]["take_status"]
@@ -1970,6 +1971,7 @@ export type Database = {
           media_duration?: string | null
           media_kind?: Database["public"]["Enums"]["media_kind"] | null
           media_object_id?: string | null
+          media_poster_url?: string | null
           media_url?: string | null
           reactions_count?: number
           status?: Database["public"]["Enums"]["take_status"]
@@ -1988,6 +1990,7 @@ export type Database = {
           media_duration?: string | null
           media_kind?: Database["public"]["Enums"]["media_kind"] | null
           media_object_id?: string | null
+          media_poster_url?: string | null
           media_url?: string | null
           reactions_count?: number
           status?: Database["public"]["Enums"]["take_status"]
@@ -2750,6 +2753,7 @@ export type Database = {
         Args: {
           p_hood: Database["public"]["Enums"]["hood_id"]
           p_media_object_id?: string
+          p_media_poster_url?: string
           p_media_url?: string
           p_text: string
         }
@@ -2766,6 +2770,7 @@ export type Database = {
           media_duration: string | null
           media_kind: Database["public"]["Enums"]["media_kind"] | null
           media_object_id: string | null
+          media_poster_url: string | null
           media_url: string | null
           reactions_count: number
           status: Database["public"]["Enums"]["take_status"]
@@ -3009,6 +3014,10 @@ export type Database = {
       list_live_arena_topics: {
         Args: Record<PropertyKey, never>
         Returns: Json[]
+      }
+      list_live_arena_topic_previews: {
+        Args: { p_limit?: number; p_topic_id: string }
+        Returns: Json
       }
       list_my_sponsor_campaigns: {
         Args: { p_advertiser_id: string }

@@ -30,8 +30,8 @@ select has_function('public', 'create_take', 'create_take exists');
 select has_column('public', 'takes', 'media_object_id', 'takes.media_object_id exists');
 
 -- ── privileges: RPC is authenticated-only ────────────────────────────────────
-select is(has_function_privilege('authenticated', 'public.create_take(public.hood_id, text, text, text)', 'EXECUTE'), true, 'authenticated can create a take');
-select is(has_function_privilege('anon', 'public.create_take(public.hood_id, text, text, text)', 'EXECUTE'), false, 'anon cannot create a take');
+select is(has_function_privilege('authenticated', 'public.create_take(public.hood_id, text, text, text, text)', 'EXECUTE'), true, 'authenticated can create a take');
+select is(has_function_privilege('anon', 'public.create_take(public.hood_id, text, text, text, text)', 'EXECUTE'), false, 'anon cannot create a take');
 
 -- ── signed-out user is rejected ──────────────────────────────────────────────
 select set_config('role', 'anon', true);

@@ -73,6 +73,11 @@ export interface TakeMedia {
   colors: GradientColors;
   /** Permanent public URL for an uploaded asset; absent for the seeded gradient plate. */
   url?: string;
+  /**
+   * Still image poster for video Takes. Never an mp4/mov URL.
+   * Absent for legacy videos and when thumbnail generation failed.
+   */
+  posterUrl?: string;
   duration?: string;
   /** Tenor (or future) GIF provider metadata for comment GIFs. */
   gifProvider?: 'tenor';

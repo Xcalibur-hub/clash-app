@@ -2,15 +2,23 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
+  FadeIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { HOOD_LABEL } from '../../data/hoods';
-import type { LiveArenaTopic, Stance } from '../../services/liveArenaService';
+import type {
+  LiveArgumentExcerpt,
+  LiveArenaTopic,
+  LiveReactionSignal,
+  LiveTopicPresence,
+  Stance,
+} from '../../services/liveArenaService';
 import type { HoodId } from '../../store/types';
 import {
   arenaAccentForHood,
@@ -23,7 +31,10 @@ import {
 } from '../../theme';
 import { plural } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
+import { CrossedSwords } from '../clash/CrossedSwords';
+import { Avatar } from '../shared/Avatar';
 import { PressableScale } from '../shared/PressableScale';
+import { LiveArgumentPreview } from './LiveArgumentPreview';
 import { LivePulse } from './LivePulse';
 import { phaseLabel, secondsLabel, softFill, STANCE_LABEL } from './liveArenaStyles';
 
@@ -35,6 +46,13 @@ export interface ArenaTopicDeckCardProps {
   active: boolean;
   /** Surface / shadow variation across the stack. */
   tone: DeckCardTone;
+  /** Real live excerpts — only wired for the active card. */
+  excerpts?: readonly LiveArgumentExcerpt[];
+  presence?: readonly LiveTopicPresence[];
+  signals?: readonly LiveReactionSignal[];
+  burstText?: string | null;
+  /** Changes when the active topic first appears / swaps — drives sword play. */
+  swordKey?: string | number | null;
   onOpen: () => void;
   onChoose: (stance: Stance) => void;
   onWatch: () => void;
@@ -46,12 +64,17 @@ export interface ArenaTopicDeckCardProps {
 
 /**
  * Editorial surface inside the Arena topic deck.
- * ~85% calm plate + ~15% hood-derived accent (blob, LIVE tint, doodle).
+ * Active card is a lightweight live window; peeks stay calm summaries.
  */
 export function ArenaTopicDeckCard({
   topic,
   active,
   tone,
+  excerpts = [],
+  presence = [],
+  signals = [],
+  burstText = null,
+  swordKey = null,
   onOpen,
   onChoose,
   onWatch,
@@ -60,6 +83,7 @@ export function ArenaTopicDeckCard({
   onBringForward,
 }: ArenaTopicDeckCardProps): React.JSX.Element {
   const t = useThemeColors();
+  const reduced = useReducedMotion();
   const accent = arenaAccentForHood(topic.hood, t.scheme, topic.id);
   const surface = deckSurface(t, tone);
   const closed = topic.phase === 'closed';
@@ -70,6 +94,27 @@ export function ArenaTopicDeckCard({
   const stance = topic.viewerStance ?? topic.viewerFinalStance;
   const hood = hoodDisplayName(topic.hood);
   const corner = active ? 30 : 26;
+  const enterOpacity = useSharedValue(reduced ? 1 : 0);
+
+  React.useEffect(() => {
+    if (!active || reduced) {
+      enterOpacity.value = 1;
+      return;
+    }
+    enterOpacity.value = 0;
+    enterOpacity.value = withDelay(
+      100,
+      withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [active, enterOpacity, reduced, topic.id]);
+
+  const enterStyle = useAnimatedStyle(() => ({
+    opacity: 0.92 + enterOpacity.value * 0.08,
+    transform: [
+      { translateY: (1 - enterOpacity.value) * 8 },
+      { scale: 0.985 + enterOpacity.value * 0.015 },
+    ],
+  }));
 
   if (!active) {
     return (
@@ -114,113 +159,164 @@ export function ArenaTopicDeckCard({
           {topic.title}
         </Text>
         <Text allowFontScaling={false} style={[styles.peekMeta, { color: t.textSecondary }]}>
-          {plural(topic.participantCount, 'debating', 'debating')}
+          {plural(topic.participantCount, 'arguing now', 'arguing now')}
         </Text>
       </Pressable>
     );
   }
 
   return (
-    <Pressable
-      onPress={() => {
-        hapticTap();
-        if (isDebater || settled || isSpectator) onEnter();
-        else onOpen();
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={cardA11yLabel(topic)}
-      style={[
-        styles.active,
-        {
-          backgroundColor: surface,
-          borderColor: t.border,
-          shadowColor: t.shadowColor,
-          borderRadius: corner,
-        },
-      ]}
-    >
-      <AccentBlob color={accent.soft} />
-      <CardDoodle color={accent.ink} />
+    <Animated.View style={[{ flex: 1 }, enterStyle]}>
+      <Pressable
+        onPress={() => {
+          hapticTap();
+          if (isDebater || settled || isSpectator) onEnter();
+          else onOpen();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={cardA11yLabel(topic)}
+        style={[
+          styles.active,
+          {
+            backgroundColor: surface,
+            borderColor: t.border,
+            shadowColor: t.shadowColor,
+            borderRadius: corner,
+          },
+        ]}
+      >
+        <AccentBlob color={accent.soft} />
+        <CardDoodle color={accent.ink} />
 
-      <View style={styles.activeHead}>
-        <View style={styles.peekHead}>
-          {closed ? (
-            <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
-              Closed
-            </Text>
-          ) : (
-            <LivePulse color={accent.ink} />
-          )}
-          {hood ? (
-            <View style={[styles.hoodChip, { backgroundColor: accent.soft }]}>
-              <Text allowFontScaling={false} style={[styles.hoodChipText, { color: accent.ink }]}>
-                {hood}
+        <View style={styles.swordSlot} pointerEvents="none">
+          <CrossedSwords triggerKey={swordKey} size={48} color={accent.ink} cooldownMs={7000} />
+        </View>
+
+        <View style={styles.activeHead}>
+          <View style={styles.peekHead}>
+            {closed ? (
+              <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
+                Closed
               </Text>
+            ) : (
+              <LivePulse color={accent.ink} />
+            )}
+            {hood ? (
+              <View style={[styles.hoodChip, { backgroundColor: accent.soft }]}>
+                <Text allowFontScaling={false} style={[styles.hoodChipText, { color: accent.ink }]}>
+                  {hood}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text allowFontScaling={false} style={[styles.timeMeta, { color: t.textSecondary }]}>
+            {closed
+              ? phaseLabel(topic.phase)
+              : topic.phase === 'final_arguments'
+                ? `Final arguments · ${secondsClock(topic.secondsRemaining)}`
+                : secondsLabel(topic.secondsRemaining)}
+          </Text>
+        </View>
+
+        <Animated.View entering={reduced ? undefined : FadeIn.delay(180).duration(320)}>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={3}
+            style={[styles.activeTitle, { color: t.textPrimary }]}
+          >
+            {topic.title}
+          </Text>
+        </Animated.View>
+
+        <Animated.View
+          entering={reduced ? undefined : FadeIn.delay(420).duration(360)}
+          style={styles.previewSlot}
+        >
+          <LiveArgumentPreview
+            excerpts={excerpts}
+            signals={signals}
+            active={active && !closed}
+            burstText={burstText}
+            emptyLabel={closed ? 'The room has closed.' : 'Be the first argument.'}
+          />
+        </Animated.View>
+
+        <View style={styles.presenceRow}>
+          {presence.length > 0 ? (
+            <View style={styles.avatars}>
+              {presence.slice(0, 3).map((person, i) => (
+                <Avatar
+                  key={`${person.handle}-${i}`}
+                  name={person.name}
+                  tint={person.avatarTint}
+                  size={22}
+                  style={i > 0 ? { marginLeft: -8 } : undefined}
+                />
+              ))}
             </View>
           ) : null}
+          <Text allowFontScaling={false} style={[styles.participant, { color: t.textSecondary }]}>
+            {plural(topic.participantCount, 'arguing now', 'arguing now')}
+          </Text>
         </View>
-        <Text allowFontScaling={false} style={[styles.timeMeta, { color: t.textSecondary }]}>
-          {closed ? phaseLabel(topic.phase) : secondsLabel(topic.secondsRemaining)}
-        </Text>
-      </View>
 
-      <Text allowFontScaling={false} numberOfLines={5} style={[styles.activeTitle, { color: t.textPrimary }]}>
-        {topic.title}
-      </Text>
-
-      <Text allowFontScaling={false} style={[styles.participant, { color: t.textSecondary }]}>
-        {plural(topic.participantCount, 'participating', 'participating')}
-      </Text>
-
-      <View style={styles.cta}>
-        {settled ? (
-          <PrimaryButton label="See result" onPress={onEnter} />
-        ) : isDebater ? (
-          <View style={styles.joinedBlock}>
-            {stance ? (
-              <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
-                You · {STANCE_LABEL[stance]}
-              </Text>
-            ) : null}
-            <PrimaryButton label="Enter your room" onPress={onEnter} />
-          </View>
-        ) : isSpectator ? (
-          <View style={styles.joinedBlock}>
-            <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
-              Watching
-            </Text>
-            <PrimaryButton label="Join the debate" onPress={onJoinDebate} />
-          </View>
-        ) : canJoin ? (
-          <View style={styles.gate}>
-            <View style={[styles.stanceRow, { backgroundColor: softFill(t) }]}>
-              <StancePill label="Agree" onPress={() => onChoose('AGREE')} />
-              <View style={[styles.stanceDiv, { backgroundColor: t.borderStrong }]} />
-              <StancePill label="Unsure" onPress={() => onChoose('UNSURE')} />
-              <View style={[styles.stanceDiv, { backgroundColor: t.borderStrong }]} />
-              <StancePill label="Disagree" onPress={() => onChoose('DISAGREE')} />
+        <View style={styles.cta}>
+          {settled ? (
+            <PrimaryButton label="See result" onPress={onEnter} />
+          ) : isDebater ? (
+            <View style={styles.joinedBlock}>
+              {stance ? (
+                <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
+                  You · {STANCE_LABEL[stance]}
+                </Text>
+              ) : null}
+              <PrimaryButton label="Enter Arena" onPress={onEnter} />
             </View>
-            <Pressable
-              onPress={() => {
-                hapticTap();
-                onWatch();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Watch live"
-              hitSlop={10}
-              style={styles.watchLink}
-            >
-              <Text allowFontScaling={false} style={[styles.watchText, { color: accent.ink }]}>
-                Watch →
+          ) : isSpectator ? (
+            <View style={styles.joinedBlock}>
+              <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
+                Watching
               </Text>
-            </Pressable>
-          </View>
-        ) : (
-          <SecondaryButton label="See how it ended" onPress={onOpen} />
-        )}
-      </View>
-    </Pressable>
+              <PrimaryButton label="Join the debate" onPress={onJoinDebate} />
+            </View>
+          ) : canJoin ? (
+            <View style={styles.gate}>
+              <View style={[styles.stanceRow, { backgroundColor: softFill(t) }]}>
+                <StancePill label="Agree" onPress={() => onChoose('AGREE')} />
+                <View style={[styles.stanceDiv, { backgroundColor: t.borderStrong }]} />
+                <StancePill label="Unsure" onPress={() => onChoose('UNSURE')} />
+                <View style={[styles.stanceDiv, { backgroundColor: t.borderStrong }]} />
+                <StancePill label="Disagree" onPress={() => onChoose('DISAGREE')} />
+              </View>
+              <Pressable
+                onPress={() => {
+                  hapticTap();
+                  onWatch();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Watch live"
+                hitSlop={10}
+                style={styles.watchLink}
+              >
+                <Text allowFontScaling={false} style={[styles.watchText, { color: accent.ink }]}>
+                  Watch →
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <SecondaryButton label="See how it ended" onPress={onOpen} />
+          )}
+        </View>
+      </Pressable>
+    </Animated.View>
   );
+}
+
+function secondsClock(total: number): string {
+  const s = Math.max(0, Math.floor(total));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
 }
 
 function AccentBlob({ color }: { color: string }): React.JSX.Element {
@@ -241,9 +337,9 @@ function AccentBlob({ color }: { color: string }): React.JSX.Element {
 
   const style = useAnimatedStyle(() => ({
     transform: [
-      { translateX: drift.value * 4 },
-      { translateY: drift.value * -3 },
-      { scale: 1 + drift.value * 0.03 },
+      { translateX: drift.value * 3 },
+      { translateY: drift.value * -2 },
+      { scale: 1 + drift.value * 0.02 },
     ],
   }));
 
@@ -269,8 +365,8 @@ function CardDoodle({ color }: { color: string }): React.JSX.Element {
   }, [drift, reduced]);
 
   const style = useAnimatedStyle(() => ({
-    transform: [{ translateX: drift.value * 3 }, { rotate: `${drift.value * 2}deg` }],
-    opacity: 0.22 + drift.value * 0.06,
+    transform: [{ translateX: drift.value * 2 }, { rotate: `${drift.value * 1.5}deg` }],
+    opacity: 0.18 + drift.value * 0.05,
   }));
 
   return (
@@ -322,8 +418,8 @@ function cardA11yLabel(topic: LiveArenaTopic): string {
   const live = topic.phase === 'closed' ? 'Closed' : 'Live';
   return `${topic.title}. ${live}. ${plural(
     topic.participantCount,
-    'person participating',
-    'people participating',
+    'person arguing',
+    'people arguing',
   )}`;
 }
 
@@ -441,6 +537,12 @@ const styles = StyleSheet.create({
     right: 8,
     top: 72,
   },
+  swordSlot: {
+    position: 'absolute',
+    right: 14,
+    top: 54,
+    zIndex: 2,
+  },
   activeHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -478,11 +580,16 @@ const styles = StyleSheet.create({
   },
   activeTitle: {
     ...typeScale.editorial,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: '700',
-    letterSpacing: -0.4,
+    letterSpacing: -0.35,
     zIndex: 1,
+  },
+  previewSlot: {
+    marginTop: space.sm,
+    zIndex: 1,
+    flexGrow: 1,
   },
   peekTitle: {
     ...typeScale.editorial,
@@ -496,15 +603,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 'auto',
   },
+  presenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: space.sm,
+    zIndex: 1,
+  },
+  avatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   participant: {
     ...typeScale.meta,
-    fontSize: 14,
-    marginTop: space.md,
-    zIndex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   cta: {
     marginTop: 'auto',
-    paddingTop: space.lg,
+    paddingTop: space.md,
     zIndex: 1,
   },
   joinedBlock: { gap: space.sm },

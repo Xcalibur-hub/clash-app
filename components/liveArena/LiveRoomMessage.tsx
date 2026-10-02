@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import type { ArenaEvidence, ArenaMessage } from '../../services/liveArenaService';
 import type { TakeMedia } from '../../store/types';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
@@ -71,6 +72,7 @@ export function LiveRoomMessage({
   onReportEvidence,
 }: LiveRoomMessageProps): React.JSX.Element {
   const t = useThemeColors();
+  const reduced = useReducedMotion();
 
   if (message.kind === 'system') {
     return (
@@ -94,7 +96,10 @@ export function LiveRoomMessage({
     : message.reactions;
 
   return (
-    <View style={[styles.row, pending && styles.pending]}>
+    <Animated.View
+      entering={reduced || pending ? undefined : FadeIn.duration(220)}
+      style={[styles.row, pending && styles.pending]}
+    >
       <Pressable
         onPress={() => {
           if (!author || !onOpenProfile) return;
@@ -227,7 +232,7 @@ export function LiveRoomMessage({
           ) : null}
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -150,7 +150,8 @@ function FreshHeroMedia({
   radiusPx?: number;
 }): React.JSX.Element {
   const t = useThemeColors();
-  const mode = useSafeHeroFit(url);
+  const [failed, setFailed] = React.useState(false);
+  const mode = useSafeHeroFit(failed ? undefined : url);
 
   return (
     <View
@@ -159,15 +160,30 @@ function FreshHeroMedia({
         { height, backgroundColor: t.surfaceMuted, borderRadius: radiusPx ?? radius.xl },
       ]}
     >
-      {mode === 'contain' ? (
-        <Image
-          source={{ uri: url }}
-          style={[StyleSheet.absoluteFill, { opacity: 0.32 }]}
-          resizeMode="cover"
-          blurRadius={28}
+      {failed ? (
+        <LinearGradient
+          colors={['#2A2A2E', '#111113']}
+          style={StyleSheet.absoluteFill}
         />
-      ) : null}
-      <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode={mode} />
+      ) : (
+        <>
+          {mode === 'contain' ? (
+            <Image
+              source={{ uri: url }}
+              style={[StyleSheet.absoluteFill, { opacity: 0.32 }]}
+              resizeMode="cover"
+              blurRadius={28}
+              onError={() => setFailed(true)}
+            />
+          ) : null}
+          <Image
+            source={{ uri: url }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={mode}
+            onError={() => setFailed(true)}
+          />
+        </>
+      )}
       <LinearGradient
         colors={
           mode === 'cover'
@@ -202,10 +218,16 @@ function CinematicBackdrop({
 }): React.JSX.Element {
   const reduced = useReducedMotion();
   const drift = useSharedValue(0);
-  const mode = useSafeHeroFit(url);
+  const [failed, setFailed] = React.useState(false);
+  const showUrl = url && !failed ? url : undefined;
+  const mode = useSafeHeroFit(showUrl);
 
   React.useEffect(() => {
-    if (reduced || !url) {
+    setFailed(false);
+  }, [url]);
+
+  React.useEffect(() => {
+    if (reduced || !showUrl) {
       drift.value = 0;
       return;
     }
@@ -214,32 +236,36 @@ function CinematicBackdrop({
       -1,
       true,
     );
-  }, [drift, reduced, url]);
+  }, [drift, reduced, showUrl]);
 
   const mediaStyle = useAnimatedStyle(() => ({
-    transform: reduced || !url ? [] : [{ translateX: drift.value * 3 }, { scale: 1.04 }],
+    transform: reduced || !showUrl ? [] : [{ translateX: drift.value * 3 }, { scale: 1.04 }],
   }));
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {url ? (
+      {showUrl ? (
         <Animated.View style={[StyleSheet.absoluteFill, mediaStyle]}>
           {mode === 'contain' ? (
             <Image
-              source={{ uri: url }}
+              source={{ uri: showUrl }}
               style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
               resizeMode="cover"
               blurRadius={32}
+              onError={() => setFailed(true)}
             />
           ) : null}
-          <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode={mode} />
+          <Image
+            source={{ uri: showUrl }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={mode}
+            onError={() => setFailed(true)}
+          />
         </Animated.View>
       ) : (
         <LinearGradient colors={[...colors]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
       )}
-      {/* Soft overall tint — faint, keeps photo recognizable */}
       <View style={styles.cinematicTint} />
-      {/* Localized readability veil — denser near the text band */}
       <LinearGradient
         colors={['rgba(8,8,11,0.05)', 'rgba(8,8,11,0.28)', 'rgba(8,8,11,0.78)']}
         locations={[0, 0.42, 1]}
@@ -287,9 +313,13 @@ export function FreshTakeCard({
           .damping(20)
           .stiffness(240);
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
-  const hasMedia = Boolean(take.media?.url);
+  const hasMediaAsset = Boolean(take.media);
   const isVideo = take.media?.kind === 'video';
-  const mediaUrl = take.media?.url;
+  /** Still image only — never an mp4 URL. */
+  const mediaUrl = take.media?.kind === 'video' ? take.media?.posterUrl : take.media?.url;
+  const mediaColors = take.media?.colors ?? (['#2A2A2E', '#111113'] as const);
+  /** Cinematic plate when media exists (poster or gradient fallback for video). */
+  const hasMedia = hasMediaAsset && (Boolean(mediaUrl) || isVideo || Boolean(take.media?.url));
   const wrapStyle = embedded
     ? styles.embeddedWrap
     : grid
@@ -322,8 +352,6 @@ export function FreshTakeCard({
 
   if (variant === 'lead') {
     const cinematic = Boolean(hasMedia);
-    const posterUrl = take.media?.url;
-    const mediaColors = take.media?.colors ?? (['#2A2A2E', '#111113'] as const);
 
     return (
       <Animated.View entering={entering} style={wrapStyle}>
@@ -346,7 +374,7 @@ export function FreshTakeCard({
           >
             {cinematic ? (
               <>
-                <CinematicBackdrop url={posterUrl} colors={mediaColors} isVideo={isVideo} />
+                <CinematicBackdrop url={mediaUrl} colors={mediaColors} isVideo={isVideo} />
                 <View style={[styles.cinematicContent, embedded && styles.cinematicContentFill]}>
                   <PulseChip pulse={pulse} />
                   <Text allowFontScaling style={styles.cinematicHeadline} numberOfLines={5}>
@@ -472,8 +500,6 @@ export function FreshTakeCard({
   if (variant === 'clash') {
     const accent = pulseAccent('clash', t.scheme)!;
     const cinematic = Boolean(hasMedia);
-    const posterUrl = take.media?.url;
-    const mediaColors = take.media?.colors ?? (['#2A2A2E', '#111113'] as const);
 
     return (
       <Animated.View entering={entering} style={wrapStyle}>
@@ -497,7 +523,7 @@ export function FreshTakeCard({
           >
             {cinematic ? (
               <>
-                <CinematicBackdrop url={posterUrl} colors={mediaColors} isVideo={isVideo} />
+                <CinematicBackdrop url={mediaUrl} colors={mediaColors} isVideo={isVideo} />
                 <View style={[styles.clashStripTop, { backgroundColor: accent.ink }]} />
                 <View style={[styles.clashBody, styles.clashBodyOnMedia]}>
                   <PulseChip pulse="clash" />
@@ -592,6 +618,13 @@ export function FreshTakeCard({
             {hasMedia && mediaUrl ? (
               <View style={[styles.compactThumb, (grid || embedded) && styles.compactThumbWide, { backgroundColor: t.surfaceMuted }]}>
                 <CompactThumb url={mediaUrl} isVideo={isVideo} />
+              </View>
+            ) : hasMedia && isVideo ? (
+              <View style={[styles.compactThumb, (grid || embedded) && styles.compactThumbWide, { backgroundColor: t.surfaceMuted }]}>
+                <LinearGradient colors={[...mediaColors]} style={StyleSheet.absoluteFill} />
+                <View style={styles.playMini} pointerEvents="none">
+                  <PlayIcon size={12} color="#FAFAF8" strokeWidth={2.4} />
+                </View>
               </View>
             ) : null}
             <View style={styles.compactBody}>
@@ -800,10 +833,23 @@ function ActionStat({
 }
 
 function CompactThumb({ url, isVideo }: { url: string; isVideo: boolean }): React.JSX.Element {
-  const mode = useSafeHeroFit(url);
+  const [failed, setFailed] = React.useState(false);
+  const mode = useSafeHeroFit(failed ? undefined : url);
+  if (failed) {
+    return (
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#2A2A2E', alignItems: 'center', justifyContent: 'center' }]}>
+        {isVideo ? <PlayIcon size={12} color="#FAFAF8" strokeWidth={2.4} /> : null}
+      </View>
+    );
+  }
   return (
     <>
-      <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode={mode} />
+      <Image
+        source={{ uri: url }}
+        style={StyleSheet.absoluteFill}
+        resizeMode={mode}
+        onError={() => setFailed(true)}
+      />
       {isVideo ? (
         <View style={styles.playMini} pointerEvents="none">
           <PlayIcon size={12} color="#FAFAF8" strokeWidth={2.4} />

@@ -88,6 +88,36 @@ export interface LiveArenaTopic {
   viewerRole: ArenaParticipantRole | null;
 }
 
+/** One public argument snippet for Arena home — no stance, no room id. */
+export interface LiveArgumentExcerpt {
+  id: string;
+  text: string;
+  kind: string;
+  gifUrl: string | null;
+  createdAt: number;
+  handle: string;
+  name: string;
+  avatarTint: string;
+}
+
+export interface LiveTopicPresence {
+  handle: string;
+  name: string;
+  avatarTint: string;
+}
+
+export interface LiveReactionSignal {
+  emoji: string;
+  count: number;
+}
+
+export interface LiveTopicPreview {
+  topicId: string;
+  excerpts: LiveArgumentExcerpt[];
+  presence: LiveTopicPresence[];
+  reactionSignals: LiveReactionSignal[];
+}
+
 export interface ArenaJoinResult {
   /** False when the membership already existed — joining is idempotent. */
   joined: boolean;
@@ -524,6 +554,78 @@ export async function fetchLiveTopics(): Promise<LiveArenaTopic[]> {
   const { data, error } = await client().rpc('list_live_arena_topics');
   if (error) throw requestError(error);
   return (data ?? []).map(toTopic);
+}
+
+/**
+ * Bounded live argument + presence preview for one topic card.
+ * SECURITY DEFINER; respects blocks/mutes/hidden. No room subscription.
+ */
+export async function fetchTopicLivePreview(topicId: string): Promise<LiveTopicPreview> {
+  const { data, error } = await client().rpc('list_live_arena_topic_previews', {
+    p_topic_id: topicId,
+    p_limit: 4,
+  });
+  if (error) throw requestError(error);
+  return toTopicPreview(data);
+}
+
+function toTopicPreview(payload: Json | null): LiveTopicPreview {
+  const record = asRecord(payload);
+  if (!record) {
+    return { topicId: '', excerpts: [], presence: [], reactionSignals: [] };
+  }
+  const excerptsRaw = Array.isArray(record.excerpts) ? record.excerpts : [];
+  const presenceRaw = Array.isArray(record.presence) ? record.presence : [];
+  const signalsRaw = Array.isArray(record.reactionSignals) ? record.reactionSignals : [];
+
+  const excerpts: LiveArgumentExcerpt[] = [];
+  for (const item of excerptsRaw) {
+    const row = asRecord(item as Json);
+    if (!row) continue;
+    const id = str(row.id);
+    const handle = str(row.handle);
+    if (!id || !handle) continue;
+    excerpts.push({
+      id,
+      text: str(row.text) ?? '',
+      kind: str(row.kind) ?? 'text',
+      gifUrl: str(row.gifUrl),
+      createdAt: millis(row.createdAt) ?? Date.now(),
+      handle,
+      name: str(row.name) ?? handle,
+      avatarTint: str(row.avatarTint) ?? '#A1A1AA',
+    });
+  }
+
+  const presence: LiveTopicPresence[] = [];
+  for (const item of presenceRaw) {
+    const row = asRecord(item as Json);
+    if (!row) continue;
+    const handle = str(row.handle);
+    if (!handle) continue;
+    presence.push({
+      handle,
+      name: str(row.name) ?? handle,
+      avatarTint: str(row.avatarTint) ?? '#A1A1AA',
+    });
+  }
+
+  const reactionSignals: LiveReactionSignal[] = [];
+  for (const item of signalsRaw) {
+    const row = asRecord(item as Json);
+    if (!row) continue;
+    const emoji = str(row.emoji);
+    const count = num(row.count);
+    if (!emoji || count == null || count <= 0) continue;
+    reactionSignals.push({ emoji, count });
+  }
+
+  return {
+    topicId: str(record.topicId) ?? '',
+    excerpts,
+    presence,
+    reactionSignals,
+  };
 }
 
 /** One topic card. Scheduled topics are staff-only and raise server-side. */
