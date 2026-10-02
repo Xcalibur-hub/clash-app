@@ -376,17 +376,18 @@ export function FreshTakeCard({
             {cinematic ? (
               <>
                 <CinematicBackdrop url={mediaUrl} colors={mediaColors} isVideo={isVideo} />
-                <View style={[styles.cinematicContent, embedded && styles.cinematicContentFill]}>
+                <View style={styles.cinematicTop}>
+                  <Avatar name={author.name} tint={author.tint} size={24} />
+                  <Text allowFontScaling={false} style={styles.cinematicAuthor} numberOfLines={1}>
+                    @{author.handle} · {timeAgo(take.createdAt)}
+                  </Text>
+                  <View style={{ flex: 1 }} />
                   <PulseChip pulse={pulse} />
+                </View>
+                <View style={[styles.cinematicContent, embedded && styles.cinematicContentFill]}>
                   <Text allowFontScaling style={styles.cinematicHeadline} numberOfLines={5}>
                     {take.text}
                   </Text>
-                  <View style={styles.metaRow}>
-                    <Avatar name={author.name} tint={author.tint} size={22} />
-                    <Text allowFontScaling={false} style={styles.leadMeta} numberOfLines={1}>
-                      @{author.handle} · {hood} · {timeAgo(take.createdAt)}
-                    </Text>
-                  </View>
                 </View>
               </>
             ) : (
@@ -941,13 +942,30 @@ const styles = StyleSheet.create({
   cinematicContentFill: {
     minHeight: 0,
   },
+  cinematicTop: {
+    position: 'absolute',
+    top: space.md,
+    left: space.md,
+    right: space.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 3,
+  },
+  cinematicAuthor: {
+    ...typeScale.label,
+    color: '#FAFAF8',
+    fontSize: 13,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
   cinematicHeadline: {
     ...typeScale.takeText,
     color: '#FAFAF8',
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: '800',
-    letterSpacing: -0.45,
+    letterSpacing: -0.4,
   },
   videoBadge: {
     position: 'absolute',
@@ -969,9 +987,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   leadActionsOnMedia: {
-    backgroundColor: 'rgba(8,8,11,0.28)',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
   },
   heroFrame: {
     width: '100%',

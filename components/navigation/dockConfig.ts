@@ -11,7 +11,7 @@ import {
 } from '../shared/icons';
 
 /** Visual height of the floating capsule dock (icons + padding). */
-export const DOCK_HEIGHT = 48;
+export const DOCK_HEIGHT = 52;
 
 /**
  * Breathing room above the dock top edge (not including safe-area inset).

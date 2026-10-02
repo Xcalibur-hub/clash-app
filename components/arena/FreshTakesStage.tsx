@@ -50,9 +50,9 @@ export interface FreshTakeEntry {
 }
 
 /** Editorial horizontal stage — distinct from Today's Arena physical stack. */
-const ACTIVE_W = 0.86;
-const PEEK_W = 0.68;
-const STAGE_H = 392;
+const ACTIVE_W = 0.9;
+const PEEK_W = 0.7;
+const STAGE_H = 440;
 const SWIPE_RATIO = 0.2;
 const VELOCITY = 620;
 const MAX_ROTATE = 2.8;

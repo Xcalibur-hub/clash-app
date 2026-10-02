@@ -31,8 +31,8 @@ import { ArenaTopicDeckCard, type DeckCardTone } from './ArenaTopicDeckCard';
 import { ArenaTopicDeckPagination } from './ArenaTopicDeckPagination';
 import { useLiveTopicPreview } from '../../hooks/useLiveTopicPreview';
 
-/** Designed stage — tall enough for living argument preview + peeks. */
-const STAGE_HEIGHT = 488;
+/** Designed stage — tall immersive hero + peeks. */
+const STAGE_HEIGHT = 540;
 const MAX_VISIBLE = 3;
 const SWIPE_RATIO = 0.18;
 const VELOCITY = 620;
@@ -341,31 +341,31 @@ export function ArenaTopicDeck({
  * Single-topic uses a centered hero (layouts[0] overridden in DeckLayer).
  */
 function slotLayouts(stageWidth: number): [SlotLayout, SlotLayout, SlotLayout] {
-  const activeW = Math.round(stageWidth * 0.8);
-  const nextW = Math.round(stageWidth * 0.62);
-  const thirdW = Math.round(stageWidth * 0.54);
+  const activeW = Math.round(stageWidth * 0.9);
+  const nextW = Math.round(stageWidth * 0.66);
+  const thirdW = Math.round(stageWidth * 0.56);
 
   return [
     {
       width: activeW,
-      height: 308,
-      left: Math.round(stageWidth * 0.05),
-      top: 78,
-      rotate: -0.6,
+      height: 360,
+      left: Math.round((stageWidth - activeW) / 2),
+      top: 72,
+      rotate: -0.4,
     },
     {
       width: nextW,
-      height: 168,
-      left: Math.round(stageWidth * 0.34),
-      top: 6,
-      rotate: 3.2,
+      height: 176,
+      left: Math.round(stageWidth * 0.36),
+      top: 4,
+      rotate: 2.8,
     },
     {
       width: thirdW,
-      height: 142,
-      left: Math.round(stageWidth * 0.08),
-      top: 268,
-      rotate: -2.4,
+      height: 148,
+      left: Math.round(stageWidth * 0.06),
+      top: 300,
+      rotate: -2.2,
     },
   ];
 }
@@ -538,24 +538,24 @@ function hoodDisplayName(hood: string): string {
 
 const styles = StyleSheet.create({
   section: {
-    paddingTop: space.lg,
-    paddingBottom: space.xl,
-    gap: space.md,
+    paddingTop: space.md,
+    paddingBottom: space.md,
+    gap: space.sm,
   },
   header: {
     paddingHorizontal: layout.screenX,
-    gap: 4,
+    gap: 2,
   },
   sectionTitle: {
     ...typeScale.caption,
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
+    fontWeight: '800',
+    letterSpacing: 1.4,
   },
   sectionSub: {
     ...typeScale.meta,
     fontSize: 13,
-    marginBottom: space.xs,
+    fontWeight: '500',
   },
   chipScroll: {
     marginHorizontal: -layout.screenX,

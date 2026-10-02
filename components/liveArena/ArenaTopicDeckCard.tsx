@@ -129,10 +129,11 @@ export function ArenaTopicDeckCard({
           styles.peek,
           {
             backgroundColor: surface,
-            borderColor: t.border,
+            borderColor: 'transparent',
             shadowColor: t.shadowColor,
             borderRadius: corner,
             elevation: tone === 1 ? 3 : 2,
+            borderWidth: 0,
           },
         ]}
       >
@@ -179,9 +180,10 @@ export function ArenaTopicDeckCard({
           styles.active,
           {
             backgroundColor: surface,
-            borderColor: t.border,
+            borderColor: 'transparent',
             shadowColor: t.shadowColor,
             borderRadius: corner,
+            borderWidth: 0,
           },
         ]}
       >
@@ -499,11 +501,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingTop: space.md + 2,
     paddingBottom: space.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowOpacity: 0.14,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
+    borderWidth: 0,
+    shadowOpacity: 0.16,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
   },
   peek: {
     flex: 1,
@@ -511,10 +513,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: space.sm + 2,
     gap: 6,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
+    borderWidth: 0,
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
     justifyContent: 'flex-start',
   },
   accentStrip: {

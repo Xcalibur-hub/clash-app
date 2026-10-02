@@ -269,7 +269,7 @@ export default function ArenaScreen(): React.JSX.Element {
   );
 
   const renderItem = React.useCallback(
-    ({ item }: ListRenderItemInfo<Take>) => {
+    ({ item, index }: ListRenderItemInfo<Take>) => {
       const author = selectAuthor(state, item.authorId);
       if (!author) return null;
       const topComment = selectTopComment(state, item.id);
@@ -284,6 +284,7 @@ export default function ArenaScreen(): React.JSX.Element {
           commentCount={selectCommentsForTake(state, item.id).length}
           topComment={topComment}
           topCommentAuthor={topCommentAuthor}
+          index={index}
           onOpenDetail={() => openDetail(item.id)}
           onOpenClash={() => openClash(item.id)}
           onReact={() => {
@@ -347,6 +348,9 @@ export default function ArenaScreen(): React.JSX.Element {
           <Text allowFontScaling={false} style={[styles.feedTitle, { color: theme.textPrimary }]}>
             Your Feed
           </Text>
+          <Text allowFontScaling={false} style={[styles.feedSub, { color: theme.textMuted }]}>
+            Takes from across CLASH
+          </Text>
           <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         </View>
       </View>
@@ -365,6 +369,7 @@ export default function ArenaScreen(): React.JSX.Element {
       scope,
       shareTake,
       theme.textPrimary,
+      theme.textMuted,
       toggleReaction,
     ],
   );
@@ -497,18 +502,25 @@ function FeedSkeleton(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { flexGrow: 1 },
-  hero: { paddingBottom: space.xs, gap: 2 },
+  hero: { paddingBottom: space.sm, gap: space.md },
   feedHead: {
-    paddingTop: space.lg,
-    paddingBottom: space.xs,
-    gap: space.sm,
+    paddingTop: space.sm,
+    paddingBottom: space.md,
+    gap: 4,
   },
   feedTitle: {
     ...typeScale.caption,
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
+    fontWeight: '800',
+    letterSpacing: 1.4,
     paddingHorizontal: layout.screenX,
+  },
+  feedSub: {
+    ...typeScale.meta,
+    fontSize: 13,
+    fontWeight: '500',
+    paddingHorizontal: layout.screenX,
+    marginBottom: space.xs,
   },
 });
 

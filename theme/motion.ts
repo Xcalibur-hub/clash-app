@@ -23,5 +23,5 @@ export const spring = {
 } as const;
 
 export const scale = {
-  press: 0.98,
+  press: 0.985,
 } as const;

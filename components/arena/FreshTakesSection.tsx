@@ -2,7 +2,6 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Take } from '../../store';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
-import { Underline } from '../shared/Doodles';
 import { FreshTakesStage, type FreshTakeEntry } from './FreshTakesStage';
 
 export type { FreshTakeEntry };
@@ -39,12 +38,11 @@ export function FreshTakesSection({
     <View style={styles.section}>
       <View style={styles.head}>
         <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-          Fresh Takes
+          FRESH TAKES
         </Text>
         <Text allowFontScaling={false} style={[styles.sub, { color: t.textMuted }]}>
           What people are arguing about now
         </Text>
-        <Underline size={72} color={t.textPrimary} opacity={0.22} style={styles.mark} />
       </View>
 
       <FreshTakesStage
@@ -63,25 +61,24 @@ export function FreshTakesSection({
 
 const styles = StyleSheet.create({
   section: {
-    paddingTop: space.md,
-    paddingBottom: space.lg,
+    paddingTop: space.sm,
+    paddingBottom: space.md,
     gap: space.sm,
   },
   head: {
     paddingHorizontal: layout.screenX,
-    paddingBottom: space.xs,
-    position: 'relative',
+    paddingBottom: 2,
   },
   title: {
-    ...typeScale.section,
-    fontSize: 20,
+    ...typeScale.caption,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: -0.4,
+    letterSpacing: 1.4,
   },
   sub: {
     ...typeScale.meta,
     fontSize: 13,
-    marginTop: 4,
+    fontWeight: '500',
+    marginTop: 2,
   },
-  mark: { marginTop: 4 },
 });

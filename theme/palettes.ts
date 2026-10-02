@@ -39,16 +39,16 @@ export interface SemanticTheme {
 /** Warm-white editorial light — not sterile pure white. */
 export const lightTheme: SemanticTheme = {
   scheme: 'light',
-  background: '#F4F3EF',
-  surface: '#FFFFFF',
+  background: '#F2F0EB',
+  surface: '#FFFEFA',
   surfaceElevated: '#FFFFFF',
-  surfaceMuted: '#EBEAE6',
+  surfaceMuted: '#E8E6E0',
   textPrimary: '#111113',
   textSecondary: '#52525B',
   textMuted: '#71717A',
   textInverse: '#FAFAF8',
-  border: 'rgba(17,17,19,0.08)',
-  borderStrong: 'rgba(17,17,19,0.14)',
+  border: 'rgba(17,17,19,0.06)',
+  borderStrong: 'rgba(17,17,19,0.12)',
   accent: '#C9A96A',
   danger: '#E5484D',
   success: '#2F9E6E',
@@ -60,11 +60,11 @@ export const lightTheme: SemanticTheme = {
   tabBar: 'rgba(255,255,255,0.94)',
   tabBarBorder: 'rgba(17,17,19,0.08)',
   inputBackground: '#EFEFEE',
-  mediaScrim: ['transparent', 'rgba(8,8,11,0.28)', 'rgba(8,8,11,0.88)'],
+  mediaScrim: ['transparent', 'rgba(8,8,11,0.22)', 'rgba(8,8,11,0.78)'],
   clashFill: '#111113',
   clashText: '#FAFAF8',
   shadowColor: '#111113',
-  shadowOpacity: 0.12,
+  shadowOpacity: 0.1,
 };
 
 /** Matte obsidian dark — rich near-black, no neon. */
