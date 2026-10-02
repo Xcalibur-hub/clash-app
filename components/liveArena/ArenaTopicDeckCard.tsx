@@ -1,104 +1,152 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { HOOD_LABEL } from '../../data/hoods';
 import type { LiveArenaTopic, Stance } from '../../services/liveArenaService';
-import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import type { HoodId } from '../../store/types';
+import { layout, radius, space, typeScale, useThemeColors, type SemanticTheme } from '../../theme';
 import { plural } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
 import { LivePulse } from './LivePulse';
 import { phaseLabel, secondsLabel, softFill, STANCE_LABEL } from './liveArenaStyles';
 
+export type DeckCardTone = 0 | 1 | 2;
+
 export interface ArenaTopicDeckCardProps {
   topic: LiveArenaTopic;
-  /** Active front card — only the front card receives pointer events from the deck. */
+  /** Front card shows full CTAs; peeks stay editorial summaries. */
   active: boolean;
+  /** Surface / shadow variation across the stack. */
+  tone: DeckCardTone;
   onOpen: () => void;
   onChoose: (stance: Stance) => void;
   onWatch: () => void;
   onEnter: () => void;
   onJoinDebate: () => void;
+  /** Peek cards only — bring this topic forward. */
+  onBringForward?: () => void;
 }
 
 /**
- * Single editorial surface inside the Arena topic deck.
- * Presentation only — all join / room / stance writes stay with the parent callbacks.
+ * Editorial surface inside the Arena topic deck.
+ * Active = full hierarchy + CTAs. Peek = LIVE · hood · title · count.
  */
 export function ArenaTopicDeckCard({
   topic,
   active,
+  tone,
   onOpen,
   onChoose,
   onWatch,
   onEnter,
   onJoinDebate,
+  onBringForward,
 }: ArenaTopicDeckCardProps): React.JSX.Element {
   const t = useThemeColors();
+  const surface = deckSurface(t, tone);
   const closed = topic.phase === 'closed';
   const settled = topic.viewerRoomStatus === 'SETTLED';
   const isSpectator = topic.viewerJoined && topic.viewerRole === 'spectator';
-  // Joined without an explicit spectator role keeps the prior debater entry path.
   const isDebater = topic.viewerJoined && !isSpectator;
   const canJoin = !topic.viewerJoined && !closed && topic.status === 'live';
   const stance = topic.viewerStance ?? topic.viewerFinalStance;
+  const hood = hoodDisplayName(topic.hood);
+  const corner = active ? 30 : 26;
+
+  if (!active) {
+    return (
+      <Pressable
+        onPress={() => {
+          hapticTap();
+          onBringForward?.();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={`Next: ${topic.title}. Bring forward.`}
+        style={[
+          styles.peek,
+          {
+            backgroundColor: surface,
+            borderColor: t.border,
+            shadowColor: t.shadowColor,
+            borderRadius: corner,
+            elevation: tone === 1 ? 3 : 2,
+          },
+        ]}
+      >
+        <View style={styles.peekHead}>
+          {closed ? (
+            <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
+              Closed
+            </Text>
+          ) : (
+            <LivePulse size={6} />
+          )}
+          {hood ? (
+            <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
+              · {hood}
+            </Text>
+          ) : null}
+        </View>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={3}
+          style={[styles.peekTitle, { color: t.textPrimary }]}
+        >
+          {topic.title}
+        </Text>
+        <Text allowFontScaling={false} style={[styles.peekMeta, { color: t.textSecondary }]}>
+          {plural(topic.participantCount, 'debating', 'debating')}
+        </Text>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
-      disabled={!active}
       onPress={() => {
         hapticTap();
-        if (isDebater || settled) onEnter();
-        else if (isSpectator) onEnter();
+        if (isDebater || settled || isSpectator) onEnter();
         else onOpen();
       }}
       accessibilityRole="button"
       accessibilityLabel={cardA11yLabel(topic)}
       style={[
-        styles.card,
+        styles.active,
         {
-          backgroundColor: t.surface,
+          backgroundColor: surface,
           borderColor: t.border,
           shadowColor: t.shadowColor,
+          borderRadius: corner,
         },
       ]}
     >
-      <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          TODAY'S ARENA
+      <View style={styles.activeHead}>
+        <View style={styles.peekHead}>
+          {closed ? (
+            <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
+              Closed
+            </Text>
+          ) : (
+            <LivePulse />
+          )}
+          {hood ? (
+            <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
+              · {hood}
+            </Text>
+          ) : null}
+        </View>
+        <Text allowFontScaling={false} style={[styles.timeMeta, { color: t.textSecondary }]}>
+          {closed ? phaseLabel(topic.phase) : secondsLabel(topic.secondsRemaining)}
         </Text>
-        {closed ? (
-          <Text allowFontScaling={false} style={[styles.closed, { color: t.textMuted }]}>
-            Closed
-          </Text>
-        ) : (
-          <LivePulse />
-        )}
       </View>
 
-      <Text allowFontScaling={false} numberOfLines={4} style={[styles.title, { color: t.textPrimary }]}>
+      <Text allowFontScaling={false} numberOfLines={5} style={[styles.activeTitle, { color: t.textPrimary }]}>
         {topic.title}
       </Text>
 
-      {topic.description ? (
-        <Text
-          allowFontScaling={false}
-          numberOfLines={2}
-          style={[styles.description, { color: t.textSecondary }]}
-        >
-          {topic.description}
-        </Text>
-      ) : null}
-
-      <View style={styles.statRow}>
-        <Text allowFontScaling={false} style={[styles.stat, { color: t.textSecondary }]}>
-          {plural(topic.participantCount, 'person participating', 'people participating')}
-        </Text>
-        <Text allowFontScaling={false} style={[styles.dot, { color: t.textMuted }]}>
-          ·
-        </Text>
-        <Text allowFontScaling={false} style={[styles.stat, { color: t.textSecondary }]}>
-          {closed ? phaseLabel(topic.phase) : `${secondsLabel(topic.secondsRemaining)} left`}
-        </Text>
-      </View>
+      <Text allowFontScaling={false} style={[styles.participant, { color: t.textSecondary }]}>
+        {plural(topic.participantCount, 'participating', 'participating')}
+      </Text>
 
       <View style={styles.cta}>
         {settled ? (
@@ -106,30 +154,27 @@ export function ArenaTopicDeckCard({
         ) : isDebater ? (
           <View style={styles.joinedBlock}>
             {stance ? (
-              <View style={[styles.stanceChip, { backgroundColor: softFill(t), borderColor: t.border }]}>
-                <Text allowFontScaling={false} style={[styles.stanceChipText, { color: t.textSecondary }]}>
-                  You · {STANCE_LABEL[stance]}
-                </Text>
-              </View>
+              <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
+                You · {STANCE_LABEL[stance]}
+              </Text>
             ) : null}
             <PrimaryButton label="Enter your room" onPress={onEnter} />
           </View>
         ) : isSpectator ? (
           <View style={styles.joinedBlock}>
-            <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
+            <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
               Watching
             </Text>
             <PrimaryButton label="Join the debate" onPress={onJoinDebate} />
           </View>
         ) : canJoin ? (
           <View style={styles.gate}>
-            <Text allowFontScaling={false} style={[styles.prompt, { color: t.textMuted }]}>
-              What do you think?
-            </Text>
-            <View style={styles.choices}>
-              <ChoiceButton label="Agree" onPress={() => onChoose('AGREE')} />
-              <ChoiceButton label="Unsure" onPress={() => onChoose('UNSURE')} />
-              <ChoiceButton label="Disagree" onPress={() => onChoose('DISAGREE')} />
+            <View style={[styles.stanceRow, { backgroundColor: softFill(t) }]}>
+              <StancePill label="Agree" onPress={() => onChoose('AGREE')} />
+              <View style={[styles.stanceDiv, { backgroundColor: t.borderStrong }]} />
+              <StancePill label="Unsure" onPress={() => onChoose('UNSURE')} />
+              <View style={[styles.stanceDiv, { backgroundColor: t.borderStrong }]} />
+              <StancePill label="Disagree" onPress={() => onChoose('DISAGREE')} />
             </View>
             <Pressable
               onPress={() => {
@@ -138,11 +183,11 @@ export function ArenaTopicDeckCard({
               }}
               accessibilityRole="button"
               accessibilityLabel="Watch live"
-              hitSlop={8}
+              hitSlop={10}
               style={styles.watchLink}
             >
               <Text allowFontScaling={false} style={[styles.watchText, { color: t.textSecondary }]}>
-                Watch live
+                Watch →
               </Text>
             </Pressable>
           </View>
@@ -154,9 +199,37 @@ export function ArenaTopicDeckCard({
   );
 }
 
+/** Theme-safe tonal plates so stack cards read as separate objects. */
+export function deckSurface(t: SemanticTheme, tone: DeckCardTone): string {
+  if (t.scheme === 'light') {
+    if (tone === 0) return '#FFFEFA';
+    if (tone === 1) return '#F1EFE8';
+    return '#E8E9ED';
+  }
+  if (tone === 0) return '#141416';
+  if (tone === 1) return '#1A1A1E';
+  return '#101014';
+}
+
+function hoodDisplayName(hood: string | null): string | null {
+  if (!hood?.trim()) return null;
+  const short: Record<string, string> = {
+    techtakes: 'TECH',
+    campushustle: 'CAMPUS',
+    goatalk: 'GOA',
+    movies: 'MOVIES',
+    gaming: 'GAMING',
+    startups: 'STARTUPS',
+    football: 'SPORT',
+  };
+  if (hood in short) return short[hood];
+  if (hood in HOOD_LABEL) return HOOD_LABEL[hood as HoodId].toUpperCase();
+  return hood.toUpperCase();
+}
+
 function cardA11yLabel(topic: LiveArenaTopic): string {
   const live = topic.phase === 'closed' ? 'Closed' : 'Live';
-  return `Today's Arena. ${topic.title}. ${live}. ${plural(
+  return `${topic.title}. ${live}. ${plural(
     topic.participantCount,
     'person participating',
     'people participating',
@@ -207,7 +280,7 @@ function SecondaryButton({
   );
 }
 
-function ChoiceButton({
+function StancePill({
   label,
   onPress,
 }: {
@@ -223,9 +296,9 @@ function ChoiceButton({
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[styles.choice, { backgroundColor: t.surfaceMuted, borderColor: t.borderStrong }]}
+      style={styles.stancePill}
     >
-      <Text allowFontScaling={false} style={[styles.choiceText, { color: t.textPrimary }]}>
+      <Text allowFontScaling={false} style={[styles.stancePillText, { color: t.textPrimary }]}>
         {label}
       </Text>
     </PressableScale>
@@ -233,88 +306,113 @@ function ChoiceButton({
 }
 
 const styles = StyleSheet.create({
-  card: {
+  active: {
     flex: 1,
-    gap: space.sm,
-    padding: layout.cardPadding + 2,
-    borderRadius: radius.xxl,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md + 2,
+    paddingBottom: space.md,
     borderWidth: StyleSheet.hairlineWidth,
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 6,
+  },
+  peek: {
+    flex: 1,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm + 2,
+    gap: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
     justifyContent: 'flex-start',
   },
-  head: {
+  activeHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: space.sm,
   },
-  eyebrow: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.1,
-  },
-  closed: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.6,
-  },
-  title: {
-    ...typeScale.editorial,
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '700',
-  },
-  description: {
-    ...typeScale.meta,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  statRow: {
+  peekHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 2,
+    gap: 4,
+    flexShrink: 1,
   },
-  stat: { ...typeScale.meta, fontSize: 13 },
-  dot: { ...typeScale.meta, fontSize: 13 },
-  cta: {
-    marginTop: 'auto',
-    paddingTop: space.sm,
+  metaCaps: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
   },
-  joinedBlock: { gap: space.sm },
-  watching: {
+  timeMeta: {
     ...typeScale.caption,
     fontSize: 12,
     fontWeight: '600',
   },
-  stanceChip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: space.sm,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
+  activeTitle: {
+    ...typeScale.editorial,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '700',
+    letterSpacing: -0.4,
   },
-  stanceChipText: { ...typeScale.caption, fontSize: 11, fontWeight: '600' },
-  gate: { gap: space.xs },
-  prompt: { ...typeScale.caption, fontSize: 12, fontWeight: '600' },
-  choices: { flexDirection: 'row', gap: space.xs },
-  choice: {
+  peekTitle: {
+    ...typeScale.editorial,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  peekMeta: {
+    ...typeScale.meta,
+    fontSize: 12,
+    marginTop: 'auto',
+  },
+  participant: {
+    ...typeScale.meta,
+    fontSize: 14,
+    marginTop: space.md,
+  },
+  cta: {
+    marginTop: 'auto',
+    paddingTop: space.lg,
+  },
+  joinedBlock: { gap: space.sm },
+  youStance: {
+    ...typeScale.caption,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  gate: { gap: space.sm, alignItems: 'center' },
+  stanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    borderRadius: radius.pill,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  stancePill: {
     flex: 1,
     minHeight: layout.hit,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: space.xs,
   },
-  choiceText: { ...typeScale.button, fontSize: 13, fontWeight: '700' },
+  stancePillText: {
+    ...typeScale.button,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  stanceDiv: {
+    width: StyleSheet.hairlineWidth,
+    height: 18,
+    opacity: 0.7,
+  },
   watchLink: {
-    alignSelf: 'center',
     paddingVertical: space.xs,
     minHeight: 36,
     justifyContent: 'center',
@@ -328,14 +426,14 @@ const styles = StyleSheet.create({
     minHeight: layout.hit,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
   },
   primaryText: { ...typeScale.button, fontSize: 15, fontWeight: '700' },
   secondary: {
     minHeight: layout.hit,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
   },
   secondaryText: { ...typeScale.button, fontSize: 15, fontWeight: '600' },

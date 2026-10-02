@@ -3,8 +3,8 @@
 -- ----------------------------------------------------------------------------
 -- Synthetic profiles + Takes + Clashes so a real signed-in developer can:
 --   other user's Take → reply → CLASH → Standard/Blind → judge.
--- Plus a live and a settled Live Daily Arena topic (`devfx_arena_*`) so the
--- Arena card, the stance gate, the room and the verdict all have real data.
+-- Plus Live Daily Arena topics (`devfx_arena_*`): three live Topics for the
+-- stacked Arena deck, plus one settled Topic for the verdict / Mindshift UI.
 --
 -- SAFETY
 --   · Not a migration — never applied by `supabase db push` / hosted deploy.
@@ -206,14 +206,12 @@ values
 -- ============================================================================
 -- LIVE DAILY ARENA (Phase 13) — `devfx_arena_*`
 -- ----------------------------------------------------------------------------
--- Two topics so both halves of the UI are reachable from a cold local DB:
+-- Local-only Topics so the Arena home deck can be visually tested with depth:
 --
---   devfx_arena_topic_live     live now, one OPEN room with 6 debaters, a thread,
---                              two citations and reactions. Your real account
---                              joins through the app; join_arena_topic picks the
---                              oldest non-full OPEN room, which is this one.
---   devfx_arena_topic_settled  already closed, with a SETTLED room + result so the
---                              verdict / best argument / Mindshift UI has data.
+--   devfx_arena_topic_live      live · techtakes · full OPEN room + thread
+--   devfx_arena_topic_live_b    live · movies · light OPEN room (deck card 2)
+--   devfx_arena_topic_live_c    live · football · light OPEN room (deck card 3)
+--   devfx_arena_topic_settled   closed · startups · SETTLED room + result
 --
 -- The settled room's THREAD is members-only (that is the RLS rule, not a bug),
 -- so a non-member sees the public result and an explanatory note instead of the
@@ -234,6 +232,26 @@ values
    now() + interval '4 hours',
    now() - interval '2 hours'),
 
+  ('devfx_arena_topic_live_b',
+   'Is AI art real art?',
+   'If the prompt is yours, is the image yours — or is that just vibes?',
+   'movies', 'live',
+   now() - interval '90 minutes',
+   now() + interval '150 minutes',
+   now() + interval '3 hours 30 minutes',
+   now() + interval '4 hours 30 minutes',
+   now() - interval '90 minutes'),
+
+  ('devfx_arena_topic_live_c',
+   'VAR ruined football.',
+   'Precision over drama — or the death of the game as theatre.',
+   'football', 'live',
+   now() - interval '70 minutes',
+   now() + interval '170 minutes',
+   now() + interval '3 hours 50 minutes',
+   now() + interval '4 hours 50 minutes',
+   now() - interval '70 minutes'),
+
   ('devfx_arena_topic_settled',
    'Remote-first startups ship slower than in-person ones.',
    'Settled yesterday — kept around so the verdict UI has something real to render.',
@@ -249,7 +267,13 @@ insert into public.arena_rooms
   (id, topic_id, status, capacity, participant_count, opens_at, closes_at, created_at)
 values
   ('devfx_arena_room_open', 'devfx_arena_topic_live', 'OPEN', 40, 6,
-   now() - interval '2 hours', now() + interval '4 hours', now() - interval '2 hours');
+   now() - interval '2 hours', now() + interval '4 hours', now() - interval '2 hours'),
+
+  ('devfx_arena_room_open_b', 'devfx_arena_topic_live_b', 'OPEN', 40, 4,
+   now() - interval '90 minutes', now() + interval '4 hours 30 minutes', now() - interval '90 minutes'),
+
+  ('devfx_arena_room_open_c', 'devfx_arena_topic_live_c', 'OPEN', 40, 5,
+   now() - interval '70 minutes', now() + interval '4 hours 50 minutes', now() - interval '70 minutes');
 
 -- A stance is private forever: these rows exist so the room has real people in
 -- it, and no RPC ever reports how they split.
@@ -261,7 +285,18 @@ values
   ('devfx_arena_room_open', 'devfx_arena_topic_live', 'devfx_juror_a',    'AGREE',    'debater', now() - interval '100 minutes'),
   ('devfx_arena_room_open', 'devfx_arena_topic_live', 'devfx_juror_b',    'DISAGREE', 'debater', now() - interval '95 minutes'),
   ('devfx_arena_room_open', 'devfx_arena_topic_live', 'devfx_arguer',     'UNSURE',   'debater', now() - interval '80 minutes'),
-  ('devfx_arena_room_open', 'devfx_arena_topic_live', 'devfx_arena_u1',   'AGREE',    'debater', now() - interval '70 minutes');
+  ('devfx_arena_room_open', 'devfx_arena_topic_live', 'devfx_arena_u1',   'AGREE',    'debater', now() - interval '70 minutes'),
+
+  ('devfx_arena_room_open_b', 'devfx_arena_topic_live_b', 'devfx_clash_test', 'DISAGREE', 'debater', now() - interval '80 minutes'),
+  ('devfx_arena_room_open_b', 'devfx_arena_topic_live_b', 'devfx_challenger', 'AGREE',    'debater', now() - interval '75 minutes'),
+  ('devfx_arena_room_open_b', 'devfx_arena_topic_live_b', 'devfx_arena_u2',   'UNSURE',   'debater', now() - interval '60 minutes'),
+  ('devfx_arena_room_open_b', 'devfx_arena_topic_live_b', 'devfx_arena_u3',   'AGREE',    'debater', now() - interval '45 minutes'),
+
+  ('devfx_arena_room_open_c', 'devfx_arena_topic_live_c', 'devfx_clash_test', 'AGREE',    'debater', now() - interval '65 minutes'),
+  ('devfx_arena_room_open_c', 'devfx_arena_topic_live_c', 'devfx_challenger', 'DISAGREE', 'debater', now() - interval '60 minutes'),
+  ('devfx_arena_room_open_c', 'devfx_arena_topic_live_c', 'devfx_juror_a',    'AGREE',    'debater', now() - interval '50 minutes'),
+  ('devfx_arena_room_open_c', 'devfx_arena_topic_live_c', 'devfx_juror_b',    'DISAGREE', 'debater', now() - interval '40 minutes'),
+  ('devfx_arena_room_open_c', 'devfx_arena_topic_live_c', 'devfx_arguer',     'UNSURE',   'debater', now() - interval '30 minutes');
 
 insert into public.arena_room_messages
   (id, room_id, author_id, kind, body, parent_message_id, created_at)
@@ -393,5 +428,5 @@ commit;
 -- Smoke notice for operators (visible in psql / docker logs).
 do $$
 begin
-  raise notice 'clash_dev_fixtures: ready — @clash_test takes + open STANDARD/BLIND + settled Clash + live/settled Arena topics';
+  raise notice 'clash_dev_fixtures: ready — @clash_test takes + open STANDARD/BLIND + settled Clash + 3 live Arena topics + settled Arena topic';
 end $$;

@@ -25,8 +25,12 @@ test multi-user Clash flows with **one real OTP account**.
 
 | Id | Purpose |
 |----|---------|
-| `devfx_arena_topic_live` | **Live** topic — "AI will replace most software developers within 10 years." (`techtakes`, opened 2h ago, closes in 4h) |
+| `devfx_arena_topic_live` | **Live** topic — "AI will replace most software developers within 10 years." (`techtakes`) |
 | `devfx_arena_room_open` | OPEN room on that topic: 6 debaters, 8 arguments, 2 link citations, reactions |
+| `devfx_arena_topic_live_b` | **Live** topic — "Is AI art real art?" (`movies`) — deck depth card |
+| `devfx_arena_room_open_b` | OPEN room: 4 debaters |
+| `devfx_arena_topic_live_c` | **Live** topic — "VAR ruined football." (`football`) — deck depth card |
+| `devfx_arena_room_open_c` | OPEN room: 5 debaters |
 | `devfx_arena_topic_settled` | **Closed** topic — "Remote-first startups ship slower than in-person ones." |
 | `devfx_arena_room_settled` | SETTLED room + result: AGREE 3–2, best argument, 50% Mindshift |
 

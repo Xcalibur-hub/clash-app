@@ -24,16 +24,24 @@ import type { LiveArenaTopic, Stance } from '../../services/liveArenaService';
 import type { HoodId } from '../../store/types';
 import { layout, radius, space, spring, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
-import { ArenaTopicDeckCard } from './ArenaTopicDeckCard';
+import { ArenaTopicDeckCard, type DeckCardTone } from './ArenaTopicDeckCard';
 import { ArenaTopicDeckPagination } from './ArenaTopicDeckPagination';
 
-const FRONT_WIDTH_RATIO = 0.9;
-const CARD_HEIGHT = 348;
+/** Designed stage — tall enough for asymmetric peeks without crowding Fresh Takes. */
+const STAGE_HEIGHT = 412;
 const MAX_VISIBLE = 3;
-const SWIPE_RATIO = 0.2;
-const VELOCITY = 640;
-const MAX_ROTATE_DEG = 3.2;
+const SWIPE_RATIO = 0.18;
+const VELOCITY = 620;
+const MAX_ROTATE_DEG = 3.6;
 const FOR_YOU = 'for-you';
+
+type SlotLayout = {
+  width: number;
+  height: number;
+  left: number;
+  top: number;
+  rotate: number;
+};
 
 export interface ArenaTopicDeckProps {
   topics: LiveArenaTopic[];
@@ -45,7 +53,7 @@ export interface ArenaTopicDeckProps {
 }
 
 /**
- * Signature Arena home deck — layered editorial cards for live Topics.
+ * Signature Arena home deck — asymmetric editorial stage for live Topics.
  * Filters appear only when topics carry at least two real hood values.
  */
 export function ArenaTopicDeck({
@@ -57,9 +65,9 @@ export function ArenaTopicDeck({
   onJoinDebate,
 }: ArenaTopicDeckProps): React.JSX.Element | null {
   const { width: windowWidth } = useWindowDimensions();
-  const cardWidth = Math.round(windowWidth * FRONT_WIDTH_RATIO);
   const stageWidth = windowWidth;
-  const stageHeight = CARD_HEIGHT + 28;
+  const layouts = React.useMemo(() => slotLayouts(stageWidth), [stageWidth]);
+  const activeW = layouts[0].width;
   const reduced = useReducedMotion();
   const t = useThemeColors();
 
@@ -82,6 +90,7 @@ export function ArenaTopicDeck({
   const dragX = useSharedValue(0);
   const animating = useSharedValue(0);
   const itemCount = filtered.length;
+  const single = filtered.length === 1;
   const itemKey = React.useMemo(() => filtered.map((topic) => topic.id).join('|'), [filtered]);
 
   React.useEffect(() => {
@@ -117,8 +126,8 @@ export function ArenaTopicDeck({
         animating.value = 0;
         return;
       }
-      const fly = direction * (cardWidth * 1.08);
-      dragX.value = withSpring(fly, { damping: 24, stiffness: 190, mass: 0.85 }, (done) => {
+      const fly = direction * (activeW * 1.12);
+      dragX.value = withSpring(fly, { damping: 22, stiffness: 175, mass: 0.85 }, (done) => {
         if (done) {
           runOnJS(goTo)(next);
           dragX.value = 0;
@@ -126,7 +135,7 @@ export function ArenaTopicDeck({
         }
       });
     },
-    [animating, cardWidth, dragX, goTo, indexSV, itemCount],
+    [activeW, animating, dragX, goTo, indexSV, itemCount],
   );
 
   const cancelSwipe = React.useCallback((): void => {
@@ -139,7 +148,7 @@ export function ArenaTopicDeck({
       Gesture.Pan()
         .enabled(!reduced && itemCount > 1)
         .activeOffsetX([-12, 12])
-        .failOffsetY([-24, 24])
+        .failOffsetY([-28, 28])
         .onBegin(() => {
           animating.value = 0;
         })
@@ -152,7 +161,7 @@ export function ArenaTopicDeck({
         })
         .onEnd((event) => {
           if (animating.value === 1) return;
-          const threshold = cardWidth * SWIPE_RATIO;
+          const threshold = activeW * SWIPE_RATIO;
           const shouldNext = event.translationX < -threshold || event.velocityX < -VELOCITY;
           const shouldPrev = event.translationX > threshold || event.velocityX > VELOCITY;
           if (shouldNext && indexSV.value < itemCount - 1) {
@@ -165,7 +174,7 @@ export function ArenaTopicDeck({
             runOnJS(cancelSwipe)();
           }
         }),
-    [animating, cancelSwipe, cardWidth, dragX, finishSwipe, indexSV, itemCount, reduced],
+    [activeW, animating, cancelSwipe, dragX, finishSwipe, indexSV, itemCount, reduced],
   );
 
   const announce = React.useCallback((label: string): void => {
@@ -191,6 +200,9 @@ export function ArenaTopicDeck({
       <View style={styles.header}>
         <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
           TODAY'S ARENA
+        </Text>
+        <Text allowFontScaling={false} style={[styles.sectionSub, { color: t.textMuted }]}>
+          Debates happening right now
         </Text>
         {showFilters ? (
           <ScrollView
@@ -243,29 +255,33 @@ export function ArenaTopicDeck({
           }}
         >
           <GestureDetector gesture={pan}>
-            <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
+            <View style={[styles.stage, { width: stageWidth, height: STAGE_HEIGHT }]}>
               {slots.map((slotIndex) => {
                 const depth = slotIndex - index;
                 const topic = filtered[slotIndex];
                 if (!topic) return null;
+                const tone = ((slotIndex + topic.id.length) % 3) as DeckCardTone;
                 return (
                   <DeckLayer
                     key={topic.id}
                     depth={depth}
                     dragX={dragX}
                     reduced={Boolean(reduced)}
-                    cardWidth={cardWidth}
+                    layouts={layouts}
+                    single={single}
+                    activeWidth={activeW}
                     stageWidth={stageWidth}
-                    single={filtered.length === 1}
                   >
                     <ArenaTopicDeckCard
                       topic={topic}
                       active={depth === 0}
+                      tone={depth === 0 ? 0 : tone === 0 ? 1 : tone}
                       onOpen={() => onOpen(topic.id)}
                       onChoose={(stance) => onChoose(topic.id, stance)}
                       onWatch={() => onWatch(topic.id)}
                       onEnter={() => onEnter(topic.id, topic.viewerRoomId)}
                       onJoinDebate={() => onJoinDebate(topic.id, topic.viewerRoomId)}
+                      onBringForward={depth > 0 ? () => goTo(slotIndex) : undefined}
                     />
                   </DeckLayer>
                 );
@@ -307,63 +323,138 @@ export function ArenaTopicDeck({
   );
 }
 
+/**
+ * Rest poses for the asymmetric stage.
+ * Depth 0 = hero, 1 = upper-right peek, 2 = lower accent peek.
+ * Single-topic uses a centered hero (layouts[0] overridden in DeckLayer).
+ */
+function slotLayouts(stageWidth: number): [SlotLayout, SlotLayout, SlotLayout] {
+  const activeW = Math.round(stageWidth * 0.8);
+  const nextW = Math.round(stageWidth * 0.62);
+  const thirdW = Math.round(stageWidth * 0.54);
+
+  return [
+    {
+      width: activeW,
+      height: 308,
+      left: Math.round(stageWidth * 0.05),
+      top: 78,
+      rotate: -0.6,
+    },
+    {
+      width: nextW,
+      height: 168,
+      left: Math.round(stageWidth * 0.34),
+      top: 6,
+      rotate: 3.2,
+    },
+    {
+      width: thirdW,
+      height: 142,
+      left: Math.round(stageWidth * 0.08),
+      top: 268,
+      rotate: -2.4,
+    },
+  ];
+}
+
 function DeckLayer({
   children,
   depth,
   dragX,
   reduced,
-  cardWidth,
-  stageWidth,
+  layouts,
   single,
+  activeWidth,
+  stageWidth,
 }: {
   children: React.ReactNode;
   depth: number;
   dragX: SharedValue<number>;
   reduced: boolean;
-  cardWidth: number;
-  stageWidth: number;
+  layouts: [SlotLayout, SlotLayout, SlotLayout];
   single: boolean;
+  activeWidth: number;
+  stageWidth: number;
 }): React.JSX.Element {
   const style = useAnimatedStyle(() => {
-    const progress = Math.min(1, Math.abs(dragX.value) / (cardWidth * SWIPE_RATIO));
-    const centerX = (stageWidth - cardWidth) / 2;
+    const progress = Math.min(1, Math.abs(dragX.value) / (activeWidth * SWIPE_RATIO));
+    const goingNext = dragX.value < 0;
 
-    if (depth === 0) {
-      const rotate = reduced ? 0 : (dragX.value / cardWidth) * MAX_ROTATE_DEG;
+    // Single topic: one centered hero — never invent background cards.
+    if (single) {
+      const hero = layouts[0];
       return {
         zIndex: 40,
-        left: centerX,
-        transform: [{ translateX: dragX.value }, { rotate: `${rotate}deg` }, { scale: 1 }],
+        left: Math.round((stageWidth - hero.width) / 2),
+        top: 48,
+        width: hero.width,
+        height: hero.height + 28,
+        transform: [{ rotate: '0deg' }, { scale: 1 }],
       };
     }
 
-    // Wallet-like stack: back cards peek above, slightly smaller, tiny X offset.
-    const restScale = depth === 1 ? 0.965 : 0.93;
-    const restY = depth === 1 ? -12 : -22;
-    const restX = depth === 1 ? 6 : -4;
+    if (depth === 0) {
+      const rest = layouts[0];
+      const rotate = reduced
+        ? rest.rotate
+        : rest.rotate + (dragX.value / activeWidth) * MAX_ROTATE_DEG;
+      const scale = reduced
+        ? 1
+        : interpolate(Math.abs(dragX.value), [0, activeWidth * 0.55], [1, 0.94], Extrapolation.CLAMP);
+      return {
+        zIndex: 40,
+        left: rest.left,
+        top: rest.top,
+        width: rest.width,
+        height: rest.height,
+        transform: [{ translateX: dragX.value }, { rotate: `${rotate}deg` }, { scale }],
+      };
+    }
 
-    const scale = single
-      ? 1
-      : interpolate(progress, [0, 1], [restScale, depth === 1 ? 1 : 0.965], Extrapolation.CLAMP);
-    const translateY = single
-      ? 0
-      : interpolate(progress, [0, 1], [restY, depth === 1 ? 0 : -12], Extrapolation.CLAMP);
-    const translateX = single
-      ? 0
-      : interpolate(progress, [0, 1], [restX, depth === 1 ? 0 : 6], Extrapolation.CLAMP);
+    if (depth === 1) {
+      const from = layouts[1];
+      const to = layouts[0];
+      // Morph toward active only when swiping forward (next).
+      const p = goingNext ? progress : 0;
+      return {
+        zIndex: 30,
+        left: interpolate(p, [0, 1], [from.left, to.left], Extrapolation.CLAMP),
+        top: interpolate(p, [0, 1], [from.top, to.top], Extrapolation.CLAMP),
+        width: interpolate(p, [0, 1], [from.width, to.width], Extrapolation.CLAMP),
+        height: interpolate(p, [0, 1], [from.height, to.height], Extrapolation.CLAMP),
+        opacity: interpolate(p, [0, 1], [0.96, 1], Extrapolation.CLAMP),
+        transform: [
+          {
+            rotate: `${interpolate(p, [0, 1], [from.rotate, to.rotate], Extrapolation.CLAMP)}deg`,
+          },
+        ],
+      };
+    }
 
+    // depth ≥ 2 → third slot advances toward next's rest pose.
+    const from = layouts[2];
+    const to = layouts[1];
+    const p = goingNext ? progress : 0;
     return {
-      zIndex: 40 - depth,
-      left: centerX,
-      opacity: depth > 2 ? 0 : depth === 1 ? 0.92 : 0.78,
-      transform: [{ translateX }, { translateY }, { scale }],
+      zIndex: 20,
+      left: interpolate(p, [0, 1], [from.left, to.left], Extrapolation.CLAMP),
+      top: interpolate(p, [0, 1], [from.top, to.top], Extrapolation.CLAMP),
+      width: interpolate(p, [0, 1], [from.width, to.width], Extrapolation.CLAMP),
+      height: interpolate(p, [0, 1], [from.height, to.height], Extrapolation.CLAMP),
+      opacity: interpolate(p, [0, 1], [0.88, 0.96], Extrapolation.CLAMP),
+      transform: [
+        {
+          rotate: `${interpolate(p, [0, 1], [from.rotate, to.rotate], Extrapolation.CLAMP)}deg`,
+        },
+      ],
     };
   });
 
   return (
     <Animated.View
-      pointerEvents={depth === 0 ? 'auto' : 'none'}
-      style={[styles.layer, { width: cardWidth, height: CARD_HEIGHT }, style]}
+      pointerEvents="auto"
+      style={[styles.layer, style]}
     >
       {children}
     </Animated.View>
@@ -423,13 +514,13 @@ function hoodDisplayName(hood: string): string {
 
 const styles = StyleSheet.create({
   section: {
-    paddingTop: space.md,
-    paddingBottom: space.sm,
-    gap: space.sm,
+    paddingTop: space.lg,
+    paddingBottom: space.xl,
+    gap: space.md,
   },
   header: {
     paddingHorizontal: layout.screenX,
-    gap: space.sm,
+    gap: 4,
   },
   sectionTitle: {
     ...typeScale.caption,
@@ -437,8 +528,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1.2,
   },
+  sectionSub: {
+    ...typeScale.meta,
+    fontSize: 13,
+    marginBottom: space.xs,
+  },
   chipScroll: {
     marginHorizontal: -layout.screenX,
+    marginTop: space.xs,
   },
   chips: {
     paddingHorizontal: layout.screenX,
@@ -461,11 +558,10 @@ const styles = StyleSheet.create({
   },
   stage: {
     alignSelf: 'center',
-    justifyContent: 'flex-end',
+    position: 'relative',
   },
   layer: {
     position: 'absolute',
-    bottom: 0,
   },
   empty: {
     marginHorizontal: layout.screenX,

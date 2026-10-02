@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   hero: { paddingBottom: space.xs, gap: 2 },
   freshHead: {
     paddingHorizontal: layout.screenX,
-    paddingTop: space.md,
+    paddingTop: space.xl,
     paddingBottom: space.sm,
     position: 'relative',
   },
