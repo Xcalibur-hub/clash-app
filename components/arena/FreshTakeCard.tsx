@@ -1,6 +1,7 @@
 /**
  * Fresh Takes card variants — editorial discovery, not identical stacked rows.
  * Pulse badges (CLASH LIVE / HOT / RISING) are derived only from real metrics.
+ * Feed actions (save / share / more) stay available without cluttering the layout.
  */
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -13,7 +14,16 @@ import { compact, timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { takePulse, type TakePulse } from '../../utils/takePulse';
 import { Avatar } from '../shared/Avatar';
-import { ArenaIcon, CommentIcon, FlameIcon, PlayIcon, ZapIcon } from '../shared/icons';
+import {
+  ArenaIcon,
+  BookmarkIcon,
+  CommentIcon,
+  FlameIcon,
+  MoreIcon,
+  PlayIcon,
+  ShareIcon,
+  ZapIcon,
+} from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
 
 export type FreshTakeVariant = 'lead' | 'media' | 'compact' | 'text';
@@ -23,12 +33,47 @@ export interface FreshTakeCardProps {
   author: User;
   commentCount: number;
   hasReacted: boolean;
+  isSaved: boolean;
   variant: FreshTakeVariant;
   index: number;
   now: number;
   onOpen: () => void;
   onClash: () => void;
   onReact: () => void;
+  onSave: () => void;
+  onShare: () => void;
+  onMore: () => void;
+}
+
+/** Extreme ratios (docs / screenshots) stay contain; photo-like stay cover. */
+function useSafeHeroFit(url: string | undefined): 'cover' | 'contain' {
+  const [mode, setMode] = React.useState<'cover' | 'contain'>('cover');
+
+  React.useEffect(() => {
+    if (!url) {
+      setMode('cover');
+      return;
+    }
+    let cancelled = false;
+    Image.getSize(
+      url,
+      (w, h) => {
+        if (cancelled || w <= 0 || h <= 0) return;
+        const r = w / h;
+        // Match TakeMedia detail clamping intent: extreme tall/wide = documents.
+        const documentLike = r < 0.72 || r > 1.55;
+        setMode(documentLike ? 'contain' : 'cover');
+      },
+      () => {
+        if (!cancelled) setMode('cover');
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  return mode;
 }
 
 function PulseChip({ pulse, tone }: { pulse: TakePulse; tone: string }): React.JSX.Element | null {
@@ -45,17 +90,97 @@ function PulseChip({ pulse, tone }: { pulse: TakePulse; tone: string }): React.J
   );
 }
 
+function IconAction({
+  label,
+  onPress,
+  children,
+  active,
+}: {
+  label: string;
+  onPress: () => void;
+  children: React.ReactNode;
+  active?: boolean;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      onPress={() => {
+        hapticTap();
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={active ? { selected: true } : undefined}
+      hitSlop={8}
+      style={styles.iconHit}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+function FreshHeroMedia({
+  url,
+  isVideo,
+  height,
+  overlay,
+}: {
+  url: string;
+  isVideo: boolean;
+  height: number;
+  overlay?: React.ReactNode;
+}): React.JSX.Element {
+  const t = useThemeColors();
+  const mode = useSafeHeroFit(url);
+
+  return (
+    <View style={[styles.heroFrame, { height, backgroundColor: t.surfaceMuted }]}>
+      {mode === 'contain' ? (
+        <Image
+          source={{ uri: url }}
+          style={[StyleSheet.absoluteFill, { opacity: 0.32 }]}
+          resizeMode="cover"
+          blurRadius={28}
+        />
+      ) : null}
+      <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode={mode} />
+      {mode === 'cover' ? (
+        <LinearGradient
+          colors={['transparent', 'rgba(8,8,11,0.78)']}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      ) : (
+        <LinearGradient
+          colors={['transparent', 'rgba(8,8,11,0.55)']}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      )}
+      {isVideo ? (
+        <View style={styles.playChip} pointerEvents="none">
+          <PlayIcon size={18} color="#FAFAF8" strokeWidth={2.4} />
+        </View>
+      ) : null}
+      {overlay}
+    </View>
+  );
+}
+
 export function FreshTakeCard({
   take,
   author,
   commentCount,
   hasReacted,
+  isSaved,
   variant,
   index,
   now,
   onOpen,
   onClash,
   onReact,
+  onSave,
+  onShare,
+  onMore,
 }: FreshTakeCardProps): React.JSX.Element {
   const t = useThemeColors();
   const pulse = takePulse(take, now);
@@ -66,45 +191,63 @@ export function FreshTakeCard({
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
   const hasMedia = Boolean(take.media?.url);
   const isVideo = take.media?.kind === 'video';
+  const mediaUrl = take.media?.url;
+
+  const metaActions = (
+    <View style={styles.metaActions}>
+      <IconAction label="Share this take" onPress={onShare}>
+        <ShareIcon size={15} color={t.textMuted} strokeWidth={2.1} />
+      </IconAction>
+      <IconAction
+        label={isSaved ? 'Remove from saved' : 'Save this take'}
+        onPress={onSave}
+        active={isSaved}
+      >
+        <BookmarkIcon
+          size={15}
+          color={isSaved ? t.textPrimary : t.textMuted}
+          strokeWidth={isSaved ? 2.4 : 2.1}
+        />
+      </IconAction>
+      <IconAction label="More take actions" onPress={onMore}>
+        <MoreIcon size={16} color={t.textMuted} strokeWidth={2.2} />
+      </IconAction>
+    </View>
+  );
 
   if (variant === 'lead') {
     return (
       <Animated.View entering={entering} style={styles.leadWrap}>
         <PressableScale onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open take">
           <View style={[styles.lead, { backgroundColor: t.surface, borderColor: t.border }]}>
-            {hasMedia ? (
-              <View style={styles.leadMedia}>
-                <Image
-                  source={{ uri: take.media!.url as string }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="cover"
-                />
-                <LinearGradient
-                  colors={['transparent', 'rgba(8,8,11,0.78)']}
-                  style={StyleSheet.absoluteFill}
-                  pointerEvents="none"
-                />
-                {isVideo ? (
-                  <View style={styles.playChip} pointerEvents="none">
-                    <PlayIcon size={18} color="#FAFAF8" strokeWidth={2.4} />
-                  </View>
-                ) : null}
-                <View style={styles.leadOverlay}>
-                  <PulseChip pulse={pulse} tone="#FAFAF8" />
-                  <Text allowFontScaling style={styles.leadHeadline} numberOfLines={3}>
-                    {take.text}
-                  </Text>
-                  <View style={styles.metaRow}>
-                    <Avatar name={author.name} tint={author.tint} size={22} />
-                    <Text allowFontScaling={false} style={styles.leadMeta} numberOfLines={1}>
-                      @{author.handle} · {hood} · {timeAgo(take.createdAt)}
+            {hasMedia && mediaUrl ? (
+              <FreshHeroMedia
+                url={mediaUrl}
+                isVideo={isVideo}
+                height={280}
+                overlay={
+                  <View style={styles.leadOverlay}>
+                    <PulseChip pulse={pulse} tone="#FAFAF8" />
+                    <Text allowFontScaling style={styles.leadHeadline} numberOfLines={3}>
+                      {take.text}
                     </Text>
+                    <View style={styles.metaRow}>
+                      <Avatar name={author.name} tint={author.tint} size={22} />
+                      <Text allowFontScaling={false} style={styles.leadMeta} numberOfLines={1}>
+                        @{author.handle} · {hood} · {timeAgo(take.createdAt)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </View>
+                }
+              />
             ) : (
               <View style={[styles.leadTextOnly, { backgroundColor: t.surfaceMuted }]}>
-                <PulseChip pulse={pulse} tone={t.clashText} />
+                <View style={styles.leadTextTop}>
+                  <PulseChip pulse={pulse} tone={t.clashText} />
+                  <IconAction label="More take actions" onPress={onMore}>
+                    <MoreIcon size={18} color={t.textMuted} strokeWidth={2.2} />
+                  </IconAction>
+                </View>
                 <Text
                   allowFontScaling
                   style={[styles.leadHeadlineDark, { color: t.textPrimary }]}
@@ -183,6 +326,8 @@ export function FreshTakeCard({
                   </Text>
                 </Pressable>
               )}
+              <View style={styles.spacer} />
+              {metaActions}
             </View>
           </View>
         </PressableScale>
@@ -195,18 +340,9 @@ export function FreshTakeCard({
       <Animated.View entering={entering} style={styles.padX}>
         <PressableScale onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open take">
           <View style={[styles.compact, { backgroundColor: t.surface, borderColor: t.border }]}>
-            {hasMedia ? (
-              <View style={styles.compactThumb}>
-                <Image
-                  source={{ uri: take.media!.url as string }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="cover"
-                />
-                {isVideo ? (
-                  <View style={styles.playMini} pointerEvents="none">
-                    <PlayIcon size={12} color="#FAFAF8" strokeWidth={2.4} />
-                  </View>
-                ) : null}
+            {hasMedia && mediaUrl ? (
+              <View style={[styles.compactThumb, { backgroundColor: t.surfaceMuted }]}>
+                <CompactThumb url={mediaUrl} isVideo={isVideo} />
               </View>
             ) : (
               <View style={[styles.compactThumb, { backgroundColor: t.surfaceMuted }]} />
@@ -224,7 +360,10 @@ export function FreshTakeCard({
                 {take.clashes > 0 ? ` · ${take.clashes} clash` : ''}
               </Text>
             </View>
-            {pulse === 'live' ? <PulseChip pulse={pulse} tone={t.clashText} /> : null}
+            <View style={styles.compactTrail}>
+              {pulse === 'live' ? <PulseChip pulse={pulse} tone={t.clashText} /> : null}
+              {metaActions}
+            </View>
           </View>
         </PressableScale>
       </Animated.View>
@@ -248,6 +387,9 @@ export function FreshTakeCard({
               </Text>
             </View>
             <PulseChip pulse={pulse} tone={t.clashText} />
+            <IconAction label="More take actions" onPress={onMore}>
+              <MoreIcon size={18} color={t.textMuted} strokeWidth={2.2} />
+            </IconAction>
           </View>
           <Text
             allowFontScaling
@@ -259,27 +401,31 @@ export function FreshTakeCard({
           >
             {take.text}
           </Text>
-          {variant === 'media' && hasMedia ? (
-            <View style={[styles.cardMedia, { backgroundColor: t.surfaceMuted }]}>
-              <Image
-                source={{ uri: take.media!.url as string }}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-              />
-              {isVideo ? (
-                <View style={styles.playChip} pointerEvents="none">
-                  <PlayIcon size={16} color="#FAFAF8" strokeWidth={2.4} />
-                </View>
-              ) : null}
-            </View>
+          {variant === 'media' && hasMedia && mediaUrl ? (
+            <FreshHeroMedia url={mediaUrl} isVideo={isVideo} height={168} />
           ) : null}
           <View style={styles.leadActions}>
-            <View style={styles.stat}>
-              <FlameIcon size={13} color={hasReacted ? t.textPrimary : t.textMuted} strokeWidth={2} />
-              <Text allowFontScaling={false} style={[styles.statText, { color: t.textMuted }]}>
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                onReact();
+              }}
+              style={styles.stat}
+              accessibilityRole="button"
+              accessibilityLabel="React"
+            >
+              <FlameIcon
+                size={13}
+                color={hasReacted ? t.textPrimary : t.textMuted}
+                strokeWidth={hasReacted ? 2.4 : 2}
+              />
+              <Text
+                allowFontScaling={false}
+                style={[styles.statText, { color: hasReacted ? t.textPrimary : t.textMuted }]}
+              >
                 {compact(take.reactions)}
               </Text>
-            </View>
+            </Pressable>
             <View style={styles.stat}>
               <CommentIcon size={13} color={t.textMuted} strokeWidth={2} />
               <Text allowFontScaling={false} style={[styles.statText, { color: t.textMuted }]}>
@@ -293,16 +439,49 @@ export function FreshTakeCard({
                   onClash();
                 }}
                 style={[styles.clashPill, { backgroundColor: t.clashFill }]}
+                accessibilityRole="button"
+                accessibilityLabel="Open Clash"
               >
                 <Text allowFontScaling={false} style={[styles.clashPillText, { color: t.clashText }]}>
                   CLASH LIVE
                 </Text>
               </Pressable>
             ) : null}
+            <View style={styles.spacer} />
+            <View style={styles.metaActions}>
+              <IconAction label="Share this take" onPress={onShare}>
+                <ShareIcon size={15} color={t.textMuted} strokeWidth={2.1} />
+              </IconAction>
+              <IconAction
+                label={isSaved ? 'Remove from saved' : 'Save this take'}
+                onPress={onSave}
+                active={isSaved}
+              >
+                <BookmarkIcon
+                  size={15}
+                  color={isSaved ? t.textPrimary : t.textMuted}
+                  strokeWidth={isSaved ? 2.4 : 2.1}
+                />
+              </IconAction>
+            </View>
           </View>
         </View>
       </PressableScale>
     </Animated.View>
+  );
+}
+
+function CompactThumb({ url, isVideo }: { url: string; isVideo: boolean }): React.JSX.Element {
+  const mode = useSafeHeroFit(url);
+  return (
+    <>
+      <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode={mode} />
+      {isVideo ? (
+        <View style={styles.playMini} pointerEvents="none">
+          <PlayIcon size={12} color="#FAFAF8" strokeWidth={2.4} />
+        </View>
+      ) : null}
+    </>
   );
 }
 
@@ -321,8 +500,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  leadMedia: { height: 280, justifyContent: 'flex-end' },
+  heroFrame: {
+    width: '100%',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+    borderRadius: radius.lg,
+  },
   leadTextOnly: { padding: space.lg, gap: space.md, minHeight: 200, justifyContent: 'flex-end' },
+  leadTextTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+  },
   leadOverlay: { padding: space.lg, gap: space.sm },
   leadHeadline: {
     ...typeScale.takeText,
@@ -342,7 +532,7 @@ const styles = StyleSheet.create({
   leadActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
+    gap: space.sm,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
   },
@@ -386,9 +576,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radius.pill,
-    marginLeft: 'auto',
   },
   clashPillText: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+  spacer: { flex: 1, minWidth: 4 },
+  metaActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  iconHit: {
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   compact: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -406,6 +603,7 @@ const styles = StyleSheet.create({
   },
   compactBody: { flex: 1, gap: 4, minWidth: 0 },
   compactText: { ...typeScale.body, fontSize: 15, lineHeight: 20, fontWeight: '600' },
+  compactTrail: { alignItems: 'flex-end', gap: 4 },
   card: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: space.md,
@@ -416,9 +614,4 @@ const styles = StyleSheet.create({
   cardAuthor: { ...typeScale.label, fontSize: 13, fontWeight: '700' },
   cardText: { ...typeScale.takeText, fontSize: 17, lineHeight: 24, fontWeight: '600' },
   textHero: { ...typeScale.takeText, fontSize: 20, lineHeight: 28, fontWeight: '700', letterSpacing: -0.2 },
-  cardMedia: {
-    height: 168,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
 });

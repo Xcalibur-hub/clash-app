@@ -229,6 +229,7 @@ export default function ArenaScreen(): React.JSX.Element {
           author={author}
           commentCount={selectCommentsForTake(state, item.id).length}
           hasReacted={selectHasReacted(state, item.id)}
+          isSaved={selectIsSaved(state, item.id)}
           variant={freshTakeVariant(item, index)}
           index={index}
           now={now}
@@ -237,10 +238,19 @@ export default function ArenaScreen(): React.JSX.Element {
           onReact={() => {
             void toggleReaction(item);
           }}
+          onSave={() => {
+            if (requireAuth()) dispatch(toggleSave(item.id));
+          }}
+          onShare={() => {
+            void shareTake(item, author.handle);
+          }}
+          onMore={() => {
+            void openMenu(item);
+          }}
         />
       );
     },
-    [now, openClash, openDetail, state, toggleReaction],
+    [dispatch, now, openClash, openDetail, openMenu, requireAuth, shareTake, state, toggleReaction],
   );
 
   const header = React.useMemo(
