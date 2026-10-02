@@ -36,6 +36,7 @@ import {
 } from '../../theme';
 import { compact } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
+import { resolveStillUrl } from '../../utils/mediaStill';
 import { pulseLabel, takePulse } from '../../utils/takePulse';
 import { ArenaStackProgress } from './ArenaStackProgress';
 import { FreshTakeCard, type FreshTakeVariant } from './FreshTakeCard';
@@ -436,8 +437,16 @@ function FreshTakePeek({
   const pulse = takePulse(entry.take, now);
   const pulseTone = pulseAccent(pulse, t.scheme);
   const hood = HOOD_LABEL[entry.take.hood] ?? entry.take.hood;
-  const mediaUrl = entry.take.media?.url;
+  const previewUrl = resolveStillUrl(entry.take.media);
   const isVideo = entry.take.media?.kind === 'video';
+  const mediaColors = entry.take.media?.colors ?? (['#2A2A2E', '#111113'] as const);
+  const [imageFailed, setImageFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageFailed(false);
+  }, [previewUrl]);
+
+  const showPoster = Boolean(previewUrl) && !imageFailed;
 
   return (
     <Pressable
@@ -456,9 +465,23 @@ function FreshTakePeek({
         },
       ]}
     >
-      {mediaUrl ? (
+      {showPoster || isVideo || entry.take.media ? (
         <View style={[styles.peekMedia, { backgroundColor: t.surfaceMuted }]}>
-          <Image source={{ uri: mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          {showPoster ? (
+            <Image
+              source={{ uri: previewUrl as string }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <LinearGradient
+              colors={[...mediaColors]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
           <LinearGradient
             colors={['transparent', 'rgba(8,8,11,0.55)']}
             style={StyleSheet.absoluteFill}

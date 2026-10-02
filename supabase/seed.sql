@@ -70,7 +70,7 @@ values
 -- so the server and the prototype agree on what is live and what is hot.
 insert into public.takes
   (id, author_id, hood, text, media_url, media_kind, media_caption, media_colors,
-   media_duration, created_at, expires_at, clashes_count, reactions_count)
+   media_duration, media_poster_url, created_at, expires_at, clashes_count, reactions_count)
 select
   s.id,
   s.author_id,
@@ -81,6 +81,7 @@ select
   s.media_caption,
   s.media_colors::text[],
   s.media_duration,
+  s.media_poster_url,
   now() - make_interval(mins => s.age_minutes),
   now() - make_interval(mins => s.age_minutes) + interval '24 hours',
   s.clashes,
@@ -88,40 +89,43 @@ select
 from (values
   ('t-pixel', 'u-maya', 'techtakes', 'Pixel takes better photos than the iPhone.',
    'https://media.clash.app/takes/t-pixel-night-mode.jpg', 'image',
-   'Night mode, 48MP, zero edits', '{#B794FF,#6C63FF}', null, 200, 42, 318),
+   'Night mode, 48MP, zero edits', '{#B794FF,#6C63FF}', null, null, 200, 42, 318),
   -- Lands on the spec example: "2h 41m left".
   ('t-flagship', 'u-aarav', 'techtakes',
    'Android flagships have officially caught up with iPhone.',
-   null, null, null, null, null, 1279, 18, 205),
+   null, null, null, null, null, null, 1279, 18, 205),
   ('t-trailers', 'u-riya', 'movies',
    'AI-generated videos are already better than most Hollywood trailers.',
    'https://media.clash.app/takes/t-trailers-teaser.mp4', 'video',
-   'Leaked teaser, 18 seconds', '{#FF8A4C,#FF4D6A}', '0:18', 50, 96, 1240),
+   'Leaked teaser, 18 seconds', '{#FF8A4C,#FF4D6A}', '0:18',
+   -- Real JPEG poster (never the .mp4). Seed video URL is a placeholder.
+   'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=1600&h=900&fit=crop',
+   50, 96, 1240),
   ('t-degree', 'u-zoya', 'campushustle', 'The campus degree is becoming obsolete.',
-   null, null, null, null, null, 310, 63, 512),
+   null, null, null, null, null, null, 310, 63, 512),
   ('t-monsoon', 'u-ishaan', 'goatalk', 'Goa in monsoon beats Goa in December.',
    'https://media.clash.app/takes/t-monsoon-empty-beach.jpg', 'image',
-   'Saturday, 6:12 PM, empty beach', '{#57A0FF,#7A6BFF}', null, 380, 37, 289),
+   'Saturday, 6:12 PM, empty beach', '{#57A0FF,#7A6BFF}', null, null, 380, 37, 289),
   ('t-matchmaking', 'u-kabir', 'gaming', 'Ranked matchmaking ruined casual gaming.',
-   null, null, null, null, null, 430, 54, 401),
+   null, null, null, null, null, null, 430, 54, 401),
   ('t-distribution', 'u-tanvi', 'startups',
    'Most startup ideas die from distribution, not from the product.',
-   null, null, null, null, null, 505, 22, 160),
+   null, null, null, null, null, null, 505, 22, 160),
   ('t-highlights', 'u-neel', 'football',
    'Football highlights are better than watching the full match.',
-   null, null, null, null, null, 560, 71, 640),
+   null, null, null, null, null, null, 560, 71, 640),
   ('t-iphone-price', 'u-ananya', 'techtakes',
    'iPhone users pay too much for the same experience.',
-   null, null, null, null, null, 70, 88, 730),
+   null, null, null, null, null, null, 70, 88, 730),
   ('t-viewer-sleep', 'u-viewer', 'campushustle',
    'Everyone is faking productivity with three apps and no sleep.',
-   null, null, null, null, null, 140, 14, 96),
+   null, null, null, null, null, null, 140, 14, 96),
   ('t-viewer-placements', 'u-viewer', 'campushustle',
    'Placements matter less than your first two years of real work.',
    'https://media.clash.app/takes/t-viewer-placements-curve.jpg', 'image',
-   'First offer vs fifth year — the real curve', '{#FFE0A3,#FFA53D}', null, 660, 31, 240)
+   'First offer vs fifth year — the real curve', '{#FFE0A3,#FFA53D}', null, null, 660, 31, 240)
 ) as s(id, author_id, hood, text, media_url, media_kind, media_caption, media_colors,
-       media_duration, age_minutes, clashes, reactions);
+       media_duration, media_poster_url, age_minutes, clashes, reactions);
 
 -- ── comments / rebuttals (22) ───────────────────────────────────────────────
 -- Two per take, mirroring data/mockComments.ts. `is_pinned` marks the rebuttal

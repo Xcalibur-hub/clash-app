@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --experimental-strip-types --test utils/clashStart.test.ts utils/videoPlayerLifecycle.test.ts utils/takePulse.test.ts utils/tenorUrl.test.ts utils/liveArenaUrl.test.ts utils/videoPoster.test.ts",
+    "test:unit": "node --experimental-strip-types --test utils/clashStart.test.ts utils/videoPlayerLifecycle.test.ts utils/takePulse.test.ts utils/tenorUrl.test.ts utils/liveArenaUrl.test.ts utils/videoPoster.test.ts utils/mediaStill.test.ts",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
@@ -18,7 +18,8 @@
     "supabase:seed:clash-dev": "node scripts/seed-clash-dev.mjs",
     "adb:reverse-supabase": "node scripts/adb-reverse-supabase.mjs",
     "dev:local": "node scripts/dev-local.mjs",
-    "dev:hosted": "node scripts/dev-hosted.mjs"
+    "dev:hosted": "node scripts/dev-hosted.mjs",
+    "dev:backfill-video-posters": "node scripts/backfill-video-posters.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/comic-neue": "^0.4.1",

@@ -22,8 +22,10 @@ import {
   getPublicMediaUrl,
   readPickedBytes,
   uploadFile,
+  uploadVideoPoster,
 } from '../../services/mediaService';
 import { generateVideoPosterUri } from '../../services/videoPoster';
+import { logger } from '../../services/logger';
 import { errorText } from '../../services/supabaseClient';
 import { createTake, showNotice, useClash } from '../../store';
 import type { DbHood } from '../../supabase/types';
@@ -139,13 +141,13 @@ export default function CreateTakeScreen(): React.JSX.Element {
         const localPoster = await generateVideoPosterUri(picked.uri, picked.durationMs);
         if (localPoster) {
           try {
-            const posterPlan = await createUpload('image', 'image/jpeg', 'public');
             const posterBytes = await readPickedBytes(localPoster);
-            await uploadFile(posterPlan, posterBytes, 'image/jpeg');
-            await completeUpload(posterPlan.id, posterBytes.byteLength);
-            posterUrl = getPublicMediaUrl(posterPlan.bucket, posterPlan.path);
-          } catch {
-            // Poster is best-effort — video Take still ships with gradient fallback.
+            posterUrl = await uploadVideoPoster(plan, posterBytes);
+          } catch (error) {
+            logger.warn('video poster upload failed; take will use gradient fallback', {
+              source: 'create.uploadMedia',
+              message: error instanceof Error ? error.message : 'unknown',
+            });
           }
         }
       }

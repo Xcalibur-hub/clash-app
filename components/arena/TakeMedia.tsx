@@ -1,18 +1,13 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { resolveStillUrl } from '../../utils/mediaStill';
 import type { TakeMedia as TakeMediaModel } from '../../store';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { PlayIcon } from '../shared/icons';
 import { MediaViewer } from '../shared/MediaViewer';
 
 export type TakeMediaVariant = 'feed' | 'detail';
-
-/** Image URL safe for <Image>. Never returns an mp4/mov/video URL. */
-function stillUrl(media: TakeMediaModel): string | undefined {
-  if (media.kind === 'video') return media.posterUrl;
-  return media.url;
-}
 
 /**
  * Bounded media plate.
@@ -32,7 +27,7 @@ export function TakeMedia({
 }): React.JSX.Element {
   const t = useThemeColors();
   const isVideo = media.kind === 'video';
-  const poster = stillUrl(media);
+  const poster = resolveStillUrl(media);
   const hasStill = Boolean(poster);
   const playUrl = media.url;
   const detail = variant === 'detail' || edge;

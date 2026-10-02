@@ -5,6 +5,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { TakeMedia as TakeMediaModel } from '../../store';
 import { ink } from '../../theme';
+import { resolveStillUrl } from '../../utils/mediaStill';
 import { tap as hapticTap } from '../../utils/haptics';
 import { PauseIcon, PlayIcon, Volume2Icon, VolumeXIcon } from '../shared/icons';
 
@@ -57,7 +58,7 @@ function Poster({
   media: TakeMediaModel;
   showPlay: boolean;
 }): React.JSX.Element {
-  const imageUrl = media.kind === 'image' && media.url ? media.url : undefined;
+  const imageUrl = resolveStillUrl(media);
   return (
     <View style={StyleSheet.absoluteFill}>
       {imageUrl ? (

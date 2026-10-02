@@ -110,6 +110,35 @@ export function getPublicMediaUrl(bucket: string, path: string): string {
 }
 
 /**
+ * Sibling poster path for a video storage object.
+ * `owner/m_abc/m_abc.mp4` → `owner/m_abc/m_abc_poster.jpg`
+ */
+export function posterPathForVideo(videoPath: string): string {
+  const slash = videoPath.lastIndexOf('/');
+  const dir = slash >= 0 ? videoPath.slice(0, slash + 1) : '';
+  const file = slash >= 0 ? videoPath.slice(slash + 1) : videoPath;
+  const base = file.replace(/\.[^.]+$/, '') || file;
+  return `${dir}${base}_poster.jpg`;
+}
+
+/**
+ * Upload a JPEG poster next to an already-approved video object.
+ * Uses the caller's storage namespace (same RLS as create_media_upload paths).
+ * Does not create a second media_objects row — the Take stores poster URL.
+ */
+export async function uploadVideoPoster(
+  videoPlan: MediaUploadPlan,
+  posterBytes: ArrayBuffer,
+): Promise<string> {
+  const path = posterPathForVideo(videoPlan.path);
+  const { error } = await requireSupabase()
+    .storage.from(videoPlan.bucket)
+    .upload(path, posterBytes, { contentType: 'image/jpeg', upsert: true });
+  if (error) throw new SupabaseError(error.message, 'media_upload');
+  return getPublicMediaUrl(videoPlan.bucket, path);
+}
+
+/**
  * Future Vault private-media access: a short-lived signed URL after an
  * entitlement check. Deliberately not implemented — private media must never be
  * reachable through a permanent public URL.

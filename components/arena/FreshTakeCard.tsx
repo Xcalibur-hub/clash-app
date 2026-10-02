@@ -28,6 +28,7 @@ import {
 import { compact, timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { pulseLabel, takePulse, type TakePulse } from '../../utils/takePulse';
+import { resolveStillUrl } from '../../utils/mediaStill';
 import { Avatar } from '../shared/Avatar';
 import { Squiggle } from '../shared/Doodles';
 import {
@@ -316,7 +317,7 @@ export function FreshTakeCard({
   const hasMediaAsset = Boolean(take.media);
   const isVideo = take.media?.kind === 'video';
   /** Still image only — never an mp4 URL. */
-  const mediaUrl = take.media?.kind === 'video' ? take.media?.posterUrl : take.media?.url;
+  const mediaUrl = resolveStillUrl(take.media);
   const mediaColors = take.media?.colors ?? (['#2A2A2E', '#111113'] as const);
   /** Cinematic plate when media exists (poster or gradient fallback for video). */
   const hasMedia = hasMediaAsset && (Boolean(mediaUrl) || isVideo || Boolean(take.media?.url));
