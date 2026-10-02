@@ -20,6 +20,10 @@ export interface ArenaStackMediaProps {
  * Featured-stack media plane.
  * Images load immediately; videos stay on poster until the card is active,
  * then muted autoplay after a short delay. At most one player is mounted.
+ *
+ * Player lifecycle: `useVideoPlayer` owns release on unmount. Never call
+ * pause/play/release from an effect cleanup that can run after that release
+ * (React runs the hook's release cleanup before later sibling cleanups).
  */
 export function ArenaStackMedia({
   media,
@@ -91,6 +95,8 @@ function ActiveVideo({
   const [muted, setMuted] = React.useState(true);
   const [playing, setPlaying] = React.useState(false);
   const [ready, setReady] = React.useState(false);
+  /** False only after this instance's unmount path has begun. */
+  const mountedRef = React.useRef(true);
 
   const player = useVideoPlayer(url, (instance) => {
     instance.loop = true;
@@ -98,32 +104,44 @@ function ActiveVideo({
   });
 
   React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!mountedRef.current) return;
     player.muted = muted;
   }, [muted, player]);
 
   React.useEffect(() => {
     if (!shouldPlay) {
+      // Still mounted — safe. Pause here instead of in cleanup so unmount
+      // never touches a player that useVideoPlayer already released.
       player.pause();
       setPlaying(false);
       return undefined;
     }
+
+    let cancelled = false;
     const timer = setTimeout(() => {
-      try {
-        player.play();
-        setPlaying(true);
-        setReady(true);
-      } catch {
-        /* playback is best-effort on slow networks */
-      }
+      if (cancelled || !mountedRef.current) return;
+      player.play();
+      setPlaying(true);
+      setReady(true);
     }, 380);
+
     return () => {
+      cancelled = true;
       clearTimeout(timer);
-      player.pause();
-      setPlaying(false);
+      // Intentionally no player.pause() — on unmount useVideoPlayer releases
+      // first; pausing here throws "shared object already released".
     };
   }, [shouldPlay, player]);
 
   const togglePlay = (): void => {
+    if (!mountedRef.current) return;
     hapticTap();
     if (player.playing) {
       player.pause();

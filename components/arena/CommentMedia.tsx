@@ -92,6 +92,7 @@ export function CommentMedia({
       <MediaViewer
         visible={viewerOpen}
         uri={media.url ?? null}
+        kind={media.kind}
         onClose={() => setViewerOpen(false)}
       />
     </>
