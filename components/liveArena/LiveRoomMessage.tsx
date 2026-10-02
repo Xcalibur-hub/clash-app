@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { ArenaMessage } from '../../services/liveArenaService';
+import type { ArenaEvidence, ArenaMessage } from '../../services/liveArenaService';
 import type { TakeMedia } from '../../store/types';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { timeAgo } from '../../utils/format';
@@ -8,6 +8,7 @@ import { tap as hapticTap } from '../../utils/haptics';
 import { CommentMedia } from '../arena/CommentMedia';
 import { Avatar } from '../shared/Avatar';
 import { MoreIcon } from '../shared/icons';
+import { LiveEvidenceCard } from './LiveEvidenceCard';
 import { softFill } from './liveArenaStyles';
 
 const DEFAULT_REACTION = '🔥';
@@ -17,13 +18,19 @@ export interface LiveRoomMessageProps {
   now: number;
   /** One line of the argument being answered, when this message is a reply. */
   parent?: ArenaMessage | null;
+  /** Evidence attached to this argument (inline, not a rail). */
+  evidence?: readonly ArenaEvidence[];
   /** Hidden once the room stops accepting arguments. */
   canReply?: boolean;
   canReact?: boolean;
+  canMarkEvidence?: boolean;
   onReply?: (message: ArenaMessage) => void;
   onReact?: (message: ArenaMessage, emoji: string) => void;
   onOpenProfile?: (profileId: string) => void;
   onReport?: (message: ArenaMessage) => void;
+  onMarkEvidence?: (evidence: ArenaEvidence) => void;
+  onChallengeEvidence?: (evidence: ArenaEvidence) => void;
+  onReportEvidence?: (evidence: ArenaEvidence) => void;
 }
 
 /** Media messages carry a real URL; the gradient plate is a Take-only fallback. */
@@ -51,12 +58,17 @@ export function LiveRoomMessage({
   message,
   now,
   parent = null,
+  evidence = [],
   canReply = true,
   canReact = true,
+  canMarkEvidence = false,
   onReply,
   onReact,
   onOpenProfile,
   onReport,
+  onMarkEvidence,
+  onChallengeEvidence,
+  onReportEvidence,
 }: LiveRoomMessageProps): React.JSX.Element {
   const t = useThemeColors();
 
@@ -154,6 +166,22 @@ export function LiveRoomMessage({
         {media ? (
           <View style={styles.media}>
             <CommentMedia media={media} compact />
+          </View>
+        ) : null}
+
+        {evidence.length > 0 ? (
+          <View style={styles.evidenceStack}>
+            {evidence.map((item) => (
+              <LiveEvidenceCard
+                key={item.id}
+                evidence={item}
+                inline
+                canMark={canMarkEvidence}
+                onMarkUseful={onMarkEvidence}
+                onChallenge={onChallengeEvidence}
+                onReport={onReportEvidence}
+              />
+            ))}
           </View>
         ) : null}
 
@@ -261,6 +289,7 @@ const styles = StyleSheet.create({
   quoteText: { ...typeScale.caption, fontSize: 11 },
   text: { ...typeScale.body, fontSize: 15, lineHeight: 21 },
   media: { marginTop: 2, maxWidth: 260 },
+  evidenceStack: { gap: 6, marginTop: 4 },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',

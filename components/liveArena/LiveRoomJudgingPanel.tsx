@@ -51,7 +51,7 @@ export function LiveRoomJudgingPanel({
     return (
       <View style={[styles.panel, { backgroundColor: t.surface, borderColor: t.border }]}>
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          JUDGING
+          TIME TO JUDGE
         </Text>
         <Text allowFontScaling={false} style={[styles.note, { color: t.textSecondary }]}>
           This room is being judged by the people who argued in it.
@@ -64,7 +64,7 @@ export function LiveRoomJudgingPanel({
     <View style={[styles.panel, { backgroundColor: t.surface, borderColor: t.border }]}>
       <View style={styles.head}>
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          JUDGING
+          TIME TO JUDGE
         </Text>
         {room.secondsRemaining > 0 ? (
           <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
@@ -80,7 +80,7 @@ export function LiveRoomJudgingPanel({
       ) : (
         <>
           <Text allowFontScaling={false} style={[styles.question, { color: t.textPrimary }]}>
-            Which side argued it better?
+            Winning side
           </Text>
           {hasSideVote ? (
             <Text allowFontScaling={false} style={[styles.recorded, { color: t.textMuted }]}>
@@ -110,7 +110,7 @@ export function LiveRoomJudgingPanel({
           <View style={[styles.divider, { backgroundColor: t.border }]} />
 
           <Text allowFontScaling={false} style={[styles.question, { color: t.textPrimary }]}>
-            Best argument in the room
+            Best argument
           </Text>
           {hasArgumentVote ? (
             <Text allowFontScaling={false} style={[styles.recorded, { color: t.textMuted }]}>

@@ -13,6 +13,7 @@ import {
   submitEvidence,
   submitSideVote,
   subscribeRoomMessages,
+  upgradeSpectator,
   type ArenaAuthor,
   type ArenaEvidence,
   type ArenaMessage,
@@ -22,7 +23,7 @@ import {
   type Stance,
   type SubmitArenaEvidenceInput,
 } from '../services/liveArenaService';
-import { errorText } from '../services/supabaseClient';
+import { errorText, SupabaseError } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
 
 /** How many arguments one page of the thread carries. */
@@ -45,6 +46,8 @@ export interface LiveArenaRoomController {
   sending: boolean;
   loadingOlder: boolean;
   hasOlder: boolean;
+  /** True after a capacity rejection on upgrade — user stays spectator. */
+  roomFullOnUpgrade: boolean;
   refresh: () => Promise<void>;
   loadOlder: () => Promise<void>;
   /** Optimistic; rolls the placeholder back and surfaces a notice on failure. */
@@ -55,6 +58,8 @@ export interface LiveArenaRoomController {
   voteSide: (side: 'AGREE' | 'DISAGREE') => Promise<boolean>;
   voteArgument: (messageId: string) => Promise<boolean>;
   recordFinal: (stance: Stance) => Promise<boolean>;
+  /** Spectator → debater in-place. Refreshes room state on success. */
+  upgradeToDebater: (stance: Stance) => Promise<boolean>;
 }
 
 /** Newest-first merge that keeps one row per id — an optimistic echo never doubles. */
@@ -112,6 +117,7 @@ export function useLiveArenaRoom(
   const [sending, setSending] = React.useState(false);
   const [loadingOlder, setLoadingOlder] = React.useState(false);
   const [hasOlder, setHasOlder] = React.useState(true);
+  const [roomFullOnUpgrade, setRoomFullOnUpgrade] = React.useState(false);
 
   const mounted = React.useRef(true);
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -438,6 +444,31 @@ export function useLiveArenaRoom(
     [notify, roomId],
   );
 
+  const upgradeToDebater = React.useCallback(
+    async (stance: Stance): Promise<boolean> => {
+      try {
+        setRoomFullOnUpgrade(false);
+        await upgradeSpectator(roomId, stance);
+        if (!mounted.current) return true;
+        const next = await fetchRoom(roomId);
+        if (mounted.current) setRoom(next);
+        return true;
+      } catch (caught) {
+        if (
+          caught instanceof SupabaseError &&
+          (caught.code === 'P0009' || /room is full/i.test(caught.message))
+        ) {
+          if (mounted.current) setRoomFullOnUpgrade(true);
+          dispatch(showNotice('This room filled up while you were watching.'));
+          return false;
+        }
+        notify(caught);
+        return false;
+      }
+    },
+    [dispatch, notify, roomId],
+  );
+
   return {
     room,
     messages,
@@ -450,6 +481,7 @@ export function useLiveArenaRoom(
     sending,
     loadingOlder,
     hasOlder,
+    roomFullOnUpgrade,
     refresh,
     loadOlder,
     send,
@@ -459,5 +491,6 @@ export function useLiveArenaRoom(
     voteSide,
     voteArgument,
     recordFinal,
+    upgradeToDebater,
   };
 }

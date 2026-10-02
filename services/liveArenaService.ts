@@ -573,6 +573,48 @@ export async function joinTopic(
   };
 }
 
+export interface ArenaUpgradeResult {
+  upgraded: boolean;
+  roomId: string;
+  topicId: string;
+  stance: Stance;
+  role: ArenaParticipantRole;
+  status: ArenaRoomStatus;
+  capacity: number;
+  participantCount: number;
+  joinedAt: number;
+}
+
+/**
+ * Spectator → debater in the same room. Records the private initial stance and
+ * consumes one capacity slot. Never creates a second membership row.
+ */
+export async function upgradeSpectator(
+  roomId: string,
+  stance: Stance,
+): Promise<ArenaUpgradeResult> {
+  const { data, error } = await client().rpc('upgrade_arena_spectator', {
+    p_room_id: roomId,
+    p_stance: stance,
+  });
+  if (error) throw requestError(error);
+  const record = asRecord(data);
+  const nextRoomId = record ? str(record.roomId) : null;
+  const nextStance = record ? oneOf(record.stance, STANCES) : null;
+  if (!record || !nextRoomId || !nextStance) bad('upgrade_arena_spectator');
+  return {
+    upgraded: bool(record.upgraded),
+    roomId: nextRoomId,
+    topicId: str(record.topicId) ?? '',
+    stance: nextStance,
+    role: oneOf(record.role, ROLES) ?? 'debater',
+    status: oneOf(record.status, ROOM_STATUSES) ?? 'OPEN',
+    capacity: num(record.capacity) ?? 0,
+    participantCount: num(record.participantCount) ?? 0,
+    joinedAt: millis(record.joinedAt) ?? Date.now(),
+  };
+}
+
 // ── Room + thread ───────────────────────────────────────────────────────────
 
 export async function fetchRoom(roomId: string): Promise<ArenaRoom> {

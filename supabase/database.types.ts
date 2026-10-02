@@ -3427,6 +3427,13 @@ export type Database = {
           updated_at: string
         }
       }
+      upgrade_arena_spectator: {
+        Args: {
+          p_room_id: string
+          p_stance: Database["public"]["Enums"]["take_stance"]
+        }
+        Returns: Json
+      }
       vault_drop_card: {
         Args: { p_drop_id: string }
         Returns: Json

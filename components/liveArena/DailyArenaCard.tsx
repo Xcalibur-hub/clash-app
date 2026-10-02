@@ -80,7 +80,7 @@ export function DailyArenaCard({
 
         <View style={styles.statRow}>
           <Text allowFontScaling={false} style={[styles.stat, { color: t.textSecondary }]}>
-            {plural(topic.participantCount, 'person arguing', 'people arguing')}
+            {plural(topic.participantCount, 'person participating', 'people participating')}
           </Text>
           <Text allowFontScaling={false} style={[styles.dot, { color: t.textMuted }]}>
             ·

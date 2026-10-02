@@ -17,6 +17,8 @@ export interface LiveEvidenceCardProps {
   onReport?: (evidence: ArenaEvidence) => void;
   /** Horizontal rail cards get a fixed width; the detail list stretches. */
   width?: number;
+  /** Nested under a message — quieter chrome. */
+  inline?: boolean;
 }
 
 /**
@@ -33,6 +35,7 @@ export function LiveEvidenceCard({
   onMarkUseful,
   onReport,
   width,
+  inline = false,
 }: LiveEvidenceCardProps): React.JSX.Element {
   const t = useThemeColors();
   const host = evidenceHostLabel(evidence.sourceUrl);
@@ -49,6 +52,7 @@ export function LiveEvidenceCard({
     <View
       style={[
         styles.card,
+        inline && styles.inlineCard,
         width ? { width } : styles.stretch,
         { backgroundColor: t.surface, borderColor: t.border },
       ]}
@@ -178,6 +182,10 @@ const styles = StyleSheet.create({
     padding: space.sm,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  inlineCard: {
+    marginTop: space.xs,
+    padding: space.sm,
   },
   stretch: { alignSelf: 'stretch' },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.xs },

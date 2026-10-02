@@ -4,7 +4,6 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,10 +14,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EvidenceComposerSheet } from '../../../components/liveArena/EvidenceComposerSheet';
 import { LiveEvidenceCard } from '../../../components/liveArena/LiveEvidenceCard';
 import { LiveRoomComposer } from '../../../components/liveArena/LiveRoomComposer';
-import { LiveRoomHeader } from '../../../components/liveArena/LiveRoomHeader';
+import { LiveRoomHeader, secondsClock } from '../../../components/liveArena/LiveRoomHeader';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
 import { LiveRoomMessage } from '../../../components/liveArena/LiveRoomMessage';
 import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResultReveal';
+import {
+  JoinDebateSheet,
+  SpectatorJoinBar,
+} from '../../../components/liveArena/SpectatorJoinBar';
 import { PostActionsSheet } from '../../../components/arena/PostActionsSheet';
 import { EmptyState } from '../../../components/shared/EmptyState';
 import { Notice } from '../../../components/shared/Notice';
@@ -26,20 +29,16 @@ import { ArenaIcon } from '../../../components/shared/icons';
 import { useClock } from '../../../hooks/useClock';
 import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
 import { analytics } from '../../../services/analytics';
-import type { ArenaAuthor, ArenaMessage } from '../../../services/liveArenaService';
+import type { ArenaAuthor, ArenaEvidence, ArenaMessage } from '../../../services/liveArenaService';
 import { showNotice, useClash, type User } from '../../../store';
 import type { ReportTarget } from '../../../supabase/types';
 import { layout, space, typeScale, useThemeColors } from '../../../theme';
-
-/** Width of a card in the horizontal evidence rail. */
-const EVIDENCE_CARD_WIDTH = 230;
 
 interface SafetyTarget {
   user: User;
   report: { kind: ReportTarget; id: string };
 }
 
-/** PostActionsSheet speaks the Arena's `User`; a room author card is a subset of it. */
 function asUser(author: ArenaAuthor): User {
   return {
     id: author.id,
@@ -58,15 +57,8 @@ function asUser(author: ArenaAuthor): User {
 }
 
 /**
- * The live room — one screen for every phase the server can put it in.
- *
- * OPEN / FINAL_ARGUMENTS  thread + composer + evidence rail
- * JUDGING                 thread (read-only) + the two ballots
- * SETTLED                 verdict, best argument, Mindshift, then the transcript
- *
- * The phase comes from `room.status`, which the scheduler owns. Nothing here
- * advances a clock, and the composer being hidden is a reflection of the server
- * state rather than the thing that enforces it.
+ * Premium live conversation: compact header, thread, phase-appropriate bottom.
+ * Spectator → debater upgrades in place without leaving the screen.
  */
 export default function LiveArenaRoomScreen(): React.JSX.Element {
   const { roomId: raw } = useLocalSearchParams<{ roomId: string | string[] }>();
@@ -74,7 +66,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useThemeColors();
-  const now = useClock(30_000);
+  const now = useClock(1_000);
   const { state, dispatch } = useClash();
 
   const viewerAuthor = React.useMemo<ArenaAuthor>(
@@ -100,6 +92,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     sending,
     loadingOlder,
     hasOlder,
+    roomFullOnUpgrade,
     refresh,
     loadOlder,
     send,
@@ -109,10 +102,13 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     voteSide,
     voteArgument,
     recordFinal,
+    upgradeToDebater,
   } = useLiveArenaRoom(roomId, viewerAuthor);
 
   const [replyTo, setReplyTo] = React.useState<ArenaMessage | null>(null);
   const [proofOpen, setProofOpen] = React.useState(false);
+  const [joinOpen, setJoinOpen] = React.useState(false);
+  const [joining, setJoining] = React.useState(false);
   const [safety, setSafety] = React.useState<SafetyTarget | null>(null);
   const [voting, setVoting] = React.useState(false);
 
@@ -126,6 +122,21 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     for (const message of messages) map.set(message.id, message);
     return map;
   }, [messages]);
+
+  const evidenceByMessage = React.useMemo(() => {
+    const map = new Map<string, ArenaEvidence[]>();
+    const orphans: ArenaEvidence[] = [];
+    for (const item of evidence) {
+      if (item.messageId && byId.has(item.messageId)) {
+        const list = map.get(item.messageId) ?? [];
+        list.push(item);
+        map.set(item.messageId, list);
+      } else {
+        orphans.push(item);
+      }
+    }
+    return { map, orphans };
+  }, [byId, evidence]);
 
   const accepting = room?.status === 'OPEN' || room?.status === 'FINAL_ARGUMENTS';
   const settled = room?.status === 'SETTLED';
@@ -144,11 +155,30 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         message={item}
         now={now}
         parent={item.parentMessageId ? (byId.get(item.parentMessageId) ?? null) : null}
+        evidence={evidenceByMessage.map.get(item.id) ?? []}
         canReply={accepting && isDebater}
         canReact={!settled && isDebater}
+        canMarkEvidence={!settled && isDebater}
         onReply={setReplyTo}
         onReact={(message, emoji) => void react(message.id, emoji)}
         onOpenProfile={openProfile}
+        onMarkEvidence={(ev) => void markUseful(ev.id)}
+        onChallengeEvidence={
+          accepting && isDebater
+            ? (ev) => {
+                const anchor = ev.messageId ? byId.get(ev.messageId) : undefined;
+                if (anchor) setReplyTo(anchor);
+                else notify(`Answer "${ev.title}" in your next argument.`);
+              }
+            : undefined
+        }
+        onReportEvidence={(ev) => {
+          if (!ev.author) return;
+          setSafety({
+            user: asUser(ev.author),
+            report: { kind: 'arena_room_evidence', id: ev.id },
+          });
+        }}
         onReport={
           item.author
             ? (message) =>
@@ -160,7 +190,18 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         }
       />
     ),
-    [accepting, byId, isDebater, now, openProfile, react, settled],
+    [
+      accepting,
+      byId,
+      evidenceByMessage.map,
+      isDebater,
+      markUseful,
+      notify,
+      now,
+      openProfile,
+      react,
+      settled,
+    ],
   );
 
   if (loading && !room) {
@@ -186,90 +227,101 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     );
   }
 
-  const evidenceRail =
-    evidence.length > 0 ? (
-      <View style={styles.railWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.rail}
-        >
-          {evidence.map((item) => (
-            <LiveEvidenceCard
-              key={item.id}
-              evidence={item}
-              width={EVIDENCE_CARD_WIDTH}
-              canMark={!settled && isDebater}
-              onMarkUseful={(target) => void markUseful(target.id)}
-              onChallenge={
-                accepting && isDebater
-                  ? (target) => {
-                      const anchor = target.messageId ? byId.get(target.messageId) : undefined;
-                      if (anchor) setReplyTo(anchor);
-                      else notify(`Answer "${target.title}" in your next argument.`);
-                    }
-                  : undefined
-              }
-              onReport={
-                item.author
-                  ? (target) =>
-                      setSafety({
-                        user: asUser(target.author as ArenaAuthor),
-                        report: { kind: 'arena_room_evidence', id: target.id },
-                      })
-                  : undefined
-              }
-            />
-          ))}
-        </ScrollView>
+  const finalBanner =
+    room.status === 'FINAL_ARGUMENTS' ? (
+      <View style={[styles.phaseBanner, { backgroundColor: t.surfaceMuted }]}>
+        <Text allowFontScaling={false} style={[styles.phaseText, { color: t.textSecondary }]}>
+          Final arguments
+          {room.secondsToJudging > 0 ? ` · ${secondsClock(room.secondsToJudging)}` : ''}
+        </Text>
       </View>
     ) : null;
 
-  const thread = threadLocked ? (
-    <View style={styles.locked}>
-      <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
-        Join as a debater or spectator to read this room's transcript.
-      </Text>
-    </View>
-  ) : isSpectator ? (
-    <View style={styles.locked}>
-      <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
-        You are watching. Spectators can read the room but cannot argue or vote.
-      </Text>
-    </View>
-  ) : null;
+  const orphanEvidence =
+    evidenceByMessage.orphans.length > 0 ? (
+      <View style={styles.orphanWrap}>
+        {evidenceByMessage.orphans.map((item) => (
+          <LiveEvidenceCard
+            key={item.id}
+            evidence={item}
+            inline
+            canMark={!settled && isDebater}
+            onMarkUseful={(ev) => void markUseful(ev.id)}
+            onChallenge={
+              accepting && isDebater
+                ? (ev) => notify(`Answer "${ev.title}" in your next argument.`)
+                : undefined
+            }
+            onReport={
+              item.author
+                ? (ev) =>
+                    setSafety({
+                      user: asUser(ev.author as ArenaAuthor),
+                      report: { kind: 'arena_room_evidence', id: ev.id },
+                    })
+                : undefined
+            }
+          />
+        ))}
+      </View>
+    ) : null;
 
-  const composer = isDebater ? (
-    <LiveRoomComposer
-      disabled={!accepting}
-      disabledReason={
-        judging
-          ? 'Arguments are closed. Cast your votes above.'
-          : 'This room is settled.'
-      }
-      replyingTo={replyTo?.author?.name ?? null}
-      sending={sending}
-      onCancelReply={() => setReplyTo(null)}
-      onSend={async (argument) => {
-        const ok = await send({
-          body: argument.body,
-          parentMessageId: replyTo?.id ?? null,
-          ...(argument.media ? { media: argument.media } : {}),
-          ...(argument.gif ? { gif: argument.gif } : {}),
-        });
-        if (ok) {
-          setReplyTo(null);
-          analytics.track('arena_message_sent', {
-            realm: 'arena',
-            media_type: argument.gif ? 'gif' : (argument.media?.kind ?? 'none'),
-          });
-        }
-        return ok;
-      }}
-      onAddProof={() => setProofOpen(true)}
-      onError={notify}
-    />
-  ) : null;
+  const bottom = (() => {
+    if (isSpectator) {
+      return (
+        <SpectatorJoinBar
+          busy={joining}
+          roomFull={roomFullOnUpgrade}
+          onJoinPress={() => setJoinOpen(true)}
+        />
+      );
+    }
+    if (judging && isDebater) {
+      return (
+        <LiveRoomJudgingPanel
+          room={room}
+          messages={messages}
+          busy={voting}
+          onVoteSide={(side) => {
+            setVoting(true);
+            void voteSide(side).finally(() => setVoting(false));
+          }}
+          onVoteArgument={(messageId) => {
+            setVoting(true);
+            void voteArgument(messageId).finally(() => setVoting(false));
+          }}
+        />
+      );
+    }
+    if (isDebater && accepting) {
+      return (
+        <LiveRoomComposer
+          replyingTo={replyTo?.author?.name ?? null}
+          sending={sending}
+          onCancelReply={() => setReplyTo(null)}
+          onSend={async (argument) => {
+            const ok = await send({
+              body: argument.body,
+              parentMessageId: replyTo?.id ?? null,
+              ...(argument.media ? { media: argument.media } : {}),
+              ...(argument.gif ? { gif: argument.gif } : {}),
+            });
+            if (ok) {
+              setReplyTo(null);
+              analytics.track('arena_message_sent', {
+                realm: 'arena',
+                media_type: argument.gif ? 'gif' : (argument.media?.kind ?? 'none'),
+              });
+            }
+            return ok;
+          }}
+          onAddProof={() => setProofOpen(true)}
+          onError={notify}
+        />
+      );
+    }
+    return null;
+  })();
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
@@ -281,6 +333,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
           else router.replace('/(tabs)');
         }}
       />
+      {finalBanner}
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -304,26 +357,27 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                     void recordFinal(stance).finally(() => setVoting(false));
                   }}
                 />
-                {evidenceRail}
-                {thread}
+                {orphanEvidence}
               </>
             }
-            contentContainerStyle={[
-              styles.list,
-              { paddingBottom: insets.bottom + space.xxl },
-            ]}
+            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + space.xxl }]}
             refreshing={refreshing}
             onRefresh={() => void refresh()}
             showsVerticalScrollIndicator={false}
           />
         ) : (
           <>
-            {evidenceRail}
-            {thread}
+            {threadLocked ? (
+              <View style={styles.locked}>
+                <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
+                  Join this room to read the conversation.
+                </Text>
+              </View>
+            ) : null}
             {messages.length === 0 && !threadLocked ? (
               <View style={styles.empty}>
                 <Text allowFontScaling={false} style={[styles.emptyText, { color: t.textMuted }]}>
-                  No arguments yet. Open the room.
+                  No arguments yet. Be the first.
                 </Text>
               </View>
             ) : null}
@@ -332,6 +386,14 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
               data={messages}
               keyExtractor={(item) => item.id}
               renderItem={renderMessage}
+              ListFooterComponent={
+                <>
+                  {orphanEvidence}
+                  {loadingOlder ? (
+                    <ActivityIndicator style={styles.older} size="small" color={t.textMuted} />
+                  ) : null}
+                </>
+              }
               contentContainerStyle={styles.list}
               style={styles.flex}
               refreshing={refreshing}
@@ -342,36 +404,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
               onEndReachedThreshold={0.4}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              ListFooterComponent={
-                loadingOlder ? (
-                  <ActivityIndicator style={styles.older} size="small" color={t.textMuted} />
-                ) : null
-              }
             />
-
-            {judging && isDebater ? (
-              <ScrollView
-                style={styles.judgingScroll}
-                contentContainerStyle={styles.judgingContent}
-                showsVerticalScrollIndicator={false}
-              >
-                <LiveRoomJudgingPanel
-                  room={room}
-                  messages={messages}
-                  busy={voting}
-                  onVoteSide={(side) => {
-                    setVoting(true);
-                    void voteSide(side).finally(() => setVoting(false));
-                  }}
-                  onVoteArgument={(messageId) => {
-                    setVoting(true);
-                    void voteArgument(messageId).finally(() => setVoting(false));
-                  }}
-                />
-              </ScrollView>
-            ) : null}
-
-            <View style={{ paddingBottom: insets.bottom }}>{composer}</View>
+            <View style={{ paddingBottom: insets.bottom }}>{bottom}</View>
           </>
         )}
       </KeyboardAvoidingView>
@@ -381,6 +415,20 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         onClose={() => setProofOpen(false)}
         onSubmit={(input) => addEvidence(input)}
         onError={notify}
+      />
+
+      <JoinDebateSheet
+        visible={joinOpen}
+        busy={joining}
+        onClose={() => setJoinOpen(false)}
+        onChoose={(stance) => {
+          setJoining(true);
+          void upgradeToDebater(stance)
+            .then((ok) => {
+              if (ok) setJoinOpen(false);
+            })
+            .finally(() => setJoining(false));
+        }}
       />
 
       <PostActionsSheet
@@ -403,13 +451,15 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: layout.screenX, paddingVertical: space.xs, flexGrow: 1 },
-  railWrap: { paddingVertical: space.xs },
-  rail: { gap: space.xs, paddingHorizontal: layout.screenX },
+  phaseBanner: {
+    paddingHorizontal: layout.screenX,
+    paddingVertical: 8,
+  },
+  phaseText: { ...typeScale.caption, fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
+  orphanWrap: { gap: space.xs, paddingHorizontal: layout.screenX, paddingVertical: space.xs },
   locked: { paddingHorizontal: layout.screenX, paddingVertical: space.sm },
-  lockedText: { ...typeScale.caption, fontSize: 11, lineHeight: 16 },
-  empty: { paddingVertical: space.xxl, alignItems: 'center' },
+  lockedText: { ...typeScale.caption, fontSize: 12, lineHeight: 17 },
+  empty: { paddingVertical: space.xl, alignItems: 'center' },
   emptyText: { ...typeScale.meta, fontSize: 13 },
   older: { marginVertical: space.sm },
-  judgingScroll: { maxHeight: 340 },
-  judgingContent: { paddingBottom: space.xs },
 });
