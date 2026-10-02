@@ -122,6 +122,7 @@ export function DailyArenaCard({
             </Text>
             <View style={styles.choices}>
               <ChoiceButton label="Agree" onPress={() => onChoose('AGREE')} />
+              <ChoiceButton label="Unsure" onPress={() => onChoose('UNSURE')} />
               <ChoiceButton label="Disagree" onPress={() => onChoose('DISAGREE')} />
             </View>
           </View>
@@ -220,7 +221,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: space.xs,
   },
-  choiceText: { ...typeScale.button, fontSize: 15, fontWeight: '700' },
+  choiceText: { ...typeScale.button, fontSize: 13, fontWeight: '700' },
   primary: {
     minHeight: layout.hit,
     alignItems: 'center',

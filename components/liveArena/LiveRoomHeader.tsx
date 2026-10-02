@@ -87,10 +87,16 @@ export function LiveRoomHeader({
         ) : null}
       </View>
 
-      {room.viewer ? (
+      {room.viewer?.stance ? (
         <View style={[styles.stanceChip, { backgroundColor: softFill(t), borderColor: t.border }]}>
           <Text allowFontScaling={false} style={[styles.stanceText, { color: t.textSecondary }]}>
             Your stance · {STANCE_LABEL[room.viewer.stance]} · private
+          </Text>
+        </View>
+      ) : room.viewer?.role === 'spectator' ? (
+        <View style={[styles.stanceChip, { backgroundColor: softFill(t), borderColor: t.border }]}>
+          <Text allowFontScaling={false} style={[styles.stanceText, { color: t.textSecondary }]}>
+            Watching · spectator
           </Text>
         </View>
       ) : null}

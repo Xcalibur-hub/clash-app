@@ -60,7 +60,8 @@ export function LiveRoomResultReveal({
   const winnerPercent = totalVotes > 0 ? Math.round((winnerVotes / totalVotes) * 100) : null;
 
   const changedPercent = stats?.changedPercent ?? result.mindshiftChangedPercent;
-  const needsFinalStance = viewer !== null && viewer.finalStance === null;
+  const needsFinalStance =
+    viewer !== null && viewer.role === 'debater' && viewer.stance !== null && viewer.finalStance === null;
 
   React.useEffect(() => {
     if (reduced) return;
@@ -191,7 +192,7 @@ export function LiveRoomResultReveal({
             Recorded once, and only as an aggregate. Nobody sees your answer.
           </Text>
         </View>
-      ) : viewer?.finalStance ? (
+      ) : viewer?.finalStance && viewer.stance ? (
         <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }]}>
           <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
             YOUR JOURNEY

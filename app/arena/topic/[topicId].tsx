@@ -82,12 +82,12 @@ export default function ArenaTopicScreen(): React.JSX.Element {
   }, [dispatch, goToRoom, signedIn, topicId]);
 
   const join = React.useCallback(
-    async (stance: Stance): Promise<void> => {
+    async (stance: Stance | null, role: 'debater' | 'spectator' = 'debater'): Promise<void> => {
       if (joining) return;
       if (!requireAuth()) return;
       setJoining(true);
       try {
-        const result = await joinTopic(topicId, stance);
+        const result = await joinTopic(topicId, stance, role);
         analytics.track('arena_room_joined', { realm: 'arena', is_guest: false });
         goToRoom(result.roomId);
       } catch (error) {
@@ -105,7 +105,7 @@ export default function ArenaTopicScreen(): React.JSX.Element {
     if (autoJoined.current || !presetStance || authLoading || !signedIn) return;
     if (!topic || topic.viewerJoined || topic.status !== 'live' || topic.phase === 'closed') return;
     autoJoined.current = true;
-    void join(presetStance);
+    void join(presetStance, 'debater');
   }, [authLoading, join, presetStance, signedIn, topic]);
 
   if (topic === undefined) {
@@ -173,7 +173,8 @@ export default function ArenaTopicScreen(): React.JSX.Element {
             secondsRemaining={topic.secondsRemaining}
             participantCount={topic.participantCount}
             busy={joining}
-            onChoose={(stance) => void join(stance)}
+            onChoose={(stance) => void join(stance, 'debater')}
+            onWatch={() => void join(null, 'spectator')}
           />
         )}
 

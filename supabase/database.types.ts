@@ -388,7 +388,7 @@ export type Database = {
         Row: {
           final_recorded_at: string | null
           final_stance: Database["public"]["Enums"]["take_stance"] | null
-          initial_stance: Database["public"]["Enums"]["take_stance"]
+          initial_stance: Database["public"]["Enums"]["take_stance"] | null
           joined_at: string
           profile_id: string
           role: Database["public"]["Enums"]["arena_participant_role"]
@@ -398,7 +398,7 @@ export type Database = {
         Insert: {
           final_recorded_at?: string | null
           final_stance?: Database["public"]["Enums"]["take_stance"] | null
-          initial_stance: Database["public"]["Enums"]["take_stance"]
+          initial_stance?: Database["public"]["Enums"]["take_stance"] | null
           joined_at?: string
           profile_id: string
           role?: Database["public"]["Enums"]["arena_participant_role"]
@@ -408,7 +408,7 @@ export type Database = {
         Update: {
           final_recorded_at?: string | null
           final_stance?: Database["public"]["Enums"]["take_stance"] | null
-          initial_stance?: Database["public"]["Enums"]["take_stance"]
+          initial_stance?: Database["public"]["Enums"]["take_stance"] | null
           joined_at?: string
           profile_id?: string
           role?: Database["public"]["Enums"]["arena_participant_role"]
@@ -2439,6 +2439,10 @@ export type Database = {
         Args: { p_evidence_id: string }
         Returns: string
       }
+      arena_is_room_debater: {
+        Args: { p_room_id: string }
+        Returns: boolean
+      }
       arena_is_room_member: {
         Args: { p_room_id: string }
         Returns: boolean
@@ -2954,7 +2958,7 @@ export type Database = {
       join_arena_topic: {
         Args: {
           p_role?: Database["public"]["Enums"]["arena_participant_role"]
-          p_stance: Database["public"]["Enums"]["take_stance"]
+          p_stance?: Database["public"]["Enums"]["take_stance"]
           p_topic_id: string
         }
         Returns: Json

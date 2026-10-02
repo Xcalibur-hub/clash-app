@@ -93,7 +93,8 @@ export interface ArenaJoinResult {
   joined: boolean;
   roomId: string;
   topicId: string;
-  stance: Stance;
+  /** Null for spectators — they never record a private stance. */
+  stance: Stance | null;
   role: ArenaParticipantRole;
   status: ArenaRoomStatus;
   capacity: number;
@@ -104,7 +105,8 @@ export interface ArenaJoinResult {
 export interface ArenaRoomViewer {
   isMember: true;
   role: ArenaParticipantRole;
-  stance: Stance;
+  /** Null for spectators. */
+  stance: Stance | null;
   finalStance: Stance | null;
   finalRecordedAt: number | null;
   joinedAt: number;
@@ -387,12 +389,14 @@ function toResult(value: Json | undefined): ArenaResult | null {
 function toRoomViewer(value: Json | undefined): ArenaRoomViewer | null {
   const record = asRecord(value ?? null);
   if (!record) return null;
+  const role = oneOf(record.role, ROLES) ?? 'debater';
   const stance = oneOf(record.stance, STANCES);
-  if (!stance) return null;
+  // Spectators have no stance; debaters must have one.
+  if (role === 'debater' && !stance) return null;
   return {
     isMember: true,
-    role: oneOf(record.role, ROLES) ?? 'debater',
-    stance,
+    role,
+    stance: stance ?? null,
     finalStance: oneOf(record.finalStance, STANCES),
     finalRecordedAt: millis(record.finalRecordedAt),
     joinedAt: millis(record.joinedAt) ?? Date.now(),
@@ -532,31 +536,36 @@ export async function fetchTopic(topicId: string): Promise<LiveArenaTopic> {
 /**
  * Join today's topic and get auto-placed into a room.
  *
+ * Debaters must pass a stance. Spectators pass `null` stance + role `spectator`
+ * and never record a private position.
+ *
  * Idempotent: a second call returns the existing membership and the stance
  * recorded the first time. A stance is immutable, so re-joining with a different
  * one is quietly ignored by the server rather than rejected.
  */
 export async function joinTopic(
   topicId: string,
-  stance: Stance,
+  stance: Stance | null,
   role: ArenaParticipantRole = 'debater',
 ): Promise<ArenaJoinResult> {
   const { data, error } = await client().rpc('join_arena_topic', {
     p_topic_id: topicId,
-    p_stance: stance,
+    p_stance: stance ?? undefined,
     p_role: role,
   });
   if (error) throw requestError(error);
   const record = asRecord(data);
   const roomId = record ? str(record.roomId) : null;
+  const joinRole = record ? (oneOf(record.role, ROLES) ?? 'debater') : null;
   const joinStance = record ? oneOf(record.stance, STANCES) : null;
-  if (!record || !roomId || !joinStance) bad('join_arena_topic');
+  if (!record || !roomId || !joinRole) bad('join_arena_topic');
+  if (joinRole === 'debater' && !joinStance) bad('join_arena_topic');
   return {
     joined: bool(record.joined),
     roomId,
     topicId: str(record.topicId) ?? topicId,
     stance: joinStance,
-    role: oneOf(record.role, ROLES) ?? 'debater',
+    role: joinRole,
     status: oneOf(record.status, ROOM_STATUSES) ?? 'OPEN',
     capacity: num(record.capacity) ?? 0,
     participantCount: num(record.participantCount) ?? 0,

@@ -130,7 +130,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const accepting = room?.status === 'OPEN' || room?.status === 'FINAL_ARGUMENTS';
   const settled = room?.status === 'SETTLED';
   const judging = room?.status === 'JUDGING';
-  const isMember = room?.viewer != null;
+  const isDebater = room?.viewer?.role === 'debater';
+  const isSpectator = room?.viewer?.role === 'spectator';
 
   const openProfile = React.useCallback(
     (profileId: string) => router.push(`/profile/${profileId}`),
@@ -143,8 +144,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         message={item}
         now={now}
         parent={item.parentMessageId ? (byId.get(item.parentMessageId) ?? null) : null}
-        canReply={accepting && isMember}
-        canReact={!settled && isMember}
+        canReply={accepting && isDebater}
+        canReact={!settled && isDebater}
         onReply={setReplyTo}
         onReact={(message, emoji) => void react(message.id, emoji)}
         onOpenProfile={openProfile}
@@ -159,7 +160,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         }
       />
     ),
-    [accepting, byId, isMember, now, openProfile, react, settled],
+    [accepting, byId, isDebater, now, openProfile, react, settled],
   );
 
   if (loading && !room) {
@@ -198,10 +199,10 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
               key={item.id}
               evidence={item}
               width={EVIDENCE_CARD_WIDTH}
-              canMark={!settled && isMember}
+              canMark={!settled && isDebater}
               onMarkUseful={(target) => void markUseful(target.id)}
               onChallenge={
-                accepting && isMember
+                accepting && isDebater
                   ? (target) => {
                       const anchor = target.messageId ? byId.get(target.messageId) : undefined;
                       if (anchor) setReplyTo(anchor);
@@ -227,20 +228,24 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const thread = threadLocked ? (
     <View style={styles.locked}>
       <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
-        The transcript is only visible to people who argued in this room.
+        Join as a debater or spectator to read this room's transcript.
+      </Text>
+    </View>
+  ) : isSpectator ? (
+    <View style={styles.locked}>
+      <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
+        You are watching. Spectators can read the room but cannot argue or vote.
       </Text>
     </View>
   ) : null;
 
-  const composer = (
+  const composer = isDebater ? (
     <LiveRoomComposer
-      disabled={!accepting || !isMember}
+      disabled={!accepting}
       disabledReason={
-        !isMember
-          ? 'You are reading this room, not arguing in it.'
-          : judging
-            ? 'Arguments are closed. Cast your votes above.'
-            : 'This room is settled.'
+        judging
+          ? 'Arguments are closed. Cast your votes above.'
+          : 'This room is settled.'
       }
       replyingTo={replyTo?.author?.name ?? null}
       sending={sending}
@@ -264,7 +269,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       onAddProof={() => setProofOpen(true)}
       onError={notify}
     />
-  );
+  ) : null;
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
@@ -344,7 +349,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
               }
             />
 
-            {judging ? (
+            {judging && isDebater ? (
               <ScrollView
                 style={styles.judgingScroll}
                 contentContainerStyle={styles.judgingContent}

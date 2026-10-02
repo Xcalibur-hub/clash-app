@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Stance } from '../../services/liveArenaService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { StanceChoiceRow } from '../arena/StanceChoiceRow';
@@ -14,6 +14,8 @@ export interface ArenaStanceGateProps {
   participantCount?: number;
   busy?: boolean;
   onChoose: (stance: Stance) => void;
+  /** Optional spectator entry — no stance, read-only room membership. */
+  onWatch?: () => void;
 }
 
 /**
@@ -30,6 +32,7 @@ export function ArenaStanceGate({
   participantCount,
   busy = false,
   onChoose,
+  onWatch,
 }: ArenaStanceGateProps): React.JSX.Element {
   const t = useThemeColors();
 
@@ -61,6 +64,20 @@ export function ArenaStanceGate({
         </Text>
       </View>
 
+      {onWatch ? (
+        <Pressable
+          onPress={onWatch}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="Watch without taking a side"
+          style={styles.watchHit}
+        >
+          <Text allowFontScaling={false} style={[styles.watch, { color: t.textSecondary }]}>
+            Watch without taking a side
+          </Text>
+        </Pressable>
+      ) : null}
+
       {typeof participantCount === 'number' && participantCount > 0 ? (
         <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
           {participantCount} already arguing
@@ -89,5 +106,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   note: { ...typeScale.caption, fontSize: 11, lineHeight: 16 },
+  watchHit: { alignSelf: 'center', paddingVertical: space.xs, paddingHorizontal: space.sm },
+  watch: { ...typeScale.meta, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
   meta: { ...typeScale.meta, fontSize: 13 },
 });
