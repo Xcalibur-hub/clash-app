@@ -5,7 +5,8 @@
 # belongs here. `supabase start` boots the stack below on this machine.
 #
 #   npm run supabase:start     boot the stack (Docker required)
-#   npm run supabase:reset     replay every migration, then supabase/seed.sql
+#   npm run supabase:reset     replay every migration, then local seeds
+#                              (incl. storage bootstrap) + seed buckets
 #                              + seeds/clash_dev_fixtures.sql (local Clash test data)
 #   npm run supabase:seed:clash-dev  re-apply Clash fixtures only (local Docker)
 #   npm run supabase:types     regenerate supabase/database.types.ts
@@ -89,7 +90,7 @@ schema_paths = []
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql", "./seeds/clash_dev_fixtures.sql", "./seeds/local_dev_auth.sql"]
+sql_paths = ["./seeds/00_storage_bootstrap.sql", "./seed.sql", "./seeds/clash_dev_fixtures.sql", "./seeds/local_dev_auth.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
@@ -138,13 +139,18 @@ file_size_limit = "50MiB"
 # [storage.image_transformation]
 # enabled = true
 
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+# Local Storage bucket declarations. `supabase db reset` / `supabase seed buckets`
+# upsert these through the Storage service (not a hand-rolled schema). Mirrors
+# the public-media / private-media pair from migration 20260926150000.
+[storage.buckets.public-media]
+public = true
+file_size_limit = "100MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime", "video/webm"]
 
+[storage.buckets.private-media]
+public = false
+file_size_limit = "100MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime", "video/webm"]
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used

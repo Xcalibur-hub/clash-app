@@ -238,44 +238,74 @@ revoke execute on function public.delete_media(text) from public, anon;
 -- The Storage INSERT policy calls this to resolve the caller's namespace.
 grant execute on function public.my_profile_id() to authenticated;
 
--- ── 6. Storage buckets ──────────────────────────────────────────────────────
--- One public bucket, one private bucket. Bucket config enforces a ceiling and a
--- MIME allow-list server-side (the RPC enforces finer per-kind limits).
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values
-  ('public-media', 'public-media', true, 104857600,
-   array['image/jpeg','image/png','image/webp','image/heic','image/heif','video/mp4','video/quicktime','video/webm']),
-  ('private-media', 'private-media', false, 104857600,
-   array['image/jpeg','image/png','image/webp','image/heic','image/heif','video/mp4','video/quicktime','video/webm'])
-on conflict (id) do nothing;
+-- ── 6–7. Storage buckets + Storage RLS ──────────────────────────────────────
+-- Hosted Supabase already has the Storage-owned `storage.buckets` /
+-- `storage.objects` tables when this migration first applied.
+--
+-- Local `supabase db reset` (CLI ≥2.x) recreates Postgres and applies user
+-- migrations *before* the Storage service finishes creating its tables, so an
+-- unguarded INSERT/POLICY here aborts the whole reset with:
+--   relation "storage.buckets" does not exist
+--
+-- When the Storage tables are missing we no-op here. Local resets restore
+-- buckets via `[storage.buckets.*]` in config.toml (CLI `seed buckets`) and
+-- restore the same RLS policies via `seeds/00_storage_bootstrap.sql`.
+-- Do NOT invent a fake Storage schema in this migration.
+do $storage$
+begin
+  if to_regclass('storage.buckets') is null or to_regclass('storage.objects') is null then
+    raise notice 'storage.buckets/objects not ready yet — skipping bucket+policy bootstrap (local reset; restored by seed/config)';
+    return;
+  end if;
 
--- ── 7. Storage RLS (storage.objects) ────────────────────────────────────────
--- Public media is readable by everyone; private media is only the owner's. Upload
--- is allowed only into the caller's own namespace; only the owner may overwrite
--- or delete.
-drop policy if exists "media objects are publicly readable" on storage.objects;
-create policy "media objects are publicly readable"
-  on storage.objects for select using (bucket_id = 'public-media');
+  -- One public bucket, one private bucket. Bucket config enforces a ceiling and a
+  -- MIME allow-list server-side (the RPC enforces finer per-kind limits).
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values
+    ('public-media', 'public-media', true, 104857600,
+     array['image/jpeg','image/png','image/webp','image/heic','image/heif','video/mp4','video/quicktime','video/webm']),
+    ('private-media', 'private-media', false, 104857600,
+     array['image/jpeg','image/png','image/webp','image/heic','image/heif','video/mp4','video/quicktime','video/webm'])
+  on conflict (id) do nothing;
 
-drop policy if exists "own media objects are readable" on storage.objects;
-create policy "own media objects are readable"
-  on storage.objects for select to authenticated using (owner = auth.uid());
+  -- Public media is readable by everyone; private media is only the owner's. Upload
+  -- is allowed only into the caller's own namespace; only the owner may overwrite
+  -- or delete.
+  execute 'drop policy if exists "media objects are publicly readable" on storage.objects';
+  execute $p$
+    create policy "media objects are publicly readable"
+      on storage.objects for select using (bucket_id = 'public-media')
+  $p$;
 
-drop policy if exists "media upload into own namespace" on storage.objects;
-create policy "media upload into own namespace"
-  on storage.objects for insert to authenticated
-  with check (
-    bucket_id in ('public-media', 'private-media')
-    and name like public.my_profile_id() || '/%'
-  );
+  execute 'drop policy if exists "own media objects are readable" on storage.objects';
+  execute $p$
+    create policy "own media objects are readable"
+      on storage.objects for select to authenticated using (owner = auth.uid())
+  $p$;
 
-drop policy if exists "own media objects are updatable" on storage.objects;
-create policy "own media objects are updatable"
-  on storage.objects for update to authenticated
-  using (owner = auth.uid())
-  with check (owner = auth.uid());
+  execute 'drop policy if exists "media upload into own namespace" on storage.objects';
+  execute $p$
+    create policy "media upload into own namespace"
+      on storage.objects for insert to authenticated
+      with check (
+        bucket_id in ('public-media', 'private-media')
+        and name like public.my_profile_id() || '/%'
+      )
+  $p$;
 
-drop policy if exists "own media objects are deletable" on storage.objects;
-create policy "own media objects are deletable"
-  on storage.objects for delete to authenticated
-  using (owner = auth.uid());
+  execute 'drop policy if exists "own media objects are updatable" on storage.objects';
+  execute $p$
+    create policy "own media objects are updatable"
+      on storage.objects for update to authenticated
+      using (owner = auth.uid())
+      with check (owner = auth.uid())
+  $p$;
+
+  execute 'drop policy if exists "own media objects are deletable" on storage.objects';
+  execute $p$
+    create policy "own media objects are deletable"
+      on storage.objects for delete to authenticated
+      using (owner = auth.uid())
+  $p$;
+end;
+$storage$;
