@@ -45,11 +45,19 @@ export function toTake(row: TableRow<'takes'>): Take {
 
 function toCommentMedia(row: TableRow<'comments'>): TakeMedia | undefined {
   if (!row.media_kind) return undefined;
+  const gifProvider = row.gif_provider;
+  const gifExternalId = row.gif_external_id;
   return {
     kind: row.media_kind,
     caption: '',
     colors: gradient.violet,
     ...(row.media_url ? { url: row.media_url } : {}),
+    ...(gifProvider === 'tenor'
+      ? {
+          gifProvider: 'tenor' as const,
+          ...(gifExternalId ? { gifExternalId } : {}),
+        }
+      : {}),
   };
 }
 

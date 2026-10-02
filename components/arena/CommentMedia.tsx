@@ -1,9 +1,10 @@
 /**
  * Compact media plate for threaded replies — preserves aspect ratio,
  * clamps extremes, opens MediaViewer on tap. No autoplay for video.
+ * GIFs animate via RN Image using the Tenor tinygif URL (no VideoPlayer).
  */
 import React from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { TakeMedia as TakeMediaModel } from '../../store';
 import { radius, useThemeColors } from '../../theme';
 import { PlayIcon } from '../shared/icons';
@@ -24,13 +25,14 @@ export function CommentMedia({
   const t = useThemeColors();
   const hasUrl = Boolean(media.url);
   const isVideo = media.kind === 'video';
-  const [ratio, setRatio] = React.useState(1);
+  const isGif = media.kind === 'gif';
+  const [ratio, setRatio] = React.useState(isGif ? 1.2 : 1);
   const [viewerOpen, setViewerOpen] = React.useState(false);
   const maxH = compact ? 200 : MAX_H;
 
   React.useEffect(() => {
     if (!hasUrl || !media.url || isVideo) {
-      setRatio(isVideo ? 16 / 9 : 1);
+      setRatio(isVideo ? 16 / 9 : isGif ? 1.2 : 1);
       return;
     }
     let cancelled = false;
@@ -41,13 +43,13 @@ export function CommentMedia({
         setRatio(Math.min(MAX_RATIO, Math.max(MIN_RATIO, w / h)));
       },
       () => {
-        if (!cancelled) setRatio(1);
+        if (!cancelled) setRatio(isGif ? 1.2 : 1);
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [hasUrl, isVideo, media.url]);
+  }, [hasUrl, isGif, isVideo, media.url]);
 
   if (!hasUrl) return null;
 
@@ -64,7 +66,7 @@ export function CommentMedia({
       ]}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={isVideo ? 'Video reply' : 'Image reply'}
+      accessibilityLabel={isVideo ? 'Video reply' : isGif ? 'GIF reply' : 'Image reply'}
     >
       <Image
         source={{ uri: media.url as string }}
@@ -76,6 +78,13 @@ export function CommentMedia({
           <PlayIcon size={22} color="#FAFAF8" strokeWidth={2.4} />
         </View>
       ) : null}
+      {isGif ? (
+        <View style={styles.gifBadge} pointerEvents="none">
+          <Text allowFontScaling={false} style={styles.gifBadgeText}>
+            GIF
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -84,7 +93,7 @@ export function CommentMedia({
       <Pressable
         onPress={() => setViewerOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={isVideo ? 'Open video' : 'View full image'}
+        accessibilityLabel={isVideo ? 'Open video' : isGif ? 'View GIF' : 'View full image'}
         style={styles.press}
       >
         {plate}
@@ -92,7 +101,7 @@ export function CommentMedia({
       <MediaViewer
         visible={viewerOpen}
         uri={media.url ?? null}
-        kind={media.kind}
+        kind={isVideo ? 'video' : 'image'}
         onClose={() => setViewerOpen(false)}
       />
     </>
@@ -112,5 +121,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(8,8,11,0.28)',
+  },
+  gifBadge: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(8,8,11,0.55)',
+  },
+  gifBadgeText: {
+    color: '#FAFAF8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
 });

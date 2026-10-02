@@ -64,7 +64,7 @@ export interface User {
   badges: readonly Badge[];
 }
 
-export type MediaKind = 'image' | 'video';
+export type MediaKind = 'image' | 'video' | 'gif';
 
 /** Media on a Take: a real upload renders its URL, a seed row renders a gradient plate. */
 export interface TakeMedia {
@@ -74,6 +74,9 @@ export interface TakeMedia {
   /** Permanent public URL for an uploaded asset; absent for the seeded gradient plate. */
   url?: string;
   duration?: string;
+  /** Tenor (or future) GIF provider metadata for comment GIFs. */
+  gifProvider?: 'tenor';
+  gifExternalId?: string;
 }
 
 /** A Take is the atomic Arena post and expires after 24 hours. */

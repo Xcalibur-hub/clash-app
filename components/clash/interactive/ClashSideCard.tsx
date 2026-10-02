@@ -58,7 +58,9 @@ export function ClashSideCard({
   const reveal = useSharedValue(author ? 1 : 0);
   const pressPulse = useSharedValue(1);
   const hidden = author === null;
-  const hasImage = Boolean(media?.kind === 'image' && media.url);
+  const hasImage = Boolean(
+    (media?.kind === 'image' || media?.kind === 'gif') && media.url,
+  );
   const hasVideo = Boolean(media?.kind === 'video' && media.url);
   const mediaFirst = hasImage || hasVideo || Boolean(media && !media.url);
 

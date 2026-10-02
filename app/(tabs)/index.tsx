@@ -6,8 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
 import { ArenaFeaturedStack } from '../../components/arena/ArenaFeaturedStack';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
+import { FreshTakeCard, freshTakeVariant } from '../../components/arena/FreshTakeCard';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
-import { TakeFeedItem } from '../../components/arena/TakeFeedItem';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
 import { Underline } from '../../components/shared/Doodles';
@@ -26,7 +26,6 @@ import {
   selectFeedForScope,
   selectHasReacted,
   selectIsSaved,
-  selectTopComment,
   showNotice,
   syncTakeReaction,
   toggleSave,
@@ -221,39 +220,27 @@ export default function ArenaScreen(): React.JSX.Element {
   );
 
   const renderItem = React.useCallback(
-    ({ item }: ListRenderItemInfo<Take>) => {
+    ({ item, index }: ListRenderItemInfo<Take>) => {
       const author = selectAuthor(state, item.authorId);
       if (!author) return null;
-      const topComment = selectTopComment(state, item.id);
-      const topCommentAuthor = topComment ? selectAuthor(state, topComment.authorId) : undefined;
       return (
-        <TakeFeedItem
+        <FreshTakeCard
           take={item}
           author={author}
-          isViewer={author.id === state.viewer.id}
-          isSaved={selectIsSaved(state, item.id)}
-          hasReacted={selectHasReacted(state, item.id)}
           commentCount={selectCommentsForTake(state, item.id).length}
-          topComment={topComment}
-          topCommentAuthor={topCommentAuthor}
-          onOpenDetail={() => openDetail(item.id)}
-          onOpenClash={() => openClash(item.id)}
+          hasReacted={selectHasReacted(state, item.id)}
+          variant={freshTakeVariant(item, index)}
+          index={index}
+          now={now}
+          onOpen={() => openDetail(item.id)}
+          onClash={() => openClash(item.id)}
           onReact={() => {
             void toggleReaction(item);
-          }}
-          onSave={() => {
-            if (requireAuth()) dispatch(toggleSave(item.id));
-          }}
-          onShare={() => {
-            void shareTake(item, author.handle);
-          }}
-          onMore={() => {
-            void openMenu(item);
           }}
         />
       );
     },
-    [dispatch, openClash, openDetail, openMenu, requireAuth, shareTake, state, toggleReaction],
+    [now, openClash, openDetail, state, toggleReaction],
   );
 
   const header = React.useMemo(
@@ -277,6 +264,9 @@ export default function ArenaScreen(): React.JSX.Element {
           <Text allowFontScaling={false} style={[styles.freshTitle, { color: theme.textPrimary }]}>
             Fresh Takes
           </Text>
+          <Text allowFontScaling={false} style={[styles.freshSub, { color: theme.textMuted }]}>
+            What people are arguing about now
+          </Text>
           <Underline size={72} color={theme.textPrimary} opacity={0.2} style={styles.freshMark} />
         </View>
       </View>
@@ -290,6 +280,7 @@ export default function ArenaScreen(): React.JSX.Element {
       scope,
       state.arenaStatus,
       theme.textPrimary,
+      theme.textMuted,
       toggleReaction,
     ],
   );
@@ -435,7 +426,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.35,
   },
-  freshMark: { marginTop: 2 },
+  freshSub: {
+    ...typeScale.meta,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  freshMark: { marginTop: 4 },
 });
 
 const skeletonStyles = StyleSheet.create({

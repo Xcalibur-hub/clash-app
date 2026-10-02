@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -11,7 +12,7 @@ import { createComment, showNotice, useClash } from '../../store';
 import { useMediaPicker, type PickedMedia } from '../../hooks/useMediaPicker';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { analytics } from '../../services/analytics';
-import { postComment, type NewCommentMedia } from '../../services/apiService';
+import { postComment, type NewCommentGif, type NewCommentMedia } from '../../services/apiService';
 import {
   completeUpload,
   createUpload,
@@ -20,11 +21,13 @@ import {
   readPickedBytes,
   uploadFile,
 } from '../../services/mediaService';
+import type { TenorGif } from '../../services/tenorService';
 import { errorText } from '../../services/supabaseClient';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
-import { CloseIcon, ImageIcon, VideoIcon } from '../shared/icons';
+import { CloseIcon, ImageIcon, StickerIcon, VideoIcon } from '../shared/icons';
+import { GifPickerSheet } from './GifPickerSheet';
 import { TakeMediaPreview } from './TakeMediaPreview';
 
 const MAX = 180;
@@ -58,8 +61,8 @@ export interface RebuttalInputProps {
 }
 
 /**
- * Compact conversation composer with optional image/video attachment.
- * Flow: pick → preview → upload → create_comment → appear in thread.
+ * Conversation composer: text + image/video upload + Tenor GIF.
+ * Upload flow unchanged; GIFs skip storage and post via create_comment.
  */
 export function RebuttalInput({
   takeId,
@@ -74,13 +77,21 @@ export function RebuttalInput({
   const t = useThemeColors();
   const [draft, setDraft] = React.useState('');
   const [media, setMedia] = React.useState<PickedMedia | null>(null);
+  const [gif, setGif] = React.useState<TenorGif | null>(null);
+  const [gifOpen, setGifOpen] = React.useState(false);
   const [focused, setFocused] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const inputRef = React.useRef<TextInput>(null);
 
-  const expanded = focused || Boolean(draft.trim()) || Boolean(media) || pending;
-  const canSend = (Boolean(draft.trim()) || Boolean(media)) && !pending;
+  const hasAttachment = Boolean(media) || Boolean(gif);
+  const expanded = focused || Boolean(draft.trim()) || hasAttachment || pending;
+  const canSend = (Boolean(draft.trim()) || hasAttachment) && !pending;
+
+  const clearAttachments = (): void => {
+    setMedia(null);
+    setGif(null);
+  };
 
   const attach = async (kind: 'image' | 'video'): Promise<void> => {
     if (!requireAuth()) return;
@@ -94,12 +105,19 @@ export function RebuttalInput({
     try {
       const picked = kind === 'image' ? await pickImage() : await pickVideo();
       if (picked) {
+        setGif(null);
         setMedia(picked);
         setFocused(true);
       }
     } catch (error) {
       dispatch(showNotice(errorText(error)));
     }
+  };
+
+  const openGifPicker = (): void => {
+    if (!requireAuth()) return;
+    hapticTap();
+    setGifOpen(true);
   };
 
   const uploadMedia = async (picked: PickedMedia): Promise<NewCommentMedia> => {
@@ -126,17 +144,30 @@ export function RebuttalInput({
 
   async function submit(): Promise<void> {
     const text = draft.trim();
-    if ((!text && !media) || pending) return;
+    if ((!text && !media && !gif) || pending) return;
     if (!requireAuth()) return;
     hapticPress();
     setPending(true);
     try {
       let attached: NewCommentMedia | undefined;
+      let attachedGif: NewCommentGif | undefined;
       if (media) {
         setUploading(true);
         attached = await uploadMedia(media);
+      } else if (gif) {
+        attachedGif = {
+          provider: 'tenor',
+          externalId: gif.id,
+          url: gif.previewUrl,
+        };
       }
-      const comment = await postComment(takeId, text.slice(0, MAX), parentId, attached);
+      const comment = await postComment(
+        takeId,
+        text.slice(0, MAX),
+        parentId,
+        attached,
+        attachedGif,
+      );
       if (attached) {
         analytics.track('media_reply_created', {
           source: parentId ? 'comment' : 'take',
@@ -144,20 +175,77 @@ export function RebuttalInput({
           reply_depth: replyDepth,
           realm: 'arena',
         });
+      } else if (attachedGif) {
+        analytics.track('gif_reply_created', {
+          source: parentId ? 'comment' : 'take',
+          media_type: 'gif',
+          reply_depth: replyDepth,
+          realm: 'arena',
+        });
       }
       dispatch(createComment(comment));
       setDraft('');
-      setMedia(null);
+      clearAttachments();
       setFocused(false);
       onDone?.();
     } catch (error) {
-      // Keep draft + picked media so the user can retry.
       dispatch(showNotice(errorText(error)));
     } finally {
       setUploading(false);
       setPending(false);
     }
   }
+
+  const attachButtons = (
+    <>
+      <Pressable
+        onPress={() => {
+          void attach('image');
+        }}
+        disabled={pending}
+        accessibilityRole="button"
+        accessibilityLabel="Attach photo"
+        hitSlop={6}
+        style={styles.iconBtn}
+      >
+        <ImageIcon size={18} color={t.textSecondary} strokeWidth={2} />
+      </Pressable>
+      <Pressable
+        onPress={() => {
+          void attach('video');
+        }}
+        disabled={pending}
+        accessibilityRole="button"
+        accessibilityLabel="Attach video"
+        hitSlop={6}
+        style={styles.iconBtn}
+      >
+        <VideoIcon size={18} color={t.textSecondary} strokeWidth={2} />
+      </Pressable>
+      <Pressable
+        onPress={openGifPicker}
+        disabled={pending}
+        accessibilityRole="button"
+        accessibilityLabel="Attach GIF"
+        hitSlop={6}
+        style={styles.iconBtn}
+      >
+        <StickerIcon size={18} color={t.textSecondary} strokeWidth={2} />
+      </Pressable>
+      {hasAttachment ? (
+        <Pressable
+          onPress={clearAttachments}
+          disabled={pending}
+          accessibilityRole="button"
+          accessibilityLabel="Remove attachment"
+          hitSlop={6}
+          style={styles.iconBtn}
+        >
+          <CloseIcon size={16} color={t.textMuted} strokeWidth={2.2} />
+        </Pressable>
+      ) : null}
+    </>
+  );
 
   return (
     <View style={styles.wrap}>
@@ -169,7 +257,7 @@ export function RebuttalInput({
           <Pressable
             onPress={() => {
               setDraft('');
-              setMedia(null);
+              clearAttachments();
               setFocused(false);
               onDone?.();
             }}
@@ -201,64 +289,37 @@ export function RebuttalInput({
             onChangeText={(next) => setDraft(next.slice(0, MAX))}
             onFocus={() => setFocused(true)}
             onBlur={() => {
-              if (!draft.trim() && !media && !pending) setFocused(false);
+              if (!draft.trim() && !hasAttachment && !pending) setFocused(false);
             }}
-            placeholder={parentId ? 'Write a reply…' : 'Write a reply…'}
+            placeholder="Write a reply…"
             placeholderTextColor={t.textMuted}
             multiline={expanded}
-            style={[
-              styles.input,
-              { color: t.textPrimary, minHeight: expanded ? 44 : 36 },
-            ]}
+            style={[styles.input, { color: t.textPrimary, minHeight: expanded ? 44 : 36 }]}
             accessibilityLabel={parentId ? 'Reply to rebuttal' : 'Add to the conversation'}
           />
 
           {media ? (
             <View style={styles.preview}>
-              <TakeMediaPreview media={media} onRemove={() => setMedia(null)} />
+              <TakeMediaPreview media={media} onRemove={clearAttachments} />
+            </View>
+          ) : null}
+          {gif ? (
+            <View style={[styles.gifPreview, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
+              <Image source={{ uri: gif.previewUrl }} style={styles.gifImage} resizeMode="cover" />
+              <Pressable
+                onPress={clearAttachments}
+                style={styles.gifRemove}
+                accessibilityRole="button"
+                accessibilityLabel="Remove GIF"
+              >
+                <CloseIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
+              </Pressable>
             </View>
           ) : null}
 
           {expanded ? (
             <View style={styles.toolbar}>
-              <View style={styles.attachRow}>
-                <Pressable
-                  onPress={() => {
-                    void attach('image');
-                  }}
-                  disabled={pending}
-                  accessibilityRole="button"
-                  accessibilityLabel="Attach photo"
-                  hitSlop={6}
-                  style={styles.iconBtn}
-                >
-                  <ImageIcon size={18} color={t.textSecondary} strokeWidth={2} />
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    void attach('video');
-                  }}
-                  disabled={pending}
-                  accessibilityRole="button"
-                  accessibilityLabel="Attach video"
-                  hitSlop={6}
-                  style={styles.iconBtn}
-                >
-                  <VideoIcon size={18} color={t.textSecondary} strokeWidth={2} />
-                </Pressable>
-                {media ? (
-                  <Pressable
-                    onPress={() => setMedia(null)}
-                    disabled={pending}
-                    accessibilityRole="button"
-                    accessibilityLabel="Remove attachment"
-                    hitSlop={6}
-                    style={styles.iconBtn}
-                  >
-                    <CloseIcon size={16} color={t.textMuted} strokeWidth={2.2} />
-                  </Pressable>
-                ) : null}
-              </View>
+              <View style={styles.attachRow}>{attachButtons}</View>
               <View style={styles.sendRow}>
                 {uploading || pending ? (
                   <ActivityIndicator size="small" color={t.textMuted} />
@@ -284,6 +345,15 @@ export function RebuttalInput({
             </View>
           ) : (
             <View style={styles.compactActions}>
+              <Pressable
+                onPress={openGifPicker}
+                accessibilityRole="button"
+                accessibilityLabel="Attach GIF"
+                hitSlop={6}
+                style={styles.iconBtn}
+              >
+                <StickerIcon size={17} color={t.textMuted} strokeWidth={2} />
+              </Pressable>
               <Pressable
                 onPress={() => {
                   void attach('image');
@@ -313,6 +383,17 @@ export function RebuttalInput({
           )}
         </View>
       </View>
+
+      <GifPickerSheet
+        visible={gifOpen}
+        source={parentId ? 'comment' : 'take'}
+        onClose={() => setGifOpen(false)}
+        onSelect={(selected) => {
+          setMedia(null);
+          setGif(selected);
+          setFocused(true);
+        }}
+      />
     </View>
   );
 }
@@ -344,6 +425,24 @@ const styles = StyleSheet.create({
     maxHeight: 120,
   },
   preview: { borderRadius: radius.md, overflow: 'hidden' },
+  gifPreview: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  gifImage: { width: 160, height: 120 },
+  gifRemove: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(8,8,11,0.72)',
+  },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',

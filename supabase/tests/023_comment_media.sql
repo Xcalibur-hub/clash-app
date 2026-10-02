@@ -37,12 +37,12 @@ select has_column('public', 'comments', 'media_url', 'comments.media_url exists'
 select has_function('public', 'create_comment', 'create_comment exists');
 
 select is(
-  has_function_privilege('authenticated', 'public.create_comment(text, text, text, text, text)', 'EXECUTE'),
+  has_function_privilege('authenticated', 'public.create_comment(text, text, text, text, text, text, text)', 'EXECUTE'),
   true,
   'authenticated can create_comment'
 );
 select is(
-  has_function_privilege('anon', 'public.create_comment(text, text, text, text, text)', 'EXECUTE'),
+  has_function_privilege('anon', 'public.create_comment(text, text, text, text, text, text, text)', 'EXECUTE'),
   false,
   'anon cannot create_comment'
 );

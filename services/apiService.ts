@@ -202,6 +202,14 @@ export async function postTake(
 /** Media already uploaded and ready to attach to a rebuttal. */
 export type NewCommentMedia = NewTakeMedia;
 
+/** Validated Tenor GIF attachment (no storage upload). */
+export interface NewCommentGif {
+  provider: 'tenor';
+  externalId: string;
+  /** Allowed Tenor CDN URL (tinygif/share). */
+  url: string;
+}
+
 /**
  * Posts a rebuttal (or reply) through `create_comment`. Author and media
  * ownership are server-stamped; empty (no text and no media) is rejected.
@@ -211,13 +219,24 @@ export async function postComment(
   text: string,
   parentId?: string,
   media?: NewCommentMedia,
+  gif?: NewCommentGif,
 ): Promise<ChallengerComment> {
+  if (media && gif) {
+    throw new SupabaseError('Choose either an upload or a GIF, not both', 'bad_payload');
+  }
   const { data, error } = await requireSupabase().rpc('create_comment', {
     p_take_id: takeId,
     p_text: text,
     ...(parentId ? { p_parent_comment_id: parentId } : {}),
     ...(media
       ? { p_media_object_id: media.mediaObjectId, p_media_url: media.url }
+      : {}),
+    ...(gif
+      ? {
+          p_media_url: gif.url,
+          p_gif_provider: gif.provider,
+          p_gif_external_id: gif.externalId,
+        }
       : {}),
   });
 

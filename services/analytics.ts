@@ -71,7 +71,9 @@ export type AnalyticsEvent =
   | 'creator_referral_shared'
   | 'creator_coupon_shared'
   | 'media_reply_picker_opened'
-  | 'media_reply_created';
+  | 'media_reply_created'
+  | 'gif_picker_opened'
+  | 'gif_reply_created';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([
@@ -89,6 +91,7 @@ const ALLOWED_PROP_KEYS = new Set([
   'world_filter',
   'accessible',
   'reply_depth',
+  'has_query',
 ]);
 
 export type AnalyticsProperties = {
@@ -96,7 +99,7 @@ export type AnalyticsProperties = {
   realm?: 'arena' | 'world' | 'vault' | 'profile';
   hood_id?: string;
   take_has_media?: boolean;
-  media_type?: 'image' | 'video' | 'none';
+  media_type?: 'image' | 'video' | 'gif' | 'none';
   clash_mode?: 'STANDARD' | 'BLIND';
   is_creator?: boolean;
   is_guest?: boolean;
@@ -107,6 +110,8 @@ export type AnalyticsProperties = {
   accessible?: boolean;
   /** Nesting depth of a media reply (0 = top-level). */
   reply_depth?: number;
+  /** Whether GIF search had a non-empty query (never the query text). */
+  has_query?: boolean;
 };
 
 let client: PostHog | null = null;

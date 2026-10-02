@@ -248,6 +248,8 @@ export type Database = {
         Row: {
           author_id: string
           created_at: string
+          gif_external_id: string | null
+          gif_provider: string | null
           id: string
           is_pinned: boolean
           is_removed: boolean
@@ -262,6 +264,8 @@ export type Database = {
         Insert: {
           author_id: string
           created_at?: string
+          gif_external_id?: string | null
+          gif_provider?: string | null
           id: string
           is_pinned?: boolean
           is_removed?: boolean
@@ -276,6 +280,8 @@ export type Database = {
         Update: {
           author_id?: string
           created_at?: string
+          gif_external_id?: string | null
+          gif_provider?: string | null
           id?: string
           is_pinned?: boolean
           is_removed?: boolean
@@ -2075,6 +2081,8 @@ export type Database = {
       }
       create_comment: {
         Args: {
+          p_gif_external_id?: string
+          p_gif_provider?: string
           p_media_object_id?: string
           p_media_url?: string
           p_parent_comment_id?: string
@@ -2084,6 +2092,8 @@ export type Database = {
         Returns: {
           author_id: string
           created_at: string
+          gif_external_id: string | null
+          gif_provider: string | null
           id: string
           is_pinned: boolean
           is_removed: boolean
@@ -2316,6 +2326,10 @@ export type Database = {
       }
       is_advertiser_owner: {
         Args: { p_advertiser_id: string }
+        Returns: boolean
+      }
+      is_allowed_tenor_media_url: {
+        Args: { p_url: string }
         Returns: boolean
       }
       is_assigned_campaign_creator: {
@@ -2825,7 +2839,7 @@ export type Database = {
         | "gaming"
         | "startups"
         | "football"
-      media_kind: "image" | "video"
+      media_kind: "image" | "video" | "gif"
       media_status: "uploading" | "ready" | "failed" | "deleted"
       media_visibility: "public" | "private"
       moderation_action:
@@ -3050,7 +3064,7 @@ export const Constants = {
         "startups",
         "football",
       ],
-      media_kind: ["image", "video"],
+      media_kind: ["image", "video", "gif"],
       media_status: ["uploading", "ready", "failed", "deleted"],
       media_visibility: ["public", "private"],
       moderation_action: [

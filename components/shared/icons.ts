@@ -32,6 +32,7 @@ export { default as VolumeXIcon } from 'lucide-react-native/icons/volume-x';
 export { default as Volume2Icon } from 'lucide-react-native/icons/volume-2';
 export { default as VideoIcon } from 'lucide-react-native/icons/video';
 export { default as ImageIcon } from 'lucide-react-native/icons/image';
+export { default as StickerIcon } from 'lucide-react-native/icons/sticker';
 export { default as HashIcon } from 'lucide-react-native/icons/hash';
 export { default as MedalIcon } from 'lucide-react-native/icons/medal';
 export { default as VerifiedIcon } from 'lucide-react-native/icons/circle-check';

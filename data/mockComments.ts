@@ -62,6 +62,17 @@ export const COMMENTS: readonly ChallengerComment[] = [
     media: FIXTURE_NESTED,
   }),
   row('c-flagship-2', 't-flagship', 'u-maya', '', 42, 0.5, { media: FIXTURE_VIDEO }),
+  // LOCAL-ONLY: GIF-shaped reply (Tenor-like URL used only in offline fixtures).
+  row('c-flagship-gif', 't-flagship', 'u-liam', 'this energy', 28, 0.2, {
+    media: {
+      kind: 'gif',
+      caption: '',
+      colors: gradient.violet,
+      url: 'https://media.tenor.com/images/placeholder/tenor.gif',
+      gifProvider: 'tenor',
+      gifExternalId: 'fixture1',
+    },
+  }),
   row('c-trailers-1', 't-trailers', 'u-maya', 'Trailers are marketing. Nobody is watching AI for two hours.', 402, 1.5),
   row('c-trailers-2', 't-trailers', 'u-kabir', 'Give it a year — short AI films already beat ad spots.', 133, 1),
   row('c-degree-1', 't-degree', 'u-ananya', 'The degree is a visa for your first job. Try skipping it.', 287, 4),
