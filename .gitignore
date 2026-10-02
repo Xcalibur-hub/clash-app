@@ -20,10 +20,11 @@ supabase/.branches/
 
 # Local secrets. EXPO_PUBLIC_* values are public by design (RLS guards the data),
 # but they are environment-specific: document them in `.env.example`, not in git.
-# `.env.example` is the only environment file that belongs in the repository.
+# `.env.example` / `.env.local.example` are the only environment files that belong in the repository.
 .env
 .env.*
 !.env.example
+!.env.local.example
 # Expo generated native projects
 /android/
 /ios/

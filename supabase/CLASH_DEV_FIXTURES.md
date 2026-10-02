@@ -40,11 +40,13 @@ With the local stack already running:
 npm run supabase:seed:clash-dev
 ```
 
-This script:
+This also (re)creates the local developer auth user:
 
-1. Requires Docker container `supabase_db_clash` (project `clash`)
-2. Refuses any other target
-3. Re-deletes the `devfx_*` namespace and re-inserts
+| Email | Password |
+|-------|----------|
+| `dev@clash.local` | `clash-local-dev` |
+
+Physical Android + local stack: see `docs/LOCAL_DEVICE_SUPABASE.md`.
 
 ## How to test in the app
 

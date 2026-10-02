@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, type AppStateStatus } from 'react-native';
 import { createClient, type PostgrestError, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../supabase/database.types';
+import { isLocalSupabaseUrl } from '../utils/supabaseEnv';
 import { logger } from './logger';
 
 /**
@@ -12,6 +13,9 @@ import { logger } from './logger';
  * refresh is paused while the app is backgrounded so a stale token is never
  * rotated on a frozen JS thread. `detectSessionInUrl` stays off — there is no
  * browser URL to parse, deep-link auth is a Phase 4 concern.
+ *
+ * Local vs hosted sessions use different AsyncStorage keys so a phone that was
+ * signed into hosted Supabase does not reuse that JWT against the local stack.
  *
  * `EXPO_PUBLIC_*` values are inlined at build time and are safe to ship: the
  * publishable key only grants what Row Level Security allows.
@@ -33,6 +37,9 @@ export class SupabaseError extends Error {
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+/** True when EXPO_PUBLIC_SUPABASE_URL points at 127.0.0.1 / localhost. */
+export const isLocalSupabase: boolean = isLocalSupabaseUrl(url);
 
 /** False when `.env` is missing — live Arena stays empty/error (never silent mocks). */
 export const isSupabaseConfigured: boolean = url.length > 0 && anonKey.length > 0;
@@ -62,6 +69,8 @@ function buildClient(): ClashSupabaseClient | null {
   const client = createClient<Database>(url, anonKey, {
     auth: {
       storage: AsyncStorage,
+      // Isolate local vs hosted sessions on the same physical device.
+      storageKey: isLocalSupabase ? 'sb-clash-local-auth-token' : 'sb-clash-hosted-auth-token',
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

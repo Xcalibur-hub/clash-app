@@ -35,6 +35,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const isDevelopment = variant === 'development';
   const applicationId = isDevelopment ? 'com.clash.v2.dev' : 'com.clash.v2';
 
+  // Guard: EAS/CI must never bake a local Docker URL into preview/production.
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const isCiBuild = Boolean(process.env.EAS_BUILD || process.env.CI);
+  if (
+    isCiBuild &&
+    !isDevelopment &&
+    /127\.0\.0\.1|localhost/i.test(supabaseUrl)
+  ) {
+    throw new Error(
+      'Local Supabase URL (127.0.0.1/localhost) cannot be used for preview/production EAS builds. Clear .env.local and use hosted EAS secrets.',
+    );
+  }
+
   const sentryOrg = process.env.SENTRY_ORG?.trim();
   const sentryProject = process.env.SENTRY_PROJECT?.trim();
   const sentryPlugin: NonNullable<ExpoConfig['plugins']>[number] = [
@@ -71,6 +84,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       ...config.android,
       package: applicationId,
+      // DEVELOPMENT ONLY: allow http://127.0.0.1 for local Supabase via adb reverse.
+      // Preview/production builds never set this — HTTPS hosted Supabase only.
+      ...(isDevelopment ? { usesCleartextTraffic: true } : {}),
       config: {
         ...config.android?.config,
         // Required for production Google Maps on Android store/dev builds.

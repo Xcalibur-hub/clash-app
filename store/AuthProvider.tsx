@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User as AuthUser } from '@supabase/supabase-js';
-import { requestOtp, signOut, verifyOtp } from '../services/authService';
-import { supabase } from '../services/supabaseClient';
+import { requestOtp, signInWithPasswordLocal, signOut, verifyOtp } from '../services/authService';
+import { isLocalSupabase, supabase } from '../services/supabaseClient';
 
 /**
  * One auth context for the whole app. It owns the session lifecycle — restore on
@@ -14,8 +14,12 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   signedIn: boolean;
+  /** True when EXPO_PUBLIC_SUPABASE_URL is the local Docker stack. */
+  isLocalSupabase: boolean;
   requestOtp: (email: string) => Promise<void>;
   verifyOtp: (email: string, token: string) => Promise<void>;
+  /** LOCAL ONLY — password path for seeded `dev@clash.local`. */
+  signInWithPasswordLocal: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -60,8 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       user: session?.user ?? null,
       loading,
       signedIn: Boolean(session?.user),
+      isLocalSupabase,
       requestOtp,
       verifyOtp,
+      signInWithPasswordLocal,
       signOut,
     }),
     [session, loading],

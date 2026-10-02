@@ -11,6 +11,7 @@ import { ClashProvider } from '../store';
 import { AuthProvider } from '../store/AuthProvider';
 import { AuthHydrator } from '../store/AuthHydrator';
 import { FontBootstrap, ThemeProvider, useThemeColors } from '../theme';
+import { LocalSupabaseBadge } from '../components/dev/LocalSupabaseBadge';
 
 initSentry();
 initAnalytics();
@@ -28,6 +29,7 @@ initAnalytics();
  *
  * SentryTestTrigger is intentionally NOT mounted here. Opt-in only via an
  * explicit internal debug entry — never in ordinary app UI.
+ * LocalSupabaseBadge mounts only when EXPO_PUBLIC_SUPABASE_URL is local + dev.
  */
 
 function ThemedChrome({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -93,6 +95,7 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="world/compose" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="world/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
                 </ThemedChrome>
+                <LocalSupabaseBadge />
               </FontBootstrap>
             </ThemeProvider>
           </ClashProvider>

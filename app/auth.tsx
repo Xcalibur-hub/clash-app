@@ -70,10 +70,11 @@ export default function AuthScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const t = useThemeColors();
-  const { signedIn, requestOtp, verifyOtp } = useAuth();
+  const { signedIn, requestOtp, verifyOtp, isLocalSupabase, signInWithPasswordLocal } = useAuth();
 
   const [step, setStep] = React.useState<'email' | 'code'>('email');
-  const [email, setEmail] = React.useState('');
+  const [email, setEmail] = React.useState(isLocalSupabase ? 'dev@clash.local' : '');
+  const [password, setPassword] = React.useState('');
   const [code, setCode] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -125,6 +126,20 @@ export default function AuthScreen(): React.JSX.Element {
     }
   };
 
+  const confirmLocalPassword = async (): Promise<void> => {
+    if (!isLocalSupabase || !emailValid || password.length < 6 || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await signInWithPasswordLocal(email.trim(), password);
+      analytics.track('auth_completed', { source: 'local_password' });
+    } catch (caught) {
+      setError(authErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const confirm = async (): Promise<void> => {
     if (!codeValid || busy) return;
     setBusy(true);
@@ -161,9 +176,11 @@ export default function AuthScreen(): React.JSX.Element {
           <View style={styles.head}>
             <Text style={[styles.wordmark, { color: t.textPrimary }]}>CLASH</Text>
             <Text style={[styles.sub, { color: t.textSecondary }]}>
-              {step === 'email'
-                ? 'Say what everyone else is thinking.'
-                : 'Check your inbox.'}
+              {isLocalSupabase
+                ? 'Local Supabase — use the seeded developer account.'
+                : step === 'email'
+                  ? 'Say what everyone else is thinking.'
+                  : 'Check your inbox.'}
             </Text>
           </View>
 
@@ -177,15 +194,18 @@ export default function AuthScreen(): React.JSX.Element {
                   setEmail(next);
                   if (error) setError(null);
                 }}
-                placeholder="you@example.com"
+                placeholder={isLocalSupabase ? 'dev@clash.local' : 'you@example.com'}
                 placeholderTextColor={t.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
                 textContentType="emailAddress"
                 autoComplete="email"
-                returnKeyType="go"
-                onSubmitEditing={() => void sendCode()}
+                returnKeyType={isLocalSupabase ? 'next' : 'go'}
+                onSubmitEditing={() => {
+                  if (isLocalSupabase) return;
+                  void sendCode();
+                }}
                 style={[
                   styles.input,
                   {
@@ -196,14 +216,55 @@ export default function AuthScreen(): React.JSX.Element {
                 ]}
                 accessibilityLabel="Email address"
               />
-              <PrimaryButton
-                label={busy ? 'Sending…' : 'Continue'}
-                onPress={() => void sendCode()}
-                disabled={!emailValid || busy}
-                loading={busy}
-                fill={t.clashFill}
-                text={t.clashText}
-              />
+              {isLocalSupabase ? (
+                <>
+                  <Text style={[styles.label, { color: t.textMuted }]}>Password (local only)</Text>
+                  <TextInput
+                    value={password}
+                    onChangeText={(next) => {
+                      setPassword(next);
+                      if (error) setError(null);
+                    }}
+                    placeholder="clash-local-dev"
+                    placeholderTextColor={t.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    secureTextEntry
+                    textContentType="password"
+                    returnKeyType="go"
+                    onSubmitEditing={() => void confirmLocalPassword()}
+                    style={[
+                      styles.input,
+                      {
+                        color: t.textPrimary,
+                        borderColor: t.border,
+                        backgroundColor: t.inputBackground,
+                      },
+                    ]}
+                    accessibilityLabel="Local development password"
+                  />
+                  <PrimaryButton
+                    label={busy ? 'Signing in…' : 'Sign in (local)'}
+                    onPress={() => void confirmLocalPassword()}
+                    disabled={!emailValid || password.length < 6 || busy}
+                    loading={busy}
+                    fill={t.clashFill}
+                    text={t.clashText}
+                  />
+                  <Text style={[styles.localHint, { color: t.textMuted }]}>
+                    Seeded account: dev@clash.local / clash-local-dev
+                  </Text>
+                </>
+              ) : (
+                <PrimaryButton
+                  label={busy ? 'Sending…' : 'Continue'}
+                  onPress={() => void sendCode()}
+                  disabled={!emailValid || busy}
+                  loading={busy}
+                  fill={t.clashFill}
+                  text={t.clashText}
+                />
+              )}
             </View>
           ) : (
             <View style={styles.form}>
@@ -390,6 +451,7 @@ const styles = StyleSheet.create({
     marginTop: space.xs,
   },
   error: { ...typeScale.meta },
+  localHint: { ...typeScale.caption, marginTop: space.xs },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',

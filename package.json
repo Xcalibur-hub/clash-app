@@ -15,7 +15,10 @@
     "supabase:reset": "supabase db reset",
     "supabase:types": "supabase gen types typescript --local > supabase/database.types.ts",
     "supabase:test": "supabase test db",
-    "supabase:seed:clash-dev": "node scripts/seed-clash-dev.mjs"
+    "supabase:seed:clash-dev": "node scripts/seed-clash-dev.mjs",
+    "adb:reverse-supabase": "node scripts/adb-reverse-supabase.mjs",
+    "dev:local": "node scripts/dev-local.mjs",
+    "dev:hosted": "node scripts/dev-hosted.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/comic-neue": "^0.4.1",
