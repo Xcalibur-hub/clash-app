@@ -8,6 +8,7 @@ import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
 import { ArenaIcon, ArrowBigUpIcon, CommentIcon, MoreIcon } from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
+import { CommentMedia } from './CommentMedia';
 
 export interface CommentThreadProps {
   nodes: CommentNode[];
@@ -73,7 +74,10 @@ const CommentItem = React.memo(function CommentItem({
   const isViewer = comment.authorId === state.viewer.id;
   const isOp = takeAuthorId !== undefined && comment.authorId === takeAuthorId;
   const parentRemoved = Boolean(comment.parentId) && !state.comments.some((c) => c.id === comment.parentId);
-  const indent = Math.min(depth, 4) * 14;
+  // Cap indent so nested media stays usable on small screens.
+  const step = depth >= 3 ? 8 : 12;
+  const indent = Math.min(depth, 4) * step;
+  const hasText = Boolean(comment.text.trim());
 
   return (
     <View>
@@ -118,9 +122,12 @@ const CommentItem = React.memo(function CommentItem({
               · {timeAgo(comment.createdAt)}
             </Text>
           </View>
-          <Text allowFontScaling style={[styles.body, { color: t.textPrimary }]}>
-            {comment.text}
-          </Text>
+          {comment.media ? <CommentMedia media={comment.media} compact={depth >= 2} /> : null}
+          {hasText ? (
+            <Text allowFontScaling style={[styles.body, { color: t.textPrimary }]}>
+              {comment.text}
+            </Text>
+          ) : null}
           <View style={styles.actions}>
             <Pressable
               onPress={() => {
@@ -228,7 +235,7 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingVertical: 4,
   },
-  main: { flex: 1, gap: 4 },
+  main: { flex: 1, gap: 6, minWidth: 0 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
   name: { ...typeScale.label, fontSize: 13, fontWeight: '700' },
   handle: { ...typeScale.caption, fontSize: 11, flexShrink: 1 },

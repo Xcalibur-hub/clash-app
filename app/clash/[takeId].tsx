@@ -112,6 +112,15 @@ export default function ClashScreen(): React.JSX.Element {
 
   const take = state.takes.find((item) => item.id === id);
   const sideAMedia = take?.media ?? null;
+  const sideBMedia = React.useMemo(() => {
+    if (!view?.sideBMediaKind || !view.sideBMediaUrl) return null;
+    return {
+      kind: view.sideBMediaKind,
+      caption: '',
+      colors: ['#1C1917', '#44403C'] as [string, string],
+      url: view.sideBMediaUrl,
+    };
+  }, [view?.sideBMediaKind, view?.sideBMediaUrl]);
 
   const argumentItems = React.useMemo(() => {
     const comments = selectCommentsForTake(state, id)
@@ -355,6 +364,7 @@ export default function ClashScreen(): React.JSX.Element {
           sideA={sideA}
           sideB={sideB}
           sideAMedia={sideAMedia}
+          sideBMedia={sideBMedia}
           selectedSide={activeSelection}
           myBallot={ballot}
           settled={settled}

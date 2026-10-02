@@ -111,6 +111,8 @@ export interface ChallengerComment {
   createdAt: number;
   /** Parent rebuttal id (null for a top-level rebuttal). */
   parentId?: string;
+  /** Attached Arena media (owned media_objects), when present. */
+  media?: TakeMedia;
 }
 
 /** The two duelling sides of a Clash. */

@@ -13,6 +13,7 @@ export interface ClashMatchupProps {
   sideA: User | null;
   sideB: User | null;
   sideAMedia?: TakeMedia | null;
+  sideBMedia?: TakeMedia | null;
   selectedSide?: Side | null;
   myBallot?: Side | null;
   settled?: boolean;
@@ -28,6 +29,7 @@ export function ClashMatchup({
   sideA,
   sideB,
   sideAMedia = null,
+  sideBMedia = null,
   selectedSide = null,
   myBallot = null,
   settled = false,
@@ -70,7 +72,8 @@ export function ClashMatchup({
       <ClashSideCard
         side="B"
         author={sideB}
-        text={sideBText || 'Rebuttal unavailable'}
+        text={sideBText || (sideBMedia ? '' : 'Rebuttal unavailable')}
+        media={sideBMedia}
         enterDelay={120}
         rotationDeg={2.6}
         offsetX={10}

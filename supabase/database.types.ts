@@ -251,6 +251,9 @@ export type Database = {
           id: string
           is_pinned: boolean
           is_removed: boolean
+          media_kind: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id: string | null
+          media_url: string | null
           parent_comment_id: string | null
           take_id: string
           text: string
@@ -262,6 +265,9 @@ export type Database = {
           id: string
           is_pinned?: boolean
           is_removed?: boolean
+          media_kind?: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id?: string | null
+          media_url?: string | null
           parent_comment_id?: string | null
           take_id: string
           text: string
@@ -273,6 +279,9 @@ export type Database = {
           id?: string
           is_pinned?: boolean
           is_removed?: boolean
+          media_kind?: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id?: string | null
+          media_url?: string | null
           parent_comment_id?: string | null
           take_id?: string
           text?: string
@@ -284,6 +293,13 @@ export type Database = {
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_media_object_id_fkey"
+            columns: ["media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
             referencedColumns: ["id"]
           },
           {
@@ -2056,6 +2072,29 @@ export type Database = {
           updated_at: string
           vault_id: string
         }
+      }
+      create_comment: {
+        Args: {
+          p_media_object_id?: string
+          p_media_url?: string
+          p_parent_comment_id?: string
+          p_take_id: string
+          p_text: string
+        }
+        Returns: {
+          author_id: string
+          created_at: string
+          id: string
+          is_pinned: boolean
+          is_removed: boolean
+          media_kind: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id: string | null
+          media_url: string | null
+          parent_comment_id: string | null
+          take_id: string
+          text: string
+          upvotes_count: number
+        }[]
       }
       create_media_upload: {
         Args: {

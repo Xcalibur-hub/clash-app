@@ -16,6 +16,7 @@ import type { Side, TakeMedia, User } from '../../../store';
 import { duration, radius, space, spring, typeScale, useThemeColors } from '../../../theme';
 import { Avatar } from '../../shared/Avatar';
 import { PressableScale } from '../../shared/PressableScale';
+import { PlayIcon } from '../../shared/icons';
 import { useDuelSurface } from './clashTheme';
 
 export interface ClashSideCardProps {
@@ -58,7 +59,8 @@ export function ClashSideCard({
   const pressPulse = useSharedValue(1);
   const hidden = author === null;
   const hasImage = Boolean(media?.kind === 'image' && media.url);
-  const mediaFirst = hasImage || Boolean(media && !media.url);
+  const hasVideo = Boolean(media?.kind === 'video' && media.url);
+  const mediaFirst = hasImage || hasVideo || Boolean(media && !media.url);
 
   React.useEffect(() => {
     if (reduced) {
@@ -191,6 +193,10 @@ export function ClashSideCard({
               resizeMode="cover"
               style={StyleSheet.absoluteFill}
             />
+          ) : hasVideo ? (
+            <View style={[StyleSheet.absoluteFill, styles.videoPlate]}>
+              <PlayIcon size={28} color="#FAFAF8" strokeWidth={2.4} />
+            </View>
           ) : media ? (
             <LinearGradient
               colors={media.colors}
@@ -254,6 +260,11 @@ const styles = StyleSheet.create({
     minHeight: 228,
     paddingVertical: 0,
     paddingHorizontal: 0,
+  },
+  videoPlate: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#121214',
   },
   mediaContent: {
     flex: 1,

@@ -1,7 +1,31 @@
-import type { ChallengerComment } from '../store/types';
+import type { ChallengerComment, TakeMedia } from '../store/types';
+import { gradient } from '../theme';
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.now();
+
+/** Local-only Unsplash fixtures for offline Arena media reply previews. */
+const FIXTURE_IMAGE: TakeMedia = {
+  kind: 'image',
+  caption: '',
+  colors: gradient.violet,
+  url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&h=800&fit=crop',
+};
+
+const FIXTURE_NESTED: TakeMedia = {
+  kind: 'image',
+  caption: '',
+  colors: gradient.violet,
+  url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=800&fit=crop',
+};
+
+const FIXTURE_VIDEO: TakeMedia = {
+  kind: 'video',
+  caption: '',
+  colors: ['#0C0C10', '#1C1917'],
+  url: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1280&h=720&fit=crop',
+  duration: '0:12',
+};
 
 function row(
   id: string,
@@ -10,19 +34,34 @@ function row(
   text: string,
   upvotes: number,
   ageHours: number,
+  extras?: { parentId?: string; media?: TakeMedia },
 ): ChallengerComment {
-  return { id, takeId, authorId, text, upvotes, createdAt: NOW - ageHours * HOUR };
+  return {
+    id,
+    takeId,
+    authorId,
+    text,
+    upvotes,
+    createdAt: NOW - ageHours * HOUR,
+    ...(extras?.parentId ? { parentId: extras.parentId } : {}),
+    ...(extras?.media ? { media: extras.media } : {}),
+  };
 }
 
 /**
- * Community rebuttals (2 per take) — the guest/offline fallback the store starts
- * from before `hydrationService` swaps in the live Arena.
+ * Community rebuttals — guest/offline fallback before hydration swaps in live Arena.
+ * LOCAL-ONLY media reply examples live on the flagship take thread.
  */
 export const COMMENTS: readonly ChallengerComment[] = [
   row('c-pixel-1', 't-pixel', 'u-liam', "Photos aren't the whole story. iPhone still dominates video.", 214, 3),
   row('c-pixel-2', 't-pixel', 'u-zoya', 'Gcam port on Pixel still clears iPhone night mode for half the price.', 96, 2),
-  row('c-flagship-1', 't-flagship', 'u-liam', 'Caught up on specs, still behind on resale value.', 158, 2),
-  row('c-flagship-2', 't-flagship', 'u-maya', 'Trade-in counters disagree — Pixels hold better than they used to.', 71, 1),
+  // LOCAL-ONLY: image reply + nested image + video reply on the flagship take.
+  row('c-flagship-1', 't-flagship', 'u-liam', 'Sure they have.', 158, 2, { media: FIXTURE_IMAGE }),
+  row('c-flagship-1n', 't-flagship', 'u-maya', 'literally this', 71, 1, {
+    parentId: 'c-flagship-1',
+    media: FIXTURE_NESTED,
+  }),
+  row('c-flagship-2', 't-flagship', 'u-maya', '', 42, 0.5, { media: FIXTURE_VIDEO }),
   row('c-trailers-1', 't-trailers', 'u-maya', 'Trailers are marketing. Nobody is watching AI for two hours.', 402, 1.5),
   row('c-trailers-2', 't-trailers', 'u-kabir', 'Give it a year — short AI films already beat ad spots.', 133, 1),
   row('c-degree-1', 't-degree', 'u-ananya', 'The degree is a visa for your first job. Try skipping it.', 287, 4),

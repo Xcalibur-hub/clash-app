@@ -412,6 +412,21 @@ export default function TakeDetailScreen(): React.JSX.Element {
           <RebuttalInput
             takeId={take.id}
             parentId={replyTo?.comment.id}
+            replyDepth={
+              replyTo
+                ? (() => {
+                    let depth = 1;
+                    let cursor: string | undefined = replyTo.comment.parentId;
+                    const byId = new Map(state.comments.map((c) => [c.id, c]));
+                    while (cursor) {
+                      depth += 1;
+                      cursor = byId.get(cursor)?.parentId;
+                      if (depth > 32) break;
+                    }
+                    return depth;
+                  })()
+                : 0
+            }
             replyingTo={replyTo?.handle}
             onDone={() => setReplyTo(null)}
           />

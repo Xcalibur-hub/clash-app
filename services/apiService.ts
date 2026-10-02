@@ -199,27 +199,32 @@ export async function postTake(
   return toTake(row);
 }
 
-/** Posts a rebuttal (or reply) on a take that is still live (the DB enforces it). */
+/** Media already uploaded and ready to attach to a rebuttal. */
+export type NewCommentMedia = NewTakeMedia;
+
+/**
+ * Posts a rebuttal (or reply) through `create_comment`. Author and media
+ * ownership are server-stamped; empty (no text and no media) is rejected.
+ */
 export async function postComment(
   takeId: string,
   text: string,
   parentId?: string,
+  media?: NewCommentMedia,
 ): Promise<ChallengerComment> {
-  const authorId = await requireViewerProfileId();
-  const { data, error } = await requireSupabase()
-    .from('comments')
-    .insert({
-      id: `c-${Date.now()}`,
-      take_id: takeId,
-      author_id: authorId,
-      text,
-      ...(parentId ? { parent_comment_id: parentId } : {}),
-    })
-    .select('*')
-    .single();
+  const { data, error } = await requireSupabase().rpc('create_comment', {
+    p_take_id: takeId,
+    p_text: text,
+    ...(parentId ? { p_parent_comment_id: parentId } : {}),
+    ...(media
+      ? { p_media_object_id: media.mediaObjectId, p_media_url: media.url }
+      : {}),
+  });
 
   if (error) throw requestError(error);
-  return toComment(data);
+  const row = data?.[0];
+  if (!row) throw new SupabaseError('create_comment returned no row', 'bad_payload');
+  return toComment(row);
 }
 
 /**

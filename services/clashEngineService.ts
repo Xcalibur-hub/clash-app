@@ -165,6 +165,9 @@ export interface ClashView {
   sideBText: string;
   sideA: ClashParticipant | null;
   sideB: ClashParticipant | null;
+  /** Optional Side B media from the challenger comment (image/video URL). */
+  sideBMediaKind: 'image' | 'video' | null;
+  sideBMediaUrl: string | null;
   verdict: ServerVerdict | null;
 }
 
@@ -270,6 +273,9 @@ function toClashView(payload: Json | null): ClashView {
     sideBText,
     sideA: toParticipant(r.sideA),
     sideB: toParticipant(r.sideB),
+    sideBMediaKind:
+      r.sideBMediaKind === 'image' || r.sideBMediaKind === 'video' ? r.sideBMediaKind : null,
+    sideBMediaUrl: typeof r.sideBMediaUrl === 'string' ? r.sideBMediaUrl : null,
     verdict: toViewVerdict(r.verdict),
   };
 }

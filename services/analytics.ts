@@ -69,7 +69,9 @@ export type AnalyticsEvent =
   | 'creator_earnings_viewed'
   | 'creator_campaign_opened'
   | 'creator_referral_shared'
-  | 'creator_coupon_shared';
+  | 'creator_coupon_shared'
+  | 'media_reply_picker_opened'
+  | 'media_reply_created';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([
@@ -86,6 +88,7 @@ const ALLOWED_PROP_KEYS = new Set([
   'vault_access_type',
   'world_filter',
   'accessible',
+  'reply_depth',
 ]);
 
 export type AnalyticsProperties = {
@@ -102,6 +105,8 @@ export type AnalyticsProperties = {
   vault_access_type?: 'free' | 'subscriber';
   world_filter?: 'nearby' | 'recent' | 'mission';
   accessible?: boolean;
+  /** Nesting depth of a media reply (0 = top-level). */
+  reply_depth?: number;
 };
 
 let client: PostHog | null = null;

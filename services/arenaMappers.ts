@@ -43,7 +43,18 @@ export function toTake(row: TableRow<'takes'>): Take {
   };
 }
 
+function toCommentMedia(row: TableRow<'comments'>): TakeMedia | undefined {
+  if (!row.media_kind) return undefined;
+  return {
+    kind: row.media_kind,
+    caption: '',
+    colors: gradient.violet,
+    ...(row.media_url ? { url: row.media_url } : {}),
+  };
+}
+
 export function toComment(row: TableRow<'comments'>): ChallengerComment {
+  const media = toCommentMedia(row);
   return {
     id: row.id,
     takeId: row.take_id,
@@ -52,6 +63,7 @@ export function toComment(row: TableRow<'comments'>): ChallengerComment {
     upvotes: row.upvotes_count,
     createdAt: Date.parse(row.created_at),
     ...(row.parent_comment_id ? { parentId: row.parent_comment_id } : {}),
+    ...(media ? { media } : {}),
   };
 }
 
