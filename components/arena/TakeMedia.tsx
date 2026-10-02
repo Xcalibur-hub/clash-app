@@ -12,6 +12,7 @@ export type TakeMediaVariant = 'feed' | 'detail';
  * Bounded media plate.
  * Feed: editorial cover crop (5:4).
  * Detail: preserve full image (contain) with intelligent frame — no blind cover-crop.
+ * Video: static poster/frame only until MediaViewer opens (never autoplay here).
  */
 export function TakeMedia({
   media,
@@ -25,14 +26,14 @@ export function TakeMedia({
 }): React.JSX.Element {
   const t = useThemeColors();
   const isVideo = media.kind === 'video';
-  const hasImage = media.kind === 'image' && Boolean(media.url);
+  const hasUrl = Boolean(media.url);
   const detail = variant === 'detail' || edge;
   const [frameRatio, setFrameRatio] = React.useState(detail ? 4 / 5 : 5 / 4);
   const [viewerOpen, setViewerOpen] = React.useState(false);
 
   React.useEffect(() => {
-    if (!detail || !hasImage || !media.url) {
-      setFrameRatio(detail ? 4 / 5 : 5 / 4);
+    if (!detail || !hasUrl || !media.url) {
+      setFrameRatio(detail ? 3 / 4 : 5 / 4);
       return;
     }
     let cancelled = false;
@@ -46,13 +47,15 @@ export function TakeMedia({
         setFrameRatio(clamped);
       },
       () => {
-        if (!cancelled) setFrameRatio(4 / 5);
+        if (!cancelled) setFrameRatio(3 / 4);
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [detail, hasImage, media.url]);
+  }, [detail, hasUrl, media.url]);
+
+  const fitMode = detail ? 'contain' : 'cover';
 
   const plate = (
     <View
@@ -65,10 +68,9 @@ export function TakeMedia({
       accessibilityRole="image"
       accessibilityLabel={`${media.kind}${media.caption ? `: ${media.caption}` : ''}`}
     >
-      {hasImage ? (
+      {hasUrl ? (
         <>
-          {/* Soft fill behind contain so letterboxing feels intentional */}
-          {detail ? (
+          {detail || fitMode === 'contain' ? (
             <Image
               source={{ uri: media.url as string }}
               resizeMode="cover"
@@ -78,7 +80,7 @@ export function TakeMedia({
           ) : null}
           <Image
             source={{ uri: media.url as string }}
-            resizeMode={detail ? 'contain' : 'cover'}
+            resizeMode={fitMode}
             style={StyleSheet.absoluteFill}
           />
         </>
@@ -104,19 +106,20 @@ export function TakeMedia({
     </View>
   );
 
-  if (detail && hasImage) {
+  if (detail && hasUrl) {
     return (
       <>
         <Pressable
           onPress={() => setViewerOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="View full media"
+          accessibilityLabel={isVideo ? 'Play video' : 'View full media'}
         >
           {plate}
         </Pressable>
         <MediaViewer
           visible={viewerOpen}
           uri={media.url ?? null}
+          kind={isVideo ? 'video' : 'image'}
           onClose={() => setViewerOpen(false)}
         />
       </>
@@ -138,8 +141,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
   },
   detail: {
-    borderRadius: radius.md,
-    maxHeight: 520,
+    borderRadius: radius.xxl,
+    maxHeight: 560,
+    minHeight: 220,
   },
   veil: {
     ...StyleSheet.absoluteFillObject,

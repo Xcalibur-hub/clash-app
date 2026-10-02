@@ -4,7 +4,15 @@
  */
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HOOD_LABEL } from '../../data/hoods';
 import type { Take, User } from '../../store';
@@ -179,6 +187,76 @@ function FreshHeroMedia({
   );
 }
 
+/**
+ * Full-bleed cinematic plate for embedded Fresh Takes.
+ * Static image/poster only — never mounts a video player.
+ */
+function CinematicBackdrop({
+  url,
+  colors,
+  isVideo,
+}: {
+  url?: string;
+  colors: readonly [string, string, ...string[]];
+  isVideo: boolean;
+}): React.JSX.Element {
+  const reduced = useReducedMotion();
+  const drift = useSharedValue(0);
+  const mode = useSafeHeroFit(url);
+
+  React.useEffect(() => {
+    if (reduced || !url) {
+      drift.value = 0;
+      return;
+    }
+    drift.value = withRepeat(
+      withTiming(1, { duration: 4200, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+  }, [drift, reduced, url]);
+
+  const mediaStyle = useAnimatedStyle(() => ({
+    transform: reduced || !url ? [] : [{ translateX: drift.value * 3 }, { scale: 1.04 }],
+  }));
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {url ? (
+        <Animated.View style={[StyleSheet.absoluteFill, mediaStyle]}>
+          {mode === 'contain' ? (
+            <Image
+              source={{ uri: url }}
+              style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
+              resizeMode="cover"
+              blurRadius={32}
+            />
+          ) : null}
+          <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode={mode} />
+        </Animated.View>
+      ) : (
+        <LinearGradient colors={[...colors]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      )}
+      {/* Soft overall tint — faint, keeps photo recognizable */}
+      <View style={styles.cinematicTint} />
+      {/* Localized readability veil — denser near the text band */}
+      <LinearGradient
+        colors={['rgba(8,8,11,0.05)', 'rgba(8,8,11,0.28)', 'rgba(8,8,11,0.78)']}
+        locations={[0, 0.42, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      {isVideo ? (
+        <View style={styles.videoBadge} pointerEvents="none">
+          <PlayIcon size={12} color="#FAFAF8" strokeWidth={2.6} />
+          <Text allowFontScaling={false} style={styles.videoBadgeText}>
+            VIDEO
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function FreshTakeCard({
   take,
   author,
@@ -243,6 +321,10 @@ export function FreshTakeCard({
   );
 
   if (variant === 'lead') {
+    const cinematic = Boolean(hasMedia);
+    const posterUrl = take.media?.url;
+    const mediaColors = take.media?.colors ?? (['#2A2A2E', '#111113'] as const);
+
     return (
       <Animated.View entering={entering} style={wrapStyle}>
         <PressableScale
@@ -256,36 +338,33 @@ export function FreshTakeCard({
               styles.lead,
               embedded && styles.leadFill,
               {
-                backgroundColor: t.surface,
+                backgroundColor: cinematic ? '#111113' : t.surface,
                 borderColor: t.border,
                 shadowColor: t.shadowColor,
               },
             ]}
           >
-            <View style={[styles.leadAccentBlob, { backgroundColor: hoodAccent.soft }]} />
-            {hasMedia && mediaUrl ? (
-              <FreshHeroMedia
-                url={mediaUrl}
-                isVideo={isVideo}
-                height={embedded ? 220 : 300}
-                radiusPx={0}
-                overlay={
-                  <View style={styles.leadOverlay}>
-                    <PulseChip pulse={pulse} />
-                    <Text allowFontScaling style={styles.leadHeadline} numberOfLines={3}>
-                      {take.text}
+            {cinematic ? (
+              <>
+                <CinematicBackdrop url={posterUrl} colors={mediaColors} isVideo={isVideo} />
+                <View style={[styles.cinematicContent, embedded && styles.cinematicContentFill]}>
+                  <PulseChip pulse={pulse} />
+                  <Text allowFontScaling style={styles.cinematicHeadline} numberOfLines={5}>
+                    {take.text}
+                  </Text>
+                  <View style={styles.metaRow}>
+                    <Avatar name={author.name} tint={author.tint} size={22} />
+                    <Text allowFontScaling={false} style={styles.leadMeta} numberOfLines={1}>
+                      @{author.handle} · {hood} · {timeAgo(take.createdAt)}
                     </Text>
-                    <View style={styles.metaRow}>
-                      <Avatar name={author.name} tint={author.tint} size={22} />
-                      <Text allowFontScaling={false} style={styles.leadMeta} numberOfLines={1}>
-                        @{author.handle} · {hood} · {timeAgo(take.createdAt)}
-                      </Text>
-                    </View>
                   </View>
-                }
-              />
+                </View>
+              </>
             ) : (
               <View style={[styles.leadTextOnly, embedded && styles.leadTextFill]}>
+                <View style={[styles.textAccentPanel, { backgroundColor: hoodAccent.soft }]} />
+                <View style={[styles.leadAccentBlobLarge, { backgroundColor: hoodAccent.deep }]} />
+                <View style={[styles.textAccentEdge, { backgroundColor: hoodAccent.ink }]} />
                 <View style={styles.leadTextTop}>
                   <PulseChip pulse={pulse} />
                   <IconAction label="More take actions" onPress={onMore}>
@@ -295,11 +374,11 @@ export function FreshTakeCard({
                 <Text
                   allowFontScaling
                   style={[styles.leadHeadlineDark, { color: t.textPrimary }]}
-                  numberOfLines={4}
+                  numberOfLines={5}
                 >
                   {take.text}
                 </Text>
-                <Squiggle size={88} color={hoodAccent.ink} opacity={0.28} style={styles.leadSquiggle} />
+                <Squiggle size={96} color={hoodAccent.ink} opacity={0.35} style={styles.leadSquiggle} />
                 <View style={styles.metaRow}>
                   <Avatar name={author.name} tint={author.tint} size={22} />
                   <Text
@@ -312,29 +391,77 @@ export function FreshTakeCard({
                 </View>
               </View>
             )}
-            <View style={styles.leadActions}>
+            <View style={[styles.leadActions, cinematic && styles.leadActionsOnMedia]}>
               <ActionStat
                 label="React"
                 onPress={onReact}
                 icon={
                   <FlameIcon
                     size={14}
-                    color={hasReacted ? hoodAccent.ink : t.textMuted}
+                    color={
+                      hasReacted
+                        ? cinematic
+                          ? '#FAFAF8'
+                          : hoodAccent.ink
+                        : cinematic
+                          ? 'rgba(250,250,248,0.7)'
+                          : t.textMuted
+                    }
                     strokeWidth={hasReacted ? 2.4 : 2}
                   />
                 }
                 value={compact(take.reactions)}
-                color={hasReacted ? hoodAccent.ink : t.textMuted}
+                color={
+                  hasReacted
+                    ? cinematic
+                      ? '#FAFAF8'
+                      : hoodAccent.ink
+                    : cinematic
+                      ? 'rgba(250,250,248,0.72)'
+                      : t.textMuted
+                }
               />
               <View style={styles.stat}>
-                <CommentIcon size={14} color={t.textMuted} strokeWidth={2} />
-                <Text allowFontScaling={false} style={[styles.statText, { color: t.textMuted }]}>
+                <CommentIcon
+                  size={14}
+                  color={cinematic ? 'rgba(250,250,248,0.7)' : t.textMuted}
+                  strokeWidth={2}
+                />
+                <Text
+                  allowFontScaling={false}
+                  style={[
+                    styles.statText,
+                    { color: cinematic ? 'rgba(250,250,248,0.72)' : t.textMuted },
+                  ]}
+                >
                   {compact(commentCount)}
                 </Text>
               </View>
-              <ClashAction take={take} onClash={onClash} />
+              <ClashAction take={take} onClash={onClash} onMedia={cinematic} />
               <View style={styles.spacer} />
-              {metaActions}
+              {cinematic ? (
+                <View style={styles.metaActions}>
+                  <IconAction label="Share this take" onPress={onShare}>
+                    <ShareIcon size={15} color="rgba(250,250,248,0.75)" strokeWidth={2.1} />
+                  </IconAction>
+                  <IconAction
+                    label={isSaved ? 'Remove from saved' : 'Save this take'}
+                    onPress={onSave}
+                    active={isSaved}
+                  >
+                    <BookmarkIcon
+                      size={15}
+                      color={isSaved ? '#FAFAF8' : 'rgba(250,250,248,0.75)'}
+                      strokeWidth={isSaved ? 2.4 : 2.1}
+                    />
+                  </IconAction>
+                  <IconAction label="More take actions" onPress={onMore}>
+                    <MoreIcon size={16} color="rgba(250,250,248,0.75)" strokeWidth={2.2} />
+                  </IconAction>
+                </View>
+              ) : (
+                metaActions
+              )}
             </View>
           </View>
         </PressableScale>
@@ -344,6 +471,10 @@ export function FreshTakeCard({
 
   if (variant === 'clash') {
     const accent = pulseAccent('clash', t.scheme)!;
+    const cinematic = Boolean(hasMedia);
+    const posterUrl = take.media?.url;
+    const mediaColors = take.media?.colors ?? (['#2A2A2E', '#111113'] as const);
+
     return (
       <Animated.View entering={entering} style={wrapStyle}>
         <PressableScale
@@ -356,45 +487,82 @@ export function FreshTakeCard({
             style={[
               styles.clashCard,
               embedded && styles.leadFill,
+              cinematic && styles.clashCinematic,
               {
-                backgroundColor: t.surface,
+                backgroundColor: cinematic ? '#111113' : t.surface,
                 borderColor: accent.ink,
                 shadowColor: t.shadowColor,
               },
             ]}
           >
-            <View style={[styles.clashStrip, { backgroundColor: accent.ink }]} />
-            <View style={styles.clashBody}>
-              <PulseChip pulse="clash" />
-              <Text
-                allowFontScaling
-                style={[styles.clashTitle, { color: t.textPrimary }]}
-                numberOfLines={3}
-              >
-                {take.text}
-              </Text>
-              <Text allowFontScaling={false} style={[styles.metaMuted, { color: t.textMuted }]} numberOfLines={1}>
-                @{author.handle} · {hood} · {take.clashes} active
-              </Text>
-              <View style={styles.leadActions}>
-                <Pressable
-                  onPress={() => {
-                    hapticTap();
-                    onClash();
-                  }}
-                  style={[styles.clashPill, { backgroundColor: accent.soft }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Open Clash"
-                >
-                  <ArenaIcon size={12} color={accent.ink} strokeWidth={2.6} />
-                  <Text allowFontScaling={false} style={[styles.clashPillText, { color: accent.ink }]}>
-                    Enter Clash
+            {cinematic ? (
+              <>
+                <CinematicBackdrop url={posterUrl} colors={mediaColors} isVideo={isVideo} />
+                <View style={[styles.clashStripTop, { backgroundColor: accent.ink }]} />
+                <View style={[styles.clashBody, styles.clashBodyOnMedia]}>
+                  <PulseChip pulse="clash" />
+                  <Text allowFontScaling style={styles.cinematicHeadline} numberOfLines={4}>
+                    {take.text}
                   </Text>
-                </Pressable>
-                <View style={styles.spacer} />
-                {metaActions}
-              </View>
-            </View>
+                  <Text allowFontScaling={false} style={styles.leadMeta} numberOfLines={1}>
+                    @{author.handle} · {hood} · {take.clashes} active
+                  </Text>
+                  <View style={styles.leadActions}>
+                    <Pressable
+                      onPress={() => {
+                        hapticTap();
+                        onClash();
+                      }}
+                      style={[styles.clashPill, { backgroundColor: accent.soft }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open Clash"
+                    >
+                      <ArenaIcon size={12} color={accent.ink} strokeWidth={2.6} />
+                      <Text allowFontScaling={false} style={[styles.clashPillText, { color: accent.ink }]}>
+                        Enter Clash
+                      </Text>
+                    </Pressable>
+                    <View style={styles.spacer} />
+                    {metaActions}
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={[styles.clashStrip, { backgroundColor: accent.ink }]} />
+                <View style={styles.clashBody}>
+                  <PulseChip pulse="clash" />
+                  <Text
+                    allowFontScaling
+                    style={[styles.clashTitle, { color: t.textPrimary }]}
+                    numberOfLines={3}
+                  >
+                    {take.text}
+                  </Text>
+                  <Text allowFontScaling={false} style={[styles.metaMuted, { color: t.textMuted }]} numberOfLines={1}>
+                    @{author.handle} · {hood} · {take.clashes} active
+                  </Text>
+                  <View style={styles.leadActions}>
+                    <Pressable
+                      onPress={() => {
+                        hapticTap();
+                        onClash();
+                      }}
+                      style={[styles.clashPill, { backgroundColor: accent.soft }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open Clash"
+                    >
+                      <ArenaIcon size={12} color={accent.ink} strokeWidth={2.6} />
+                      <Text allowFontScaling={false} style={[styles.clashPillText, { color: accent.ink }]}>
+                        Enter Clash
+                      </Text>
+                    </Pressable>
+                    <View style={styles.spacer} />
+                    {metaActions}
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         </PressableScale>
       </Animated.View>
@@ -543,7 +711,15 @@ export function FreshTakeCard({
   );
 }
 
-function ClashAction({ take, onClash }: { take: Take; onClash: () => void }): React.JSX.Element {
+function ClashAction({
+  take,
+  onClash,
+  onMedia = false,
+}: {
+  take: Take;
+  onClash: () => void;
+  onMedia?: boolean;
+}): React.JSX.Element {
   const t = useThemeColors();
   const accent = pulseAccent('clash', t.scheme)!;
   if (take.clashes > 0) {
@@ -553,12 +729,15 @@ function ClashAction({ take, onClash }: { take: Take; onClash: () => void }): Re
           hapticTap();
           onClash();
         }}
-        style={[styles.clashPill, { backgroundColor: accent.soft }]}
+        style={[styles.clashPill, { backgroundColor: onMedia ? 'rgba(255,255,255,0.16)' : accent.soft }]}
         accessibilityRole="button"
         accessibilityLabel="Open Clash"
       >
-        <ArenaIcon size={11} color={accent.ink} strokeWidth={2.6} />
-        <Text allowFontScaling={false} style={[styles.clashPillText, { color: accent.ink }]}>
+        <ArenaIcon size={11} color={onMedia ? '#FAFAF8' : accent.ink} strokeWidth={2.6} />
+        <Text
+          allowFontScaling={false}
+          style={[styles.clashPillText, { color: onMedia ? '#FAFAF8' : accent.ink }]}
+        >
           CLASH · {take.clashes}
         </Text>
       </Pressable>
@@ -574,8 +753,15 @@ function ClashAction({ take, onClash }: { take: Take; onClash: () => void }): Re
       accessibilityRole="button"
       accessibilityLabel="Clash"
     >
-      <ArenaIcon size={13} color={t.textMuted} strokeWidth={2.2} />
-      <Text allowFontScaling={false} style={[styles.statText, { color: t.textMuted }]}>
+      <ArenaIcon
+        size={13}
+        color={onMedia ? 'rgba(250,250,248,0.7)' : t.textMuted}
+        strokeWidth={2.2}
+      />
+      <Text
+        allowFontScaling={false}
+        style={[styles.statText, { color: onMedia ? 'rgba(250,250,248,0.72)' : t.textMuted }]}
+      >
         Clash
       </Text>
     </Pressable>
@@ -662,6 +848,84 @@ const styles = StyleSheet.create({
     right: -36,
     zIndex: 0,
   },
+  leadAccentBlobLarge: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    top: -70,
+    right: -60,
+    zIndex: 0,
+  },
+  textAccentPanel: {
+    position: 'absolute',
+    left: -8,
+    top: '28%',
+    width: '62%',
+    height: '48%',
+    borderRadius: 28,
+    opacity: 0.9,
+    zIndex: 0,
+  },
+  textAccentEdge: {
+    position: 'absolute',
+    left: 0,
+    top: 24,
+    bottom: 24,
+    width: 5,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    zIndex: 1,
+  },
+  cinematicTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(8,8,11,0.12)',
+  },
+  cinematicContent: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: space.lg,
+    paddingTop: space.lg,
+    paddingBottom: space.sm,
+    gap: space.sm,
+    zIndex: 1,
+    minHeight: 220,
+  },
+  cinematicContentFill: {
+    minHeight: 0,
+  },
+  cinematicHeadline: {
+    ...typeScale.takeText,
+    color: '#FAFAF8',
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '800',
+    letterSpacing: -0.45,
+  },
+  videoBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(8,8,11,0.45)',
+  },
+  videoBadgeText: {
+    ...typeScale.caption,
+    color: '#FAFAF8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  leadActionsOnMedia: {
+    backgroundColor: 'rgba(8,8,11,0.28)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.12)',
+  },
   heroFrame: {
     width: '100%',
     justifyContent: 'flex-end',
@@ -672,6 +936,7 @@ const styles = StyleSheet.create({
     gap: space.md,
     minHeight: 220,
     justifyContent: 'flex-end',
+    overflow: 'hidden',
   },
   leadTextTop: {
     flexDirection: 'row',
@@ -842,8 +1107,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
+  clashCinematic: {
+    flexDirection: 'column',
+  },
   clashStrip: { width: 5 },
+  clashStripTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    zIndex: 2,
+  },
   clashBody: { flex: 1, padding: space.md, gap: space.sm },
+  clashBodyOnMedia: {
+    paddingTop: space.lg,
+    justifyContent: 'flex-end',
+    zIndex: 1,
+  },
   clashTitle: {
     ...typeScale.takeText,
     fontSize: 18,

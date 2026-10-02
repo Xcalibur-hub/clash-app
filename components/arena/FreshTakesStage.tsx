@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
   Extrapolation,
@@ -420,7 +421,7 @@ function StageLayer({
   );
 }
 
-/** Lightweight peek — no action row / heavy media player. */
+/** Lightweight peek — static poster strip only, no video player. */
 function FreshTakePeek({
   entry,
   now,
@@ -436,6 +437,7 @@ function FreshTakePeek({
   const pulseTone = pulseAccent(pulse, t.scheme);
   const hood = HOOD_LABEL[entry.take.hood] ?? entry.take.hood;
   const mediaUrl = entry.take.media?.url;
+  const isVideo = entry.take.media?.kind === 'video';
 
   return (
     <Pressable
@@ -454,12 +456,25 @@ function FreshTakePeek({
         },
       ]}
     >
-      <View style={[styles.peekBlob, { backgroundColor: accent.soft }]} />
       {mediaUrl ? (
         <View style={[styles.peekMedia, { backgroundColor: t.surfaceMuted }]}>
           <Image source={{ uri: mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <LinearGradient
+            colors={['transparent', 'rgba(8,8,11,0.55)']}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          {isVideo ? (
+            <View style={styles.peekPlay} pointerEvents="none">
+              <Text allowFontScaling={false} style={styles.peekPlayText}>
+                ▶
+              </Text>
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      ) : (
+        <View style={[styles.peekBlob, { backgroundColor: accent.soft }]} />
+      )}
       <View style={styles.peekBody}>
         {pulse && pulseTone ? (
           <Text allowFontScaling={false} style={[styles.peekPulse, { color: pulseTone.ink }]}>
@@ -512,8 +527,20 @@ const styles = StyleSheet.create({
     right: -20,
   },
   peekMedia: {
-    height: 96,
+    height: 118,
     width: '100%',
+  },
+  peekPlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  peekPlayText: {
+    color: '#FAFAF8',
+    fontSize: 18,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowRadius: 6,
   },
   peekBody: {
     flex: 1,

@@ -327,7 +327,13 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </Pressable>
           </View>
 
-          {/* Compact author */}
+          {/* Media first when present — cinematic hero above author/copy */}
+          {take.media ? (
+            <View style={styles.mediaFrame}>
+              <TakeMedia media={take.media} variant="detail" />
+            </View>
+          ) : null}
+
           <View style={styles.authorRow}>
             <Avatar name={author.name} tint={author.tint} size={34} />
             <View style={styles.authorText}>
@@ -340,13 +346,6 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </View>
           </View>
 
-          {take.media ? (
-            <View style={styles.mediaFrame}>
-              <TakeMedia media={take.media} variant="detail" />
-            </View>
-          ) : null}
-
-          {/* Hero Take */}
           <Text
             allowFontScaling
             style={[
@@ -496,10 +495,10 @@ const styles = StyleSheet.create({
   authorName: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
   authorMeta: { ...typeScale.meta, fontSize: 12 },
   takeWithMedia: {
-    fontSize: 20,
-    lineHeight: 27,
+    fontSize: 22,
+    lineHeight: 30,
     fontWeight: '700',
-    letterSpacing: -0.35,
+    letterSpacing: -0.4,
   },
   takeShort: {
     fontSize: 32,
@@ -515,8 +514,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   mediaFrame: {
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
+    marginHorizontal: -4,
   },
   threadHead: {
     flexDirection: 'row',
