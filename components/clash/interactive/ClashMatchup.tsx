@@ -1,10 +1,12 @@
 /**
- * Dominant matchup — asymmetric opposing cards with a restrained VS.
+ * Dominant matchup — asymmetric opposing cards with CLASH sword bridge.
+ * Confrontation stage: judgement energy, not a chat list.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import type { Side, TakeMedia, User } from '../../../store';
-import { space, typeScale, useThemeColors } from '../../../theme';
+import { space, useThemeColors } from '../../../theme';
+import { CrossedSwords } from '../CrossedSwords';
 import { ClashSideCard } from './ClashSideCard';
 
 export interface ClashMatchupProps {
@@ -40,6 +42,7 @@ export function ClashMatchup({
 }: ClashMatchupProps): React.JSX.Element {
   const t = useThemeColors();
   const active = selectedSide ?? myBallot;
+  const swordKey = `${sideA?.id ?? 'a'}-${sideB?.id ?? 'b'}-${settled ? 'done' : 'open'}`;
 
   return (
     <View style={styles.wrap}>
@@ -49,8 +52,8 @@ export function ClashMatchup({
         text={sideAText}
         media={sideAMedia}
         enterDelay={40}
-        rotationDeg={-2.4}
-        offsetX={-8}
+        rotationDeg={-2.8}
+        offsetX={-10}
         emphasized={active === 'A' || (settled && winnerSide === 'A')}
         diminished={(active === 'B' && !settled) || (settled && winnerSide === 'B')}
         winner={settled && winnerSide === 'A'}
@@ -64,9 +67,9 @@ export function ClashMatchup({
         importantForAccessibility="no-hide-descendants"
       >
         <View style={[styles.rule, { backgroundColor: t.borderStrong }]} />
-        <Text allowFontScaling={false} style={[styles.bridgeLabel, { color: t.textMuted }]}>
-          VS
-        </Text>
+        <View style={[styles.swordPlate, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
+          <CrossedSwords triggerKey={swordKey} size={36} color={t.textMuted} cooldownMs={4000} />
+        </View>
         <View style={[styles.rule, { backgroundColor: t.borderStrong }]} />
       </View>
       <ClashSideCard
@@ -75,8 +78,8 @@ export function ClashMatchup({
         text={sideBText || (sideBMedia ? '' : 'Rebuttal unavailable')}
         media={sideBMedia}
         enterDelay={120}
-        rotationDeg={2.6}
-        offsetX={10}
+        rotationDeg={3.0}
+        offsetX={12}
         emphasized={active === 'B' || (settled && winnerSide === 'B')}
         diminished={(active === 'A' && !settled) || (settled && winnerSide === 'A')}
         winner={settled && winnerSide === 'B'}
@@ -89,20 +92,23 @@ export function ClashMatchup({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.md + 2, paddingTop: space.xs },
+  wrap: { gap: space.md + 4, paddingTop: space.xs },
   bridge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.sm,
     paddingVertical: 2,
-    marginVertical: -6,
+    marginVertical: -10,
+    zIndex: 2,
   },
-  rule: { flex: 1, height: StyleSheet.hairlineWidth, maxWidth: 40 },
-  bridgeLabel: {
-    ...typeScale.caption,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    fontSize: 11,
+  rule: { flex: 1, height: StyleSheet.hairlineWidth, maxWidth: 48 },
+  swordPlate: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

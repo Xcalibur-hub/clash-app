@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ClashArguments } from '../../components/clash/interactive/ClashArguments';
@@ -42,7 +43,7 @@ import {
   type User,
 } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { judge as hapticJudge, tap as hapticTap } from '../../utils/haptics';
 
 const POLL_MS = 20_000;
@@ -308,6 +309,16 @@ export default function ClashScreen(): React.JSX.Element {
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
+      <LinearGradient
+        colors={
+          t.scheme === 'light'
+            ? ['rgba(196,165,116,0.14)', 'rgba(126,154,168,0.10)', 'transparent']
+            : ['rgba(196,165,116,0.12)', 'rgba(126,154,168,0.10)', 'transparent']
+        }
+        locations={[0, 0.42, 1]}
+        style={styles.stageWash}
+        pointerEvents="none"
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -338,6 +349,9 @@ export default function ClashScreen(): React.JSX.Element {
           <View style={styles.titleBlock}>
             <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textPrimary }]}>
               {blind ? 'Blind Clash' : 'Clash'}
+            </Text>
+            <Text allowFontScaling={false} style={[styles.subEyebrow, { color: t.textMuted }]}>
+              Judgement
             </Text>
             <ClashCountdown
               closesAt={view.closesAt}
@@ -400,19 +414,19 @@ export default function ClashScreen(): React.JSX.Element {
             />
           </>
         ) : cancelled ? (
-          <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
+          <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
             <Text allowFontScaling={false} style={[styles.noticeText, { color: t.textMuted }]}>
               No community verdict was reached for this Clash.
             </Text>
           </View>
         ) : closed ? (
-          <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
+          <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
             <Text allowFontScaling={false} style={[styles.noticeText, { color: t.textMuted }]}>
               Judging closed · result pending…
             </Text>
           </View>
         ) : view.isParticipant ? (
-          <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
+          <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
             <Text allowFontScaling={false} style={[styles.noticeText, { color: t.textMuted }]}>
               Participants can’t judge their own Clash.
             </Text>
@@ -457,22 +471,33 @@ export default function ClashScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: layout.screenX, gap: space.md + 2 },
+  stageWash: {
+    ...StyleSheet.absoluteFillObject,
+    height: 320,
+  },
+  content: { paddingHorizontal: layout.screenX, gap: space.md + 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
-  titleBlock: { alignItems: 'center', gap: 3, flexShrink: 1, paddingHorizontal: space.sm },
+  titleBlock: { alignItems: 'center', gap: 2, flexShrink: 1, paddingHorizontal: space.sm },
   eyebrow: {
     ...typeScale.label,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    fontSize: 17,
+  },
+  subEyebrow: {
+    ...typeScale.caption,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.6,
-    fontSize: 15,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   noticeBox: {
     padding: space.md,
-    borderRadius: 16,
+    borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  noticeText: { ...typeScale.meta },
+  noticeText: { ...typeScale.meta, textAlign: 'center' },
   fallbackBtn: { alignSelf: 'stretch' },
   inlineError: { ...typeScale.caption, textAlign: 'center' },
 });

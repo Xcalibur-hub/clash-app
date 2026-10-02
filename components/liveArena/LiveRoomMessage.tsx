@@ -111,10 +111,19 @@ export function LiveRoomMessage({
         accessibilityLabel={author ? `Open ${author.name}'s profile` : undefined}
         hitSlop={4}
       >
-        <Avatar name={author?.name ?? 'Someone'} tint={author?.avatarTint ?? '#71717A'} size={30} />
+        <Avatar name={author?.name ?? 'Someone'} tint={author?.avatarTint ?? '#71717A'} size={32} />
       </Pressable>
 
-      <View style={styles.body}>
+      <View
+        style={[
+          styles.plate,
+          {
+            backgroundColor: own ? softFill(t) : t.surfaceElevated,
+            borderColor: t.border,
+          },
+          own && styles.plateOwn,
+        ]}
+      >
         <View style={styles.headRow}>
           <Pressable
             onPress={() => {
@@ -127,7 +136,7 @@ export function LiveRoomMessage({
             style={styles.nameHit}
           >
             <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
-              {author?.name ?? 'Someone'}
+              {author?.handle ? `@${author.handle}` : author?.name ?? 'Someone'}
             </Text>
           </Pressable>
           <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
@@ -150,13 +159,13 @@ export function LiveRoomMessage({
         </View>
 
         {parent ? (
-          <View style={[styles.quote, { borderLeftColor: t.borderStrong }]}>
+          <View style={[styles.quote, { backgroundColor: softFill(t), borderColor: t.border }]}>
             <Text
               allowFontScaling={false}
-              numberOfLines={1}
+              numberOfLines={2}
               style={[styles.quoteText, { color: t.textMuted }]}
             >
-              {parent.author ? `${parent.author.name}: ` : ''}
+              {parent.author ? `@${parent.author.handle ?? parent.author.name}: ` : ''}
               {parent.body || 'attachment'}
             </Text>
           </View>
@@ -278,20 +287,32 @@ function ReactionButton({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: space.sm, paddingVertical: space.xs },
+  row: { flexDirection: 'row', gap: space.sm, paddingVertical: 5, alignItems: 'flex-end' },
   pending: { opacity: 0.55 },
-  body: { flex: 1, gap: 4 },
+  plate: {
+    flex: 1,
+    gap: 6,
+    minWidth: 0,
+    paddingHorizontal: space.sm + 2,
+    paddingVertical: space.sm,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  plateOwn: {
+    borderBottomRightRadius: 8,
+  },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   nameHit: { flexShrink: 1 },
-  name: { ...typeScale.label, fontSize: 14, fontWeight: '700' },
+  name: { ...typeScale.label, fontSize: 13, fontWeight: '700' },
   meta: { ...typeScale.caption, fontSize: 11 },
   more: { marginLeft: 'auto', paddingLeft: space.xs },
   quote: {
-    borderLeftWidth: 2,
-    paddingLeft: space.xs,
-    paddingVertical: 1,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.sm,
+    paddingVertical: 6,
   },
-  quoteText: { ...typeScale.caption, fontSize: 11 },
+  quoteText: { ...typeScale.caption, fontSize: 11, lineHeight: 15 },
   text: { ...typeScale.body, fontSize: 15, lineHeight: 21 },
   media: { marginTop: 2, maxWidth: 260 },
   evidenceStack: { gap: 6, marginTop: 4 },

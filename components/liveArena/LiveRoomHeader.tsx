@@ -1,14 +1,14 @@
 /**
- * Compact Live Room header — conversation chrome, not a dashboard.
+ * Live Room header — realtime social room chrome, not a dashboard strip.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ArenaRoom } from '../../services/liveArenaService';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { BackIcon } from '../shared/icons';
 import { LivePulse } from './LivePulse';
-import { secondsLabel, STANCE_LABEL } from './liveArenaStyles';
+import { softFill, secondsLabel, STANCE_LABEL } from './liveArenaStyles';
 
 export interface LiveRoomHeaderProps {
   room: ArenaRoom;
@@ -46,7 +46,6 @@ export function LiveRoomHeader({
         {
           paddingTop: paddingTop + space.xs,
           backgroundColor: t.background,
-          borderBottomColor: t.border,
         },
       ]}
     >
@@ -64,13 +63,18 @@ export function LiveRoomHeader({
           <BackIcon size={20} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
 
-        <Text
-          allowFontScaling={false}
-          numberOfLines={2}
-          style={[styles.title, { color: t.textPrimary }]}
-        >
-          {room.topic.title}
-        </Text>
+        <View style={styles.titleBlock}>
+          <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+            Live Arena
+          </Text>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={2}
+            style={[styles.title, { color: t.textPrimary }]}
+          >
+            {room.topic.title}
+          </Text>
+        </View>
 
         {live ? (
           <View style={styles.live}>
@@ -81,12 +85,12 @@ export function LiveRoomHeader({
         )}
       </View>
 
-      <View style={styles.metaRow}>
+      <View style={[styles.metaPlate, { backgroundColor: softFill(t) }]}>
         <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
           {room.participantCount} in this room
         </Text>
         {countdown ? (
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text allowFontScaling={false} style={[styles.meta, { color: t.textSecondary }]}>
             · {countdown}
           </Text>
         ) : null}
@@ -113,8 +117,7 @@ const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: layout.screenX,
     paddingBottom: space.sm,
-    gap: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: space.sm,
   },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.xs },
   back: {
@@ -124,22 +127,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  titleBlock: { flex: 1, gap: 2, paddingTop: 4 },
+  kicker: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
   title: {
     ...typeScale.section,
-    flex: 1,
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: '700',
-    paddingTop: 7,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   live: { paddingTop: 10 },
   livePlaceholder: { width: 28 },
-  metaRow: {
+  metaPlate: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 4,
-    paddingLeft: 28,
+    marginLeft: 28,
+    paddingHorizontal: space.sm + 2,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    alignSelf: 'flex-start',
   },
   meta: { ...typeScale.caption, fontSize: 12 },
 });

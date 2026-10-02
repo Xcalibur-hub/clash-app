@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
-  list: { paddingHorizontal: layout.screenX, paddingVertical: space.xs, flexGrow: 1 },
+  list: { paddingHorizontal: layout.screenX, paddingVertical: space.sm, flexGrow: 1 },
   phaseBanner: {
     paddingHorizontal: layout.screenX,
     paddingVertical: 8,

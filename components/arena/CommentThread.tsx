@@ -19,7 +19,7 @@ export interface CommentThreadProps {
   onMore: (comment: ChallengerComment) => void;
 }
 
-/** Threaded conversation — indentation + thread line, no giant cards. */
+/** Immersive conversation — top-level replies stay open; nested replies float as soft plates. */
 export function CommentThread({
   nodes,
   takeAuthorId,
@@ -75,9 +75,11 @@ const CommentItem = React.memo(function CommentItem({
   const isOp = takeAuthorId !== undefined && comment.authorId === takeAuthorId;
   const parentRemoved = Boolean(comment.parentId) && !state.comments.some((c) => c.id === comment.parentId);
   // Cap indent so nested media stays usable on small screens.
-  const step = depth >= 3 ? 8 : 12;
+  const step = depth >= 3 ? 10 : 14;
   const indent = Math.min(depth, 4) * step;
   const hasText = Boolean(comment.text.trim());
+  const nested = depth > 0;
+  const handle = author?.handle ? `@${author.handle}` : '@ghost';
 
   return (
     <View>
@@ -92,19 +94,20 @@ const CommentItem = React.memo(function CommentItem({
       <View
         style={[
           styles.item,
-          {
+          nested && styles.itemNested,
+          nested && {
             marginLeft: indent,
-            borderLeftWidth: depth > 0 ? StyleSheet.hairlineWidth * 2 : 0,
-            borderLeftColor: depth > 0 ? t.borderStrong : 'transparent',
-            paddingLeft: depth > 0 ? space.sm : 0,
+            backgroundColor: t.surfaceElevated,
+            borderColor: t.border,
           },
+          !nested && { marginLeft: 0 },
         ]}
       >
-        <Avatar name={author?.name ?? '?'} tint={author?.tint ?? '#888'} size={depth === 0 ? 30 : 24} />
+        <Avatar name={author?.name ?? '?'} tint={author?.tint ?? '#888'} size={nested ? 24 : 30} />
         <View style={styles.main}>
           <View style={styles.meta}>
             <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
-              {author?.name ?? 'ghost'}
+              {handle}
             </Text>
             {isOp ? (
               <View style={[styles.opBadge, { backgroundColor: t.surfaceMuted }]}>
@@ -173,7 +176,7 @@ const CommentItem = React.memo(function CommentItem({
               >
                 <ArenaIcon size={11} color={t.clashText} strokeWidth={2.6} />
                 <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
-                  CLASH
+                  Challenge
                 </Text>
               </PressableScale>
             ) : null}
@@ -229,11 +232,18 @@ const CommentItem = React.memo(function CommentItem({
 });
 
 const styles = StyleSheet.create({
-  list: { gap: space.md },
+  list: { gap: space.md + 2 },
   item: {
     flexDirection: 'row',
     gap: space.sm,
     paddingVertical: 4,
+  },
+  itemNested: {
+    paddingHorizontal: space.sm + 2,
+    paddingVertical: space.sm,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 2,
   },
   main: { flex: 1, gap: 6, minWidth: 0 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
@@ -269,7 +279,7 @@ const styles = StyleSheet.create({
     ...typeScale.caption,
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   spacer: { flex: 1 },
   more: { padding: 2 },

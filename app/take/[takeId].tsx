@@ -16,11 +16,10 @@ import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { RebuttalInput } from '../../components/arena/RebuttalInput';
 import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
 import { TakeActionRow } from '../../components/arena/TakeActionRow';
-import { TakeMedia } from '../../components/arena/TakeMedia';
+import { TakeDetailHero } from '../../components/arena/TakeDetailHero';
 import { Avatar } from '../../components/shared/Avatar';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { SegmentedTabs } from '../../components/shared/SegmentedTabs';
-import { Underline } from '../../components/shared/Doodles';
 import { BackIcon, MoreIcon } from '../../components/shared/icons';
 import { HOOD_LABEL } from '../../data/hoods';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
@@ -48,7 +47,7 @@ import {
   type CommentSort,
   type User,
 } from '../../store';
-import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import {
   clashStartErrorMessage,
   shouldOpenExistingClash,
@@ -70,8 +69,9 @@ export interface MenuTarget {
 }
 
 /**
- * Take conversation — Arena visual language, continuous scroll:
- * Take → stance → actions → discussion. Logic unchanged.
+ * Immersive Take Detail — social story/article conversation.
+ * Media opens as a large hero with copy on-plate; text Takes stay editorial.
+ * Backend / reply / clash logic unchanged.
  */
 export default function TakeDetailScreen(): React.JSX.Element {
   const { takeId } = useLocalSearchParams<{ takeId: string | string[] }>();
@@ -266,6 +266,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const nodes = buildCommentTree(comments, sort);
   const hasMedia = Boolean(take.media);
   const shortText = take.text.trim().length < 48;
+  const isViewerAuthor = author.id === state.viewer.id;
 
   const openClash = (): void => {
     if (!requireAuth()) return;
@@ -292,7 +293,6 @@ export default function TakeDetailScreen(): React.JSX.Element {
             },
           ]}
         >
-          {/* Compact chrome */}
           <View style={styles.topRow}>
             <Pressable
               onPress={() => router.back()}
@@ -303,17 +303,14 @@ export default function TakeDetailScreen(): React.JSX.Element {
             >
               <BackIcon size={20} color={theme.textPrimary} />
             </Pressable>
-            <View style={styles.hoodWrap}>
-              <Text allowFontScaling={false} style={[styles.hood, { color: theme.textMuted }]}>
-                {HOOD_LABEL[take.hood]}
-              </Text>
-              <Underline size={56} opacity={0.2} color={theme.textPrimary} style={styles.hoodMark} />
-            </View>
+            <Text allowFontScaling={false} style={[styles.hood, { color: theme.textMuted }]}>
+              {HOOD_LABEL[take.hood]}
+            </Text>
             <Pressable
               onPress={() =>
                 setMenu({
                   target: author,
-                  isSelf: author.id === state.viewer.id,
+                  isSelf: isViewerAuthor,
                   following: followingAuthor,
                   reportTarget: { kind: 'take', id: take.id },
                 })
@@ -327,34 +324,38 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </Pressable>
           </View>
 
-          {/* Media first when present — cinematic hero above author/copy */}
-          {take.media ? (
-            <View style={styles.mediaFrame}>
-              <TakeMedia media={take.media} variant="detail" />
-            </View>
-          ) : null}
-
-          <View style={styles.authorRow}>
-            <Avatar name={author.name} tint={author.tint} size={34} />
-            <View style={styles.authorText}>
-              <Text allowFontScaling={false} style={[styles.authorName, { color: theme.textPrimary }]} numberOfLines={1}>
-                {author.name}
+          {hasMedia ? (
+            <TakeDetailHero take={take} author={author} isViewer={isViewerAuthor} />
+          ) : (
+            <View style={styles.textStage}>
+              <View style={styles.authorRow}>
+                <Avatar name={author.name} tint={author.tint} size={34} />
+                <View style={styles.authorText}>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.authorName, { color: theme.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    @{author.handle}
+                    {isViewerAuthor ? ' · You' : ''}
+                  </Text>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.authorMeta, { color: theme.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {timeAgo(take.createdAt)} · {timeLeftLabel(take.expiresAt)}
+                  </Text>
+                </View>
+              </View>
+              <Text
+                allowFontScaling
+                style={[shortText ? styles.takeShort : styles.takeLong, { color: theme.textPrimary }]}
+              >
+                {take.text}
               </Text>
-              <Text allowFontScaling={false} style={[styles.authorMeta, { color: theme.textMuted }]} numberOfLines={1}>
-                @{author.handle} · {timeAgo(take.createdAt)} · {timeLeftLabel(take.expiresAt)}
-              </Text>
             </View>
-          </View>
-
-          <Text
-            allowFontScaling
-            style={[
-              hasMedia ? styles.takeWithMedia : shortText ? styles.takeShort : styles.takeLong,
-              { color: theme.textPrimary },
-            ]}
-          >
-            {take.text}
-          </Text>
+          )}
 
           <MindshiftPanel takeId={take.id} />
 
@@ -373,10 +374,13 @@ export default function TakeDetailScreen(): React.JSX.Element {
             prominence="conversation"
           />
 
-          <View style={[styles.threadHead, { borderTopColor: theme.border }]}>
-            <Text allowFontScaling={false} style={[styles.threadTitle, { color: theme.textPrimary }]}>
-              {comments.length === 0 ? 'Conversation' : `${comments.length} replies`}
-            </Text>
+          <View style={styles.threadHead}>
+            <View style={styles.threadTitleWrap}>
+              <Text allowFontScaling={false} style={[styles.threadTitle, { color: theme.textPrimary }]}>
+                Conversation
+              </Text>
+              <View style={[styles.threadRule, { backgroundColor: theme.borderStrong }]} />
+            </View>
             <View style={styles.sortWrap}>
               <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" compact />
             </View>
@@ -384,7 +388,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
           {nodes.length === 0 ? (
             <Text allowFontScaling={false} style={[styles.empty, { color: theme.textMuted }]}>
-              No replies yet — add the first take on this take.
+              No replies yet — start the conversation.
             </Text>
           ) : (
             <CommentThread
@@ -481,7 +485,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  hoodWrap: { alignItems: 'center', paddingBottom: 2 },
   hood: {
     ...typeScale.caption,
     fontSize: 11,
@@ -489,17 +492,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
-  hoodMark: { marginTop: -1 },
+  textStage: { gap: space.md, paddingTop: space.xs },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   authorText: { flex: 1, gap: 1 },
   authorName: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
   authorMeta: { ...typeScale.meta, fontSize: 12 },
-  takeWithMedia: {
-    fontSize: 22,
-    lineHeight: 30,
-    fontWeight: '700',
-    letterSpacing: -0.4,
-  },
   takeShort: {
     fontSize: 32,
     lineHeight: 38,
@@ -513,27 +510,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  mediaFrame: {
-    borderRadius: radius.xxl,
-    overflow: 'hidden',
-    marginHorizontal: -4,
-  },
   threadHead: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     gap: space.md,
-    paddingTop: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: space.sm,
   },
+  threadTitleWrap: { flex: 1, gap: 8 },
   threadTitle: {
     ...typeScale.section,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
-    letterSpacing: -0.3,
-    flexShrink: 1,
+    letterSpacing: -0.35,
   },
-  sortWrap: { maxWidth: 148 },
+  threadRule: {
+    height: StyleSheet.hairlineWidth,
+    width: '100%',
+  },
+  sortWrap: { maxWidth: 148, paddingBottom: 2 },
   empty: {
     ...typeScale.meta,
     fontSize: 14,
