@@ -4,23 +4,25 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
   type ListRenderItemInfo,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedValue } from 'react-native-reanimated';
 import { EvidenceComposerSheet } from '../../../components/liveArena/EvidenceComposerSheet';
 import { LiveEvidenceCard } from '../../../components/liveArena/LiveEvidenceCard';
+import { LiveRoomAtmosphere } from '../../../components/liveArena/LiveRoomAtmosphere';
 import { LiveRoomComposer } from '../../../components/liveArena/LiveRoomComposer';
-import { LiveRoomHeader, secondsClock } from '../../../components/liveArena/LiveRoomHeader';
+import { LiveRoomEmptyFloor } from '../../../components/liveArena/LiveRoomEmptyFloor';
+import { LiveRoomEventBanner } from '../../../components/liveArena/LiveRoomEventBanner';
+import { LiveRoomHeader } from '../../../components/liveArena/LiveRoomHeader';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
 import { LiveRoomMessage } from '../../../components/liveArena/LiveRoomMessage';
 import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResultReveal';
+import { LiveRoomSkeleton } from '../../../components/liveArena/LiveRoomSkeleton';
 import {
   JoinDebateSheet,
   SpectatorJoinBar,
@@ -33,14 +35,22 @@ import { useClock } from '../../../hooks/useClock';
 import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
 import { analytics } from '../../../services/analytics';
 import {
+  fetchRoomPresence,
   fetchTopicRooms,
   type ArenaAuthor,
   type ArenaEvidence,
   type ArenaMessage,
+  type ArenaRoomPresence,
+  type ArenaRoomStatus,
 } from '../../../services/liveArenaService';
 import { showNotice, useClash, type User } from '../../../store';
 import type { ReportTarget } from '../../../supabase/types';
-import { layout, radius, space, typeScale, useThemeColors } from '../../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../../theme';
+import {
+  newArgumentsEvent,
+  phaseEventForStatus,
+  type LiveRoomEvent,
+} from '../../../utils/liveRoomEvents';
 import { tap as hapticTap } from '../../../utils/haptics';
 
 interface SafetyTarget {
@@ -72,6 +82,9 @@ function reactionScore(message: ArenaMessage): number {
 /**
  * Live Arena room — premium social event, not a plain chat timeline.
  * Server remains authoritative for phases, capacity, judging, and privacy.
+ *
+ * Stance upgrade: spectators intentionally store null stance. Upgrade always
+ * requires a fresh private stance choice — there is no safe reuse path.
  */
 export default function LiveArenaRoomScreen(): React.JSX.Element {
   const { roomId: raw } = useLocalSearchParams<{ roomId: string | string[] }>();
@@ -129,6 +142,10 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const [roomIndex, setRoomIndex] = React.useState<number | null>(null);
   const [newCount, setNewCount] = React.useState(0);
   const [atLiveEdge, setAtLiveEdge] = React.useState(true);
+  const [presence, setPresence] = React.useState<ArenaRoomPresence[]>([]);
+  const [composerFocus, setComposerFocus] = React.useState(0);
+  const [phaseBanner, setPhaseBanner] = React.useState<LiveRoomEvent | null>(null);
+  const prevStatus = React.useRef<ArenaRoomStatus | null>(null);
   const seenIds = React.useRef<Set<string>>(new Set());
   const bootstrapped = React.useRef(false);
 
@@ -153,6 +170,33 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       cancelled = true;
     };
   }, [room?.roomId, room?.topicId]);
+
+  const loadPresence = React.useCallback(async () => {
+    if (!roomId) return;
+    try {
+      const people = await fetchRoomPresence(roomId, 12);
+      setPresence(people);
+    } catch {
+      // Keep last good presence; strip is additive presentation.
+    }
+  }, [roomId]);
+
+  React.useEffect(() => {
+    if (!room) return;
+    void loadPresence();
+    const id = setInterval(() => void loadPresence(), 20_000);
+    return () => clearInterval(id);
+  }, [loadPresence, room?.roomId, room?.participantCount]);
+
+  React.useEffect(() => {
+    if (!room) return;
+    const next = phaseEventForStatus(room.status, prevStatus.current);
+    prevStatus.current = room.status;
+    if (!next) return;
+    setPhaseBanner(next);
+    const id = setTimeout(() => setPhaseBanner(null), 3_200);
+    return () => clearTimeout(id);
+  }, [room?.status]);
 
   React.useEffect(() => {
     if (messages.length === 0) return;
@@ -194,18 +238,6 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     }
     return { map, orphans };
   }, [byId, evidence]);
-
-  const presence = React.useMemo(() => {
-    const seen = new Set<string>();
-    const people: ArenaAuthor[] = [];
-    for (const message of messages) {
-      if (!message.author || seen.has(message.author.id)) continue;
-      seen.add(message.author.id);
-      people.push(message.author);
-      if (people.length >= 5) break;
-    }
-    return people;
-  }, [messages]);
 
   const highlightId = React.useMemo(() => {
     if (room?.result?.bestArgumentMessageId) return room.result.bestArgumentMessageId;
@@ -305,8 +337,9 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
 
   if (loading && !room) {
     return (
-      <View style={[styles.root, styles.center, { backgroundColor: t.background }]}>
-        <ActivityIndicator color={t.textPrimary} />
+      <View style={[styles.root, { backgroundColor: t.background }]}>
+        <LiveRoomSkeleton paddingTop={insets.top} />
+        <Notice offset={0} />
       </View>
     );
   }
@@ -325,29 +358,6 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       </View>
     );
   }
-
-  const finalBanner =
-    room.status === 'FINAL_ARGUMENTS' ? (
-      <View
-        style={[
-          styles.phaseBanner,
-          {
-            backgroundColor: t.surfaceElevated,
-            borderColor: t.borderStrong,
-            shadowColor: t.shadowColor,
-          },
-        ]}
-      >
-        <Text allowFontScaling={false} style={[styles.phaseText, { color: t.textPrimary }]}>
-          FINAL ARGUMENTS
-        </Text>
-        {room.secondsToJudging > 0 ? (
-          <Text allowFontScaling={false} style={[styles.phaseClock, { color: t.textSecondary }]}>
-            {secondsClock(room.secondsToJudging)}
-          </Text>
-        ) : null}
-      </View>
-    ) : null;
 
   const orphanEvidence =
     evidenceByMessage.orphans.length > 0 ? (
@@ -379,16 +389,6 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     ) : null;
 
   const bottom = (() => {
-    if (isSpectator) {
-      return (
-        <SpectatorJoinBar
-          busy={joining}
-          roomFull={roomFullOnUpgrade}
-          roomIndex={roomIndex}
-          onJoinPress={() => setJoinOpen(true)}
-        />
-      );
-    }
     if (judging && isDebater) {
       return (
         <LiveRoomJudgingPanel
@@ -406,9 +406,20 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         />
       );
     }
+    if (isSpectator) {
+      return (
+        <SpectatorJoinBar
+          busy={joining}
+          roomFull={roomFullOnUpgrade}
+          roomIndex={roomIndex}
+          onJoinPress={() => setJoinOpen(true)}
+        />
+      );
+    }
     if (isDebater && accepting) {
       return (
         <LiveRoomComposer
+          focusToken={composerFocus}
           replyingTo={replyTo?.author?.name ?? null}
           sending={sending}
           onCancelReply={() => setReplyTo(null)}
@@ -425,6 +436,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                 realm: 'arena',
                 media_type: argument.gif ? 'gif' : (argument.media?.kind ?? 'none'),
               });
+              void loadPresence();
             }
             return ok;
           }}
@@ -443,17 +455,26 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
+  const floatingEvent =
+    phaseBanner ??
+    (newCount > 0 && !atLiveEdge ? newArgumentsEvent(newCount) : null);
+
+  const emptyFloor =
+    messages.length === 0 && !threadLocked ? (
+      <LiveRoomEmptyFloor
+        presence={presence}
+        participantCount={room.participantCount}
+        isDebater={isDebater}
+        isSpectator={isSpectator}
+        accepting={accepting}
+        onStartArgument={() => setComposerFocus((n) => n + 1)}
+        onJoinDebate={() => setJoinOpen(true)}
+      />
+    ) : null;
+
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
-      <LinearGradient
-        colors={
-          t.scheme === 'light'
-            ? ['rgba(196,165,116,0.10)', 'transparent']
-            : ['rgba(196,165,116,0.08)', 'transparent']
-        }
-        style={styles.wash}
-        pointerEvents="none"
-      />
+      <LiveRoomAtmosphere topicId={room.topicId} hood={room.topic.hood} />
       <LiveRoomHeader
         room={room}
         paddingTop={insets.top}
@@ -465,7 +486,6 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
           else router.replace('/(tabs)');
         }}
       />
-      {finalBanner}
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -507,60 +527,56 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
               </View>
             ) : null}
             {messages.length === 0 && !threadLocked ? (
-              <View style={styles.empty}>
-                <Text allowFontScaling={false} style={[styles.emptyText, { color: t.textMuted }]}>
-                  No arguments yet. Be the first.
-                </Text>
+              <View style={styles.flex}>
+                {emptyFloor}
+                <LiveRoomEventBanner event={phaseBanner} />
               </View>
-            ) : null}
-            <View style={styles.flex}>
-              <FlatList
-                ref={listRef}
-                inverted
-                data={messages}
-                keyExtractor={(item) => item.id}
-                renderItem={renderMessage}
-                ListFooterComponent={
-                  <>
-                    {orphanEvidence}
-                    {loadingOlder ? (
-                      <ActivityIndicator style={styles.older} size="small" color={t.textMuted} />
-                    ) : null}
-                  </>
-                }
-                contentContainerStyle={styles.list}
-                style={styles.flex}
-                refreshing={refreshing}
-                onRefresh={() => void refresh()}
-                onEndReached={() => {
-                  if (hasOlder) void loadOlder();
-                }}
-                onEndReachedThreshold={0.4}
-                onScroll={(e) => {
-                  const y = e.nativeEvent.contentOffset.y;
-                  scrollY.value = y;
-                  const nearEdge = y < 48;
-                  setAtLiveEdge(nearEdge);
-                  if (nearEdge && newCount > 0) setNewCount(0);
-                }}
-                scrollEventThrottle={16}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              />
-              {newCount > 0 ? (
-                <Pressable
-                  onPress={jumpToLatest}
-                  style={[styles.newPill, { backgroundColor: t.clashFill }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${newCount} new arguments`}
-                >
-                  <Text allowFontScaling={false} style={[styles.newPillText, { color: t.clashText }]}>
-                    {newCount} new argument{newCount === 1 ? '' : 's'} ↓
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-            <View style={{ paddingBottom: insets.bottom }}>{bottom}</View>
+            ) : messages.length > 0 ? (
+              <View style={styles.flex}>
+                <FlatList
+                  ref={listRef}
+                  inverted
+                  data={messages}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderMessage}
+                  ListFooterComponent={
+                    <>
+                      {orphanEvidence}
+                      {loadingOlder ? (
+                        <ActivityIndicator style={styles.older} size="small" color={t.textMuted} />
+                      ) : null}
+                    </>
+                  }
+                  contentContainerStyle={styles.list}
+                  style={styles.flex}
+                  refreshing={refreshing}
+                  onRefresh={() => void refresh()}
+                  onEndReached={() => {
+                    if (hasOlder) void loadOlder();
+                  }}
+                  onEndReachedThreshold={0.4}
+                  onScroll={(e) => {
+                    const y = e.nativeEvent.contentOffset.y;
+                    scrollY.value = y;
+                    const nearEdge = y < 48;
+                    setAtLiveEdge(nearEdge);
+                    if (nearEdge && newCount > 0) setNewCount(0);
+                  }}
+                  scrollEventThrottle={16}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                />
+                <LiveRoomEventBanner
+                  event={floatingEvent}
+                  onPress={
+                    floatingEvent?.kind === 'new_arguments' ? jumpToLatest : undefined
+                  }
+                />
+              </View>
+            ) : (
+              <View style={styles.flex} />
+            )}
+            <View style={{ paddingBottom: Math.max(insets.bottom, space.sm) }}>{bottom}</View>
           </>
         )}
       </KeyboardAvoidingView>
@@ -575,12 +591,16 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       <JoinDebateSheet
         visible={joinOpen}
         busy={joining}
+        roomIndex={roomIndex}
         onClose={() => setJoinOpen(false)}
         onChoose={(stance) => {
           setJoining(true);
           void upgradeToDebater(stance)
             .then((ok) => {
-              if (ok) setJoinOpen(false);
+              if (ok) {
+                setJoinOpen(false);
+                void loadPresence();
+              }
             })
             .finally(() => setJoining(false));
         }}
@@ -604,40 +624,9 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  wash: { ...StyleSheet.absoluteFillObject, height: 220 },
   list: { paddingHorizontal: layout.screenX, paddingVertical: space.sm, flexGrow: 1 },
-  phaseBanner: {
-    marginHorizontal: layout.screenX,
-    marginBottom: space.xs,
-    paddingHorizontal: space.md,
-    paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  phaseText: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
-  phaseClock: { ...typeScale.data, fontSize: 14, fontWeight: '800' },
   orphanWrap: { gap: space.xs, paddingHorizontal: layout.screenX, paddingVertical: space.xs },
   locked: { paddingHorizontal: layout.screenX, paddingVertical: space.sm },
   lockedText: { ...typeScale.caption, fontSize: 12, lineHeight: 17 },
-  empty: { paddingVertical: space.xl, alignItems: 'center' },
-  emptyText: { ...typeScale.meta, fontSize: 13 },
   older: { marginVertical: space.sm },
-  newPill: {
-    position: 'absolute',
-    alignSelf: 'center',
-    bottom: 12,
-    paddingHorizontal: space.md,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-  },
-  newPillText: { ...typeScale.caption, fontSize: 12, fontWeight: '800' },
 });

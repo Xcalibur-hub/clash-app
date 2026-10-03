@@ -680,6 +680,32 @@ export async function fetchTopicRooms(topicId: string): Promise<ArenaTopicRoomCa
  * Debaters already assigned elsewhere are refused by the server (P0006).
  * Never increments capacity.
  */
+/** Room member for presence strip — never includes stance. */
+export interface ArenaRoomPresence extends ArenaAuthor {
+  isViewer: boolean;
+}
+
+/** Members currently in the room (membership-gated). No stance fields. */
+export async function fetchRoomPresence(
+  roomId: string,
+  limit = 12,
+): Promise<ArenaRoomPresence[]> {
+  const { data, error } = await client().rpc('list_arena_room_presence', {
+    p_room_id: roomId,
+    p_limit: limit,
+  });
+  if (error) throw requestError(error);
+  if (!Array.isArray(data)) return [];
+  const out: ArenaRoomPresence[] = [];
+  for (const item of data) {
+    const author = toAuthor(item);
+    if (!author) continue;
+    const row = asRecord(item);
+    out.push({ ...author, isViewer: bool(row?.isViewer) });
+  }
+  return out;
+}
+
 export async function watchRoom(roomId: string): Promise<ArenaJoinResult> {
   const { data, error } = await client().rpc('watch_arena_room', { p_room_id: roomId });
   if (error) throw requestError(error);

@@ -36,6 +36,8 @@ export interface LiveRoomComposerProps {
   /** Name of the author being answered, when a reply is staged. */
   replyingTo?: string | null;
   sending?: boolean;
+  /** Bump to focus the argument field (empty-floor CTA). */
+  focusToken?: number;
   onCancelReply?: () => void;
   /** Resolve false to keep the draft — the hook already surfaced the reason. */
   onSend: (argument: ComposedArgument) => Promise<boolean>;
@@ -56,6 +58,7 @@ export function LiveRoomComposer({
   disabledReason,
   replyingTo = null,
   sending = false,
+  focusToken = 0,
   onCancelReply,
   onSend,
   onAddProof,
@@ -63,11 +66,20 @@ export function LiveRoomComposer({
 }: LiveRoomComposerProps): React.JSX.Element {
   const t = useThemeColors();
   const { pickImage, pickVideo } = useMediaPicker();
+  const inputRef = React.useRef<TextInput>(null);
   const [draft, setDraft] = React.useState('');
   const [media, setMedia] = React.useState<PickedMedia | null>(null);
   const [gif, setGif] = React.useState<TenorGif | null>(null);
   const [gifOpen, setGifOpen] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (focusToken > 0 && !disabled) {
+      const id = setTimeout(() => inputRef.current?.focus(), 80);
+      return () => clearTimeout(id);
+    }
+    return undefined;
+  }, [disabled, focusToken]);
 
   const hasAttachment = Boolean(media) || Boolean(gif);
   const busy = sending || uploading;
@@ -163,6 +175,7 @@ export function LiveRoomComposer({
         ]}
       >
         <TextInput
+          ref={inputRef}
           value={draft}
           onChangeText={(next) => setDraft(next.slice(0, ARENA_MESSAGE_MAX))}
           placeholder="Add your argument…"

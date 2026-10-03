@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   text: { ...typeScale.body, fontSize: 16, lineHeight: 23 },
   textCompact: { fontSize: 14, lineHeight: 20 },
   textStrong: { fontWeight: '600' },
-  media: { marginTop: 2, maxWidth: 280 },
+  media: { marginTop: 2, alignSelf: 'stretch', maxWidth: '100%' },
   evidenceStack: { gap: 6, marginTop: 4 },
   actions: {
     flexDirection: 'row',

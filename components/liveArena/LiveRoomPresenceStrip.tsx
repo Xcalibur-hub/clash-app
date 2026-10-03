@@ -1,22 +1,19 @@
 /**
- * Visible participant presence — avatar stack + count + overflow.
- * Real authors only. No stance aggregates.
+ * Compact real-member strip: initials chips + optional own stance cue.
+ * Does not repeat Room N / count (those live in the header meta line).
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { ArenaAuthor, Stance } from '../../services/liveArenaService';
-import { radius, space, typeScale, useThemeColors } from '../../theme';
+import type { ArenaRoomPresence, Stance } from '../../services/liveArenaService';
+import { space, typeScale, useThemeColors } from '../../theme';
 import { Avatar } from '../shared/Avatar';
-import { LivePulse } from './LivePulse';
-import { softFill, STANCE_LABEL } from './liveArenaStyles';
+import { STANCE_LABEL } from './liveArenaStyles';
 
 export interface LiveRoomPresenceStripProps {
-  people: readonly ArenaAuthor[];
+  people: readonly ArenaRoomPresence[];
   participantCount: number;
   viewerStance?: Stance | null;
   viewerRole?: 'debater' | 'spectator' | null;
-  roomIndex?: number | null;
-  emphasized?: boolean;
 }
 
 export function LiveRoomPresenceStrip({
@@ -24,96 +21,56 @@ export function LiveRoomPresenceStrip({
   participantCount,
   viewerStance = null,
   viewerRole = null,
-  roomIndex = null,
-  emphasized = false,
 }: LiveRoomPresenceStripProps): React.JSX.Element {
   const t = useThemeColors();
-  const shown = people.slice(0, emphasized ? 5 : 4);
+  const shown = people.slice(0, 6);
   const overflow = Math.max(0, participantCount - shown.length);
-  const avatarSize = emphasized ? 28 : 24;
 
   return (
-    <View style={[styles.wrap, emphasized && styles.wrapEmph, { backgroundColor: softFill(t) }]}>
-      <View style={styles.avatars}>
-        {shown.map((person, i) => (
-          <View key={`${person.id}-${i}`} style={i > 0 ? { marginLeft: -10 } : undefined}>
-            <Avatar name={person.name} tint={person.avatarTint} size={avatarSize} />
-            {i === 0 && emphasized ? (
-              <View style={styles.pulseDot}>
-                <LivePulse size={5} />
-              </View>
-            ) : null}
+    <View style={styles.wrap}>
+      <View style={styles.row}>
+        {shown.map((person) => (
+          <View key={person.id} style={styles.chip}>
+            <Avatar name={person.name} tint={person.avatarTint} size={30} />
+            <Text
+              allowFontScaling={false}
+              style={[styles.label, { color: person.isViewer ? t.textPrimary : t.textMuted }]}
+              numberOfLines={1}
+            >
+              {person.isViewer ? 'YOU' : person.handle.slice(0, 2).toUpperCase()}
+            </Text>
           </View>
         ))}
         {overflow > 0 ? (
-          <View
-            style={[
-              styles.overflow,
-              {
-                marginLeft: shown.length > 0 ? -8 : 0,
-                backgroundColor: t.surfaceMuted,
-                borderColor: t.border,
-                width: avatarSize,
-                height: avatarSize,
-                borderRadius: avatarSize / 2,
-              },
-            ]}
-          >
-            <Text allowFontScaling={false} style={[styles.overflowText, { color: t.textSecondary }]}>
-              +{overflow}
-            </Text>
-          </View>
+          <Text allowFontScaling={false} style={[styles.more, { color: t.textMuted }]}>
+            +{overflow}
+          </Text>
         ) : null}
       </View>
-
-      <View style={styles.metaCol}>
-        <Text allowFontScaling={false} style={[styles.count, { color: t.textPrimary }]}>
-          {participantCount} here
-          {roomIndex != null && viewerRole === 'spectator' ? ` · Room ${roomIndex}` : ''}
+      {viewerRole === 'debater' && viewerStance ? (
+        <Text allowFontScaling={false} style={[styles.you, { color: t.textMuted }]}>
+          You · {STANCE_LABEL[viewerStance]}
         </Text>
-        {viewerRole === 'spectator' ? (
-          <Text allowFontScaling={false} style={[styles.you, { color: t.textMuted }]}>
-            Watching
-            {roomIndex != null ? ` Room ${roomIndex}` : ''}
-          </Text>
-        ) : viewerStance ? (
-          <Text allowFontScaling={false} style={[styles.you, { color: t.textMuted }]}>
-            You · {STANCE_LABEL[viewerStance]}
-          </Text>
-        ) : null}
-      </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
+  wrap: { gap: 6 },
+  row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     flexWrap: 'wrap',
-    gap: 10,
-    paddingHorizontal: space.sm + 2,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    alignSelf: 'stretch',
+    gap: space.sm,
   },
-  wrapEmph: {
-    paddingVertical: 10,
-    borderRadius: 18,
+  chip: { alignItems: 'center', gap: 3, width: 40 },
+  label: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
-  avatars: { flexDirection: 'row', alignItems: 'center' },
-  pulseDot: {
-    position: 'absolute',
-    right: -2,
-    bottom: -1,
-  },
-  overflow: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  overflowText: { ...typeScale.caption, fontSize: 10, fontWeight: '800' },
-  metaCol: { flex: 1, gap: 1, minWidth: 80 },
-  count: { ...typeScale.caption, fontSize: 13, fontWeight: '800' },
+  more: { ...typeScale.caption, fontSize: 12, fontWeight: '800', paddingBottom: 14 },
   you: { ...typeScale.caption, fontSize: 11, fontWeight: '600' },
 });

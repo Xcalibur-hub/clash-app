@@ -1,5 +1,8 @@
 /**
- * Spectator event tray + stance sheet for upgrading into the debate.
+ * Spectator event tray + live-event join sheet.
+ *
+ * Stance note: spectators store null stance by design (privacy). Upgrade always
+ * requires a fresh private stance choice — there is no safe reuse path.
  */
 import React from 'react';
 import {
@@ -10,11 +13,23 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import type { Stance } from '../../services/liveArenaService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
-import { tap as hapticTap } from '../../utils/haptics';
-import { StanceChoiceRow } from '../arena/StanceChoiceRow';
+import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { softFill } from './liveArenaStyles';
+
+const CHOICES: readonly { key: Stance; label: string }[] = [
+  { key: 'AGREE', label: 'Agree' },
+  { key: 'UNSURE', label: 'Unsure' },
+  { key: 'DISAGREE', label: 'Disagree' },
+];
 
 export interface SpectatorJoinBarProps {
   busy?: boolean;
@@ -23,7 +38,6 @@ export interface SpectatorJoinBarProps {
   onJoinPress: () => void;
 }
 
-/** Floating spectator tray — Watching Room N + Join this debate. */
 export function SpectatorJoinBar({
   busy = false,
   roomFull = false,
@@ -32,7 +46,7 @@ export function SpectatorJoinBar({
 }: SpectatorJoinBarProps): React.JSX.Element {
   const t = useThemeColors();
   const watchingLabel =
-    roomIndex != null ? `Watching Room ${roomIndex}` : 'Watching this debate';
+    roomIndex != null ? `Watching Room ${roomIndex}` : 'Watching';
 
   return (
     <View style={styles.wrap}>
@@ -77,14 +91,16 @@ export function SpectatorJoinBar({
 export interface JoinDebateSheetProps {
   visible: boolean;
   busy?: boolean;
+  roomIndex?: number | null;
   onClose: () => void;
   onChoose: (stance: Stance) => void;
 }
 
-/** Small stance picker — anti-anchoring, no aggregates. */
+/** Live-event stance chooser — large tactile choices, private by design. */
 export function JoinDebateSheet({
   visible,
   busy = false,
+  roomIndex = null,
   onClose,
   onChoose,
 }: JoinDebateSheetProps): React.JSX.Element {
@@ -96,18 +112,78 @@ export function JoinDebateSheet({
           style={[styles.sheet, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}
           onPress={() => undefined}
         >
+          <Text allowFontScaling={false} style={[styles.sheetKicker, { color: t.textMuted }]}>
+            {roomIndex != null ? `Join Room ${roomIndex}` : 'Join this debate'}
+          </Text>
           <Text allowFontScaling={false} style={[styles.sheetTitle, { color: t.textPrimary }]}>
-            Join this debate
+            Choose your stance
           </Text>
           <Text allowFontScaling={false} style={[styles.sheetBody, { color: t.textMuted }]}>
             Your stance stays private. Capacity is checked by the server.
           </Text>
-          <View style={[styles.sheetPanel, { backgroundColor: softFill(t) }]}>
-            <StanceChoiceRow prompt="What do you believe?" disabled={busy} onChoose={onChoose} />
+          <View style={styles.choices}>
+            {CHOICES.map((choice) => (
+              <StanceChoice
+                key={choice.key}
+                label={choice.label}
+                disabled={busy}
+                onPress={() => onChoose(choice.key)}
+              />
+            ))}
           </View>
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+function StanceChoice({
+  label,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  disabled?: boolean;
+  onPress: () => void;
+}): React.JSX.Element {
+  const t = useThemeColors();
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={() => {
+        hapticPress();
+        if (!reduced) {
+          scale.value = withSequence(
+            withSpring(0.94, { damping: 14, stiffness: 420 }),
+            withSpring(1, { damping: 12, stiffness: 280 }),
+          );
+        }
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={styles.choiceHit}
+    >
+      <Animated.View
+        style={[
+          styles.choice,
+          anim,
+          {
+            backgroundColor: softFill(t),
+            borderColor: t.borderStrong,
+            opacity: disabled ? 0.5 : 1,
+          },
+        ]}
+      >
+        <Text allowFontScaling={false} style={[styles.choiceText, { color: t.textPrimary }]}>
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -145,18 +221,40 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(8,8,11,0.45)',
+    backgroundColor: 'rgba(8,8,11,0.5)',
     justifyContent: 'flex-end',
     padding: layout.screenX,
     paddingBottom: space.xxl,
   },
   sheet: {
-    borderRadius: 24,
+    borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
     padding: space.lg,
     gap: space.sm,
   },
-  sheetTitle: { ...typeScale.section, fontSize: 18, fontWeight: '800' },
-  sheetBody: { ...typeScale.meta, fontSize: 13 },
-  sheetPanel: { borderRadius: 16, padding: space.sm },
+  sheetKicker: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  sheetTitle: { ...typeScale.section, fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  sheetBody: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
+  choices: { gap: space.sm, marginTop: space.xs },
+  choiceHit: { width: '100%' },
+  choice: {
+    minHeight: 54,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choiceText: {
+    ...typeScale.label,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
 });
