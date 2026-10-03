@@ -14,6 +14,7 @@ import {
   fetchTopicRooms,
   joinTopic,
   upgradeSpectator,
+  watchRoom,
   type ArenaTopicRoomCard,
   type LiveArenaTopic,
   type Stance,
@@ -144,6 +145,27 @@ export default function ArenaTopicScreen(): React.JSX.Element {
     [dispatch, goToRoom, joining, requireAuth, topic?.viewerRoomId, topicId],
   );
 
+  const watchSpecificRoom = React.useCallback(
+    async (roomId: string): Promise<void> => {
+      if (joining) return;
+      if (!requireAuth()) return;
+      setJoining(true);
+      try {
+        const result = await watchRoom(roomId);
+        analytics.track('arena_room_joined', { realm: 'arena', is_guest: false });
+        const refreshed = await fetchTopic(topicId);
+        setTopic(refreshed);
+        await reloadRooms();
+        goToRoom(result.roomId);
+      } catch (error) {
+        dispatch(showNotice(errorText(error)));
+      } finally {
+        setJoining(false);
+      }
+    },
+    [dispatch, goToRoom, joining, reloadRooms, requireAuth, topicId],
+  );
+
   // Stance deep-link from Arena card — join once, then enter room.
   React.useEffect(() => {
     if (autoJoined.current || !presetStance || authLoading || !signedIn) return;
@@ -232,6 +254,7 @@ export default function ArenaTopicScreen(): React.JSX.Element {
             roomsLoading={roomsLoading}
             busy={joining}
             onEnterRoom={goToRoom}
+            onWatchRoom={(roomId) => void watchSpecificRoom(roomId)}
             onJoinDebate={(stance) => {
               if (topic.viewerRole === 'spectator' && topic.viewerRoomId) {
                 void upgrade(stance);
@@ -242,6 +265,8 @@ export default function ArenaTopicScreen(): React.JSX.Element {
             onWatch={() => {
               if (topic.viewerJoined && topic.viewerRoomId) {
                 goToRoom(topic.viewerRoomId);
+              } else if (rooms[0]) {
+                void watchSpecificRoom(rooms[0].roomId);
               } else {
                 void join(null, 'spectator');
               }

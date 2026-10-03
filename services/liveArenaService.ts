@@ -676,6 +676,31 @@ export async function fetchTopicRooms(topicId: string): Promise<ArenaTopicRoomCa
 }
 
 /**
+ * Enter a specific room as a spectator (or move an existing spectator membership).
+ * Debaters already assigned elsewhere are refused by the server (P0006).
+ * Never increments capacity.
+ */
+export async function watchRoom(roomId: string): Promise<ArenaJoinResult> {
+  const { data, error } = await client().rpc('watch_arena_room', { p_room_id: roomId });
+  if (error) throw requestError(error);
+  const record = asRecord(data);
+  const nextRoomId = record ? str(record.roomId) : null;
+  const joinRole = record ? (oneOf(record.role, ROLES) ?? 'spectator') : null;
+  if (!record || !nextRoomId || !joinRole) bad('watch_arena_room');
+  return {
+    joined: bool(record.joined),
+    roomId: nextRoomId,
+    topicId: str(record.topicId) ?? '',
+    stance: oneOf(record.stance, STANCES),
+    role: joinRole,
+    status: oneOf(record.status, ROOM_STATUSES) ?? 'OPEN',
+    capacity: num(record.capacity) ?? 0,
+    participantCount: num(record.participantCount) ?? 0,
+    joinedAt: millis(record.joinedAt) ?? Date.now(),
+  };
+}
+
+/**
  * Join today's topic and get auto-placed into a room.
  *
  * Debaters must pass a stance. Spectators pass `null` stance + role `spectator`

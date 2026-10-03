@@ -53,13 +53,19 @@ export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX
                     borderColor: current || done ? t.textPrimary : t.borderStrong,
                   },
                 ]}
-              />
+              >
+                {step.key === 'SETTLED' && (current || done) ? (
+                  <Text allowFontScaling={false} style={styles.check}>
+                    ✓
+                  </Text>
+                ) : null}
+              </View>
               <Text
                 allowFontScaling={false}
                 style={[
                   styles.label,
                   {
-                    color: current ? t.textPrimary : t.textMuted,
+                    color: current ? t.textPrimary : done ? t.textSecondary : t.textMuted,
                     fontWeight: current ? '800' : '600',
                   },
                 ]}
@@ -83,11 +89,14 @@ const styles = StyleSheet.create({
   },
   step: { alignItems: 'center', gap: 4, minWidth: 44 },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  check: { color: '#FAFAF8', fontSize: 7, fontWeight: '800', lineHeight: 9 },
   label: { ...typeScale.caption, fontSize: 10, letterSpacing: 0.2 },
   rail: { flex: 1, height: StyleSheet.hairlineWidth, marginHorizontal: 4, marginBottom: 14 },
   railHot: { height: 1.5 },

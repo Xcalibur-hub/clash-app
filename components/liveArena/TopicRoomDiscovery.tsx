@@ -1,6 +1,5 @@
 /**
- * Topic door — Live Topic summary + Your Room / Join / Watch + optional room list.
- * Uses only real room cards from `list_arena_topic_rooms`. No stance aggregates.
+ * Topic door — Live Topic + Your Room + interactive Active Rooms (spectator watch).
  */
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -21,8 +20,25 @@ export interface TopicRoomDiscoveryProps {
   roomsLoading?: boolean;
   busy?: boolean;
   onEnterRoom: (roomId: string) => void;
+  /** Spectator entry into an explicit room (server-authoritative). */
+  onWatchRoom: (roomId: string) => void;
   onJoinDebate: (stance: Stance) => void;
   onWatch: () => void;
+}
+
+function roomStatusLabel(status: ArenaTopicRoomCard['status']): string {
+  switch (status) {
+    case 'OPEN':
+      return 'OPEN';
+    case 'FINAL_ARGUMENTS':
+      return 'FINAL';
+    case 'JUDGING':
+      return 'JUDGING';
+    case 'SETTLED':
+      return 'SETTLED';
+    default:
+      return status;
+  }
 }
 
 export function TopicRoomDiscovery({
@@ -31,6 +47,7 @@ export function TopicRoomDiscovery({
   roomsLoading = false,
   busy = false,
   onEnterRoom,
+  onWatchRoom,
   onJoinDebate,
   onWatch,
 }: TopicRoomDiscoveryProps): React.JSX.Element {
@@ -46,8 +63,14 @@ export function TopicRoomDiscovery({
         }
       : null;
   const isSpectator = topic.viewerRole === 'spectator';
-  const otherRooms = rooms.filter((room) => !room.isViewerRoom).slice(0, 6);
+  const isDebater = topic.viewerRole === 'debater';
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
+
+  // Debaters stay in their assigned room; everyone else can watch any listed room.
+  const watchableRooms = rooms.filter((room) => {
+    if (isDebater && assigned && room.roomId !== assigned.roomId) return false;
+    return true;
+  });
 
   return (
     <View style={styles.wrap}>
@@ -134,11 +157,11 @@ export function TopicRoomDiscovery({
             }}
             disabled={busy}
             accessibilityRole="button"
-            accessibilityLabel="Watch Room"
+            accessibilityLabel="Watch a live room"
             style={styles.watchHit}
           >
             <Text allowFontScaling={false} style={[styles.watch, { color: t.textSecondary }]}>
-              Watch Room
+              Or pick a room below to watch
             </Text>
           </Pressable>
         </View>
@@ -146,37 +169,72 @@ export function TopicRoomDiscovery({
 
       {roomsLoading ? (
         <ActivityIndicator color={t.textMuted} style={styles.loader} />
-      ) : otherRooms.length > 0 ? (
+      ) : watchableRooms.length > 0 ? (
         <View style={styles.listBlock}>
           <Text allowFontScaling={false} style={[styles.listTitle, { color: t.textMuted }]}>
             Active rooms
           </Text>
-          {otherRooms.map((room) => (
-            <Pressable
-              key={room.roomId}
-              onPress={() => {
-                // Non-members cannot open another room's thread until join places them.
-                // Tapping shows the room card context only when already assigned elsewhere —
-                // otherwise join flow remains the door.
-                if (assigned) return;
-                hapticTap();
-              }}
-              disabled={Boolean(assigned) || busy}
-              style={[styles.roomRow, { borderColor: t.border }]}
-              accessibilityRole="text"
-              accessibilityLabel={`Room ${room.roomIndex}, ${room.participantCount} here`}
-            >
-              <Text allowFontScaling={false} style={[styles.roomRowTitle, { color: t.textPrimary }]}>
-                Room {room.roomIndex}
-              </Text>
-              <Text allowFontScaling={false} style={[styles.roomRowMeta, { color: t.textMuted }]}>
-                {room.participantCount} here
-                {room.status !== 'OPEN'
-                  ? ` · ${room.status.replace(/_/g, ' ').toLowerCase()}`
-                  : ''}
-              </Text>
-            </Pressable>
-          ))}
+          {watchableRooms.map((room) => {
+            const full = room.participantCount >= room.capacity && room.status === 'OPEN';
+            const mine = room.isViewerRoom;
+            const meta = full
+              ? `${room.participantCount} / ${room.capacity} · ${roomStatusLabel(room.status)} · FULL`
+              : `${room.participantCount} here · ${roomStatusLabel(room.status)}`;
+            const cta = mine
+              ? isDebater
+                ? 'Enter →'
+                : 'Watching →'
+              : 'Watch →';
+
+            return (
+              <Pressable
+                key={room.roomId}
+                onPress={() => {
+                  hapticTap();
+                  if (mine && isDebater) onEnterRoom(room.roomId);
+                  else if (mine) onEnterRoom(room.roomId);
+                  else onWatchRoom(room.roomId);
+                }}
+                disabled={busy}
+                style={[
+                  styles.roomRow,
+                  {
+                    borderColor: t.border,
+                    backgroundColor: mine ? softFill(t) : 'transparent',
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Room ${room.roomIndex}, ${meta}. ${cta}`}
+              >
+                <View style={styles.roomRowLeft}>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.roomRowTitle, { color: t.textPrimary }]}
+                  >
+                    Room {room.roomIndex}
+                    {mine ? ' · Yours' : ''}
+                  </Text>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.roomRowMeta, { color: full ? t.textSecondary : t.textMuted }]}
+                  >
+                    {meta}
+                  </Text>
+                </View>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.roomRowCta, { color: t.textPrimary }]}
+                >
+                  {cta}
+                </Text>
+              </Pressable>
+            );
+          })}
+          {isDebater ? (
+            <Text allowFontScaling={false} style={[styles.debaterNote, { color: t.textMuted }]}>
+              You’re debating in your assigned room — pick Enter Room above.
+            </Text>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -296,7 +354,7 @@ const styles = StyleSheet.create({
   watchHit: { alignSelf: 'center', paddingVertical: space.sm },
   watch: { ...typeScale.meta, fontSize: 14, fontWeight: '600' },
   loader: { marginTop: space.sm },
-  listBlock: { gap: space.xs },
+  listBlock: { gap: 6 },
   listTitle: {
     ...typeScale.caption,
     fontSize: 11,
@@ -310,8 +368,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.sm,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: space.sm,
   },
+  roomRowLeft: { flex: 1, gap: 2 },
   roomRowTitle: { ...typeScale.label, fontSize: 15, fontWeight: '700' },
   roomRowMeta: { ...typeScale.caption, fontSize: 12 },
+  roomRowCta: { ...typeScale.label, fontSize: 13, fontWeight: '800' },
+  debaterNote: { ...typeScale.caption, fontSize: 11, marginTop: 4, lineHeight: 15 },
 });

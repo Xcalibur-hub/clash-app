@@ -61,7 +61,16 @@ export function LiveRoomJudgingPanel({
   }
 
   return (
-    <View style={[styles.panel, { backgroundColor: t.surface, borderColor: t.border }]}>
+    <View
+      style={[
+        styles.panel,
+        {
+          backgroundColor: t.surfaceElevated,
+          borderColor: t.border,
+          shadowColor: t.shadowColor,
+        },
+      ]}
+    >
       <View style={styles.head}>
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
           JUDGING
@@ -231,28 +240,39 @@ function SideButton({
 
 const styles = StyleSheet.create({
   panel: {
-    margin: layout.screenX,
-    padding: space.md,
+    marginHorizontal: layout.screenX,
+    marginTop: space.sm,
+    padding: space.lg,
     gap: space.sm,
-    borderRadius: radius.lg,
+    borderRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
   },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  eyebrow: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  eyebrow: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
   meta: { ...typeScale.caption, fontSize: 11 },
-  question: { ...typeScale.label, fontSize: 15, fontWeight: '700' },
+  question: { ...typeScale.label, fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
   note: { ...typeScale.meta, fontSize: 13 },
   recorded: { ...typeScale.caption, fontSize: 11, lineHeight: 16 },
-  sides: { flexDirection: 'row', gap: space.xs },
+  sides: { flexDirection: 'row', gap: space.sm },
   side: {
     flex: 1,
-    minHeight: layout.hit,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  sideText: { ...typeScale.button, fontSize: 15, fontWeight: '700' },
+  sideText: {
+    ...typeScale.button,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 2 },
   rail: { gap: space.xs, paddingVertical: 2, paddingRight: space.xs },
   candidate: {

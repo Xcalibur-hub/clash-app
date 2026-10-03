@@ -1,5 +1,5 @@
 /**
- * Compact spectator CTA + stance sheet for upgrading into the debate.
+ * Spectator event tray + stance sheet for upgrading into the debate.
  */
 import React from 'react';
 import {
@@ -19,16 +19,21 @@ import { softFill } from './liveArenaStyles';
 export interface SpectatorJoinBarProps {
   busy?: boolean;
   roomFull?: boolean;
+  roomIndex?: number | null;
   onJoinPress: () => void;
 }
 
-/** Floating spectator tray — Watching + Join the debate. */
+/** Floating spectator tray — Watching Room N + Join this debate. */
 export function SpectatorJoinBar({
   busy = false,
   roomFull = false,
+  roomIndex = null,
   onJoinPress,
 }: SpectatorJoinBarProps): React.JSX.Element {
   const t = useThemeColors();
+  const watchingLabel =
+    roomIndex != null ? `Watching Room ${roomIndex}` : 'Watching this debate';
+
   return (
     <View style={styles.wrap}>
       <View
@@ -42,7 +47,7 @@ export function SpectatorJoinBar({
         ]}
       >
         <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
-          {roomFull ? 'This room filled up while you were watching.' : 'Watching'}
+          {roomFull ? 'This room filled up while you were watching.' : watchingLabel}
         </Text>
         {!roomFull ? (
           <Pressable
@@ -52,14 +57,14 @@ export function SpectatorJoinBar({
             }}
             disabled={busy}
             accessibilityRole="button"
-            accessibilityLabel="Join the debate"
+            accessibilityLabel="Join this debate"
             style={[styles.cta, { backgroundColor: t.clashFill }]}
           >
             {busy ? (
               <ActivityIndicator color={t.clashText} />
             ) : (
               <Text allowFontScaling={false} style={[styles.ctaText, { color: t.clashText }]}>
-                Join the debate
+                Join this debate
               </Text>
             )}
           </Pressable>
@@ -92,10 +97,10 @@ export function JoinDebateSheet({
           onPress={() => undefined}
         >
           <Text allowFontScaling={false} style={[styles.sheetTitle, { color: t.textPrimary }]}>
-            Join the debate
+            Join this debate
           </Text>
           <Text allowFontScaling={false} style={[styles.sheetBody, { color: t.textMuted }]}>
-            Your stance stays private.
+            Your stance stays private. Capacity is checked by the server.
           </Text>
           <View style={[styles.sheetPanel, { backgroundColor: softFill(t) }]}>
             <StanceChoiceRow prompt="What do you believe?" disabled={busy} onChoose={onChoose} />
@@ -109,24 +114,35 @@ export function JoinDebateSheet({
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: space.md, paddingTop: space.sm },
   bar: {
-    borderRadius: 22,
+    borderRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm + 2,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
     gap: space.sm,
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
   },
-  watching: { ...typeScale.meta, fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  watching: {
+    ...typeScale.meta,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   cta: {
-    minHeight: 44,
+    minHeight: 48,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { ...typeScale.label, fontSize: 14, fontWeight: '800' },
+  ctaText: {
+    ...typeScale.label,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(8,8,11,0.45)',

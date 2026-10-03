@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSharedValue } from 'react-native-reanimated';
 import { EvidenceComposerSheet } from '../../../components/liveArena/EvidenceComposerSheet';
 import { LiveEvidenceCard } from '../../../components/liveArena/LiveEvidenceCard';
 import { LiveRoomComposer } from '../../../components/liveArena/LiveRoomComposer';
@@ -81,6 +82,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const now = useClock(1_000);
   const { state, dispatch } = useClash();
   const listRef = React.useRef<FlatList<ArenaMessage>>(null);
+  const scrollY = useSharedValue(0);
 
   const viewerAuthor = React.useMemo<ArenaAuthor>(
     () => ({
@@ -326,11 +328,24 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
 
   const finalBanner =
     room.status === 'FINAL_ARGUMENTS' ? (
-      <View style={[styles.phaseBanner, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
+      <View
+        style={[
+          styles.phaseBanner,
+          {
+            backgroundColor: t.surfaceElevated,
+            borderColor: t.borderStrong,
+            shadowColor: t.shadowColor,
+          },
+        ]}
+      >
         <Text allowFontScaling={false} style={[styles.phaseText, { color: t.textPrimary }]}>
           FINAL ARGUMENTS
-          {room.secondsToJudging > 0 ? ` · ${secondsClock(room.secondsToJudging)}` : ''}
         </Text>
+        {room.secondsToJudging > 0 ? (
+          <Text allowFontScaling={false} style={[styles.phaseClock, { color: t.textSecondary }]}>
+            {secondsClock(room.secondsToJudging)}
+          </Text>
+        ) : null}
       </View>
     ) : null;
 
@@ -369,6 +384,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         <SpectatorJoinBar
           busy={joining}
           roomFull={roomFullOnUpgrade}
+          roomIndex={roomIndex}
           onJoinPress={() => setJoinOpen(true)}
         />
       );
@@ -443,6 +459,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         paddingTop={insets.top}
         roomIndex={roomIndex}
         presence={presence}
+        scrollY={scrollY}
         onBack={() => {
           if (router.canGoBack()) router.back();
           else router.replace('/(tabs)');
@@ -521,11 +538,12 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                 onEndReachedThreshold={0.4}
                 onScroll={(e) => {
                   const y = e.nativeEvent.contentOffset.y;
+                  scrollY.value = y;
                   const nearEdge = y < 48;
                   setAtLiveEdge(nearEdge);
                   if (nearEdge && newCount > 0) setNewCount(0);
                 }}
-                scrollEventThrottle={32}
+                scrollEventThrottle={16}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               />
@@ -593,12 +611,20 @@ const styles = StyleSheet.create({
     marginHorizontal: layout.screenX,
     marginBottom: space.xs,
     paddingHorizontal: space.md,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
+    paddingVertical: 10,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    alignSelf: 'center',
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  phaseText: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+  phaseText: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  phaseClock: { ...typeScale.data, fontSize: 14, fontWeight: '800' },
   orphanWrap: { gap: space.xs, paddingHorizontal: layout.screenX, paddingVertical: space.xs },
   locked: { paddingHorizontal: layout.screenX, paddingVertical: space.sm },
   lockedText: { ...typeScale.caption, fontSize: 12, lineHeight: 17 },

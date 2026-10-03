@@ -246,7 +246,7 @@ export function LiveRoomComposer({
               style={[styles.send, { backgroundColor: t.pill }, !canSend && styles.off]}
             >
               <Text allowFontScaling={false} style={[styles.sendText, { color: t.pillText }]}>
-                Send
+                ↑
               </Text>
             </Pressable>
           </View>
@@ -367,12 +367,12 @@ const styles = StyleSheet.create({
   sendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   count: { ...typeScale.data, fontSize: 10 },
   send: {
-    paddingHorizontal: 14,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   off: { opacity: 0.35 },
-  sendText: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
+  sendText: { fontSize: 18, fontWeight: '800', lineHeight: 20 },
 });
