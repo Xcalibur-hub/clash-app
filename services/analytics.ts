@@ -78,7 +78,16 @@ export type AnalyticsEvent =
   | 'media_reply_picker_opened'
   | 'media_reply_created'
   | 'gif_picker_opened'
-  | 'gif_reply_created';
+  | 'gif_reply_created'
+  | 'explore_opened'
+  | 'explore_country_selected'
+  | 'explore_country_searched'
+  | 'explore_teleport'
+  | 'explore_content_opened'
+  | 'explore_globe_rotated'
+  | 'explore_challenge_opened'
+  | 'explore_treasure_opened'
+  | 'explore_vault_preview_opened';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([
@@ -101,7 +110,7 @@ const ALLOWED_PROP_KEYS = new Set([
 
 export type AnalyticsProperties = {
   source?: string;
-  realm?: 'arena' | 'world' | 'vault' | 'profile';
+  realm?: 'arena' | 'world' | 'vault' | 'profile' | 'explore';
   hood_id?: string;
   take_has_media?: boolean;
   media_type?: 'image' | 'video' | 'gif' | 'none';

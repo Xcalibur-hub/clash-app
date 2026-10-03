@@ -14,7 +14,7 @@ export interface ExploreSearchProps {
 export function ExploreSearch({
   value,
   onChange,
-  placeholder = 'Search Hoods, Takes, people…',
+  placeholder = 'Search the world…',
 }: ExploreSearchProps): React.JSX.Element {
   const t = useThemeColors();
   const inputRef = React.useRef<TextInput>(null);

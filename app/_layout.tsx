@@ -94,6 +94,7 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="hood/[hoodId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="hood/game/[gameId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="world" options={{ animation: 'slide_from_right' }} />
+                  <Stack.Screen name="explore" options={{ animation: 'slide_from_right' }} />
                 </ThemedChrome>
                 <LocalSupabaseBadge />
               </FontBootstrap>

@@ -2928,6 +2928,30 @@ export type Database = {
         Args: { p_topic_id: string }
         Returns: Json
       }
+      get_explore_world_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_explore_country: {
+        Args: { p_country_code: string }
+        Returns: Json
+      }
+      get_global_viral: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
+      get_teleport_candidate: {
+        Args: { p_exclude_ids?: string[] }
+        Returns: Json
+      }
+      search_explore: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: Json
+      }
+      list_explore_vault_previews: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       hood_active_prediction: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: Json
