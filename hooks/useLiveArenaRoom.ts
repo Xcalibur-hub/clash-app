@@ -3,6 +3,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import {
   fetchEvidence,
   fetchMessages,
+  fetchMessagesSince,
   fetchMindshiftStats,
   fetchRoom,
   markEvidenceUseful,
@@ -25,6 +26,7 @@ import {
 } from '../services/liveArenaService';
 import { errorText, SupabaseError } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
+import { mergeMessagesById } from '../utils/liveRoomThread';
 
 /** How many arguments one page of the thread carries. */
 const PAGE = 40;
@@ -67,16 +69,7 @@ function mergeMessages(
   current: readonly ArenaMessage[],
   incoming: readonly ArenaMessage[],
 ): ArenaMessage[] {
-  const byId = new Map<string, ArenaMessage>();
-  for (const message of current) byId.set(message.id, message);
-  for (const message of incoming) {
-    const existing = byId.get(message.id);
-    // A server payload always wins over a pending placeholder of the same id.
-    byId.set(message.id, existing?.pending ? message : { ...existing, ...message });
-  }
-  return [...byId.values()].sort((a, b) =>
-    b.createdAt === a.createdAt ? b.id.localeCompare(a.id) : b.createdAt - a.createdAt,
-  );
+  return mergeMessagesById(current, incoming);
 }
 
 /** Row-level-security refusals read as 42501; the thread is members-only. */
@@ -122,7 +115,9 @@ export function useLiveArenaRoom(
   const mounted = React.useRef(true);
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const authorRef = React.useRef<ArenaAuthor | null>(viewerAuthor);
+  const messagesRef = React.useRef<ArenaMessage[]>([]);
   authorRef.current = viewerAuthor;
+  messagesRef.current = messages;
 
   React.useEffect(() => {
     mounted.current = true;
@@ -139,13 +134,24 @@ export function useLiveArenaRoom(
     [dispatch],
   );
 
-  /** Re-read the newest page without touching older pages already loaded. */
+  /**
+   * Gap-aware thread refresh after realtime hints / reconnect.
+   * 1) gap-fetch messages newer than the last confirmed server timestamp
+   * 2) re-read newest page for reaction/replyCount rollups
+   * Merge + dedupe by id; server timestamps + ids own ordering.
+   */
   const refreshThread = React.useCallback(async (): Promise<void> => {
     try {
-      const page = await fetchMessages(roomId, undefined, PAGE);
+      const newest = messagesRef.current.find((m) => !m.pending)?.createdAt;
+      const [fresh, gap] = await Promise.all([
+        fetchMessages(roomId, undefined, PAGE),
+        newest != null
+          ? fetchMessagesSince(roomId, newest, PAGE).catch(() => [] as ArenaMessage[])
+          : Promise.resolve([] as ArenaMessage[]),
+      ]);
       if (!mounted.current) return;
       setThreadLocked(false);
-      setMessages((current) => mergeMessages(current, page));
+      setMessages((current) => mergeMessages(current, mergeMessages(gap, fresh)));
     } catch (caught) {
       if (!mounted.current) return;
       if (isMembershipRefusal(caught)) setThreadLocked(true);
@@ -236,17 +242,19 @@ export function useLiveArenaRoom(
     };
   }, [roomId, refreshThread]);
 
-  // Coming back from the background: the socket may have missed messages and
-  // the room may have changed phase while the JS thread was frozen.
+  // Coming back from the background: gap-fetch missed messages, then refresh room.
   React.useEffect(() => {
     let previous = AppState.currentState;
     const subscription = AppState.addEventListener('change', (status: AppStateStatus) => {
       const wasAway = previous !== 'active';
       previous = status;
-      if (status === 'active' && wasAway) void load('refresh');
+      if (status === 'active' && wasAway) {
+        void refreshThread();
+        void load('refresh');
+      }
     });
     return () => subscription.remove();
-  }, [load]);
+  }, [load, refreshThread]);
 
   const loadOlder = React.useCallback(async (): Promise<void> => {
     if (loadingOlder || !hasOlder || threadLocked || messages.length === 0) return;
@@ -282,6 +290,7 @@ export function useLiveArenaRoom(
         isOwn: true,
         author: authorRef.current,
         reactions: [],
+        replyCount: 0,
         argumentVotes: null,
         pending: true,
       };

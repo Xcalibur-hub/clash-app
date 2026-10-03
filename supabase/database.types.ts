@@ -2981,8 +2981,17 @@ export type Database = {
         Returns: Json[]
       }
       list_arena_room_messages: {
-        Args: { p_before?: string; p_limit?: number; p_room_id: string }
+        Args: {
+          p_after?: string
+          p_before?: string
+          p_limit?: number
+          p_room_id: string
+        }
         Returns: Json[]
+      }
+      get_arena_room_pulse: {
+        Args: { p_room_id: string }
+        Returns: Json
       }
       list_campaign_coupons: {
         Args: { p_campaign_id: string }

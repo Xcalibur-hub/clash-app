@@ -47,6 +47,8 @@ export type AnalyticsEvent =
   | 'arena_topic_viewed'
   | 'arena_room_joined'
   | 'arena_message_sent'
+  | 'room_pulse_opened'
+  | 'room_pulse_category_viewed'
   | 'take_opened'
   | 'take_created'
   | 'hood_joined'

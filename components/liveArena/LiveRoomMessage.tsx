@@ -18,6 +18,8 @@ export interface LiveRoomMessageProps {
   message: ArenaMessage;
   now: number;
   parent?: ArenaMessage | null;
+  /** Parent id exists but the parent row is hidden/unavailable. */
+  parentUnavailable?: boolean;
   evidence?: readonly ArenaEvidence[];
   canReply?: boolean;
   canReact?: boolean;
@@ -27,6 +29,10 @@ export interface LiveRoomMessageProps {
   highlightLabel?: string | null;
   /** Own stance cue only (privacy — never other members' stances). */
   ownStance?: Stance | null;
+  /** Ranked reply preview nested under a root argument. */
+  nestedReplies?: readonly ArenaMessage[];
+  hiddenReplyCount?: number;
+  onExpandReplies?: () => void;
   onReply?: (message: ArenaMessage) => void;
   onReact?: (message: ArenaMessage, emoji: string) => void;
   onOpenProfile?: (profileId: string) => void;
@@ -54,6 +60,7 @@ export function LiveRoomMessage({
   message,
   now,
   parent = null,
+  parentUnavailable = false,
   evidence = [],
   canReply = true,
   canReact = true,
@@ -61,6 +68,9 @@ export function LiveRoomMessage({
   highlighted = false,
   highlightLabel = null,
   ownStance = null,
+  nestedReplies = [],
+  hiddenReplyCount = 0,
+  onExpandReplies,
   onReply,
   onReact,
   onOpenProfile,
@@ -86,7 +96,8 @@ export function LiveRoomMessage({
   const media = toTakeMedia(message);
   const own = message.isOwn;
   const pending = message.pending === true;
-  const isReply = Boolean(parent);
+  const isReply = Boolean(parent) || parentUnavailable || Boolean(message.parentMessageId);
+  const replyTotal = Math.max(message.replyCount ?? 0, nestedReplies.length + hiddenReplyCount);
   const showReactButton = canReact && Boolean(onReact) && !pending;
   const staticReactions = showReactButton
     ? message.reactions.filter((reaction) => reaction.emoji !== DEFAULT_REACTION)
@@ -181,7 +192,7 @@ export function LiveRoomMessage({
           ) : null}
         </View>
 
-        {parent ? (
+        {parent || parentUnavailable ? (
           <View style={styles.replyAttach}>
             <View style={[styles.connector, { backgroundColor: t.borderStrong }]} />
             <View style={[styles.quote, { backgroundColor: softFill(t), borderColor: t.border }]}>
@@ -190,8 +201,11 @@ export function LiveRoomMessage({
                 numberOfLines={2}
                 style={[styles.quoteText, { color: t.textMuted }]}
               >
-                {parent.author ? `@${parent.author.handle ?? parent.author.name}: ` : ''}
-                {parent.body || 'attachment'}
+                {parentUnavailable || !parent
+                  ? '[argument unavailable]'
+                  : `${parent.author ? `@${parent.author.handle ?? parent.author.name}: ` : ''}${
+                      parent.body || 'attachment'
+                    }`}
               </Text>
             </View>
           </View>
@@ -270,6 +284,11 @@ export function LiveRoomMessage({
               </Text>
             </Pressable>
           ) : null}
+          {replyTotal > 0 && !message.parentMessageId ? (
+            <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
+              ↩ {replyTotal} response{replyTotal === 1 ? '' : 's'}
+            </Text>
+          ) : null}
           {message.argumentVotes !== null && message.argumentVotes > 0 ? (
             <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
               {message.argumentVotes} best-argument
@@ -277,6 +296,42 @@ export function LiveRoomMessage({
             </Text>
           ) : null}
         </View>
+
+        {nestedReplies.length > 0 ? (
+          <View style={styles.nested}>
+            {nestedReplies.map((reply) => (
+              <View
+                key={reply.id}
+                style={[styles.nestedRow, { borderColor: t.border, backgroundColor: softFill(t) }]}
+              >
+                <Text allowFontScaling={false} style={[styles.nestedName, { color: t.textPrimary }]}>
+                  {reply.author?.name ?? 'Someone'}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={3}
+                  style={[styles.nestedBody, { color: t.textSecondary }]}
+                >
+                  {reply.body || (reply.mediaUrl ? 'attachment' : '')}
+                </Text>
+              </View>
+            ))}
+            {hiddenReplyCount > 0 && onExpandReplies ? (
+              <Pressable
+                onPress={() => {
+                  hapticTap();
+                  onExpandReplies();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`View ${hiddenReplyCount} more responses`}
+              >
+                <Text allowFontScaling={false} style={[styles.moreReplies, { color: t.textPrimary }]}>
+                  View {hiddenReplyCount} more response{hiddenReplyCount === 1 ? '' : 's'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
       </View>
     </Animated.View>
   );
@@ -401,4 +456,20 @@ const styles = StyleSheet.create({
   action: { ...typeScale.caption, fontSize: 11, fontWeight: '600' },
   systemWrap: { paddingVertical: space.sm, alignItems: 'center' },
   system: { ...typeScale.caption, fontSize: 11, textAlign: 'center' },
+  nested: { gap: 6, marginTop: 4 },
+  nestedRow: {
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.sm,
+    paddingVertical: 8,
+    gap: 2,
+  },
+  nestedName: { ...typeScale.label, fontSize: 12, fontWeight: '800' },
+  nestedBody: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
+  moreReplies: {
+    ...typeScale.caption,
+    fontSize: 12,
+    fontWeight: '800',
+    paddingVertical: 4,
+  },
 });

@@ -27,6 +27,7 @@ export interface LiveRoomHeaderProps {
   presence?: readonly ArenaRoomPresence[];
   scrollY?: SharedValue<number>;
   onBack: () => void;
+  onPulsePress?: () => void;
 }
 
 export function LiveRoomHeader({
@@ -36,6 +37,7 @@ export function LiveRoomHeader({
   presence = [],
   scrollY,
   onBack,
+  onPulsePress,
 }: LiveRoomHeaderProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
@@ -92,6 +94,23 @@ export function LiveRoomHeader({
           {` · ${room.participantCount} here`}
           {countdown ? ` · ${countdown}` : ''}
         </Text>
+        {onPulsePress ? (
+          <Pressable
+            onPress={() => {
+              hapticTap();
+              onPulsePress();
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open Room Pulse"
+            style={[styles.pulseBtn, { borderColor: t.borderStrong, backgroundColor: t.surfaceElevated }]}
+          >
+            <Text allowFontScaling={false} style={[styles.pulseBtnText, { color: t.textPrimary }]}>
+              PULSE
+            </Text>
+            <View style={[styles.pulseDot, { backgroundColor: t.textPrimary }]} />
+          </Pressable>
+        ) : null}
       </View>
 
       <Animated.View style={[styles.detail, detailStyle]}>
@@ -152,6 +171,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.2,
+    flexShrink: 1,
   },
+  pulseBtn: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  pulseBtnText: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  pulseDot: { width: 6, height: 6, borderRadius: 3 },
   detail: { gap: space.sm, overflow: 'hidden', paddingLeft: 28 },
 });

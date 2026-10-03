@@ -212,10 +212,46 @@ export interface ArenaMessage {
   isOwn: boolean;
   author: ArenaAuthor | null;
   reactions: ArenaReaction[];
+  /** Visible reply children (server count). */
+  replyCount: number;
   /** Withheld (null) until the room settles — a live count is a bandwagon signal. */
   argumentVotes: number | null;
   /** True while an optimistic send is still in flight. Never set by the server. */
   pending?: boolean;
+}
+
+export type ArenaPulseCategory =
+  | 'TOP_ARGUMENT'
+  | 'BEST_EVIDENCE'
+  | 'BEST_REBUTTAL'
+  | 'FAST_RISING'
+  | 'CROWD_FAVORITE';
+
+export interface ArenaPulseLeader {
+  category: ArenaPulseCategory;
+  label: string;
+  messageId: string | null;
+  evidenceId: string | null;
+  author: ArenaAuthor | null;
+  score: number;
+  preview: string;
+}
+
+export interface ArenaRoomPulse {
+  roomId: string;
+  status: ArenaRoomStatus;
+  leaders: ArenaPulseLeader[];
+  generatedAt: number;
+}
+
+/** Ephemeral typing presence — never persisted, never includes draft text. */
+export interface ArenaTypingState {
+  userId: string;
+  handle: string;
+  name: string;
+  avatarTint: string;
+  replyingToMessageId: string | null;
+  typing: true;
 }
 
 export interface ArenaEvidence {
@@ -514,6 +550,7 @@ function toMessage(payload: Json | null): ArenaMessage {
     isOwn: bool(record.isOwn),
     author: toAuthor(record.author),
     reactions: toReactions(record.reactions),
+    replyCount: num(record.replyCount) ?? 0,
     argumentVotes: num(record.argumentVotes),
   };
 }
@@ -817,22 +854,86 @@ export async function fetchRoom(roomId: string): Promise<ArenaRoom> {
 }
 
 /**
- * A page of the thread, newest first. `before` pages backwards through time;
- * pass the oldest `createdAt` you already hold. Members only — hidden messages
- * and blocked/muted authors are filtered server-side, never here.
+ * A page of the thread, newest first.
+ *
+ * Ordering: server `created_at` desc, then `id` desc (stable). Never client clocks.
+ *
+ * `before` pages older (pass oldest createdAt held).
+ * `after` gap-fetches newer after reconnect (pass newest createdAt held).
+ *
+ * Members only — hidden messages and blocked/muted authors are filtered server-side.
  */
 export async function fetchMessages(
   roomId: string,
   before?: number,
   limit = 50,
+  after?: number,
 ): Promise<ArenaMessage[]> {
   const { data, error } = await client().rpc('list_arena_room_messages', {
     p_room_id: roomId,
     p_limit: limit,
     ...(before !== undefined ? { p_before: new Date(before).toISOString() } : {}),
+    ...(after !== undefined ? { p_after: new Date(after).toISOString() } : {}),
   });
   if (error) throw requestError(error);
   return (data ?? []).map(toMessage);
+}
+
+/** Messages strictly newer than `after` — reconnect gap recovery. */
+export async function fetchMessagesSince(
+  roomId: string,
+  after: number,
+  limit = 50,
+): Promise<ArenaMessage[]> {
+  return fetchMessages(roomId, undefined, limit, after);
+}
+
+const PULSE_CATEGORIES = [
+  'TOP_ARGUMENT',
+  'BEST_EVIDENCE',
+  'BEST_REBUTTAL',
+  'FAST_RISING',
+  'CROWD_FAVORITE',
+] as const;
+
+function toPulseLeader(value: Json | undefined): ArenaPulseLeader | null {
+  const record = asRecord(value ?? null);
+  if (!record) return null;
+  const category = oneOf(record.category, PULSE_CATEGORIES);
+  if (!category) return null;
+  return {
+    category,
+    label: str(record.label) ?? category,
+    messageId: str(record.messageId),
+    evidenceId: str(record.evidenceId),
+    author: toAuthor(record.author),
+    score: num(record.score) ?? 0,
+    preview: str(record.preview) ?? '',
+  };
+}
+
+/** Deterministic Room Pulse leaders for the current room. Categories may be empty. */
+export async function fetchRoomPulse(roomId: string): Promise<ArenaRoomPulse> {
+  const { data, error } = await client().rpc('get_arena_room_pulse', {
+    p_room_id: roomId,
+  });
+  if (error) throw requestError(error);
+  const record = asRecord(data);
+  if (!record) bad('get_arena_room_pulse');
+  const leadersRaw = record.leaders;
+  const leaders: ArenaPulseLeader[] = [];
+  if (Array.isArray(leadersRaw)) {
+    for (const item of leadersRaw) {
+      const leader = toPulseLeader(item as Json);
+      if (leader) leaders.push(leader);
+    }
+  }
+  return {
+    roomId: str(record.roomId) ?? roomId,
+    status: oneOf(record.status, ROOM_STATUSES) ?? 'OPEN',
+    leaders,
+    generatedAt: millis(record.generatedAt) ?? Date.now(),
+  };
 }
 
 export interface PostArenaMessageInput {
@@ -888,6 +989,7 @@ export async function postMessage(
     isOwn: true,
     author,
     reactions: [],
+    replyCount: 0,
     argumentVotes: null,
   };
 }
@@ -1180,4 +1282,88 @@ export function subscribeRoomMessages(
     disposed = true;
     void supabase.removeChannel(channel);
   };
+}
+
+/**
+ * Ephemeral room typing via Realtime Presence.
+ * Channel is room-scoped — Room 1 never sees Room 2 typers.
+ * Payload never includes draft text or stance.
+ *
+ * @returns controllers to set/clear typing + unsubscribe
+ */
+export function subscribeRoomTyping(
+  roomId: string,
+  viewer: { userId: string; handle: string; name: string; avatarTint: string },
+  onPeers: (peers: ArenaTypingState[]) => void,
+): {
+  setTyping: (replyingToMessageId: string | null) => void;
+  clearTyping: () => void;
+  unsubscribe: () => void;
+} {
+  const supabase = client();
+  const channel = supabase.channel(`arena-typing:${roomId}`, {
+    config: { presence: { key: viewer.userId } },
+  });
+
+  let disposed = false;
+
+  const publishPeers = (): void => {
+    if (disposed) return;
+    const state = channel.presenceState();
+    const peers: ArenaTypingState[] = [];
+    for (const metas of Object.values(state)) {
+      const meta = (metas?.[0] ?? null) as Partial<ArenaTypingState> | null;
+      if (!meta || typeof meta.userId !== 'string') continue;
+      if (meta.typing !== true) continue;
+      peers.push({
+        userId: meta.userId,
+        handle: typeof meta.handle === 'string' ? meta.handle : '',
+        name: typeof meta.name === 'string' ? meta.name : '',
+        avatarTint: typeof meta.avatarTint === 'string' ? meta.avatarTint : '#A1A1AA',
+        replyingToMessageId:
+          typeof meta.replyingToMessageId === 'string' ? meta.replyingToMessageId : null,
+        typing: true,
+      });
+    }
+    onPeers(peers);
+  };
+
+  channel.on('presence', { event: 'sync' }, publishPeers);
+  channel.on('presence', { event: 'join' }, publishPeers);
+  channel.on('presence', { event: 'leave' }, publishPeers);
+
+  void (async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      await supabase.realtime.setAuth(data.session?.access_token ?? null);
+    } catch {
+      /* allow subscribe; presence stays empty without auth */
+    }
+    if (disposed) return;
+    channel.subscribe();
+  })();
+
+  const setTyping = (replyingToMessageId: string | null): void => {
+    if (disposed) return;
+    void channel.track({
+      userId: viewer.userId,
+      handle: viewer.handle,
+      name: viewer.name,
+      avatarTint: viewer.avatarTint,
+      replyingToMessageId,
+      typing: true,
+    });
+  };
+
+  const clearTyping = (): void => {
+    void channel.untrack();
+  };
+
+  const unsubscribe = (): void => {
+    disposed = true;
+    void channel.untrack();
+    void supabase.removeChannel(channel);
+  };
+
+  return { setTyping, clearTyping, unsubscribe };
 }

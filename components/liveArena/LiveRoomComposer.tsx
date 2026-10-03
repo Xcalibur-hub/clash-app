@@ -38,7 +38,12 @@ export interface LiveRoomComposerProps {
   sending?: boolean;
   /** Bump to focus the argument field (empty-floor CTA). */
   focusToken?: number;
+  /** Parent message id when staging a reply — for targeted typing presence. */
+  replyingToMessageId?: string | null;
   onCancelReply?: () => void;
+  /** Ephemeral typing signal — never receives draft text. */
+  onTypingActivity?: (replyingToMessageId: string | null, hasInput: boolean) => void;
+  onTypingClear?: () => void;
   /** Resolve false to keep the draft — the hook already surfaced the reason. */
   onSend: (argument: ComposedArgument) => Promise<boolean>;
   onAddProof: () => void;
@@ -59,7 +64,10 @@ export function LiveRoomComposer({
   replyingTo = null,
   sending = false,
   focusToken = 0,
+  replyingToMessageId = null,
   onCancelReply,
+  onTypingActivity,
+  onTypingClear,
   onSend,
   onAddProof,
   onError,
@@ -108,6 +116,7 @@ export function LiveRoomComposer({
   const submit = async (): Promise<void> => {
     if (!canSend) return;
     hapticPress();
+    onTypingClear?.();
     let attachment: ArenaMediaAttachment | undefined;
     if (media) {
       setUploading(true);
@@ -126,6 +135,7 @@ export function LiveRoomComposer({
       ...(gif ? { gif: { provider: 'tenor', externalId: gif.id, url: gif.previewUrl } } : {}),
     });
     if (sent) {
+      onTypingClear?.();
       setDraft('');
       clearAttachments();
     }
@@ -151,6 +161,7 @@ export function LiveRoomComposer({
           <Pressable
             onPress={() => {
               hapticTap();
+              onTypingClear?.();
               onCancelReply?.();
             }}
             hitSlop={8}
@@ -177,7 +188,14 @@ export function LiveRoomComposer({
         <TextInput
           ref={inputRef}
           value={draft}
-          onChangeText={(next) => setDraft(next.slice(0, ARENA_MESSAGE_MAX))}
+          onChangeText={(next) => {
+            const value = next.slice(0, ARENA_MESSAGE_MAX);
+            setDraft(value);
+            onTypingActivity?.(
+              replyingToMessageId,
+              value.trim().length > 0 || hasAttachment,
+            );
+          }}
           placeholder="Add your argument…"
           placeholderTextColor={t.textMuted}
           multiline

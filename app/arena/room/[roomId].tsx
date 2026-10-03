@@ -23,6 +23,8 @@ import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudg
 import { LiveRoomMessage } from '../../../components/liveArena/LiveRoomMessage';
 import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResultReveal';
 import { LiveRoomSkeleton } from '../../../components/liveArena/LiveRoomSkeleton';
+import { LiveRoomTypingCue } from '../../../components/liveArena/LiveRoomTypingCue';
+import { RoomPulseSheet } from '../../../components/liveArena/RoomPulseSheet';
 import {
   JoinDebateSheet,
   SpectatorJoinBar,
@@ -33,14 +35,17 @@ import { Notice } from '../../../components/shared/Notice';
 import { ArenaIcon } from '../../../components/shared/icons';
 import { useClock } from '../../../hooks/useClock';
 import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
+import { useRoomTyping } from '../../../hooks/useRoomTyping';
 import { analytics } from '../../../services/analytics';
 import {
   fetchRoomPresence,
+  fetchRoomPulse,
   fetchTopicRooms,
   type ArenaAuthor,
   type ArenaEvidence,
   type ArenaMessage,
   type ArenaRoomPresence,
+  type ArenaRoomPulse,
   type ArenaRoomStatus,
 } from '../../../services/liveArenaService';
 import { showNotice, useClash, type User } from '../../../store';
@@ -51,7 +56,15 @@ import {
   phaseEventForStatus,
   type LiveRoomEvent,
 } from '../../../utils/liveRoomEvents';
+import { replyPreview, selectThreadRoots } from '../../../utils/liveRoomThread';
+import {
+  pulseLeaderChanges,
+  type PulseLeader,
+} from '../../../utils/roomPulseScore';
 import { tap as hapticTap } from '../../../utils/haptics';
+
+const REPLY_PREVIEW_LIMIT = 3;
+const PULSE_REFRESH_MS = 15_000;
 
 interface SafetyTarget {
   user: User;
@@ -145,9 +158,37 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const [presence, setPresence] = React.useState<ArenaRoomPresence[]>([]);
   const [composerFocus, setComposerFocus] = React.useState(0);
   const [phaseBanner, setPhaseBanner] = React.useState<LiveRoomEvent | null>(null);
+  const [pulseOpen, setPulseOpen] = React.useState(false);
+  const [pulse, setPulse] = React.useState<ArenaRoomPulse | null>(null);
+  const [pulseLoading, setPulseLoading] = React.useState(false);
+  const [expandedReplies, setExpandedReplies] = React.useState<Set<string>>(new Set());
   const prevStatus = React.useRef<ArenaRoomStatus | null>(null);
+  const prevPulseLeaders = React.useRef<PulseLeader[]>([]);
   const seenIds = React.useRef<Set<string>>(new Set());
   const bootstrapped = React.useRef(false);
+
+  const typingViewer = React.useMemo(
+    () =>
+      viewerAuthor
+        ? {
+            userId: viewerAuthor.id,
+            handle: viewerAuthor.handle,
+            name: viewerAuthor.name,
+            avatarTint: viewerAuthor.avatarTint,
+          }
+        : null,
+    [viewerAuthor],
+  );
+
+  const {
+    peers: typingPeers,
+    onComposerActivity,
+    clearTyping,
+  } = useRoomTyping({
+    roomId,
+    enabled: Boolean(room && room.viewer?.role === 'debater'),
+    viewer: typingViewer,
+  });
 
   const notify = React.useCallback(
     (message: string) => dispatch(showNotice(message)),
@@ -198,6 +239,50 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     return () => clearTimeout(id);
   }, [room?.status]);
 
+  const loadPulse = React.useCallback(async (): Promise<void> => {
+    if (!roomId) return;
+    try {
+      setPulseLoading(true);
+      const next = await fetchRoomPulse(roomId);
+      if (!next) return;
+      const mapped: PulseLeader[] = next.leaders.map((l) => ({
+        category: l.category,
+        authorId: l.author?.id ?? '',
+        authorName: l.author?.name ?? 'Someone',
+        label: l.label,
+        messageId: l.messageId,
+        evidenceId: l.evidenceId,
+        authorHandle: l.author?.handle ?? '',
+        authorTint: l.author?.avatarTint ?? '#A1A1AA',
+        score: l.score,
+        preview: l.preview,
+      }));
+      const changes = pulseLeaderChanges(prevPulseLeaders.current, mapped);
+      prevPulseLeaders.current = mapped;
+      setPulse(next);
+      if (changes.length === 1) {
+        const change = changes[0];
+        const label =
+          change.category === 'FAST_RISING'
+            ? `${change.authorName} is now Fast Rising`
+            : 'Room Pulse updated';
+        setPhaseBanner({ kind: 'new_arguments', label });
+        setTimeout(() => setPhaseBanner(null), 2_800);
+      }
+    } catch {
+      /* pulse is additive presentation */
+    } finally {
+      setPulseLoading(false);
+    }
+  }, [roomId]);
+
+  React.useEffect(() => {
+    if (!room) return;
+    void loadPulse();
+    const id = setInterval(() => void loadPulse(), PULSE_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [loadPulse, room?.roomId, room?.status]);
+
   React.useEffect(() => {
     if (messages.length === 0) return;
     if (!bootstrapped.current) {
@@ -222,6 +307,16 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     const map = new Map<string, ArenaMessage>();
     for (const message of messages) map.set(message.id, message);
     return map;
+  }, [messages]);
+
+  const threadRoots = React.useMemo(() => selectThreadRoots(messages), [messages]);
+
+  const viewerMessageIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const message of messages) {
+      if (message.isOwn) ids.add(message.id);
+    }
+    return ids;
   }, [messages]);
 
   const evidenceByMessage = React.useMemo(() => {
@@ -268,28 +363,47 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const renderMessage = React.useCallback(
     ({ item }: ListRenderItemInfo<ArenaMessage>) => {
       const isHighlight = item.id === highlightId;
+      const parentId = item.parentMessageId;
+      const parent = parentId ? byId.get(parentId) ?? null : null;
+      const parentUnavailable = Boolean(parentId && !parent);
+      const isRoot = !parentId;
+      const expanded = expandedReplies.has(item.id);
+      const preview = isRoot
+        ? replyPreview(messages, item.id, REPLY_PREVIEW_LIMIT, expanded)
+        : { shown: [] as ArenaMessage[], hiddenCount: 0, total: 0 };
       return (
         <LiveRoomMessage
           message={item}
           now={now}
-          parent={item.parentMessageId ? (byId.get(item.parentMessageId) ?? null) : null}
+          parent={parent}
+          parentUnavailable={parentUnavailable}
+          nestedReplies={preview.shown}
+          hiddenReplyCount={preview.hiddenCount}
+          onExpandReplies={
+            preview.hiddenCount > 0
+              ? () =>
+                  setExpandedReplies((prev) => {
+                    const next = new Set(prev);
+                    next.add(item.id);
+                    return next;
+                  })
+              : undefined
+          }
           evidence={evidenceByMessage.map.get(item.id) ?? []}
           canReply={accepting && isDebater}
           canReact={!settled && isDebater}
           canMarkEvidence={!settled && isDebater}
           highlighted={isHighlight}
-          highlightLabel={
-            isHighlight
-              ? room?.result?.bestArgumentMessageId === item.id
-                ? 'Top argument'
-                : 'Top argument'
-              : null
-          }
+          highlightLabel={isHighlight ? 'Top argument' : null}
           ownStance={item.isOwn ? room?.viewer?.stance ?? null : null}
           onReply={setReplyTo}
-          onReact={(message, emoji) => void react(message.id, emoji)}
+          onReact={(message, emoji) => {
+            void react(message.id, emoji).then(() => void loadPulse());
+          }}
           onOpenProfile={openProfile}
-          onMarkEvidence={(ev) => void markUseful(ev.id)}
+          onMarkEvidence={(ev) => {
+            void markUseful(ev.id).then(() => void loadPulse());
+          }}
           onChallengeEvidence={
             accepting && isDebater
               ? (ev) => {
@@ -322,14 +436,16 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       accepting,
       byId,
       evidenceByMessage.map,
+      expandedReplies,
       highlightId,
       isDebater,
+      loadPulse,
       markUseful,
+      messages,
       notify,
       now,
       openProfile,
       react,
-      room?.result?.bestArgumentMessageId,
       room?.viewer?.stance,
       settled,
     ],
@@ -418,31 +534,44 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     }
     if (isDebater && accepting) {
       return (
-        <LiveRoomComposer
-          focusToken={composerFocus}
-          replyingTo={replyTo?.author?.name ?? null}
-          sending={sending}
-          onCancelReply={() => setReplyTo(null)}
-          onSend={async (argument) => {
-            const ok = await send({
-              body: argument.body,
-              parentMessageId: replyTo?.id ?? null,
-              ...(argument.media ? { media: argument.media } : {}),
-              ...(argument.gif ? { gif: argument.gif } : {}),
-            });
-            if (ok) {
-              setReplyTo(null);
-              analytics.track('arena_message_sent', {
-                realm: 'arena',
-                media_type: argument.gif ? 'gif' : (argument.media?.kind ?? 'none'),
+        <>
+          <LiveRoomTypingCue
+            peers={typingPeers}
+            viewerId={state.viewer.id}
+            viewerMessageIds={viewerMessageIds}
+            showGeneric={atLiveEdge}
+          />
+          <LiveRoomComposer
+            focusToken={composerFocus}
+            replyingTo={replyTo?.author?.name ?? null}
+            replyingToMessageId={replyTo?.id ?? null}
+            sending={sending}
+            onCancelReply={() => setReplyTo(null)}
+            onTypingActivity={onComposerActivity}
+            onTypingClear={clearTyping}
+            onSend={async (argument) => {
+              clearTyping();
+              const ok = await send({
+                body: argument.body,
+                parentMessageId: replyTo?.id ?? null,
+                ...(argument.media ? { media: argument.media } : {}),
+                ...(argument.gif ? { gif: argument.gif } : {}),
               });
-              void loadPresence();
-            }
-            return ok;
-          }}
-          onAddProof={() => setProofOpen(true)}
-          onError={notify}
-        />
+              if (ok) {
+                setReplyTo(null);
+                analytics.track('arena_message_sent', {
+                  realm: 'arena',
+                  media_type: argument.gif ? 'gif' : (argument.media?.kind ?? 'none'),
+                });
+                void loadPresence();
+                void loadPulse();
+              }
+              return ok;
+            }}
+            onAddProof={() => setProofOpen(true)}
+            onError={notify}
+          />
+        </>
       );
     }
     return null;
@@ -485,6 +614,11 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
           if (router.canGoBack()) router.back();
           else router.replace('/(tabs)');
         }}
+        onPulsePress={() => {
+          setPulseOpen(true);
+          analytics.track('room_pulse_opened', { realm: 'arena' });
+          void loadPulse();
+        }}
       />
 
       <KeyboardAvoidingView
@@ -494,9 +628,13 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       >
         {settled && room.result ? (
           <FlatList
-            data={[...messages].reverse()}
+            data={[...threadRoots].reverse()}
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
+            initialNumToRender={12}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            removeClippedSubviews={Platform.OS === 'android'}
             ListHeaderComponent={
               <>
                 <LiveRoomResultReveal
@@ -536,9 +674,13 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                 <FlatList
                   ref={listRef}
                   inverted
-                  data={messages}
+                  data={threadRoots}
                   keyExtractor={(item) => item.id}
                   renderItem={renderMessage}
+                  initialNumToRender={12}
+                  maxToRenderPerBatch={10}
+                  windowSize={7}
+                  removeClippedSubviews={Platform.OS === 'android'}
                   ListFooterComponent={
                     <>
                       {orphanEvidence}
@@ -604,6 +746,14 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
             })
             .finally(() => setJoining(false));
         }}
+      />
+
+      <RoomPulseSheet
+        visible={pulseOpen}
+        pulse={pulse}
+        loading={pulseLoading}
+        roomIndex={roomIndex}
+        onClose={() => setPulseOpen(false)}
       />
 
       <PostActionsSheet
