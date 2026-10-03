@@ -3019,6 +3019,10 @@ export type Database = {
         Args: { p_limit?: number; p_topic_id: string }
         Returns: Json
       }
+      list_arena_topic_rooms: {
+        Args: { p_topic_id: string }
+        Returns: Json
+      }
       list_my_sponsor_campaigns: {
         Args: { p_advertiser_id: string }
         Returns: {

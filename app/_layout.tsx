@@ -88,15 +88,12 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="sponsor/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="earnings/index" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="earnings/[campaignId]" options={{ animation: 'slide_from_bottom' }} />
-                  <Stack.Screen name="arena/topic/[topicId]" options={{ animation: 'slide_from_right' }} />
-                  <Stack.Screen name="arena/room/[roomId]" options={{ animation: 'slide_from_right' }} />
+                  <Stack.Screen name="arena" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="take/[takeId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="profile/[profileId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="hood/[hoodId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="hood/game/[gameId]" options={{ animation: 'slide_from_right' }} />
-                  <Stack.Screen name="world/index" options={{ animation: 'slide_from_right' }} />
-                  <Stack.Screen name="world/compose" options={{ animation: 'slide_from_bottom' }} />
-                  <Stack.Screen name="world/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
+                  <Stack.Screen name="world" options={{ animation: 'slide_from_right' }} />
                 </ThemedChrome>
                 <LocalSupabaseBadge />
               </FontBootstrap>

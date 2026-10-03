@@ -121,7 +121,7 @@ export function LiveRoomComposer({
 
   if (disabled) {
     return (
-      <View style={[styles.closed, { backgroundColor: t.surface, borderTopColor: t.border }]}>
+      <View style={[styles.closed, { backgroundColor: t.surfaceElevated, borderColor: t.border, borderWidth: StyleSheet.hairlineWidth }]}>
         <Text allowFontScaling={false} style={[styles.closedText, { color: t.textMuted }]}>
           {disabledReason ?? 'This room is no longer accepting arguments.'}
         </Text>
@@ -130,7 +130,7 @@ export function LiveRoomComposer({
   }
 
   return (
-    <View style={[styles.wrap, { backgroundColor: t.surface, borderTopColor: t.border }]}>
+    <View style={styles.wrap}>
       {replyingTo ? (
         <View style={styles.replyRow}>
           <Text allowFontScaling={false} style={[styles.replyLabel, { color: t.textMuted }]}>
@@ -152,11 +152,20 @@ export function LiveRoomComposer({
         </View>
       ) : null}
 
-      <View style={[styles.box, { backgroundColor: t.inputBackground, borderColor: t.border }]}>
+      <View
+        style={[
+          styles.box,
+          {
+            backgroundColor: t.surfaceElevated,
+            borderColor: t.border,
+            shadowColor: t.shadowColor,
+          },
+        ]}
+      >
         <TextInput
           value={draft}
           onChangeText={(next) => setDraft(next.slice(0, ARENA_MESSAGE_MAX))}
-          placeholder="Make your argument…"
+          placeholder="Add your argument…"
           placeholderTextColor={t.textMuted}
           multiline
           style={[styles.input, { color: t.textPrimary }]}
@@ -284,15 +293,18 @@ function ToolButton({
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingHorizontal: space.sm,
-    paddingTop: space.xs,
-    gap: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.md,
+    paddingTop: space.sm,
+    gap: 8,
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
   },
   closed: {
+    marginHorizontal: space.md,
+    marginBottom: space.xs,
     paddingHorizontal: space.md,
     paddingVertical: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderRadius: 20,
   },
   closedText: { ...typeScale.meta, fontSize: 13, textAlign: 'center' },
   replyRow: {
@@ -304,12 +316,16 @@ const styles = StyleSheet.create({
   replyLabel: { ...typeScale.caption, fontSize: 11, flexShrink: 1 },
   cancel: { ...typeScale.caption, fontSize: 11, fontWeight: '700' },
   box: {
-    borderRadius: radius.lg,
+    borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: space.sm,
-    paddingTop: 4,
-    paddingBottom: 6,
+    paddingHorizontal: space.sm + 2,
+    paddingTop: 8,
+    paddingBottom: 8,
     gap: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   input: { ...typeScale.body, fontSize: 15, paddingVertical: 6, minHeight: 40, maxHeight: 132 },
   preview: { borderRadius: radius.md, overflow: 'hidden' },

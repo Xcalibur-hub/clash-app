@@ -272,14 +272,15 @@ export function ArenaTopicDeckCard({
                   You · {STANCE_LABEL[stance]}
                 </Text>
               ) : null}
-              <PrimaryButton label="Enter Arena" onPress={onEnter} />
+              <PrimaryButton label="Enter Room" onPress={onEnter} />
             </View>
           ) : isSpectator ? (
             <View style={styles.joinedBlock}>
               <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
                 Watching
               </Text>
-              <PrimaryButton label="Join the debate" onPress={onJoinDebate} />
+              <PrimaryButton label="Watch Room" onPress={onEnter} />
+              <SecondaryButton label="Join Debate" onPress={onJoinDebate} />
             </View>
           ) : canJoin ? (
             <View style={styles.gate}>

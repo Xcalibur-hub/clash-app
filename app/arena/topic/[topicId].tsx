@@ -2,14 +2,22 @@ import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArenaStanceGate } from '../../../components/liveArena/ArenaStanceGate';
+import { TopicRoomDiscovery } from '../../../components/liveArena/TopicRoomDiscovery';
 import { phaseLabel } from '../../../components/liveArena/liveArenaStyles';
 import { EmptyState } from '../../../components/shared/EmptyState';
 import { Notice } from '../../../components/shared/Notice';
 import { ArenaIcon, BackIcon } from '../../../components/shared/icons';
 import { useRequireAuth } from '../../../hooks/useRequireAuth';
 import { analytics } from '../../../services/analytics';
-import { fetchTopic, joinTopic, type LiveArenaTopic, type Stance } from '../../../services/liveArenaService';
+import {
+  fetchTopic,
+  fetchTopicRooms,
+  joinTopic,
+  upgradeSpectator,
+  type ArenaTopicRoomCard,
+  type LiveArenaTopic,
+  type Stance,
+} from '../../../services/liveArenaService';
 import { errorText } from '../../../services/supabaseClient';
 import { showNotice, useClash } from '../../../store';
 import { useAuth } from '../../../store/AuthProvider';
@@ -26,15 +34,10 @@ function asStance(value: string | string[] | undefined): Stance | null {
 }
 
 /**
- * The door into today's Topic.
+ * Topic door — room discovery + assignment entry.
  *
- * A member is forwarded straight to their room — one room per topic per person
- * is a database rule, so there is never a second room to choose. Everyone else
- * answers the stance gate first; joining is what creates the membership, and
- * the server decides which room they land in.
- *
- * `?stance=AGREE` lets the Arena card commit a stance in one tap. Joining is
- * idempotent, so a replayed deep link cannot double-join or change a stance.
+ * Joined members see Your Room and choose Enter (no silent redirect).
+ * Deep-link `?stance=` still joins once, then lands on discovery with Enter Room.
  */
 export default function ArenaTopicScreen(): React.JSX.Element {
   const params = useLocalSearchParams<{ topicId: string | string[]; stance?: string | string[] }>();
@@ -48,15 +51,29 @@ export default function ArenaTopicScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
 
   const [topic, setTopic] = React.useState<LiveArenaTopic | null | undefined>(undefined);
+  const [rooms, setRooms] = React.useState<ArenaTopicRoomCard[]>([]);
+  const [roomsLoading, setRoomsLoading] = React.useState(false);
   const [joining, setJoining] = React.useState(false);
   const autoJoined = React.useRef(false);
 
   const goToRoom = React.useCallback(
     (roomId: string) => {
-      router.replace(`/arena/room/${roomId}`);
+      router.push(`/arena/room/${roomId}`);
     },
     [router],
   );
+
+  const reloadRooms = React.useCallback(async (): Promise<void> => {
+    setRoomsLoading(true);
+    try {
+      const next = await fetchTopicRooms(topicId);
+      setRooms(next);
+    } catch {
+      setRooms([]);
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, [topicId]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -69,7 +86,7 @@ export default function ArenaTopicScreen(): React.JSX.Element {
           realm: 'arena',
           is_guest: !signedIn,
         });
-        if (next.viewerJoined && next.viewerRoomId) goToRoom(next.viewerRoomId);
+        // Discovery stays visible — Enter Room is explicit. No auto-replace.
       } catch (error) {
         if (cancelled) return;
         dispatch(showNotice(errorText(error)));
@@ -79,7 +96,12 @@ export default function ArenaTopicScreen(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [dispatch, goToRoom, signedIn, topicId]);
+  }, [dispatch, signedIn, topicId]);
+
+  React.useEffect(() => {
+    if (!topic || topic.status !== 'live') return;
+    void reloadRooms();
+  }, [reloadRooms, topic]);
 
   const join = React.useCallback(
     async (stance: Stance | null, role: 'debater' | 'spectator' = 'debater'): Promise<void> => {
@@ -89,6 +111,10 @@ export default function ArenaTopicScreen(): React.JSX.Element {
       try {
         const result = await joinTopic(topicId, stance, role);
         analytics.track('arena_room_joined', { realm: 'arena', is_guest: false });
+        const refreshed = await fetchTopic(topicId);
+        setTopic(refreshed);
+        await reloadRooms();
+        // After join, take them into the room — they explicitly chose a stance / watch.
         goToRoom(result.roomId);
       } catch (error) {
         dispatch(showNotice(errorText(error)));
@@ -96,11 +122,29 @@ export default function ArenaTopicScreen(): React.JSX.Element {
         setJoining(false);
       }
     },
-    [dispatch, goToRoom, joining, requireAuth, topicId],
+    [dispatch, goToRoom, joining, reloadRooms, requireAuth, topicId],
   );
 
-  // A stance arriving in the URL came from an explicit Agree/Disagree tap on the
-  // Arena card, so honour it once the topic is known to be joinable.
+  const upgrade = React.useCallback(
+    async (stance: Stance): Promise<void> => {
+      if (joining || !topic?.viewerRoomId) return;
+      if (!requireAuth()) return;
+      setJoining(true);
+      try {
+        await upgradeSpectator(topic.viewerRoomId, stance);
+        const refreshed = await fetchTopic(topicId);
+        setTopic(refreshed);
+        goToRoom(topic.viewerRoomId);
+      } catch (error) {
+        dispatch(showNotice(errorText(error)));
+      } finally {
+        setJoining(false);
+      }
+    },
+    [dispatch, goToRoom, joining, requireAuth, topic?.viewerRoomId, topicId],
+  );
+
+  // Stance deep-link from Arena card — join once, then enter room.
   React.useEffect(() => {
     if (autoJoined.current || !presetStance || authLoading || !signedIn) return;
     if (!topic || topic.viewerJoined || topic.status !== 'live' || topic.phase === 'closed') return;
@@ -165,16 +209,43 @@ export default function ArenaTopicScreen(): React.JSX.Element {
             <Text allowFontScaling={false} style={[styles.closedBody, { color: t.textSecondary }]}>
               {topic.participantCount} people argued this one. A new Topic opens every day.
             </Text>
+            {topic.viewerRoomId ? (
+              <Pressable
+                onPress={() => {
+                  hapticTap();
+                  goToRoom(topic.viewerRoomId as string);
+                }}
+                style={[styles.resultCta, { backgroundColor: t.clashFill }]}
+                accessibilityRole="button"
+                accessibilityLabel="See your room result"
+              >
+                <Text allowFontScaling={false} style={[styles.resultCtaText, { color: t.clashText }]}>
+                  See your room
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : (
-          <ArenaStanceGate
-            title={topic.title}
-            description={topic.description}
-            secondsRemaining={topic.secondsRemaining}
-            participantCount={topic.participantCount}
+          <TopicRoomDiscovery
+            topic={topic}
+            rooms={rooms}
+            roomsLoading={roomsLoading}
             busy={joining}
-            onChoose={(stance) => void join(stance, 'debater')}
-            onWatch={() => void join(null, 'spectator')}
+            onEnterRoom={goToRoom}
+            onJoinDebate={(stance) => {
+              if (topic.viewerRole === 'spectator' && topic.viewerRoomId) {
+                void upgrade(stance);
+              } else {
+                void join(stance, 'debater');
+              }
+            }}
+            onWatch={() => {
+              if (topic.viewerJoined && topic.viewerRoomId) {
+                goToRoom(topic.viewerRoomId);
+              } else {
+                void join(null, 'spectator');
+              }
+            }}
           />
         )}
 
@@ -202,6 +273,14 @@ const styles = StyleSheet.create({
   closedEyebrow: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
   closedTitle: { ...typeScale.editorial, fontSize: 24, lineHeight: 31, fontWeight: '700' },
   closedBody: { ...typeScale.body, fontSize: 15 },
+  resultCta: {
+    marginTop: space.md,
+    minHeight: 48,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultCtaText: { ...typeScale.label, fontSize: 15, fontWeight: '800' },
   joining: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   joiningText: { ...typeScale.meta, fontSize: 13 },
 });

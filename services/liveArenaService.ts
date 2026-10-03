@@ -635,6 +635,46 @@ export async function fetchTopic(topicId: string): Promise<LiveArenaTopic> {
   return toTopic(data);
 }
 
+/** Public room card for topic discovery — capacity/presence only, never stance splits. */
+export interface ArenaTopicRoomCard {
+  roomId: string;
+  roomIndex: number;
+  status: ArenaRoomStatus;
+  capacity: number;
+  participantCount: number;
+  opensAt: number;
+  closesAt: number;
+  isViewerRoom: boolean;
+}
+
+/** Active rooms on a topic, ordered by creation (Room 1, Room 2, …). */
+export async function fetchTopicRooms(topicId: string): Promise<ArenaTopicRoomCard[]> {
+  const { data, error } = await client().rpc('list_arena_topic_rooms', { p_topic_id: topicId });
+  if (error) throw requestError(error);
+  const record = asRecord(data);
+  const rooms = record?.rooms;
+  if (!Array.isArray(rooms)) return [];
+  const out: ArenaTopicRoomCard[] = [];
+  for (const item of rooms) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const roomId = str(row.roomId);
+    const status = oneOf(row.status, ROOM_STATUSES);
+    if (!roomId || !status) continue;
+    out.push({
+      roomId,
+      roomIndex: num(row.roomIndex) ?? out.length + 1,
+      status,
+      capacity: num(row.capacity) ?? 0,
+      participantCount: num(row.participantCount) ?? 0,
+      opensAt: millis(row.opensAt) ?? 0,
+      closesAt: millis(row.closesAt) ?? 0,
+      isViewerRoom: bool(row.isViewerRoom),
+    });
+  }
+  return out;
+}
+
 /**
  * Join today's topic and get auto-placed into a room.
  *

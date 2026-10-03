@@ -87,7 +87,7 @@ export function LiveRoomResultReveal({
         ]}
       >
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          VERDICT
+          RESULT
         </Text>
 
         <View style={styles.headline}>
@@ -128,12 +128,16 @@ export function LiveRoomResultReveal({
 
         <View style={styles.tally}>
           <Text allowFontScaling={false} style={[styles.tallyText, { color: t.textSecondary }]}>
-            Agree · {result.agreeVotes}
+            Agree {totalVotes > 0 ? `${Math.round(agreeShare * 100)}%` : '—'}
           </Text>
           <Text allowFontScaling={false} style={[styles.tallyText, { color: t.textMuted }]}>
-            Disagree · {result.disagreeVotes}
+            Disagree{' '}
+            {totalVotes > 0 ? `${Math.round((1 - agreeShare) * 100)}%` : '—'}
           </Text>
         </View>
+        <Text allowFontScaling={false} style={[styles.sub, { color: t.textMuted }]}>
+          {result.participantCount.toLocaleString()} participants
+        </Text>
       </Animated.View>
 
       {result.bestArgumentBody || result.bestArgumentAuthor ? (
