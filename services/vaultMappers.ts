@@ -112,7 +112,12 @@ export function toCreatorVault(row: CreatorVaultRow): CreatorVault {
   };
 }
 
-export function toVaultDrop(row: VaultDropRow): VaultDrop {
+/** RPC returns may lag the table Row type when new nullable columns are added. */
+type VaultDropRowLike = Omit<VaultDropRow, 'public_preview_media_object_id'> & {
+  public_preview_media_object_id?: string | null;
+};
+
+export function toVaultDrop(row: VaultDropRowLike): VaultDrop {
   return {
     id: row.id,
     vaultId: row.vault_id,

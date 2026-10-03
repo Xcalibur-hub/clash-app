@@ -1,10 +1,24 @@
 /**
  * Explore discovery — globe/country/viral/teleport/search.
  * Country geography uses profiles.public_country_code only (explicit, public).
- * Vault shelf is FREE + public media only — never subscriber paths.
+ * Vault shelf is FREE + PREVIEW (intentional public teaser) only — never subscriber source paths.
  */
 import { countryByCode } from '../data/exploreCountries';
+import {
+  isExploreVaultVisible,
+  normalizeExploreVaultAccess,
+} from '../utils/exploreVaultVisibility';
+import { getPublicMediaUrl } from './mediaService';
 import { requestError, requireSupabase, SupabaseError } from './supabaseClient';
+
+function publicVaultMediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  try {
+    return getPublicMediaUrl('public-media', path);
+  } catch {
+    return null;
+  }
+}
 
 function client() {
   return requireSupabase();
@@ -55,6 +69,7 @@ export interface ExploreChallenge {
   status: string;
   entryCount: number;
   endsAt: number;
+  coverUrl: string | null;
 }
 
 export interface ExploreTreasure {
@@ -67,6 +82,7 @@ export interface ExploreTreasure {
   giftsRemaining: number;
   endsAt: number;
   rewardType: string;
+  coverUrl: string | null;
 }
 
 export interface ExploreWorldSummary {
@@ -93,6 +109,7 @@ export interface ExploreViralItem {
   countryCode: string | null;
   href: string | null;
   mediaUrl?: string | null;
+  accessLevel?: 'free' | 'preview' | null;
 }
 
 export interface ExploreTeleportCandidate {
@@ -101,6 +118,23 @@ export interface ExploreTeleportCandidate {
   title: string;
   countryCode: string | null;
   href: string | null;
+  mediaUrl?: string | null;
+  accessLevel?: 'free' | 'preview' | null;
+}
+
+export interface ExploreVaultPreview {
+  dropId: string;
+  vaultId: string;
+  creatorId: string;
+  title: string;
+  accessLevel: 'free' | 'preview';
+  publicMediaPath: string | null;
+  mediaUrl: string | null;
+  mediaKind: string | null;
+  authorHandle: string;
+  authorName: string;
+  authorTint: string;
+  countryCode?: string | null;
 }
 
 export interface ExploreCountryPage {
@@ -126,18 +160,7 @@ export interface ExploreCountryPage {
     mediaKind: string | null;
     createdAt: number;
   }[];
-  vaultPreviews: {
-    dropId: string;
-    vaultId: string;
-    creatorId: string;
-    title: string;
-    accessLevel: 'free';
-    publicMediaPath: string | null;
-    mediaKind: string | null;
-    authorHandle: string;
-    authorName: string;
-    authorTint: string;
-  }[];
+  vaultPreviews: ExploreVaultPreview[];
   challenges: ExploreChallenge[];
   treasures: ExploreTreasure[];
   liveTopics: {
@@ -158,13 +181,20 @@ export interface ExploreSearchResults {
     avatarTint: string;
     countryCode: string | null;
   }[];
-  takes: { id: string; text: string; heat: number; authorHandle: string }[];
+  takes: {
+    id: string;
+    text: string;
+    heat: number;
+    authorHandle: string;
+    mediaUrl: string | null;
+  }[];
   topics: { id: string; title: string; status: string }[];
   vault: {
     dropId: string;
     title: string;
     creatorHandle: string;
-    accessLevel: string;
+    accessLevel: 'free' | 'preview';
+    mediaUrl: string | null;
   }[];
 }
 
@@ -186,6 +216,7 @@ function toChallenge(raw: unknown): ExploreChallenge | null {
     status: str(r.status) ?? 'active',
     entryCount: num(r.entryCount) ?? 0,
     endsAt,
+    coverUrl: str(r.coverUrl),
   };
 }
 
@@ -207,6 +238,31 @@ function toTreasure(raw: unknown): ExploreTreasure | null {
     giftsRemaining: num(r.giftsRemaining) ?? 0,
     endsAt,
     rewardType: str(r.rewardType) ?? 'badge',
+    coverUrl: str(r.coverUrl),
+  };
+}
+
+function toVaultPreview(raw: unknown): ExploreVaultPreview | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const dropId = str(r.dropId);
+  if (!dropId) return null;
+  const access = normalizeExploreVaultAccess(str(r.accessLevel));
+  const publicMediaPath = str(r.publicMediaPath);
+  if (!access || !isExploreVaultVisible({ accessLevel: access, publicMediaPath })) return null;
+  return {
+    dropId,
+    vaultId: str(r.vaultId) ?? '',
+    creatorId: str(r.creatorId) ?? '',
+    title: str(r.title) ?? 'Preview',
+    accessLevel: access === 'preview' ? 'preview' : 'free',
+    publicMediaPath,
+    mediaUrl: publicVaultMediaUrl(publicMediaPath),
+    mediaKind: str(r.mediaKind),
+    authorHandle: str(r.authorHandle) ?? str(r.creatorHandle) ?? '',
+    authorName: str(r.authorName) ?? str(r.creatorName) ?? '',
+    authorTint: str(r.authorTint) ?? '#A1A1AA',
+    countryCode: str(r.countryCode),
   };
 }
 
@@ -295,27 +351,8 @@ export async function fetchExploreCountry(countryCode: string): Promise<ExploreC
     .filter((x): x is NonNullable<typeof x> => Boolean(x));
 
   const vaultPreviews = (Array.isArray(record.vaultPreviews) ? record.vaultPreviews : [])
-    .map((item) => {
-      const r = asRecord(item);
-      if (!r) return null;
-      const dropId = str(r.dropId);
-      if (!dropId) return null;
-      // Hard client guard: never accept subscriber access from Explore RPCs.
-      if (str(r.accessLevel) !== 'free') return null;
-      return {
-        dropId,
-        vaultId: str(r.vaultId) ?? '',
-        creatorId: str(r.creatorId) ?? '',
-        title: str(r.title) ?? 'Preview',
-        accessLevel: 'free' as const,
-        publicMediaPath: str(r.publicMediaPath),
-        mediaKind: str(r.mediaKind),
-        authorHandle: str(r.authorHandle) ?? '',
-        authorName: str(r.authorName) ?? '',
-        authorTint: str(r.authorTint) ?? '#A1A1AA',
-      };
-    })
-    .filter((x): x is NonNullable<typeof x> => Boolean(x));
+    .map(toVaultPreview)
+    .filter((x): x is ExploreVaultPreview => Boolean(x));
 
   const liveTopics = (Array.isArray(record.liveTopics) ? record.liveTopics : [])
     .map((item) => {
@@ -364,6 +401,11 @@ export async function fetchGlobalViral(limit = 12): Promise<ExploreViralItem[]> 
     const id = str(r.id);
     const title = str(r.title);
     if (!kind || !id || !title) continue;
+    const access = normalizeExploreVaultAccess(str(r.accessLevel));
+    if (kind === 'VAULT_PREVIEW') {
+      const path = str(r.publicMediaPath);
+      if (!isExploreVaultVisible({ accessLevel: access, publicMediaPath: path })) continue;
+    }
     out.push({
       kind,
       id,
@@ -372,10 +414,19 @@ export async function fetchGlobalViral(limit = 12): Promise<ExploreViralItem[]> 
       score: num(r.score) ?? 0,
       countryCode: str(r.countryCode),
       href: str(r.href),
-      mediaUrl: str(r.mediaUrl),
+      mediaUrl: str(r.mediaUrl) ?? publicVaultMediaUrl(str(r.publicMediaPath)),
+      accessLevel: access === 'free' || access === 'preview' ? access : null,
     });
   }
   return out;
+}
+
+export async function fetchExploreVaultPreviews(limit = 12): Promise<ExploreVaultPreview[]> {
+  const { data, error } = await client().rpc('list_explore_vault_previews', { p_limit: limit });
+  if (error) throw requestError(error);
+  return (Array.isArray(data) ? data : [])
+    .map(toVaultPreview)
+    .filter((x): x is ExploreVaultPreview => Boolean(x));
 }
 
 export async function fetchTeleportCandidate(
@@ -392,14 +443,19 @@ export async function fetchTeleportCandidate(
   const id = str(candidate.id);
   const title = str(candidate.title);
   if (!kind || !id || !title) return null;
-  // Never teleport into subscriber vault — server already filters; defend client-side.
-  if (kind === 'VAULT_PREVIEW' && str(candidate.accessLevel) === 'subscriber') return null;
+  const access = normalizeExploreVaultAccess(str(candidate.accessLevel));
+  if (kind === 'VAULT_PREVIEW') {
+    const path = str(candidate.publicMediaPath);
+    if (!isExploreVaultVisible({ accessLevel: access, publicMediaPath: path })) return null;
+  }
   return {
     kind,
     id,
     title,
     countryCode: str(candidate.countryCode),
     href: str(candidate.href),
+    mediaUrl: str(candidate.mediaUrl) ?? publicVaultMediaUrl(str(candidate.publicMediaPath)),
+    accessLevel: access === 'free' || access === 'preview' ? access : null,
   };
 }
 
@@ -453,6 +509,7 @@ export async function searchExplore(query: string, limit = 20): Promise<ExploreS
           text: str(r?.text) ?? '',
           heat: num(r?.heat) ?? 0,
           authorHandle: str(r?.authorHandle) ?? '',
+          mediaUrl: str(r?.mediaUrl),
         };
       })
       .filter((x): x is NonNullable<typeof x> => Boolean(x)),
@@ -467,15 +524,14 @@ export async function searchExplore(query: string, limit = 20): Promise<ExploreS
       .filter((x): x is NonNullable<typeof x> => Boolean(x)),
     vault: (Array.isArray(record.vault) ? record.vault : [])
       .map((item) => {
-        const r = asRecord(item);
-        const dropId = str(r?.dropId);
-        if (!dropId) return null;
-        if (str(r?.accessLevel) !== 'free') return null;
+        const preview = toVaultPreview(item);
+        if (!preview) return null;
         return {
-          dropId,
-          title: str(r?.title) ?? 'Preview',
-          creatorHandle: str(r?.creatorHandle) ?? '',
-          accessLevel: 'free',
+          dropId: preview.dropId,
+          title: preview.title,
+          creatorHandle: preview.authorHandle,
+          accessLevel: preview.accessLevel,
+          mediaUrl: preview.mediaUrl,
         };
       })
       .filter((x): x is NonNullable<typeof x> => Boolean(x)),

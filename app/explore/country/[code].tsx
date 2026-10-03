@@ -12,6 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ExploreDiscoveryCard } from '../../../components/explore/ExploreDiscoveryCard';
+import { ExploreMediaTile } from '../../../components/explore/ExploreMediaTile';
+import { ExploreMosaic, type ExploreMosaicItem } from '../../../components/explore/ExploreMosaic';
+import { Avatar } from '../../../components/shared/Avatar';
 import { BackIcon } from '../../../components/shared/icons';
 import { Notice } from '../../../components/shared/Notice';
 import { dockBottomPadding } from '../../../components/navigation/dockConfig';
@@ -22,11 +25,12 @@ import {
 import { analytics } from '../../../services/analytics';
 import { countryByCode } from '../../../data/exploreCountries';
 import { layout, space, typeScale, useThemeColors } from '../../../theme';
+import { exploreVaultKindLabel } from '../../../utils/exploreVaultVisibility';
 import { tap as hapticTap } from '../../../utils/haptics';
 
 /**
- * Country Explore surface.
- * Country source: profiles.public_country_code (explicit public declaration only).
+ * Country Explore — media-rich discovery for one public country code.
+ * Source: profiles.public_country_code only.
  */
 export default function ExploreCountryScreen(): React.JSX.Element {
   const { code: raw } = useLocalSearchParams<{ code: string | string[] }>();
@@ -70,7 +74,60 @@ export default function ExploreCountryScreen(): React.JSX.Element {
     page.creators.length === 0 &&
     page.vaultPreviews.length === 0 &&
     page.challenges.length === 0 &&
-    page.treasures.length === 0;
+    page.treasures.length === 0 &&
+    page.liveTopics.length === 0;
+
+  const mosaicItems = React.useMemo((): ExploreMosaicItem[] => {
+    if (!page) return [];
+    const items: ExploreMosaicItem[] = [];
+    for (const take of page.takes) {
+      items.push({
+        id: take.id,
+        kind: 'TAKE',
+        title: take.text,
+        subtitle: `@${take.authorHandle}`,
+        mediaUrl: take.mediaUrl,
+        onPress: () => {
+          analytics.track('explore_content_opened', { realm: 'arena', source: 'explore' });
+          router.push(`/take/${take.id}`);
+        },
+      });
+    }
+    for (const drop of page.vaultPreviews) {
+      items.push({
+        id: drop.dropId,
+        kind: exploreVaultKindLabel(drop.accessLevel) === 'VAULT PREVIEW' ? 'VAULT PREVIEW' : 'VAULT',
+        title: drop.title,
+        subtitle: `@${drop.authorHandle}`,
+        mediaUrl: drop.mediaUrl,
+        accent: drop.authorTint,
+        onPress: () => {
+          analytics.track('explore_vault_preview_opened', {
+            realm: 'vault',
+            source: 'explore',
+            vault_access_type: drop.accessLevel,
+          });
+          router.push(`/vault/drop/${drop.dropId}`);
+        },
+      });
+    }
+    for (const topic of page.liveTopics) {
+      items.push({
+        id: topic.id,
+        kind: 'LIVE',
+        title: topic.title,
+        subtitle: topic.hood,
+        accent: '#1B3A4B',
+        onPress: () => {
+          analytics.track('explore_content_opened', { realm: 'arena', source: 'explore' });
+          router.push(`/arena/topic/${topic.id}`);
+        },
+      });
+    }
+    return items;
+  }, [page, router]);
+
+  const heroTake = page?.takes.find((x) => x.mediaUrl) ?? page?.takes[0] ?? null;
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
@@ -99,9 +156,9 @@ export default function ExploreCountryScreen(): React.JSX.Element {
           </Pressable>
         </View>
 
-        <Animated.View entering={reduced ? undefined : FadeInDown.duration(420)}>
+        <Animated.View entering={reduced ? undefined : FadeInDown.duration(380)} style={styles.heroCopy}>
           <Text allowFontScaling={false} style={[styles.country, { color: t.textPrimary }]}>
-            {(meta?.name ?? code).split('').join(' ')}
+            {(meta?.name ?? code).toUpperCase()}
           </Text>
           <Text allowFontScaling={false} style={[styles.activity, { color: t.textSecondary }]}>
             {page?.activityCount != null
@@ -115,6 +172,22 @@ export default function ExploreCountryScreen(): React.JSX.Element {
           <Text allowFontScaling={false} style={{ color: t.textMuted }}>
             {error}
           </Text>
+        ) : null}
+
+        {heroTake ? (
+          <Animated.View entering={reduced ? undefined : FadeInDown.delay(80).duration(420)}>
+            <ExploreMediaTile
+              kind="TAKE"
+              title={heroTake.text}
+              subtitle={`@${heroTake.authorHandle}`}
+              mediaUrl={heroTake.mediaUrl}
+              span="hero"
+              onPress={() => {
+                analytics.track('explore_content_opened', { realm: 'arena', source: 'explore' });
+                router.push(`/take/${heroTake.id}`);
+              }}
+            />
+          </Animated.View>
         ) : null}
 
         {quiet ? (
@@ -141,8 +214,14 @@ export default function ExploreCountryScreen(): React.JSX.Element {
           </View>
         ) : null}
 
+        {mosaicItems.length > 0 ? (
+          <Section title={`Trending in ${meta?.name ?? code}`}>
+            <ExploreMosaic items={mosaicItems} max={8} />
+          </Section>
+        ) : null}
+
         {page && page.liveTopics.length > 0 ? (
-          <Section title="Live now">
+          <Section title={`Live in ${meta?.name ?? code}`}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
               {page.liveTopics.map((topic) => (
                 <ExploreDiscoveryCard
@@ -150,29 +229,10 @@ export default function ExploreCountryScreen(): React.JSX.Element {
                   kind="LIVE"
                   title={topic.title}
                   subtitle={topic.hood}
+                  accent="#1B3A4B"
                   onPress={() => {
                     analytics.track('explore_content_opened', { realm: 'arena', source: 'explore' });
                     router.push(`/arena/topic/${topic.id}`);
-                  }}
-                />
-              ))}
-            </ScrollView>
-          </Section>
-        ) : null}
-
-        {page && page.takes.length > 0 ? (
-          <Section title="Viral">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
-              {page.takes.map((take) => (
-                <ExploreDiscoveryCard
-                  key={take.id}
-                  kind="TAKE"
-                  title={take.text}
-                  subtitle={`@${take.authorHandle}`}
-                  meta={`Heat ${take.heat}`}
-                  onPress={() => {
-                    analytics.track('explore_content_opened', { realm: 'arena', source: 'explore' });
-                    router.push(`/take/${take.id}`);
                   }}
                 />
               ))}
@@ -189,12 +249,14 @@ export default function ExploreCountryScreen(): React.JSX.Element {
                   kind="VAULT"
                   title={drop.title}
                   subtitle={`@${drop.authorHandle}`}
-                  meta="Preview · Free"
+                  meta={drop.accessLevel === 'preview' ? 'Preview' : 'Free Drop'}
+                  mediaUrl={drop.mediaUrl}
+                  accent={drop.authorTint}
                   onPress={() => {
                     analytics.track('explore_vault_preview_opened', {
                       realm: 'vault',
                       source: 'explore',
-                      vault_access_type: 'free',
+                      vault_access_type: drop.accessLevel,
                     });
                     router.push(`/vault/drop/${drop.dropId}`);
                   }}
@@ -208,17 +270,32 @@ export default function ExploreCountryScreen(): React.JSX.Element {
           <Section title={`Creators from ${meta?.name ?? code}`}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
               {page.creators.map((creator) => (
-                <ExploreDiscoveryCard
+                <Pressable
                   key={creator.id}
-                  kind="CREATOR"
-                  title={creator.name}
-                  subtitle={`@${creator.handle}`}
-                  meta={creator.homeHood ?? creator.rank}
                   onPress={() => {
+                    hapticTap();
                     analytics.track('explore_content_opened', { realm: 'profile', source: 'explore' });
                     router.push(`/profile/${creator.id}`);
                   }}
-                />
+                  style={[
+                    styles.creatorCard,
+                    { backgroundColor: creator.avatarTint, borderColor: t.border },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${creator.name}, @${creator.handle}`}
+                >
+                  <View style={styles.creatorScrim} />
+                  <Avatar name={creator.name} tint={creator.avatarTint} size={52} />
+                  <Text allowFontScaling={false} style={styles.creatorName} numberOfLines={1}>
+                    {creator.name}
+                  </Text>
+                  <Text allowFontScaling={false} style={styles.creatorHandle} numberOfLines={1}>
+                    @{creator.handle}
+                  </Text>
+                  <Text allowFontScaling={false} style={styles.creatorMeta} numberOfLines={1}>
+                    {creator.homeHood ?? creator.rank}
+                  </Text>
+                </Pressable>
               ))}
             </ScrollView>
           </Section>
@@ -234,6 +311,10 @@ export default function ExploreCountryScreen(): React.JSX.Element {
                   title={challenge.title}
                   subtitle={challenge.challengeType}
                   meta={`${challenge.entryCount} entries`}
+                  mediaUrl={challenge.coverUrl}
+                  accent="#24362E"
+                  width={230}
+                  height={260}
                   onPress={() => {
                     analytics.track('explore_challenge_opened', { realm: 'arena', source: 'explore' });
                   }}
@@ -253,6 +334,10 @@ export default function ExploreCountryScreen(): React.JSX.Element {
                   title={hunt.title}
                   subtitle={hunt.clue}
                   meta={`${hunt.giftsRemaining} gifts remaining`}
+                  mediaUrl={hunt.coverUrl}
+                  accent="#2A2438"
+                  width={240}
+                  height={270}
                   onPress={() => {
                     analytics.track('explore_treasure_opened', { realm: 'arena', source: 'explore' });
                   }}
@@ -262,22 +347,27 @@ export default function ExploreCountryScreen(): React.JSX.Element {
           </Section>
         ) : null}
 
-        {/* Connect entry — product placeholder only; no fake matching. */}
         <View
-          style={[styles.connect, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}
+          style={[
+            styles.connect,
+            {
+              borderColor: t.border,
+              backgroundColor: t.scheme === 'light' ? '#111318' : t.surfaceElevated,
+            },
+          ]}
           accessibilityLabel="Meet the world. Text chat coming next."
         >
-          <Text allowFontScaling={false} style={[styles.connectKicker, { color: t.textMuted }]}>
+          <Text allowFontScaling={false} style={styles.connectKicker}>
             Meet the world
           </Text>
-          <Text allowFontScaling={false} style={[styles.connectTitle, { color: t.textPrimary }]}>
+          <Text allowFontScaling={false} style={styles.connectTitle}>
             Talk to someone from {meta?.name ?? code}
           </Text>
-          <Text allowFontScaling={false} style={[styles.connectBody, { color: t.textSecondary }]}>
+          <Text allowFontScaling={false} style={styles.connectBody}>
             Pseudonymous text matching is next. Video later. Accountable internally —
             never unauthenticated chat.
           </Text>
-          <Text allowFontScaling={false} style={[styles.connectSoon, { color: t.textMuted }]}>
+          <Text allowFontScaling={false} style={styles.connectSoon}>
             Coming next
           </Text>
         </View>
@@ -315,15 +405,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  heroCopy: { gap: 6 },
   country: {
     ...typeScale.editorial,
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 40,
+    lineHeight: 44,
     fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    letterSpacing: -1.2,
   },
-  activity: { ...typeScale.meta, fontSize: 15, marginTop: 6 },
+  activity: { ...typeScale.meta, fontSize: 15 },
   section: { gap: space.sm },
   sectionTitle: {
     ...typeScale.caption,
@@ -333,7 +423,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   rail: { gap: space.sm, paddingRight: layout.screenX },
-  quiet: { gap: space.sm, paddingVertical: space.lg },
+  quiet: { gap: space.sm, paddingVertical: space.md },
   quietTitle: { ...typeScale.section, fontSize: 22, fontWeight: '800' },
   quietBody: { ...typeScale.meta, fontSize: 15 },
   teleport: {
@@ -345,8 +435,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   teleportText: { ...typeScale.label, fontSize: 14, fontWeight: '800' },
-  connect: {
+  creatorCard: {
+    width: 148,
+    height: 196,
     borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: space.md,
+    justifyContent: 'flex-end',
+    gap: 4,
+    overflow: 'hidden',
+  },
+  creatorScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  creatorName: { ...typeScale.label, fontSize: 15, fontWeight: '800', color: '#FAFAF8' },
+  creatorHandle: { ...typeScale.meta, fontSize: 12, color: 'rgba(255,255,255,0.75)' },
+  creatorMeta: { ...typeScale.caption, fontSize: 11, color: 'rgba(255,255,255,0.6)' },
+  connect: {
+    borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
     padding: space.lg,
     gap: 6,
@@ -357,8 +464,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
     textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.55)',
   },
-  connectTitle: { ...typeScale.section, fontSize: 20, fontWeight: '800' },
-  connectBody: { ...typeScale.meta, fontSize: 14, lineHeight: 20 },
-  connectSoon: { ...typeScale.caption, fontSize: 12, fontWeight: '700', marginTop: 4 },
+  connectTitle: { ...typeScale.section, fontSize: 22, fontWeight: '800', color: '#FAFAF8' },
+  connectBody: {
+    ...typeScale.meta,
+    fontSize: 14,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.68)',
+  },
+  connectSoon: {
+    ...typeScale.caption,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.5)',
+  },
 });

@@ -119,7 +119,7 @@ export type AnalyticsProperties = {
   is_guest?: boolean;
   is_self?: boolean;
   world_distance_band?: string;
-  vault_access_type?: 'free' | 'subscriber';
+  vault_access_type?: 'free' | 'subscriber' | 'preview';
   world_filter?: 'nearby' | 'recent' | 'mission';
   accessible?: boolean;
   /** Nesting depth of a media reply (0 = top-level). */

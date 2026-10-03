@@ -2104,6 +2104,7 @@ export type Database = {
           expires_at: string | null
           id: string
           media_object_id: string | null
+          public_preview_media_object_id: string | null
           published_at: string | null
           status: Database["public"]["Enums"]["vault_drop_status"]
           vault_id: string
@@ -2117,6 +2118,7 @@ export type Database = {
           expires_at?: string | null
           id: string
           media_object_id?: string | null
+          public_preview_media_object_id?: string | null
           published_at?: string | null
           status?: Database["public"]["Enums"]["vault_drop_status"]
           vault_id: string
@@ -2130,6 +2132,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           media_object_id?: string | null
+          public_preview_media_object_id?: string | null
           published_at?: string | null
           status?: Database["public"]["Enums"]["vault_drop_status"]
           vault_id?: string
