@@ -1,6 +1,7 @@
 /**
- * Curated ISO country catalogue for Explore globe + search.
- * Lat/lng are approximate centroids for projection only — never user GPS.
+ * Curated ISO country catalogue for Explore search/focus labels.
+ * Lat/lng are geometry-aligned centroids — never user GPS.
+ * Full polygons live in exploreWorldGeometry.json.
  */
 
 export interface ExploreCountry {
@@ -11,53 +12,56 @@ export interface ExploreCountry {
 }
 
 export const EXPLORE_COUNTRIES: readonly ExploreCountry[] = [
-  { code: 'IN', name: 'India', lat: 20.59, lng: 78.96 },
-  { code: 'JP', name: 'Japan', lat: 36.2, lng: 138.25 },
-  { code: 'KR', name: 'South Korea', lat: 35.91, lng: 127.77 },
-  { code: 'US', name: 'United States', lat: 37.09, lng: -95.71 },
-  { code: 'GB', name: 'United Kingdom', lat: 55.38, lng: -3.44 },
-  { code: 'BR', name: 'Brazil', lat: -14.24, lng: -51.93 },
-  { code: 'DE', name: 'Germany', lat: 51.17, lng: 10.45 },
-  { code: 'FR', name: 'France', lat: 46.23, lng: 2.21 },
-  { code: 'NG', name: 'Nigeria', lat: 9.08, lng: 8.68 },
-  { code: 'MX', name: 'Mexico', lat: 23.63, lng: -102.55 },
-  { code: 'AU', name: 'Australia', lat: -25.27, lng: 133.78 },
-  { code: 'CA', name: 'Canada', lat: 56.13, lng: -106.35 },
-  { code: 'ID', name: 'Indonesia', lat: -0.79, lng: 113.92 },
-  { code: 'PH', name: 'Philippines', lat: 12.88, lng: 121.77 },
-  { code: 'ZA', name: 'South Africa', lat: -30.56, lng: 22.94 },
-  { code: 'EG', name: 'Egypt', lat: 26.82, lng: 30.8 },
-  { code: 'TR', name: 'Turkey', lat: 38.96, lng: 35.24 },
-  { code: 'IT', name: 'Italy', lat: 41.87, lng: 12.57 },
-  { code: 'ES', name: 'Spain', lat: 40.46, lng: -3.75 },
-  { code: 'AR', name: 'Argentina', lat: -38.42, lng: -63.62 },
-  { code: 'SE', name: 'Sweden', lat: 60.13, lng: 18.64 },
-  { code: 'PL', name: 'Poland', lat: 51.92, lng: 19.15 },
-  { code: 'NL', name: 'Netherlands', lat: 52.13, lng: 5.29 },
-  { code: 'AE', name: 'United Arab Emirates', lat: 23.42, lng: 53.85 },
+  { code: 'IN', name: 'India', lat: 24.05, lng: 83.78 },
+  { code: 'JP', name: 'Japan', lat: 37.28, lng: 137.32 },
+  { code: 'KR', name: 'South Korea', lat: 36.4, lng: 127.8 },
+  { code: 'US', name: 'United States', lat: 38.32, lng: -90.49 },
+  { code: 'GB', name: 'United Kingdom', lat: 54.03, lng: -4.01 },
+  { code: 'BR', name: 'Brazil', lat: -10.8, lng: -53.1 },
+  { code: 'DE', name: 'Germany', lat: 51.2, lng: 10.4 },
+  { code: 'FR', name: 'France', lat: 46.6, lng: 2.5 },
+  { code: 'NG', name: 'Nigeria', lat: 9.6, lng: 8.1 },
+  { code: 'MX', name: 'Mexico', lat: 23.8, lng: -102.3 },
+  { code: 'AU', name: 'Australia', lat: -25.7, lng: 134.5 },
+  { code: 'CA', name: 'Canada', lat: 60.1, lng: -100.2 },
+  { code: 'ID', name: 'Indonesia', lat: -2.2, lng: 117.2 },
+  { code: 'PH', name: 'Philippines', lat: 12.1, lng: 122.9 },
+  { code: 'ZA', name: 'South Africa', lat: -29.0, lng: 25.1 },
+  { code: 'EG', name: 'Egypt', lat: 26.8, lng: 30.8 },
+  { code: 'TR', name: 'Turkey', lat: 39.1, lng: 35.2 },
+  { code: 'IT', name: 'Italy', lat: 42.8, lng: 12.1 },
+  { code: 'ES', name: 'Spain', lat: 40.2, lng: -3.7 },
+  { code: 'AR', name: 'Argentina', lat: -35.2, lng: -65.2 },
+  { code: 'SE', name: 'Sweden', lat: 62.2, lng: 16.4 },
+  { code: 'PL', name: 'Poland', lat: 52.1, lng: 19.4 },
+  { code: 'NL', name: 'Netherlands', lat: 52.1, lng: 5.3 },
+  { code: 'AE', name: 'United Arab Emirates', lat: 23.9, lng: 54.3 },
   { code: 'SG', name: 'Singapore', lat: 1.35, lng: 103.82 },
-  { code: 'TH', name: 'Thailand', lat: 15.87, lng: 100.99 },
-  { code: 'VN', name: 'Vietnam', lat: 14.06, lng: 108.28 },
-  { code: 'PK', name: 'Pakistan', lat: 30.38, lng: 69.35 },
-  { code: 'BD', name: 'Bangladesh', lat: 23.68, lng: 90.36 },
-  { code: 'KE', name: 'Kenya', lat: -0.02, lng: 37.91 },
-  { code: 'GH', name: 'Ghana', lat: 7.95, lng: -1.02 },
-  { code: 'CO', name: 'Colombia', lat: 4.57, lng: -74.3 },
-  { code: 'CL', name: 'Chile', lat: -35.68, lng: -71.54 },
-  { code: 'NZ', name: 'New Zealand', lat: -40.9, lng: 174.89 },
-  { code: 'IE', name: 'Ireland', lat: 53.14, lng: -7.69 },
-  { code: 'PT', name: 'Portugal', lat: 39.4, lng: -8.22 },
+  { code: 'TH', name: 'Thailand', lat: 15.5, lng: 101.3 },
+  { code: 'VN', name: 'Vietnam', lat: 16.1, lng: 107.8 },
+  { code: 'PK', name: 'Pakistan', lat: 29.9, lng: 69.3 },
+  { code: 'BD', name: 'Bangladesh', lat: 23.8, lng: 90.3 },
+  { code: 'KE', name: 'Kenya', lat: 0.5, lng: 37.9 },
+  { code: 'GH', name: 'Ghana', lat: 7.9, lng: -1.2 },
+  { code: 'CO', name: 'Colombia', lat: 3.9, lng: -73.1 },
+  { code: 'CL', name: 'Chile', lat: -35.7, lng: -71.5 },
+  { code: 'NZ', name: 'New Zealand', lat: -41.5, lng: 172.8 },
+  { code: 'IE', name: 'Ireland', lat: 53.3, lng: -7.7 },
+  { code: 'PT', name: 'Portugal', lat: 39.6, lng: -8.1 },
   { code: 'IS', name: 'Iceland', lat: 64.96, lng: -19.02 },
-  { code: 'FI', name: 'Finland', lat: 61.92, lng: 25.75 },
-  { code: 'NO', name: 'Norway', lat: 60.47, lng: 8.47 },
-  { code: 'CH', name: 'Switzerland', lat: 46.82, lng: 8.23 },
+  { code: 'FI', name: 'Finland', lat: 64.2, lng: 26.3 },
+  { code: 'NO', name: 'Norway', lat: 64.5, lng: 11.5 },
+  { code: 'CH', name: 'Switzerland', lat: 46.8, lng: 8.2 },
+  { code: 'CN', name: 'China', lat: 35.9, lng: 104.2 },
+  { code: 'RU', name: 'Russia', lat: 61.5, lng: 99.0 },
 ] as const;
 
 const BY_CODE = new Map(EXPLORE_COUNTRIES.map((c) => [c.code, c]));
 
 export function countryByCode(code: string | null | undefined): ExploreCountry | null {
   if (!code) return null;
-  return BY_CODE.get(code.toUpperCase()) ?? null;
+  const upper = code.toUpperCase();
+  return BY_CODE.get(upper) ?? null;
 }
 
 export function searchCountries(query: string, limit = 12): ExploreCountry[] {

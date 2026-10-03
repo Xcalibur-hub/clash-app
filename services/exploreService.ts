@@ -196,6 +196,46 @@ export interface ExploreSearchResults {
     accessLevel: 'free' | 'preview';
     mediaUrl: string | null;
   }[];
+  hoods: { hood: string; label: string }[];
+}
+
+export interface ExploreForYouItem {
+  kind: ExploreViralKind;
+  id: string;
+  title: string;
+  subtitle: string | null;
+  creatorId: string | null;
+  countryCode: string | null;
+  mediaUrl: string | null;
+  href: string | null;
+  score: number;
+  accessLevel?: 'free' | 'preview' | null;
+}
+
+export interface ExploreForYouPage {
+  items: ExploreForYouItem[];
+  nextCursor: number | null;
+}
+
+export interface ExploreLiveFeed {
+  topics: {
+    id: string;
+    title: string;
+    hood: string | null;
+    status: string;
+    closesAt: number;
+    href: string;
+  }[];
+  takes: {
+    id: string;
+    title: string;
+    subtitle: string | null;
+    heat: number;
+    mediaUrl: string | null;
+    creatorId: string | null;
+    countryCode: string | null;
+    href: string;
+  }[];
 }
 
 function toChallenge(raw: unknown): ExploreChallenge | null {
@@ -429,6 +469,93 @@ export async function fetchExploreVaultPreviews(limit = 12): Promise<ExploreVaul
     .filter((x): x is ExploreVaultPreview => Boolean(x));
 }
 
+function toForYouItem(raw: unknown): ExploreForYouItem | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const kind = str(r.kind) as ExploreViralKind | null;
+  const id = str(r.id);
+  const title = str(r.title);
+  if (!kind || !id || !title) return null;
+  const access = normalizeExploreVaultAccess(str(r.accessLevel));
+  if (kind === 'VAULT_PREVIEW') {
+    const path = str(r.publicMediaPath);
+    if (!isExploreVaultVisible({ accessLevel: access, publicMediaPath: path })) return null;
+  }
+  return {
+    kind,
+    id,
+    title,
+    subtitle: str(r.subtitle),
+    creatorId: str(r.creatorId),
+    countryCode: str(r.countryCode),
+    mediaUrl: str(r.mediaUrl) ?? publicVaultMediaUrl(str(r.publicMediaPath)),
+    href: str(r.href),
+    score: num(r.score) ?? 0,
+    accessLevel: access === 'free' || access === 'preview' ? access : null,
+  };
+}
+
+export async function fetchExploreForYou(
+  limit = 24,
+  cursor = 0,
+): Promise<ExploreForYouPage> {
+  const { data, error } = await client().rpc('get_explore_for_you', {
+    p_limit: limit,
+    p_cursor: cursor,
+  });
+  if (error) throw requestError(error);
+  const record = asRecord(data);
+  const items = (Array.isArray(record?.items) ? record.items : [])
+    .map(toForYouItem)
+    .filter((x): x is ExploreForYouItem => Boolean(x));
+  return {
+    items,
+    nextCursor: num(record?.nextCursor),
+  };
+}
+
+export async function fetchExploreLive(limit = 24): Promise<ExploreLiveFeed> {
+  const { data, error } = await client().rpc('get_explore_live', { p_limit: limit });
+  if (error) throw requestError(error);
+  const record = asRecord(data);
+  return {
+    topics: (Array.isArray(record?.topics) ? record.topics : [])
+      .map((item) => {
+        const r = asRecord(item);
+        const id = str(r?.id);
+        const title = str(r?.title);
+        if (!id || !title) return null;
+        return {
+          id,
+          title,
+          hood: str(r?.hood),
+          status: str(r?.status) ?? 'live',
+          closesAt: millis(r?.closesAt) ?? 0,
+          href: str(r?.href) ?? `/arena/topic/${id}`,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => Boolean(x)),
+    takes: (Array.isArray(record?.takes) ? record.takes : [])
+      .map((item) => {
+        const r = asRecord(item);
+        const id = str(r?.id);
+        const title = str(r?.title);
+        if (!id || !title) return null;
+        return {
+          id,
+          title,
+          subtitle: str(r?.subtitle),
+          heat: num(r?.heat) ?? 0,
+          mediaUrl: str(r?.mediaUrl),
+          creatorId: str(r?.creatorId),
+          countryCode: str(r?.countryCode),
+          href: str(r?.href) ?? `/take/${id}`,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => Boolean(x)),
+  };
+}
+
 export async function fetchTeleportCandidate(
   excludeIds: readonly string[] = [],
 ): Promise<ExploreTeleportCandidate | null> {
@@ -472,6 +599,7 @@ export async function searchExplore(query: string, limit = 20): Promise<ExploreS
     takes: [],
     topics: [],
     vault: [],
+    hoods: [],
   };
   if (!record) return empty;
 
@@ -535,6 +663,14 @@ export async function searchExplore(query: string, limit = 20): Promise<ExploreS
         };
       })
       .filter((x): x is NonNullable<typeof x> => Boolean(x)),
+    hoods: (Array.isArray(record.hoods) ? record.hoods : [])
+      .map((item) => {
+        const r = asRecord(item);
+        const hood = str(r?.hood);
+        if (!hood) return null;
+        return { hood, label: str(r?.label) ?? hood };
+      })
+      .filter((x): x is { hood: string; label: string } => Boolean(x)),
   };
 }
 

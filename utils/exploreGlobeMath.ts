@@ -1,5 +1,5 @@
 /**
- * Orthographic projection helpers for the Explore pseudo-3D globe.
+ * Orthographic projection helpers for the Explore globe.
  * Rotation is longitude-only (drag). Lat/lng never come from GPS here.
  */
 
@@ -20,7 +20,7 @@ export function projectCountry(
   return {
     x,
     y,
-    visible: z > -0.05,
+    visible: z > 0.02,
     depth: z,
   };
 }
@@ -34,7 +34,6 @@ export function focusCountryCode(
   for (const country of countries) {
     const projected = projectCountry(country.lat, country.lng, rotationDeg, 1);
     if (!projected.visible) continue;
-    // Prefer points near the visual center (x≈0) and facing camera.
     const score = projected.depth * 2 - Math.abs(projected.x) - Math.abs(projected.y) * 0.35;
     if (!best || score > best.score) best = { code: country.code, score };
   }
@@ -42,7 +41,6 @@ export function focusCountryCode(
 }
 
 export function rotationToward(lng: number): number {
-  // Bring longitude to front (lambda ≈ 0).
   return lng;
 }
 

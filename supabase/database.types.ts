@@ -2939,6 +2939,14 @@ export type Database = {
         Args: { p_country_code: string }
         Returns: Json
       }
+      get_explore_for_you: {
+        Args: { p_limit?: number; p_cursor?: number }
+        Returns: Json
+      }
+      get_explore_live: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       get_global_viral: {
         Args: { p_limit?: number }
         Returns: Json
