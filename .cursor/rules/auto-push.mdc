@@ -1,0 +1,13 @@
+---
+description: After committing, push to origin without asking
+alwaysApply: true
+---
+
+# Auto-push after commit
+
+When the user asks for a commit (or a task that includes committing), push to `origin` immediately after a successful commit.
+
+- Do not ask "want me to push?"
+- Use `git push -u origin HEAD` (or equivalent) after commit succeeds
+- Report the push result briefly in the same response as the commit
+- Still never force-push to main/master unless explicitly requested
