@@ -5,7 +5,7 @@ import { communityCoverUrl } from '../../../services/vaultCommunityService';
 import { space, typeScale, useThemeColors } from '../../../theme';
 import { ExploreHeading } from '../../explore/ExploreHeading';
 import { CommunityAnnouncementCard } from './CommunityAnnouncementCard';
-import { CommunityComposer } from './CommunityComposer';
+import { CommunityComposerSection } from './CommunityComposerSection';
 import { CommunityHero } from './CommunityHero';
 import { CommunityThread } from './CommunityThread';
 import type { CommunityTarget } from './communityTargets';
@@ -115,29 +115,16 @@ export function CommunityFeed({
         );
       case 'composer':
         return (
-          <View style={styles.composerWrap}>
-            {summary.viewerCanAnnounce ? (
-              <View style={styles.typeRow}>
-                <TypePill
-                  label="Discussion"
-                  active={composeType === 'discussion'}
-                  onPress={() => onChangeComposeType('discussion')}
-                />
-                <TypePill
-                  label="Announcement"
-                  active={composeType === 'announcement'}
-                  onPress={() => onChangeComposeType('announcement')}
-                />
-              </View>
-            ) : null}
-            <CommunityComposer
-              realName={realName}
-              pseudonymEnabled={summary.pseudonymousEnabled && composeType === 'discussion'}
-              pseudonym={summary.viewerPseudonym}
-              busy={composerBusy}
-              onSubmit={onSubmitPost}
-            />
-          </View>
+          <CommunityComposerSection
+            canAnnounce={summary.viewerCanAnnounce}
+            pseudonymous={summary.pseudonymousEnabled}
+            pseudonym={summary.viewerPseudonym}
+            realName={realName}
+            composeType={composeType}
+            onChangeComposeType={onChangeComposeType}
+            busy={composerBusy}
+            onSubmit={onSubmitPost}
+          />
         );
       default:
         return <View />;
@@ -147,11 +134,7 @@ export function CommunityFeed({
   return (
     <FlatList
       data={rows}
-      keyExtractor={(row, index) =>
-        row.kind === 'post' || row.kind === 'announcement'
-          ? `${row.kind}:${row.post.id}`
-          : `${row.kind}:${index}`
-      }
+      keyExtractor={(row, index) => `${row.kind}:${'post' in row ? row.post.id : index}`}
       renderItem={renderItem}
       showsVerticalScrollIndicator={false}
       onEndReached={onEndReached}
@@ -161,44 +144,7 @@ export function CommunityFeed({
   );
 }
 
-function TypePill({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}): React.JSX.Element {
-  const t = useThemeColors();
-  return (
-    <Text
-      onPress={onPress}
-      allowFontScaling={false}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={[
-        styles.typePill,
-        { color: active ? t.textPrimary : t.textMuted, borderColor: active ? t.textPrimary : t.border },
-      ]}
-    >
-      {label}
-    </Text>
-  );
-}
-
 const styles = StyleSheet.create({
   content: { paddingBottom: space.xxxl, gap: space.md },
   empty: { ...typeScale.meta, paddingVertical: space.lg, textAlign: 'center' },
-  composerWrap: { gap: space.sm },
-  typeRow: { flexDirection: 'row', gap: space.sm },
-  typePill: {
-    ...typeScale.caption,
-    fontSize: 12,
-    fontWeight: '700',
-    paddingHorizontal: space.sm,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
 });

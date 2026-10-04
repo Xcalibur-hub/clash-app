@@ -1,8 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { radius, space, typeScale, useThemeColors } from '../../../theme';
-import { tap as hapticTap } from '../../../utils/haptics';
 import { VaultActionButton } from '../VaultActionButton';
+import { CommunityIdentityPill } from './CommunityIdentityPill';
 
 export interface CommunityComposerProps {
   realName: string;
@@ -51,12 +51,12 @@ export function CommunityComposer({
     >
       {canChooseIdentity ? (
         <View style={styles.identityRow}>
-          <IdentityPill
+          <CommunityIdentityPill
             label={`Post as ${realName.split(' ')[0] || realName}`}
             active={!pseudonymous}
             onPress={() => setPseudonymous(false)}
           />
-          <IdentityPill
+          <CommunityIdentityPill
             label={`Post as ${pseudonym}`}
             active={pseudonymous}
             onPress={() => setPseudonymous(true)}
@@ -87,43 +87,6 @@ export function CommunityComposer({
   );
 }
 
-function IdentityPill({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}): React.JSX.Element {
-  const t = useThemeColors();
-  return (
-    <Pressable
-      onPress={() => {
-        hapticTap();
-        onPress();
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={[
-        styles.pill,
-        {
-          backgroundColor: active ? (t.scheme === 'light' ? t.textPrimary : 'rgba(255,255,255,0.12)') : 'transparent',
-          borderColor: t.border,
-        },
-      ]}
-    >
-      <Text
-        allowFontScaling={false}
-        style={[styles.pillLabel, { color: active ? (t.scheme === 'light' ? t.textInverse : t.textPrimary) : t.textSecondary }]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   wrap: {
     gap: space.sm,
@@ -133,14 +96,6 @@ const styles = StyleSheet.create({
   },
   wrapCompact: { padding: space.sm, borderRadius: radius.lg },
   identityRow: { flexDirection: 'row', gap: space.xs, flexWrap: 'wrap' },
-  pill: {
-    paddingHorizontal: space.sm,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    maxWidth: '100%',
-  },
-  pillLabel: { ...typeScale.caption, fontSize: 12, fontWeight: '700' },
   input: {
     minHeight: 46,
     maxHeight: 140,

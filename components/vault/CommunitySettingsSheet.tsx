@@ -2,12 +2,9 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import type { CommunityAccessType, CommunitySettings } from '../../services/vaultCommunityMappers';
-import { communityAccessLabel, communityAccessRule } from '../../utils/vaultCommunityAccess';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
-import { tap as hapticTap } from '../../utils/haptics';
 import { VaultActionButton } from './VaultActionButton';
-
-const ACCESS_TYPES: readonly CommunityAccessType[] = ['public', 'followers', 'subscribers'];
+import { CommunityAccessPicker } from './CommunityAccessPicker';
 
 export interface CommunitySettingsSheetProps {
   visible: boolean;
@@ -81,36 +78,7 @@ export function CommunitySettingsSheet({
                 { color: t.textPrimary, borderColor: t.border, backgroundColor: t.inputBackground },
               ]}
             />
-            <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
-              ACCESS
-            </Text>
-            <View style={styles.pills}>
-              {ACCESS_TYPES.map((type) => (
-                <Pressable
-                  key={type}
-                  onPress={() => {
-                    hapticTap();
-                    setAccessType(type);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={communityAccessLabel(type)}
-                  style={[
-                    styles.pill,
-                    {
-                      borderColor: accessType === type ? t.textPrimary : t.border,
-                      backgroundColor: accessType === type ? t.surfaceMuted : 'transparent',
-                    },
-                  ]}
-                >
-                  <Text allowFontScaling={false} style={[styles.pillLabel, { color: t.textPrimary }]}>
-                    {communityAccessLabel(type)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
-              {communityAccessRule(accessType)}
-            </Text>
+            <CommunityAccessPicker value={accessType} onChange={setAccessType} />
             <View style={styles.switchRow}>
               <View style={styles.switchCopy}>
                 <Text allowFontScaling={false} style={[styles.pillLabel, { color: t.textPrimary }]}>
@@ -168,14 +136,6 @@ const styles = StyleSheet.create({
     ...typeScale.body,
   },
   textarea: { minHeight: 76, textAlignVertical: 'top' },
-  label: { ...typeScale.caption, fontWeight: '800', letterSpacing: 0.8, marginTop: space.xs },
-  pills: { flexDirection: 'row', gap: space.xs, flexWrap: 'wrap' },
-  pill: {
-    paddingHorizontal: space.md,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
   pillLabel: { ...typeScale.label, fontWeight: '700' },
   hint: { ...typeScale.meta, fontSize: 12 },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },

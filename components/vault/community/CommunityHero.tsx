@@ -1,14 +1,13 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CommunityAccessType } from '../../../services/vaultCommunityMappers';
 import { communityAccessLabel } from '../../../utils/vaultCommunityAccess';
-import { communityActiveLabel, communityMemberLabel } from '../../../utils/vaultCommunityFeed';
-import { duration, layout, radius, space, typeScale, useThemeColors } from '../../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../../theme';
 import { tap as hapticTap } from '../../../utils/haptics';
 import { BackIcon } from '../../shared/icons';
+import { CommunityMetaCard } from './CommunityMetaCard';
 
 export interface CommunityHeroProps {
   name: string;
@@ -34,7 +33,6 @@ export function CommunityHero({
 }: CommunityHeroProps): React.JSX.Element {
   const t = useThemeColors();
   const insets = useSafeAreaInsets();
-  const reduced = useReducedMotion();
   const fallback = tint || (t.scheme === 'light' ? '#2C3340' : '#141418');
 
   return (
@@ -82,33 +80,7 @@ export function CommunityHero({
         </View>
       </View>
 
-      <Animated.View
-        entering={reduced ? undefined : FadeInUp.duration(duration.base)}
-        style={[
-          styles.overlap,
-          {
-            backgroundColor: t.scheme === 'light' ? t.background : 'rgba(12,12,14,0.92)',
-            borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
-          },
-        ]}
-      >
-        {description ? (
-          <Text allowFontScaling={false} style={[styles.desc, { color: t.textSecondary }]} numberOfLines={3}>
-            {description}
-          </Text>
-        ) : null}
-        <View style={styles.metaRow}>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-            {communityMemberLabel(memberCount)}
-          </Text>
-          <Text allowFontScaling={false} style={[styles.dot, { color: t.textMuted }]}>
-            ·
-          </Text>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-            {communityActiveLabel(activeToday)}
-          </Text>
-        </View>
-      </Animated.View>
+      <CommunityMetaCard description={description} memberCount={memberCount} activeToday={activeToday} />
     </View>
   );
 }
@@ -140,17 +112,4 @@ const styles = StyleSheet.create({
   kind: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 1, color: 'rgba(255,255,255,0.78)' },
   name: { ...typeScale.display, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -1, color: '#FAFAF8' },
   access: { ...typeScale.caption, letterSpacing: 0.4, fontWeight: '600', color: 'rgba(250,250,248,0.72)' },
-  overlap: {
-    gap: 6,
-    marginTop: -space.md,
-    marginHorizontal: space.xs,
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-    borderRadius: radius.xxl,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  desc: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  meta: { ...typeScale.caption, fontSize: 12, fontWeight: '600' },
-  dot: { ...typeScale.caption, fontSize: 12 },
 });
