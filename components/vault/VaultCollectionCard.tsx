@@ -3,8 +3,7 @@ import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import type { StorefrontDrop } from '../../services/vaultMappers';
 import { getPublicMediaUrl } from '../../services/mediaService';
 import { vaultPublicVisualMedia } from '../../utils/vaultAccess';
-import { editorialTitleLines } from '../../utils/vaultPresentation';
-import { space, typeScale, useThemeColors } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { PressableScale } from '../shared/PressableScale';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -26,7 +25,7 @@ function episodeThumb(drop: StorefrontDrop): string | null {
 }
 
 /**
- * Collection as SERIES — film-strip episodes, not a folder card.
+ * Collection as SERIES — streaming-strip episodes, Explore media language.
  */
 export function VaultCollectionCard({
   title,
@@ -35,8 +34,7 @@ export function VaultCollectionCard({
   onOpen,
 }: VaultCollectionCardProps): React.JSX.Element {
   const t = useThemeColors();
-  const lines = editorialTitleLines(title, 2);
-  const countLabel = `${String(drops.length).padStart(2, '0')} EPISODE${drops.length === 1 ? '' : 'S'}`;
+  const countLabel = `${drops.length} episode${drops.length === 1 ? '' : 's'}`;
 
   const body = (
     <>
@@ -44,11 +42,9 @@ export function VaultCollectionCard({
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
           SERIES
         </Text>
-        {lines.map((line) => (
-          <Text key={line} allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-            {line}
-          </Text>
-        ))}
+        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
+          {title}
+        </Text>
         <Text allowFontScaling={false} style={[styles.count, { color: t.textMuted }]}>
           {drops.length === 0 ? 'Nothing saved yet' : countLabel}
         </Text>
@@ -70,13 +66,30 @@ export function VaultCollectionCard({
             const url = episodeThumb(item);
             return (
               <View style={styles.episode}>
-                <View style={[styles.frame, { backgroundColor: t.surfaceMuted }]}>
+                <View
+                  style={[
+                    styles.frame,
+                    {
+                      backgroundColor: t.surfaceMuted,
+                      borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                    },
+                  ]}
+                >
                   {url ? (
                     <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   ) : null}
+                  <View style={styles.epBadge}>
+                    <Text allowFontScaling={false} style={styles.epIndex}>
+                      {String(index + 1).padStart(2, '0')}
+                    </Text>
+                  </View>
                 </View>
-                <Text allowFontScaling={false} style={[styles.epIndex, { color: t.textMuted }]}>
-                  {String(index + 1).padStart(2, '0')}
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.epCaption, { color: t.textSecondary }]}
+                  numberOfLines={2}
+                >
+                  {item.caption}
                 </Text>
               </View>
             );
@@ -110,35 +123,58 @@ export function VaultCollectionCard({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.md, paddingVertical: space.sm },
+  wrap: { gap: space.sm, paddingVertical: space.xs },
   header: { gap: 2 },
-  kicker: { ...typeScale.caption, letterSpacing: 1.2 },
+  kicker: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
   title: {
     fontFamily: typeScale.display.fontFamily,
-    fontSize: 30,
-    lineHeight: 32,
-    fontWeight: '700',
-    letterSpacing: -1,
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '800',
+    letterSpacing: -0.8,
   },
   count: {
     ...typeScale.caption,
-    letterSpacing: 1,
-    marginTop: 6,
+    letterSpacing: 0.3,
+    marginTop: 4,
   },
-  description: { ...typeScale.meta, marginTop: 4, maxWidth: 320 },
+  description: { ...typeScale.meta, marginTop: 2, maxWidth: 320 },
   strip: {
-    gap: space.sm,
+    gap: space.xs,
     paddingRight: space.xl,
   },
-  episode: { width: 108, gap: 6 },
+  episode: { width: 120, gap: 6 },
   frame: {
-    width: 108,
+    width: 120,
     aspectRatio: 3 / 4,
-    borderRadius: 2,
+    borderRadius: radius.xl,
     overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  epBadge: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   epIndex: {
     ...typeScale.caption,
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: '#FAFAF8',
+  },
+  epCaption: {
+    ...typeScale.meta,
+    fontSize: 12,
+    lineHeight: 15,
   },
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { VaultHomeScope } from '../../services/vaultHomeService';
-import { space, typeScale, useThemeColors } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 
 const ITEMS: readonly { key: VaultHomeScope; label: string }[] = [
@@ -14,12 +14,21 @@ export interface VaultScopeControlProps {
   onChange: (next: VaultHomeScope) => void;
 }
 
-/** Compact Following / Discover control — navigation, not the visual centerpiece. */
+/** Compact pill selector — Explore filter density, not a chunky tab bar. */
 export function VaultScopeControl({ value, onChange }: VaultScopeControlProps): React.JSX.Element {
   const t = useThemeColors();
 
   return (
-    <View style={styles.row} accessibilityRole="tablist" accessibilityLabel="Vault scope">
+    <View
+      style={[
+        styles.row,
+        {
+          backgroundColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+        },
+      ]}
+      accessibilityRole="tablist"
+      accessibilityLabel="Vault scope"
+    >
       {ITEMS.map((item) => {
         const active = item.key === value;
         return (
@@ -32,7 +41,12 @@ export function VaultScopeControl({ value, onChange }: VaultScopeControlProps): 
             }}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            style={styles.item}
+            style={[
+              styles.pill,
+              active && {
+                backgroundColor: t.scheme === 'light' ? t.surface : 'rgba(255,255,255,0.12)',
+              },
+            ]}
           >
             <Text
               allowFontScaling={false}
@@ -44,12 +58,6 @@ export function VaultScopeControl({ value, onChange }: VaultScopeControlProps): 
             >
               {item.label}
             </Text>
-            <View
-              style={[
-                styles.underline,
-                { backgroundColor: active ? t.textPrimary : 'transparent' },
-              ]}
-            />
           </Pressable>
         );
       })}
@@ -59,22 +67,23 @@ export function VaultScopeControl({ value, onChange }: VaultScopeControlProps): 
 
 const styles = StyleSheet.create({
   row: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: space.lg,
-    paddingBottom: 2,
+    borderRadius: radius.pill,
+    padding: 3,
+    gap: 2,
   },
-  item: { gap: 6, paddingBottom: 2 },
+  pill: {
+    paddingHorizontal: space.md,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+  },
   label: {
-    ...typeScale.meta,
-    letterSpacing: 0.2,
-  },
-  labelActive: {
+    ...typeScale.caption,
+    fontSize: 12,
     fontWeight: '600',
   },
-  underline: {
-    height: 2,
-    borderRadius: 1,
-    width: '100%',
+  labelActive: {
+    fontWeight: '800',
   },
 });

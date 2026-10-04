@@ -1,14 +1,13 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import type { VaultCreatorWorldCard } from '../../services/vaultHomeService';
 import {
   creatorIdentityLine,
-  editorialTitleLines,
-  vaultTintWash,
   worldHappeningLine,
 } from '../../utils/vaultPresentation';
-import { duration, layout, space, typeScale, useThemeColors } from '../../theme';
+import { duration, radius, space, typeScale, useThemeColors } from '../../theme';
 import { PressableScale } from '../shared/PressableScale';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -17,7 +16,7 @@ export interface FeaturedWorldProps {
   onEnter: () => void;
 }
 
-/** Dominant Discover hero — image is the surface, not a bordered card. */
+/** Featured Creator World — Explore hero language: rounded media, gradient scrim, layered type. */
 export const FeaturedWorld = React.memo(function FeaturedWorld({
   creator,
   onEnter,
@@ -25,49 +24,55 @@ export const FeaturedWorld = React.memo(function FeaturedWorld({
   const t = useThemeColors();
   const reduced = useReducedMotion();
   const { width } = useWindowDimensions();
-  const height = Math.round(Math.min(width * 1.18, width * 0.92 + 120));
-  const lines = editorialTitleLines(creator.latestCaption ?? creator.name, 2);
-  const identity = creatorIdentityLine(creator.bio, creator.name);
+  const height = Math.round(Math.min(width * 1.05, 420));
+  const identity = creatorIdentityLine(creator.bio, 'Creator');
   const happening = worldHappeningLine(creator);
-  const wash = vaultTintWash(creator.tint, t.scheme === 'dark' ? 0.22 : 0.12);
+  const fallback = creator.tint || (t.scheme === 'light' ? '#2C3340' : '#1A1A20');
 
   return (
-    <Animated.View entering={reduced ? undefined : FadeIn.duration(duration.reveal)}>
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(duration.slow)}>
       <PressableScale
         onPress={() => {
           hapticTap();
           onEnter();
         }}
-        style={[styles.wrap, { height, marginHorizontal: -layout.screenX }]}
+        style={[
+          styles.wrap,
+          {
+            height,
+            borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+            backgroundColor: fallback,
+          },
+        ]}
         accessibilityLabel={`Enter ${creator.name}'s world`}
       >
-        <View style={[styles.media, { backgroundColor: t.surfaceMuted }]}>
-          {creator.mediaUrl ? (
-            <Image source={{ uri: creator.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        {creator.mediaUrl ? (
+          <Image source={{ uri: creator.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <LinearGradient
+            colors={[fallback, t.scheme === 'light' ? '#D8D2C8' : '#121216']}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.82)']} style={styles.scrim} />
+        <View style={styles.copy}>
+          <Text allowFontScaling={false} style={styles.kind}>
+            FEATURED WORLD
+          </Text>
+          <Text allowFontScaling={false} style={styles.name} numberOfLines={1}>
+            {creator.name}
+          </Text>
+          {happening ? (
+            <Text allowFontScaling={false} style={styles.happening} numberOfLines={2}>
+              {happening}
+            </Text>
           ) : null}
-          <View style={[styles.tint, { backgroundColor: wash }]} />
-          <View style={styles.scrim} />
-          <View style={styles.copy}>
-            <Text allowFontScaling={false} style={styles.name}>
-              {creator.name.toUpperCase()}
-            </Text>
-            <View style={styles.titleBlock}>
-              {lines.map((line) => (
-                <Text key={line} allowFontScaling={false} style={styles.titleLine}>
-                  {line}
-                </Text>
-              ))}
-            </View>
-            <Text allowFontScaling={false} style={styles.identity} numberOfLines={1}>
-              {identity}
-            </Text>
-            {happening ? (
-              <Text allowFontScaling={false} style={styles.happening} numberOfLines={1}>
-                {happening}
-              </Text>
-            ) : null}
+          <Text allowFontScaling={false} style={styles.identity} numberOfLines={1}>
+            {identity}
+          </Text>
+          <View style={styles.ctaPill}>
             <Text allowFontScaling={false} style={styles.cta}>
-              ENTER WORLD →
+              ENTER →
             </Text>
           </View>
         </View>
@@ -78,55 +83,65 @@ export const FeaturedWorld = React.memo(function FeaturedWorld({
 
 const styles = StyleSheet.create({
   wrap: {
-    width: undefined,
+    width: '100%',
+    borderRadius: radius.xxl,
     overflow: 'hidden',
-  },
-  media: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  tint: {
-    ...StyleSheet.absoluteFillObject,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(9,9,11,0.38)',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '72%',
   },
   copy: {
-    gap: 6,
-    paddingHorizontal: layout.screenX + 4,
-    paddingBottom: space.xxl,
-    paddingTop: space.xxxl,
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: space.lg,
+    gap: 4,
+  },
+  kind: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.78)',
   },
   name: {
-    ...typeScale.caption,
-    color: 'rgba(250,250,248,0.78)',
-    letterSpacing: 1.4,
-  },
-  titleBlock: { gap: 0, marginTop: 2 },
-  titleLine: {
-    fontFamily: typeScale.display.fontFamily,
-    fontSize: 40,
-    lineHeight: 42,
-    fontWeight: '700',
-    letterSpacing: -1.4,
+    ...typeScale.display,
+    fontSize: 34,
+    lineHeight: 36,
+    fontWeight: '800',
+    letterSpacing: -1.1,
     color: '#FAFAF8',
+  },
+  happening: {
+    ...typeScale.label,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '700',
+    color: 'rgba(250,250,248,0.92)',
+    marginTop: 2,
   },
   identity: {
     ...typeScale.meta,
-    color: 'rgba(250,250,248,0.78)',
-    marginTop: 4,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.72)',
   },
-  happening: {
-    ...typeScale.body,
-    color: 'rgba(250,250,248,0.9)',
-    marginTop: 2,
+  ctaPill: {
+    alignSelf: 'flex-start',
+    marginTop: space.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.14)',
   },
   cta: {
     ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.9,
     color: '#FAFAF8',
-    letterSpacing: 1.1,
-    marginTop: space.md,
-    fontWeight: '600',
   },
 });

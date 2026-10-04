@@ -35,7 +35,8 @@ import { resolveCreatorWorldModules, type CreatorModuleType } from '../../utils/
 import { vaultExperienceHref } from '../../utils/vaultExperiences';
 import { vaultPublicVisualMedia } from '../../utils/vaultAccess';
 import { creatorWorldChapterTitle, vaultTintWash } from '../../utils/vaultPresentation';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, radius, space, useThemeColors } from '../../theme';
+import { ExploreHeading } from '../explore/ExploreHeading';
 import { EmptyState } from '../shared/EmptyState';
 import { BackIcon, VaultIcon } from '../shared/icons';
 import { VaultIdentityHeader } from './VaultIdentityHeader';
@@ -52,7 +53,7 @@ type Phase = 'loading' | 'ready' | 'none' | 'blocked' | 'error';
 type WorldRow =
   | { kind: 'hero' }
   | { kind: 'section'; title: string; module: CreatorModuleType }
-  | { kind: 'drop'; drop: StorefrontDrop }
+  | { kind: 'drop'; drop: StorefrontDrop; cinematic?: boolean }
   | { kind: 'collection'; collection: VaultCollection; drops: StorefrontDrop[] }
   | { kind: 'service'; service: CreatorService }
   | { kind: 'course'; course: CreatorCourse }
@@ -204,9 +205,9 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
           title: creatorWorldChapterTitle('CONTENT', creator.name),
           module: 'CONTENT',
         });
-        for (const drop of liveDrops.slice(0, 12)) {
-          next.push({ kind: 'drop', drop });
-        }
+        liveDrops.slice(0, 12).forEach((drop, index) => {
+          next.push({ kind: 'drop', drop, cinematic: index === 0 });
+        });
       }
       if (mod.type === 'COLLECTIONS') {
         next.push({
@@ -328,16 +329,12 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
           </View>
         );
       case 'section':
-        return (
-          <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
-            {item.title}
-          </Text>
-        );
+        return <ExploreHeading title={item.title} style={styles.section} />;
       case 'drop':
         return (
           <VaultDropCard
             drop={item.drop}
-            cinematic
+            cinematic={item.cinematic === true}
             creatorHandle={creator.handle}
             onOpen={() => router.push(`/vault/drop/${item.drop.id}`)}
             onSubscribe={() => setSubscribeOpen(true)}
@@ -483,28 +480,26 @@ function BackChip({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   centered: { justifyContent: 'center', alignItems: 'center', gap: space.md },
-  content: { paddingHorizontal: layout.screenX, gap: space.xl },
-  heroBlock: { gap: 0 },
+  content: { paddingHorizontal: layout.screenX, gap: space.md },
+  heroBlock: { gap: 0, marginBottom: -space.sm },
   backFloat: {
     position: 'absolute',
     left: 0,
     zIndex: 4,
   },
   section: {
-    ...typeScale.caption,
-    letterSpacing: 1.3,
-    marginTop: space.sm,
+    marginTop: space.xs,
   },
   back: {
     alignSelf: 'flex-start',
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
     zIndex: 2,
   },
-  loadBlock: { width: '70%', height: 220, borderRadius: 4 },
-  loadLine: { width: '40%', height: 12, borderRadius: 4 },
+  loadBlock: { width: '100%', height: 280, borderRadius: radius.xxl },
+  loadLine: { width: '40%', height: 12, borderRadius: radius.sm },
 });

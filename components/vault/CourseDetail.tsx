@@ -22,7 +22,7 @@ import type { CourseLessonCard, CreatorCourse } from '../../services/vaultCommer
 import type { User } from '../../store';
 import { analytics } from '../../services/analytics';
 import { vaultOfferPriceLabel } from '../../utils/vaultMoney';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { EmptyState } from '../shared/EmptyState';
 import { BackIcon, VaultIcon } from '../shared/icons';
 import { VaultActionButton } from './VaultActionButton';
@@ -214,19 +214,26 @@ const styles = StyleSheet.create({
     aspectRatio: 4 / 5,
     overflow: 'hidden',
     justifyContent: 'flex-end',
-    paddingHorizontal: layout.screenX,
+    paddingHorizontal: space.lg,
     paddingBottom: space.xl,
     gap: 6,
-    marginHorizontal: -layout.screenX,
+    borderRadius: radius.xxl,
   },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.36)' },
-  kicker: { ...typeScale.caption, color: 'rgba(250,250,248,0.75)', letterSpacing: 1.2, zIndex: 1 },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.42)' },
+  kicker: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(250,250,248,0.75)',
+    letterSpacing: 1,
+    zIndex: 1,
+  },
   title: {
     fontFamily: typeScale.display.fontFamily,
-    fontSize: 36,
-    lineHeight: 38,
-    fontWeight: '700',
-    letterSpacing: -1.2,
+    fontSize: 34,
+    lineHeight: 36,
+    fontWeight: '800',
+    letterSpacing: -1.1,
     color: '#FAFAF8',
     zIndex: 1,
   },
