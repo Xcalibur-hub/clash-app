@@ -862,9 +862,9 @@ select ok(public.run_maintenance(50) ? 'arena_rooms_transitioned',
   'run_maintenance reports arena_rooms_transitioned');
 select is(
   (select array(select jsonb_object_keys(public.run_maintenance(50)) order by 1)),
-  ARRAY['arena_rooms_transitioned', 'clashes_settled', 'media', 'prediction_games_closed',
-        'rate_limits_pruned', 'takes_expired', 'vault_drops_expired',
-        'vault_subscriptions_expired', 'world_drops_expired'],
+  ARRAY['arena_rooms_transitioned', 'clashes_settled', 'media', 'meet_signals_pruned',
+        'prediction_games_closed', 'rate_limits_pruned', 'takes_expired',
+        'vault_drops_expired', 'vault_subscriptions_expired', 'world_drops_expired'],
   'run_maintenance preserves every existing key and adds the arena key'
 );
 

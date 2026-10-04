@@ -65,7 +65,22 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name: isDevelopment ? 'CLASH (Dev)' : 'CLASH',
     slug: isDevelopment ? 'clash-dev' : 'clash',
     scheme: isDevelopment ? 'clash-dev' : 'clash',
-    plugins: [...(config.plugins ?? []), 'expo-video', 'expo-localization', sentryPlugin],
+    plugins: [
+      ...(config.plugins ?? []),
+      'expo-video',
+      'expo-localization',
+      'expo-camera',
+      [
+        '@config-plugins/react-native-webrtc',
+        {
+          cameraPermission:
+            'CLASH uses your camera for Meet Video so you can talk face to face with someone new.',
+          microphonePermission:
+            'CLASH uses your microphone for Meet Video so the other person can hear you.',
+        },
+      ],
+      sentryPlugin,
+    ],
     extra: {
       ...config.extra,
       appVariant: variant,

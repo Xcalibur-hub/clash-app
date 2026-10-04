@@ -1,19 +1,21 @@
 /**
- * Meet the World — pseudonymous text matching (no video).
- * Server owns queue matching; clients never pick peers directly.
+ * Meet the World — pseudonymous TEXT + VIDEO matching.
+ * Server owns queue matching / signaling; media is peer-to-peer WebRTC.
  */
 import {
   MEET_INTERESTS,
+  type MeetChannel,
   type MeetHoodId,
   type MeetMatchMode,
 } from '../utils/meetModes';
 import { requestError, requireSupabase, SupabaseError } from './supabaseClient';
 
-export { MEET_INTERESTS, type MeetHoodId, type MeetMatchMode };
+export { MEET_INTERESTS, type MeetChannel, type MeetHoodId, type MeetMatchMode };
 
 export interface MeetSession {
   sessionId: string;
   mode: MeetMatchMode;
+  channel: MeetChannel;
   status: 'active' | 'ended';
   countryCode: string | null;
   hood: MeetHoodId | null;
@@ -21,6 +23,7 @@ export interface MeetSession {
   myAlias: string;
   peerAlias: string;
   peerConnected: boolean;
+  isOfferer: boolean;
   createdAt: number;
   endedAt: number | null;
   endReason: string | null;
@@ -39,9 +42,24 @@ export interface MeetQueueState {
   matched: boolean;
   queueId?: string;
   mode?: MeetMatchMode;
+  channel?: MeetChannel;
   queuedAt?: number;
   session?: MeetSession | null;
   alreadyActive?: boolean;
+}
+
+export type MeetSignalKind = 'offer' | 'answer' | 'ice';
+
+export interface MeetSignal {
+  id: string;
+  kind: MeetSignalKind;
+  payload: Record<string, unknown>;
+  createdAt: number;
+}
+
+export interface MeetIceServers {
+  iceServers: RTCIceServer[];
+  hasTurn: boolean;
 }
 
 function client() {
@@ -68,6 +86,10 @@ function millis(value: unknown): number | null {
     return Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+function parseChannel(value: unknown): MeetChannel {
+  return value === 'VIDEO' ? 'VIDEO' : 'TEXT';
 }
 
 function toSession(value: unknown): MeetSession | null {
@@ -99,6 +121,7 @@ function toSession(value: unknown): MeetSession | null {
   return {
     sessionId,
     mode,
+    channel: parseChannel(r.channel),
     status: str(r.status) === 'ended' ? 'ended' : 'active',
     countryCode: str(r.countryCode),
     hood,
@@ -106,6 +129,7 @@ function toSession(value: unknown): MeetSession | null {
     myAlias: str(r.myAlias) ?? 'Stranger',
     peerAlias: str(r.peerAlias) ?? 'Stranger',
     peerConnected: bool(r.peerConnected),
+    isOfferer: bool(r.isOfferer),
     createdAt: millis(r.createdAt) ?? Date.now(),
     endedAt: millis(r.endedAt),
     endReason: str(r.endReason),
@@ -123,6 +147,7 @@ function toQueueState(value: unknown): MeetQueueState {
       mode === 'ANYWHERE' || mode === 'COUNTRY' || mode === 'INTERESTS' || mode === 'HOOD'
         ? mode
         : undefined,
+    channel: r.channel != null ? parseChannel(r.channel) : undefined,
     queuedAt: millis(r.queuedAt) ?? undefined,
     session: toSession(r.session),
     alreadyActive: bool(r.alreadyActive),
@@ -131,6 +156,7 @@ function toQueueState(value: unknown): MeetQueueState {
 
 export async function joinMeetQueue(input: {
   mode: MeetMatchMode;
+  channel?: MeetChannel;
   countryCode?: string | null;
   hood?: MeetHoodId | null;
   interests?: string[];
@@ -140,6 +166,7 @@ export async function joinMeetQueue(input: {
     p_country_code: input.countryCode ?? undefined,
     p_hood: input.hood ?? undefined,
     p_interests: input.interests ?? [],
+    p_channel: input.channel ?? 'TEXT',
   });
   if (error) throw requestError(error);
   return toQueueState(data);
@@ -229,6 +256,7 @@ export async function nextMeet(
   sessionId: string,
   input: {
     mode: MeetMatchMode;
+    channel?: MeetChannel;
     countryCode?: string | null;
     hood?: MeetHoodId | null;
     interests?: string[];
@@ -240,6 +268,7 @@ export async function nextMeet(
     p_country_code: input.countryCode ?? undefined,
     p_hood: input.hood ?? undefined,
     p_interests: input.interests ?? [],
+    p_channel: input.channel ?? 'TEXT',
   });
   if (error) throw requestError(error);
   return toQueueState(data);
@@ -263,7 +292,97 @@ export async function reportMeetSession(
   if (error) throw requestError(error);
 }
 
-/** Poll messages (no Realtime row payloads — avoids exposing peer profile ids). */
+export async function ackMeetVideoSafety(): Promise<void> {
+  const { error } = await client().rpc('ack_meet_video_safety');
+  if (error) throw requestError(error);
+}
+
+export async function hasMeetVideoSafetyAck(): Promise<boolean> {
+  const { data, error } = await client().rpc('has_meet_video_safety_ack');
+  if (error) throw requestError(error);
+  return data === true;
+}
+
+export async function canUseVideoMeet(): Promise<boolean> {
+  const { data: profileId, error: idErr } = await client().rpc('my_profile_id');
+  if (idErr) throw requestError(idErr);
+  if (!profileId || typeof profileId !== 'string') return false;
+  const { data, error } = await client().rpc('can_use_video_meet', {
+    p_profile: profileId,
+  });
+  if (error) throw requestError(error);
+  return data === true;
+}
+
+export async function fetchMeetIceServers(): Promise<MeetIceServers> {
+  const { data, error } = await client().rpc('get_meet_ice_servers');
+  if (error) throw requestError(error);
+  const r = asRecord(data);
+  const raw = Array.isArray(r?.iceServers) ? r!.iceServers : [];
+  const iceServers: RTCIceServer[] = [];
+  for (const row of raw) {
+    const s = asRecord(row);
+    if (!s) continue;
+    const urls = s.urls;
+    if (typeof urls === 'string') {
+      iceServers.push({
+        urls,
+        username: str(s.username) ?? undefined,
+        credential: str(s.credential) ?? undefined,
+      });
+    } else if (Array.isArray(urls)) {
+      iceServers.push({
+        urls: urls.filter((u): u is string => typeof u === 'string'),
+        username: str(s.username) ?? undefined,
+        credential: str(s.credential) ?? undefined,
+      });
+    }
+  }
+  if (iceServers.length === 0) {
+    iceServers.push({ urls: 'stun:stun.l.google.com:19302' });
+  }
+  return { iceServers, hasTurn: bool(r?.hasTurn) };
+}
+
+export async function publishMeetSignal(
+  sessionId: string,
+  kind: MeetSignalKind,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await client().rpc('publish_meet_signal', {
+    p_session_id: sessionId,
+    p_kind: kind,
+    p_payload: payload as never,
+  });
+  if (error) throw requestError(error);
+}
+
+export async function listMeetSignals(
+  sessionId: string,
+  after?: number | null,
+): Promise<{ active: boolean; items: MeetSignal[] }> {
+  const { data, error } = await client().rpc('list_meet_signals', {
+    p_session_id: sessionId,
+    p_after: after ? new Date(after).toISOString() : undefined,
+  });
+  if (error) throw requestError(error);
+  const r = asRecord(data);
+  const itemsRaw = Array.isArray(r?.items) ? r!.items : [];
+  const items: MeetSignal[] = [];
+  for (const row of itemsRaw) {
+    const m = asRecord(row);
+    if (!m) continue;
+    const id = str(m.id);
+    const kind = str(m.kind);
+    const createdAt = millis(m.createdAt);
+    const payload = asRecord(m.payload);
+    if (!id || !kind || createdAt == null || !payload) continue;
+    if (kind !== 'offer' && kind !== 'answer' && kind !== 'ice') continue;
+    items.push({ id, kind, payload, createdAt });
+  }
+  return { active: r?.active !== false, items };
+}
+
 export function pollMeetMessages(
   sessionId: string,
   onBatch: (messages: MeetMessage[]) => void,

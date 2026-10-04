@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlowButton } from '../../../components/shared/GlowButton';
+import { MeetButton } from '../../../components/meet/MeetButton';
 import { analytics } from '../../../services/analytics';
 import {
   blockMeetPeer,
@@ -128,6 +128,7 @@ export default function MeetChatScreen(): React.JSX.Element {
       analytics.track('meet_next', { realm: 'explore', source: 'explore' });
       const state = await nextMeet(sessionId, {
         mode: session.mode,
+        channel: 'TEXT',
         countryCode: session.countryCode,
         hood: session.hood,
         interests: session.sharedInterest ? [session.sharedInterest] : [],
@@ -208,10 +209,10 @@ export default function MeetChatScreen(): React.JSX.Element {
 
       {menuOpen ? (
         <View style={[styles.menu, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-          <GlowButton label="Next" onPress={() => void onNext()} tone="light" compact />
-          <GlowButton label="Report" onPress={() => void onReport()} tone="glass" compact />
-          <GlowButton label="Block" onPress={() => void onBlock()} tone="glass" compact />
-          <GlowButton label="Leave" onPress={() => void onLeave()} tone="glass" compact />
+          <MeetButton label="Next" onPress={() => void onNext()} tone="light" compact />
+          <MeetButton label="Report" onPress={() => void onReport()} tone="glass" compact />
+          <MeetButton label="Block" onPress={() => void onBlock()} tone="glass" compact />
+          <MeetButton label="Leave" onPress={() => void onLeave()} tone="glass" compact />
         </View>
       ) : null}
 
@@ -253,7 +254,7 @@ export default function MeetChatScreen(): React.JSX.Element {
           <Text allowFontScaling={false} style={{ color: t.textMuted, marginBottom: 8 }}>
             Stranger disconnected.
           </Text>
-          <GlowButton label="Find someone else" onPress={() => void onNext()} tone="light" />
+          <MeetButton label="Find someone else" onPress={() => void onNext()} tone="light" />
         </View>
       ) : (
         <View style={[styles.composer, { paddingBottom: insets.bottom + 8, borderColor: t.border }]}>

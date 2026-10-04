@@ -107,7 +107,16 @@ export type AnalyticsEvent =
   | 'meet_next'
   | 'meet_left'
   | 'meet_reported'
-  | 'meet_blocked';
+  | 'meet_blocked'
+  | 'meet_video_opened'
+  | 'meet_video_queue_joined'
+  | 'meet_video_matched'
+  | 'meet_video_connected'
+  | 'meet_video_next'
+  | 'meet_video_left'
+  | 'meet_video_reported'
+  | 'meet_video_blocked'
+  | 'meet_video_connection_failed';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([

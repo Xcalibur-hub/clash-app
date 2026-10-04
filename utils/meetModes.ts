@@ -1,5 +1,7 @@
 export type MeetMatchMode = 'ANYWHERE' | 'COUNTRY' | 'INTERESTS' | 'HOOD';
 
+export type MeetChannel = 'TEXT' | 'VIDEO';
+
 export type MeetHoodId =
   | 'techtakes'
   | 'campushustle'
@@ -26,3 +28,12 @@ export const MEET_INTERESTS = [
   'Travel',
   'Gaming',
 ] as const;
+
+/** Seat A is always the WebRTC offerer — never both peers race. */
+export function meetIsOfferer(seat: 'A' | 'B' | string | null | undefined): boolean {
+  return seat === 'A';
+}
+
+export function meetChannelsCompatible(a: MeetChannel, b: MeetChannel): boolean {
+  return a === b;
+}

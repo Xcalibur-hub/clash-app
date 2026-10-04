@@ -3585,6 +3585,7 @@ export type Database = {
       }
       join_meet_queue: {
         Args: {
+          p_channel?: Database["public"]["Enums"]["meet_channel"]
           p_country_code?: string
           p_hood?: Database["public"]["Enums"]["hood_id"]
           p_interests?: string[]
@@ -3724,10 +3725,39 @@ export type Database = {
       }
       next_meet: {
         Args: {
+          p_channel?: Database["public"]["Enums"]["meet_channel"]
           p_country_code?: string
           p_hood?: Database["public"]["Enums"]["hood_id"]
           p_interests?: string[]
           p_mode: Database["public"]["Enums"]["meet_match_mode"]
+          p_session_id: string
+        }
+        Returns: Json
+      }
+      ack_meet_video_safety: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      can_use_video_meet: {
+        Args: { p_profile: string }
+        Returns: boolean
+      }
+      get_meet_ice_servers: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      has_meet_video_safety_ack: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      list_meet_signals: {
+        Args: { p_after?: string; p_session_id: string }
+        Returns: Json
+      }
+      publish_meet_signal: {
+        Args: {
+          p_kind: Database["public"]["Enums"]["meet_signal_kind"]
+          p_payload: Json
           p_session_id: string
         }
         Returns: Json
@@ -4327,9 +4357,11 @@ export type Database = {
       media_kind: "image" | "video" | "gif"
       media_status: "uploading" | "ready" | "failed" | "deleted"
       media_visibility: "public" | "private"
+      meet_channel: "TEXT" | "VIDEO"
       meet_match_mode: "ANYWHERE" | "COUNTRY" | "INTERESTS" | "HOOD"
       meet_queue_status: "waiting" | "matched" | "cancelled"
       meet_session_status: "active" | "ended"
+      meet_signal_kind: "offer" | "answer" | "ice"
       moderation_action:
         | "warn"
         | "remove_content"
@@ -4598,9 +4630,11 @@ export const Constants = {
       media_kind: ["image", "video", "gif"],
       media_status: ["uploading", "ready", "failed", "deleted"],
       media_visibility: ["public", "private"],
+      meet_channel: ["TEXT", "VIDEO"],
       meet_match_mode: ["ANYWHERE", "COUNTRY", "INTERESTS", "HOOD"],
       meet_queue_status: ["waiting", "matched", "cancelled"],
       meet_session_status: ["active", "ended"],
+      meet_signal_kind: ["offer", "answer", "ice"],
       moderation_action: [
         "warn",
         "remove_content",
