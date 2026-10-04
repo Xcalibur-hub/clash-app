@@ -107,7 +107,7 @@ export function CourseDetail({ courseId }: { courseId: string }): React.JSX.Elem
     return (
       <Pressable
         onPress={() => router.push(`/vault/course/${courseId}/lesson/${item.id}`)}
-        style={[styles.lesson, { borderColor: t.border, backgroundColor: t.surface }]}
+        style={[styles.lesson, { borderBottomColor: t.border }]}
         accessibilityRole="button"
         accessibilityLabel={`${n} ${item.title}`}
       >
@@ -211,16 +211,25 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   hero: {
-    aspectRatio: 16 / 10,
-    borderRadius: 28,
+    aspectRatio: 4 / 5,
     overflow: 'hidden',
     justifyContent: 'flex-end',
-    padding: space.lg,
+    paddingHorizontal: layout.screenX,
+    paddingBottom: space.xl,
     gap: 6,
+    marginHorizontal: -layout.screenX,
   },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.32)' },
-  kicker: { ...typeScale.caption, color: 'rgba(250,250,248,0.8)', letterSpacing: 0.8, zIndex: 1 },
-  title: { ...typeScale.display, color: '#FAFAF8', zIndex: 1 },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.36)' },
+  kicker: { ...typeScale.caption, color: 'rgba(250,250,248,0.75)', letterSpacing: 1.2, zIndex: 1 },
+  title: {
+    fontFamily: typeScale.display.fontFamily,
+    fontSize: 36,
+    lineHeight: 38,
+    fontWeight: '700',
+    letterSpacing: -1.2,
+    color: '#FAFAF8',
+    zIndex: 1,
+  },
   byline: { ...typeScale.meta },
   body: { ...typeScale.body },
   progress: { ...typeScale.caption, letterSpacing: 0.4 },
@@ -228,12 +237,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: space.md,
     alignItems: 'center',
-    padding: space.md,
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: space.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  lessonIndex: { ...typeScale.meta, width: 28 },
+  lessonIndex: { ...typeScale.caption, letterSpacing: 1, width: 28 },
   lessonText: { flex: 1, gap: 2 },
-  lessonTitle: { ...typeScale.cardTitle },
+  lessonTitle: { ...typeScale.label, fontWeight: '600' },
   lessonMeta: { ...typeScale.caption },
 });

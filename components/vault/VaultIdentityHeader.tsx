@@ -2,8 +2,8 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { User } from '../../store';
 import type { CreatorVault, VaultSubscriptionState } from '../../services/vaultMappers';
+import { creatorIdentityLine, vaultTintWash } from '../../utils/vaultPresentation';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
-import { Avatar } from '../shared/Avatar';
 import { VaultActionButton } from './VaultActionButton';
 
 export interface VaultIdentityHeaderProps {
@@ -29,7 +29,7 @@ function subscriptionLabel(subscription: VaultSubscriptionState | null): string 
 }
 
 /**
- * Creator World hero — large visual, identity, Follow / Subscribe.
+ * Immersive Creator World hero — artist universe entry, not a social profile.
  */
 export function VaultIdentityHeader({
   creator,
@@ -45,6 +45,8 @@ export function VaultIdentityHeader({
   const t = useThemeColors();
   const subLabel = subscriptionLabel(subscription);
   const subscribed = subscription?.active === true;
+  const identity = creatorIdentityLine(creator.bio ?? vault.description, vault.title);
+  const wash = vaultTintWash(creator.tint, t.scheme === 'dark' ? 0.2 : 0.1);
 
   return (
     <View style={styles.wrap}>
@@ -53,26 +55,30 @@ export function VaultIdentityHeader({
           {heroUrl ? (
             <Image source={{ uri: heroUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : null}
+          <View style={[styles.tint, { backgroundColor: wash }]} />
           <View style={styles.heroScrim} />
-          <View style={styles.heroIdentity}>
-            <Avatar name={creator.name} tint={creator.tint} size={72} />
+          <View style={styles.heroCopy}>
             <Text allowFontScaling={false} style={styles.name} numberOfLines={2}>
-              {creator.name}
+              {creator.name.toUpperCase()}
             </Text>
-            <Text allowFontScaling={false} style={styles.handle} numberOfLines={1}>
-              @{creator.handle}
+            <Text allowFontScaling={false} style={styles.identity} numberOfLines={2}>
+              {identity}
             </Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.copy}>
+      <View style={styles.below}>
         <Text allowFontScaling={false} style={[styles.vaultTitle, { color: t.textPrimary }]} numberOfLines={2}>
           {vault.title}
         </Text>
-        {vault.description || creator.bio ? (
-          <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]}>
-            {vault.description || creator.bio}
+        {creator.bio && creator.bio !== identity ? (
+          <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]} numberOfLines={3}>
+            {creator.bio}
+          </Text>
+        ) : vault.description ? (
+          <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]} numberOfLines={3}>
+            {vault.description}
           </Text>
         ) : null}
         {subLabel ? (
@@ -109,29 +115,51 @@ export function VaultIdentityHeader({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.md },
+  wrap: { gap: 0 },
   heroBleed: { width: 'auto' },
   hero: {
-    aspectRatio: 5 / 4,
+    aspectRatio: 4 / 5,
     width: '100%',
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
+  tint: { ...StyleSheet.absoluteFillObject },
   heroScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(9,9,11,0.35)',
+    backgroundColor: 'rgba(9,9,11,0.34)',
   },
-  heroIdentity: {
-    alignItems: 'center',
-    gap: 6,
-    paddingBottom: space.xl,
-    paddingHorizontal: space.lg,
+  heroCopy: {
+    gap: 8,
+    paddingBottom: space.xxl,
+    paddingHorizontal: layout.screenX + 4,
+    paddingTop: space.xxxl,
   },
-  name: { ...typeScale.title, color: '#FAFAF8', textAlign: 'center' },
-  handle: { ...typeScale.meta, color: 'rgba(250,250,248,0.8)', textAlign: 'center' },
-  copy: { gap: space.sm },
-  vaultTitle: { ...typeScale.section },
-  description: { ...typeScale.body },
-  access: { ...typeScale.caption, letterSpacing: 0.4 },
+  name: {
+    fontFamily: typeScale.display.fontFamily,
+    fontSize: 44,
+    lineHeight: 46,
+    fontWeight: '700',
+    letterSpacing: -1.6,
+    color: '#FAFAF8',
+  },
+  identity: {
+    ...typeScale.body,
+    color: 'rgba(250,250,248,0.86)',
+    maxWidth: 280,
+  },
+  below: {
+    gap: space.sm,
+    paddingTop: space.lg,
+    marginTop: -space.md,
+  },
+  vaultTitle: {
+    fontFamily: typeScale.title.fontFamily,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '600',
+    letterSpacing: -0.4,
+  },
+  description: { ...typeScale.body, fontSize: 15 },
+  access: { ...typeScale.caption, letterSpacing: 0.5 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.xs },
 });

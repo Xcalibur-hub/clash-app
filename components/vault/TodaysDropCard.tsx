@@ -1,7 +1,8 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { VaultHomeDropCard } from '../../services/vaultHomeService';
-import { space, typeScale, useThemeColors } from '../../theme';
+import { vaultAccessMeta } from '../../utils/vaultPresentation';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { PressableScale } from '../shared/PressableScale';
 import { PlayIcon } from '../shared/icons';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -12,7 +13,7 @@ export interface TodaysDropCardProps {
   large?: boolean;
 }
 
-/** Cinematic Today's Drop card — poster-first, no autoplay. */
+/** Cinematic Drop — media dominates, tiny access meta, no bordered marketplace card. */
 export const TodaysDropCard = React.memo(function TodaysDropCard({
   drop,
   onOpen,
@@ -20,7 +21,7 @@ export const TodaysDropCard = React.memo(function TodaysDropCard({
 }: TodaysDropCardProps): React.JSX.Element {
   const t = useThemeColors();
   const isVideo = drop.mediaKind === 'video';
-  const accessLabel = drop.accessLevel === 'preview' ? 'PREVIEW AVAILABLE' : 'FREE DROP';
+  const accessLabel = vaultAccessMeta(drop.accessLevel);
 
   return (
     <PressableScale
@@ -28,33 +29,31 @@ export const TodaysDropCard = React.memo(function TodaysDropCard({
         hapticTap();
         onOpen();
       }}
-      style={[
-        styles.card,
-        large ? styles.large : styles.compact,
-        {
-          backgroundColor: t.surface,
-          borderColor: t.border,
-          shadowColor: t.shadowColor,
-          shadowOpacity: t.scheme === 'light' ? 0.1 : 0,
-        },
-      ]}
+      style={[styles.wrap, large ? styles.large : styles.compact, !large && { marginRight: space.md }]}
       accessibilityLabel={`${accessLabel}: ${drop.caption} by @${drop.authorHandle}`}
     >
-      <View style={[styles.media, { backgroundColor: t.surfaceMuted }]}>
+      <View
+        style={[
+          styles.media,
+          large ? styles.mediaLarge : styles.mediaCompact,
+          { backgroundColor: t.surfaceMuted },
+          large && { marginHorizontal: -layout.screenX },
+        ]}
+      >
         {drop.mediaUrl ? (
           <Image source={{ uri: drop.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : null}
         <View style={styles.scrim} />
         {isVideo ? (
           <View style={styles.play}>
-            <PlayIcon size={16} color="#FAFAF8" strokeWidth={2.4} />
+            <PlayIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
           </View>
         ) : null}
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, large && styles.overlayLarge]}>
           <Text allowFontScaling={false} style={styles.handle} numberOfLines={1}>
             @{drop.authorHandle}
           </Text>
-          <Text allowFontScaling={false} style={styles.caption} numberOfLines={2}>
+          <Text allowFontScaling={false} style={[styles.caption, !large && styles.captionCompact]} numberOfLines={2}>
             {drop.caption}
           </Text>
           <Text allowFontScaling={false} style={styles.access}>
@@ -67,54 +66,60 @@ export const TodaysDropCard = React.memo(function TodaysDropCard({
 });
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 3,
-  },
+  wrap: { overflow: 'hidden' },
   large: { width: '100%' },
-  compact: { width: 260 },
+  compact: { width: 240 },
   media: {
-    aspectRatio: 4 / 5,
     width: '100%',
     justifyContent: 'flex-end',
+    overflow: 'hidden',
   },
+  mediaLarge: { aspectRatio: 4 / 5 },
+  mediaCompact: { aspectRatio: 3 / 4, borderRadius: 2 },
   scrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(9,9,11,0.28)',
   },
   overlay: {
-    gap: 6,
-    paddingHorizontal: space.lg,
-    paddingBottom: space.lg,
+    gap: 4,
+    paddingHorizontal: space.md,
+    paddingBottom: space.md,
     paddingTop: space.xxl,
   },
+  overlayLarge: {
+    paddingHorizontal: layout.screenX + 4,
+    paddingBottom: space.xl,
+  },
   handle: {
-    ...typeScale.meta,
-    color: 'rgba(250,250,248,0.82)',
+    ...typeScale.caption,
+    color: 'rgba(250,250,248,0.72)',
+    letterSpacing: 0.4,
   },
   caption: {
-    ...typeScale.title,
+    fontFamily: typeScale.title.fontFamily,
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: '700',
+    letterSpacing: -0.6,
     color: '#FAFAF8',
   },
+  captionCompact: { fontSize: 18, lineHeight: 22 },
   access: {
     ...typeScale.caption,
-    color: 'rgba(250,250,248,0.78)',
-    letterSpacing: 0.7,
+    color: 'rgba(250,250,248,0.7)',
+    letterSpacing: 0.9,
     marginTop: 4,
+    fontSize: 10,
   },
   play: {
     position: 'absolute',
     top: space.md,
     right: space.md,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
 });

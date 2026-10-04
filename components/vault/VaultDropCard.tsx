@@ -2,14 +2,14 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { StorefrontDrop } from '../../services/vaultMappers';
 import { getPublicMediaUrl } from '../../services/mediaService';
-import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import {
   isVaultDropFeedExpired,
-  vaultDropAccessBadge,
   vaultDropDisplayAccess,
   vaultExpiryLabel,
   vaultPublicVisualMedia,
 } from '../../utils/vaultAccess';
+import { vaultAccessMeta } from '../../utils/vaultPresentation';
 import { tap as hapticTap } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
 import { PlayIcon } from '../shared/icons';
@@ -51,13 +51,9 @@ export function VaultDropCard({
   });
   const mediaUrl = visual ? getPublicMediaUrl(visual.bucket, visual.path) : null;
   const isVideo = visual?.kind === 'video';
-  const badge = vaultDropAccessBadge(display);
+  const badge = vaultAccessMeta(display);
   const expiry =
-    drop.expiresAt && drop.status === 'published' && !locked
-      ? vaultExpiryLabel(drop.expiresAt)
-      : drop.expiresAt && drop.status === 'published' && locked
-        ? vaultExpiryLabel(drop.expiresAt)
-        : null;
+    drop.expiresAt && drop.status === 'published' ? vaultExpiryLabel(drop.expiresAt) : null;
 
   const open = (): void => {
     hapticTap();
@@ -67,56 +63,43 @@ export function VaultDropCard({
   return (
     <PressableScale
       onPress={open}
-      style={[
-        styles.card,
-        cinematic && styles.cinematic,
-        {
-          backgroundColor: t.surface,
-          borderColor: t.border,
-          shadowColor: t.shadowColor,
-          shadowOpacity: t.scheme === 'light' ? 0.08 : 0,
-        },
-      ]}
+      style={[styles.wrap, cinematic && { marginHorizontal: -layout.screenX }]}
       accessibilityLabel={`${badge}: ${drop.caption}`}
       accessibilityHint={locked ? 'Subscription required to unlock full Drop' : 'Opens this drop'}
     >
       {mediaUrl ? (
-        <View style={[styles.media, cinematic && styles.mediaCinema, { backgroundColor: t.surfaceMuted }]}>
+        <View
+          style={[
+            styles.media,
+            cinematic ? styles.mediaCinema : styles.mediaDefault,
+            { backgroundColor: t.surfaceMuted },
+          ]}
+        >
           <Image source={{ uri: mediaUrl }} resizeMode="cover" style={StyleSheet.absoluteFill} />
-          {cinematic ? <View style={styles.scrim} /> : null}
+          <View style={styles.scrim} />
           {isVideo ? (
             <View style={styles.playBadge}>
               <PlayIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
             </View>
           ) : null}
-          {cinematic ? (
-            <View style={styles.cinemaCopy}>
-              {creatorHandle ? (
-                <Text allowFontScaling={false} style={styles.cinemaHandle} numberOfLines={1}>
-                  @{creatorHandle}
-                </Text>
-              ) : null}
-              <Text allowFontScaling={false} style={styles.cinemaCaption} numberOfLines={2}>
-                {drop.caption}
+          <View style={[styles.cinemaCopy, cinematic && styles.cinemaCopyPad]}>
+            {creatorHandle ? (
+              <Text allowFontScaling={false} style={styles.cinemaHandle} numberOfLines={1}>
+                @{creatorHandle}
               </Text>
-              <View style={styles.cinemaMeta}>
-                <Text allowFontScaling={false} style={styles.cinemaBadge}>
-                  {badge}
-                </Text>
-                {expiry ? (
-                  <Text allowFontScaling={false} style={styles.cinemaBadge}>
-                    {expiry}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          ) : (
-            <View style={[styles.freeTag, { backgroundColor: 'rgba(9,9,11,0.55)' }]}>
-              <Text allowFontScaling={false} style={styles.freeTagText}>
-                {badge}
-              </Text>
-            </View>
-          )}
+            ) : null}
+            <Text
+              allowFontScaling={false}
+              style={[styles.cinemaCaption, !cinematic && styles.cinemaCaptionSmall]}
+              numberOfLines={2}
+            >
+              {drop.caption}
+            </Text>
+            <Text allowFontScaling={false} style={styles.cinemaBadge}>
+              {badge}
+              {expiry ? ` · ${expiry}` : ''}
+            </Text>
+          </View>
         </View>
       ) : locked ? (
         <View style={[styles.lockedMedia, { backgroundColor: t.surfaceMuted }]}>
@@ -127,75 +110,16 @@ export function VaultDropCard({
             Unlock with this Vault
           </Text>
         </View>
-      ) : drop.accessLevel === 'subscriber' ? (
-        <View style={[styles.lockedMedia, { backgroundColor: t.surfaceMuted }]}>
-          <PlayIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
-          <Text allowFontScaling={false} style={[styles.membersHint, { color: t.textMuted }]}>
-            Members
-          </Text>
-        </View>
       ) : (
         <View style={[styles.textDrop, { backgroundColor: t.surfaceMuted }]}>
-          <Text allowFontScaling={false} style={[styles.textDropMark, { color: t.textMuted }]}>
-            DROP
+          <Text allowFontScaling={false} style={[styles.captionBare, { color: t.textPrimary }]} numberOfLines={3}>
+            {drop.caption}
           </Text>
         </View>
       )}
 
-      {!cinematic ? (
-        <View style={styles.body}>
-          <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]} numberOfLines={3}>
-            {drop.caption}
-          </Text>
-
-          <View style={styles.metaRow}>
-            {display === 'SUBSCRIBER' ? (
-              <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-                Subscriber
-              </Text>
-            ) : null}
-            {archived ? (
-              <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-                Archived
-              </Text>
-            ) : null}
-            {expiry ? (
-              <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-                {expiry}
-              </Text>
-            ) : null}
-          </View>
-
-          {locked ? (
-            <Pressable
-              onPress={() => {
-                hapticTap();
-                onSubscribe?.();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Unlock"
-              style={[
-                styles.subscribe,
-                {
-                  backgroundColor: t.scheme === 'light' ? t.textPrimary : t.surfaceElevated,
-                  borderColor: t.border,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[
-                  styles.subscribeText,
-                  { color: t.scheme === 'light' ? t.textInverse : t.textPrimary },
-                ]}
-              >
-                Unlock
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : locked ? (
-        <View style={styles.unlockBar}>
+      {locked ? (
+        <View style={[styles.unlockBar, cinematic && styles.unlockBarPad]}>
           <Pressable
             onPress={() => {
               hapticTap();
@@ -203,65 +127,66 @@ export function VaultDropCard({
             }}
             accessibilityRole="button"
             accessibilityLabel="Unlock"
-            style={[
-              styles.subscribe,
-              {
-                backgroundColor: t.scheme === 'light' ? t.textPrimary : t.surfaceElevated,
-                borderColor: t.border,
-              },
-            ]}
+            hitSlop={8}
           >
-            <Text
-              allowFontScaling={false}
-              style={[
-                styles.subscribeText,
-                { color: t.scheme === 'light' ? t.textInverse : t.textPrimary },
-              ]}
-            >
-              Unlock
+            <Text allowFontScaling={false} style={[styles.unlockText, { color: t.textPrimary }]}>
+              Unlock →
             </Text>
           </Pressable>
         </View>
+      ) : !cinematic && (archived || expiry) ? (
+        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          {archived ? 'Archived' : expiry}
+        </Text>
       ) : null}
     </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  cinematic: { borderRadius: 28 },
+  wrap: { gap: space.sm },
   media: {
-    aspectRatio: 4 / 5,
     width: '100%',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  mediaDefault: {
+    aspectRatio: 4 / 5,
+    borderRadius: 2,
   },
   mediaCinema: {
     aspectRatio: 4 / 5,
-    justifyContent: 'flex-end',
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(9,9,11,0.28)',
   },
   cinemaCopy: {
-    gap: 6,
-    paddingHorizontal: space.lg,
-    paddingBottom: space.lg,
+    gap: 4,
+    paddingHorizontal: space.md,
+    paddingBottom: space.md,
     paddingTop: space.xxl,
   },
-  cinemaHandle: { ...typeScale.meta, color: 'rgba(250,250,248,0.82)' },
-  cinemaCaption: { ...typeScale.title, color: '#FAFAF8' },
-  cinemaMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: 4 },
+  cinemaCopyPad: {
+    paddingHorizontal: layout.screenX + 4,
+    paddingBottom: space.xl,
+  },
+  cinemaHandle: { ...typeScale.caption, color: 'rgba(250,250,248,0.72)', letterSpacing: 0.3 },
+  cinemaCaption: {
+    fontFamily: typeScale.title.fontFamily,
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    color: '#FAFAF8',
+  },
+  cinemaCaptionSmall: { fontSize: 20, lineHeight: 24 },
   cinemaBadge: {
     ...typeScale.caption,
-    color: 'rgba(250,250,248,0.8)',
-    letterSpacing: 0.6,
+    color: 'rgba(250,250,248,0.7)',
+    letterSpacing: 0.8,
+    fontSize: 10,
+    marginTop: 2,
   },
   playBadge: {
     position: 'absolute',
@@ -272,81 +197,29 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  freeTag: {
-    position: 'absolute',
-    left: space.sm,
-    top: space.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  freeTagText: {
-    ...typeScale.caption,
-    color: '#FAFAF8',
-    fontSize: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   lockedMedia: {
     aspectRatio: 16 / 10,
     width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: space.lg,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    gap: 4,
+    padding: space.lg,
+    borderRadius: 2,
   },
-  lockedKicker: {
-    ...typeScale.caption,
-    letterSpacing: 0.8,
-  },
-  lockedHint: {
-    ...typeScale.meta,
-    textAlign: 'center',
-  },
-  membersHint: {
-    ...typeScale.caption,
-    letterSpacing: 0.4,
-  },
+  lockedKicker: { ...typeScale.caption, letterSpacing: 1 },
+  lockedHint: { ...typeScale.meta },
   textDrop: {
     aspectRatio: 16 / 9,
     width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    padding: space.lg,
+    borderRadius: 2,
   },
-  textDropMark: {
-    ...typeScale.caption,
-    letterSpacing: 1,
-  },
-  body: {
-    gap: 8,
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-  },
-  unlockBar: {
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-  },
-  caption: {
-    ...typeScale.takeText,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space.sm,
-  },
-  meta: {
-    ...typeScale.meta,
-  },
-  subscribe: {
-    alignSelf: 'flex-start',
-    marginTop: 2,
-    paddingHorizontal: space.md,
-    paddingVertical: 10,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  subscribeText: {
-    ...typeScale.label,
-    fontWeight: '600',
-  },
+  captionBare: { ...typeScale.takeText },
+  unlockBar: { paddingTop: 2 },
+  unlockBarPad: { paddingHorizontal: layout.screenX },
+  unlockText: { ...typeScale.label, fontWeight: '600' },
+  meta: { ...typeScale.caption, letterSpacing: 0.3 },
 });

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import type { StorefrontDrop } from '../../services/vaultMappers';
 import { getPublicMediaUrl } from '../../services/mediaService';
 import { vaultPublicVisualMedia } from '../../utils/vaultAccess';
+import { editorialTitleLines } from '../../utils/vaultPresentation';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { PressableScale } from '../shared/PressableScale';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -14,8 +15,18 @@ export interface VaultCollectionCardProps {
   onOpen?: () => void;
 }
 
+function episodeThumb(drop: StorefrontDrop): string | null {
+  const visual = vaultPublicVisualMedia({
+    accessLevel: drop.accessLevel,
+    accessible: drop.accessible,
+    publicMedia: drop.publicMedia,
+    previewMedia: drop.previewMedia,
+  });
+  return visual ? getPublicMediaUrl(visual.bucket, visual.path) : null;
+}
+
 /**
- * Collection as series / world chapter — cover from public free or preview media only.
+ * Collection as SERIES — film-strip episodes, not a folder card.
  */
 export function VaultCollectionCard({
   title,
@@ -24,72 +35,60 @@ export function VaultCollectionCard({
   onOpen,
 }: VaultCollectionCardProps): React.JSX.Element {
   const t = useThemeColors();
-  const coverDrop = drops.find((drop) => {
-    const visual = vaultPublicVisualMedia({
-      accessLevel: drop.accessLevel,
-      accessible: drop.accessible,
-      publicMedia: drop.publicMedia,
-      previewMedia: drop.previewMedia,
-    });
-    return Boolean(visual);
-  });
-  const visual = coverDrop
-    ? vaultPublicVisualMedia({
-        accessLevel: coverDrop.accessLevel,
-        accessible: coverDrop.accessible,
-        publicMedia: coverDrop.publicMedia,
-        previewMedia: coverDrop.previewMedia,
-      })
-    : null;
-  const coverUrl = visual ? getPublicMediaUrl(visual.bucket, visual.path) : null;
-  const countLabel = drops.length === 1 ? '1 episode' : `${drops.length} episodes`;
+  const lines = editorialTitleLines(title, 2);
+  const countLabel = `${String(drops.length).padStart(2, '0')} EPISODE${drops.length === 1 ? '' : 'S'}`;
 
   const body = (
     <>
-      <View style={[styles.cover, { backgroundColor: t.surfaceMuted }]}>
-        {coverUrl ? (
-          <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-        ) : (
-          <Text allowFontScaling={false} style={[styles.coverMark, { color: t.textMuted }]}>
-            COLLECTION
-          </Text>
-        )}
-        <View style={styles.coverScrim} />
-        <Text allowFontScaling={false} style={styles.coverTitle} numberOfLines={2}>
-          {title}
-        </Text>
-      </View>
-
-      <View style={styles.body}>
+      <View style={styles.header}>
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
           SERIES
+        </Text>
+        {lines.map((line) => (
+          <Text key={line} allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            {line}
+          </Text>
+        ))}
+        <Text allowFontScaling={false} style={[styles.count, { color: t.textMuted }]}>
+          {drops.length === 0 ? 'Nothing saved yet' : countLabel}
         </Text>
         {description ? (
           <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]} numberOfLines={2}>
             {description}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-          {drops.length === 0 ? 'Nothing saved yet' : `${countLabel} · permanent`}
-        </Text>
       </View>
+
+      {drops.length > 0 ? (
+        <FlatList
+          horizontal
+          data={drops.slice(0, 8)}
+          keyExtractor={(d) => d.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.strip}
+          renderItem={({ item, index }) => {
+            const url = episodeThumb(item);
+            return (
+              <View style={styles.episode}>
+                <View style={[styles.frame, { backgroundColor: t.surfaceMuted }]}>
+                  {url ? (
+                    <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : null}
+                </View>
+                <Text allowFontScaling={false} style={[styles.epIndex, { color: t.textMuted }]}>
+                  {String(index + 1).padStart(2, '0')}
+                </Text>
+              </View>
+            );
+          }}
+        />
+      ) : null}
     </>
   );
 
   if (!onOpen) {
     return (
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: t.surface,
-            borderColor: t.border,
-            shadowColor: t.shadowColor,
-            shadowOpacity: t.scheme === 'light' ? 0.08 : 0,
-          },
-        ]}
-        accessibilityLabel={`Collection: ${title}`}
-      >
+      <View style={styles.wrap} accessibilityLabel={`Series: ${title}`}>
         {body}
       </View>
     );
@@ -101,16 +100,8 @@ export function VaultCollectionCard({
         hapticTap();
         onOpen();
       }}
-      style={[
-        styles.card,
-        {
-          backgroundColor: t.surface,
-          borderColor: t.border,
-          shadowColor: t.shadowColor,
-          shadowOpacity: t.scheme === 'light' ? 0.08 : 0,
-        },
-      ]}
-      accessibilityLabel={`Collection: ${title}`}
+      style={styles.wrap}
+      accessibilityLabel={`Series: ${title}`}
       accessibilityHint="Opens this series"
     >
       {body}
@@ -119,48 +110,35 @@ export function VaultCollectionCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 26,
-    borderWidth: StyleSheet.hairlineWidth,
+  wrap: { gap: space.md, paddingVertical: space.sm },
+  header: { gap: 2 },
+  kicker: { ...typeScale.caption, letterSpacing: 1.2 },
+  title: {
+    fontFamily: typeScale.display.fontFamily,
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: '700',
+    letterSpacing: -1,
+  },
+  count: {
+    ...typeScale.caption,
+    letterSpacing: 1,
+    marginTop: 6,
+  },
+  description: { ...typeScale.meta, marginTop: 4, maxWidth: 320 },
+  strip: {
+    gap: space.sm,
+    paddingRight: space.xl,
+  },
+  episode: { width: 108, gap: 6 },
+  frame: {
+    width: 108,
+    aspectRatio: 3 / 4,
+    borderRadius: 2,
     overflow: 'hidden',
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
   },
-  cover: {
-    aspectRatio: 16 / 10,
-    width: '100%',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-end',
-    padding: space.lg,
-  },
-  coverScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(9,9,11,0.28)',
-  },
-  coverMark: {
+  epIndex: {
     ...typeScale.caption,
-    letterSpacing: 1.2,
-  },
-  coverTitle: {
-    ...typeScale.title,
-    color: '#FAFAF8',
-    zIndex: 1,
-  },
-  body: {
-    gap: 6,
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-  },
-  kicker: {
-    ...typeScale.caption,
-    letterSpacing: 0.8,
-  },
-  description: {
-    ...typeScale.meta,
-  },
-  meta: {
-    ...typeScale.meta,
-    marginTop: 2,
+    letterSpacing: 1,
   },
 });

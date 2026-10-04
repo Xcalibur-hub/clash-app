@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   StyleSheet,
@@ -35,13 +34,16 @@ import { analytics } from '../../services/analytics';
 import { resolveCreatorWorldModules, type CreatorModuleType } from '../../utils/vaultModules';
 import { vaultExperienceHref } from '../../utils/vaultExperiences';
 import { vaultPublicVisualMedia } from '../../utils/vaultAccess';
+import { creatorWorldChapterTitle, vaultTintWash } from '../../utils/vaultPresentation';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { EmptyState } from '../shared/EmptyState';
 import { BackIcon, VaultIcon } from '../shared/icons';
 import { VaultIdentityHeader } from './VaultIdentityHeader';
 import { VaultDropCard } from './VaultDropCard';
 import { VaultCollectionCard } from './VaultCollectionCard';
-import { OfferCard } from './OfferCard';
+import { CourseMasterclassCard } from './CourseMasterclassCard';
+import { ServiceSessionCard } from './ServiceSessionCard';
+import { ProductArtifactCard } from './ProductArtifactCard';
 import { SubscriptionInfoSheet } from './SubscriptionInfoSheet';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -63,7 +65,7 @@ export interface VaultScreenProps {
   hideSafeTop?: boolean;
 }
 
-/** Creator World — dynamically composed modules from real Vault data. */
+/** Creator World — chapters of a personal universe, not a profile dashboard. */
 export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -186,6 +188,8 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
     return null;
   }, [liveDrops]);
 
+  const atmosphere = creator ? vaultTintWash(creator.tint, t.scheme === 'dark' ? 0.08 : 0.04) : 'transparent';
+
   const rows = React.useMemo((): WorldRow[] => {
     if (phase !== 'ready' || !creator || !vault) return [];
     const next: WorldRow[] = [{ kind: 'hero' }];
@@ -197,7 +201,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       if (mod.type === 'CONTENT') {
         next.push({
           kind: 'section',
-          title: `NEW FROM ${creator.name.toUpperCase()}`,
+          title: creatorWorldChapterTitle('CONTENT', creator.name),
           module: 'CONTENT',
         });
         for (const drop of liveDrops.slice(0, 12)) {
@@ -205,7 +209,11 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         }
       }
       if (mod.type === 'COLLECTIONS') {
-        next.push({ kind: 'section', title: 'COLLECTIONS', module: 'COLLECTIONS' });
+        next.push({
+          kind: 'section',
+          title: creatorWorldChapterTitle('COLLECTIONS', creator.name),
+          module: 'COLLECTIONS',
+        });
         for (const collection of collections) {
           next.push({
             kind: 'collection',
@@ -215,19 +223,27 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         }
       }
       if (mod.type === 'SERVICES') {
-        next.push({ kind: 'section', title: 'SERVICES', module: 'SERVICES' });
+        next.push({
+          kind: 'section',
+          title: creatorWorldChapterTitle('SERVICES', creator.name),
+          module: 'SERVICES',
+        });
         for (const service of services) next.push({ kind: 'service', service });
       }
       if (mod.type === 'COURSES') {
         next.push({
           kind: 'section',
-          title: `LEARN WITH ${creator.name.toUpperCase()}`,
+          title: creatorWorldChapterTitle('COURSES', creator.name),
           module: 'COURSES',
         });
         for (const course of courses) next.push({ kind: 'course', course });
       }
       if (mod.type === 'STORE') {
-        next.push({ kind: 'section', title: 'SHOP', module: 'STORE' });
+        next.push({
+          kind: 'section',
+          title: creatorWorldChapterTitle('STORE', creator.name),
+          module: 'STORE',
+        });
         for (const product of products) next.push({ kind: 'product', product });
       }
     }
@@ -236,8 +252,15 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
 
   if (phase === 'loading') {
     return (
-      <View style={[styles.screen, styles.centered, { backgroundColor: t.background, paddingTop: hideSafeTop ? 0 : insets.top }]}>
-        <ActivityIndicator color={t.textPrimary} />
+      <View
+        style={[
+          styles.screen,
+          styles.centered,
+          { backgroundColor: t.background, paddingTop: hideSafeTop ? 0 : insets.top },
+        ]}
+      >
+        <View style={[styles.loadBlock, { backgroundColor: t.surfaceMuted }]} />
+        <View style={[styles.loadLine, { backgroundColor: t.surfaceMuted }]} />
       </View>
     );
   }
@@ -287,7 +310,9 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       case 'hero':
         return (
           <View style={styles.heroBlock}>
-            <BackChip onPress={() => router.back()} />
+            <View style={[styles.backFloat, { top: hideSafeTop ? space.sm : 0 }]}>
+              <BackChip onPress={() => router.back()} overMedia />
+            </View>
             <VaultIdentityHeader
               creator={creator}
               vault={vault}
@@ -330,15 +355,14 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       case 'service': {
         const href = vaultExperienceHref({ type: 'SERVICE', id: item.service.id });
         return (
-          <OfferCard
-            kind="SERVICE"
+          <ServiceSessionCard
             title={item.service.title}
             subtitle={item.service.description}
             coverUrl={vaultCoverUrl(item.service.coverMedia)}
             accessType={item.service.accessType}
             priceAmountMinor={item.service.priceAmountMinor}
             currency={item.service.currency}
-            externalUrl={item.service.externalUrl}
+            creatorName={creator.name}
             onOpen={() => href && router.push(href as never)}
           />
         );
@@ -346,14 +370,14 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       case 'course': {
         const href = vaultExperienceHref({ type: 'COURSE', id: item.course.id });
         return (
-          <OfferCard
-            kind="COURSE"
+          <CourseMasterclassCard
             title={item.course.title}
-            subtitle={`${item.course.lessonCount} lesson${item.course.lessonCount === 1 ? '' : 's'}`}
+            lessonCount={item.course.lessonCount}
             coverUrl={vaultCoverUrl(item.course.coverMedia)}
             accessType={item.course.accessType}
             priceAmountMinor={item.course.priceAmountMinor}
             currency={item.course.currency}
+            creatorName={creator.name}
             onOpen={() => href && router.push(href as never)}
           />
         );
@@ -361,15 +385,14 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       case 'product': {
         const href = vaultExperienceHref({ type: 'PRODUCT', id: item.product.id });
         return (
-          <OfferCard
-            kind="PRODUCT"
+          <ProductArtifactCard
             title={item.product.title}
-            subtitle={item.product.description}
             coverUrl={vaultCoverUrl(item.product.coverMedia)}
             accessType={item.product.accessType}
             priceAmountMinor={item.product.priceAmountMinor}
             currency={item.product.currency}
             externalUrl={item.product.externalUrl}
+            creatorName={creator.name}
             onOpen={() => href && router.push(href as never)}
           />
         );
@@ -395,6 +418,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
 
   return (
     <View style={[styles.screen, { backgroundColor: t.background }]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: atmosphere }]} pointerEvents="none" />
       <FlatList
         data={rows}
         keyExtractor={(row, index) => {
@@ -411,7 +435,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: (hideSafeTop ? 0 : insets.top) + space.md,
+            paddingTop: hideSafeTop ? 0 : insets.top,
             paddingBottom: insets.bottom + space.xxl,
           },
         ]}
@@ -427,7 +451,13 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
   );
 }
 
-function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
+function BackChip({
+  onPress,
+  overMedia = false,
+}: {
+  onPress: () => void;
+  overMedia?: boolean;
+}): React.JSX.Element {
   const t = useThemeColors();
   return (
     <Pressable
@@ -438,24 +468,33 @@ function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
       style={[
         styles.back,
         {
-          backgroundColor: t.surface,
-          borderColor: t.border,
+          backgroundColor: overMedia ? 'rgba(9,9,11,0.45)' : t.surface,
+          borderColor: overMedia ? 'transparent' : t.border,
         },
       ]}
       accessibilityRole="button"
       accessibilityLabel="Back"
     >
-      <BackIcon size={18} color={t.textPrimary} strokeWidth={2.2} />
+      <BackIcon size={18} color={overMedia ? '#FAFAF8' : t.textPrimary} strokeWidth={2.2} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  centered: { justifyContent: 'center', alignItems: 'center' },
-  content: { paddingHorizontal: layout.screenX, gap: space.md },
-  heroBlock: { gap: space.md },
-  section: { ...typeScale.caption, letterSpacing: 0.9, marginTop: space.sm },
+  centered: { justifyContent: 'center', alignItems: 'center', gap: space.md },
+  content: { paddingHorizontal: layout.screenX, gap: space.xl },
+  heroBlock: { gap: 0 },
+  backFloat: {
+    position: 'absolute',
+    left: 0,
+    zIndex: 4,
+  },
+  section: {
+    ...typeScale.caption,
+    letterSpacing: 1.3,
+    marginTop: space.sm,
+  },
   back: {
     alignSelf: 'flex-start',
     width: 40,
@@ -466,4 +505,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     zIndex: 2,
   },
+  loadBlock: { width: '70%', height: 220, borderRadius: 4 },
+  loadLine: { width: '40%', height: 12, borderRadius: 4 },
 });
