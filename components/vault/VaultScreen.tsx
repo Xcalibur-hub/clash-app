@@ -1,5 +1,13 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { User } from '../../store';
@@ -7,6 +15,7 @@ import { currentViewerProfileId } from '../../services/apiService';
 import { fetchProfileById } from '../../services/profileService';
 import { fetchFollowState, followUser, unfollowUser, type FollowState } from '../../services/socialService';
 import { fetchViewerSafetyState } from '../../services/safetyService';
+import { getPublicMediaUrl } from '../../services/mediaService';
 import {
   fetchCollections,
   fetchStorefront,
@@ -16,8 +25,9 @@ import {
 import type { CreatorVault, StorefrontDrop, VaultCollection, VaultSubscriptionState } from '../../services/vaultMappers';
 import { errorText } from '../../services/supabaseClient';
 import { analytics } from '../../services/analytics';
+import { resolveCreatorWorldModules, type CreatorModuleType } from '../../utils/vaultModules';
+import { vaultPublicVisualMedia } from '../../utils/vaultAccess';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
-import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { EmptyState } from '../shared/EmptyState';
 import { BackIcon, VaultIcon } from '../shared/icons';
 import { VaultIdentityHeader } from './VaultIdentityHeader';
@@ -26,14 +36,14 @@ import { VaultCollectionCard } from './VaultCollectionCard';
 import { SubscriptionInfoSheet } from './SubscriptionInfoSheet';
 import { tap as hapticTap } from '../../utils/haptics';
 
-type VaultTab = 'drops' | 'collections';
-
-const TABS: readonly { key: VaultTab; label: string }[] = [
-  { key: 'drops', label: 'Drops' },
-  { key: 'collections', label: 'Collections' },
-];
-
 type Phase = 'loading' | 'ready' | 'none' | 'blocked' | 'error';
+
+type WorldRow =
+  | { kind: 'hero' }
+  | { kind: 'section'; title: string; module: CreatorModuleType }
+  | { kind: 'drop'; drop: StorefrontDrop }
+  | { kind: 'collection'; collection: VaultCollection; drops: StorefrontDrop[] }
+  | { kind: 'empty' };
 
 export interface VaultScreenProps {
   creatorId: string;
@@ -41,7 +51,7 @@ export interface VaultScreenProps {
   hideSafeTop?: boolean;
 }
 
-/** Public creator Vault — entering their private content space. */
+/** Creator World — dynamically composed modules from real Vault data. */
 export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -55,7 +65,6 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
   const [storefront, setStorefront] = React.useState<StorefrontDrop[]>([]);
   const [collections, setCollections] = React.useState<VaultCollection[]>([]);
   const [isSelf, setIsSelf] = React.useState(false);
-  const [tab, setTab] = React.useState<VaultTab>('drops');
   const [subscribeOpen, setSubscribeOpen] = React.useState(false);
 
   const load = React.useCallback(async (): Promise<void> => {
@@ -123,6 +132,68 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
     setFollow({ ...follow, following: !follow.following });
   };
 
+  const liveDrops = React.useMemo(
+    () =>
+      storefront.filter(
+        (drop) => drop.status === 'published' || (drop.status === 'expired' && drop.collectionIds.length > 0),
+      ),
+    [storefront],
+  );
+
+  const modules = React.useMemo(
+    () =>
+      resolveCreatorWorldModules({
+        contentCount: liveDrops.length,
+        collectionCount: collections.length,
+      }),
+    [liveDrops.length, collections.length],
+  );
+
+  const heroUrl = React.useMemo(() => {
+    for (const drop of liveDrops) {
+      const visual = vaultPublicVisualMedia({
+        accessLevel: drop.accessLevel,
+        accessible: drop.accessible,
+        publicMedia: drop.publicMedia,
+        previewMedia: drop.previewMedia,
+      });
+      if (visual) return getPublicMediaUrl(visual.bucket, visual.path);
+    }
+    return null;
+  }, [liveDrops]);
+
+  const rows = React.useMemo((): WorldRow[] => {
+    if (phase !== 'ready' || !creator || !vault) return [];
+    const next: WorldRow[] = [{ kind: 'hero' }];
+    if (modules.length === 0) {
+      next.push({ kind: 'empty' });
+      return next;
+    }
+    for (const mod of modules) {
+      if (mod.type === 'CONTENT') {
+        next.push({
+          kind: 'section',
+          title: `NEW FROM ${creator.name.toUpperCase()}`,
+          module: 'CONTENT',
+        });
+        for (const drop of liveDrops.slice(0, 12)) {
+          next.push({ kind: 'drop', drop });
+        }
+      }
+      if (mod.type === 'COLLECTIONS') {
+        next.push({ kind: 'section', title: 'COLLECTIONS', module: 'COLLECTIONS' });
+        for (const collection of collections) {
+          next.push({
+            kind: 'collection',
+            collection,
+            drops: storefront.filter((drop) => drop.collectionIds.includes(collection.id)),
+          });
+        }
+      }
+    }
+    return next;
+  }, [phase, creator, vault, modules, liveDrops, collections, storefront]);
+
   if (phase === 'loading') {
     return (
       <View style={[styles.screen, styles.centered, { backgroundColor: t.background, paddingTop: hideSafeTop ? 0 : insets.top }]}>
@@ -158,18 +229,92 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
                   : 'This Vault could not be loaded.'
           }
           actionLabel={isNone && isSelf ? 'Create first Drop' : undefined}
-          onAction={isNone && isSelf ? () => router.replace('/(vault)') : undefined}
+          onAction={isNone && isSelf ? () => router.replace('/vault/studio') : undefined}
         />
       </View>
     );
   }
 
-  const collectedBy = (collectionId: string): StorefrontDrop[] =>
-    storefront.filter((drop) => drop.collectionIds.includes(collectionId));
+  const subscribeBenefits = [
+    'Subscriber Drops',
+    ...(collections.length > 0 ? ['Complete Collections'] : []),
+  ];
+
+  const renderItem = ({ item }: ListRenderItemInfo<WorldRow>): React.JSX.Element | null => {
+    switch (item.kind) {
+      case 'hero':
+        return (
+          <View style={styles.heroBlock}>
+            <BackChip onPress={() => router.back()} />
+            <VaultIdentityHeader
+              creator={creator}
+              vault={vault}
+              following={follow?.following ?? false}
+              followerCount={follow?.followerCount ?? 0}
+              isSelf={isSelf}
+              subscription={subscription}
+              heroUrl={heroUrl}
+              onToggleFollow={() => void toggleFollow()}
+              onSubscribe={() => setSubscribeOpen(true)}
+              onManage={() => router.push('/vault/studio')}
+            />
+          </View>
+        );
+      case 'section':
+        return (
+          <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+            {item.title}
+          </Text>
+        );
+      case 'drop':
+        return (
+          <VaultDropCard
+            drop={item.drop}
+            cinematic
+            creatorHandle={creator.handle}
+            onOpen={() => router.push(`/vault/drop/${item.drop.id}`)}
+            onSubscribe={() => setSubscribeOpen(true)}
+          />
+        );
+      case 'collection':
+        return (
+          <VaultCollectionCard
+            title={item.collection.title}
+            description={item.collection.description}
+            drops={item.drops}
+            onOpen={() => router.push(`/vault/collection/${item.collection.id}`)}
+          />
+        );
+      case 'empty':
+        return (
+          <EmptyState
+            icon={VaultIcon}
+            title={isSelf ? 'Your Vault is ready' : 'Nothing inside yet'}
+            body={
+              isSelf
+                ? "Share something your followers won't find in Arena."
+                : `@${creator.handle} hasn't posted a Drop yet.`
+            }
+            actionLabel={isSelf ? 'Create first Drop' : undefined}
+            onAction={isSelf ? () => router.push('/vault/compose') : undefined}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: t.background }]}>
-      <ScrollView
+      <FlatList
+        data={rows}
+        keyExtractor={(row, index) => {
+          if (row.kind === 'drop') return `drop:${row.drop.id}`;
+          if (row.kind === 'collection') return `col:${row.collection.id}`;
+          if (row.kind === 'section') return `section:${row.module}:${row.title}`;
+          return `${row.kind}:${index}`;
+        }}
+        renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
@@ -178,71 +323,14 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
             paddingBottom: insets.bottom + space.xxl,
           },
         ]}
-      >
-        <BackChip onPress={() => router.back()} />
+      />
 
-        <VaultIdentityHeader
-          creator={creator}
-          vault={vault}
-          following={follow?.following ?? false}
-          followerCount={follow?.followerCount ?? 0}
-          isSelf={isSelf}
-          subscription={subscription}
-          onToggleFollow={() => void toggleFollow()}
-          onManage={() => router.replace('/(vault)')}
-        />
-
-        <SegmentedTabs value={tab} items={TABS} onChange={setTab} label="Vault content" />
-
-        {tab === 'drops' ? (
-          storefront.length === 0 ? (
-            <EmptyState
-              icon={VaultIcon}
-              title={isSelf ? 'Your Vault is ready' : 'Nothing inside yet'}
-              body={
-                isSelf
-                  ? "Share something your followers won't find in Arena."
-                  : `@${creator.handle} hasn't posted a Drop yet.`
-              }
-              actionLabel={isSelf ? 'Create first Drop' : undefined}
-              onAction={isSelf ? () => router.push('/vault/compose') : undefined}
-            />
-          ) : (
-            <View style={styles.list}>
-              <Text allowFontScaling={false} style={[styles.ephemeral, { color: t.textMuted }]}>
-                Drops disappear after 7 days. Collections keep them.
-              </Text>
-              {storefront.map((drop) => (
-                <VaultDropCard
-                  key={drop.id}
-                  drop={drop}
-                  onOpen={() => router.push(`/vault/drop/${drop.id}`)}
-                  onSubscribe={() => setSubscribeOpen(true)}
-                />
-              ))}
-            </View>
-          )
-        ) : collections.length === 0 ? (
-          <EmptyState
-            icon={VaultIcon}
-            title="No Collections yet"
-            body="Permanent chapters of this Vault will appear here."
-          />
-        ) : (
-          <View style={styles.list}>
-            {collections.map((collection) => (
-              <VaultCollectionCard
-                key={collection.id}
-                title={collection.title}
-                description={collection.description}
-                drops={collectedBy(collection.id)}
-              />
-            ))}
-          </View>
-        )}
-      </ScrollView>
-
-      <SubscriptionInfoSheet visible={subscribeOpen} creatorName={creator.name} onClose={() => setSubscribeOpen(false)} />
+      <SubscriptionInfoSheet
+        visible={subscribeOpen}
+        creatorName={creator.name}
+        benefits={subscribeBenefits}
+        onClose={() => setSubscribeOpen(false)}
+      />
     </View>
   );
 }
@@ -273,9 +361,9 @@ function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   centered: { justifyContent: 'center', alignItems: 'center' },
-  content: { paddingHorizontal: layout.screenX, gap: space.lg },
-  list: { gap: space.md },
-  ephemeral: { ...typeScale.meta, marginBottom: 2 },
+  content: { paddingHorizontal: layout.screenX, gap: space.md },
+  heroBlock: { gap: space.md },
+  section: { ...typeScale.caption, letterSpacing: 0.9, marginTop: space.sm },
   back: {
     alignSelf: 'flex-start',
     width: 40,
@@ -284,5 +372,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
+    zIndex: 2,
   },
 });

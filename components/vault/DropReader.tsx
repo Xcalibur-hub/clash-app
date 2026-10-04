@@ -9,12 +9,16 @@ import type { StorefrontDrop } from '../../services/vaultMappers';
 import { getPublicMediaUrl } from '../../services/mediaService';
 import { errorText } from '../../services/supabaseClient';
 import { analytics } from '../../services/analytics';
+import {
+  vaultDropAccessBadge,
+  vaultDropDisplayAccess,
+  vaultExpiryLabel,
+} from '../../utils/vaultAccess';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
-import { timeLeftLabel } from '../../utils/format';
 import { Avatar } from '../shared/Avatar';
-import { GlowButton } from '../shared/GlowButton';
 import { BackIcon, PlayIcon } from '../shared/icons';
 import { SubscriptionInfoSheet } from './SubscriptionInfoSheet';
+import { VaultActionButton } from './VaultActionButton';
 import { tap as hapticTap } from '../../utils/haptics';
 
 type Phase = 'loading' | 'ready' | 'missing' | 'locked' | 'error';
@@ -24,8 +28,8 @@ export interface DropReaderProps {
 }
 
 /**
- * Drop reader. Free → public URL; subscriber → signed URL only after accessible.
- * Locked Drops never touch Storage. Signed URLs are not cached.
+ * Drop detail — media dominates. Free → public URL; subscriber → signed URL only
+ * after accessible. Locked Drops use intentional preview only — never private bytes.
  */
 export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
   const router = useRouter();
@@ -47,7 +51,7 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
       setUrl(getPublicMediaUrl(nextDrop.publicMedia.bucket, nextDrop.publicMedia.path));
       return;
     }
-    if (nextDrop.accessLevel === 'subscriber') {
+    if (nextDrop.accessLevel === 'subscriber' && nextDrop.accessible) {
       try {
         const access = await requestPrivateMediaAccess(nextDrop.id);
         setMediaKind(access.mediaKind);
@@ -71,6 +75,13 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
 
       if (!nextDrop.accessible) {
         setPhase('locked');
+        const preview = nextDrop.previewMedia;
+        if (preview) {
+          setMediaKind(preview.kind);
+          setUrl(getPublicMediaUrl(preview.bucket, preview.path));
+        } else {
+          setUrl(null);
+        }
         analytics.trackOnce(`vault_drop_opened:${dropId}`, 'vault_drop_opened', {
           realm: 'vault',
           vault_access_type: nextDrop.accessLevel,
@@ -119,8 +130,22 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
     );
   }
 
+  const display = drop
+    ? vaultDropDisplayAccess({
+        accessLevel: drop.accessLevel,
+        accessible: drop.accessible,
+        hasPreviewMedia: Boolean(drop.previewMedia),
+      })
+    : 'FREE';
+  const badge = vaultDropAccessBadge(display);
   const isVideo = mediaKind === 'video';
-  const expiry = drop?.expiresAt && phase !== 'locked' ? timeLeftLabel(drop.expiresAt) : null;
+  const expiry = drop?.expiresAt && phase !== 'locked' ? vaultExpiryLabel(drop.expiresAt) : null;
+  const collectionHint =
+    drop && drop.collectionIds.length > 0
+      ? drop.collectionIds.length === 1
+        ? 'In a Collection'
+        : `In ${drop.collectionIds.length} Collections`
+      : null;
 
   return (
     <View style={[styles.screen, { backgroundColor: t.background }]}>
@@ -136,87 +161,118 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
       >
         <BackChip onPress={() => router.back()} />
 
-        {creator && drop ? (
-          <View style={styles.headRow}>
-            <Avatar name={creator.name} tint={creator.tint} size={44} />
-            <View style={styles.headText}>
-              <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
-                {creator.name}
-              </Text>
-              <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
-                @{creator.handle}
-                {drop.accessLevel === 'subscriber' ? ' · Subscriber' : ' · Free'}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]}>
-          {drop?.caption}
-        </Text>
-
         {phase === 'locked' ? (
-          <View style={[styles.locked, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
-            <Text allowFontScaling={false} style={[styles.lockedKicker, { color: t.textMuted }]}>
-              SUBSCRIBERS
+          <View style={styles.lockedStack}>
+            {url ? (
+              <View style={[styles.mediaHero, { backgroundColor: t.surfaceMuted }]}>
+                <Image source={{ uri: url }} resizeMode="cover" style={StyleSheet.absoluteFill} />
+                <View style={styles.mediaScrim} />
+              </View>
+            ) : (
+              <View style={[styles.lockedPlate, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
+                <Text allowFontScaling={false} style={[styles.lockedKicker, { color: t.textMuted }]}>
+                  SUBSCRIBERS
+                </Text>
+              </View>
+            )}
+            <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]}>
+              {drop?.caption}
             </Text>
-            <Text allowFontScaling={false} style={[styles.lockedTitle, { color: t.textPrimary }]}>
-              A private Drop
+            <Text allowFontScaling={false} style={[styles.accessLine, { color: t.textMuted }]}>
+              Subscribers
             </Text>
-            <Text allowFontScaling={false} style={[styles.lockedBody, { color: t.textSecondary }]}>
-              Unlock with {creator?.name ?? 'this creator'}'s Vault.
-            </Text>
-            <GlowButton
-              label="Subscriber Drop"
-              onPress={() => setSubscribeOpen(true)}
-              tone="light"
-              compact
-            />
+            <VaultActionButton label="Unlock" onPress={() => setSubscribeOpen(true)} />
           </View>
-        ) : url ? (
-          isVideo ? (
-            <View style={[styles.video, { backgroundColor: t.surfaceMuted }]}>
-              <PlayIcon size={30} color={t.textPrimary} strokeWidth={2.2} />
-              <Text allowFontScaling={false} style={[styles.videoNote, { color: t.textMuted }]}>
-                Video playback arrives with the media player.
-              </Text>
-            </View>
-          ) : (
-            <View
-              style={[styles.media, { backgroundColor: t.surfaceMuted }]}
-              accessible
-              accessibilityRole="image"
-              accessibilityLabel={drop?.caption}
-            >
-              <Image
-                source={{ uri: url }}
-                resizeMode="cover"
-                style={StyleSheet.absoluteFill}
-                onError={() => {
-                  setUrl(null);
-                  setMediaError('The media failed to load.');
-                }}
-              />
-            </View>
-          )
-        ) : mediaError ? (
-          <View style={[styles.locked, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
-            <Text allowFontScaling={false} style={[styles.lockedTitle, { color: t.textPrimary }]}>
-              {mediaError}
-            </Text>
-            <GlowButton label="Try again" onPress={() => drop && void resolveMedia(drop)} tone="light" compact />
-          </View>
-        ) : null}
+        ) : (
+          <>
+            {url ? (
+              isVideo ? (
+                <View style={[styles.mediaHero, styles.videoHero, { backgroundColor: t.surfaceMuted }]}>
+                  <PlayIcon size={30} color={t.textPrimary} strokeWidth={2.2} />
+                  <Text allowFontScaling={false} style={[styles.videoNote, { color: t.textMuted }]}>
+                    Video playback arrives with the media player.
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={[styles.mediaHero, { backgroundColor: t.surfaceMuted }]}
+                  accessible
+                  accessibilityRole="image"
+                  accessibilityLabel={drop?.caption}
+                >
+                  <Image
+                    source={{ uri: url }}
+                    resizeMode="cover"
+                    style={StyleSheet.absoluteFill}
+                    onError={() => {
+                      setUrl(null);
+                      setMediaError('The media failed to load.');
+                    }}
+                  />
+                </View>
+              )
+            ) : mediaError ? (
+              <View style={[styles.lockedPlate, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
+                <Text allowFontScaling={false} style={[styles.lockedTitle, { color: t.textPrimary }]}>
+                  {mediaError}
+                </Text>
+                <VaultActionButton
+                  label="Try again"
+                  onPress={() => drop && void resolveMedia(drop)}
+                  tone="quiet"
+                  compact
+                />
+              </View>
+            ) : null}
 
-        {expiry ? (
-          <Text allowFontScaling={false} style={[styles.expiry, { color: t.textMuted }]}>
-            {expiry}
-          </Text>
-        ) : null}
+            {creator && drop ? (
+              <Pressable
+                style={styles.headRow}
+                onPress={() => router.push(`/vault/${creator.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${creator.name}'s Vault`}
+              >
+                <Avatar name={creator.name} tint={creator.tint} size={44} />
+                <View style={styles.headText}>
+                  <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+                    {creator.name}
+                  </Text>
+                  <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
+                    @{creator.handle}
+                  </Text>
+                </View>
+              </Pressable>
+            ) : null}
+
+            <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]}>
+              {drop?.caption}
+            </Text>
+            <Text allowFontScaling={false} style={[styles.accessLine, { color: t.textMuted }]}>
+              {badge}
+              {expiry ? ` · ${expiry}` : ''}
+            </Text>
+            {collectionHint ? (
+              <Pressable
+                onPress={() => {
+                  const first = drop?.collectionIds[0];
+                  if (first) router.push(`/vault/collection/${first}`);
+                }}
+              >
+                <Text allowFontScaling={false} style={[styles.context, { color: t.textSecondary }]}>
+                  {collectionHint}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
       </ScrollView>
 
       {creator ? (
-        <SubscriptionInfoSheet visible={subscribeOpen} creatorName={creator.name} onClose={() => setSubscribeOpen(false)} />
+        <SubscriptionInfoSheet
+          visible={subscribeOpen}
+          creatorName={creator.name}
+          onClose={() => setSubscribeOpen(false)}
+        />
       ) : null}
     </View>
   );
@@ -252,38 +308,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  headRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  headText: { flex: 1, gap: 2 },
-  name: { ...typeScale.cardTitle },
-  handle: { ...typeScale.meta },
-  caption: { ...typeScale.title },
-  media: {
+  mediaHero: {
     aspectRatio: 4 / 5,
     width: '100%',
-    borderRadius: 22,
+    borderRadius: 28,
     overflow: 'hidden',
   },
-  video: {
+  mediaScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(9,9,11,0.18)',
+  },
+  videoHero: {
     aspectRatio: 16 / 9,
-    width: '100%',
-    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.sm,
     paddingHorizontal: space.lg,
   },
   videoNote: { ...typeScale.meta, textAlign: 'center' },
-  locked: {
+  headRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  headText: { flex: 1, gap: 2 },
+  name: { ...typeScale.cardTitle },
+  handle: { ...typeScale.meta },
+  caption: { ...typeScale.title },
+  accessLine: { ...typeScale.caption, letterSpacing: 0.5 },
+  context: { ...typeScale.meta },
+  lockedStack: { gap: space.md },
+  lockedPlate: {
     alignItems: 'center',
     gap: space.sm,
     paddingVertical: space.xl,
     paddingHorizontal: space.lg,
-    borderRadius: 22,
+    borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
+    aspectRatio: 16 / 10,
+    justifyContent: 'center',
   },
   lockedKicker: { ...typeScale.caption, letterSpacing: 0.8 },
   lockedTitle: { ...typeScale.section, textAlign: 'center' },
   lockedBody: { ...typeScale.body, textAlign: 'center' },
   missing: { padding: space.xl, gap: space.sm, alignItems: 'center' },
-  expiry: { ...typeScale.meta },
 });

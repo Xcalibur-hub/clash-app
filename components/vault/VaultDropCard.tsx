@@ -3,7 +3,13 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { StorefrontDrop } from '../../services/vaultMappers';
 import { getPublicMediaUrl } from '../../services/mediaService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
-import { timeLeftLabel } from '../../utils/format';
+import {
+  isVaultDropFeedExpired,
+  vaultDropAccessBadge,
+  vaultDropDisplayAccess,
+  vaultExpiryLabel,
+  vaultPublicVisualMedia,
+} from '../../utils/vaultAccess';
 import { tap as hapticTap } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
 import { PlayIcon } from '../shared/icons';
@@ -13,37 +19,57 @@ export interface VaultDropCardProps {
   onOpen: () => void;
   /** A locked subscriber Drop shows a subscribe affordance. */
   onSubscribe?: () => void;
+  creatorHandle?: string;
+  cinematic?: boolean;
 }
 
 /**
- * Storefront Drop — media-first when public; elegant locked surface when not entitled.
+ * Storefront Drop — media-first when public/preview; elegant locked surface when not.
  * Never fetches or renders private media. Entitlement stays `drop.accessible`.
  */
-export function VaultDropCard({ drop, onOpen, onSubscribe }: VaultDropCardProps): React.JSX.Element {
+export function VaultDropCard({
+  drop,
+  onOpen,
+  onSubscribe,
+  creatorHandle,
+  cinematic = false,
+}: VaultDropCardProps): React.JSX.Element {
   const t = useThemeColors();
-  const isSubscriber = drop.accessLevel === 'subscriber';
-  const locked = isSubscriber && !drop.accessible;
+  const feedExpired = isVaultDropFeedExpired(drop.expiresAt) && drop.status === 'published';
+  const display = vaultDropDisplayAccess({
+    accessLevel: drop.accessLevel,
+    accessible: drop.accessible && !feedExpired,
+    hasPreviewMedia: Boolean(drop.previewMedia),
+  });
+  const locked = display === 'PREVIEW' || display === 'SUBSCRIBER_LOCKED';
   const archived = drop.status === 'expired';
-  const isVideo = drop.publicMedia?.kind === 'video';
-
-  const mediaUrl =
-    !isSubscriber && drop.publicMedia
-      ? getPublicMediaUrl(drop.publicMedia.bucket, drop.publicMedia.path)
-      : null;
+  const visual = vaultPublicVisualMedia({
+    accessLevel: drop.accessLevel,
+    accessible: drop.accessible,
+    publicMedia: drop.publicMedia,
+    previewMedia: drop.previewMedia,
+  });
+  const mediaUrl = visual ? getPublicMediaUrl(visual.bucket, visual.path) : null;
+  const isVideo = visual?.kind === 'video';
+  const badge = vaultDropAccessBadge(display);
+  const expiry =
+    drop.expiresAt && drop.status === 'published' && !locked
+      ? vaultExpiryLabel(drop.expiresAt)
+      : drop.expiresAt && drop.status === 'published' && locked
+        ? vaultExpiryLabel(drop.expiresAt)
+        : null;
 
   const open = (): void => {
     hapticTap();
     onOpen();
   };
 
-  const expiry =
-    drop.expiresAt && drop.status === 'published' ? timeLeftLabel(drop.expiresAt) : null;
-
   return (
     <PressableScale
       onPress={open}
       style={[
         styles.card,
+        cinematic && styles.cinematic,
         {
           backgroundColor: t.surface,
           borderColor: t.border,
@@ -51,24 +77,46 @@ export function VaultDropCard({ drop, onOpen, onSubscribe }: VaultDropCardProps)
           shadowOpacity: t.scheme === 'light' ? 0.08 : 0,
         },
       ]}
-      accessibilityLabel={`${isSubscriber ? 'Subscriber drop' : 'Drop'}: ${drop.caption}`}
-      accessibilityHint={locked ? 'Subscription required' : 'Opens this drop'}
+      accessibilityLabel={`${badge}: ${drop.caption}`}
+      accessibilityHint={locked ? 'Subscription required to unlock full Drop' : 'Opens this drop'}
     >
       {mediaUrl ? (
-        <View style={[styles.media, { backgroundColor: t.surfaceMuted }]}>
+        <View style={[styles.media, cinematic && styles.mediaCinema, { backgroundColor: t.surfaceMuted }]}>
           <Image source={{ uri: mediaUrl }} resizeMode="cover" style={StyleSheet.absoluteFill} />
+          {cinematic ? <View style={styles.scrim} /> : null}
           {isVideo ? (
             <View style={styles.playBadge}>
               <PlayIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
             </View>
           ) : null}
-          {!isSubscriber ? (
+          {cinematic ? (
+            <View style={styles.cinemaCopy}>
+              {creatorHandle ? (
+                <Text allowFontScaling={false} style={styles.cinemaHandle} numberOfLines={1}>
+                  @{creatorHandle}
+                </Text>
+              ) : null}
+              <Text allowFontScaling={false} style={styles.cinemaCaption} numberOfLines={2}>
+                {drop.caption}
+              </Text>
+              <View style={styles.cinemaMeta}>
+                <Text allowFontScaling={false} style={styles.cinemaBadge}>
+                  {badge}
+                </Text>
+                {expiry ? (
+                  <Text allowFontScaling={false} style={styles.cinemaBadge}>
+                    {expiry}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ) : (
             <View style={[styles.freeTag, { backgroundColor: 'rgba(9,9,11,0.55)' }]}>
               <Text allowFontScaling={false} style={styles.freeTagText}>
-                Free
+                {badge}
               </Text>
             </View>
-          ) : null}
+          )}
         </View>
       ) : locked ? (
         <View style={[styles.lockedMedia, { backgroundColor: t.surfaceMuted }]}>
@@ -79,7 +127,7 @@ export function VaultDropCard({ drop, onOpen, onSubscribe }: VaultDropCardProps)
             Unlock with this Vault
           </Text>
         </View>
-      ) : isSubscriber ? (
+      ) : drop.accessLevel === 'subscriber' ? (
         <View style={[styles.lockedMedia, { backgroundColor: t.surfaceMuted }]}>
           <PlayIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
           <Text allowFontScaling={false} style={[styles.membersHint, { color: t.textMuted }]}>
@@ -94,37 +142,67 @@ export function VaultDropCard({ drop, onOpen, onSubscribe }: VaultDropCardProps)
         </View>
       )}
 
-      <View style={styles.body}>
-        <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]} numberOfLines={3}>
-          {drop.caption}
-        </Text>
+      {!cinematic ? (
+        <View style={styles.body}>
+          <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]} numberOfLines={3}>
+            {drop.caption}
+          </Text>
 
-        <View style={styles.metaRow}>
-          {isSubscriber && !locked ? (
-            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-              Subscriber
-            </Text>
-          ) : null}
-          {archived ? (
-            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-              Archived
-            </Text>
-          ) : null}
-          {expiry && !locked ? (
-            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-              {expiry}
-            </Text>
+          <View style={styles.metaRow}>
+            {display === 'SUBSCRIBER' ? (
+              <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+                Subscriber
+              </Text>
+            ) : null}
+            {archived ? (
+              <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+                Archived
+              </Text>
+            ) : null}
+            {expiry ? (
+              <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+                {expiry}
+              </Text>
+            ) : null}
+          </View>
+
+          {locked ? (
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                onSubscribe?.();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Unlock"
+              style={[
+                styles.subscribe,
+                {
+                  backgroundColor: t.scheme === 'light' ? t.textPrimary : t.surfaceElevated,
+                  borderColor: t.border,
+                },
+              ]}
+            >
+              <Text
+                allowFontScaling={false}
+                style={[
+                  styles.subscribeText,
+                  { color: t.scheme === 'light' ? t.textInverse : t.textPrimary },
+                ]}
+              >
+                Unlock
+              </Text>
+            </Pressable>
           ) : null}
         </View>
-
-        {locked ? (
+      ) : locked ? (
+        <View style={styles.unlockBar}>
           <Pressable
             onPress={() => {
               hapticTap();
               onSubscribe?.();
             }}
             accessibilityRole="button"
-            accessibilityLabel="Subscription options"
+            accessibilityLabel="Unlock"
             style={[
               styles.subscribe,
               {
@@ -140,11 +218,11 @@ export function VaultDropCard({ drop, onOpen, onSubscribe }: VaultDropCardProps)
                 { color: t.scheme === 'light' ? t.textInverse : t.textPrimary },
               ]}
             >
-              Subscriber Drop
+              Unlock
             </Text>
           </Pressable>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
     </PressableScale>
   );
 }
@@ -158,14 +236,37 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
+  cinematic: { borderRadius: 28 },
   media: {
     aspectRatio: 4 / 5,
     width: '100%',
   },
+  mediaCinema: {
+    aspectRatio: 4 / 5,
+    justifyContent: 'flex-end',
+  },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(9,9,11,0.28)',
+  },
+  cinemaCopy: {
+    gap: 6,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.lg,
+    paddingTop: space.xxl,
+  },
+  cinemaHandle: { ...typeScale.meta, color: 'rgba(250,250,248,0.82)' },
+  cinemaCaption: { ...typeScale.title, color: '#FAFAF8' },
+  cinemaMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: 4 },
+  cinemaBadge: {
+    ...typeScale.caption,
+    color: 'rgba(250,250,248,0.8)',
+    letterSpacing: 0.6,
+  },
   playBadge: {
     position: 'absolute',
     right: space.sm,
-    bottom: space.sm,
+    top: space.sm,
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -218,6 +319,10 @@ const styles = StyleSheet.create({
   },
   body: {
     gap: 8,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+  },
+  unlockBar: {
     paddingHorizontal: space.md,
     paddingVertical: space.md,
   },

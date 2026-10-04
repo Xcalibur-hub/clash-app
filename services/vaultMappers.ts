@@ -25,8 +25,11 @@ export interface StorefrontMedia {
  * creator's management view renders (drafts included).
  *
  * `publicMedia` is present only for a FREE Drop the caller may read — free media
- * lives in the public bucket. A subscriber Drop is always `publicMedia: null` and
- * loads its bytes through the signed-URL Edge Function on demand.
+ * lives in the public bucket. A subscriber Drop keeps `publicMedia: null` and
+ * loads private bytes through the signed-URL Edge Function on demand.
+ *
+ * `previewMedia` is an intentional public teaser the creator attached to a
+ * subscriber Drop. It is never derived from private content.
  */
 export interface StorefrontDrop {
   id: string;
@@ -42,6 +45,8 @@ export interface StorefrontDrop {
   accessible: boolean;
   collectionIds: readonly string[];
   publicMedia: StorefrontMedia | null;
+  /** Intentional public preview for subscriber Drops; null when absent. */
+  previewMedia: StorefrontMedia | null;
 }
 
 /** A creator's Vault (one per creator — `creator_vaults.creator_id` is unique). */
@@ -191,6 +196,16 @@ export function toStorefrontDrop(value: unknown): StorefrontDrop {
         }
       : null;
 
+  const previewRecord = asRecord(record.previewMedia);
+  const previewMedia: StorefrontMedia | null =
+    previewRecord && asString(previewRecord.bucket) && asString(previewRecord.path)
+      ? {
+          bucket: asString(previewRecord.bucket) as string,
+          path: asString(previewRecord.path) as string,
+          kind: asString(previewRecord.kind) ?? 'image',
+        }
+      : null;
+
   const rawCollections = Array.isArray(record.collectionIds) ? record.collectionIds : [];
   const collectionIds = rawCollections.filter((entry): entry is string => typeof entry === 'string');
 
@@ -207,6 +222,7 @@ export function toStorefrontDrop(value: unknown): StorefrontDrop {
     accessible: asBool(record.accessible),
     collectionIds,
     publicMedia,
+    previewMedia,
   };
 }
 

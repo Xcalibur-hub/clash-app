@@ -19,9 +19,9 @@ import { analytics } from '../../services/analytics';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { dockBottomPadding } from '../navigation/dockConfig';
 import { EmptyState } from '../shared/EmptyState';
-import { GlowButton } from '../shared/GlowButton';
-import { EditIcon, PlusIcon, VaultIcon } from '../shared/icons';
+import { VaultIcon } from '../shared/icons';
 import { CreatorDropRow } from './CreatorDropRow';
+import { VaultActionButton } from './VaultActionButton';
 import { VaultFormSheet } from './VaultFormSheet';
 
 type Phase = 'loading' | 'ready';
@@ -160,17 +160,14 @@ export function CreatorVaultHome(): React.JSX.Element {
               ) : null}
 
               <View style={styles.actions}>
-                <GlowButton
+                <VaultActionButton
                   label="New Drop"
-                  icon={PlusIcon}
-                  tone="light"
                   compact
                   onPress={() => router.push('/vault/compose')}
                 />
-                <GlowButton
+                <VaultActionButton
                   label="Manage"
-                  icon={EditIcon}
-                  tone="ink"
+                  tone="quiet"
                   compact
                   onPress={() => {
                     setFormMode('edit');

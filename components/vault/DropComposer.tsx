@@ -22,8 +22,8 @@ import { errorText } from '../../services/supabaseClient';
 import { analytics } from '../../services/analytics';
 import type { MediaVisibility } from '../../supabase/types';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
-import { GlowButton } from '../shared/GlowButton';
-import { BackIcon, ImageIcon, LockIcon, VideoIcon, VaultIcon } from '../shared/icons';
+import { LockIcon, VaultIcon } from '../shared/icons';
+import { VaultActionButton } from './VaultActionButton';
 
 const MAX_CAPTION = 280;
 
@@ -136,7 +136,7 @@ export function DropComposer(): React.JSX.Element {
           },
         ]}
       >
-        <GlowButton label="Back" icon={BackIcon} tone="ink" compact onPress={() => router.back()} style={styles.back} />
+        <VaultActionButton label="Back" tone="quiet" compact onPress={() => router.back()} style={styles.back} />
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
           YOUR VAULT
         </Text>
@@ -243,8 +243,8 @@ export function DropComposer(): React.JSX.Element {
           </View>
         ) : (
           <View style={styles.pickRow}>
-            <GlowButton label="Image" icon={ImageIcon} tone="ink" compact onPress={() => void attach('image')} />
-            <GlowButton label="Video" icon={VideoIcon} tone="ink" compact onPress={() => void attach('video')} />
+            <VaultActionButton label="Image" tone="quiet" compact onPress={() => void attach('image')} />
+            <VaultActionButton label="Video" tone="quiet" compact onPress={() => void attach('video')} />
           </View>
         )}
       </ScrollView>
@@ -259,18 +259,19 @@ export function DropComposer(): React.JSX.Element {
           },
         ]}
       >
-        <GlowButton
+        <VaultActionButton
           label={busy ? 'Working…' : 'Save draft'}
-          onPress={() => void submit(false)}
-          tone="ink"
-          disabled={!canSubmit}
+          onPress={() => {
+            if (canSubmit) void submit(false);
+          }}
+          tone="quiet"
           style={styles.footerBtn}
         />
-        <GlowButton
+        <VaultActionButton
           label={busy ? 'Working…' : 'Publish'}
-          onPress={() => void submit(true)}
-          tone="light"
-          disabled={!canSubmit}
+          onPress={() => {
+            if (canSubmit) void submit(true);
+          }}
           style={styles.footerBtn}
         />
       </View>

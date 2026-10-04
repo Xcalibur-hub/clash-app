@@ -7,7 +7,7 @@ import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
 import { ArenaIcon } from '../../components/shared/icons';
 import { useThemeColors } from '../../theme';
 
-/** Vault realm: creator Vault — Drops, Collections, Profile. */
+/** Vault realm: Creator Worlds, Collections studio, Profile. */
 export default function VaultLayout(): React.JSX.Element {
   const { shifting, first, direction, shiftTo } = useRealmSwitch();
   const t = useThemeColors();
@@ -28,7 +28,7 @@ export default function VaultLayout(): React.JSX.Element {
           sceneStyle: { backgroundColor: t.background },
         }}
       >
-        <Tabs.Screen name="index" options={{ title: 'Drops' }} />
+        <Tabs.Screen name="index" options={{ title: 'Worlds' }} />
         <Tabs.Screen name="collections" options={{ title: 'Collections' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>

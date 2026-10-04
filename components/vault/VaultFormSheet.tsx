@@ -10,9 +10,9 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
-import { GlowButton } from '../shared/GlowButton';
 import { CloseIcon } from '../shared/icons';
 import { duration, radius, space, typeScale, useThemeColors } from '../../theme';
+import { VaultActionButton } from './VaultActionButton';
 
 export interface VaultFormSheetProps {
   visible: boolean;
@@ -115,10 +115,11 @@ export function VaultFormSheet({
                 ]}
               />
 
-              <GlowButton
+              <VaultActionButton
                 label={busy ? 'Saving…' : mode === 'create' ? 'Create Vault' : 'Save'}
-                onPress={() => onSubmit(title.trim(), description.trim())}
-                disabled={!canSubmit}
+                onPress={() => {
+                  if (canSubmit) onSubmit(title.trim(), description.trim());
+                }}
                 style={styles.cta}
               />
             </View>

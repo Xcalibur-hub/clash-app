@@ -178,6 +178,21 @@ export async function fetchVault(creatorId: string): Promise<CreatorVault | null
   return data ? toCreatorVault(data) : null;
 }
 
+/** Active Vaults for a set of creators — used by Vault home "Your Creators". */
+export async function fetchActiveVaultsForCreators(
+  creatorIds: readonly string[],
+): Promise<CreatorVault[]> {
+  if (creatorIds.length === 0) return [];
+  const { data, error } = await requireSupabase()
+    .from('creator_vaults')
+    .select('*')
+    .in('creator_id', [...creatorIds])
+    .eq('status', 'active')
+    .limit(40);
+  if (error) throw requestError(error);
+  return data.map(toCreatorVault);
+}
+
 /** The live free shelf: published, still inside its 7-day window, `free`. */
 export async function fetchFreeDrops(vaultId: string): Promise<VaultDrop[]> {
   const { data, error } = await requireSupabase()
@@ -242,6 +257,41 @@ export async function fetchDrop(dropId: string): Promise<StorefrontDrop | null> 
   if (error) throw requestError(error);
   if (data === null) return null;
   return toStorefrontDrop(data);
+}
+
+/** One Collection with its items — used by Collection World. */
+export async function fetchCollection(collectionId: string): Promise<VaultCollection | null> {
+  const client = requireSupabase();
+  const { data: row, error } = await client
+    .from('vault_collections')
+    .select('*')
+    .eq('id', collectionId)
+    .maybeSingle();
+  if (error) throw requestError(error);
+  if (!row) return null;
+
+  const { data: items, error: itemError } = await client
+    .from('vault_collection_items')
+    .select('drop_id, position')
+    .eq('collection_id', collectionId)
+    .order('position', { ascending: true });
+  if (itemError) throw requestError(itemError);
+
+  const dropIds = items.map((item) => item.drop_id);
+  let drops: VaultDrop[] = [];
+  if (dropIds.length > 0) {
+    const { data: dropRows, error: dropError } = await client
+      .from('vault_drops')
+      .select('*')
+      .in('id', dropIds);
+    if (dropError) throw requestError(dropError);
+    const byId = new Map(dropRows.map((d) => [d.id, toVaultDrop(d)]));
+    drops = dropIds
+      .map((id) => byId.get(id))
+      .filter((drop): drop is VaultDrop => drop !== undefined);
+  }
+
+  return toVaultCollection(row, drops);
 }
 
 /** The Vault's Collections with their items — the permanent shelves. */

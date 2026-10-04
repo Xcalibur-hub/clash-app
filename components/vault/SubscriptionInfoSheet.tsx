@@ -1,22 +1,27 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
-import { GlowButton } from '../shared/GlowButton';
 import { duration, space, typeScale, useThemeColors } from '../../theme';
+import { VaultActionButton } from './VaultActionButton';
 
 export interface SubscriptionInfoSheetProps {
   visible: boolean;
   creatorName: string;
+  /** Only list benefits that are actually available today. */
+  benefits?: readonly string[];
   onClose: () => void;
 }
 
+const DEFAULT_BENEFITS = ['Subscriber Drops', 'Complete Collections'] as const;
+
 /**
  * Honest subscription CTA — informational only.
- * Never charges, never grants access, never implies a purchase.
+ * Never charges, never grants access, never invents prices or future features.
  */
 export function SubscriptionInfoSheet({
   visible,
   creatorName,
+  benefits = DEFAULT_BENEFITS,
   onClose,
 }: SubscriptionInfoSheetProps): React.JSX.Element | null {
   const t = useThemeColors();
@@ -37,16 +42,27 @@ export function SubscriptionInfoSheet({
             ]}
           >
             <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-              SUBSCRIBER DROP
+              JOIN {creatorName.toUpperCase()}'S VAULT
             </Text>
             <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-              Subscriptions coming soon
+              Unlock this world
             </Text>
-            <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
-              Subscribing to {creatorName}'s Vault isn't available in this build yet. Nothing was
-              charged, and no access was granted.
+            <View style={styles.benefits}>
+              {benefits.map((benefit) => (
+                <Text
+                  key={benefit}
+                  allowFontScaling={false}
+                  style={[styles.benefit, { color: t.textSecondary }]}
+                >
+                  {benefit}
+                </Text>
+              ))}
+            </View>
+            <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+              Subscriptions aren't available in this build yet. Nothing was charged, and no access
+              was granted.
             </Text>
-            <GlowButton label="Got it" onPress={onClose} tone="light" compact style={styles.cta} />
+            <VaultActionButton label="Got it" onPress={onClose} compact style={styles.cta} />
           </View>
         </Animated.View>
       </Animated.View>
@@ -67,8 +83,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  kicker: { ...typeScale.caption, letterSpacing: 0.8 },
+  kicker: { ...typeScale.caption, letterSpacing: 0.8, textAlign: 'center' },
   title: { ...typeScale.section, textAlign: 'center' },
-  body: { ...typeScale.body, textAlign: 'center' },
-  cta: { marginTop: space.xs, minWidth: 160 },
+  benefits: { gap: 4, alignItems: 'center', marginTop: 2 },
+  benefit: { ...typeScale.body, textAlign: 'center' },
+  body: { ...typeScale.meta, textAlign: 'center', marginTop: space.xs },
+  cta: { marginTop: space.xs, minWidth: 160, alignSelf: 'center' },
 });

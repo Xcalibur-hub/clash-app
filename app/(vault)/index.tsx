@@ -1,12 +1,12 @@
 import React from 'react';
-import { CreatorVaultHome } from '../../components/vault/CreatorVaultHome';
+import { VaultHome } from '../../components/vault/VaultHome';
 import { Notice } from '../../components/shared/Notice';
 
-/** Your Vault — the Drops tab (creator perspective). */
-export default function VaultDropsScreen(): React.JSX.Element {
+/** Vault realm home — Creator Worlds. */
+export default function VaultWorldsScreen(): React.JSX.Element {
   return (
     <>
-      <CreatorVaultHome />
+      <VaultHome />
       <Notice offset={0} />
     </>
   );

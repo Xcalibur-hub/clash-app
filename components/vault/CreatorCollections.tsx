@@ -24,9 +24,10 @@ import type { CreatorVault, StorefrontDrop, VaultCollection } from '../../servic
 import { errorText } from '../../services/supabaseClient';
 import { duration, layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { dockBottomPadding } from '../navigation/dockConfig';
+import { useRouter } from 'expo-router';
 import { EmptyState } from '../shared/EmptyState';
-import { GlowButton } from '../shared/GlowButton';
-import { PlusIcon, VaultIcon } from '../shared/icons';
+import { VaultIcon } from '../shared/icons';
+import { VaultActionButton } from './VaultActionButton';
 
 type Phase = 'loading' | 'ready';
 
@@ -35,6 +36,7 @@ type Phase = 'loading' | 'ready';
  */
 export function CreatorCollections(): React.JSX.Element {
   const { dispatch } = useClash();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useThemeColors();
 
@@ -118,6 +120,8 @@ export function CreatorCollections(): React.JSX.Element {
           icon={VaultIcon}
           title="Open your Vault first"
           body="Collections are permanent chapters inside your Vault."
+          actionLabel="Open Studio"
+          onAction={() => router.push('/vault/studio')}
         />
       </View>
     );
@@ -162,7 +166,7 @@ export function CreatorCollections(): React.JSX.Element {
             ]}
             onSubmitEditing={() => void create()}
           />
-          <GlowButton label="Create" icon={PlusIcon} tone="light" compact onPress={() => void create()} />
+          <VaultActionButton label="Create" compact onPress={() => void create()} />
         </View>
 
         {collections.length === 0 ? (
@@ -204,7 +208,12 @@ export function CreatorCollections(): React.JSX.Element {
                         {drops.length === 1 ? '1 moment' : `${drops.length} moments`}
                       </Text>
                     </View>
-                    <GlowButton label="Add" tone="ink" compact onPress={() => setPickerFor(collection.id)} />
+                    <VaultActionButton
+                      label="Add"
+                      tone="quiet"
+                      compact
+                      onPress={() => setPickerFor(collection.id)}
+                    />
                   </View>
 
                   {drops.length > 0 ? (
