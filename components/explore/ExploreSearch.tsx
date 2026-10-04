@@ -8,6 +8,8 @@ export interface ExploreSearchProps {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
+  /** Compact floating header variant. */
+  compact?: boolean;
 }
 
 /** Theme-aware Explore search — soft elevated surface in Light, lifted near-black in Dark. */
@@ -15,6 +17,7 @@ export function ExploreSearch({
   value,
   onChange,
   placeholder = 'Search the world…',
+  compact = false,
 }: ExploreSearchProps): React.JSX.Element {
   const t = useThemeColors();
   const inputRef = React.useRef<TextInput>(null);
@@ -30,15 +33,16 @@ export function ExploreSearch({
       accessibilityLabel={placeholder}
       style={[
         styles.shell,
+        compact && styles.shellCompact,
         {
-          backgroundColor: t.surface,
+          backgroundColor: t.scheme === 'light' ? '#FFFEFA' : t.surface,
           borderColor: focused ? t.borderStrong : t.border,
           shadowColor: t.shadowColor,
           shadowOpacity: t.scheme === 'light' ? (focused ? 0.1 : 0.06) : 0,
         },
       ]}
     >
-      <SearchIcon size={17} color={t.textMuted} strokeWidth={2.3} />
+      <SearchIcon size={compact ? 15 : 17} color={t.textMuted} strokeWidth={2.3} />
       <TextInput
         ref={inputRef}
         value={value}
@@ -49,7 +53,7 @@ export function ExploreSearch({
         returnKeyType="search"
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        style={[styles.input, { color: t.textPrimary }]}
+        style={[styles.input, compact && styles.inputCompact, { color: t.textPrimary }]}
       />
       {value.length > 0 ? (
         <Pressable
@@ -74,20 +78,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    minHeight: 50,
+    minHeight: 48,
     paddingHorizontal: 14,
-    borderRadius: radius.lg,
+    borderRadius: radius.xxl,
     borderWidth: StyleSheet.hairlineWidth,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
+  shellCompact: {
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
   input: {
     flex: 1,
     ...typeScale.body,
     fontSize: 15,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 0,
+  },
+  inputCompact: {
+    fontSize: 14,
+    paddingVertical: 8,
   },
   clear: {
     width: 28,

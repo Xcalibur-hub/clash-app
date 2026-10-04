@@ -35,16 +35,18 @@ export interface ExploreMediaTileProps {
   mediaUrl?: string | null;
   accent?: string | null;
   span?: ExploreMosaicSpan;
+  /** Stretch inside a flex row (ignores percentage width). */
+  fill?: boolean;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
 const SPAN_HEIGHT: Record<ExploreMosaicSpan, number> = {
-  hero: 220,
-  half: 148,
-  wide: 132,
-  portrait: 180,
-  square: 140,
+  hero: 248,
+  half: 118,
+  wide: 148,
+  portrait: 196,
+  square: 152,
 };
 
 const FALLBACKS = ['#2A3340', '#3A2E28', '#24362E', '#3A2A38', '#2E3340'];
@@ -56,6 +58,7 @@ export function ExploreMediaTile({
   mediaUrl = null,
   accent = null,
   span = 'square',
+  fill = false,
   onPress,
   style,
 }: ExploreMediaTileProps): React.JSX.Element {
@@ -63,8 +66,9 @@ export function ExploreMediaTile({
   const reduced = useReducedMotion();
   const height = SPAN_HEIGHT[span];
   const fallback = accent ?? FALLBACKS[Math.abs(title.length) % FALLBACKS.length]!;
-  const widthStyle =
-    span === 'hero' || span === 'wide'
+  const widthStyle = fill
+    ? styles.fill
+    : span === 'hero' || span === 'wide'
       ? styles.full
       : span === 'half'
         ? styles.half
@@ -73,7 +77,7 @@ export function ExploreMediaTile({
           : styles.third;
 
   return (
-    <Animated.View entering={reduced ? undefined : FadeIn.duration(320)} style={[widthStyle, style]}>
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(280)} style={[widthStyle, style]}>
       <Pressable
         onPress={() => {
           hapticTap();
@@ -82,9 +86,11 @@ export function ExploreMediaTile({
         style={[
           styles.tile,
           {
-            height,
+            height: fill && (span === 'half' || span === 'hero') ? undefined : height,
+            flex: fill && span === 'half' ? 1 : undefined,
+            minHeight: fill && span === 'hero' ? 248 : fill && span === 'half' ? 118 : undefined,
             backgroundColor: fallback,
-            borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+            borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
           },
         ]}
         accessibilityRole="button"
@@ -124,12 +130,13 @@ export function ExploreMediaTile({
 
 const styles = StyleSheet.create({
   full: { width: '100%' },
+  fill: { flex: 1, minWidth: 0 },
   half: { width: '48.5%' },
   portrait: { width: '48.5%' },
   third: { width: '31.5%' },
   tile: {
     width: '100%',
-    borderRadius: 22,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -138,13 +145,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '62%',
+    height: '58%',
   },
   copy: {
     flex: 1,
     justifyContent: 'flex-end',
-    padding: space.md,
-    gap: 3,
+    padding: space.sm,
+    gap: 2,
   },
   kind: {
     ...typeScale.caption,
@@ -155,14 +162,14 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typeScale.label,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 18,
     fontWeight: '800',
     color: '#FAFAF8',
   },
   sub: {
     ...typeScale.meta,
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255,255,255,0.72)',
   },
 });

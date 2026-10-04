@@ -95,7 +95,7 @@ export function ExploreDiscoveryCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 22,
+    borderRadius: 24,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
   },

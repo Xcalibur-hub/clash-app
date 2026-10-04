@@ -133,7 +133,7 @@ export function PlayHomePanel(): React.JSX.Element {
   return (
     <View style={styles.root}>
       <View style={styles.titleRow}>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
           PLAY
         </Text>
         <Pressable
@@ -150,11 +150,11 @@ export function PlayHomePanel(): React.JSX.Element {
         </Pressable>
       </View>
 
-      <View style={styles.tabs}>
+      <View style={[styles.tabs, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
         {(
           [
-            ['challenges', 'Challenges'],
-            ['treasure', 'Treasure'],
+            ['challenges', 'CHALLENGES'],
+            ['treasure', 'TREASURE'],
           ] as const
         ).map(([id, label]) => {
           const on = tab === id;
@@ -165,17 +165,14 @@ export function PlayHomePanel(): React.JSX.Element {
                 hapticTap();
                 setTab(id);
               }}
-              style={[
-                styles.tab,
-                {
-                  backgroundColor: on ? t.textPrimary : t.surfaceElevated,
-                  borderColor: t.border,
-                },
-              ]}
+              style={[styles.tab, on && { backgroundColor: t.textPrimary }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={label}
             >
               <Text
                 allowFontScaling={false}
-                style={[styles.tabLabel, { color: on ? t.background : t.textPrimary }]}
+                style={[styles.tabLabel, { color: on ? t.background : t.textMuted }]}
               >
                 {label}
               </Text>
@@ -275,40 +272,47 @@ export function PlayHomePanel(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { gap: space.md },
+  root: { gap: space.sm },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  title: {
-    fontFamily: typeScale.title.fontFamily,
-    fontSize: 34,
+  kicker: {
+    fontFamily: typeScale.caption.fontFamily,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
   },
   myPlay: {
     fontFamily: typeScale.caption.fontFamily,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
-  tabs: { flexDirection: 'row', gap: space.sm },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  tabs: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    gap: 2,
+    padding: 3,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  tab: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
   tabLabel: {
     fontFamily: typeScale.caption.fontFamily,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   section: {
     fontFamily: typeScale.section.fontFamily,
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
   },
-  railBlock: { gap: space.sm },
-  rail: { gap: space.sm, paddingRight: space.md },
+  railBlock: { gap: 8 },
+  rail: { gap: 8, paddingRight: space.md },
 });

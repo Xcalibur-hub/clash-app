@@ -10,21 +10,34 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useReducedMotion } from 'react-native-reanimated';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  interpolate,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { CountryPickerSheet } from '../../components/explore/CountryPickerSheet';
 import { ExploreDiscoveryCard } from '../../components/explore/ExploreDiscoveryCard';
+import { ExploreFilterWheel } from '../../components/explore/ExploreFilterWheel';
 import { ExploreMediaTile } from '../../components/explore/ExploreMediaTile';
-import { ExploreModeBar } from '../../components/explore/ExploreModeBar';
+import {
+  ExploreMosaicRowView,
+  type ExploreFeedTile,
+} from '../../components/explore/ExploreMosaicRow';
+import { ExploreModeRail } from '../../components/explore/ExploreModeRail';
 import { ExploreSearch } from '../../components/explore/ExploreSearch';
 import { ExploreWorldCanvas, type WorldVisualMode } from '../../components/explore/ExploreWorldCanvas';
 import { Avatar } from '../../components/shared/Avatar';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { Notice } from '../../components/shared/Notice';
+import { PlayHomePanel } from '../../components/play/PlayHomePanel';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { countryByCode } from '../../data/exploreCountries';
 import { analytics } from '../../services/analytics';
-import { PlayHomePanel } from '../../components/play/PlayHomePanel';
 import {
   fetchExploreForYou,
   fetchExploreLive,
@@ -47,13 +60,16 @@ import {
   type ExploreMode,
   type ExploreSearchGroup,
 } from '../../utils/exploreForYouRank';
+import {
+  DEFAULT_FOR_YOU_FILTER,
+  packExploreMosaicRows,
+  type ForYouFilterId,
+} from '../../utils/exploreNav';
 import { tap as hapticTap } from '../../utils/haptics';
-
-type ForYouFilter = 'all' | 'trending' | 'arena' | 'vault' | 'creators' | 'video' | 'challenges';
 
 /**
  * EXPLORE IA: For You | World | Live | Play | Meet
- * Search sticky near top. Meet never buried under the feed.
+ * Floating mode rail + compact rolling filters. Feed stays virtualized.
  */
 export default function ExploreScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
@@ -71,7 +87,7 @@ export default function ExploreScreen(): React.JSX.Element {
   const [summary, setSummary] = React.useState<ExploreWorldSummary | null>(null);
   const [forYou, setForYou] = React.useState<ExploreForYouItem[]>([]);
   const [forYouCursor, setForYouCursor] = React.useState<number | null>(0);
-  const [forYouFilter, setForYouFilter] = React.useState<ForYouFilter>('all');
+  const [forYouFilter, setForYouFilter] = React.useState<ForYouFilterId>(DEFAULT_FOR_YOU_FILTER);
   const [live, setLive] = React.useState<ExploreLiveFeed | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [loadingMore, setLoadingMore] = React.useState(false);
@@ -84,6 +100,8 @@ export default function ExploreScreen(): React.JSX.Element {
   const [teleporting, setTeleporting] = React.useState(false);
   const [teleportReveal, setTeleportReveal] = React.useState<ExploreTeleportCandidate | null>(null);
   const [selectedCountry, setSelectedCountry] = React.useState<string | null>(null);
+
+  const headerCollapse = useSharedValue(0);
 
   React.useEffect(() => {
     analytics.track('explore_opened', { realm: 'arena', source: 'explore' });
@@ -133,15 +151,6 @@ export default function ExploreScreen(): React.JSX.Element {
     };
   }, [debounced, searching]);
 
-  const openCountry = React.useCallback(
-    (code: string) => {
-      setSelectedCountry(code);
-      setRecent((prev) => [code, ...prev.filter((c) => c !== code)].slice(0, 8));
-      setMode('world');
-    },
-    [],
-  );
-
   const goCountryPage = React.useCallback(
     (code: string) => {
       setRecent((prev) => [code, ...prev.filter((c) => c !== code)].slice(0, 8));
@@ -149,6 +158,11 @@ export default function ExploreScreen(): React.JSX.Element {
     },
     [router],
   );
+
+  const changeMode = React.useCallback((next: ExploreMode) => {
+    hapticTap();
+    setMode(next);
+  }, []);
 
   const teleport = React.useCallback(async () => {
     if (teleporting) return;
@@ -184,9 +198,7 @@ export default function ExploreScreen(): React.JSX.Element {
     setLoadingMore(true);
     try {
       const page = await fetchExploreForYou(24, forYouCursor);
-      setForYou((prev) =>
-        diversifyByCreator(dedupeExploreItems([...prev, ...page.items])),
-      );
+      setForYou((prev) => diversifyByCreator(dedupeExploreItems([...prev, ...page.items])));
       setForYouCursor(page.nextCursor);
     } catch {
       /* ignore */
@@ -202,27 +214,83 @@ export default function ExploreScreen(): React.JSX.Element {
       return forYou.filter((i) => i.kind === 'TAKE' || i.kind === 'LIVE_ARENA' || i.kind === 'CLASH');
     }
     if (forYouFilter === 'vault') return forYou.filter((i) => i.kind === 'VAULT_PREVIEW');
-    if (forYouFilter === 'video') {
-      return forYou.filter((i) => Boolean(i.mediaUrl));
-    }
+    if (forYouFilter === 'video') return forYou.filter((i) => Boolean(i.mediaUrl));
     if (forYouFilter === 'challenges') return forYou.filter((i) => i.kind === 'CHALLENGE');
     return forYou;
   }, [forYou, forYouFilter]);
 
-  const header = (
-    <View style={styles.stickyHeader}>
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-        Explore
-      </Text>
-      <ExploreSearch value={query} onChange={setQuery} />
-      <ExploreModeBar mode={mode} onChange={setMode} />
-    </View>
+  const feedTiles = React.useMemo((): ExploreFeedTile[] => {
+    return filteredForYou.map((item) => ({
+      id: item.id,
+      kind:
+        item.kind === 'LIVE_ARENA'
+          ? 'LIVE'
+          : item.kind === 'VAULT_PREVIEW'
+            ? item.accessLevel === 'preview'
+              ? 'VAULT PREVIEW'
+              : 'VAULT'
+            : item.kind === 'CHALLENGE'
+              ? 'CHALLENGE'
+              : item.kind === 'CLASH'
+                ? 'CLASH'
+                : 'TAKE',
+      title: item.title,
+      subtitle: item.subtitle,
+      mediaUrl: item.mediaUrl,
+      onPress: () => {
+        analytics.track('explore_content_opened', { realm: 'arena', source: 'explore' });
+        if (item.kind === 'CHALLENGE') {
+          analytics.track('challenge_opened', { realm: 'explore', source: 'explore' });
+          router.push(`/explore/challenge/${item.id}` as never);
+        } else if (item.href) router.push(item.href as never);
+      },
+    }));
+  }, [filteredForYou, router]);
+
+  const mosaicRows = React.useMemo(() => packExploreMosaicRows(feedTiles), [feedTiles]);
+
+  const headerAnim = useAnimatedStyle(() => ({
+    opacity: 1 - headerCollapse.value * 0.15,
+    transform: [{ translateY: -headerCollapse.value * 6 }],
+  }));
+
+  const titleAnim = useAnimatedStyle(() => ({
+    opacity: 1 - headerCollapse.value,
+    height: interpolate(headerCollapse.value, [0, 1], [18, 0]),
+    marginBottom: interpolate(headerCollapse.value, [0, 1], [4, 0]),
+    overflow: 'hidden' as const,
+  }));
+
+  const onFeedScroll = (y: number) => {
+    const next = y > 28 ? 1 : Math.max(0, y / 28);
+    headerCollapse.value = reduced ? next : withTiming(next, { duration: 160 });
+  };
+
+  const compactHeader = (
+    <Animated.View style={[styles.headerBlock, headerAnim]}>
+      <Animated.View style={titleAnim}>
+        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          Explore
+        </Text>
+      </Animated.View>
+      <ExploreSearch value={query} onChange={setQuery} compact />
+      {mode === 'for_you' && !searching ? (
+        <ExploreFilterWheel value={forYouFilter} onChange={setForYouFilter} />
+      ) : null}
+    </Animated.View>
   );
 
   return (
     <View style={[styles.container, { backgroundColor: t.background }]}>
-      <View style={{ paddingTop: insets.top + space.sm, paddingHorizontal: layout.screenX }}>
-        {header}
+      <View
+        style={{
+          paddingTop: insets.top + space.xs,
+          paddingHorizontal: layout.screenX,
+          paddingRight: layout.screenX + 56,
+          zIndex: 2,
+        }}
+      >
+        {compactHeader}
       </View>
 
       {searching && searchResults ? (
@@ -230,8 +298,8 @@ export default function ExploreScreen(): React.JSX.Element {
           contentContainerStyle={{
             paddingHorizontal: layout.screenX,
             paddingBottom: dockBottomPadding(insets.bottom),
-            gap: space.md,
-            paddingTop: space.md,
+            gap: space.sm,
+            paddingTop: space.xs,
           }}
         >
           <SearchHub
@@ -242,294 +310,300 @@ export default function ExploreScreen(): React.JSX.Element {
           />
         </ScrollView>
       ) : mode === 'for_you' ? (
-        <FlatList
-          data={filteredForYou}
-          keyExtractor={(item) => `${item.kind}-${item.id}`}
-          numColumns={2}
-          columnWrapperStyle={styles.gridRow}
-          contentContainerStyle={{
-            paddingHorizontal: layout.screenX,
-            paddingBottom: dockBottomPadding(insets.bottom),
-            paddingTop: space.md,
-            gap: space.sm,
-          }}
-          ListHeaderComponent={
-            <View style={styles.filterRow}>
-              {(
-                [
-                  ['all', 'For You'],
-                  ['trending', 'Trending'],
-                  ['arena', 'Arena'],
-                  ['vault', 'Vault'],
-                  ['video', 'Video'],
-                  ['challenges', 'Challenges'],
-                ] as const
-              ).map(([id, label]) => {
-                const on = forYouFilter === id;
-                return (
-                  <Pressable
-                    key={id}
-                    onPress={() => {
-                      hapticTap();
-                      setForYouFilter(id);
-                    }}
-                    style={[
-                      styles.filterChip,
-                      {
-                        backgroundColor: on ? t.textPrimary : t.surfaceElevated,
-                        borderColor: t.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      allowFontScaling={false}
-                      style={{
-                        color: on ? t.background : t.textPrimary,
-                        fontWeight: '700',
-                        fontSize: 12,
-                      }}
-                    >
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          }
-          renderItem={({ item, index }) => {
-            const tall = index % 5 === 0 || index % 5 === 3;
-            return (
-              <View style={{ flex: 1, marginBottom: 8, paddingHorizontal: 4 }}>
-                <ExploreMediaTile
-                  kind={
-                    item.kind === 'LIVE_ARENA'
-                      ? 'LIVE'
-                      : item.kind === 'VAULT_PREVIEW'
-                        ? item.accessLevel === 'preview'
-                          ? 'VAULT PREVIEW'
-                          : 'VAULT'
-                        : item.kind === 'CHALLENGE'
-                          ? 'CHALLENGE'
-                          : item.kind === 'CLASH'
-                            ? 'CLASH'
-                            : 'TAKE'
-                  }
-                  title={item.title}
-                  subtitle={item.subtitle}
-                  mediaUrl={item.mediaUrl}
-                  span={tall ? 'portrait' : 'square'}
-                  style={{ width: '100%' }}
-                  onPress={() => {
-                    analytics.track('explore_content_opened', { realm: 'arena', source: 'explore' });
-                    if (item.kind === 'CHALLENGE') {
-                      analytics.track('challenge_opened', { realm: 'explore', source: 'explore' });
-                      router.push(`/explore/challenge/${item.id}` as never);
-                    } else if (item.href) router.push(item.href as never);
-                  }}
-                />
-              </View>
-            );
-          }}
-          onEndReached={() => void loadMoreForYou()}
-          onEndReachedThreshold={0.4}
-          ListFooterComponent={
-            loading || loadingMore ? (
-              <ActivityIndicator color={t.textPrimary} style={{ marginVertical: space.md }} />
-            ) : null
-          }
-          ListEmptyComponent={
-            !loading ? (
-              <Text allowFontScaling={false} style={{ color: t.textMuted, marginTop: space.lg }}>
-                Nothing here yet — try World or Teleport.
-              </Text>
-            ) : null
-          }
-        />
-      ) : (
-        <ScrollView
-          contentContainerStyle={{
-            paddingHorizontal: layout.screenX,
-            paddingBottom: dockBottomPadding(insets.bottom),
-            gap: space.lg,
-            paddingTop: space.md,
-          }}
-          showsVerticalScrollIndicator={false}
+        <Animated.View
+          key="for_you"
+          entering={reduced ? undefined : FadeIn.duration(220)}
+          exiting={reduced ? undefined : FadeOut.duration(140)}
+          style={{ flex: 1 }}
         >
-          {mode === 'world' ? (
-            <>
-              <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-                What&apos;s happening{'\n'}on Earth?
-              </Text>
-              <ExploreWorldCanvas
-                activity={summary?.countries ?? []}
-                selectedCode={selectedCountry}
-                visualMode={worldVisual}
-                onVisualModeChange={setWorldVisual}
-                onSelectCountry={(code) => {
-                  setSelectedCountry(code);
-                  analytics.track('explore_country_selected', { realm: 'arena', source: 'explore' });
-                }}
-                spinToken={spinToken}
-                spinTargetLng={spinLng}
-                spinning={teleporting}
-              />
-              <View style={styles.worldControls}>
-                <RoundControl
-                  label="Search"
-                  onPress={() => {
-                    hapticTap();
-                    setPickerOpen(true);
-                  }}
-                />
-                <RoundControl label={teleporting ? '…' : 'Teleport'} onPress={() => void teleport()} emphasis />
-              </View>
-              {selectedCountry ? (
-                <Animated.View
-                  entering={reduced ? undefined : FadeInDown.duration(360)}
-                  style={[styles.countryCard, { backgroundColor: t.textPrimary }]}
-                >
-                  <Text allowFontScaling={false} style={[styles.countryCardTitle, { color: t.background }]}>
-                    {countryByCode(selectedCountry)?.name ?? selectedCountry}
-                  </Text>
-                  <Text allowFontScaling={false} style={[styles.countryCardMeta, { color: t.background }]}>
-                    {summary?.countries.find((c) => c.countryCode === selectedCountry)?.activityCount !=
-                    null
-                      ? `${summary.countries
-                          .find((c) => c.countryCode === selectedCountry)!
-                          .activityCount!.toLocaleString()} exploring`
-                      : 'Quiet right now'}
-                  </Text>
-                  <Pressable
-                    onPress={() => goCountryPage(selectedCountry)}
-                    style={[styles.countryCardCta, { backgroundColor: t.background }]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Explore ${countryByCode(selectedCountry)?.name ?? selectedCountry}`}
-                  >
-                    <Text allowFontScaling={false} style={[styles.countryCardCtaText, { color: t.textPrimary }]}>
-                      Explore {countryByCode(selectedCountry)?.name ?? selectedCountry}
-                    </Text>
-                  </Pressable>
-                </Animated.View>
-              ) : null}
-              {teleportReveal ? (
-                <View style={{ gap: space.sm }}>
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
-                    Teleport landed
-                  </Text>
-                  <ExploreMediaTile
-                    kind={
-                      teleportReveal.kind === 'LIVE_ARENA'
-                        ? 'LIVE'
-                        : teleportReveal.kind === 'VAULT_PREVIEW'
-                          ? 'VAULT PREVIEW'
-                          : teleportReveal.kind === 'CHALLENGE'
-                            ? 'CHALLENGE'
-                            : 'TAKE'
-                    }
-                    title={teleportReveal.title}
-                    subtitle={
-                      teleportReveal.countryCode
-                        ? countryByCode(teleportReveal.countryCode)?.name ?? teleportReveal.countryCode
-                        : null
-                    }
-                    mediaUrl={teleportReveal.mediaUrl}
-                    span="hero"
-                    onPress={() => {
-                      if (teleportReveal.href) router.push(teleportReveal.href as never);
-                    }}
-                  />
-                  <RoundControl label="Teleport again" onPress={() => void teleport()} emphasis />
-                </View>
-              ) : null}
-            </>
-          ) : null}
-
-          {mode === 'live' ? (
-            <>
-              <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-                Live now
-              </Text>
-              {(live?.topics.length ?? 0) === 0 && (live?.takes.length ?? 0) === 0 ? (
-                <Text allowFontScaling={false} style={{ color: t.textMuted }}>
-                  No live activity right now.
+          <FlatList
+            data={mosaicRows}
+            keyExtractor={(row) => row.key}
+            contentContainerStyle={{
+              paddingHorizontal: layout.screenX,
+              paddingBottom: dockBottomPadding(insets.bottom),
+              paddingTop: space.xs,
+              paddingRight: layout.screenX + 8,
+            }}
+            renderItem={({ item }) => <ExploreMosaicRowView row={item} />}
+            onScroll={(e) => onFeedScroll(e.nativeEvent.contentOffset.y)}
+            scrollEventThrottle={16}
+            onEndReached={() => void loadMoreForYou()}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={
+              loading || loadingMore ? (
+                <ActivityIndicator color={t.textPrimary} style={{ marginVertical: space.sm }} />
+              ) : null
+            }
+            ListEmptyComponent={
+              !loading ? (
+                <Text allowFontScaling={false} style={{ color: t.textMuted, marginTop: space.md }}>
+                  Nothing here yet — try World or Teleport.
                 </Text>
-              ) : null}
-              {live?.topics.map((topic) => (
-                <ExploreMediaTile
-                  key={topic.id}
-                  kind="LIVE"
-                  title={topic.title}
-                  subtitle={topic.hood}
-                  accent="#1B3A4B"
-                  span="hero"
-                  onPress={() => router.push(topic.href as never)}
-                />
-              ))}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
-                {live?.takes.map((take) => (
-                  <ExploreDiscoveryCard
-                    key={take.id}
-                    kind="TAKE"
-                    title={take.title}
-                    subtitle={take.subtitle}
-                    mediaUrl={take.mediaUrl}
-                    meta={`Heat ${take.heat}`}
-                    onPress={() => router.push(take.href as never)}
+              ) : null
+            }
+          />
+        </Animated.View>
+      ) : (
+        <Animated.View
+          key={mode}
+          entering={reduced ? undefined : FadeIn.duration(220)}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: layout.screenX,
+              paddingBottom: dockBottomPadding(insets.bottom),
+              gap: space.md,
+              paddingTop: space.xs,
+              paddingRight: layout.screenX + 8,
+            }}
+            showsVerticalScrollIndicator={false}
+            onScroll={(e) => onFeedScroll(e.nativeEvent.contentOffset.y)}
+            scrollEventThrottle={16}
+          >
+            {mode === 'world' ? (
+              <View style={styles.worldBlock}>
+                <View style={styles.worldTop}>
+                  <Text allowFontScaling={false} style={[styles.modeLabel, { color: t.textMuted }]}>
+                    WORLD
+                  </Text>
+                  <View style={[styles.visualToggle, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
+                    {(
+                      [
+                        ['globe', 'Globe'],
+                        ['map', 'Map'],
+                      ] as const
+                    ).map(([id, label]) => {
+                      const on = worldVisual === id;
+                      return (
+                        <Pressable
+                          key={id}
+                          onPress={() => {
+                            hapticTap();
+                            setWorldVisual(id);
+                          }}
+                          style={[
+                            styles.visualChip,
+                            on && { backgroundColor: t.textPrimary },
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          accessibilityLabel={label}
+                        >
+                          <Text
+                            allowFontScaling={false}
+                            style={{
+                              color: on ? t.background : t.textPrimary,
+                              fontWeight: '800',
+                              fontSize: 12,
+                            }}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={styles.worldStage}>
+                  <ExploreWorldCanvas
+                    activity={summary?.countries ?? []}
+                    selectedCode={selectedCountry}
+                    visualMode={worldVisual}
+                    onVisualModeChange={setWorldVisual}
+                    onSelectCountry={(code) => {
+                      setSelectedCountry(code);
+                      analytics.track('explore_country_selected', {
+                        realm: 'arena',
+                        source: 'explore',
+                      });
+                    }}
+                    spinToken={spinToken}
+                    spinTargetLng={spinLng}
+                    spinning={teleporting}
+                  />
+                  <View style={styles.worldFloatControls}>
+                    <RoundControl
+                      label="Search"
+                      onPress={() => {
+                        hapticTap();
+                        setPickerOpen(true);
+                      }}
+                    />
+                    <RoundControl
+                      label={teleporting ? '…' : 'Teleport'}
+                      onPress={() => void teleport()}
+                      emphasis
+                    />
+                  </View>
+                  {selectedCountry ? (
+                    <Animated.View
+                      entering={reduced ? undefined : FadeInDown.duration(320)}
+                      style={[
+                        styles.countryCard,
+                        {
+                          backgroundColor: t.scheme === 'light' ? '#111113' : t.textPrimary,
+                        },
+                      ]}
+                    >
+                      <Text allowFontScaling={false} style={styles.countryCardTitle}>
+                        {countryByCode(selectedCountry)?.name ?? selectedCountry}
+                      </Text>
+                      <Text allowFontScaling={false} style={styles.countryCardMeta}>
+                        {summary?.countries.find((c) => c.countryCode === selectedCountry)
+                          ?.activityCount != null
+                          ? `${summary.countries
+                              .find((c) => c.countryCode === selectedCountry)!
+                              .activityCount!.toLocaleString()} exploring`
+                          : 'Trending quietly'}
+                      </Text>
+                      <Pressable
+                        onPress={() => goCountryPage(selectedCountry)}
+                        style={styles.countryCardCta}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Explore ${countryByCode(selectedCountry)?.name ?? selectedCountry}`}
+                      >
+                        <Text allowFontScaling={false} style={styles.countryCardCtaText}>
+                          Explore →
+                        </Text>
+                      </Pressable>
+                    </Animated.View>
+                  ) : null}
+                </View>
+
+                {teleportReveal ? (
+                  <View style={{ gap: space.xs }}>
+                    <Text allowFontScaling={false} style={[styles.modeLabel, { color: t.textMuted }]}>
+                      TELEPORT LANDED
+                    </Text>
+                    <ExploreMediaTile
+                      kind={
+                        teleportReveal.kind === 'LIVE_ARENA'
+                          ? 'LIVE'
+                          : teleportReveal.kind === 'VAULT_PREVIEW'
+                            ? 'VAULT PREVIEW'
+                            : teleportReveal.kind === 'CHALLENGE'
+                              ? 'CHALLENGE'
+                              : 'TAKE'
+                      }
+                      title={teleportReveal.title}
+                      subtitle={
+                        teleportReveal.countryCode
+                          ? countryByCode(teleportReveal.countryCode)?.name ??
+                            teleportReveal.countryCode
+                          : null
+                      }
+                      mediaUrl={teleportReveal.mediaUrl}
+                      span="hero"
+                      onPress={() => {
+                        if (teleportReveal.href) router.push(teleportReveal.href as never);
+                      }}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {mode === 'live' ? (
+              <View style={{ gap: space.sm }}>
+                <Text allowFontScaling={false} style={[styles.modeLabel, { color: t.textMuted }]}>
+                  LIVE
+                </Text>
+                {(live?.topics.length ?? 0) === 0 && (live?.takes.length ?? 0) === 0 ? (
+                  <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+                    No live activity right now.
+                  </Text>
+                ) : null}
+                {live?.topics.map((topic) => (
+                  <ExploreMediaTile
+                    key={topic.id}
+                    kind="LIVE"
+                    title={topic.title}
+                    subtitle={topic.hood}
+                    accent="#1B3A4B"
+                    span="hero"
+                    onPress={() => router.push(topic.href as never)}
                   />
                 ))}
-              </ScrollView>
-            </>
-          ) : null}
-
-          {mode === 'play' ? <PlayHomePanel /> : null}
-
-          {mode === 'meet' ? (
-            <View
-              style={[
-                styles.meet,
-                {
-                  backgroundColor: t.scheme === 'light' ? '#111318' : t.surfaceElevated,
-                  borderColor: t.border,
-                },
-              ]}
-              accessibilityLabel="Meet the world. Text chat coming next."
-            >
-              <Text allowFontScaling={false} style={styles.meetKicker}>
-                Meet the world
-              </Text>
-              <Text allowFontScaling={false} style={styles.meetTitle}>
-                Talk to someone new
-              </Text>
-              <Text allowFontScaling={false} style={styles.meetBody}>
-                Pseudonymous text matching comes next — Anywhere, Selected Country, Shared
-                Interests, or Same Hood. Video later. Always authenticated under the hood for
-                safety — never untraceable chat.
-              </Text>
-              <View style={styles.meetRow}>
-                <View style={styles.meetPill}>
-                  <Text allowFontScaling={false} style={styles.meetPillText}>
-                    Text · Coming next
-                  </Text>
-                </View>
-                <View style={[styles.meetPill, { opacity: 0.55 }]}>
-                  <Text allowFontScaling={false} style={styles.meetPillText}>
-                    Video · Later
-                  </Text>
-                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.rail}
+                >
+                  {live?.takes.map((take) => (
+                    <ExploreDiscoveryCard
+                      key={take.id}
+                      kind="TAKE"
+                      title={take.title}
+                      subtitle={take.subtitle}
+                      mediaUrl={take.mediaUrl}
+                      meta={`Heat ${take.heat}`}
+                      onPress={() => router.push(take.href as never)}
+                    />
+                  ))}
+                </ScrollView>
               </View>
-              <View style={styles.meetChoices}>
-                {['Anywhere', 'Selected Country', 'Shared Interests', 'Same Hood'].map((label) => (
-                  <View key={label} style={styles.meetChoice}>
-                    <Text allowFontScaling={false} style={styles.meetChoiceText}>
-                      {label}
+            ) : null}
+
+            {mode === 'play' ? <PlayHomePanel /> : null}
+
+            {mode === 'meet' ? (
+              <View
+                style={[
+                  styles.meet,
+                  {
+                    backgroundColor: t.scheme === 'light' ? '#111318' : t.surfaceElevated,
+                    borderColor: t.border,
+                  },
+                ]}
+                accessibilityLabel="Meet the world. Text chat coming next."
+              >
+                <Text allowFontScaling={false} style={styles.meetKicker}>
+                  MEET
+                </Text>
+                <Text allowFontScaling={false} style={styles.meetTitle}>
+                  Talk to someone new
+                </Text>
+                <Text allowFontScaling={false} style={styles.meetBody}>
+                  Pseudonymous text matching comes next — Anywhere, Selected Country, Shared
+                  Interests, or Same Hood. Video later.
+                </Text>
+                <View style={styles.meetRow}>
+                  <View style={styles.meetPill}>
+                    <Text allowFontScaling={false} style={styles.meetPillText}>
+                      Text · Coming next
                     </Text>
                   </View>
-                ))}
+                  <View style={[styles.meetPill, { opacity: 0.55 }]}>
+                    <Text allowFontScaling={false} style={styles.meetPillText}>
+                      Video · Later
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.meetChoices}>
+                  {['Anywhere', 'Selected Country', 'Shared Interests', 'Same Hood'].map(
+                    (label) => (
+                      <View key={label} style={styles.meetChoice}>
+                        <Text allowFontScaling={false} style={styles.meetChoiceText}>
+                          {label}
+                        </Text>
+                      </View>
+                    ),
+                  )}
+                </View>
               </View>
-            </View>
-          ) : null}
-        </ScrollView>
+            ) : null}
+          </ScrollView>
+        </Animated.View>
       )}
+
+      <ExploreModeRail
+        mode={mode}
+        onChange={changeMode}
+        bottomOffset={dockBottomPadding(insets.bottom) - 24}
+      />
 
       <CountryPickerSheet
         visible={pickerOpen}
@@ -562,7 +636,7 @@ function RoundControl({
       style={[
         styles.round,
         {
-          backgroundColor: emphasis ? t.textPrimary : t.surfaceElevated,
+          backgroundColor: emphasis ? t.textPrimary : t.scheme === 'light' ? '#FFFEFA' : t.surfaceElevated,
           borderColor: t.borderStrong,
         },
       ]}
@@ -594,8 +668,12 @@ function SearchHub({
   const router = useRouter();
 
   return (
-    <View style={{ gap: space.md }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+    <View style={{ gap: space.sm }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+      >
         {EXPLORE_SEARCH_GROUPS.map((g) => {
           const on = group === g.id;
           return (
@@ -605,14 +683,20 @@ function SearchHub({
               style={[
                 styles.filterChip,
                 {
-                  backgroundColor: on ? t.textPrimary : t.surfaceElevated,
-                  borderColor: t.border,
+                  backgroundColor: on ? t.textPrimary : 'transparent',
                 },
               ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={g.label}
             >
               <Text
                 allowFontScaling={false}
-                style={{ color: on ? t.background : t.textPrimary, fontWeight: '700', fontSize: 12 }}
+                style={{
+                  color: on ? t.background : t.textMuted,
+                  fontWeight: on ? '800' : '600',
+                  fontSize: 12,
+                }}
               >
                 {g.label}
               </Text>
@@ -627,12 +711,21 @@ function SearchHub({
             <Pressable
               key={c.countryCode}
               onPress={() => onCountry(c.countryCode)}
-              style={[styles.countryCardSmall, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}
+              style={[
+                styles.countryCardSmall,
+                { backgroundColor: t.surfaceElevated, borderColor: t.border },
+              ]}
             >
-              <Text allowFontScaling={false} style={{ color: t.textMuted, fontWeight: '800', fontSize: 11 }}>
+              <Text
+                allowFontScaling={false}
+                style={{ color: t.textMuted, fontWeight: '800', fontSize: 11 }}
+              >
                 {c.countryCode}
               </Text>
-              <Text allowFontScaling={false} style={{ color: t.textPrimary, fontWeight: '800', fontSize: 15 }}>
+              <Text
+                allowFontScaling={false}
+                style={{ color: t.textPrimary, fontWeight: '800', fontSize: 15 }}
+              >
                 {c.name}
               </Text>
             </Pressable>
@@ -660,12 +753,19 @@ function SearchHub({
       ) : null}
 
       {(group === 'top' || group === 'people') && results.people.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rail}
+        >
           {results.people.map((person) => (
             <Pressable
               key={person.id}
               onPress={() => router.push(`/profile/${person.id}`)}
-              style={[styles.personCard, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}
+              style={[
+                styles.personCard,
+                { backgroundColor: t.surfaceElevated, borderColor: t.border },
+              ]}
             >
               <Avatar name={person.name} tint={person.avatarTint} size={52} />
               <Text allowFontScaling={false} style={{ color: t.textPrimary, fontWeight: '800' }}>
@@ -677,7 +777,11 @@ function SearchHub({
       ) : null}
 
       {(group === 'top' || group === 'arena') && results.topics.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rail}
+        >
           {results.topics.map((topic) => (
             <ExploreDiscoveryCard
               key={topic.id}
@@ -692,7 +796,11 @@ function SearchHub({
       ) : null}
 
       {(group === 'top' || group === 'vault') && results.vault.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rail}
+        >
           {results.vault.map((drop) => (
             <ExploreDiscoveryCard
               key={drop.dropId}
@@ -708,9 +816,13 @@ function SearchHub({
       ) : null}
 
       {(group === 'top' || group === 'hoods') && results.hoods.length > 0 ? (
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: 6 }}>
           {results.hoods.map((h) => (
-            <Text key={h.hood} allowFontScaling={false} style={{ color: t.textPrimary, fontWeight: '700' }}>
+            <Text
+              key={h.hood}
+              allowFontScaling={false}
+              style={{ color: t.textPrimary, fontWeight: '700' }}
+            >
               {h.label}
             </Text>
           ))}
@@ -722,90 +834,121 @@ function SearchHub({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  stickyHeader: { gap: space.sm },
+  headerBlock: { gap: 8 },
   kicker: {
     ...typeScale.caption,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  title: {
-    ...typeScale.editorial,
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '800',
-    letterSpacing: -1,
-  },
-  sectionTitle: {
+  modeLabel: {
     ...typeScale.caption,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    letterSpacing: 1.4,
   },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.sm },
+  filterRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   filterChip: {
-    minHeight: 32,
+    minHeight: 30,
     paddingHorizontal: 12,
     borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gridRow: { justifyContent: 'space-between' },
-  worldControls: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
+  worldBlock: { gap: space.sm },
+  worldTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  visualToggle: {
+    flexDirection: 'row',
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 3,
+    gap: 2,
+  },
+  visualChip: {
+    minHeight: 30,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  worldStage: {
+    position: 'relative',
+    marginBottom: 56,
+  },
+  worldFloatControls: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    gap: 8,
+    zIndex: 2,
+  },
   round: {
-    minHeight: 44,
-    minWidth: 44,
-    paddingHorizontal: 18,
+    minHeight: 40,
+    minWidth: 40,
+    paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roundText: { ...typeScale.label, fontSize: 13, fontWeight: '800' },
+  roundText: { ...typeScale.label, fontSize: 12, fontWeight: '800' },
   countryCard: {
-    borderRadius: 28,
-    padding: space.lg,
-    gap: 8,
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: -48,
+    borderRadius: radius.xxl,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+    gap: 4,
+    zIndex: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
   countryCardTitle: {
     ...typeScale.editorial,
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
-    textTransform: 'uppercase',
+    color: '#FAFAF8',
   },
-  countryCardMeta: { ...typeScale.meta, fontSize: 14, opacity: 0.8 },
+  countryCardMeta: { ...typeScale.meta, fontSize: 13, color: 'rgba(255,255,255,0.7)' },
   countryCardCta: {
     alignSelf: 'flex-start',
-    minHeight: 40,
-    paddingHorizontal: 16,
+    marginTop: 6,
+    minHeight: 34,
+    paddingHorizontal: 14,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
+    backgroundColor: '#FAFAF8',
   },
-  countryCardCtaText: { ...typeScale.label, fontSize: 13, fontWeight: '800' },
-  rail: { gap: space.sm, paddingRight: layout.screenX },
+  countryCardCtaText: { ...typeScale.label, fontSize: 12, fontWeight: '800', color: '#111113' },
+  rail: { gap: space.xs, paddingRight: layout.screenX },
   meet: {
-    borderRadius: 28,
+    borderRadius: radius.xxl,
     borderWidth: StyleSheet.hairlineWidth,
     padding: space.lg,
     gap: 10,
-    minHeight: 420,
+    minHeight: 380,
   },
   meetKicker: {
     ...typeScale.caption,
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    letterSpacing: 1.2,
     color: 'rgba(255,255,255,0.55)',
   },
-  meetTitle: { ...typeScale.editorial, fontSize: 36, fontWeight: '800', color: '#FAFAF8' },
-  meetBody: { ...typeScale.meta, fontSize: 15, lineHeight: 22, color: 'rgba(255,255,255,0.7)' },
-  meetRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  meetTitle: { ...typeScale.editorial, fontSize: 32, fontWeight: '800', color: '#FAFAF8' },
+  meetBody: { ...typeScale.meta, fontSize: 14, lineHeight: 21, color: 'rgba(255,255,255,0.7)' },
+  meetRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   meetPill: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -813,28 +956,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   meetPillText: { ...typeScale.caption, fontSize: 12, fontWeight: '700', color: '#FAFAF8' },
-  meetChoices: { gap: 8, marginTop: 12 },
+  meetChoices: { gap: 6, marginTop: 8 },
   meetChoice: {
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: radius.lg,
+    padding: 12,
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   meetChoiceText: { color: 'rgba(255,255,255,0.55)', fontWeight: '700', fontSize: 14 },
-  countryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  countryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
   countryCardSmall: {
     width: '48%',
-    borderRadius: 18,
+    borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: space.md,
+    padding: space.sm,
     gap: 4,
   },
-  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: space.sm },
+  mediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: space.xs,
+  },
   personCard: {
-    width: 120,
-    borderRadius: 22,
+    width: 112,
+    borderRadius: radius.xxl,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: space.md,
+    padding: space.sm,
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
 });
