@@ -1138,6 +1138,481 @@ export type Database = {
           },
         ]
       }
+      explore_challenge_entries: {
+        Row: {
+          caption: string | null
+          challenge_id: string
+          created_at: string
+          id: string
+          media_object_id: string
+          profile_id: string
+          reactions_count: number
+          status: Database["public"]["Enums"]["explore_entry_status"]
+        }
+        Insert: {
+          caption?: string | null
+          challenge_id: string
+          created_at?: string
+          id?: string
+          media_object_id: string
+          profile_id: string
+          reactions_count?: number
+          status?: Database["public"]["Enums"]["explore_entry_status"]
+        }
+        Update: {
+          caption?: string | null
+          challenge_id?: string
+          created_at?: string
+          id?: string
+          media_object_id?: string
+          profile_id?: string
+          reactions_count?: number
+          status?: Database["public"]["Enums"]["explore_entry_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_challenge_entries_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "explore_challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_challenge_entries_media_object_id_fkey"
+            columns: ["media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_challenge_entries_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_challenge_entry_reactions: {
+        Row: {
+          created_at: string
+          entry_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          entry_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          entry_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_challenge_entry_reactions_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "explore_challenge_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_challenge_entry_reactions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_challenge_participants: {
+        Row: {
+          challenge_id: string
+          joined_at: string
+          profile_id: string
+        }
+        Insert: {
+          challenge_id: string
+          joined_at?: string
+          profile_id: string
+        }
+        Update: {
+          challenge_id?: string
+          joined_at?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_challenge_participants_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "explore_challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_challenge_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_challenge_results: {
+        Row: {
+          challenge_id: string
+          metrics: Json
+          settled_at: string
+          winner_entry_id: string | null
+          winner_profile_id: string | null
+        }
+        Insert: {
+          challenge_id: string
+          metrics?: Json
+          settled_at?: string
+          winner_entry_id?: string | null
+          winner_profile_id?: string | null
+        }
+        Update: {
+          challenge_id?: string
+          metrics?: Json
+          settled_at?: string
+          winner_entry_id?: string | null
+          winner_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_challenge_results_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: true
+            referencedRelation: "explore_challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_challenge_results_winner_entry_id_fkey"
+            columns: ["winner_entry_id"]
+            isOneToOne: false
+            referencedRelation: "explore_challenge_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_challenge_results_winner_profile_id_fkey"
+            columns: ["winner_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_challenges: {
+        Row: {
+          challenge_type: Database["public"]["Enums"]["explore_challenge_type"]
+          country_code: string | null
+          cover_url: string | null
+          created_at: string
+          creator_id: string | null
+          description: string | null
+          ends_at: string
+          entry_count: number
+          id: string
+          reward_metadata: Json
+          reward_type: Database["public"]["Enums"]["explore_reward_type"] | null
+          starts_at: string
+          status: Database["public"]["Enums"]["explore_challenge_status"]
+          title: string
+          visibility: string
+        }
+        Insert: {
+          challenge_type: Database["public"]["Enums"]["explore_challenge_type"]
+          country_code?: string | null
+          cover_url?: string | null
+          created_at?: string
+          creator_id?: string | null
+          description?: string | null
+          ends_at: string
+          entry_count?: number
+          id?: string
+          reward_metadata?: Json
+          reward_type?:
+            | Database["public"]["Enums"]["explore_reward_type"]
+            | null
+          starts_at: string
+          status?: Database["public"]["Enums"]["explore_challenge_status"]
+          title: string
+          visibility?: string
+        }
+        Update: {
+          challenge_type?: Database["public"]["Enums"]["explore_challenge_type"]
+          country_code?: string | null
+          cover_url?: string | null
+          created_at?: string
+          creator_id?: string | null
+          description?: string | null
+          ends_at?: string
+          entry_count?: number
+          id?: string
+          reward_metadata?: Json
+          reward_type?:
+            | Database["public"]["Enums"]["explore_reward_type"]
+            | null
+          starts_at?: string
+          status?: Database["public"]["Enums"]["explore_challenge_status"]
+          title?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_challenges_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_treasure_clue_progress: {
+        Row: {
+          clue_id: string
+          hunt_id: string
+          profile_id: string
+          solved_at: string
+        }
+        Insert: {
+          clue_id: string
+          hunt_id: string
+          profile_id: string
+          solved_at?: string
+        }
+        Update: {
+          clue_id?: string
+          hunt_id?: string
+          profile_id?: string
+          solved_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_treasure_clue_progress_clue_id_fkey"
+            columns: ["clue_id"]
+            isOneToOne: false
+            referencedRelation: "explore_treasure_clues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_treasure_clue_progress_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "explore_treasure_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_treasure_clue_progress_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_treasure_clues: {
+        Row: {
+          answer_digest: string | null
+          choices: Json
+          clue_type: Database["public"]["Enums"]["explore_clue_type"]
+          content_target_id: string | null
+          content_target_kind:
+            | Database["public"]["Enums"]["explore_content_target"]
+            | null
+          created_at: string
+          hunt_id: string
+          id: string
+          prompt: string
+          sort_order: number
+        }
+        Insert: {
+          answer_digest?: string | null
+          choices?: Json
+          clue_type: Database["public"]["Enums"]["explore_clue_type"]
+          content_target_id?: string | null
+          content_target_kind?:
+            | Database["public"]["Enums"]["explore_content_target"]
+            | null
+          created_at?: string
+          hunt_id: string
+          id?: string
+          prompt: string
+          sort_order: number
+        }
+        Update: {
+          answer_digest?: string | null
+          choices?: Json
+          clue_type?: Database["public"]["Enums"]["explore_clue_type"]
+          content_target_id?: string | null
+          content_target_kind?:
+            | Database["public"]["Enums"]["explore_content_target"]
+            | null
+          created_at?: string
+          hunt_id?: string
+          id?: string
+          prompt?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_treasure_clues_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "explore_treasure_hunts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_treasure_hunts: {
+        Row: {
+          clue: string
+          clue_count: number
+          country_code: string | null
+          cover_url: string | null
+          created_at: string
+          creator_id: string | null
+          description: string | null
+          ends_at: string
+          gifts_remaining: number | null
+          hunt_type: Database["public"]["Enums"]["explore_treasure_type"]
+          id: string
+          reward_metadata: Json
+          reward_type: Database["public"]["Enums"]["explore_reward_type"]
+          starts_at: string
+          status: Database["public"]["Enums"]["explore_treasure_status"]
+          title: string
+          visibility: string
+        }
+        Insert: {
+          clue: string
+          clue_count?: number
+          country_code?: string | null
+          cover_url?: string | null
+          created_at?: string
+          creator_id?: string | null
+          description?: string | null
+          ends_at: string
+          gifts_remaining?: number | null
+          hunt_type?: Database["public"]["Enums"]["explore_treasure_type"]
+          id?: string
+          reward_metadata?: Json
+          reward_type?: Database["public"]["Enums"]["explore_reward_type"]
+          starts_at: string
+          status?: Database["public"]["Enums"]["explore_treasure_status"]
+          title: string
+          visibility?: string
+        }
+        Update: {
+          clue?: string
+          clue_count?: number
+          country_code?: string | null
+          cover_url?: string | null
+          created_at?: string
+          creator_id?: string | null
+          description?: string | null
+          ends_at?: string
+          gifts_remaining?: number | null
+          hunt_type?: Database["public"]["Enums"]["explore_treasure_type"]
+          id?: string
+          reward_metadata?: Json
+          reward_type?: Database["public"]["Enums"]["explore_reward_type"]
+          starts_at?: string
+          status?: Database["public"]["Enums"]["explore_treasure_status"]
+          title?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_treasure_hunts_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_treasure_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          hunt_id: string
+          profile_id: string
+          progress: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          hunt_id: string
+          profile_id: string
+          progress?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          hunt_id?: string
+          profile_id?: string
+          progress?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_treasure_progress_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "explore_treasure_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_treasure_progress_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      explore_treasure_reward_claims: {
+        Row: {
+          claimed_at: string
+          hunt_id: string
+          profile_id: string
+          reward_metadata: Json
+          reward_type: Database["public"]["Enums"]["explore_reward_type"]
+        }
+        Insert: {
+          claimed_at?: string
+          hunt_id: string
+          profile_id: string
+          reward_metadata?: Json
+          reward_type: Database["public"]["Enums"]["explore_reward_type"]
+        }
+        Update: {
+          claimed_at?: string
+          hunt_id?: string
+          profile_id?: string
+          reward_metadata?: Json
+          reward_type?: Database["public"]["Enums"]["explore_reward_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "explore_treasure_reward_claims_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "explore_treasure_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "explore_treasure_reward_claims_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follows: {
         Row: {
           created_at: string
@@ -1558,6 +2033,7 @@ export type Database = {
           id: string
           moderated_hoods: Database["public"]["Enums"]["hood_id"][]
           name: string
+          public_country_code: string | null
           rank: Database["public"]["Enums"]["rank_name"]
           reputation: number
           role: Database["public"]["Enums"]["profile_role"]
@@ -1575,6 +2051,7 @@ export type Database = {
           id: string
           moderated_hoods?: Database["public"]["Enums"]["hood_id"][]
           name: string
+          public_country_code?: string | null
           rank?: Database["public"]["Enums"]["rank_name"]
           reputation?: number
           role?: Database["public"]["Enums"]["profile_role"]
@@ -1592,6 +2069,7 @@ export type Database = {
           id?: string
           moderated_hoods?: Database["public"]["Enums"]["hood_id"][]
           name?: string
+          public_country_code?: string | null
           rank?: Database["public"]["Enums"]["rank_name"]
           reputation?: number
           role?: Database["public"]["Enums"]["profile_role"]
@@ -2153,6 +2631,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vault_drops_public_preview_media_object_id_fkey"
+            columns: ["public_preview_media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vault_drops_vault_id_fkey"
             columns: ["vault_id"]
             isOneToOne: false
@@ -2521,6 +3006,10 @@ export type Database = {
           updated_at: string
         }
       }
+      assert_play_host: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       assert_rate_limit: {
         Args: {
           p_action: string
@@ -2554,6 +3043,10 @@ export type Database = {
       can_access_vault_drop: {
         Args: { p_drop_id: string; p_viewer_profile_id: string }
         Returns: boolean
+      }
+      claim_treasure_reward: {
+        Args: { p_hunt_id: string }
+        Returns: Json
       }
       clash_identities_revealed_for: {
         Args: {
@@ -2598,6 +3091,10 @@ export type Database = {
       close_prediction_games: {
         Args: { p_limit?: number }
         Returns: number
+      }
+      complete_content_clue: {
+        Args: { p_clue_id: string; p_content_id: string; p_hunt_id: string }
+        Returns: Json
       }
       complete_media_upload: {
         Args: {
@@ -2808,6 +3305,7 @@ export type Database = {
           expires_at: string | null
           id: string
           media_object_id: string | null
+          public_preview_media_object_id: string | null
           published_at: string | null
           status: Database["public"]["Enums"]["vault_drop_status"]
           vault_id: string
@@ -2915,6 +3413,34 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      explore_actor_hidden: {
+        Args: { p_author: string; p_viewer: string }
+        Returns: boolean
+      }
+      explore_answer_digest: {
+        Args: { p_answer: string; p_clue_id: string }
+        Returns: string
+      }
+      explore_country_activity_count: {
+        Args: { p_code: string }
+        Returns: number
+      }
+      explore_vault_preview_rows: {
+        Args: { p_country_code?: string; p_limit?: number; p_viewer: string }
+        Returns: {
+          author_handle: string
+          author_name: string
+          author_tint: string
+          country_code: string
+          creator_id: string
+          discovery_access: string
+          drop_id: string
+          media_kind: string
+          public_media_path: string
+          title: string
+          vault_id: string
+        }[]
+      }
       fail_media_upload: {
         Args: { p_media_id: string }
         Returns: undefined
@@ -2927,12 +3453,16 @@ export type Database = {
         Args: { p_room_id: string }
         Returns: Json
       }
+      get_arena_room_pulse: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
       get_arena_topic: {
         Args: { p_topic_id: string }
         Returns: Json
       }
-      get_explore_world_summary: {
-        Args: Record<PropertyKey, never>
+      get_challenge_detail: {
+        Args: { p_challenge_id: string }
         Returns: Json
       }
       get_explore_country: {
@@ -2940,27 +3470,31 @@ export type Database = {
         Returns: Json
       }
       get_explore_for_you: {
-        Args: { p_limit?: number; p_cursor?: number }
+        Args: { p_cursor?: number; p_limit?: number }
         Returns: Json
       }
       get_explore_live: {
         Args: { p_limit?: number }
         Returns: Json
       }
+      get_explore_world_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_global_viral: {
         Args: { p_limit?: number }
+        Returns: Json
+      }
+      get_my_play: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       get_teleport_candidate: {
         Args: { p_exclude_ids?: string[] }
         Returns: Json
       }
-      search_explore: {
-        Args: { p_limit?: number; p_query: string }
-        Returns: Json
-      }
-      list_explore_vault_previews: {
-        Args: { p_limit?: number }
+      get_treasure_detail: {
+        Args: { p_hunt_id: string }
         Returns: Json
       }
       hood_active_prediction: {
@@ -2969,6 +3503,36 @@ export type Database = {
       }
       hood_game_view: {
         Args: { p_game_id: string }
+        Returns: Json
+      }
+      host_explore_challenge: {
+        Args: {
+          p_challenge_type: Database["public"]["Enums"]["explore_challenge_type"]
+          p_country_code: string
+          p_cover_url: string
+          p_description: string
+          p_ends_at: string
+          p_reward_type?: Database["public"]["Enums"]["explore_reward_type"]
+          p_starts_at: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      host_explore_treasure: {
+        Args: {
+          p_clues: Json
+          p_country_code: string
+          p_cover_url: string
+          p_description: string
+          p_ends_at: string
+          p_gifts_remaining: number
+          p_hunt_type: Database["public"]["Enums"]["explore_treasure_type"]
+          p_reward_metadata: Json
+          p_reward_type: Database["public"]["Enums"]["explore_reward_type"]
+          p_starts_at: string
+          p_teaser: string
+          p_title: string
+        }
         Returns: Json
       }
       is_advertiser_owner: {
@@ -3003,9 +3567,17 @@ export type Database = {
         }
         Returns: Json
       }
+      join_challenge: {
+        Args: { p_challenge_id: string }
+        Returns: Json
+      }
       join_hood: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: undefined
+      }
+      join_treasure_hunt: {
+        Args: { p_hunt_id: string }
+        Returns: Json
       }
       leave_hood: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
@@ -3024,8 +3596,12 @@ export type Database = {
         }
         Returns: Json[]
       }
-      get_arena_room_pulse: {
-        Args: { p_room_id: string }
+      list_arena_room_presence: {
+        Args: { p_limit?: number; p_room_id: string }
+        Returns: Json
+      }
+      list_arena_topic_rooms: {
+        Args: { p_topic_id: string }
         Returns: Json
       }
       list_campaign_coupons: {
@@ -3055,25 +3631,26 @@ export type Database = {
           token: string
         }[]
       }
-      list_live_arena_topics: {
-        Args: Record<PropertyKey, never>
-        Returns: Json[]
+      list_challenge_entries: {
+        Args: {
+          p_challenge_id: string
+          p_cursor?: number
+          p_limit?: number
+          p_sort?: string
+        }
+        Returns: Json
+      }
+      list_explore_vault_previews: {
+        Args: { p_limit?: number }
+        Returns: Json
       }
       list_live_arena_topic_previews: {
         Args: { p_limit?: number; p_topic_id: string }
         Returns: Json
       }
-      list_arena_topic_rooms: {
-        Args: { p_topic_id: string }
-        Returns: Json
-      }
-      watch_arena_room: {
-        Args: { p_room_id: string }
-        Returns: Json
-      }
-      list_arena_room_presence: {
-        Args: { p_limit?: number; p_room_id: string }
-        Returns: Json
+      list_live_arena_topics: {
+        Args: Record<PropertyKey, never>
+        Returns: Json[]
       }
       list_my_sponsor_campaigns: {
         Args: { p_advertiser_id: string }
@@ -3091,6 +3668,10 @@ export type Database = {
           status: Database["public"]["Enums"]["sponsor_campaign_status"]
           title: string
         }[]
+      }
+      list_play_home: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       mark_arena_evidence_useful: {
         Args: { p_evidence_id: string }
@@ -3136,6 +3717,19 @@ export type Database = {
           updated_at: string
         }
       }
+      play_next_clue_payload: {
+        Args: { p_hunt_id: string; p_progress: number }
+        Returns: Json
+      }
+      play_notify: {
+        Args: {
+          p_actor: string
+          p_kind: Database["public"]["Enums"]["notification_kind"]
+          p_recipient: string
+          p_target_id: string
+        }
+        Returns: undefined
+      }
       post_arena_room_message: {
         Args: {
           p_body: string
@@ -3177,6 +3771,7 @@ export type Database = {
           expires_at: string | null
           id: string
           media_object_id: string | null
+          public_preview_media_object_id: string | null
           published_at: string | null
           status: Database["public"]["Enums"]["vault_drop_status"]
           vault_id: string
@@ -3300,6 +3895,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      search_explore: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: Json
+      }
       set_sponsor_campaign_status: {
         Args: {
           p_campaign_id: string
@@ -3321,6 +3920,10 @@ export type Database = {
       }
       settle_arena_room: {
         Args: { p_room_id: string }
+        Returns: Json
+      }
+      settle_challenge: {
+        Args: { p_challenge_id: string }
         Returns: Json
       }
       settle_clash: {
@@ -3387,6 +3990,14 @@ export type Database = {
         }
         Returns: Json
       }
+      submit_challenge_entry: {
+        Args: {
+          p_caption?: string
+          p_challenge_id: string
+          p_media_object_id: string
+        }
+        Returns: Json
+      }
       submit_judgement: {
         Args: {
           p_clash_id: string
@@ -3407,12 +4018,20 @@ export type Database = {
         }
         Returns: string
       }
+      submit_treasure_answer: {
+        Args: { p_answer: string; p_clue_id: string; p_hunt_id: string }
+        Returns: Json
+      }
       take_hood: {
         Args: { p_take_id: string }
         Returns: Database["public"]["Enums"]["hood_id"]
       }
       take_stance_payload: {
         Args: { p_row: Database["public"]["Tables"]["take_stances"]["Row"] }
+        Returns: Json
+      }
+      toggle_challenge_entry_reaction: {
+        Args: { p_entry_id: string }
         Returns: Json
       }
       toggle_comment_upvote: {
@@ -3544,6 +4163,10 @@ export type Database = {
         Args: { p_drop_id: string }
         Returns: boolean
       }
+      watch_arena_room: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
       world_active_missions: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -3618,6 +4241,20 @@ export type Database = {
       commission_ledger_status: "PENDING" | "APPROVED" | "REJECTED" | "VOID"
       commission_type: "FIXED_PER_CONVERSION" | "PERCENTAGE" | "NONE"
       coupon_code_status: "ACTIVE" | "PAUSED" | "EXPIRED" | "REVOKED"
+      explore_challenge_status: "scheduled" | "active" | "ended" | "cancelled"
+      explore_challenge_type: "GLOBAL" | "COUNTRY" | "CREATOR"
+      explore_clue_type: "TEXT_ANSWER" | "CONTENT_FIND" | "MULTIPLE_CHOICE"
+      explore_content_target: "take" | "vault_drop" | "challenge" | "creator"
+      explore_entry_status: "visible" | "hidden" | "removed"
+      explore_reward_type:
+        | "badge"
+        | "cosmetic"
+        | "free_drop"
+        | "creator_access"
+        | "collectible"
+        | "sponsor"
+      explore_treasure_status: "scheduled" | "active" | "ended" | "cancelled"
+      explore_treasure_type: "GLOBAL" | "COUNTRY" | "CREATOR"
       hood_game_status: "DRAFT" | "OPEN" | "CLOSED" | "RESOLVED" | "CANCELLED"
       hood_game_type: "PREDICTION"
       hood_id:
@@ -3648,6 +4285,10 @@ export type Database = {
         | "vault_subscription"
         | "sponsor_activity"
         | "vault_drop"
+        | "challenge_result"
+        | "challenge_reaction"
+        | "treasure_complete"
+        | "treasure_reward"
       profile_role: "viewer" | "creator" | "moderator" | "admin"
       rank_name:
         | "Rookie"
@@ -3678,6 +4319,7 @@ export type Database = {
         | "vault_subscription"
         | "arena_room_message"
         | "arena_room_evidence"
+        | "challenge_entry"
       reputation_kind:
         | "clash_participation"
         | "clash_win"
@@ -3863,6 +4505,21 @@ export const Constants = {
       commission_ledger_status: ["PENDING", "APPROVED", "REJECTED", "VOID"],
       commission_type: ["FIXED_PER_CONVERSION", "PERCENTAGE", "NONE"],
       coupon_code_status: ["ACTIVE", "PAUSED", "EXPIRED", "REVOKED"],
+      explore_challenge_status: ["scheduled", "active", "ended", "cancelled"],
+      explore_challenge_type: ["GLOBAL", "COUNTRY", "CREATOR"],
+      explore_clue_type: ["TEXT_ANSWER", "CONTENT_FIND", "MULTIPLE_CHOICE"],
+      explore_content_target: ["take", "vault_drop", "challenge", "creator"],
+      explore_entry_status: ["visible", "hidden", "removed"],
+      explore_reward_type: [
+        "badge",
+        "cosmetic",
+        "free_drop",
+        "creator_access",
+        "collectible",
+        "sponsor",
+      ],
+      explore_treasure_status: ["scheduled", "active", "ended", "cancelled"],
+      explore_treasure_type: ["GLOBAL", "COUNTRY", "CREATOR"],
       hood_game_status: ["DRAFT", "OPEN", "CLOSED", "RESOLVED", "CANCELLED"],
       hood_game_type: ["PREDICTION"],
       hood_id: [
@@ -3895,6 +4552,10 @@ export const Constants = {
         "vault_subscription",
         "sponsor_activity",
         "vault_drop",
+        "challenge_result",
+        "challenge_reaction",
+        "treasure_complete",
+        "treasure_reward",
       ],
       profile_role: ["viewer", "creator", "moderator", "admin"],
       rank_name: [
@@ -3928,6 +4589,7 @@ export const Constants = {
         "vault_subscription",
         "arena_room_message",
         "arena_room_evidence",
+        "challenge_entry",
       ],
       reputation_kind: [
         "clash_participation",

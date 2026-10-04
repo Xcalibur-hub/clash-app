@@ -87,7 +87,19 @@ export type AnalyticsEvent =
   | 'explore_globe_rotated'
   | 'explore_challenge_opened'
   | 'explore_treasure_opened'
-  | 'explore_vault_preview_opened';
+  | 'explore_vault_preview_opened'
+  | 'play_opened'
+  | 'challenge_opened'
+  | 'challenge_joined'
+  | 'challenge_submitted'
+  | 'challenge_entry_reacted'
+  | 'challenge_completed'
+  | 'treasure_opened'
+  | 'treasure_joined'
+  | 'treasure_clue_attempted'
+  | 'treasure_clue_completed'
+  | 'treasure_completed'
+  | 'treasure_reward_claimed';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([

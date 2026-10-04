@@ -316,7 +316,8 @@ export default function ExploreCountryScreen(): React.JSX.Element {
                   width={230}
                   height={260}
                   onPress={() => {
-                    analytics.track('explore_challenge_opened', { realm: 'arena', source: 'explore' });
+                    analytics.track('challenge_opened', { realm: 'explore', source: 'explore' });
+                    router.push(`/explore/challenge/${challenge.id}` as never);
                   }}
                 />
               ))}
@@ -333,13 +334,18 @@ export default function ExploreCountryScreen(): React.JSX.Element {
                   kind="TREASURE"
                   title={hunt.title}
                   subtitle={hunt.clue}
-                  meta={`${hunt.giftsRemaining} gifts remaining`}
+                  meta={
+                    hunt.giftsRemaining == null
+                      ? 'Unlimited gifts'
+                      : `${hunt.giftsRemaining} gifts remaining`
+                  }
                   mediaUrl={hunt.coverUrl}
                   accent="#2A2438"
                   width={240}
                   height={270}
                   onPress={() => {
-                    analytics.track('explore_treasure_opened', { realm: 'arena', source: 'explore' });
+                    analytics.track('treasure_opened', { realm: 'explore', source: 'explore' });
+                    router.push(`/explore/treasure/${hunt.id}` as never);
                   }}
                 />
               ))}

@@ -24,6 +24,7 @@ import { Notice } from '../../components/shared/Notice';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { countryByCode } from '../../data/exploreCountries';
 import { analytics } from '../../services/analytics';
+import { PlayHomePanel } from '../../components/play/PlayHomePanel';
 import {
   fetchExploreForYou,
   fetchExploreLive,
@@ -320,8 +321,10 @@ export default function ExploreScreen(): React.JSX.Element {
                   style={{ width: '100%' }}
                   onPress={() => {
                     analytics.track('explore_content_opened', { realm: 'arena', source: 'explore' });
-                    if (item.kind === 'CHALLENGE' && item.countryCode) goCountryPage(item.countryCode);
-                    else if (item.href) router.push(item.href as never);
+                    if (item.kind === 'CHALLENGE') {
+                      analytics.track('challenge_opened', { realm: 'explore', source: 'explore' });
+                      router.push(`/explore/challenge/${item.id}` as never);
+                    } else if (item.href) router.push(item.href as never);
                   }}
                 />
               </View>
@@ -478,74 +481,7 @@ export default function ExploreScreen(): React.JSX.Element {
             </>
           ) : null}
 
-          {mode === 'play' ? (
-            <>
-              <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-                Play
-              </Text>
-              {(summary?.challenges.length ?? 0) === 0 && (summary?.treasures.length ?? 0) === 0 ? (
-                <Text allowFontScaling={false} style={{ color: t.textMuted }}>
-                  Challenges and treasure hunts appear here when active.
-                </Text>
-              ) : null}
-              {summary && summary.challenges.length > 0 ? (
-                <View style={{ gap: space.sm }}>
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
-                    Challenges
-                  </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
-                    {summary.challenges.map((c) => (
-                      <ExploreDiscoveryCard
-                        key={c.id}
-                        kind="CHALLENGE"
-                        title={c.title}
-                        subtitle={c.challengeType}
-                        meta={`${c.entryCount} entries`}
-                        mediaUrl={c.coverUrl}
-                        accent="#24362E"
-                        onPress={() => {
-                          analytics.track('explore_challenge_opened', {
-                            realm: 'arena',
-                            source: 'explore',
-                          });
-                          if (c.countryCode) goCountryPage(c.countryCode);
-                        }}
-                      />
-                    ))}
-                  </ScrollView>
-                </View>
-              ) : null}
-              {summary && summary.treasures.length > 0 ? (
-                <View style={{ gap: space.sm }}>
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
-                    Treasure hunts
-                  </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
-                    {summary.treasures.map((h) => (
-                      <ExploreDiscoveryCard
-                        key={h.id}
-                        kind="TREASURE"
-                        title={h.title}
-                        subtitle={h.clue}
-                        meta={`${h.giftsRemaining} gifts remaining`}
-                        mediaUrl={h.coverUrl}
-                        accent="#2A2438"
-                        width={240}
-                        height={270}
-                        onPress={() => {
-                          analytics.track('explore_treasure_opened', {
-                            realm: 'arena',
-                            source: 'explore',
-                          });
-                          if (h.countryCode) goCountryPage(h.countryCode);
-                        }}
-                      />
-                    ))}
-                  </ScrollView>
-                </View>
-              ) : null}
-            </>
-          ) : null}
+          {mode === 'play' ? <PlayHomePanel /> : null}
 
           {mode === 'meet' ? (
             <View

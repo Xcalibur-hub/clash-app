@@ -79,7 +79,7 @@ export interface ExploreTreasure {
   countryCode: string | null;
   status: string;
   clue: string;
-  giftsRemaining: number;
+  giftsRemaining: number | null;
   endsAt: number;
   rewardType: string;
   coverUrl: string | null;
@@ -275,7 +275,7 @@ function toTreasure(raw: unknown): ExploreTreasure | null {
     countryCode: str(r.countryCode),
     status: str(r.status) ?? 'active',
     clue,
-    giftsRemaining: num(r.giftsRemaining) ?? 0,
+    giftsRemaining: r.giftsRemaining === null ? null : (num(r.giftsRemaining) ?? 0),
     endsAt,
     rewardType: str(r.rewardType) ?? 'badge',
     coverUrl: str(r.coverUrl),
