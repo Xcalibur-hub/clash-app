@@ -99,7 +99,15 @@ export type AnalyticsEvent =
   | 'treasure_clue_attempted'
   | 'treasure_clue_completed'
   | 'treasure_completed'
-  | 'treasure_reward_claimed';
+  | 'treasure_reward_claimed'
+  | 'meet_opened'
+  | 'meet_queue_joined'
+  | 'meet_matched'
+  | 'meet_chat_started'
+  | 'meet_next'
+  | 'meet_left'
+  | 'meet_reported'
+  | 'meet_blocked';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([

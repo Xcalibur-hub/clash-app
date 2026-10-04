@@ -34,6 +34,7 @@ import { ExploreWorldCanvas, type WorldVisualMode } from '../../components/explo
 import { Avatar } from '../../components/shared/Avatar';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { Notice } from '../../components/shared/Notice';
+import { MeetHomePanel } from '../../components/meet/MeetHomePanel';
 import { PlayHomePanel } from '../../components/play/PlayHomePanel';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { countryByCode } from '../../data/exploreCountries';
@@ -94,7 +95,7 @@ export default function ExploreScreen(): React.JSX.Element {
 
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [recent, setRecent] = React.useState<string[]>([]);
-  const [worldVisual, setWorldVisual] = React.useState<WorldVisualMode>('globe');
+  const [worldVisual, setWorldVisual] = React.useState<WorldVisualMode>('map');
   const [spinToken, setSpinToken] = React.useState(0);
   const [spinLng, setSpinLng] = React.useState<number | null>(null);
   const [teleporting, setTeleporting] = React.useState(false);
@@ -368,11 +369,16 @@ export default function ExploreScreen(): React.JSX.Element {
                   <Text allowFontScaling={false} style={[styles.modeLabel, { color: t.textMuted }]}>
                     WORLD
                   </Text>
-                  <View style={[styles.visualToggle, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
+                  <View
+                    style={[
+                      styles.visualToggle,
+                      { backgroundColor: t.surfaceElevated, borderColor: t.border },
+                    ]}
+                  >
                     {(
                       [
-                        ['globe', 'Globe'],
                         ['map', 'Map'],
+                        ['globe', 'Globe'],
                       ] as const
                     ).map(([id, label]) => {
                       const on = worldVisual === id;
@@ -383,10 +389,7 @@ export default function ExploreScreen(): React.JSX.Element {
                             hapticTap();
                             setWorldVisual(id);
                           }}
-                          style={[
-                            styles.visualChip,
-                            on && { backgroundColor: t.textPrimary },
-                          ]}
+                          style={[styles.visualChip, on && { backgroundColor: t.textPrimary }]}
                           accessibilityRole="button"
                           accessibilityState={{ selected: on }}
                           accessibilityLabel={label}
@@ -407,70 +410,69 @@ export default function ExploreScreen(): React.JSX.Element {
                   </View>
                 </View>
 
-                <View style={styles.worldStage}>
-                  <ExploreWorldCanvas
-                    activity={summary?.countries ?? []}
-                    selectedCode={selectedCountry}
-                    visualMode={worldVisual}
-                    onVisualModeChange={setWorldVisual}
-                    onSelectCountry={(code) => {
-                      setSelectedCountry(code);
-                      analytics.track('explore_country_selected', {
-                        realm: 'arena',
-                        source: 'explore',
-                      });
-                    }}
-                    spinToken={spinToken}
-                    spinTargetLng={spinLng}
-                    spinning={teleporting}
-                  />
-                  <View style={styles.worldFloatControls}>
-                    <RoundControl
-                      label="Search"
-                      onPress={() => {
-                        hapticTap();
-                        setPickerOpen(true);
-                      }}
-                    />
-                    <RoundControl
-                      label={teleporting ? '…' : 'Teleport'}
-                      onPress={() => void teleport()}
-                      emphasis
-                    />
-                  </View>
-                  {selectedCountry ? (
-                    <Animated.View
-                      entering={reduced ? undefined : FadeInDown.duration(320)}
-                      style={[
-                        styles.countryCard,
-                        {
-                          backgroundColor: t.scheme === 'light' ? '#111113' : t.textPrimary,
-                        },
-                      ]}
+                <ExploreWorldCanvas
+                  activity={summary?.countries ?? []}
+                  selectedCode={selectedCountry}
+                  visualMode={worldVisual}
+                  onSelectCountry={(code) => {
+                    setSelectedCountry(code);
+                    analytics.track('explore_country_selected', {
+                      realm: 'arena',
+                      source: 'explore',
+                    });
+                  }}
+                  spinToken={spinToken}
+                  spinTargetLng={spinLng}
+                  spinning={teleporting}
+                />
+
+                {selectedCountry ? (
+                  <Animated.View
+                    entering={reduced ? undefined : FadeInDown.duration(320)}
+                    style={[
+                      styles.countryCard,
+                      {
+                        backgroundColor: t.scheme === 'light' ? '#111113' : t.textPrimary,
+                      },
+                    ]}
+                  >
+                    <Text allowFontScaling={false} style={styles.countryCardTitle}>
+                      {countryByCode(selectedCountry)?.name ?? selectedCountry}
+                    </Text>
+                    <Text allowFontScaling={false} style={styles.countryCardMeta}>
+                      {summary?.countries.find((c) => c.countryCode === selectedCountry)
+                        ?.activityCount != null
+                        ? `${summary.countries
+                            .find((c) => c.countryCode === selectedCountry)!
+                            .activityCount!.toLocaleString()} exploring`
+                        : 'Trending now'}
+                    </Text>
+                    <Pressable
+                      onPress={() => goCountryPage(selectedCountry)}
+                      style={styles.countryCardCta}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Explore ${countryByCode(selectedCountry)?.name ?? selectedCountry}`}
                     >
-                      <Text allowFontScaling={false} style={styles.countryCardTitle}>
-                        {countryByCode(selectedCountry)?.name ?? selectedCountry}
+                      <Text allowFontScaling={false} style={styles.countryCardCtaText}>
+                        Explore →
                       </Text>
-                      <Text allowFontScaling={false} style={styles.countryCardMeta}>
-                        {summary?.countries.find((c) => c.countryCode === selectedCountry)
-                          ?.activityCount != null
-                          ? `${summary.countries
-                              .find((c) => c.countryCode === selectedCountry)!
-                              .activityCount!.toLocaleString()} exploring`
-                          : 'Trending quietly'}
-                      </Text>
-                      <Pressable
-                        onPress={() => goCountryPage(selectedCountry)}
-                        style={styles.countryCardCta}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Explore ${countryByCode(selectedCountry)?.name ?? selectedCountry}`}
-                      >
-                        <Text allowFontScaling={false} style={styles.countryCardCtaText}>
-                          Explore →
-                        </Text>
-                      </Pressable>
-                    </Animated.View>
-                  ) : null}
+                    </Pressable>
+                  </Animated.View>
+                ) : null}
+
+                <View style={styles.worldControls}>
+                  <RoundControl
+                    label="Search"
+                    onPress={() => {
+                      hapticTap();
+                      setPickerOpen(true);
+                    }}
+                  />
+                  <RoundControl
+                    label={teleporting ? '…' : 'Teleport'}
+                    onPress={() => void teleport()}
+                    emphasis
+                  />
                 </View>
 
                 {teleportReveal ? (
@@ -549,52 +551,7 @@ export default function ExploreScreen(): React.JSX.Element {
 
             {mode === 'play' ? <PlayHomePanel /> : null}
 
-            {mode === 'meet' ? (
-              <View
-                style={[
-                  styles.meet,
-                  {
-                    backgroundColor: t.scheme === 'light' ? '#111318' : t.surfaceElevated,
-                    borderColor: t.border,
-                  },
-                ]}
-                accessibilityLabel="Meet the world. Text chat coming next."
-              >
-                <Text allowFontScaling={false} style={styles.meetKicker}>
-                  MEET
-                </Text>
-                <Text allowFontScaling={false} style={styles.meetTitle}>
-                  Talk to someone new
-                </Text>
-                <Text allowFontScaling={false} style={styles.meetBody}>
-                  Pseudonymous text matching comes next — Anywhere, Selected Country, Shared
-                  Interests, or Same Hood. Video later.
-                </Text>
-                <View style={styles.meetRow}>
-                  <View style={styles.meetPill}>
-                    <Text allowFontScaling={false} style={styles.meetPillText}>
-                      Text · Coming next
-                    </Text>
-                  </View>
-                  <View style={[styles.meetPill, { opacity: 0.55 }]}>
-                    <Text allowFontScaling={false} style={styles.meetPillText}>
-                      Video · Later
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.meetChoices}>
-                  {['Anywhere', 'Selected Country', 'Shared Interests', 'Same Hood'].map(
-                    (label) => (
-                      <View key={label} style={styles.meetChoice}>
-                        <Text allowFontScaling={false} style={styles.meetChoiceText}>
-                          {label}
-                        </Text>
-                      </View>
-                    ),
-                  )}
-                </View>
-              </View>
-            ) : null}
+            {mode === 'meet' ? <MeetHomePanel /> : null}
           </ScrollView>
         </Animated.View>
       )}
@@ -876,16 +833,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  worldStage: {
-    position: 'relative',
-    marginBottom: 56,
-  },
-  worldFloatControls: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    gap: 8,
-    zIndex: 2,
+  worldControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: space.sm,
+    marginTop: space.xs,
   },
   round: {
     minHeight: 40,
@@ -898,20 +850,16 @@ const styles = StyleSheet.create({
   },
   roundText: { ...typeScale.label, fontSize: 12, fontWeight: '800' },
   countryCard: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: -48,
     borderRadius: radius.xxl,
     paddingHorizontal: space.md,
     paddingVertical: space.md,
     gap: 4,
-    zIndex: 3,
+    marginTop: -8,
     shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   countryCardTitle: {
     ...typeScale.editorial,
@@ -932,37 +880,6 @@ const styles = StyleSheet.create({
   },
   countryCardCtaText: { ...typeScale.label, fontSize: 12, fontWeight: '800', color: '#111113' },
   rail: { gap: space.xs, paddingRight: layout.screenX },
-  meet: {
-    borderRadius: radius.xxl,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: space.lg,
-    gap: 10,
-    minHeight: 380,
-  },
-  meetKicker: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    color: 'rgba(255,255,255,0.55)',
-  },
-  meetTitle: { ...typeScale.editorial, fontSize: 32, fontWeight: '800', color: '#FAFAF8' },
-  meetBody: { ...typeScale.meta, fontSize: 14, lineHeight: 21, color: 'rgba(255,255,255,0.7)' },
-  meetRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  meetPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  meetPillText: { ...typeScale.caption, fontSize: 12, fontWeight: '700', color: '#FAFAF8' },
-  meetChoices: { gap: 6, marginTop: 8 },
-  meetChoice: {
-    borderRadius: radius.lg,
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  meetChoiceText: { color: 'rgba(255,255,255,0.55)', fontWeight: '700', fontSize: 14 },
   countryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
   countryCardSmall: {
     width: '48%',

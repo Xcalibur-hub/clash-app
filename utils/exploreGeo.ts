@@ -97,12 +97,24 @@ export function globePathForCountry(
   radius: number,
   cx: number,
   cy: number,
+  /** Sample every Nth ring point to cut per-frame projection work. */
+  stride = 1,
 ): string {
+  const step = Math.max(1, Math.floor(stride));
   const parts: string[] = [];
   for (const polygon of country.polygons) {
     const ring = polygon[0];
     if (!ring || ring.length < 3) continue;
-    const projected = ring.map((pt) => {
+    const sampled: number[][] = [];
+    for (let i = 0; i < ring.length; i += step) {
+      const pt = ring[i];
+      if (pt) sampled.push(pt);
+    }
+    const last = ring[ring.length - 1];
+    if (last && sampled[sampled.length - 1] !== last) sampled.push(last);
+    if (sampled.length < 3) continue;
+
+    const projected = sampled.map((pt) => {
       const p = projectGlobe(pt[1]!, pt[0]!, rotationDeg, radius);
       return { ...p, x: cx + p.x, y: cy + p.y };
     });

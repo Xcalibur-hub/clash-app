@@ -1,6 +1,6 @@
 /**
- * Accurate Explore WORLD canvas — MAP (equirectangular) + GLOBE (orthographic).
- * Geometry: Natural Earth 110m ISO A2. Never GPS / Google Maps.
+ * Explore WORLD canvas — MAP (default) or GLOBE (optional).
+ * Renders exactly one visualization. Geometry: Natural Earth 110m ISO A2.
  */
 import React from 'react';
 import {
@@ -13,7 +13,7 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useReducedMotion } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg';
-import { geometryByCode, geometryCountryList } from '../../data/loadExploreGeometry';
+import { geometryCountryList } from '../../data/loadExploreGeometry';
 import { countryByCode } from '../../data/exploreCountries';
 import type { ExploreCountrySummary } from '../../services/exploreService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
@@ -25,26 +25,32 @@ import {
   rotationToward,
   wrapRotation,
 } from '../../utils/exploreGeo';
+import {
+  type WorldVisualMode,
+} from '../../utils/exploreWorldPerf';
 import { tap as hapticTap } from '../../utils/haptics';
 
-export type WorldVisualMode = 'globe' | 'map';
+export type { WorldVisualMode };
 
 export interface ExploreWorldCanvasProps {
   activity: readonly ExploreCountrySummary[];
   selectedCode?: string | null;
   visualMode: WorldVisualMode;
-  onVisualModeChange: (mode: WorldVisualMode) => void;
   onSelectCountry: (code: string) => void;
   spinToken?: number;
   spinTargetLng?: number | null;
   spinning?: boolean;
 }
 
+/** Quantize rotation so path cache hits during drag. */
+function quantizeRotation(deg: number, step = 3): number {
+  return Math.round(wrapRotation(deg) / step) * step;
+}
+
 export function ExploreWorldCanvas({
   activity,
   selectedCode = null,
   visualMode,
-  onVisualModeChange,
   onSelectCountry,
   spinToken = 0,
   spinTargetLng = null,
@@ -58,14 +64,18 @@ export function ExploreWorldCanvas({
   const rotationRef = React.useRef(20);
   const dragOrigin = React.useRef(20);
   const coastRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const rafRef = React.useRef<number | null>(null);
+  const pendingRotation = React.useRef<number | null>(null);
+  const pathCache = React.useRef(new Map<string, string>());
 
   const mapW = Math.min(screenW - 32, 420);
   const mapH = mapW * 0.52;
-  const globeSize = Math.min(340, Math.max(280, screenW - 40));
+  const globeSize = Math.min(300, Math.max(240, screenW - 56));
   const R = globeSize * 0.42;
   const cx = globeSize / 2;
   const cy = globeSize / 2;
   const light = t.scheme === 'light';
+  const isGlobe = visualMode === 'globe';
 
   React.useEffect(() => {
     rotationRef.current = rotation;
@@ -78,10 +88,24 @@ export function ExploreWorldCanvas({
     }
   }, []);
 
-  React.useEffect(() => () => clearCoast(), [clearCoast]);
+  React.useEffect(
+    () => () => {
+      clearCoast();
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    },
+    [clearCoast],
+  );
+
+  // Clear globe path cache when leaving globe mode.
+  React.useEffect(() => {
+    if (!isGlobe) {
+      clearCoast();
+      pathCache.current.clear();
+    }
+  }, [clearCoast, isGlobe]);
 
   React.useEffect(() => {
-    if (spinToken <= 0) return;
+    if (!isGlobe || spinToken <= 0) return;
     clearCoast();
     const target = spinTargetLng ?? Math.random() * 360 - 180;
     if (reduced) {
@@ -93,54 +117,95 @@ export function ExploreWorldCanvas({
     const delta = wrapRotation(rotationToward(target) - start) + 360;
     coastRef.current = setInterval(() => {
       frames += 1;
-      const p = Math.min(1, frames / 18);
+      const p = Math.min(1, frames / 14);
       const eased = 1 - (1 - p) ** 3;
       setRotation(wrapRotation(start + delta * eased));
       if (p >= 1) clearCoast();
-    }, 16);
-  }, [clearCoast, reduced, spinTargetLng, spinToken]);
+    }, 32);
+  }, [clearCoast, isGlobe, reduced, spinTargetLng, spinToken]);
 
   React.useEffect(() => {
-    if (!selectedCode || spinning) return;
+    if (!isGlobe || !selectedCode || spinning) return;
     const c = countryByCode(selectedCode);
     if (!c) return;
     setRotation(wrapRotation(rotationToward(c.lng)));
-  }, [selectedCode, spinning]);
+  }, [isGlobe, selectedCode, spinning]);
 
-  const focus = React.useMemo(
-    () => selectedCode ?? focusCountryByCentroid(rotation, countries),
-    [countries, rotation, selectedCode],
-  );
-  const focusName =
-    geometryByCode(focus)?.name ?? countryByCode(focus)?.name ?? focus ?? 'Earth';
-  const focusMeta = activity.find((a) => a.countryCode === focus) ?? null;
-
-  const pan = Gesture.Pan()
-    .runOnJS(true)
-    .onBegin(() => {
-      clearCoast();
-      dragOrigin.current = rotation;
-    })
-    .onUpdate((e) => {
-      if (visualMode !== 'globe') return;
-      setRotation(wrapRotation(dragOrigin.current - e.translationX * 0.42));
-    })
-    .onEnd((e) => {
-      if (visualMode !== 'globe' || reduced) return;
-      clearCoast();
-      let velocity = -e.velocityX * 0.018;
-      coastRef.current = setInterval(() => {
-        velocity *= 0.9;
-        setRotation((prev) => wrapRotation(prev + velocity));
-        if (Math.abs(velocity) < 0.15) clearCoast();
-      }, 16);
+  const scheduleRotation = React.useCallback((next: number) => {
+    pendingRotation.current = next;
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      if (pendingRotation.current == null) return;
+      setRotation(pendingRotation.current);
+      pendingRotation.current = null;
     });
+  }, []);
+
+  const focus = React.useMemo(() => {
+    if (selectedCode) return selectedCode;
+    if (!isGlobe) return null;
+    return focusCountryByCentroid(rotation, countries);
+  }, [countries, isGlobe, rotation, selectedCode]);
 
   const activitySet = React.useMemo(() => {
     const s = new Set<string>();
     for (const a of activity) s.add(a.countryCode);
     return s;
   }, [activity]);
+
+  const mapPaths = React.useMemo(() => {
+    if (isGlobe) return [] as { code: string; d: string }[];
+    return countries
+      .map((country) => ({
+        code: country.code,
+        d: mapPathForCountry(country, mapW, mapH),
+      }))
+      .filter((row) => row.d.length > 0);
+  }, [countries, isGlobe, mapH, mapW]);
+
+  const qRot = quantizeRotation(rotation);
+  const globePaths = React.useMemo(() => {
+    if (!isGlobe) return [] as { code: string; d: string }[];
+    const cache = pathCache.current;
+    const out: { code: string; d: string }[] = [];
+    for (const country of countries) {
+      const key = `${country.code}:${qRot}:${Math.round(R)}`;
+      let d = cache.get(key);
+      if (d === undefined) {
+        d = globePathForCountry(country, qRot, R, cx, cy, 2);
+        cache.set(key, d);
+        if (cache.size > 800) {
+          // Bound memory: drop oldest half.
+          const keys = [...cache.keys()].slice(0, 400);
+          for (const k of keys) cache.delete(k);
+        }
+      }
+      if (d) out.push({ code: country.code, d });
+    }
+    return out;
+  }, [countries, cx, cy, isGlobe, qRot, R]);
+
+  const pan = Gesture.Pan()
+    .enabled(isGlobe)
+    .runOnJS(true)
+    .onBegin(() => {
+      clearCoast();
+      dragOrigin.current = rotationRef.current;
+    })
+    .onUpdate((e) => {
+      scheduleRotation(wrapRotation(dragOrigin.current - e.translationX * 0.42));
+    })
+    .onEnd((e) => {
+      if (reduced) return;
+      clearCoast();
+      let velocity = -e.velocityX * 0.014;
+      coastRef.current = setInterval(() => {
+        velocity *= 0.88;
+        setRotation((prev) => wrapRotation(prev + velocity));
+        if (Math.abs(velocity) < 0.2) clearCoast();
+      }, 32);
+    });
 
   const oceanDeep = light ? '#1B4F72' : '#0B2438';
   const oceanMid = light ? '#2E86AB' : '#123A55';
@@ -149,40 +214,8 @@ export function ExploreWorldCanvas({
   const landSelected = light ? '#111113' : '#F5F5F5';
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.modeRow}>
-        {(['globe', 'map'] as const).map((mode) => {
-          const on = visualMode === mode;
-          return (
-            <Pressable
-              key={mode}
-              onPress={() => {
-                hapticTap();
-                onVisualModeChange(mode);
-              }}
-              style={[
-                styles.modeChip,
-                {
-                  backgroundColor: on ? t.textPrimary : t.surfaceElevated,
-                  borderColor: t.borderStrong,
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={mode === 'globe' ? 'Globe view' : 'Map view'}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.modeChipText, { color: on ? t.background : t.textPrimary }]}
-              >
-                {mode === 'globe' ? 'Globe' : 'Map'}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {visualMode === 'globe' ? (
+    <View style={styles.wrap} accessibilityLabel={isGlobe ? 'World globe' : 'World map'}>
+      {isGlobe ? (
         <GestureDetector gesture={pan}>
           <View style={{ width: globeSize, height: globeSize, alignSelf: 'center' }}>
             <Svg width={globeSize} height={globeSize}>
@@ -203,22 +236,20 @@ export function ExploreWorldCanvas({
               />
               <Circle cx={cx} cy={cy} r={R} fill="url(#oceanG)" />
               <G>
-                {countries.map((country) => {
-                  const d = globePathForCountry(country, rotation, R, cx, cy);
-                  if (!d) return null;
-                  const selected = country.code === focus;
-                  const active = activitySet.has(country.code);
+                {globePaths.map((row) => {
+                  const selected = row.code === focus;
+                  const active = activitySet.has(row.code);
                   return (
                     <Path
-                      key={country.code}
-                      d={d}
+                      key={row.code}
+                      d={row.d}
                       fill={selected ? landSelected : active ? landActive : land}
                       opacity={selected ? 0.95 : active ? 0.85 : 0.55}
                       stroke={light ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.08)'}
                       strokeWidth={0.4}
                       onPress={() => {
                         hapticTap();
-                        onSelectCountry(country.code);
+                        onSelectCountry(row.code);
                       }}
                     />
                   );
@@ -237,7 +268,10 @@ export function ExploreWorldCanvas({
         </GestureDetector>
       ) : (
         <Pressable
-          style={[styles.mapFrame, { width: mapW, height: mapH, backgroundColor: light ? '#F3EFE7' : '#0E1218' }]}
+          style={[
+            styles.mapFrame,
+            { width: mapW, height: mapH, backgroundColor: light ? '#F3EFE7' : '#0E1218' },
+          ]}
           onPress={(e) => {
             const x = e.nativeEvent.locationX;
             const y = e.nativeEvent.locationY;
@@ -250,16 +284,26 @@ export function ExploreWorldCanvas({
           accessibilityLabel="World map. Tap a country to explore."
         >
           <Svg width={mapW} height={mapH}>
-            {countries.map((country) => {
-              const d = mapPathForCountry(country, mapW, mapH);
-              if (!d) return null;
-              const selected = country.code === focus;
-              const active = activitySet.has(country.code);
+            {mapPaths.map((row) => {
+              const selected = row.code === selectedCode;
+              const active = activitySet.has(row.code);
               return (
                 <Path
-                  key={country.code}
-                  d={d}
-                  fill={selected ? (light ? '#111113' : '#F5F5F5') : active ? (light ? '#2A2A2E' : '#3A3A42') : light ? '#D9D2C6' : '#2A2E36'}
+                  key={row.code}
+                  d={row.d}
+                  fill={
+                    selected
+                      ? light
+                        ? '#111113'
+                        : '#F5F5F5'
+                      : active
+                        ? light
+                          ? '#2A2A2E'
+                          : '#3A3A42'
+                        : light
+                          ? '#D9D2C6'
+                          : '#2A2E36'
+                  }
                   stroke={light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'}
                   strokeWidth={0.5}
                 />
@@ -269,73 +313,19 @@ export function ExploreWorldCanvas({
         </Pressable>
       )}
 
-      <View style={styles.caption}>
-        <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
-          {spinning ? 'Teleporting…' : visualMode === 'globe' ? 'Drag to explore' : 'Tap a country'}
-        </Text>
-        <Text allowFontScaling={false} style={[styles.focusName, { color: t.textPrimary }]}>
-          {focusName}
-        </Text>
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textSecondary }]}>
-          {focusMeta?.activityCount != null
-            ? `${focusMeta.activityCount.toLocaleString()} exploring`
-            : 'Quiet right now'}
-        </Text>
-        {focus ? (
-          <Pressable
-            onPress={() => {
-              hapticTap();
-              onSelectCountry(focus);
-            }}
-            style={[styles.cta, { backgroundColor: t.textPrimary }]}
-            accessibilityRole="button"
-            accessibilityLabel={`Explore ${focusName}`}
-          >
-            <Text allowFontScaling={false} style={[styles.ctaText, { color: t.background }]}>
-              Explore {focusName}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+        {spinning ? 'Teleporting…' : isGlobe ? 'Drag to explore' : 'Tap a country'}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.md, alignItems: 'center' },
-  modeRow: { flexDirection: 'row', gap: 8 },
-  modeChip: {
-    minHeight: 34,
-    paddingHorizontal: 14,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modeChipText: { ...typeScale.label, fontSize: 12, fontWeight: '800' },
+  wrap: { gap: space.xs, alignItems: 'center' },
   mapFrame: {
-    borderRadius: 24,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
     alignSelf: 'center',
   },
-  caption: { alignItems: 'center', gap: 4, minHeight: 110 },
-  hint: { ...typeScale.caption, fontSize: 12, fontWeight: '600' },
-  focusName: {
-    ...typeScale.editorial,
-    fontSize: 30,
-    lineHeight: 34,
-    fontWeight: '800',
-    letterSpacing: -0.6,
-    textTransform: 'uppercase',
-  },
-  meta: { ...typeScale.meta, fontSize: 14 },
-  cta: {
-    marginTop: space.sm,
-    minHeight: 44,
-    paddingHorizontal: space.lg,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaText: { ...typeScale.label, fontSize: 14, fontWeight: '800' },
+  hint: { ...typeScale.caption, fontSize: 11, fontWeight: '600' },
 });

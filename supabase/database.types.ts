@@ -3036,6 +3036,10 @@ export type Database = {
           status: Database["public"]["Enums"]["campaign_creator_status"]
         }
       }
+      block_meet_peer: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       block_profile: {
         Args: { p_target_id: string }
         Returns: undefined
@@ -3485,6 +3489,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      get_meet_session: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       get_my_play: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -3575,6 +3583,15 @@ export type Database = {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: undefined
       }
+      join_meet_queue: {
+        Args: {
+          p_country_code?: string
+          p_hood?: Database["public"]["Enums"]["hood_id"]
+          p_interests?: string[]
+          p_mode: Database["public"]["Enums"]["meet_match_mode"]
+        }
+        Returns: Json
+      }
       join_treasure_hunt: {
         Args: { p_hunt_id: string }
         Returns: Json
@@ -3582,6 +3599,14 @@ export type Database = {
       leave_hood: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: undefined
+      }
+      leave_meet_queue: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      leave_meet_session: {
+        Args: { p_reason?: string; p_session_id: string }
+        Returns: Json
       }
       list_arena_room_evidence: {
         Args: { p_limit?: number; p_room_id: string }
@@ -3669,6 +3694,14 @@ export type Database = {
           title: string
         }[]
       }
+      list_meet_messages: {
+        Args: {
+          p_before?: string
+          p_limit?: number
+          p_session_id: string
+        }
+        Returns: Json
+      }
       list_play_home: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -3688,6 +3721,16 @@ export type Database = {
       my_profile_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      next_meet: {
+        Args: {
+          p_country_code?: string
+          p_hood?: Database["public"]["Enums"]["hood_id"]
+          p_interests?: string[]
+          p_mode: Database["public"]["Enums"]["meet_match_mode"]
+          p_session_id: string
+        }
+        Returns: Json
       }
       new_arena_id: {
         Args: { p_prefix: string }
@@ -3729,6 +3772,10 @@ export type Database = {
           p_target_id: string
         }
         Returns: undefined
+      }
+      poll_meet_queue: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       post_arena_room_message: {
         Args: {
@@ -3871,6 +3918,14 @@ export type Database = {
         Args: { p_drop_id: string }
         Returns: undefined
       }
+      report_meet_session: {
+        Args: {
+          p_detail?: string
+          p_reason: Database["public"]["Enums"]["report_reason"]
+          p_session_id: string
+        }
+        Returns: Json
+      }
       resolve_prediction_game: {
         Args: { p_game_id: string; p_winning_option_id: string }
         Returns: Json
@@ -3897,6 +3952,10 @@ export type Database = {
       }
       search_explore: {
         Args: { p_limit?: number; p_query: string }
+        Returns: Json
+      }
+      send_meet_message: {
+        Args: { p_body: string; p_session_id: string }
         Returns: Json
       }
       set_sponsor_campaign_status: {
@@ -4268,6 +4327,9 @@ export type Database = {
       media_kind: "image" | "video" | "gif"
       media_status: "uploading" | "ready" | "failed" | "deleted"
       media_visibility: "public" | "private"
+      meet_match_mode: "ANYWHERE" | "COUNTRY" | "INTERESTS" | "HOOD"
+      meet_queue_status: "waiting" | "matched" | "cancelled"
+      meet_session_status: "active" | "ended"
       moderation_action:
         | "warn"
         | "remove_content"
@@ -4320,6 +4382,8 @@ export type Database = {
         | "arena_room_message"
         | "arena_room_evidence"
         | "challenge_entry"
+        | "meet_session"
+        | "meet_message"
       reputation_kind:
         | "clash_participation"
         | "clash_win"
@@ -4534,6 +4598,9 @@ export const Constants = {
       media_kind: ["image", "video", "gif"],
       media_status: ["uploading", "ready", "failed", "deleted"],
       media_visibility: ["public", "private"],
+      meet_match_mode: ["ANYWHERE", "COUNTRY", "INTERESTS", "HOOD"],
+      meet_queue_status: ["waiting", "matched", "cancelled"],
+      meet_session_status: ["active", "ended"],
       moderation_action: [
         "warn",
         "remove_content",
@@ -4590,6 +4657,8 @@ export const Constants = {
         "arena_room_message",
         "arena_room_evidence",
         "challenge_entry",
+        "meet_session",
+        "meet_message",
       ],
       reputation_kind: [
         "clash_participation",
