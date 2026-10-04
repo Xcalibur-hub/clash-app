@@ -180,7 +180,11 @@ export function ServiceDetail({ serviceId }: { serviceId: string }): React.JSX.E
           placeholderTextColor={t.textMuted}
           style={[
             styles.input,
-            { color: t.textPrimary, borderColor: t.border, backgroundColor: t.inputBackground },
+            {
+              color: t.textPrimary,
+              borderColor: t.border,
+              backgroundColor: t.scheme === 'dark' ? 'rgba(255,255,255,0.05)' : t.inputBackground,
+            },
           ]}
         />
         <VaultActionButton
@@ -200,7 +204,13 @@ function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
         hapticTap();
         onPress();
       }}
-      style={[styles.back, { backgroundColor: t.surface, borderColor: t.border }]}
+      style={[
+        styles.back,
+        {
+          backgroundColor: t.scheme === 'dark' ? 'rgba(255,255,255,0.08)' : t.surface,
+          borderColor: t.scheme === 'dark' ? 'transparent' : t.border,
+        },
+      ]}
       accessibilityRole="button"
       accessibilityLabel="Back"
     >

@@ -1,7 +1,7 @@
 /**
  * LOCAL ONLY — upload cinematic synthetic PNG posters for vault_creator_worlds.sql.
- * Multi-layer compositions (vignette, grain, shapes) — not flat color blocks.
- * Refuses non-local API URLs / missing local Docker container.
+ * Scene-aware compositions (doorways, streets, studio rings, architecture) —
+ * not flat gradient blocks. Refuses non-local API URLs / missing local Docker.
  */
 import { createClient } from '@supabase/supabase-js';
 import { spawnSync } from 'node:child_process';
@@ -14,43 +14,46 @@ const API_PORT = 55321;
 const LOCAL_SERVICE_ROLE =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 
-/** Distinct recipes so Maya/Leo/Aria/Noah never share the same look. */
+/**
+ * Distinct scene recipes — Maya/Leo/Aria/Noah never share the same look.
+ * `scene` drives composition structure; palette + seed vary lighting.
+ */
 const POSTERS = [
-  // Maya — dark cinematic horror / analog film
-  { path: 'devfx_vw_maya/devfx_vw_maya_free/devfx_vw_maya_free.png', mood: 'horror', seed: 11 },
-  { path: 'devfx_vw_maya/devfx_vw_maya_teaser/devfx_vw_maya_teaser.png', mood: 'horror', seed: 12 },
-  { path: 'devfx_vw_maya/devfx_vw_maya_ep1/devfx_vw_maya_ep1.png', mood: 'horror', seed: 13 },
-  { path: 'devfx_vw_maya/devfx_vw_maya_ep2/devfx_vw_maya_ep2.png', mood: 'horror', seed: 14 },
-  { path: 'devfx_vw_maya/devfx_vw_maya_ep3/devfx_vw_maya_ep3.png', mood: 'horror', seed: 15 },
-  { path: 'devfx_vw_maya/devfx_vw_maya_svc/devfx_vw_maya_svc.png', mood: 'horrorWarm', seed: 16 },
-  { path: 'devfx_vw_maya/devfx_vw_maya_course/devfx_vw_maya_course.png', mood: 'horror', seed: 17 },
-  { path: 'devfx_vw_maya/devfx_vw_maya_prod/devfx_vw_maya_prod.png', mood: 'artifactDark', seed: 18 },
-  // Leo — street / night photography
-  { path: 'devfx_vw_leo/devfx_vw_leo_free/devfx_vw_leo_free.png', mood: 'street', seed: 21 },
-  { path: 'devfx_vw_leo/devfx_vw_leo_course/devfx_vw_leo_course.png', mood: 'street', seed: 22 },
-  { path: 'devfx_vw_leo/devfx_vw_leo_svc/devfx_vw_leo_svc.png', mood: 'streetCool', seed: 23 },
-  // Aria — music studio / abstract audio
-  { path: 'devfx_vw_aria/devfx_vw_aria_free/devfx_vw_aria_free.png', mood: 'studio', seed: 31 },
-  { path: 'devfx_vw_aria/devfx_vw_aria_col/devfx_vw_aria_col.png', mood: 'studio', seed: 32 },
-  { path: 'devfx_vw_aria/devfx_vw_aria_svc/devfx_vw_aria_svc.png', mood: 'studioWarm', seed: 33 },
-  { path: 'devfx_vw_aria/devfx_vw_aria_prod/devfx_vw_aria_prod.png', mood: 'artifactWarm', seed: 34 },
-  // Noah — architecture / interface / design
-  { path: 'devfx_vw_noah/devfx_vw_noah_free/devfx_vw_noah_free.png', mood: 'arch', seed: 41 },
-  { path: 'devfx_vw_noah/devfx_vw_noah_course/devfx_vw_noah_course.png', mood: 'arch', seed: 42 },
-  { path: 'devfx_vw_noah/devfx_vw_noah_prod/devfx_vw_noah_prod.png', mood: 'artifactClean', seed: 43 },
+  // Maya — horror film stills
+  { path: 'devfx_vw_maya/devfx_vw_maya_free/devfx_vw_maya_free.png', mood: 'horror', scene: 'doorway', seed: 111 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_teaser/devfx_vw_maya_teaser.png', mood: 'horror', scene: 'fogHall', seed: 122 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_ep1/devfx_vw_maya_ep1.png', mood: 'horror', scene: 'tapeStill', seed: 133 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_ep2/devfx_vw_maya_ep2.png', mood: 'horror', scene: 'window', seed: 144 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_ep3/devfx_vw_maya_ep3.png', mood: 'horrorWarm', scene: 'candleRoom', seed: 155 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_svc/devfx_vw_maya_svc.png', mood: 'horrorWarm', scene: 'portraitWarm', seed: 166 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_course/devfx_vw_maya_course.png', mood: 'horror', scene: 'filmStrip', seed: 177 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_prod/devfx_vw_maya_prod.png', mood: 'artifactDark', scene: 'lutPack', seed: 188 },
+  // Leo — night / street photography
+  { path: 'devfx_vw_leo/devfx_vw_leo_free/devfx_vw_leo_free.png', mood: 'street', scene: 'neonRain', seed: 211 },
+  { path: 'devfx_vw_leo/devfx_vw_leo_course/devfx_vw_leo_course.png', mood: 'street', scene: 'alley', seed: 222 },
+  { path: 'devfx_vw_leo/devfx_vw_leo_svc/devfx_vw_leo_svc.png', mood: 'streetCool', scene: 'streetPortrait', seed: 233 },
+  // Aria — studio / music
+  { path: 'devfx_vw_aria/devfx_vw_aria_free/devfx_vw_aria_free.png', mood: 'studio', scene: 'vinyl', seed: 311 },
+  { path: 'devfx_vw_aria/devfx_vw_aria_col/devfx_vw_aria_col.png', mood: 'studio', scene: 'waveform', seed: 322 },
+  { path: 'devfx_vw_aria/devfx_vw_aria_svc/devfx_vw_aria_svc.png', mood: 'studioWarm', scene: 'micBooth', seed: 333 },
+  { path: 'devfx_vw_aria/devfx_vw_aria_prod/devfx_vw_aria_prod.png', mood: 'artifactWarm', scene: 'samplePack', seed: 344 },
+  // Noah — architecture / design
+  { path: 'devfx_vw_noah/devfx_vw_noah_free/devfx_vw_noah_free.png', mood: 'arch', scene: 'facade', seed: 411 },
+  { path: 'devfx_vw_noah/devfx_vw_noah_course/devfx_vw_noah_course.png', mood: 'arch', scene: 'blueprint', seed: 422 },
+  { path: 'devfx_vw_noah/devfx_vw_noah_prod/devfx_vw_noah_prod.png', mood: 'artifactClean', scene: 'uiKit', seed: 433 },
 ];
 
 const PALETTES = {
-  horror: { a: [18, 10, 14], b: [72, 28, 32], c: [140, 60, 48], light: [210, 170, 140] },
-  horrorWarm: { a: [28, 14, 12], b: [90, 40, 28], c: [160, 80, 50], light: [220, 180, 130] },
-  street: { a: [8, 16, 36], b: [20, 48, 96], c: [40, 90, 160], light: [220, 200, 120] },
-  streetCool: { a: [10, 22, 44], b: [28, 60, 110], c: [70, 130, 190], light: [180, 210, 240] },
-  studio: { a: [40, 18, 48], b: [90, 40, 70], c: [180, 90, 60], light: [240, 190, 120] },
-  studioWarm: { a: [48, 22, 28], b: [110, 55, 40], c: [190, 110, 70], light: [250, 210, 150] },
-  arch: { a: [22, 28, 30], b: [50, 70, 72], c: [120, 140, 138], light: [230, 235, 232] },
-  artifactDark: { a: [14, 16, 22], b: [36, 42, 58], c: [80, 90, 120], light: [200, 205, 220] },
-  artifactWarm: { a: [30, 18, 24], b: [70, 40, 50], c: [140, 90, 70], light: [235, 200, 160] },
-  artifactClean: { a: [28, 32, 36], b: [70, 80, 86], c: [140, 150, 156], light: [240, 242, 244] },
+  horror: { a: [12, 8, 10], b: [48, 18, 22], c: [110, 42, 36], light: [200, 150, 120] },
+  horrorWarm: { a: [22, 12, 10], b: [78, 34, 24], c: [150, 72, 42], light: [230, 175, 120] },
+  street: { a: [6, 12, 28], b: [16, 40, 86], c: [36, 80, 150], light: [230, 195, 100] },
+  streetCool: { a: [8, 18, 38], b: [22, 52, 100], c: [60, 120, 180], light: [170, 205, 235] },
+  studio: { a: [32, 14, 40], b: [80, 34, 62], c: [170, 80, 50], light: [245, 185, 110] },
+  studioWarm: { a: [42, 18, 22], b: [100, 48, 36], c: [185, 100, 60], light: [255, 205, 140] },
+  arch: { a: [18, 24, 26], b: [44, 62, 64], c: [110, 128, 126], light: [228, 232, 228] },
+  artifactDark: { a: [10, 12, 18], b: [30, 36, 50], c: [70, 80, 110], light: [190, 198, 215] },
+  artifactWarm: { a: [26, 14, 20], b: [64, 36, 44], c: [130, 82, 62], light: [235, 195, 155] },
+  artifactClean: { a: [24, 28, 32], b: [64, 74, 80], c: [130, 140, 146], light: [238, 240, 242] },
 };
 
 function fail(message) {
@@ -132,12 +135,141 @@ function hash(n) {
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
 }
 
-/** Cinematic still-like PNG: vignette, grain, soft light pools, optional shapes. */
-function composePoster(width, height, mood, seed) {
+function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/** Scene mask 0..1 — higher = more “subject” / lit structure. */
+function sceneMask(scene, vx, vy, seed) {
+  const s = seed * 0.01;
+  switch (scene) {
+    case 'doorway': {
+      const door = smoothstep(0.28, 0.32, vx) * (1 - smoothstep(0.68, 0.72, vx));
+      const frame = Math.abs(vx - 0.5) < 0.03 || Math.abs(vx - 0.32) < 0.012 || Math.abs(vx - 0.68) < 0.012 ? 0.85 : 0;
+      const glow = Math.exp(-((vx - 0.5) ** 2) * 18 - ((vy - 0.55) ** 2) * 10);
+      return Math.max(door * (0.35 + vy * 0.5), frame, glow * 0.9);
+    }
+    case 'fogHall': {
+      const walls = Math.exp(-((Math.abs(vx - 0.5) - 0.22) ** 2) * 80);
+      const depth = Math.exp(-((vy - 0.35) ** 2) * 6) * Math.exp(-((vx - 0.5) ** 2) * 10);
+      const mist = 0.25 + 0.35 * Math.sin(vx * 14 + s) * Math.sin(vy * 9 + s * 2);
+      return Math.max(walls * 0.7, depth, mist * 0.5);
+    }
+    case 'tapeStill': {
+      const scan = Math.abs(Math.sin(vy * Math.PI * 90 + s * 40));
+      const frame = vy > 0.08 && vy < 0.92 && vx > 0.1 && vx < 0.9 ? 0.55 : 0.15;
+      const glitch = hash(Math.floor(vy * 40) * 97 + seed) > 0.92 ? 0.9 : 0;
+      return frame * (0.55 + scan * 0.2) + glitch * 0.4;
+    }
+    case 'window': {
+      const panes =
+        (1 - smoothstep(0.18, 0.22, Math.abs(vx - 0.5))) *
+        (1 - smoothstep(0.12, 0.16, Math.abs(vy - 0.42)));
+      const mullion = Math.abs(vx - 0.5) < 0.018 || Math.abs(vy - 0.42) < 0.014 ? 0.95 : 0;
+      const spill = Math.exp(-((vx - 0.5) ** 2) * 8 - ((vy - 0.7) ** 2) * 4) * 0.7;
+      return Math.max(panes * 0.85, mullion, spill);
+    }
+    case 'candleRoom': {
+      const flame = Math.exp(-((vx - 0.48) ** 2) * 90 - ((vy - 0.62) ** 2) * 40);
+      const pool = Math.exp(-((vx - 0.5) ** 2) * 6 - ((vy - 0.75) ** 2) * 3);
+      const rim = Math.exp(-((vx - 0.2) ** 2) * 20) * (1 - vy) * 0.4;
+      return Math.max(flame, pool * 0.75, rim);
+    }
+    case 'portraitWarm': {
+      const face = Math.exp(-((vx - 0.52) ** 2) * 14 - ((vy - 0.4) ** 2) * 10);
+      const shoulder = Math.exp(-((vx - 0.5) ** 2) * 6 - ((vy - 0.78) ** 2) * 12) * 0.55;
+      return Math.max(face, shoulder);
+    }
+    case 'filmStrip': {
+      const sprocket =
+        (vx < 0.08 || vx > 0.92) && Math.abs(Math.sin(vy * Math.PI * 18)) > 0.55 ? 0.95 : 0;
+      const panels = Math.abs(Math.sin(vy * Math.PI * 3 + s)) > 0.35 ? 0.65 : 0.2;
+      return Math.max(sprocket, panels);
+    }
+    case 'lutPack': {
+      const card = smoothstep(0.18, 0.25, vx) * (1 - smoothstep(0.75, 0.82, vx)) *
+        smoothstep(0.22, 0.3, vy) * (1 - smoothstep(0.7, 0.78, vy));
+      const swatch = Math.abs(vx - 0.5) < 0.12 && Math.abs(vy - 0.48) < 0.06 ? 0.9 : 0;
+      return Math.max(card * 0.7, swatch);
+    }
+    case 'neonRain': {
+      const rain = hash(Math.floor(vx * 80) * 13 + Math.floor(vy * 120) + seed) > 0.88 ? 0.75 : 0;
+      const neon = Math.exp(-((vx - 0.35) ** 2) * 40) * (0.4 + 0.6 * Math.sin(vy * 20 + s));
+      const ground = smoothstep(0.7, 0.95, vy) * (0.3 + 0.4 * Math.sin(vx * 30));
+      return Math.max(rain * 0.5, neon * 0.85, ground);
+    }
+    case 'alley': {
+      const vanishing = Math.exp(-((vx - 0.5) ** 2) * 22 - ((vy - 0.45) ** 2) * 8);
+      const walls = Math.exp(-((Math.abs(vx - 0.5) - 0.28) ** 2) * 60);
+      const lamp = Math.exp(-((vx - 0.62) ** 2) * 70 - ((vy - 0.28) ** 2) * 50);
+      return Math.max(vanishing, walls * 0.65, lamp);
+    }
+    case 'streetPortrait': {
+      const subject = Math.exp(-((vx - 0.45) ** 2) * 16 - ((vy - 0.42) ** 2) * 9);
+      const bokeh = hash(Math.floor(vx * 20) * 31 + Math.floor(vy * 20) + seed) > 0.9 ? 0.7 : 0;
+      return Math.max(subject, bokeh * (1 - subject));
+    }
+    case 'vinyl': {
+      const cx = 0.5;
+      const cy = 0.48;
+      const d = Math.sqrt((vx - cx) ** 2 + (vy - cy) ** 2);
+      const disc = smoothstep(0.34, 0.32, d) * (1 - smoothstep(0.08, 0.05, d));
+      const grooves = Math.abs(Math.sin(d * 120)) * disc * 0.5;
+      const label = smoothstep(0.09, 0.07, d);
+      return Math.max(disc * 0.75, grooves, label);
+    }
+    case 'waveform': {
+      const wave = Math.exp(-((vy - (0.5 + 0.18 * Math.sin(vx * 28 + s))) ** 2) * 120);
+      const bars = hash(Math.floor(vx * 48) + seed) * smoothstep(0.35, 0.5, 1 - Math.abs(vy - 0.5) * 2);
+      return Math.max(wave, bars * 0.7);
+    }
+    case 'micBooth': {
+      const mic = Math.exp(-((vx - 0.5) ** 2) * 55 - ((vy - 0.45) ** 2) * 18);
+      const grille = Math.abs(Math.sin(vy * 80)) * mic * 0.5;
+      const foam = Math.exp(-((vx - 0.5) ** 2) * 8 - ((vy - 0.7) ** 2) * 20) * 0.45;
+      return Math.max(mic, grille, foam);
+    }
+    case 'samplePack': {
+      const box = smoothstep(0.2, 0.28, vx) * (1 - smoothstep(0.72, 0.8, vx)) *
+        smoothstep(0.25, 0.32, vy) * (1 - smoothstep(0.68, 0.75, vy));
+      const stripe = Math.abs(vy - 0.4) < 0.04 && vx > 0.25 && vx < 0.75 ? 0.85 : 0;
+      return Math.max(box * 0.65, stripe);
+    }
+    case 'facade': {
+      const cols = Math.abs(Math.sin(vx * Math.PI * 6 + s));
+      const rows = Math.abs(Math.sin(vy * Math.PI * 8));
+      const windows = cols > 0.55 && rows > 0.55 ? 0.8 : 0.15;
+      const ledge = Math.abs(vy - 0.62) < 0.015 ? 0.7 : 0;
+      return Math.max(windows, ledge);
+    }
+    case 'blueprint': {
+      const grid =
+        Math.abs(Math.sin(vx * Math.PI * 16)) < 0.08 || Math.abs(Math.sin(vy * Math.PI * 16)) < 0.08
+          ? 0.55
+          : 0.12;
+      const plan = Math.exp(-((vx - 0.45) ** 2) * 10 - ((vy - 0.5) ** 2) * 14) * 0.7;
+      const line = Math.abs(vy - (0.3 + vx * 0.4)) < 0.01 ? 0.85 : 0;
+      return Math.max(grid, plan, line);
+    }
+    case 'uiKit': {
+      const panel = smoothstep(0.15, 0.22, vx) * (1 - smoothstep(0.78, 0.85, vx)) *
+        smoothstep(0.18, 0.25, vy) * (1 - smoothstep(0.75, 0.82, vy));
+      const chips =
+        vy > 0.35 && vy < 0.55 && hash(Math.floor(vx * 8) * 17 + seed) > 0.55 ? 0.75 : 0;
+      return Math.max(panel * 0.6, chips * panel);
+    }
+    default:
+      return 0.35 + 0.3 * Math.sin(vx * 6 + s) * Math.cos(vy * 5);
+  }
+}
+
+/** Cinematic still-like PNG with distinct scene structure per asset. */
+function composePoster(width, height, mood, scene, seed) {
   const p = PALETTES[mood] ?? PALETTES.horror;
   const raw = Buffer.alloc((width * 3 + 1) * height);
-  const cx = width * (0.35 + hash(seed) * 0.3);
-  const cy = height * (0.3 + hash(seed + 3) * 0.4);
+  const cx = width * (0.38 + hash(seed) * 0.24);
+  const cy = height * (0.32 + hash(seed + 3) * 0.28);
   const streakAngle = hash(seed + 7) * Math.PI;
 
   for (let y = 0; y < height; y += 1) {
@@ -149,58 +281,51 @@ function composePoster(width, height, mood, seed) {
       const dx = (x - cx) / width;
       const dy = (y - cy) / height;
       const dist = Math.sqrt(dx * dx + dy * dy);
+      const mask = sceneMask(scene, vx, vy, seed);
 
-      // Base vertical + radial blend
-      let t = mix(vy, dist, 0.55);
+      let t = mix(vy, dist, 0.4);
       t = Math.max(0, Math.min(1, t));
       let r = mix(mix(p.a[0], p.b[0], t), p.c[0], t * t);
       let g = mix(mix(p.a[1], p.b[1], t), p.c[1], t * t);
       let b = mix(mix(p.a[2], p.b[2], t), p.c[2], t * t);
 
+      // Lift subject / structure from scene mask
+      r = mix(r, p.light[0], mask * 0.55);
+      g = mix(g, p.light[1], mask * 0.48);
+      b = mix(b, p.light[2], mask * 0.4);
+
       // Soft key light
-      const light = Math.exp(-dist * dist * (5.5 + hash(seed + 9) * 4));
-      r = mix(r, p.light[0], light * 0.55);
-      g = mix(g, p.light[1], light * 0.45);
-      b = mix(b, p.light[2], light * 0.35);
+      const light = Math.exp(-dist * dist * (4.5 + hash(seed + 9) * 3.5));
+      r = mix(r, p.light[0], light * 0.35);
+      g = mix(g, p.light[1], light * 0.28);
+      b = mix(b, p.light[2], light * 0.22);
 
-      // Light streak (street/neon feel) or warm rim
+      // Directional streak
       const proj = (vx - 0.5) * Math.cos(streakAngle) + (vy - 0.5) * Math.sin(streakAngle);
-      const streak = Math.exp(-Math.abs(proj) * 18) * (0.15 + hash(seed + x + y) * 0.1);
+      const streak = Math.exp(-Math.abs(proj) * 16) * (0.1 + hash(seed + x + y) * 0.08) * (0.4 + mask);
       r = mix(r, p.light[0], streak);
-      g = mix(g, p.light[1], streak * 0.8);
-      b = mix(b, p.light[2], streak * 0.6);
+      g = mix(g, p.light[1], streak * 0.85);
+      b = mix(b, p.light[2], streak * 0.7);
 
-      // Soft geometric planes (architecture / design moods)
-      if (mood.startsWith('arch') || mood.startsWith('artifact')) {
-        const grid = Math.abs(Math.sin(vx * Math.PI * 4 + seed) * Math.cos(vy * Math.PI * 3));
-        if (grid > 0.92) {
-          r = mix(r, p.light[0], 0.25);
-          g = mix(g, p.light[1], 0.25);
-          b = mix(b, p.light[2], 0.25);
-        }
-      }
-
-      // Circular motif for studio
-      if (mood.startsWith('studio')) {
-        const ring = Math.abs(dist - 0.28);
-        if (ring < 0.03) {
-          r = mix(r, p.light[0], 0.4);
-          g = mix(g, p.light[1], 0.35);
-          b = mix(b, p.light[2], 0.3);
-        }
+      // Chromatic film edge for horror scenes
+      if (mood.startsWith('horror')) {
+        const edge = smoothstep(0.78, 1, Math.max(Math.abs(vx - 0.5) * 2, Math.abs(vy - 0.5) * 2));
+        r = mix(r, p.c[0], edge * 0.25);
+        b = mix(b, p.a[2], edge * 0.2);
       }
 
       // Vignette
-      const vig = Math.min(1, dist * 1.35);
-      r *= 1 - vig * 0.55;
-      g *= 1 - vig * 0.55;
-      b *= 1 - vig * 0.6;
+      const vig = Math.min(1, dist * 1.25 + (1 - mask) * 0.15);
+      r *= 1 - vig * 0.58;
+      g *= 1 - vig * 0.58;
+      b *= 1 - vig * 0.62;
 
-      // Film grain
-      const grain = (hash(seed * 10007 + x * 131 + y * 917) - 0.5) * 18;
-      r += grain;
+      // Grain + slight color noise
+      const grain = (hash(seed * 10007 + x * 131 + y * 917) - 0.5) * 22;
+      const chroma = (hash(seed * 5011 + x * 17 + y * 41) - 0.5) * 8;
+      r += grain + chroma;
       g += grain * 0.9;
-      b += grain * 0.85;
+      b += grain * 0.85 - chroma * 0.5;
 
       const i = row + 1 + x * 3;
       raw[i] = clamp(r);
@@ -234,7 +359,7 @@ async function main() {
 
   let uploaded = 0;
   for (const poster of POSTERS) {
-    const body = composePoster(720, 960, poster.mood, poster.seed);
+    const body = composePoster(720, 960, poster.mood, poster.scene, poster.seed);
     const { error } = await supabase.storage.from('public-media').upload(poster.path, body, {
       contentType: 'image/png',
       upsert: true,
@@ -243,7 +368,7 @@ async function main() {
     if (error) fail(`${poster.path}: ${error.message}`);
     uploaded += 1;
   }
-  console.log(`upload-vault-fixture-media: uploaded ${uploaded} cinematic posters`);
+  console.log(`upload-vault-fixture-media: uploaded ${uploaded} cinematic scene posters`);
 }
 
 if (process.argv[1]?.includes('upload-vault-fixture-media')) {

@@ -9,6 +9,8 @@ export interface VaultActionButtonProps {
   onPress: () => void;
   tone?: 'solid' | 'quiet';
   compact?: boolean;
+  /** Translucent treatment for controls sitting on hero media. */
+  overMedia?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 }
@@ -19,11 +21,31 @@ export function VaultActionButton({
   onPress,
   tone = 'solid',
   compact = false,
+  overMedia = false,
   style,
   accessibilityLabel,
 }: VaultActionButtonProps): React.JSX.Element {
   const t = useThemeColors();
   const solid = tone === 'solid';
+
+  let backgroundColor: string;
+  let borderColor: string;
+  let labelColor: string;
+
+  if (overMedia) {
+    backgroundColor = solid ? 'rgba(250,250,248,0.94)' : 'rgba(255,255,255,0.14)';
+    borderColor = 'transparent';
+    labelColor = solid ? '#141418' : '#FAFAF8';
+  } else if (solid) {
+    backgroundColor = t.scheme === 'light' ? t.textPrimary : 'rgba(255,255,255,0.12)';
+    borderColor = t.border;
+    labelColor = t.scheme === 'light' ? t.textInverse : t.textPrimary;
+  } else {
+    // Quiet: avoid harsh pure-white cards in dark mode
+    backgroundColor = t.scheme === 'dark' ? 'rgba(255,255,255,0.06)' : t.surface;
+    borderColor = t.border;
+    labelColor = t.textPrimary;
+  }
 
   return (
     <PressableScale
@@ -37,29 +59,13 @@ export function VaultActionButton({
         styles.btn,
         compact && styles.compact,
         {
-          backgroundColor: solid
-            ? t.scheme === 'light'
-              ? t.textPrimary
-              : t.surfaceElevated
-            : t.surface,
-          borderColor: t.border,
+          backgroundColor,
+          borderColor,
         },
         style,
       ]}
     >
-      <Text
-        allowFontScaling={false}
-        style={[
-          styles.label,
-          {
-            color: solid
-              ? t.scheme === 'light'
-                ? t.textInverse
-                : t.textPrimary
-              : t.textPrimary,
-          },
-        ]}
-      >
+      <Text allowFontScaling={false} style={[styles.label, { color: labelColor }]}>
         {label}
       </Text>
     </PressableScale>
@@ -76,10 +82,11 @@ const styles = StyleSheet.create({
   },
   compact: {
     paddingHorizontal: space.md,
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
   label: {
     ...typeScale.label,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

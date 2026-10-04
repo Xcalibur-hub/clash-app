@@ -140,7 +140,9 @@ const styles = StyleSheet.create({
   copy: {
     flex: 1,
     justifyContent: 'flex-end',
-    padding: space.sm,
+    paddingHorizontal: space.md,
+    paddingBottom: space.md,
+    paddingTop: space.sm,
     gap: 2,
   },
   kind: {

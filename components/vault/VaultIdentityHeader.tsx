@@ -1,10 +1,11 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import type { User } from '../../store';
 import type { CreatorVault, VaultSubscriptionState } from '../../services/vaultMappers';
 import { creatorIdentityLine } from '../../utils/vaultPresentation';
-import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import { duration, layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { VaultActionButton } from './VaultActionButton';
 
 export interface VaultIdentityHeaderProps {
@@ -29,7 +30,7 @@ function subscriptionLabel(subscription: VaultSubscriptionState | null): string 
 }
 
 /**
- * Immersive Creator World hero — Explore media language + intimate creator entry.
+ * Immersive Creator World hero — identity on media, compact actions, tight handoff to content.
  */
 export function VaultIdentityHeader({
   creator,
@@ -43,10 +44,18 @@ export function VaultIdentityHeader({
   onManage,
 }: VaultIdentityHeaderProps): React.JSX.Element {
   const t = useThemeColors();
+  const reduced = useReducedMotion();
   const subLabel = subscriptionLabel(subscription);
   const subscribed = subscription?.active === true;
   const identity = creatorIdentityLine(creator.bio ?? vault.description, vault.title);
-  const fallback = creator.tint || (t.scheme === 'light' ? '#2C3340' : '#1A1A20');
+  const fallback = creator.tint || (t.scheme === 'light' ? '#2C3340' : '#141418');
+  const showVaultTitle = vault.title.trim().length > 0 && vault.title.trim() !== creator.name;
+  const extraBio =
+    creator.bio && creator.bio !== identity
+      ? creator.bio
+      : vault.description && vault.description !== identity
+        ? vault.description
+        : null;
 
   return (
     <View style={styles.wrap}>
@@ -64,11 +73,11 @@ export function VaultIdentityHeader({
           <Image source={{ uri: heroUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : (
           <LinearGradient
-            colors={[fallback, t.scheme === 'light' ? '#D8D2C8' : '#121216']}
+            colors={[fallback, t.scheme === 'light' ? '#D8D2C8' : '#0E0E12']}
             style={StyleSheet.absoluteFill}
           />
         )}
-        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.78)']} style={styles.scrim} />
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.scrim} />
         <View style={styles.heroCopy}>
           <Text allowFontScaling={false} style={styles.kind}>
             CREATOR WORLD
@@ -79,51 +88,68 @@ export function VaultIdentityHeader({
           <Text allowFontScaling={false} style={styles.identity} numberOfLines={2}>
             {identity}
           </Text>
-        </View>
-      </View>
+          {subLabel ? (
+            <Text allowFontScaling={false} style={styles.accessOnMedia}>
+              {subLabel}
+            </Text>
+          ) : null}
 
-      <View style={[styles.overlap, { backgroundColor: t.background }]}>
-        <Text allowFontScaling={false} style={[styles.vaultTitle, { color: t.textPrimary }]} numberOfLines={2}>
-          {vault.title}
-        </Text>
-        {creator.bio && creator.bio !== identity ? (
-          <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]} numberOfLines={3}>
-            {creator.bio}
-          </Text>
-        ) : vault.description ? (
-          <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]} numberOfLines={3}>
-            {vault.description}
-          </Text>
-        ) : null}
-        {subLabel ? (
-          <Text allowFontScaling={false} style={[styles.access, { color: t.textMuted }]}>
-            {subLabel}
-          </Text>
-        ) : null}
-
-        <View style={styles.actions}>
-          {isSelf ? (
-            <VaultActionButton label="Manage" tone="quiet" compact onPress={onManage ?? (() => undefined)} />
-          ) : (
-            <>
+          <View style={styles.actions}>
+            {isSelf ? (
               <VaultActionButton
-                label={following ? 'Following' : 'Follow'}
-                tone={following ? 'quiet' : 'solid'}
+                label="Manage"
+                tone="quiet"
                 compact
-                onPress={onToggleFollow ?? (() => undefined)}
+                overMedia
+                onPress={onManage ?? (() => undefined)}
               />
-              {!subscribed ? (
+            ) : (
+              <>
                 <VaultActionButton
-                  label="Subscribe"
-                  tone="quiet"
+                  label={following ? 'Following' : 'Follow'}
+                  tone={following ? 'quiet' : 'solid'}
                   compact
-                  onPress={onSubscribe ?? (() => undefined)}
+                  overMedia
+                  onPress={onToggleFollow ?? (() => undefined)}
                 />
-              ) : null}
-            </>
-          )}
+                {!subscribed ? (
+                  <VaultActionButton
+                    label="Subscribe"
+                    tone="quiet"
+                    compact
+                    overMedia
+                    onPress={onSubscribe ?? (() => undefined)}
+                  />
+                ) : null}
+              </>
+            )}
+          </View>
         </View>
       </View>
+
+      {(showVaultTitle || extraBio) && (
+        <Animated.View
+          entering={reduced ? undefined : FadeInUp.duration(duration.base)}
+          style={[
+            styles.overlap,
+            {
+              backgroundColor: t.scheme === 'light' ? t.background : 'rgba(12,12,14,0.92)',
+              borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+            },
+          ]}
+        >
+          {showVaultTitle ? (
+            <Text allowFontScaling={false} style={[styles.vaultTitle, { color: t.textPrimary }]} numberOfLines={2}>
+              {vault.title}
+            </Text>
+          ) : null}
+          {extraBio ? (
+            <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]} numberOfLines={2}>
+              {extraBio}
+            </Text>
+          ) : null}
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -145,11 +171,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '62%',
+    height: '68%',
   },
   heroCopy: {
-    gap: 6,
-    paddingBottom: space.xxl + 8,
+    gap: 5,
+    paddingBottom: space.xl,
     paddingHorizontal: layout.screenX + 4,
     paddingTop: space.xxxl,
   },
@@ -162,34 +188,46 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typeScale.display,
-    fontSize: 40,
-    lineHeight: 42,
+    fontSize: 38,
+    lineHeight: 40,
     fontWeight: '800',
-    letterSpacing: -1.4,
+    letterSpacing: -1.3,
     color: '#FAFAF8',
   },
   identity: {
     ...typeScale.body,
     fontSize: 15,
-    color: 'rgba(250,250,248,0.84)',
+    color: 'rgba(250,250,248,0.86)',
     maxWidth: 300,
   },
-  overlap: {
+  accessOnMedia: {
+    ...typeScale.caption,
+    letterSpacing: 0.4,
+    fontWeight: '600',
+    color: 'rgba(250,250,248,0.7)',
+    marginTop: 2,
+  },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: space.sm,
-    marginTop: -space.lg,
+    marginTop: space.sm,
+  },
+  overlap: {
+    gap: 4,
+    marginTop: -space.md,
     marginHorizontal: space.xs,
     paddingHorizontal: space.md,
-    paddingTop: space.lg,
+    paddingTop: space.md,
     paddingBottom: space.sm,
     borderRadius: radius.xxl,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   vaultTitle: {
     ...typeScale.section,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
-    letterSpacing: -0.35,
+    letterSpacing: -0.3,
   },
-  description: { ...typeScale.body, fontSize: 15 },
-  access: { ...typeScale.caption, letterSpacing: 0.4, fontWeight: '600' },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: 2 },
+  description: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
 });

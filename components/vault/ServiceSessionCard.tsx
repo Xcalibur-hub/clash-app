@@ -1,8 +1,9 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import { vaultOfferPriceLabel, type VaultOfferAccess } from '../../utils/vaultMoney';
-import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { duration, radius, space, typeScale, useThemeColors } from '../../theme';
 import { PressableScale } from '../shared/PressableScale';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -17,7 +18,9 @@ export interface ServiceSessionCardProps {
   onOpen: () => void;
 }
 
-/** Personal session invite — portrait + copy, Explore density. */
+/**
+ * Creator-led session invite — immersive media plane, not a marketplace listing.
+ */
 export const ServiceSessionCard = React.memo(function ServiceSessionCard({
   title,
   subtitle,
@@ -29,83 +32,115 @@ export const ServiceSessionCard = React.memo(function ServiceSessionCard({
   onOpen,
 }: ServiceSessionCardProps): React.JSX.Element {
   const t = useThemeColors();
+  const reduced = useReducedMotion();
   const price = vaultOfferPriceLabel({ accessType, priceAmountMinor, currency });
-  const fallback = t.scheme === 'light' ? '#2C3340' : '#1A1A20';
+  const fallback = t.scheme === 'light' ? '#2C3340' : '#141418';
+  const metaLine = [subtitle?.trim() || null, price].filter(Boolean).join(' · ');
 
   return (
-    <PressableScale
-      onPress={() => {
-        hapticTap();
-        onOpen();
-      }}
-      style={[
-        styles.wrap,
-        {
-          borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
-          backgroundColor: t.surface,
-        },
-      ]}
-      accessibilityLabel={`Service: ${title}`}
-    >
-      <View style={[styles.thumb, { backgroundColor: fallback }]}>
+    <Animated.View entering={reduced ? undefined : FadeInUp.duration(duration.base)}>
+      <PressableScale
+        onPress={() => {
+          hapticTap();
+          onOpen();
+        }}
+        style={[
+          styles.wrap,
+          {
+            backgroundColor: fallback,
+            borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
+          },
+        ]}
+        accessibilityLabel={`Session: ${title}`}
+      >
         {coverUrl ? (
           <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : (
-          <LinearGradient colors={[fallback, '#121216']} style={StyleSheet.absoluteFill} />
+          <LinearGradient
+            colors={[fallback, t.scheme === 'light' ? '#3A322C' : '#0E0E12']}
+            style={StyleSheet.absoluteFill}
+          />
         )}
-      </View>
-      <View style={styles.copy}>
-        <Text allowFontScaling={false} style={[styles.kind, { color: t.textMuted }]}>
-          {creatorName ? `SESSION · ${creatorName.toUpperCase()}` : 'SESSION'}
-        </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]} numberOfLines={2}>
-            {subtitle}
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.82)']} style={styles.scrim} />
+
+        <View style={styles.copy}>
+          <Text allowFontScaling={false} style={styles.kind}>
+            {creatorName ? `SESSION · ${creatorName.toUpperCase()}` : 'SESSION'}
           </Text>
-        ) : null}
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-          {price}
-        </Text>
-        <Text allowFontScaling={false} style={[styles.cta, { color: t.textPrimary }]}>
-          Request session →
-        </Text>
-      </View>
-    </PressableScale>
+          <Text allowFontScaling={false} style={styles.title} numberOfLines={2}>
+            {title}
+          </Text>
+          {metaLine ? (
+            <Text allowFontScaling={false} style={styles.meta} numberOfLines={2}>
+              {metaLine}
+            </Text>
+          ) : null}
+          <View style={styles.ctaPill}>
+            <Text allowFontScaling={false} style={styles.cta}>
+              REQUEST →
+            </Text>
+          </View>
+        </View>
+      </PressableScale>
+    </Animated.View>
   );
 });
 
 const styles = StyleSheet.create({
   wrap: {
-    flexDirection: 'row',
-    gap: space.md,
+    height: 240,
+    width: '100%',
     borderRadius: radius.xxl,
+    overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-    padding: space.sm,
   },
-  thumb: {
-    width: 108,
-    minHeight: 132,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
+  scrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '72%',
   },
-  copy: { flex: 1, gap: 3, justifyContent: 'center', paddingVertical: 4 },
+  copy: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: space.lg,
+    gap: 4,
+  },
   kind: {
     ...typeScale.caption,
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.9,
+    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.78)',
   },
   title: {
     ...typeScale.label,
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 22,
+    lineHeight: 26,
     fontWeight: '800',
+    letterSpacing: -0.4,
+    color: '#FAFAF8',
   },
-  sub: { ...typeScale.meta, fontSize: 13 },
-  meta: { ...typeScale.caption, fontWeight: '600', marginTop: 2 },
-  cta: { ...typeScale.label, fontWeight: '700', marginTop: space.xs },
+  meta: {
+    ...typeScale.meta,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.72)',
+    maxWidth: 300,
+  },
+  ctaPill: {
+    alignSelf: 'flex-start',
+    marginTop: space.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  cta: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+    color: '#FAFAF8',
+  },
 });

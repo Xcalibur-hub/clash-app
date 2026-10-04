@@ -329,16 +329,23 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
           </View>
         );
       case 'section':
-        return <ExploreHeading title={item.title} style={styles.section} />;
+        return (
+          <ExploreHeading
+            title={item.title}
+            style={[styles.section, item.module === 'CONTENT' || item.module === 'COLLECTIONS' ? styles.firstChapter : null]}
+          />
+        );
       case 'drop':
         return (
-          <VaultDropCard
-            drop={item.drop}
-            cinematic={item.cinematic === true}
-            creatorHandle={creator.handle}
-            onOpen={() => router.push(`/vault/drop/${item.drop.id}`)}
-            onSubscribe={() => setSubscribeOpen(true)}
-          />
+          <View style={item.cinematic ? styles.peekCard : undefined}>
+            <VaultDropCard
+              drop={item.drop}
+              cinematic={item.cinematic === true}
+              creatorHandle={creator.handle}
+              onOpen={() => router.push(`/vault/drop/${item.drop.id}`)}
+              onSubscribe={() => setSubscribeOpen(true)}
+            />
+          </View>
         );
       case 'collection':
         return (
@@ -480,8 +487,8 @@ function BackChip({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   centered: { justifyContent: 'center', alignItems: 'center', gap: space.md },
-  content: { paddingHorizontal: layout.screenX, gap: space.md },
-  heroBlock: { gap: 0, marginBottom: -space.sm },
+  content: { paddingHorizontal: layout.screenX, gap: space.sm },
+  heroBlock: { gap: 0, marginBottom: -space.lg },
   backFloat: {
     position: 'absolute',
     left: 0,
@@ -489,6 +496,12 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: space.xs,
+  },
+  firstChapter: {
+    marginTop: space.sm,
+  },
+  peekCard: {
+    marginTop: -space.xs,
   },
   back: {
     alignSelf: 'flex-start',
