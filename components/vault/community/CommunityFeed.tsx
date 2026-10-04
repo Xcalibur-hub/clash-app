@@ -21,6 +21,7 @@ type FeedRow =
 export interface CommunityFeedProps {
   summary: CommunitySummary;
   tint?: string | null;
+  creatorName?: string | null;
   posts: readonly CommunityPostCard[];
   expandedPostId: string | null;
   onToggleExpanded: (postId: string) => void;
@@ -39,6 +40,7 @@ export interface CommunityFeedProps {
 export function CommunityFeed({
   summary,
   tint,
+  creatorName,
   posts,
   expandedPostId,
   onToggleExpanded,
@@ -71,6 +73,7 @@ export function CommunityFeed({
         return (
           <CommunityHero
             name={summary.name}
+            creatorName={creatorName}
             description={summary.description}
             accessType={summary.accessType}
             memberCount={summary.memberCount}

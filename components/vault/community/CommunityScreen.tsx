@@ -49,6 +49,7 @@ export function CommunityScreen({ communityId }: CommunityScreenProps): React.JS
         <CommunityFeed
           summary={summary}
           tint={model.creatorTint}
+          creatorName={model.creatorName}
           posts={model.posts}
           expandedPostId={model.expandedId}
           onToggleExpanded={(id) => model.setExpandedId((prev) => (prev === id ? null : id))}

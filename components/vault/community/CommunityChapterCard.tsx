@@ -4,9 +4,10 @@ import type { CommunitySummary } from '../../../services/vaultCommunityMappers';
 import { communityAccessLabel } from '../../../utils/vaultCommunityAccess';
 import { communityActiveLabel, communityMemberLabel } from '../../../utils/vaultCommunityFeed';
 import { vaultTintWash } from '../../../utils/vaultPresentation';
-import { radius, space, typeScale, useThemeColors } from '../../../theme';
+import { space, typeScale, useThemeColors } from '../../../theme';
 import { CreatorsIcon } from '../../shared/icons';
 import { VaultActionButton } from '../VaultActionButton';
+import { MemberConstellation } from '../world/MemberConstellation';
 
 export interface CommunityChapterCardProps {
   summary: CommunitySummary;
@@ -16,8 +17,8 @@ export interface CommunityChapterCardProps {
 }
 
 /**
- * The COMMUNITY chapter card inside a Creator World. Not a dashboard tile —
- * an invitation that sits within the creator's world.
+ * The COMMUNITY chapter inside a Creator World — a doorway into a private room,
+ * not a dashboard tile.
  */
 export function CommunityChapterCard({
   summary,
@@ -29,54 +30,40 @@ export function CommunityChapterCard({
   const firstName = creatorName.trim().split(' ')[0] || creatorName;
 
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          backgroundColor: t.surface,
-          borderColor: t.border,
-          shadowColor: t.scheme === 'light' ? '#000' : '#000',
-        },
-      ]}
-    >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: vaultTintWash(tint, 0.1) }]} pointerEvents="none" />
+    <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: vaultTintWash(tint, 0.08) }]} pointerEvents="none" />
       <View style={styles.head}>
-        <CreatorsIcon size={16} color={t.textMuted} strokeWidth={2.2} />
+        <CreatorsIcon size={15} color={t.textMuted} strokeWidth={2.2} />
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
           {communityAccessLabel(summary.accessType).toUpperCase()}
         </Text>
       </View>
       <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
-        {`JOIN ${summary.name.toUpperCase()}`}
+        {summary.name}
       </Text>
       <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]} numberOfLines={1}>
         {`${firstName}'s community`}
       </Text>
+      <View style={styles.room}>
+        <MemberConstellation anonymousCount={summary.memberCount} tint={tint} total={summary.memberCount} size={36} />
+      </View>
       <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
         {`${communityMemberLabel(summary.memberCount)} · ${communityActiveLabel(summary.activeToday)}`}
       </Text>
       <View style={styles.action}>
-        <VaultActionButton label="Enter" compact onPress={onEnter} />
+        <VaultActionButton label="Enter the conversation" compact onPress={onEnter} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    overflow: 'hidden',
-    gap: 4,
-    padding: space.lg,
-    borderRadius: radius.xxl,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
+  card: { overflow: 'hidden', gap: 6, padding: space.lg, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  kicker: { ...typeScale.caption, fontWeight: '800', letterSpacing: 1 },
-  title: { ...typeScale.title, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
+  kicker: { ...typeScale.caption, fontWeight: '800', letterSpacing: 1.2 },
+  title: { ...typeScale.display, fontSize: 28, lineHeight: 30, fontWeight: '800', letterSpacing: -0.8 },
   sub: { ...typeScale.label, fontSize: 14 },
-  meta: { ...typeScale.meta, marginTop: 2 },
+  room: { marginTop: space.md, marginBottom: space.xs },
+  meta: { ...typeScale.meta },
   action: { marginTop: space.sm },
 });

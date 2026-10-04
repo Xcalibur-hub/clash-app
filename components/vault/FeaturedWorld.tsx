@@ -84,7 +84,7 @@ export const FeaturedWorld = React.memo(function FeaturedWorld({
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
-    borderRadius: radius.xxl,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
   },

@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     aspectRatio: 4 / 5,
-    borderRadius: radius.xxl,
+    borderRadius: 10,
     overflow: 'hidden',
     justifyContent: 'flex-end',
     padding: space.lg,

@@ -140,7 +140,7 @@ export function CourseDetail({ courseId }: { courseId: string }): React.JSX.Elem
               {cover ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
               <View style={styles.scrim} />
               <Text allowFontScaling={false} style={styles.kicker}>
-                COURSE
+                MASTERCLASS
               </Text>
               <Text allowFontScaling={false} style={styles.title}>
                 {course.title}
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingBottom: space.xl,
     gap: 6,
-    borderRadius: radius.xxl,
+    borderRadius: 14,
   },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.42)' },
   kicker: {

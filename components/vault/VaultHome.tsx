@@ -13,8 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import {
   fetchVaultHome,
-  type VaultCreatorWorldCard,
-  type VaultHomeDropCard,
   type VaultHomeModel,
   type VaultHomeOfferCard,
   type VaultHomeScope,
@@ -23,105 +21,16 @@ import { fetchMyVault } from '../../services/vaultService';
 import { errorText } from '../../services/supabaseClient';
 import { analytics } from '../../services/analytics';
 import { vaultExperienceHref } from '../../utils/vaultExperiences';
+import { buildHomeRows, type HomeRow } from '../../utils/vaultHomeRows';
 import { duration, layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { dockBottomPadding } from '../navigation/dockConfig';
-import { ExploreHeading } from '../explore/ExploreHeading';
 import { EmptyState } from '../shared/EmptyState';
 import { VaultIcon } from '../shared/icons';
-import { FeaturedWorld } from './FeaturedWorld';
-import { VaultWorldMosaic } from './VaultWorldMosaic';
-import { WorldRail } from './WorldRail';
 import { VaultScopeControl } from './VaultScopeControl';
-import { TodaysDropCard } from './TodaysDropCard';
-import { VaultMediaTile } from './VaultMediaTile';
-import { CourseMasterclassCard } from './CourseMasterclassCard';
-import { ServiceSessionCard } from './ServiceSessionCard';
-import { ProductArtifactCard } from './ProductArtifactCard';
-import { VaultActionButton } from './VaultActionButton';
+import { HomeRowView } from './world/HomeRowView';
 import { tap as hapticTap } from '../../utils/haptics';
 
 type Phase = 'loading' | 'ready' | 'error';
-
-type HomeRow =
-  | { kind: 'masthead' }
-  | { kind: 'scope' }
-  | { kind: 'chapter'; title: string }
-  | { kind: 'featured'; creator: VaultCreatorWorldCard }
-  | { kind: 'mosaic'; worlds: VaultCreatorWorldCard[] }
-  | { kind: 'rail'; items: VaultCreatorWorldCard[] }
-  | { kind: 'today'; drop: VaultHomeDropCard; large?: boolean }
-  | { kind: 'dropRail'; drops: VaultHomeDropCard[] }
-  | { kind: 'course'; offer: VaultHomeOfferCard }
-  | { kind: 'service'; offer: VaultHomeOfferCard }
-  | { kind: 'product'; offer: VaultHomeOfferCard }
-  | { kind: 'empty_following' }
-  | { kind: 'empty_discover' };
-
-function buildRows(model: VaultHomeModel, scope: VaultHomeScope): HomeRow[] {
-  const rows: HomeRow[] = [{ kind: 'masthead' }, { kind: 'scope' }];
-
-  if (model.isEmpty) {
-    rows.push(scope === 'following' ? { kind: 'empty_following' } : { kind: 'empty_discover' });
-    return rows;
-  }
-
-  if (scope === 'following') {
-    if (model.yourCreators.length > 0) {
-      rows.push({ kind: 'chapter', title: 'Your worlds' });
-      rows.push({ kind: 'rail', items: model.yourCreators });
-    }
-    if (model.todaysDrops.length > 0) {
-      rows.push({ kind: 'chapter', title: 'Today' });
-      const [first, ...rest] = model.todaysDrops;
-      if (first) rows.push({ kind: 'today', drop: first, large: true });
-      if (rest.length > 0) rows.push({ kind: 'dropRail', drops: rest.slice(0, 6) });
-    }
-    if (model.continueItems.length > 0) {
-      rows.push({ kind: 'chapter', title: 'Continue' });
-      rows.push({ kind: 'dropRail', drops: model.continueItems.slice(0, 4) });
-    }
-    return rows;
-  }
-
-  if (model.discoverWorlds.length > 0) {
-    const [featured, ...rest] = model.discoverWorlds;
-    if (featured) rows.push({ kind: 'featured', creator: featured });
-    if (rest.length > 0) {
-      rows.push({ kind: 'chapter', title: 'Discover worlds' });
-      rows.push({ kind: 'mosaic', worlds: rest });
-    }
-  }
-
-  if (model.todaysDrops.length > 0) {
-    rows.push({ kind: 'chapter', title: 'New drops' });
-    const [first, ...rest] = model.todaysDrops;
-    if (first) rows.push({ kind: 'today', drop: first, large: true });
-    if (rest.length > 0) rows.push({ kind: 'dropRail', drops: rest.slice(0, 8) });
-  }
-
-  if (model.discoverCourses.length > 0) {
-    rows.push({ kind: 'chapter', title: 'Learn' });
-    for (const offer of model.discoverCourses.slice(0, 3)) {
-      rows.push({ kind: 'course', offer });
-    }
-  }
-
-  if (model.discoverServices.length > 0) {
-    rows.push({ kind: 'chapter', title: 'Sessions' });
-    for (const offer of model.discoverServices.slice(0, 3)) {
-      rows.push({ kind: 'service', offer });
-    }
-  }
-
-  if (model.discoverProducts.length > 0) {
-    rows.push({ kind: 'chapter', title: 'Artifacts' });
-    for (const offer of model.discoverProducts.slice(0, 3)) {
-      rows.push({ kind: 'product', offer });
-    }
-  }
-
-  return rows;
-}
 
 function VaultHomeSkeleton({ tint }: { tint: string }): React.JSX.Element {
   return (
@@ -129,7 +38,7 @@ function VaultHomeSkeleton({ tint }: { tint: string }): React.JSX.Element {
       <View style={[styles.skeletonHero, { backgroundColor: tint }]} />
       <View style={styles.skeletonRow}>
         <View style={[styles.skeletonHalf, { backgroundColor: tint }]} />
-        <View style={styles.skeletonStack}>
+        <View style={[styles.skeletonStack]}>
           <View style={[styles.skeletonMini, { backgroundColor: tint }]} />
           <View style={[styles.skeletonMini, { backgroundColor: tint }]} />
         </View>
@@ -138,7 +47,7 @@ function VaultHomeSkeleton({ tint }: { tint: string }): React.JSX.Element {
   );
 }
 
-/** Vault home — Explore visual language, creator-world purpose. */
+/** Vault home — enter different creator universes, not a shelf of cards. */
 export function VaultHome(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -203,158 +112,41 @@ export function VaultHome(): React.JSX.Element {
     if (href) router.push(href as never);
   };
 
-  const rows = model ? buildRows(model, scope) : [];
+  const rows = model ? buildHomeRows(model, scope) : [];
 
   const renderItem = ({ item }: ListRenderItemInfo<HomeRow>): React.JSX.Element | null => {
-    switch (item.kind) {
-      case 'masthead':
-        return (
-          <Animated.View
-            entering={reduced ? undefined : FadeIn.duration(duration.base)}
-            style={styles.masthead}
-          >
-            <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-              VAULT
+    if (item.kind === 'masthead') {
+      return (
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(duration.base)} style={styles.masthead}>
+          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+            VAULT
+          </Text>
+          <View style={styles.mastheadRow}>
+            <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
+              Enter their world
             </Text>
-            <View style={styles.mastheadRow}>
-              <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
-                Enter their world
-              </Text>
-              {model?.canCreate ? (
-                <Pressable onPress={() => void onCreate()} hitSlop={12} accessibilityLabel="Create Drop">
-                  <Text allowFontScaling={false} style={[styles.createLink, { color: t.textMuted }]}>
-                    Create
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </Animated.View>
-        );
-      case 'scope':
-        return <VaultScopeControl value={scope} onChange={setScope} />;
-      case 'chapter':
-        return <ExploreHeading title={item.title} style={styles.chapter} />;
-      case 'featured':
-        return (
-          <FeaturedWorld
-            creator={item.creator}
-            onEnter={() => router.push(`/vault/${item.creator.creatorId}`)}
-          />
-        );
-      case 'mosaic':
-        return (
-          <VaultWorldMosaic
-            worlds={item.worlds}
-            onEnter={(creatorId) => router.push(`/vault/${creatorId}`)}
-          />
-        );
-      case 'rail':
-        return (
-          <WorldRail
-            creators={item.items}
-            onEnter={(creatorId) => router.push(`/vault/${creatorId}`)}
-          />
-        );
-      case 'today':
-        return (
-          <TodaysDropCard
-            drop={item.drop}
-            large={item.large !== false}
-            onOpen={() => router.push(`/vault/drop/${item.drop.dropId}`)}
-          />
-        );
-      case 'dropRail':
-        return (
-          <FlatList
-            horizontal
-            data={item.drops}
-            keyExtractor={(d) => d.dropId}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.hRail}
-            renderItem={({ item: drop }) => (
-              <VaultMediaTile
-                kind={drop.accessLevel === 'preview' ? 'PREVIEW' : 'DROP'}
-                title={drop.caption}
-                subtitle={`@${drop.authorHandle}`}
-                mediaUrl={drop.mediaUrl}
-                accent={drop.authorTint}
-                span="portrait"
-                height={220}
-                style={styles.hTile}
-                onPress={() => router.push(`/vault/drop/${drop.dropId}`)}
-              />
-            )}
-          />
-        );
-      case 'course':
-        return (
-          <CourseMasterclassCard
-            title={item.offer.title}
-            coverUrl={item.offer.coverUrl}
-            accessType={item.offer.accessType}
-            priceAmountMinor={item.offer.priceAmountMinor}
-            currency={item.offer.currency}
-            creatorName={item.offer.authorName}
-            onOpen={() => openOffer(item.offer)}
-          />
-        );
-      case 'service':
-        return (
-          <ServiceSessionCard
-            title={item.offer.title}
-            subtitle={item.offer.subtitle}
-            coverUrl={item.offer.coverUrl}
-            accessType={item.offer.accessType}
-            priceAmountMinor={item.offer.priceAmountMinor}
-            currency={item.offer.currency}
-            creatorName={item.offer.authorName}
-            onOpen={() => openOffer(item.offer)}
-          />
-        );
-      case 'product':
-        return (
-          <ProductArtifactCard
-            title={item.offer.title}
-            coverUrl={item.offer.coverUrl}
-            accessType={item.offer.accessType}
-            priceAmountMinor={item.offer.priceAmountMinor}
-            currency={item.offer.currency}
-            externalUrl={item.offer.externalUrl}
-            creatorName={item.offer.authorName}
-            onOpen={() => openOffer(item.offer)}
-          />
-        );
-      case 'empty_following':
-        return (
-          <View style={styles.quietWrap}>
-            <Text allowFontScaling={false} style={[styles.quietTitle, { color: t.textPrimary }]}>
-              Your Vault is quiet
-            </Text>
-            <Text allowFontScaling={false} style={[styles.quietBody, { color: t.textMuted }]}>
-              Follow creators to see their Drops, Collections and experiences here.
-            </Text>
-            <VaultActionButton
-              label="Discover creators"
-              onPress={() => {
-                hapticTap();
-                setScope('discover');
-              }}
-            />
+            {model?.canCreate ? (
+              <Pressable onPress={() => void onCreate()} hitSlop={12} accessibilityLabel="Create Drop">
+                <Text allowFontScaling={false} style={[styles.createLink, { color: t.textMuted }]}>
+                  Create
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
-        );
-      case 'empty_discover':
-        return (
-          <EmptyState
-            icon={VaultIcon}
-            title="Worlds are quiet"
-            body="Published Creator Worlds will appear here when creators share free or preview work."
-          />
-        );
-      default:
-        return null;
+        </Animated.View>
+      );
     }
+    if (item.kind === 'scope') return <VaultScopeControl value={scope} onChange={setScope} />;
+    return (
+      <HomeRowView
+        row={item}
+        onEnterWorld={(id) => router.push(`/vault/${id}`)}
+        onOpenDrop={(id) => router.push(`/vault/drop/${id}`)}
+        onOpenOffer={openOffer}
+        onDiscover={() => setScope('discover')}
+      />
+    );
   };
-
   if (phase === 'loading' && !model) {
     return (
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
@@ -399,12 +191,12 @@ export function VaultHome(): React.JSX.Element {
         data={rows}
         keyExtractor={(row, index) => {
           if (row.kind === 'featured') return `featured:${row.creator.creatorId}`;
-          if (row.kind === 'mosaic') return `mosaic:${row.worlds.map((w) => w.creatorId).join(',')}`;
+          if (row.kind === 'collage') return `collage:${row.worlds.map((w) => w.creatorId).join(',')}`;
           if (row.kind === 'today') return `today:${row.drop.dropId}`;
-          if (row.kind === 'dropRail') return `rail:${row.drops.map((d) => d.dropId).join(',')}`;
-          if (row.kind === 'course') return `course:${row.offer.id}`;
-          if (row.kind === 'service') return `service:${row.offer.id}`;
-          if (row.kind === 'product') return `product:${row.offer.id}`;
+          if (row.kind === 'dropStrip') return `strip:${row.drops.map((d) => d.dropId).join(',')}`;
+          if (row.kind === 'courses') return `courses:${row.offers.map((o) => o.id).join(',')}`;
+          if (row.kind === 'services') return `services:${row.offers.map((o) => o.id).join(',')}`;
+          if (row.kind === 'products') return `products:${row.offers.map((o) => o.id).join(',')}`;
           if (row.kind === 'chapter') return `chapter:${row.title}`;
           if (row.kind === 'rail') return 'creators-rail';
           return `${row.kind}:${index}`;
@@ -416,10 +208,7 @@ export function VaultHome(): React.JSX.Element {
         }
         contentContainerStyle={[
           styles.content,
-          {
-            paddingTop: insets.top + space.md,
-            paddingBottom: dockBottomPadding(insets.bottom),
-          },
+          { paddingTop: insets.top + space.md, paddingBottom: dockBottomPadding(insets.bottom) },
         ]}
       />
     </View>
@@ -428,51 +217,12 @@ export function VaultHome(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: {
-    paddingHorizontal: layout.screenX,
-    gap: space.md,
-  },
+  content: { paddingHorizontal: layout.screenX, gap: space.lg },
   masthead: { gap: 4 },
-  mastheadRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: space.md,
-  },
-  eyebrow: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  headline: {
-    ...typeScale.display,
-    fontSize: 30,
-    lineHeight: 34,
-    fontWeight: '800',
-    letterSpacing: -1,
-    flex: 1,
-  },
+  mastheadRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md },
+  eyebrow: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  headline: { ...typeScale.display, fontSize: 30, lineHeight: 34, fontWeight: '800', letterSpacing: -1, flex: 1 },
   createLink: { ...typeScale.meta, fontWeight: '600' },
-  chapter: { marginTop: space.xs },
-  hRail: { gap: space.xs, paddingRight: space.md },
-  hTile: { width: 148 },
-  quietWrap: {
-    alignItems: 'center',
-    gap: space.md,
-    paddingVertical: space.xxl,
-    paddingHorizontal: space.lg,
-  },
-  quietTitle: {
-    ...typeScale.section,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  quietBody: {
-    ...typeScale.body,
-    textAlign: 'center',
-    maxWidth: 300,
-  },
   skeletonWrap: { gap: space.xs, marginTop: space.md },
   skeletonHero: { height: 320, borderRadius: radius.xxl },
   skeletonRow: { flexDirection: 'row', gap: space.xs, minHeight: 200 },

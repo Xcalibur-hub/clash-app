@@ -17,7 +17,7 @@ export interface CommunityPostCardProps {
   children?: React.ReactNode;
 }
 
-/** A conversation card — premium social, never a Reddit row and with no voting. */
+/** A lightweight conversation row — premium social, no card chrome, no voting. */
 export function CommunityPostCard({
   post,
   onToggleReplies,
@@ -29,7 +29,7 @@ export function CommunityPostCard({
   const mediaUrl = communityCoverUrl(post.media);
 
   return (
-    <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }]}>
+    <View style={[styles.row, { borderBottomColor: t.border }]}>
       <CommunityIdentityRow
         identity={post.identity}
         createdAt={post.createdAt}
@@ -78,14 +78,9 @@ export function CommunityPostCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: space.sm,
-    padding: space.md,
-    borderRadius: radius.xxl,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  row: { gap: space.sm, paddingVertical: space.md, borderBottomWidth: StyleSheet.hairlineWidth },
   body: { ...typeScale.body, fontSize: 15, lineHeight: 22 },
-  image: { width: '100%', height: 200, borderRadius: radius.lg },
+  image: { width: '100%', height: 200, borderRadius: radius.md },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.lg, marginTop: 2 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionLabel: { ...typeScale.meta, fontSize: 12, fontWeight: '600' },

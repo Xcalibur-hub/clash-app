@@ -3,6 +3,8 @@
  * Never grants access or invents media.
  */
 
+import type { CreatorModuleType } from './vaultModules';
+
 export type WorldTileLayout = 'featured' | 'wide' | 'portrait';
 
 /** Alternating world-stack layouts after the featured hero. */
@@ -87,10 +89,7 @@ export function vaultAccessMeta(
 }
 
 /** Creator World chapter titles — editorial, not tab labels. */
-export function creatorWorldChapterTitle(
-  module: 'CONTENT' | 'COLLECTIONS' | 'COURSES' | 'SERVICES' | 'STORE' | 'COMMUNITY',
-  creatorName: string,
-): string {
+export function creatorWorldChapterTitle(module: CreatorModuleType, creatorName: string): string {
   const name = creatorName.trim() || 'Creator';
   switch (module) {
     case 'CONTENT':
