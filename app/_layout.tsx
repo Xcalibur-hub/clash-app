@@ -80,6 +80,7 @@ function RootLayout(): React.JSX.Element {
                     }}
                   />
                   <Stack.Screen name="vault/[creatorId]" options={{ animation: 'slide_from_bottom' }} />
+                  <Stack.Screen name="vault/community/[communityId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="vault/drop/[dropId]" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="vault/compose" options={{ animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="campaign/[campaignId]" options={{ animation: 'slide_from_bottom' }} />

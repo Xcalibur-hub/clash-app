@@ -33,6 +33,10 @@ function describe(notification: AppNotification, actor: User | undefined): { tit
       return { title: 'Your Take entered the Hall of Fame' };
     case 'vault_subscription':
       return { title: 'Vault subscription update' };
+    case 'community_announcement':
+      return { title: `${who} posted an announcement`, subtitle: 'Open the community' };
+    case 'community_reply':
+      return { title: `${who} replied in a community` };
     case 'sponsor_activity':
       return { title: 'Sponsor activity' };
     default:

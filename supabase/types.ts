@@ -62,6 +62,17 @@ export type VaultCollectionRow = Schema['Tables']['vault_collections']['Row'];
 export type VaultCollectionItemRow = Schema['Tables']['vault_collection_items']['Row'];
 export type VaultSubscriptionRow = Schema['Tables']['vault_subscriptions']['Row'];
 
+// ── Creator Communities vocabulary (Phase 15.2) ─────────────────────────────
+export type VaultCommunityAccess = Schema['Enums']['vault_community_access'];
+export type VaultCommunityStatus = Schema['Enums']['vault_community_status'];
+export type VaultCommunityPostType = Schema['Enums']['vault_community_post_type'];
+export type VaultCommunityContentStatus = Schema['Enums']['vault_community_content_status'];
+
+export type VaultCommunityRow = Schema['Tables']['vault_communities']['Row'];
+export type VaultCommunityMembershipRow = Schema['Tables']['vault_community_memberships']['Row'];
+export type VaultCommunityPostRow = Schema['Tables']['vault_community_posts']['Row'];
+export type VaultCommunityReplyRow = Schema['Tables']['vault_community_replies']['Row'];
+
 export type TakeStance = Schema['Enums']['take_stance'];
 export type TakeStanceRow = Schema['Tables']['take_stances']['Row'];
 

@@ -30,6 +30,14 @@ begin
 end $$;
 
 -- ── Wipe previous vault-world fixture namespace ──────────────────────────────
+delete from public.vault_community_replies
+ where community_id like 'devfx_vw_%' or id like 'devfx_vw_%';
+delete from public.vault_community_posts
+ where community_id like 'devfx_vw_%' or id like 'devfx_vw_%';
+delete from public.vault_community_memberships
+ where community_id like 'devfx_vw_%' or profile_id like 'devfx_vw_%';
+delete from public.vault_communities
+ where id like 'devfx_vw_%' or creator_id like 'devfx_vw_%';
 delete from public.course_progress
  where course_id like 'devfx_vw_%' or lesson_id like 'devfx_vw_%' or profile_id like 'devfx_vw_%';
 delete from public.course_lessons where id like 'devfx_vw_%' or course_id like 'devfx_vw_%';
@@ -276,6 +284,56 @@ values
    149900, 'INR', 'paid', 'unlimited', 'published'),
   ('devfx_vw_maya_prod_draft', 'devfx_vw_maya', 'Draft Pack',
    'Invisible draft product.', 'digital', null, 100, 'INR', 'paid', 'unlimited', 'draft');
+
+-- ── Communities ─────────────────────────────────────────────────────────────
+insert into public.vault_communities
+  (id, creator_id, vault_id, name, description, access_type, status,
+   pseudonymous_enabled, rules)
+values
+  ('devfx_vw_maya_cmt', 'devfx_vw_maya', 'devfx_vw_maya_vault',
+   'The Night Shift', 'Where the Midnight Files audience gathers.',
+   'subscribers', 'active', true, 'Be kind. No spoilers.'),
+  ('devfx_vw_leo_cmt', 'devfx_vw_leo', 'devfx_vw_leo_vault',
+   'Street Frames', 'Public street photography talk.', 'public', 'active', false, ''),
+  ('devfx_vw_aria_cmt', 'devfx_vw_aria', 'devfx_vw_aria_vault',
+   'After Hours Room', 'Followers-only late-night room.', 'followers', 'active', false, '');
+
+insert into public.vault_community_posts
+  (id, community_id, author_profile_id, post_type, body, pseudonymous, created_at)
+values
+  ('devfx_vw_maya_cmt_ann', 'devfx_vw_maya_cmt', 'devfx_vw_maya', 'announcement',
+   'Episode 04 premieres Friday night.', false, now() - interval '6 hours'),
+  ('devfx_vw_maya_cmt_p1', 'devfx_vw_maya_cmt', 'devfx_vw_maya', 'discussion',
+   'Which Midnight Files episode actually got you?', false, now() - interval '5 hours'),
+  ('devfx_vw_maya_cmt_p2', 'devfx_vw_maya_cmt', 'devfx_vw_maya', 'discussion',
+   'Anyone else notice the frame at 08:14?', true, now() - interval '4 hours'),
+  ('devfx_vw_leo_cmt_p1', 'devfx_vw_leo_cmt', 'devfx_vw_leo', 'discussion',
+   'What is your favourite focal length after midnight?', false, now() - interval '3 hours'),
+  ('devfx_vw_aria_cmt_p1', 'devfx_vw_aria_cmt', 'devfx_vw_aria', 'discussion',
+   'Drop your favourite 2am synth sound.', false, now() - interval '2 hours');
+
+insert into public.vault_community_replies
+  (id, post_id, community_id, author_profile_id, body, pseudonymous, created_at)
+values
+  ('devfx_vw_maya_cmt_r1', 'devfx_vw_maya_cmt_p1', 'devfx_vw_maya_cmt', 'devfx_vw_aria',
+   'Episode 03 — I did not sleep.', false, now() - interval '4 hours'),
+  ('devfx_vw_maya_cmt_r2', 'devfx_vw_maya_cmt_p1', 'devfx_vw_maya_cmt', 'devfx_vw_leo',
+   'The opening shot of Episode 01.', true, now() - interval '3 hours');
+
+insert into public.vault_community_memberships (community_id, profile_id, last_seen_at)
+values
+  ('devfx_vw_maya_cmt', 'devfx_vw_maya', now() - interval '1 hour'),
+  ('devfx_vw_maya_cmt', 'devfx_vw_leo', now() - interval '2 hours'),
+  ('devfx_vw_maya_cmt', 'devfx_vw_aria', now() - interval '3 days'),
+  ('devfx_vw_leo_cmt', 'devfx_vw_leo', now() - interval '30 minutes')
+on conflict do nothing;
+
+-- The local dev account joins the public community only (no fake entitlement).
+insert into public.vault_community_memberships (community_id, profile_id, last_seen_at)
+select 'devfx_vw_leo_cmt', p.id, now()
+  from public.profiles p
+ where p.auth_user_id = '00000000-0000-4000-a000-0000000000de'
+on conflict do nothing;
 
 -- ── Local dev follows Maya + Leo (Following populated, Discover still wider) ─
 insert into public.follows (follower_id, following_id)

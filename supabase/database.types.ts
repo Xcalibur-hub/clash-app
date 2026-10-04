@@ -3172,6 +3172,247 @@ export type Database = {
           },
         ]
       }
+      vault_communities: {
+        Row: {
+          access_type: Database["public"]["Enums"]["vault_community_access"]
+          created_at: string
+          creator_id: string
+          description: string
+          icon_media_object_id: string | null
+          id: string
+          name: string
+          pseudonymous_enabled: boolean
+          rules: string
+          status: Database["public"]["Enums"]["vault_community_status"]
+          updated_at: string
+          vault_id: string
+        }
+        Insert: {
+          access_type?: Database["public"]["Enums"]["vault_community_access"]
+          created_at?: string
+          creator_id: string
+          description?: string
+          icon_media_object_id?: string | null
+          id: string
+          name: string
+          pseudonymous_enabled?: boolean
+          rules?: string
+          status?: Database["public"]["Enums"]["vault_community_status"]
+          updated_at?: string
+          vault_id: string
+        }
+        Update: {
+          access_type?: Database["public"]["Enums"]["vault_community_access"]
+          created_at?: string
+          creator_id?: string
+          description?: string
+          icon_media_object_id?: string | null
+          id?: string
+          name?: string
+          pseudonymous_enabled?: boolean
+          rules?: string
+          status?: Database["public"]["Enums"]["vault_community_status"]
+          updated_at?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_communities_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_communities_icon_media_object_id_fkey"
+            columns: ["icon_media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_communities_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "creator_vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_community_memberships: {
+        Row: {
+          alias: string | null
+          community_id: string
+          joined_at: string
+          last_seen_at: string
+          profile_id: string
+        }
+        Insert: {
+          alias?: string | null
+          community_id: string
+          joined_at?: string
+          last_seen_at?: string
+          profile_id: string
+        }
+        Update: {
+          alias?: string | null
+          community_id?: string
+          joined_at?: string
+          last_seen_at?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_community_memberships_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "vault_communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_community_memberships_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_community_posts: {
+        Row: {
+          author_profile_id: string
+          body: string
+          community_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          media_object_id: string | null
+          post_type: Database["public"]["Enums"]["vault_community_post_type"]
+          pseudonymous: boolean
+          status: Database["public"]["Enums"]["vault_community_content_status"]
+          updated_at: string
+        }
+        Insert: {
+          author_profile_id: string
+          body: string
+          community_id: string
+          created_at?: string
+          deleted_at?: string | null
+          id: string
+          media_object_id?: string | null
+          post_type?: Database["public"]["Enums"]["vault_community_post_type"]
+          pseudonymous?: boolean
+          status?: Database["public"]["Enums"]["vault_community_content_status"]
+          updated_at?: string
+        }
+        Update: {
+          author_profile_id?: string
+          body?: string
+          community_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          media_object_id?: string | null
+          post_type?: Database["public"]["Enums"]["vault_community_post_type"]
+          pseudonymous?: boolean
+          status?: Database["public"]["Enums"]["vault_community_content_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_community_posts_author_profile_id_fkey"
+            columns: ["author_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_community_posts_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "vault_communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_community_posts_media_object_id_fkey"
+            columns: ["media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_community_replies: {
+        Row: {
+          author_profile_id: string
+          body: string
+          community_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          parent_reply_id: string | null
+          post_id: string
+          pseudonymous: boolean
+          status: Database["public"]["Enums"]["vault_community_content_status"]
+          updated_at: string
+        }
+        Insert: {
+          author_profile_id: string
+          body: string
+          community_id: string
+          created_at?: string
+          deleted_at?: string | null
+          id: string
+          parent_reply_id?: string | null
+          post_id: string
+          pseudonymous?: boolean
+          status?: Database["public"]["Enums"]["vault_community_content_status"]
+          updated_at?: string
+        }
+        Update: {
+          author_profile_id?: string
+          body?: string
+          community_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          parent_reply_id?: string | null
+          post_id?: string
+          pseudonymous?: boolean
+          status?: Database["public"]["Enums"]["vault_community_content_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_community_replies_author_profile_id_fkey"
+            columns: ["author_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_community_replies_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "vault_communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_community_replies_parent_reply_id_fkey"
+            columns: ["parent_reply_id"]
+            isOneToOne: false
+            referencedRelation: "vault_community_replies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_community_replies_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "vault_community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vault_drops: {
         Row: {
           access_level: Database["public"]["Enums"]["vault_drop_access"]
@@ -4091,6 +4332,49 @@ export type Database = {
           updated_at: string
         }
       }
+      create_vault_community: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_community_access"]
+          p_description?: string
+          p_icon_media_object_id?: string
+          p_name: string
+          p_pseudonymous_enabled?: boolean
+          p_rules?: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_community_access"]
+          created_at: string
+          creator_id: string
+          description: string
+          icon_media_object_id: string | null
+          id: string
+          name: string
+          pseudonymous_enabled: boolean
+          rules: string
+          status: Database["public"]["Enums"]["vault_community_status"]
+          updated_at: string
+          vault_id: string
+        }
+      }
+      create_vault_community_post: {
+        Args: {
+          p_body: string
+          p_community_id: string
+          p_media_object_id?: string
+          p_post_type: Database["public"]["Enums"]["vault_community_post_type"]
+          p_pseudonymous?: boolean
+        }
+        Returns: Json
+      }
+      create_vault_community_reply: {
+        Args: {
+          p_body: string
+          p_parent_reply_id?: string
+          p_post_id: string
+          p_pseudonymous?: boolean
+        }
+        Returns: Json
+      }
       create_vault_drop: {
         Args: {
           p_access_level: Database["public"]["Enums"]["vault_drop_access"]
@@ -4195,9 +4479,21 @@ export type Database = {
         Args: { p_media_id: string }
         Returns: undefined
       }
+      delete_vault_community_post: {
+        Args: { p_post_id: string }
+        Returns: undefined
+      }
+      delete_vault_community_reply: {
+        Args: { p_reply_id: string }
+        Returns: undefined
+      }
       delete_vault_drop: {
         Args: { p_drop_id: string }
         Returns: undefined
+      }
+      enter_vault_community: {
+        Args: { p_community_id: string }
+        Returns: Json
       }
       expire_stale_takes: {
         Args: { p_limit?: number }
@@ -4310,6 +4606,10 @@ export type Database = {
       has_meet_video_safety_ack: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      hide_vault_community_post: {
+        Args: { p_hidden: boolean; p_post_id: string }
+        Returns: undefined
       }
       hood_active_prediction: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
@@ -4476,14 +4776,6 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
-      list_vault_discover_offers: {
-        Args: { p_kind: string; p_limit?: number }
-        Returns: Json
-      }
-      list_vault_discover_worlds: {
-        Args: { p_limit?: number }
-        Returns: Json
-      }
       list_live_arena_topic_previews: {
         Args: { p_limit?: number; p_topic_id: string }
         Returns: Json
@@ -4519,6 +4811,27 @@ export type Database = {
       }
       list_play_home: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      list_vault_community_posts: {
+        Args: {
+          p_before_created_at?: string
+          p_before_id?: string
+          p_community_id: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      list_vault_community_replies: {
+        Args: { p_limit?: number; p_post_id: string }
+        Returns: Json
+      }
+      list_vault_discover_offers: {
+        Args: { p_kind: string; p_limit?: number }
+        Returns: Json
+      }
+      list_vault_discover_worlds: {
+        Args: { p_limit?: number }
         Returns: Json
       }
       mark_arena_evidence_useful: {
@@ -4943,6 +5256,26 @@ export type Database = {
           updated_at: string
         }
       }
+      set_vault_community_status: {
+        Args: {
+          p_community_id: string
+          p_status: Database["public"]["Enums"]["vault_community_status"]
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_community_access"]
+          created_at: string
+          creator_id: string
+          description: string
+          icon_media_object_id: string | null
+          id: string
+          name: string
+          pseudonymous_enabled: boolean
+          rules: string
+          status: Database["public"]["Enums"]["vault_community_status"]
+          updated_at: string
+          vault_id: string
+        }
+      }
       settle_arena_room: {
         Args: { p_room_id: string }
         Returns: Json
@@ -5259,6 +5592,31 @@ export type Database = {
           updated_at: string
         }
       }
+      update_vault_community: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_community_access"]
+          p_community_id: string
+          p_description?: string
+          p_icon_media_object_id?: string
+          p_name: string
+          p_pseudonymous_enabled?: boolean
+          p_rules?: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_community_access"]
+          created_at: string
+          creator_id: string
+          description: string
+          icon_media_object_id: string | null
+          id: string
+          name: string
+          pseudonymous_enabled: boolean
+          rules: string
+          status: Database["public"]["Enums"]["vault_community_status"]
+          updated_at: string
+          vault_id: string
+        }
+      }
       upgrade_arena_spectator: {
         Args: {
           p_room_id: string
@@ -5269,6 +5627,38 @@ export type Database = {
       vault_assert_owned_public_cover: {
         Args: { p_media_id: string; p_owner: string }
         Returns: undefined
+      }
+      vault_community_alias: {
+        Args: { p_community_id: string; p_profile_id: string }
+        Returns: string
+      }
+      vault_community_for_creator: {
+        Args: { p_creator_id: string }
+        Returns: Json
+      }
+      vault_community_post_card: {
+        Args: { p_post_id: string }
+        Returns: Json
+      }
+      vault_community_reply_card: {
+        Args: { p_reply_id: string }
+        Returns: Json
+      }
+      vault_community_seed: {
+        Args: { p_community_id: string; p_profile_id: string }
+        Returns: number
+      }
+      vault_community_summary: {
+        Args: { p_community_id: string }
+        Returns: Json
+      }
+      vault_community_touch: {
+        Args: { p_community_id: string; p_profile_id: string }
+        Returns: undefined
+      }
+      vault_community_viewer_can_access: {
+        Args: { p_community_id: string; p_viewer: string }
+        Returns: boolean
       }
       vault_drop_card: {
         Args: { p_drop_id: string }
@@ -5318,6 +5708,10 @@ export type Database = {
       vault_storefront: {
         Args: { p_vault_id: string }
         Returns: Json
+      }
+      vault_world_has_public_surface: {
+        Args: { p_creator_id: string; p_vault_id: string }
+        Returns: boolean
       }
       viewer_can_access_drop: {
         Args: { p_drop_id: string }
@@ -5458,6 +5852,8 @@ export type Database = {
         | "challenge_reaction"
         | "treasure_complete"
         | "treasure_reward"
+        | "community_announcement"
+        | "community_reply"
       profile_role: "viewer" | "creator" | "moderator" | "admin"
       rank_name:
         | "Rookie"
@@ -5491,6 +5887,8 @@ export type Database = {
         | "challenge_entry"
         | "meet_session"
         | "meet_message"
+        | "community_post"
+        | "community_reply"
       reputation_kind:
         | "clash_participation"
         | "clash_win"
@@ -5517,6 +5915,10 @@ export type Database = {
         | "SIGNUP"
       take_stance: "AGREE" | "UNSURE" | "DISAGREE"
       take_status: "active" | "expired" | "removed"
+      vault_community_access: "public" | "followers" | "subscribers"
+      vault_community_content_status: "visible" | "hidden" | "deleted"
+      vault_community_post_type: "discussion" | "announcement"
+      vault_community_status: "active" | "disabled"
       vault_drop_access: "free" | "subscriber"
       vault_drop_status: "draft" | "published" | "expired" | "removed"
       vault_inventory_mode: "unlimited" | "limited" | "external"
@@ -5753,6 +6155,8 @@ export const Constants = {
         "challenge_reaction",
         "treasure_complete",
         "treasure_reward",
+        "community_announcement",
+        "community_reply",
       ],
       profile_role: ["viewer", "creator", "moderator", "admin"],
       rank_name: [
@@ -5789,6 +6193,8 @@ export const Constants = {
         "challenge_entry",
         "meet_session",
         "meet_message",
+        "community_post",
+        "community_reply",
       ],
       reputation_kind: [
         "clash_participation",
@@ -5820,6 +6226,10 @@ export const Constants = {
       ],
       take_stance: ["AGREE", "UNSURE", "DISAGREE"],
       take_status: ["active", "expired", "removed"],
+      vault_community_access: ["public", "followers", "subscribers"],
+      vault_community_content_status: ["visible", "hidden", "deleted"],
+      vault_community_post_type: ["discussion", "announcement"],
+      vault_community_status: ["active", "disabled"],
       vault_drop_access: ["free", "subscriber"],
       vault_drop_status: ["draft", "published", "expired", "removed"],
       vault_inventory_mode: ["unlimited", "limited", "external"],

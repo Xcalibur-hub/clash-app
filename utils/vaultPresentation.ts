@@ -88,7 +88,7 @@ export function vaultAccessMeta(
 
 /** Creator World chapter titles — editorial, not tab labels. */
 export function creatorWorldChapterTitle(
-  module: 'CONTENT' | 'COLLECTIONS' | 'COURSES' | 'SERVICES' | 'STORE',
+  module: 'CONTENT' | 'COLLECTIONS' | 'COURSES' | 'SERVICES' | 'STORE' | 'COMMUNITY',
   creatorName: string,
 ): string {
   const name = creatorName.trim() || 'Creator';
@@ -103,6 +103,8 @@ export function creatorWorldChapterTitle(
       return `WORK WITH ${name.toUpperCase()}`;
     case 'STORE':
       return `FROM ${name.toUpperCase()}`;
+    case 'COMMUNITY':
+      return 'COMMUNITY';
     default:
       return name.toUpperCase();
   }

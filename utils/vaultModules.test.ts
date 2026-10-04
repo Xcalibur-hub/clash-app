@@ -34,14 +34,13 @@ describe('Creator World modules', () => {
     );
   });
 
-  it('never exposes planned modules even with fake signals', () => {
+  it('never exposes still-planned modules even with fake signals', () => {
     const mods = resolveCreatorWorldModules({
       contentCount: 1,
       collectionCount: 0,
       serviceCount: 0,
       courseCount: 0,
       storeCount: 0,
-      communityReady: true,
       aiReady: true,
       liveReady: true,
       worldDropCount: 5,
@@ -54,11 +53,24 @@ describe('Creator World modules', () => {
     assert.equal(mods.some((m) => m.type === 'AI'), false);
   });
 
-  it('marks SERVICES COURSES STORE supported in 15.1', () => {
+  it('surfaces COMMUNITY once populated (Phase 15.2)', () => {
+    const mods = resolveCreatorWorldModules({
+      contentCount: 0,
+      collectionCount: 0,
+      communityReady: true,
+    });
+    assert.deepEqual(
+      mods.map((m) => m.type),
+      ['COMMUNITY'],
+    );
+  });
+
+  it('marks SERVICES COURSES STORE COMMUNITY supported', () => {
     assert.equal(isCreatorModuleSupported('CONTENT'), true);
     assert.equal(isCreatorModuleSupported('SERVICES'), true);
     assert.equal(isCreatorModuleSupported('COURSES'), true);
     assert.equal(isCreatorModuleSupported('STORE'), true);
+    assert.equal(isCreatorModuleSupported('COMMUNITY'), true);
     assert.equal(isCreatorModuleSupported('AI'), false);
   });
 });

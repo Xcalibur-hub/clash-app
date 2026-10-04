@@ -27,6 +27,8 @@ import {
   fetchCreatorServices,
   vaultCoverUrl,
 } from '../../services/vaultCommerceService';
+import { fetchCreatorCommunity } from '../../services/vaultCommunityService';
+import type { CommunitySummary } from '../../services/vaultCommunityMappers';
 import type { CreatorVault, StorefrontDrop, VaultCollection, VaultSubscriptionState } from '../../services/vaultMappers';
 import type { CreatorCourse, CreatorProduct, CreatorService } from '../../services/vaultCommerceMappers';
 import { errorText } from '../../services/supabaseClient';
@@ -45,6 +47,7 @@ import { VaultCollectionCard } from './VaultCollectionCard';
 import { CourseMasterclassCard } from './CourseMasterclassCard';
 import { ServiceSessionCard } from './ServiceSessionCard';
 import { ProductArtifactCard } from './ProductArtifactCard';
+import { CommunityChapterCard } from './community/CommunityChapterCard';
 import { SubscriptionInfoSheet } from './SubscriptionInfoSheet';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -58,6 +61,7 @@ type WorldRow =
   | { kind: 'service'; service: CreatorService }
   | { kind: 'course'; course: CreatorCourse }
   | { kind: 'product'; product: CreatorProduct }
+  | { kind: 'community' }
   | { kind: 'empty' };
 
 export interface VaultScreenProps {
@@ -82,6 +86,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
   const [services, setServices] = React.useState<CreatorService[]>([]);
   const [courses, setCourses] = React.useState<CreatorCourse[]>([]);
   const [products, setProducts] = React.useState<CreatorProduct[]>([]);
+  const [community, setCommunity] = React.useState<CommunitySummary | null>(null);
   const [isSelf, setIsSelf] = React.useState(false);
   const [subscribeOpen, setSubscribeOpen] = React.useState(false);
 
@@ -116,13 +121,14 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         return;
       }
 
-      const [drops, cols, subs, nextServices, nextCourses, nextProducts] = await Promise.all([
+      const [drops, cols, subs, nextServices, nextCourses, nextProducts, nextCommunity] = await Promise.all([
         fetchStorefront(nextVault.id),
         fetchCollections(nextVault.id),
         fetchSubscriptionState(nextVault.id),
         fetchCreatorServices(creatorId),
         fetchCreatorCourses(creatorId),
         fetchCreatorProducts(creatorId),
+        fetchCreatorCommunity(creatorId),
       ]);
       setVault(nextVault);
       setFollow(followState);
@@ -132,6 +138,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       setServices(nextServices);
       setCourses(nextCourses);
       setProducts(nextProducts);
+      setCommunity(nextCommunity);
       setPhase('ready');
       analytics.trackOnce(`vault_opened:${creatorId}`, 'vault_opened', {
         realm: 'vault',
@@ -172,8 +179,9 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         serviceCount: services.length,
         courseCount: courses.length,
         storeCount: products.length,
+        communityReady: community !== null,
       }),
-    [liveDrops.length, collections.length, services.length, courses.length, products.length],
+    [liveDrops.length, collections.length, services.length, courses.length, products.length, community],
   );
 
   const heroUrl = React.useMemo(() => {
@@ -247,9 +255,17 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         });
         for (const product of products) next.push({ kind: 'product', product });
       }
+      if (mod.type === 'COMMUNITY' && community) {
+        next.push({
+          kind: 'section',
+          title: creatorWorldChapterTitle('COMMUNITY', creator.name),
+          module: 'COMMUNITY',
+        });
+        next.push({ kind: 'community' });
+      }
     }
     return next;
-  }, [phase, creator, vault, modules, liveDrops, collections, storefront, services, courses, products]);
+  }, [phase, creator, vault, modules, liveDrops, collections, storefront, services, courses, products, community]);
 
   if (phase === 'loading') {
     return (
@@ -398,6 +414,17 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
             externalUrl={item.product.externalUrl}
             creatorName={creator.name}
             onOpen={() => href && router.push(href as never)}
+          />
+        );
+      }
+      case 'community': {
+        if (!community) return null;
+        return (
+          <CommunityChapterCard
+            summary={community}
+            creatorName={creator.name}
+            tint={creator.tint}
+            onEnter={() => router.push(`/vault/community/${community.id}`)}
           />
         );
       }

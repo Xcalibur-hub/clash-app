@@ -52,10 +52,11 @@ import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { EmptyState } from '../shared/EmptyState';
 import { VaultIcon } from '../shared/icons';
 import { CreatorDropRow } from './CreatorDropRow';
+import { CommunityStudio } from './CommunityStudio';
 import { VaultActionButton } from './VaultActionButton';
 import { VaultFormSheet } from './VaultFormSheet';
 
-type StudioTab = 'drops' | 'services' | 'courses' | 'shop';
+type StudioTab = 'drops' | 'services' | 'courses' | 'shop' | 'community';
 type Phase = 'loading' | 'ready';
 
 const TABS: readonly { key: StudioTab; label: string }[] = [
@@ -63,6 +64,7 @@ const TABS: readonly { key: StudioTab; label: string }[] = [
   { key: 'services', label: 'Services' },
   { key: 'courses', label: 'Courses' },
   { key: 'shop', label: 'Shop' },
+  { key: 'community', label: 'Community' },
 ];
 
 /** Creator-only management surface for Vault offerings. */
@@ -439,6 +441,8 @@ export function CreatorStudio(): React.JSX.Element {
             ))}
           </View>
         ) : null}
+
+        {tab === 'community' ? <CommunityStudio /> : null}
       </ScrollView>
 
       <VaultFormSheet

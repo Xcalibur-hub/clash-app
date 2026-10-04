@@ -82,7 +82,7 @@ export const CREATOR_MODULE_REGISTRY: readonly CreatorModuleDefinition[] = [
     type: 'COMMUNITY',
     title: 'Community',
     sectionTitle: 'COMMUNITY',
-    availability: 'planned',
+    availability: 'supported',
     priority: 70,
   },
   {
