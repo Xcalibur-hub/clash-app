@@ -18,6 +18,7 @@ export type VaultExperienceType =
   | 'SECRET_DROP'
   | 'COURSE'
   | 'SERVICE'
+  | 'PRODUCT'
   | 'WORLD_DROP';
 
 export type VaultExperienceAvailability = 'enterable' | 'planned';
@@ -39,8 +40,9 @@ export const VAULT_EXPERIENCE_REGISTRY: readonly VaultExperienceDefinition[] = [
   { type: 'ANONYMOUS_ROOM', label: 'Pseudonymous room', availability: 'planned' },
   { type: 'CHALLENGE', label: 'Challenge', availability: 'planned' },
   { type: 'SECRET_DROP', label: 'Secret drop', availability: 'planned' },
-  { type: 'COURSE', label: 'Course', availability: 'planned' },
-  { type: 'SERVICE', label: 'Service', availability: 'planned' },
+  { type: 'COURSE', label: 'Course', availability: 'enterable' },
+  { type: 'SERVICE', label: 'Service', availability: 'enterable' },
+  { type: 'PRODUCT', label: 'Product', availability: 'enterable' },
   { type: 'WORLD_DROP', label: 'World drop', availability: 'planned' },
 ] as const;
 
@@ -71,6 +73,12 @@ export function vaultExperienceHref(ref: VaultExperienceRef): string | null {
       return `/vault/drop/${ref.id}`;
     case 'COLLECTION':
       return `/vault/collection/${ref.id}`;
+    case 'COURSE':
+      return `/vault/course/${ref.id}`;
+    case 'SERVICE':
+      return `/vault/service/${ref.id}`;
+    case 'PRODUCT':
+      return `/vault/product/${ref.id}`;
     default:
       return null;
   }

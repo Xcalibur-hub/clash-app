@@ -22,10 +22,18 @@ import {
   fetchSubscriptionState,
   fetchVault,
 } from '../../services/vaultService';
+import {
+  fetchCreatorCourses,
+  fetchCreatorProducts,
+  fetchCreatorServices,
+  vaultCoverUrl,
+} from '../../services/vaultCommerceService';
 import type { CreatorVault, StorefrontDrop, VaultCollection, VaultSubscriptionState } from '../../services/vaultMappers';
+import type { CreatorCourse, CreatorProduct, CreatorService } from '../../services/vaultCommerceMappers';
 import { errorText } from '../../services/supabaseClient';
 import { analytics } from '../../services/analytics';
 import { resolveCreatorWorldModules, type CreatorModuleType } from '../../utils/vaultModules';
+import { vaultExperienceHref } from '../../utils/vaultExperiences';
 import { vaultPublicVisualMedia } from '../../utils/vaultAccess';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { EmptyState } from '../shared/EmptyState';
@@ -33,6 +41,7 @@ import { BackIcon, VaultIcon } from '../shared/icons';
 import { VaultIdentityHeader } from './VaultIdentityHeader';
 import { VaultDropCard } from './VaultDropCard';
 import { VaultCollectionCard } from './VaultCollectionCard';
+import { OfferCard } from './OfferCard';
 import { SubscriptionInfoSheet } from './SubscriptionInfoSheet';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -43,6 +52,9 @@ type WorldRow =
   | { kind: 'section'; title: string; module: CreatorModuleType }
   | { kind: 'drop'; drop: StorefrontDrop }
   | { kind: 'collection'; collection: VaultCollection; drops: StorefrontDrop[] }
+  | { kind: 'service'; service: CreatorService }
+  | { kind: 'course'; course: CreatorCourse }
+  | { kind: 'product'; product: CreatorProduct }
   | { kind: 'empty' };
 
 export interface VaultScreenProps {
@@ -64,6 +76,9 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
   const [subscription, setSubscription] = React.useState<VaultSubscriptionState | null>(null);
   const [storefront, setStorefront] = React.useState<StorefrontDrop[]>([]);
   const [collections, setCollections] = React.useState<VaultCollection[]>([]);
+  const [services, setServices] = React.useState<CreatorService[]>([]);
+  const [courses, setCourses] = React.useState<CreatorCourse[]>([]);
+  const [products, setProducts] = React.useState<CreatorProduct[]>([]);
   const [isSelf, setIsSelf] = React.useState(false);
   const [subscribeOpen, setSubscribeOpen] = React.useState(false);
 
@@ -98,16 +113,22 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         return;
       }
 
-      const [drops, cols, subs] = await Promise.all([
+      const [drops, cols, subs, nextServices, nextCourses, nextProducts] = await Promise.all([
         fetchStorefront(nextVault.id),
         fetchCollections(nextVault.id),
         fetchSubscriptionState(nextVault.id),
+        fetchCreatorServices(creatorId),
+        fetchCreatorCourses(creatorId),
+        fetchCreatorProducts(creatorId),
       ]);
       setVault(nextVault);
       setFollow(followState);
       setSubscription(subs);
       setStorefront(drops);
       setCollections(cols);
+      setServices(nextServices);
+      setCourses(nextCourses);
+      setProducts(nextProducts);
       setPhase('ready');
       analytics.trackOnce(`vault_opened:${creatorId}`, 'vault_opened', {
         realm: 'vault',
@@ -145,8 +166,11 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       resolveCreatorWorldModules({
         contentCount: liveDrops.length,
         collectionCount: collections.length,
+        serviceCount: services.length,
+        courseCount: courses.length,
+        storeCount: products.length,
       }),
-    [liveDrops.length, collections.length],
+    [liveDrops.length, collections.length, services.length, courses.length, products.length],
   );
 
   const heroUrl = React.useMemo(() => {
@@ -190,9 +214,25 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
           });
         }
       }
+      if (mod.type === 'SERVICES') {
+        next.push({ kind: 'section', title: 'SERVICES', module: 'SERVICES' });
+        for (const service of services) next.push({ kind: 'service', service });
+      }
+      if (mod.type === 'COURSES') {
+        next.push({
+          kind: 'section',
+          title: `LEARN WITH ${creator.name.toUpperCase()}`,
+          module: 'COURSES',
+        });
+        for (const course of courses) next.push({ kind: 'course', course });
+      }
+      if (mod.type === 'STORE') {
+        next.push({ kind: 'section', title: 'SHOP', module: 'STORE' });
+        for (const product of products) next.push({ kind: 'product', product });
+      }
     }
     return next;
-  }, [phase, creator, vault, modules, liveDrops, collections, storefront]);
+  }, [phase, creator, vault, modules, liveDrops, collections, storefront, services, courses, products]);
 
   if (phase === 'loading') {
     return (
@@ -238,6 +278,8 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
   const subscribeBenefits = [
     'Subscriber Drops',
     ...(collections.length > 0 ? ['Complete Collections'] : []),
+    ...(courses.some((c) => c.accessType === 'subscriber') ? ['Subscriber courses'] : []),
+    ...(services.some((s) => s.accessType === 'subscriber') ? ['Subscriber services'] : []),
   ];
 
   const renderItem = ({ item }: ListRenderItemInfo<WorldRow>): React.JSX.Element | null => {
@@ -285,6 +327,53 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
             onOpen={() => router.push(`/vault/collection/${item.collection.id}`)}
           />
         );
+      case 'service': {
+        const href = vaultExperienceHref({ type: 'SERVICE', id: item.service.id });
+        return (
+          <OfferCard
+            kind="SERVICE"
+            title={item.service.title}
+            subtitle={item.service.description}
+            coverUrl={vaultCoverUrl(item.service.coverMedia)}
+            accessType={item.service.accessType}
+            priceAmountMinor={item.service.priceAmountMinor}
+            currency={item.service.currency}
+            externalUrl={item.service.externalUrl}
+            onOpen={() => href && router.push(href as never)}
+          />
+        );
+      }
+      case 'course': {
+        const href = vaultExperienceHref({ type: 'COURSE', id: item.course.id });
+        return (
+          <OfferCard
+            kind="COURSE"
+            title={item.course.title}
+            subtitle={`${item.course.lessonCount} lesson${item.course.lessonCount === 1 ? '' : 's'}`}
+            coverUrl={vaultCoverUrl(item.course.coverMedia)}
+            accessType={item.course.accessType}
+            priceAmountMinor={item.course.priceAmountMinor}
+            currency={item.course.currency}
+            onOpen={() => href && router.push(href as never)}
+          />
+        );
+      }
+      case 'product': {
+        const href = vaultExperienceHref({ type: 'PRODUCT', id: item.product.id });
+        return (
+          <OfferCard
+            kind="PRODUCT"
+            title={item.product.title}
+            subtitle={item.product.description}
+            coverUrl={vaultCoverUrl(item.product.coverMedia)}
+            accessType={item.product.accessType}
+            priceAmountMinor={item.product.priceAmountMinor}
+            currency={item.product.currency}
+            externalUrl={item.product.externalUrl}
+            onOpen={() => href && router.push(href as never)}
+          />
+        );
+      }
       case 'empty':
         return (
           <EmptyState
@@ -311,6 +400,9 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         keyExtractor={(row, index) => {
           if (row.kind === 'drop') return `drop:${row.drop.id}`;
           if (row.kind === 'collection') return `col:${row.collection.id}`;
+          if (row.kind === 'service') return `svc:${row.service.id}`;
+          if (row.kind === 'course') return `crs:${row.course.id}`;
+          if (row.kind === 'product') return `prd:${row.product.id}`;
           if (row.kind === 'section') return `section:${row.module}:${row.title}`;
           return `${row.kind}:${index}`;
         }}

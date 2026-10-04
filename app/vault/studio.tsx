@@ -1,12 +1,12 @@
 import React from 'react';
-import { CreatorVaultHome } from '../../components/vault/CreatorVaultHome';
+import { CreatorStudio } from '../../components/vault/CreatorStudio';
 import { Notice } from '../../components/shared/Notice';
 
-/** Creator manage surface — create Vault / Drops without replacing Worlds home. */
+/** Creator manage surface — Drops, Services, Courses, Shop. */
 export default function VaultStudioScreen(): React.JSX.Element {
   return (
     <>
-      <CreatorVaultHome />
+      <CreatorStudio />
       <Notice offset={0} />
     </>
   );

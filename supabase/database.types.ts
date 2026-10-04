@@ -1035,6 +1035,112 @@ export type Database = {
           },
         ]
       }
+      course_lessons: {
+        Row: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          body_text: string
+          content_type: Database["public"]["Enums"]["vault_lesson_content"]
+          course_id: string
+          created_at: string
+          description: string
+          id: string
+          media_object_id: string | null
+          position: number
+          preview_allowed: boolean
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          body_text?: string
+          content_type?: Database["public"]["Enums"]["vault_lesson_content"]
+          course_id: string
+          created_at?: string
+          description?: string
+          id: string
+          media_object_id?: string | null
+          position: number
+          preview_allowed?: boolean
+          status?: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          body_text?: string
+          content_type?: Database["public"]["Enums"]["vault_lesson_content"]
+          course_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          media_object_id?: string | null
+          position?: number
+          preview_allowed?: boolean
+          status?: Database["public"]["Enums"]["vault_offer_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_lessons_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "creator_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_lessons_media_object_id_fkey"
+            columns: ["media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_progress: {
+        Row: {
+          completed_at: string
+          course_id: string
+          lesson_id: string
+          profile_id: string
+        }
+        Insert: {
+          completed_at?: string
+          course_id: string
+          lesson_id: string
+          profile_id: string
+        }
+        Update: {
+          completed_at?: string
+          course_id?: string
+          lesson_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_progress_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "creator_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_progress_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_commission_ledger: {
         Row: {
           advertiser_id: string
@@ -1094,6 +1200,198 @@ export type Database = {
           {
             foreignKeyName: "creator_commission_ledger_creator_profile_id_fkey"
             columns: ["creator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_courses: {
+        Row: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          description: string
+          id: string
+          price_amount_minor: number | null
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id?: string | null
+          created_at?: string
+          creator_id: string
+          currency?: string | null
+          description?: string
+          id: string
+          price_amount_minor?: number | null
+          status?: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id?: string | null
+          created_at?: string
+          creator_id?: string
+          currency?: string | null
+          description?: string
+          id?: string
+          price_amount_minor?: number | null
+          status?: Database["public"]["Enums"]["vault_offer_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_courses_cover_media_object_id_fkey"
+            columns: ["cover_media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_courses_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_products: {
+        Row: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          description: string
+          external_url: string | null
+          id: string
+          inventory_count: number | null
+          inventory_mode: Database["public"]["Enums"]["vault_inventory_mode"]
+          price_amount_minor: number | null
+          product_type: Database["public"]["Enums"]["vault_product_type"]
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id?: string | null
+          created_at?: string
+          creator_id: string
+          currency?: string | null
+          description?: string
+          external_url?: string | null
+          id: string
+          inventory_count?: number | null
+          inventory_mode?: Database["public"]["Enums"]["vault_inventory_mode"]
+          price_amount_minor?: number | null
+          product_type?: Database["public"]["Enums"]["vault_product_type"]
+          status?: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id?: string | null
+          created_at?: string
+          creator_id?: string
+          currency?: string | null
+          description?: string
+          external_url?: string | null
+          id?: string
+          inventory_count?: number | null
+          inventory_mode?: Database["public"]["Enums"]["vault_inventory_mode"]
+          price_amount_minor?: number | null
+          product_type?: Database["public"]["Enums"]["vault_product_type"]
+          status?: Database["public"]["Enums"]["vault_offer_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_products_cover_media_object_id_fkey"
+            columns: ["cover_media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_products_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_services: {
+        Row: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          category: Database["public"]["Enums"]["vault_service_category"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          delivery_type: Database["public"]["Enums"]["vault_service_delivery"]
+          description: string
+          external_url: string | null
+          id: string
+          price_amount_minor: number | null
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          category?: Database["public"]["Enums"]["vault_service_category"]
+          cover_media_object_id?: string | null
+          created_at?: string
+          creator_id: string
+          currency?: string | null
+          delivery_type?: Database["public"]["Enums"]["vault_service_delivery"]
+          description?: string
+          external_url?: string | null
+          id: string
+          price_amount_minor?: number | null
+          status?: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          category?: Database["public"]["Enums"]["vault_service_category"]
+          cover_media_object_id?: string | null
+          created_at?: string
+          creator_id?: string
+          currency?: string | null
+          delivery_type?: Database["public"]["Enums"]["vault_service_delivery"]
+          description?: string
+          external_url?: string | null
+          id?: string
+          price_amount_minor?: number | null
+          status?: Database["public"]["Enums"]["vault_offer_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_services_cover_media_object_id_fkey"
+            columns: ["cover_media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_services_creator_id_fkey"
+            columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1902,6 +2200,308 @@ export type Database = {
           },
         ]
       }
+      meet_ice_config: {
+        Row: {
+          id: number
+          stun_urls: string[]
+          turn_credential: string | null
+          turn_urls: string[]
+          turn_username: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          stun_urls?: string[]
+          turn_credential?: string | null
+          turn_urls?: string[]
+          turn_username?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          stun_urls?: string[]
+          turn_credential?: string | null
+          turn_urls?: string[]
+          turn_username?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      meet_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          sender_id: string
+          session_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          sender_id: string
+          session_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meet_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meet_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "meet_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meet_participants: {
+        Row: {
+          alias: string
+          joined_at: string
+          left_at: string | null
+          profile_id: string
+          seat: string
+          session_id: string
+        }
+        Insert: {
+          alias: string
+          joined_at?: string
+          left_at?: string | null
+          profile_id: string
+          seat: string
+          session_id: string
+        }
+        Update: {
+          alias?: string
+          joined_at?: string
+          left_at?: string | null
+          profile_id?: string
+          seat?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meet_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meet_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "meet_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meet_queue: {
+        Row: {
+          channel: Database["public"]["Enums"]["meet_channel"]
+          country_code: string | null
+          hood: Database["public"]["Enums"]["hood_id"] | null
+          id: string
+          interests: string[]
+          matched_session_id: string | null
+          mode: Database["public"]["Enums"]["meet_match_mode"]
+          profile_id: string
+          queued_at: string
+          status: Database["public"]["Enums"]["meet_queue_status"]
+          updated_at: string
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["meet_channel"]
+          country_code?: string | null
+          hood?: Database["public"]["Enums"]["hood_id"] | null
+          id?: string
+          interests?: string[]
+          matched_session_id?: string | null
+          mode: Database["public"]["Enums"]["meet_match_mode"]
+          profile_id: string
+          queued_at?: string
+          status?: Database["public"]["Enums"]["meet_queue_status"]
+          updated_at?: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["meet_channel"]
+          country_code?: string | null
+          hood?: Database["public"]["Enums"]["hood_id"] | null
+          id?: string
+          interests?: string[]
+          matched_session_id?: string | null
+          mode?: Database["public"]["Enums"]["meet_match_mode"]
+          profile_id?: string
+          queued_at?: string
+          status?: Database["public"]["Enums"]["meet_queue_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meet_queue_matched_session_fk"
+            columns: ["matched_session_id"]
+            isOneToOne: false
+            referencedRelation: "meet_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meet_queue_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meet_recent_matches: {
+        Row: {
+          matched_at: string
+          other_profile_id: string
+          profile_id: string
+        }
+        Insert: {
+          matched_at?: string
+          other_profile_id: string
+          profile_id: string
+        }
+        Update: {
+          matched_at?: string
+          other_profile_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meet_recent_matches_other_profile_id_fkey"
+            columns: ["other_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meet_recent_matches_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meet_sessions: {
+        Row: {
+          channel: Database["public"]["Enums"]["meet_channel"]
+          country_code: string | null
+          created_at: string
+          end_reason: string | null
+          ended_at: string | null
+          hood: Database["public"]["Enums"]["hood_id"] | null
+          id: string
+          mode: Database["public"]["Enums"]["meet_match_mode"]
+          shared_interest: string | null
+          status: Database["public"]["Enums"]["meet_session_status"]
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["meet_channel"]
+          country_code?: string | null
+          created_at?: string
+          end_reason?: string | null
+          ended_at?: string | null
+          hood?: Database["public"]["Enums"]["hood_id"] | null
+          id?: string
+          mode: Database["public"]["Enums"]["meet_match_mode"]
+          shared_interest?: string | null
+          status?: Database["public"]["Enums"]["meet_session_status"]
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["meet_channel"]
+          country_code?: string | null
+          created_at?: string
+          end_reason?: string | null
+          ended_at?: string | null
+          hood?: Database["public"]["Enums"]["hood_id"] | null
+          id?: string
+          mode?: Database["public"]["Enums"]["meet_match_mode"]
+          shared_interest?: string | null
+          status?: Database["public"]["Enums"]["meet_session_status"]
+        }
+        Relationships: []
+      }
+      meet_signals: {
+        Row: {
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["meet_signal_kind"]
+          payload: Json
+          sender_id: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["meet_signal_kind"]
+          payload: Json
+          sender_id: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["meet_signal_kind"]
+          payload?: Json
+          sender_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meet_signals_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meet_signals_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "meet_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meet_video_acks: {
+        Row: {
+          acknowledged_at: string
+          profile_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          profile_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meet_video_acks_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       moderation_actions: {
         Row: {
           action: Database["public"]["Enums"]["moderation_action"]
@@ -2646,6 +3246,61 @@ export type Database = {
           },
         ]
       }
+      vault_service_requests: {
+        Row: {
+          created_at: string
+          creator_id: string
+          id: string
+          message: string
+          requester_id: string
+          service_id: string
+          status: Database["public"]["Enums"]["vault_service_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          id: string
+          message: string
+          requester_id: string
+          service_id: string
+          status?: Database["public"]["Enums"]["vault_service_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          id?: string
+          message?: string
+          requester_id?: string
+          service_id?: string
+          status?: Database["public"]["Enums"]["vault_service_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_service_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_service_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_service_requests_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "creator_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vault_subscriptions: {
         Row: {
           cancelled_at: string | null
@@ -2852,6 +3507,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ack_meet_video_safety: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       activate_advertiser: {
         Args: { p_advertiser_id: string }
         Returns: {
@@ -3044,8 +3703,16 @@ export type Database = {
         Args: { p_target_id: string }
         Returns: undefined
       }
+      can_access_course_lesson: {
+        Args: { p_lesson_id: string; p_viewer: string }
+        Returns: boolean
+      }
       can_access_vault_drop: {
         Args: { p_drop_id: string; p_viewer_profile_id: string }
+        Returns: boolean
+      }
+      can_use_video_meet: {
+        Args: { p_profile: string }
         Returns: boolean
       }
       claim_treasure_reward: {
@@ -3084,6 +3751,10 @@ export type Database = {
         Args: { p_take_id: string }
         Returns: Json
       }
+      cleanup_meet_signals: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       cleanup_rate_limits: {
         Args: { p_retention?: unknown }
         Returns: number
@@ -3100,6 +3771,15 @@ export type Database = {
         Args: { p_clue_id: string; p_content_id: string; p_hunt_id: string }
         Returns: Json
       }
+      complete_course_lesson: {
+        Args: { p_lesson_id: string }
+        Returns: {
+          completed_at: string
+          course_id: string
+          lesson_id: string
+          profile_id: string
+        }
+      }
       complete_media_upload: {
         Args: {
           p_duration_ms?: number
@@ -3109,6 +3789,14 @@ export type Database = {
           p_width?: number
         }
         Returns: undefined
+      }
+      course_lesson_card: {
+        Args: { p_lesson_id: string }
+        Returns: Json
+      }
+      course_lesson_media_target: {
+        Args: { p_lesson_id: string }
+        Returns: Json
       }
       create_advertiser: {
         Args: { p_name: string; p_slug: string }
@@ -3211,6 +3899,116 @@ export type Database = {
           text: string
           upvotes_count: number
         }[]
+      }
+      create_course_lesson: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          p_body_text?: string
+          p_content_type?: Database["public"]["Enums"]["vault_lesson_content"]
+          p_course_id: string
+          p_description?: string
+          p_media_object_id?: string
+          p_preview_allowed?: boolean
+          p_title: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          body_text: string
+          content_type: Database["public"]["Enums"]["vault_lesson_content"]
+          course_id: string
+          created_at: string
+          description: string
+          id: string
+          media_object_id: string | null
+          position: number
+          preview_allowed: boolean
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      create_creator_course: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          p_cover_media_object_id?: string
+          p_currency?: string
+          p_description?: string
+          p_price_amount_minor?: number
+          p_title: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          description: string
+          id: string
+          price_amount_minor: number | null
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      create_creator_product: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          p_cover_media_object_id?: string
+          p_currency?: string
+          p_description?: string
+          p_external_url?: string
+          p_inventory_count?: number
+          p_inventory_mode?: Database["public"]["Enums"]["vault_inventory_mode"]
+          p_price_amount_minor?: number
+          p_product_type?: Database["public"]["Enums"]["vault_product_type"]
+          p_title: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          description: string
+          external_url: string | null
+          id: string
+          inventory_count: number | null
+          inventory_mode: Database["public"]["Enums"]["vault_inventory_mode"]
+          price_amount_minor: number | null
+          product_type: Database["public"]["Enums"]["vault_product_type"]
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      create_creator_service: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          p_category?: Database["public"]["Enums"]["vault_service_category"]
+          p_cover_media_object_id?: string
+          p_currency?: string
+          p_delivery_type?: Database["public"]["Enums"]["vault_service_delivery"]
+          p_description?: string
+          p_external_url?: string
+          p_price_amount_minor?: number
+          p_title: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          category: Database["public"]["Enums"]["vault_service_category"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          delivery_type: Database["public"]["Enums"]["vault_service_delivery"]
+          description: string
+          external_url: string | null
+          id: string
+          price_amount_minor: number | null
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
       }
       create_media_upload: {
         Args: {
@@ -3489,6 +4287,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      get_meet_ice_servers: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_meet_session: {
         Args: { p_session_id: string }
         Returns: Json
@@ -3504,6 +4306,10 @@ export type Database = {
       get_treasure_detail: {
         Args: { p_hunt_id: string }
         Returns: Json
+      }
+      has_meet_video_safety_ack: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
       hood_active_prediction: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
@@ -3678,6 +4484,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json[]
       }
+      list_meet_messages: {
+        Args: { p_before?: string; p_limit?: number; p_session_id: string }
+        Returns: Json
+      }
+      list_meet_signals: {
+        Args: { p_after?: string; p_session_id: string }
+        Returns: Json
+      }
       list_my_sponsor_campaigns: {
         Args: { p_advertiser_id: string }
         Returns: {
@@ -3695,20 +4509,40 @@ export type Database = {
           title: string
         }[]
       }
-      list_meet_messages: {
-        Args: {
-          p_before?: string
-          p_limit?: number
-          p_session_id: string
-        }
-        Returns: Json
-      }
       list_play_home: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
       mark_arena_evidence_useful: {
         Args: { p_evidence_id: string }
+        Returns: Json
+      }
+      meet_create_session: {
+        Args: {
+          p_a: string
+          p_b: string
+          p_channel?: Database["public"]["Enums"]["meet_channel"]
+          p_country: string
+          p_hood: Database["public"]["Enums"]["hood_id"]
+          p_mode: Database["public"]["Enums"]["meet_match_mode"]
+          p_shared_interest: string
+        }
+        Returns: string
+      }
+      meet_has_active_session: {
+        Args: { p_profile: string }
+        Returns: boolean
+      }
+      meet_is_blocked: {
+        Args: { p_a: string; p_b: string }
+        Returns: boolean
+      }
+      meet_recently_matched: {
+        Args: { p_a: string; p_b: string }
+        Returns: boolean
+      }
+      meet_session_payload: {
+        Args: { p_session_id: string; p_viewer: string }
         Returns: Json
       }
       mindshift_stats: {
@@ -3723,6 +4557,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      new_arena_id: {
+        Args: { p_prefix: string }
+        Returns: string
+      }
       next_meet: {
         Args: {
           p_channel?: Database["public"]["Enums"]["meet_channel"]
@@ -3733,38 +4571,6 @@ export type Database = {
           p_session_id: string
         }
         Returns: Json
-      }
-      ack_meet_video_safety: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      can_use_video_meet: {
-        Args: { p_profile: string }
-        Returns: boolean
-      }
-      get_meet_ice_servers: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      has_meet_video_safety_ack: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      list_meet_signals: {
-        Args: { p_after?: string; p_session_id: string }
-        Returns: Json
-      }
-      publish_meet_signal: {
-        Args: {
-          p_kind: Database["public"]["Enums"]["meet_signal_kind"]
-          p_payload: Json
-          p_session_id: string
-        }
-        Returns: Json
-      }
-      new_arena_id: {
-        Args: { p_prefix: string }
-        Returns: string
       }
       owns_campaign_via_advertiser: {
         Args: { p_campaign_id: string }
@@ -3835,6 +4641,14 @@ export type Database = {
       }
       profile_clash_list: {
         Args: { p_profile_id: string }
+        Returns: Json
+      }
+      publish_meet_signal: {
+        Args: {
+          p_kind: Database["public"]["Enums"]["meet_signal_kind"]
+          p_payload: Json
+          p_session_id: string
+        }
         Returns: Json
       }
       publish_vault_drop: {
@@ -3956,6 +4770,19 @@ export type Database = {
         }
         Returns: Json
       }
+      request_creator_service: {
+        Args: { p_message: string; p_service_id: string }
+        Returns: {
+          created_at: string
+          creator_id: string
+          id: string
+          message: string
+          requester_id: string
+          service_id: string
+          status: Database["public"]["Enums"]["vault_service_request_status"]
+          updated_at: string
+        }
+      }
       resolve_prediction_game: {
         Args: { p_game_id: string; p_winning_option_id: string }
         Returns: Json
@@ -3987,6 +4814,107 @@ export type Database = {
       send_meet_message: {
         Args: { p_body: string; p_session_id: string }
         Returns: Json
+      }
+      set_course_lesson_status: {
+        Args: {
+          p_lesson_id: string
+          p_status: Database["public"]["Enums"]["vault_offer_status"]
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          body_text: string
+          content_type: Database["public"]["Enums"]["vault_lesson_content"]
+          course_id: string
+          created_at: string
+          description: string
+          id: string
+          media_object_id: string | null
+          position: number
+          preview_allowed: boolean
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      set_creator_course_status: {
+        Args: {
+          p_course_id: string
+          p_status: Database["public"]["Enums"]["vault_offer_status"]
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          description: string
+          id: string
+          price_amount_minor: number | null
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      set_creator_product_status: {
+        Args: {
+          p_product_id: string
+          p_status: Database["public"]["Enums"]["vault_offer_status"]
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          description: string
+          external_url: string | null
+          id: string
+          inventory_count: number | null
+          inventory_mode: Database["public"]["Enums"]["vault_inventory_mode"]
+          price_amount_minor: number | null
+          product_type: Database["public"]["Enums"]["vault_product_type"]
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      set_creator_service_status: {
+        Args: {
+          p_service_id: string
+          p_status: Database["public"]["Enums"]["vault_offer_status"]
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          category: Database["public"]["Enums"]["vault_service_category"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          delivery_type: Database["public"]["Enums"]["vault_service_delivery"]
+          description: string
+          external_url: string | null
+          id: string
+          price_amount_minor: number | null
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      set_service_request_status: {
+        Args: {
+          p_request_id: string
+          p_status: Database["public"]["Enums"]["vault_service_request_status"]
+        }
+        Returns: {
+          created_at: string
+          creator_id: string
+          id: string
+          message: string
+          requester_id: string
+          service_id: string
+          status: Database["public"]["Enums"]["vault_service_request_status"]
+          updated_at: string
+        }
       }
       set_sponsor_campaign_status: {
         Args: {
@@ -4135,6 +5063,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      try_meet_match: {
+        Args: { p_queue_id: string }
+        Returns: Json
+      }
       unblock_profile: {
         Args: { p_target_id: string }
         Returns: undefined
@@ -4146,6 +5078,34 @@ export type Database = {
       unmute_profile: {
         Args: { p_target_id: string }
         Returns: undefined
+      }
+      update_course_lesson: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          p_body_text?: string
+          p_clear_media?: boolean
+          p_content_type?: Database["public"]["Enums"]["vault_lesson_content"]
+          p_description?: string
+          p_lesson_id: string
+          p_media_object_id?: string
+          p_preview_allowed?: boolean
+          p_title?: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          body_text: string
+          content_type: Database["public"]["Enums"]["vault_lesson_content"]
+          course_id: string
+          created_at: string
+          description: string
+          id: string
+          media_object_id: string | null
+          position: number
+          preview_allowed: boolean
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
       }
       update_creator_commission: {
         Args: {
@@ -4162,6 +5122,97 @@ export type Database = {
           creator_profile_id: string
           id: string
           status: Database["public"]["Enums"]["campaign_creator_status"]
+        }
+      }
+      update_creator_course: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          p_clear_cover?: boolean
+          p_course_id: string
+          p_cover_media_object_id?: string
+          p_currency?: string
+          p_description?: string
+          p_price_amount_minor?: number
+          p_title?: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          description: string
+          id: string
+          price_amount_minor: number | null
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      update_creator_product: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          p_clear_cover?: boolean
+          p_clear_external_url?: boolean
+          p_cover_media_object_id?: string
+          p_currency?: string
+          p_description?: string
+          p_external_url?: string
+          p_inventory_count?: number
+          p_inventory_mode?: Database["public"]["Enums"]["vault_inventory_mode"]
+          p_price_amount_minor?: number
+          p_product_id: string
+          p_product_type?: Database["public"]["Enums"]["vault_product_type"]
+          p_title?: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          description: string
+          external_url: string | null
+          id: string
+          inventory_count: number | null
+          inventory_mode: Database["public"]["Enums"]["vault_inventory_mode"]
+          price_amount_minor: number | null
+          product_type: Database["public"]["Enums"]["vault_product_type"]
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
+        }
+      }
+      update_creator_service: {
+        Args: {
+          p_access_type?: Database["public"]["Enums"]["vault_offer_access"]
+          p_category?: Database["public"]["Enums"]["vault_service_category"]
+          p_clear_cover?: boolean
+          p_clear_external_url?: boolean
+          p_cover_media_object_id?: string
+          p_currency?: string
+          p_delivery_type?: Database["public"]["Enums"]["vault_service_delivery"]
+          p_description?: string
+          p_external_url?: string
+          p_price_amount_minor?: number
+          p_service_id: string
+          p_title?: string
+        }
+        Returns: {
+          access_type: Database["public"]["Enums"]["vault_offer_access"]
+          category: Database["public"]["Enums"]["vault_service_category"]
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          currency: string | null
+          delivery_type: Database["public"]["Enums"]["vault_service_delivery"]
+          description: string
+          external_url: string | null
+          id: string
+          price_amount_minor: number | null
+          status: Database["public"]["Enums"]["vault_offer_status"]
+          title: string
+          updated_at: string
         }
       }
       update_sponsor_campaign: {
@@ -4207,6 +5258,10 @@ export type Database = {
         }
         Returns: Json
       }
+      vault_assert_owned_public_cover: {
+        Args: { p_media_id: string; p_owner: string }
+        Returns: undefined
+      }
       vault_drop_card: {
         Args: { p_drop_id: string }
         Returns: Json
@@ -4240,6 +5295,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      vault_profiles_blocked: {
+        Args: { p_a: string; p_b: string }
+        Returns: boolean
+      }
+      vault_public_cover: {
+        Args: { p_media_id: string }
+        Returns: Json
+      }
       vault_revoke_subscription: {
         Args: { p_subscription_id: string }
         Returns: undefined
@@ -4250,6 +5313,10 @@ export type Database = {
       }
       viewer_can_access_drop: {
         Args: { p_drop_id: string }
+        Returns: boolean
+      }
+      viewer_has_vault_subscription: {
+        Args: { p_creator_id: string }
         Returns: boolean
       }
       watch_arena_room: {
@@ -4444,6 +5511,27 @@ export type Database = {
       take_status: "active" | "expired" | "removed"
       vault_drop_access: "free" | "subscriber"
       vault_drop_status: "draft" | "published" | "expired" | "removed"
+      vault_inventory_mode: "unlimited" | "limited" | "external"
+      vault_lesson_content: "video" | "text" | "image"
+      vault_offer_access: "free" | "subscriber" | "paid" | "contact"
+      vault_offer_status: "draft" | "published" | "archived"
+      vault_product_type: "digital" | "physical" | "merch" | "external"
+      vault_service_category:
+        | "consultation"
+        | "coaching"
+        | "custom_content"
+        | "commission"
+        | "private_session"
+        | "creative_service"
+        | "event"
+        | "other"
+      vault_service_delivery: "online" | "in_person" | "custom" | "external"
+      vault_service_request_status:
+        | "requested"
+        | "accepted"
+        | "declined"
+        | "cancelled"
+        | "completed"
       vault_status: "draft" | "active" | "suspended"
       vault_subscription_source: "test" | "admin" | "promo" | "payment"
       vault_subscription_status: "active" | "trial" | "cancelled" | "expired"
@@ -4726,6 +5814,29 @@ export const Constants = {
       take_status: ["active", "expired", "removed"],
       vault_drop_access: ["free", "subscriber"],
       vault_drop_status: ["draft", "published", "expired", "removed"],
+      vault_inventory_mode: ["unlimited", "limited", "external"],
+      vault_lesson_content: ["video", "text", "image"],
+      vault_offer_access: ["free", "subscriber", "paid", "contact"],
+      vault_offer_status: ["draft", "published", "archived"],
+      vault_product_type: ["digital", "physical", "merch", "external"],
+      vault_service_category: [
+        "consultation",
+        "coaching",
+        "custom_content",
+        "commission",
+        "private_session",
+        "creative_service",
+        "event",
+        "other",
+      ],
+      vault_service_delivery: ["online", "in_person", "custom", "external"],
+      vault_service_request_status: [
+        "requested",
+        "accepted",
+        "declined",
+        "cancelled",
+        "completed",
+      ],
       vault_status: ["draft", "active", "suspended"],
       vault_subscription_source: ["test", "admin", "promo", "payment"],
       vault_subscription_status: ["active", "trial", "cancelled", "expired"],
