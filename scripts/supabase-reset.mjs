@@ -34,3 +34,14 @@ function run(args) {
 run(['db', 'reset']);
 run(['seed', 'buckets', '--local']);
 run(['db', 'query', '--local', '-f', bootstrapSql]);
+
+// Vault Creator World posters (local Storage). SQL seeds insert media_objects;
+// this uploads matching public-media bytes so Discover cards are visual.
+const media = spawnSync(process.execPath, [path.join(root, 'scripts', 'upload-vault-fixture-media.mjs')], {
+  stdio: 'inherit',
+  cwd: root,
+  env: process.env,
+});
+if (media.status !== 0) {
+  process.exit(media.status ?? 1);
+}

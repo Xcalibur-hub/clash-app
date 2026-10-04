@@ -236,7 +236,7 @@ select lives_ok(
   'the creator starts a permanent collection'
 );
 select lives_ok(
-  $$ select public.add_drop_to_collection((select id from public.vault_collections limit 1), (select id from public.vault_drops where caption = 'V2 subscriber drop')) $$,
+  $$ select public.add_drop_to_collection((select id from public.vault_collections where creator_id = 'v2-creator'), (select id from public.vault_drops where caption = 'V2 subscriber drop')) $$,
   'the creator shelves the subscriber drop'
 );
 reset role;
@@ -249,12 +249,14 @@ update public.vault_drops
  where caption = 'V2 subscriber drop';
 
 select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'a collected drop past its window stays readable — collection permanence');
-select is(public.expire_vault_drops(10), 1, 'the expiry sweep closes the window');
+select ok(public.expire_vault_drops(10) >= 1, 'the expiry sweep closes the window');
 select is((select status::text from public.vault_drops where caption = 'V2 subscriber drop'), 'expired', 'the drop is now expired');
 select is((select count(*)::int from public.vault_drops where caption = 'V2 subscriber drop'), 1, 'expiry never deletes the row');
 select is((select media_object_id from public.vault_drops where caption = 'V2 subscriber drop'), 'm2-priv', 'expiry never drops the media reference');
-select is((select count(*)::int from public.vault_collection_items), 1, 'the collection item survives expiry');
-select is((select count(*)::int from public.vault_collections), 1, 'the collection itself survives expiry');
+select is((select count(*)::int from public.vault_collection_items i
+  join public.vault_collections c on c.id = i.collection_id
+ where c.creator_id = 'v2-creator'), 1, 'the collection item survives expiry');
+select is((select count(*)::int from public.vault_collections where creator_id = 'v2-creator'), 1, 'the collection itself survives expiry');
 select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the subscriber still reads it through the collection');
 select is(public.can_access_vault_drop('v2-stranger', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a non-subscriber cannot reach it through the collection');
 select is(public.can_access_vault_drop(null, (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a guest cannot reach it through the collection');

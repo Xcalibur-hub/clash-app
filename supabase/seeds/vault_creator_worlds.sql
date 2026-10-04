@@ -1,0 +1,293 @@
+-- ============================================================================
+-- CLASH · Vault Creator World fixtures (LOCAL ONLY)
+-- ----------------------------------------------------------------------------
+-- Synthetic Creator Worlds so Vault Following / Discover are testable locally.
+-- Maya / Leo / Aria / Noah — clearly fake identities (devfx_vw_*).
+--
+-- SAFETY
+--   · Not a migration — never applied by `supabase db push` / hosted deploy.
+--   · Wired only into local `[db.seed]` and `npm run supabase:seed:clash-dev`.
+--   · Idempotent: wipes the `devfx_vw_*` namespace, then re-inserts.
+--   · Does not subscribe the local dev account to anything.
+--   · Follows Maya + Leo from local_dev only (Following cold-start demo).
+-- ============================================================================
+
+begin;
+
+do $$
+declare
+  v_addr inet := inet_server_addr();
+begin
+  if v_addr is not null
+     and host(v_addr) not in ('127.0.0.1', '::1')
+     and host(v_addr) not like '172.%'
+     and host(v_addr) not like '10.%'
+  then
+    raise exception
+      'vault_creator_worlds: refused — server address % is not a local/dev network',
+      v_addr;
+  end if;
+end $$;
+
+-- ── Wipe previous vault-world fixture namespace ──────────────────────────────
+delete from public.course_progress
+ where course_id like 'devfx_vw_%' or lesson_id like 'devfx_vw_%' or profile_id like 'devfx_vw_%';
+delete from public.course_lessons where id like 'devfx_vw_%' or course_id like 'devfx_vw_%';
+delete from public.creator_courses where id like 'devfx_vw_%' or creator_id like 'devfx_vw_%';
+delete from public.vault_service_requests
+ where id like 'devfx_vw_%' or service_id like 'devfx_vw_%' or creator_id like 'devfx_vw_%';
+delete from public.creator_services where id like 'devfx_vw_%' or creator_id like 'devfx_vw_%';
+delete from public.creator_products where id like 'devfx_vw_%' or creator_id like 'devfx_vw_%';
+delete from public.vault_collection_items
+ where collection_id like 'devfx_vw_%' or drop_id like 'devfx_vw_%';
+delete from public.vault_collections where id like 'devfx_vw_%' or creator_id like 'devfx_vw_%';
+delete from public.vault_subscriptions where id like 'devfx_vw_%' or vault_id like 'devfx_vw_%';
+delete from public.vault_drops where id like 'devfx_vw_%' or creator_id like 'devfx_vw_%';
+delete from public.creator_vaults where id like 'devfx_vw_%' or creator_id like 'devfx_vw_%';
+delete from public.media_objects where id like 'devfx_vw_%' or owner_id like 'devfx_vw_%';
+delete from public.follows
+ where follower_id like 'devfx_vw_%'
+    or following_id like 'devfx_vw_%'
+    or (following_id in ('devfx_vw_maya', 'devfx_vw_leo', 'devfx_vw_aria', 'devfx_vw_noah')
+        and follower_id in (
+          select id from public.profiles
+           where auth_user_id = '00000000-0000-4000-a000-0000000000de'
+        ));
+delete from public.profiles where id like 'devfx_vw_%';
+
+-- ── Creator profiles ────────────────────────────────────────────────────────
+insert into public.profiles
+  (id, handle, name, avatar_tint, bio, home_hood, role, moderated_hoods,
+   reputation, coins, streak, rank, public_country_code)
+values
+  ('devfx_vw_maya', 'maya_vault', 'Maya', '#C45C26',
+   'Horror filmmaker and visual storyteller.',
+   'movies', 'creator', '{}', 5200, 400, 5, 'Hot Take', 'US'),
+  ('devfx_vw_leo', 'leo_vault', 'Leo', '#2F6FED',
+   'Street photographer / travel creator.',
+   'goatalk', 'creator', '{}', 3100, 220, 3, 'Instigator', 'JP'),
+  ('devfx_vw_aria', 'aria_vault', 'Aria', '#B45AD4',
+   'Music producer crafting late-night demos.',
+   'gaming', 'creator', '{}', 2800, 180, 2, 'Instigator', 'GB'),
+  ('devfx_vw_noah', 'noah_vault', 'Noah', '#1FA37A',
+   'Designer / creative technologist.',
+   'techtakes', 'creator', '{}', 4500, 260, 4, 'Hot Take', 'DE');
+
+-- ── Media (paths filled by seed media upload; objects must exist for RPCs) ──
+insert into public.media_objects
+  (id, owner_id, bucket, storage_path, media_kind, mime_type, visibility, status, ready_at, size_bytes)
+values
+  -- Maya
+  ('devfx_vw_maya_free', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_free/devfx_vw_maya_free.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_sub', 'devfx_vw_maya', 'private-media',
+   'devfx_vw_maya/devfx_vw_maya_sub/devfx_vw_maya_sub.png', 'image', 'image/png', 'private', 'ready', now(), 1),
+  ('devfx_vw_maya_teaser', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_teaser/devfx_vw_maya_teaser.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_ep1', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_ep1/devfx_vw_maya_ep1.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_ep2', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_ep2/devfx_vw_maya_ep2.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_ep3', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_ep3/devfx_vw_maya_ep3.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_svc', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_svc/devfx_vw_maya_svc.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_course', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_course/devfx_vw_maya_course.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_prod', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_prod/devfx_vw_maya_prod.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_lesson_priv', 'devfx_vw_maya', 'private-media',
+   'devfx_vw_maya/devfx_vw_maya_lesson_priv/devfx_vw_maya_lesson_priv.mp4', 'video', 'video/mp4', 'private', 'ready', now(), 1),
+  -- Leo
+  ('devfx_vw_leo_free', 'devfx_vw_leo', 'public-media',
+   'devfx_vw_leo/devfx_vw_leo_free/devfx_vw_leo_free.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_leo_course', 'devfx_vw_leo', 'public-media',
+   'devfx_vw_leo/devfx_vw_leo_course/devfx_vw_leo_course.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_leo_svc', 'devfx_vw_leo', 'public-media',
+   'devfx_vw_leo/devfx_vw_leo_svc/devfx_vw_leo_svc.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  -- Aria
+  ('devfx_vw_aria_free', 'devfx_vw_aria', 'public-media',
+   'devfx_vw_aria/devfx_vw_aria_free/devfx_vw_aria_free.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_aria_col', 'devfx_vw_aria', 'public-media',
+   'devfx_vw_aria/devfx_vw_aria_col/devfx_vw_aria_col.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_aria_svc', 'devfx_vw_aria', 'public-media',
+   'devfx_vw_aria/devfx_vw_aria_svc/devfx_vw_aria_svc.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_aria_prod', 'devfx_vw_aria', 'public-media',
+   'devfx_vw_aria/devfx_vw_aria_prod/devfx_vw_aria_prod.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  -- Noah
+  ('devfx_vw_noah_free', 'devfx_vw_noah', 'public-media',
+   'devfx_vw_noah/devfx_vw_noah_free/devfx_vw_noah_free.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_noah_course', 'devfx_vw_noah', 'public-media',
+   'devfx_vw_noah/devfx_vw_noah_course/devfx_vw_noah_course.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_noah_prod', 'devfx_vw_noah', 'public-media',
+   'devfx_vw_noah/devfx_vw_noah_prod/devfx_vw_noah_prod.png', 'image', 'image/png', 'public', 'ready', now(), 1);
+
+-- ── Vaults ──────────────────────────────────────────────────────────────────
+insert into public.creator_vaults (id, creator_id, title, description, status)
+values
+  ('devfx_vw_maya_vault', 'devfx_vw_maya', 'Midnight Files', 'Horror filmmaker world.', 'active'),
+  ('devfx_vw_leo_vault', 'devfx_vw_leo', 'After Hours Streets', 'Travel & street photography.', 'active'),
+  ('devfx_vw_aria_vault', 'devfx_vw_aria', 'After Hours', 'Late-night music world.', 'active'),
+  ('devfx_vw_noah_vault', 'devfx_vw_noah', 'Motion Lab', 'Interface motion & design.', 'active');
+
+-- ── Drops ───────────────────────────────────────────────────────────────────
+insert into public.vault_drops
+  (id, vault_id, creator_id, caption, media_object_id, access_level, status,
+   published_at, expires_at, public_preview_media_object_id)
+values
+  -- Maya free + subscriber preview + collection episodes
+  ('devfx_vw_maya_drop_free', 'devfx_vw_maya_vault', 'devfx_vw_maya',
+   'I found this tape behind the wall.', 'devfx_vw_maya_free', 'free', 'published',
+   now() - interval '2 hours', now() - interval '2 hours' + interval '7 days', null),
+  ('devfx_vw_maya_drop_sub', 'devfx_vw_maya_vault', 'devfx_vw_maya',
+   'The cut they never aired.', 'devfx_vw_maya_sub', 'subscriber', 'published',
+   now() - interval '1 hour', now() - interval '1 hour' + interval '7 days', 'devfx_vw_maya_teaser'),
+  ('devfx_vw_maya_ep1', 'devfx_vw_maya_vault', 'devfx_vw_maya',
+   'Episode 01 — The House', 'devfx_vw_maya_ep1', 'free', 'published',
+   now() - interval '3 days', now() - interval '3 days' + interval '7 days', null),
+  ('devfx_vw_maya_ep2', 'devfx_vw_maya_vault', 'devfx_vw_maya',
+   'Episode 02 — The Tape', 'devfx_vw_maya_ep2', 'free', 'published',
+   now() - interval '2 days', now() - interval '2 days' + interval '7 days', null),
+  ('devfx_vw_maya_ep3', 'devfx_vw_maya_vault', 'devfx_vw_maya',
+   'Episode 03 — The Basement', 'devfx_vw_maya_ep3', 'free', 'published',
+   now() - interval '1 day', now() - interval '1 day' + interval '7 days', null),
+  -- Leo / Aria / Noah
+  ('devfx_vw_leo_drop', 'devfx_vw_leo_vault', 'devfx_vw_leo',
+   'Tokyo after midnight.', 'devfx_vw_leo_free', 'free', 'published',
+   now() - interval '4 hours', now() - interval '4 hours' + interval '7 days', null),
+  ('devfx_vw_aria_drop', 'devfx_vw_aria_vault', 'devfx_vw_aria',
+   'Unreleased demo — keep the hiss.', 'devfx_vw_aria_free', 'free', 'published',
+   now() - interval '5 hours', now() - interval '5 hours' + interval '7 days', null),
+  ('devfx_vw_aria_col_drop', 'devfx_vw_aria_vault', 'devfx_vw_aria',
+   'After Hours — Side A', 'devfx_vw_aria_col', 'free', 'published',
+   now() - interval '6 hours', now() - interval '6 hours' + interval '7 days', null),
+  ('devfx_vw_noah_drop', 'devfx_vw_noah_vault', 'devfx_vw_noah',
+   'How I built this.', 'devfx_vw_noah_free', 'free', 'published',
+   now() - interval '3 hours', now() - interval '3 hours' + interval '7 days', null);
+
+-- Draft drop (must never appear in Discover)
+insert into public.vault_drops
+  (id, vault_id, creator_id, caption, media_object_id, access_level, status)
+values
+  ('devfx_vw_maya_draft', 'devfx_vw_maya_vault', 'devfx_vw_maya',
+   'Draft — never publish', 'devfx_vw_maya_free', 'free', 'draft');
+
+-- Expired free drop (must never appear as live Discover drop)
+insert into public.vault_drops
+  (id, vault_id, creator_id, caption, media_object_id, access_level, status,
+   published_at, expires_at)
+values
+  ('devfx_vw_maya_expired', 'devfx_vw_maya_vault', 'devfx_vw_maya',
+   'Expired hallway cut', 'devfx_vw_maya_ep1', 'free', 'published',
+   now() - interval '10 days', now() - interval '3 days');
+
+-- ── Collections ─────────────────────────────────────────────────────────────
+insert into public.vault_collections (id, vault_id, creator_id, title, description)
+values
+  ('devfx_vw_maya_col', 'devfx_vw_maya_vault', 'devfx_vw_maya',
+   'Midnight Files', 'Three episodes from the house.'),
+  ('devfx_vw_aria_col', 'devfx_vw_aria_vault', 'devfx_vw_aria',
+   'After Hours', 'Night sessions.');
+
+insert into public.vault_collection_items (collection_id, drop_id, position)
+values
+  ('devfx_vw_maya_col', 'devfx_vw_maya_ep1', 0),
+  ('devfx_vw_maya_col', 'devfx_vw_maya_ep2', 1),
+  ('devfx_vw_maya_col', 'devfx_vw_maya_ep3', 2),
+  ('devfx_vw_aria_col', 'devfx_vw_aria_col_drop', 0);
+
+-- ── Services ────────────────────────────────────────────────────────────────
+insert into public.creator_services
+  (id, creator_id, title, description, category, cover_media_object_id,
+   access_type, price_amount_minor, currency, delivery_type, status)
+values
+  ('devfx_vw_maya_svc', 'devfx_vw_maya', '1-on-1 Horror Film Review',
+   'A private review of your short or scene.', 'consultation', 'devfx_vw_maya_svc',
+   'contact', null, null, 'online', 'published'),
+  ('devfx_vw_leo_svc', 'devfx_vw_leo', 'Portfolio Review',
+   'Street portfolio feedback in one session.', 'consultation', 'devfx_vw_leo_svc',
+   'paid', 450000, 'INR', 'online', 'published'),
+  ('devfx_vw_aria_svc', 'devfx_vw_aria', 'Mix Feedback',
+   'Notes on your mix — arrangement and space.', 'creative_service', 'devfx_vw_aria_svc',
+   'contact', null, null, 'online', 'published'),
+  -- Draft must stay invisible
+  ('devfx_vw_maya_svc_draft', 'devfx_vw_maya', 'Hidden Draft Service',
+   'Should never appear.', 'other', null, 'contact', null, null, 'online', 'draft');
+
+-- ── Courses ─────────────────────────────────────────────────────────────────
+insert into public.creator_courses
+  (id, creator_id, title, description, cover_media_object_id, access_type, status)
+values
+  ('devfx_vw_maya_course', 'devfx_vw_maya', 'Filmmaking at Night',
+   'Lighting, movement, and sound after dark.', 'devfx_vw_maya_course', 'free', 'published'),
+  ('devfx_vw_leo_course', 'devfx_vw_leo', 'Street Photography',
+   'Reading light in the city.', 'devfx_vw_leo_course', 'free', 'published'),
+  ('devfx_vw_noah_course', 'devfx_vw_noah', 'Interface Motion',
+   'Motion systems for product UI.', 'devfx_vw_noah_course', 'free', 'published'),
+  ('devfx_vw_maya_course_draft', 'devfx_vw_maya', 'Draft Course',
+   'Invisible draft.', null, 'free', 'draft');
+
+insert into public.course_lessons
+  (id, course_id, title, description, position, content_type, body_text,
+   preview_allowed, access_type, status, media_object_id)
+values
+  ('devfx_vw_maya_l1', 'devfx_vw_maya_course', '01 — Introduction',
+   'Why night changes everything.', 1, 'text',
+   'Night removes the easy light. Start by deciding what you refuse to show.',
+   false, 'free', 'published', null),
+  ('devfx_vw_maya_l2', 'devfx_vw_maya_course', '02 — Lighting the dark',
+   'Practical sources and silhouettes.', 2, 'text',
+   'Use one practical. Let the rest fall away. Protect the blacks.',
+   false, 'free', 'published', null),
+  ('devfx_vw_maya_l3', 'devfx_vw_maya_course', '03 — Camera movement',
+   'Slow push and withheld reveal.', 3, 'text',
+   'Move only when the frame earns it. Hold longer than feels comfortable.',
+   false, 'free', 'published', null),
+  ('devfx_vw_maya_l4', 'devfx_vw_maya_course', '04 — Sound design',
+   'Rooms that breathe.', 4, 'text',
+   'Record the room empty first. The hush is half the scare.',
+   false, 'free', 'published', null),
+  -- Subscriber private lesson — media must never leak via Discover
+  ('devfx_vw_maya_l_sub', 'devfx_vw_maya_course', 'Members cut',
+   'Subscriber-only video notes.', 5, 'video', '',
+   false, 'subscriber', 'published', 'devfx_vw_maya_lesson_priv'),
+  ('devfx_vw_leo_l1', 'devfx_vw_leo_course', '01 — Night streets',
+   'Exposure without killing the mood.', 1, 'text',
+   'Expose for the neon you care about. Let the rest fail.',
+   false, 'free', 'published', null),
+  ('devfx_vw_noah_l1', 'devfx_vw_noah_course', '01 — Timing curves',
+   'Easing that feels physical.', 1, 'text',
+   'Prefer ease-out for entrances. Never bounce by default.',
+   false, 'free', 'published', null);
+
+-- ── Products ────────────────────────────────────────────────────────────────
+insert into public.creator_products
+  (id, creator_id, title, description, product_type, cover_media_object_id,
+   price_amount_minor, currency, access_type, inventory_mode, status)
+values
+  ('devfx_vw_maya_prod', 'devfx_vw_maya', 'Night LUT Pack',
+   'Warm-to-cold night grades for horror shorts.', 'digital', 'devfx_vw_maya_prod',
+   199900, 'INR', 'paid', 'unlimited', 'published'),
+  ('devfx_vw_aria_prod', 'devfx_vw_aria', 'Drum Pack',
+   'Tight kits for late-night demos.', 'digital', 'devfx_vw_aria_prod',
+   99900, 'INR', 'paid', 'unlimited', 'published'),
+  ('devfx_vw_noah_prod', 'devfx_vw_noah', 'UI Motion Pack',
+   'Previewable motion presets for product UI.', 'digital', 'devfx_vw_noah_prod',
+   149900, 'INR', 'paid', 'unlimited', 'published'),
+  ('devfx_vw_maya_prod_draft', 'devfx_vw_maya', 'Draft Pack',
+   'Invisible draft product.', 'digital', null, 100, 'INR', 'paid', 'unlimited', 'draft');
+
+-- ── Local dev follows Maya + Leo (Following populated, Discover still wider) ─
+insert into public.follows (follower_id, following_id)
+select p.id, f.following_id
+  from public.profiles p
+  cross join (values ('devfx_vw_maya'), ('devfx_vw_leo')) as f(following_id)
+ where p.auth_user_id = '00000000-0000-4000-a000-0000000000de'
+on conflict do nothing;
+
+commit;
+
+do $$
+begin
+  raise notice 'vault_creator_worlds: ready — Maya/Leo/Aria/Noah Creator Worlds seeded';
+end $$;

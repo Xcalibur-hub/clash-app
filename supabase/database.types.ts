@@ -4476,6 +4476,14 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      list_vault_discover_offers: {
+        Args: { p_kind: string; p_limit?: number }
+        Returns: Json
+      }
+      list_vault_discover_worlds: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       list_live_arena_topic_previews: {
         Args: { p_limit?: number; p_topic_id: string }
         Returns: Json

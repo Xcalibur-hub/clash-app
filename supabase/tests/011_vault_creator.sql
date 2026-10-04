@@ -86,9 +86,9 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select lives_ok($$ select public.create_vault('Studio A', 'Notes from A') $$, 'creator A opens a vault');
 reset role;
 
-select is((select creator_id from public.creator_vaults limit 1), 'v-creator-a', 'vault owner is derived from the session, never supplied');
+select is((select creator_id from public.creator_vaults where creator_id = 'v-creator-a'), 'v-creator-a', 'vault owner is derived from the session, never supplied');
 select is((select count(*)::int from public.creator_vaults where creator_id = 'v-creator-a'), 1, 'creator A owns exactly one vault');
-select is((select status::text from public.creator_vaults limit 1), 'active', 'a new vault is active');
+select is((select status::text from public.creator_vaults where creator_id = 'v-creator-a'), 'active', 'a new vault is active');
 
 -- duplicate vault is refused, not silently created
 select set_config('role', 'authenticated', true);
@@ -165,8 +165,8 @@ select lives_ok(
 );
 reset role;
 
-select is((select count(*)::int from public.vault_drops), 3, 'only the three legitimate drops exist');
-select is((select count(*)::int from public.vault_drops where status = 'draft'), 3, 'a new drop starts as a draft');
+select is((select count(*)::int from public.vault_drops where creator_id = 'v-creator-a'), 3, 'only the three legitimate drops exist');
+select is((select count(*)::int from public.vault_drops where creator_id = 'v-creator-a' and status = 'draft'), 3, 'a new drop starts as a draft');
 
 -- ── publishing: the server owns the 7-day window ────────────────────────────
 select set_config('role', 'authenticated', true);
@@ -237,9 +237,13 @@ select lives_ok(
 );
 reset role;
 
-select is((select count(*)::int from public.vault_collection_items), 1, 'exactly one shelf item exists');
+select is((select count(*)::int from public.vault_collection_items i
+  join public.vault_collections c on c.id = i.collection_id
+ where c.creator_id = 'v-creator-a'), 1, 'exactly one shelf item exists');
 select is(
-  (select position from public.vault_collection_items limit 1),
+  (select i.position from public.vault_collection_items i
+     join public.vault_collections c on c.id = i.collection_id
+    where c.creator_id = 'v-creator-a' limit 1),
   0, 'the first shelf item takes position 0'
 );
 

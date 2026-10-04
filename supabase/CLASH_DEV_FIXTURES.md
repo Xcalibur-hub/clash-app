@@ -37,6 +37,17 @@ test multi-user Clash flows with **one real OTP account**.
 Three extra synthetic debaters come with it: `@dev_arena_maya`, `@dev_arena_rohit`,
 `@dev_arena_sana`.
 
+### Vault Creator Worlds (`devfx_vw_*`)
+
+| Creator | Handle | Highlights |
+|---------|--------|------------|
+| **Maya** | `@maya_vault` | Free Drop, subscriber Drop + public preview, Midnight Files collection, horror service, Filmmaking at Night course, Night LUT Pack |
+| **Leo** | `@leo_vault` | Tokyo After Midnight Drop, Street Photography course, Portfolio Review service |
+| **Aria** | `@aria_vault` | Unreleased Demo Drop, After Hours collection, Mix Feedback, Drum Pack |
+| **Noah** | `@noah_vault` | How I Built This Drop, Interface Motion course, UI Motion Pack |
+
+`dev@clash.local` follows Maya + Leo only (Discover still shows Aria/Noah). No auto-subscriptions.
+
 ## How to run
 
 ### Full local reset (demo seed + these fixtures)
@@ -45,7 +56,8 @@ Three extra synthetic debaters come with it: `@dev_arena_maya`, `@dev_arena_rohi
 npm run supabase:reset
 ```
 
-`supabase/config.toml` `[db.seed]` loads `seed.sql` then `seeds/clash_dev_fixtures.sql`.
+`supabase/config.toml` `[db.seed]` loads `seed.sql`, Clash fixtures, local auth, then
+`seeds/vault_creator_worlds.sql`, and uploads Vault poster media to local Storage.
 This only affects the **local** Docker stack. It is not part of hosted deploy.
 
 ### Re-apply fixtures only (idempotent)
@@ -56,7 +68,7 @@ With the local stack already running:
 npm run supabase:seed:clash-dev
 ```
 
-This also (re)creates the local developer auth user:
+This also (re)creates the local developer auth user and Vault Creator World fixtures:
 
 | Email | Password |
 |-------|----------|

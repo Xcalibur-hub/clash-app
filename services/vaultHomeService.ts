@@ -1,48 +1,33 @@
 /**
  * Vault home composition — Creator Worlds discovery surface.
- * Reuses Explore FREE/PREVIEW previews + social following. No fake popularity.
+ * Discover uses list_vault_discover_worlds (no follows required).
+ * Never falls back to mock/fixture content on query failure.
  */
 
-import type { User } from '../store';
 import { diversifyVaultByCreator } from '../utils/vaultHomeRank';
-import { currentViewerProfileId, fetchProfilesByIds } from './apiService';
+import {
+  composeVaultHome,
+  type VaultCreatorWorldLike,
+  type VaultHomeDropLike,
+  type VaultHomeOfferLike,
+  type VaultHomeScope,
+} from '../utils/vaultHomeCompose';
+import { currentViewerProfileId } from './apiService';
 import {
   fetchExploreVaultPreviews,
   type ExploreVaultPreview,
 } from './exploreService';
+import { getPublicMediaUrl } from './mediaService';
 import { fetchViewerSafetyState } from './safetyService';
 import { fetchFollowingIds } from './socialService';
-import { fetchActiveVaultsForCreators } from './vaultService';
+import { requestError, requireSupabase, SupabaseError } from './supabaseClient';
+import type { VaultOfferAccess } from '../utils/vaultMoney';
 
-export type VaultHomeScope = 'following' | 'discover';
+export type { VaultHomeScope };
 
-export interface VaultHomeDropCard {
-  /** Alias of dropId for ranking helpers. */
-  id: string;
-  dropId: string;
-  vaultId: string;
-  creatorId: string;
-  caption: string;
-  accessLevel: 'free' | 'preview';
-  mediaUrl: string | null;
-  mediaKind: string | null;
-  authorHandle: string;
-  authorName: string;
-  authorTint: string;
-  score: number;
-}
-
-export interface VaultCreatorWorldCard {
-  creatorId: string;
-  handle: string;
-  name: string;
-  tint: string;
-  bio: string | null;
-  vaultId: string | null;
-  latestCaption: string | null;
-  latestAccess: 'free' | 'preview' | null;
-  mediaUrl: string | null;
-}
+export interface VaultHomeDropCard extends VaultHomeDropLike {}
+export interface VaultCreatorWorldCard extends VaultCreatorWorldLike {}
+export interface VaultHomeOfferCard extends VaultHomeOfferLike {}
 
 export interface VaultHomeModel {
   scope: VaultHomeScope;
@@ -50,7 +35,21 @@ export interface VaultHomeModel {
   yourCreators: VaultCreatorWorldCard[];
   continueItems: VaultHomeDropCard[];
   discoverWorlds: VaultCreatorWorldCard[];
+  discoverServices: VaultHomeOfferCard[];
+  discoverCourses: VaultHomeOfferCard[];
+  discoverProducts: VaultHomeOfferCard[];
   canCreate: boolean;
+  isEmpty: boolean;
+  followingEmpty: boolean;
+}
+
+function publicPathUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  try {
+    return getPublicMediaUrl('public-media', path);
+  } catch {
+    return null;
+  }
 }
 
 function toHomeDrop(preview: ExploreVaultPreview, rankIndex: number): VaultHomeDropCard {
@@ -66,100 +65,172 @@ function toHomeDrop(preview: ExploreVaultPreview, rankIndex: number): VaultHomeD
     authorHandle: preview.authorHandle,
     authorName: preview.authorName,
     authorTint: preview.authorTint,
-    // Explore already returns a freshness-leaning order; preserve with small free boost.
     score: 1000 - rankIndex + (preview.accessLevel === 'free' ? 1 : 0),
   };
 }
 
-function uniqueCreators(drops: readonly VaultHomeDropCard[], profiles: Map<string, User>, max: number): VaultCreatorWorldCard[] {
-  const seen = new Set<string>();
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function str(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function bool(value: unknown): boolean {
+  return value === true;
+}
+
+function num(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function toWorld(raw: unknown): VaultCreatorWorldCard | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const creatorId = str(r.creatorId);
+  if (!creatorId) return null;
+  const access = str(r.latestAccess);
+  return {
+    creatorId,
+    handle: str(r.handle) ?? '',
+    name: str(r.name) ?? 'Creator',
+    tint: str(r.tint) ?? '#A1A1AA',
+    bio: str(r.bio),
+    vaultId: str(r.vaultId),
+    latestCaption: str(r.latestCaption),
+    latestAccess: access === 'preview' || access === 'free' ? access : null,
+    mediaUrl: publicPathUrl(str(r.publicMediaPath)),
+    hasServices: bool(r.hasServices),
+    hasCourses: bool(r.hasCourses),
+    hasProducts: bool(r.hasProducts),
+    hasCollections: bool(r.hasCollections),
+    dropCount: num(r.dropCount) ?? 0,
+  };
+}
+
+function toOffer(raw: unknown): VaultHomeOfferCard | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const id = str(r.id);
+  const kind = str(r.kind);
+  const creatorId = str(r.creatorId);
+  if (!id || !creatorId || (kind !== 'service' && kind !== 'course' && kind !== 'product')) {
+    return null;
+  }
+  const access = str(r.accessType) as VaultOfferAccess | null;
+  return {
+    id,
+    kind,
+    creatorId,
+    title: str(r.title) ?? 'Offer',
+    subtitle: str(r.subtitle),
+    coverUrl: publicPathUrl(str(r.publicMediaPath)),
+    accessType: access ?? 'free',
+    priceAmountMinor: num(r.priceAmountMinor),
+    currency: str(r.currency),
+    externalUrl: str(r.externalUrl),
+    authorHandle: str(r.authorHandle) ?? '',
+    authorName: str(r.authorName) ?? '',
+  };
+}
+
+async function fetchDiscoverWorlds(limit = 12): Promise<VaultCreatorWorldCard[]> {
+  const { data, error } = await requireSupabase().rpc('list_vault_discover_worlds', {
+    p_limit: limit,
+  });
+  if (error) throw requestError(error);
+  if (!Array.isArray(data)) throw new SupabaseError('discover worlds unavailable', 'bad_payload');
   const out: VaultCreatorWorldCard[] = [];
-  for (const drop of drops) {
-    if (seen.has(drop.creatorId)) continue;
-    seen.add(drop.creatorId);
-    out.push({
-      creatorId: drop.creatorId,
+  for (const row of data) {
+    const world = toWorld(row);
+    if (world) out.push(world);
+  }
+  return out;
+}
+
+async function fetchDiscoverOffers(
+  kind: 'service' | 'course' | 'product',
+  limit = 8,
+): Promise<VaultHomeOfferCard[]> {
+  const { data, error } = await requireSupabase().rpc('list_vault_discover_offers', {
+    p_kind: kind,
+    p_limit: limit,
+  });
+  if (error) throw requestError(error);
+  if (!Array.isArray(data)) throw new SupabaseError('discover offers unavailable', 'bad_payload');
+  const out: VaultHomeOfferCard[] = [];
+  for (const row of data) {
+    const offer = toOffer(row);
+    if (offer) out.push(offer);
+  }
+  return out;
+}
+
+/** Compose Vault home from Discover worlds + Explore drop previews + commerce. */
+export async function fetchVaultHome(scope: VaultHomeScope = 'discover'): Promise<VaultHomeModel> {
+  const me = await currentViewerProfileId();
+  const [previews, worlds, services, courses, products, safety, followingIds] = await Promise.all([
+    fetchExploreVaultPreviews(24),
+    fetchDiscoverWorlds(16),
+    fetchDiscoverOffers('service', 8),
+    fetchDiscoverOffers('course', 8),
+    fetchDiscoverOffers('product', 8),
+    me
+      ? fetchViewerSafetyState(me)
+      : Promise.resolve({
+          blockedProfileIds: [] as string[],
+          blockingProfileIds: [] as string[],
+          mutedProfileIds: [] as string[],
+        }),
+    me ? fetchFollowingIds(me) : Promise.resolve([] as string[]),
+  ]);
+
+  const blocked = new Set<string>([...safety.blockedProfileIds, ...safety.blockingProfileIds]);
+  const ranked = diversifyVaultByCreator(
+    previews.map((p, index) => toHomeDrop(p, index)),
+    24,
+  );
+
+  // Enrich Following shelf: prefer discover-world cards for followed creators.
+  const worldByCreator = new Map(worlds.map((w) => [w.creatorId, w]));
+  const followingWorlds: VaultCreatorWorldCard[] = [];
+  for (const id of followingIds) {
+    if (blocked.has(id)) continue;
+    const existing = worldByCreator.get(id);
+    if (existing) {
+      followingWorlds.push(existing);
+      continue;
+    }
+    const drop = ranked.find((d) => d.creatorId === id);
+    if (!drop) continue;
+    followingWorlds.push({
+      creatorId: id,
       handle: drop.authorHandle,
       name: drop.authorName,
       tint: drop.authorTint,
-      bio: profiles.get(drop.creatorId)?.bio ?? null,
+      bio: null,
       vaultId: drop.vaultId,
       latestCaption: drop.caption,
       latestAccess: drop.accessLevel,
       mediaUrl: drop.mediaUrl,
     });
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
-/** Compose Vault home from existing Explore + social primitives. */
-export async function fetchVaultHome(scope: VaultHomeScope = 'discover'): Promise<VaultHomeModel> {
-  const me = await currentViewerProfileId();
-  const [previews, safety, followingIds] = await Promise.all([
-    fetchExploreVaultPreviews(24),
-    me
-      ? fetchViewerSafetyState(me)
-      : Promise.resolve({ blockedProfileIds: [] as string[], blockingProfileIds: [] as string[], mutedProfileIds: [] as string[] }),
-    me ? fetchFollowingIds(me) : Promise.resolve([] as string[]),
-  ]);
-
-  const blocked = new Set<string>([...safety.blockedProfileIds, ...safety.blockingProfileIds]);
-  const following = new Set(followingIds);
-
-  const visible = previews.filter((p) => !blocked.has(p.creatorId));
-  const ranked = diversifyVaultByCreator(
-    visible.map((p, index) => toHomeDrop(p, index)),
-    24,
-  );
-
-  const followingDrops = diversifyVaultByCreator(
-    ranked.filter((d) => following.has(d.creatorId)),
-    16,
-  );
-
-  const todaysDrops = scope === 'following' ? followingDrops : ranked.slice(0, 12);
-
-  const creatorIds = [...new Set(ranked.map((d) => d.creatorId))].slice(0, 24);
-  const profiles = await fetchProfilesByIds(creatorIds);
-  const byId = new Map(profiles.map((p) => [p.id, p]));
-
-  let yourCreators: VaultCreatorWorldCard[] = [];
-  if (followingIds.length > 0) {
-    const ids = followingIds.filter((id) => !blocked.has(id)).slice(0, 20);
-    const [followedProfiles, vaults] = await Promise.all([
-      fetchProfilesByIds(ids),
-      fetchActiveVaultsForCreators(ids),
-    ]);
-    const vaultByCreator = new Map(vaults.map((v) => [v.creatorId, v]));
-    yourCreators = followedProfiles
-      .filter((profile) => vaultByCreator.has(profile.id))
-      .map((profile) => {
-        const latest = ranked.find((d) => d.creatorId === profile.id);
-        return {
-          creatorId: profile.id,
-          handle: profile.handle,
-          name: profile.name,
-          tint: profile.tint,
-          bio: profile.bio ?? null,
-          vaultId: vaultByCreator.get(profile.id)?.id ?? null,
-          latestCaption: latest?.caption ?? null,
-          latestAccess: latest?.accessLevel ?? null,
-          mediaUrl: latest?.mediaUrl ?? null,
-        };
-      })
-      .slice(0, 12);
   }
 
-  const continueItems = followingDrops.slice(0, 6);
-  const discoverWorlds = uniqueCreators(scope === 'discover' ? ranked : followingDrops, byId, 10);
-
-  return {
+  const composed = composeVaultHome({
     scope,
-    todaysDrops,
-    yourCreators,
-    continueItems,
-    discoverWorlds,
+    followingIds,
+    blockedIds: blocked,
+    drops: ranked,
+    worlds: scope === 'following' ? followingWorlds : worlds,
+    services,
+    courses,
+    products,
+    continueItems: [],
     canCreate: Boolean(me),
-  };
+  });
+
+  return composed;
 }

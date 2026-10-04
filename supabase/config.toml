@@ -86,11 +86,12 @@ schema_paths = []
 # truncates the Arena tables and restores the demo rows — local demo data only.
 # Never point this at a database you care about.
 # clash_dev_fixtures.sql is LOCAL multi-user Clash test data (see CLASH_DEV_FIXTURES.md).
+# vault_creator_worlds.sql is LOCAL Vault Creator Worlds (Maya/Leo/Aria/Noah).
 # It is NOT a migration and is never applied by hosted `db push`.
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seeds/00_storage_bootstrap.sql", "./seed.sql", "./seeds/clash_dev_fixtures.sql", "./seeds/local_dev_auth.sql"]
+sql_paths = ["./seeds/00_storage_bootstrap.sql", "./seed.sql", "./seeds/clash_dev_fixtures.sql", "./seeds/local_dev_auth.sql", "./seeds/vault_creator_worlds.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.

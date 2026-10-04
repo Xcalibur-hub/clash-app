@@ -12,6 +12,7 @@ const CONTAINER = 'supabase_db_clash';
 const FILES = [
   resolve('supabase/seeds/clash_dev_fixtures.sql'),
   resolve('supabase/seeds/local_dev_auth.sql'),
+  resolve('supabase/seeds/vault_creator_worlds.sql'),
 ];
 
 function fail(message) {
@@ -70,5 +71,18 @@ function applySql(filePath) {
 
 ensureContainer();
 for (const file of FILES) applySql(file);
+
+console.log('Uploading Vault Creator World poster media …');
+const media = spawnSync(process.execPath, [resolve('scripts/upload-vault-fixture-media.mjs')], {
+  encoding: 'utf8',
+  cwd: resolve('.'),
+});
+if (media.stdout) process.stdout.write(media.stdout);
+if (media.stderr) process.stderr.write(media.stderr);
+if (media.status !== 0) {
+  fail('Vault fixture media upload failed');
+}
+
 console.log('Done. Sign in locally as dev@clash.local / clash-local-dev');
+console.log('Vault fixtures: Maya / Leo / Aria / Noah (Discover + Following)');
 console.log('See docs/LOCAL_DEVICE_SUPABASE.md');
