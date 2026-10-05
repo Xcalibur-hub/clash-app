@@ -29,8 +29,8 @@ import { RoomPulseSheet } from '../../../components/liveArena/RoomPulseSheet';
 import { VaultActionButton } from '../../../components/vault/VaultActionButton';
 import {
   BackupInviteSheet,
-  CallBackupSheet,
-} from '../../../components/liveArena/CallBackupSheet';
+} from '../../../components/liveArena/BackupInviteSheet';
+import { CallBackupSheet } from '../../../components/liveArena/CallBackupSheet';
 import {
   JoinDebateSheet,
   SpectatorJoinBar,
@@ -840,7 +840,6 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       <CallBackupSheet
         visible={backupOpen}
         busy={backup.busy}
-        roomIndex={roomIndex ?? 0}
         candidates={backup.candidates}
         loading={backup.loadingCandidates}
         policy={backup.policy}
