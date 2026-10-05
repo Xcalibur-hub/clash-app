@@ -30,7 +30,7 @@ import {
   trendRaceStage,
   type TrendRaceStage,
 } from '../../utils/arenaTrendRank';
-import { space, typeScale, useThemeColors } from '../../theme';
+import { space, typeScale, trendRaceLineAccent, useThemeColors } from '../../theme';
 
 export interface TrendingBattlesChartProps {
   battles: readonly ArenaTrendingBattle[];
@@ -233,17 +233,24 @@ export function TrendingBattlesChart({
           {battles.map((battle) => {
             const selected = battle.topicId === selectedId;
             const top3 = battle.rank <= 3;
+            const accent = trendRaceLineAccent({
+              rank: battle.rank,
+              selected,
+              topicId: battle.topicId,
+              scheme: t.scheme,
+            });
             const pathD = pathsById.get(battle.topicId) ?? '';
             const canDrawLine = pathD.length > 0;
-            const opacity = selected ? 1 : top3 ? 0.85 : 0.35;
-            const strokeW = selected ? 3 : top3 ? 2.25 : 1.25;
+            const opacity = selected ? 1 : top3 ? 0.92 : 0.32;
+            const strokeW = selected ? 3 : top3 ? 2.35 : 1.2;
             const last = battle.series[battle.series.length - 1];
             const markerRank = last ? last.v : battle.rank;
             const endX = last ? xFor(last.t) : width - PAD.right;
             const endY = trendRaceRankY(markerRank, H);
             const labelY = labelYs.get(battle.topicId) ?? endY;
             const showLabel = selected || top3;
-            const stroke = selected || top3 ? t.textPrimary : t.textMuted;
+            const stroke = accent?.ink ?? t.textMuted;
+            const labelFill = accent?.ink ?? (selected ? t.textPrimary : t.textSecondary);
 
             return (
               <G key={battle.topicId}>
@@ -279,7 +286,7 @@ export function TrendingBattlesChart({
                         cy={endY}
                         r={selected ? 5 : 3.6}
                         fill={t.surfaceElevated}
-                        stroke={t.textPrimary}
+                        stroke={stroke}
                         strokeWidth={selected ? 2.2 : 1.6}
                         opacity={1}
                         onPress={() => onSelectTopic?.(battle.topicId)}
@@ -288,7 +295,7 @@ export function TrendingBattlesChart({
                     <SvgText
                       x={endX + 8}
                       y={labelY + 3}
-                      fill={selected ? t.textPrimary : t.textSecondary}
+                      fill={labelFill}
                       fontSize={selected ? 11 : 10}
                       fontWeight="700"
                       onPress={() => onSelectTopic?.(battle.topicId)}

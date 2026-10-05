@@ -15,6 +15,7 @@ import type { ChallengerComment, Take, User } from '../../store';
 import {
   arenaAccentForHood,
   layout,
+  pulseAccent,
   radius,
   space,
   typeScale,
@@ -362,6 +363,7 @@ function TextFeedCard({
   const [swordKey, setSwordKey] = React.useState(0);
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
   const pulse = takePulse(take);
+  const clashTone = pulseAccent('clash', t.scheme);
 
   return (
     <PressableScale
@@ -418,7 +420,10 @@ function TextFeedCard({
           onOpen={onOpenDetail}
         />
       ) : take.clashes > 0 ? (
-        <Text allowFontScaling={false} style={[styles.clashHintText, { color: t.textMuted }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.clashHintText, { color: clashTone?.ink ?? t.textMuted }]}
+        >
           {`⚔ CLASH ACTIVE · ${compact(take.clashes)} in the fight`}
         </Text>
       ) : null}

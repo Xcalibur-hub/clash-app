@@ -1,49 +1,121 @@
 /**
  * Restrained Arena accent system — soft, desaturated, theme-aware.
- * Presentation only. Never persisted; derived from Hood or a stable id hash.
+ * Presentation only. Never persisted; derived from Hood, rank, moment, or id hash.
+ *
+ * Target: Apple restraint + live-competition energy.
+ * Not neon, crypto, Discord, or rainbow gradients.
  */
 import type { ColorScheme } from './palettes';
 
-export type ArenaAccentKey = 'coral' | 'sky' | 'lime' | 'lavender' | 'yellow';
+export type ArenaAccentKey = 'coral' | 'amber' | 'blue' | 'violet' | 'teal' | 'rose';
 
 export interface ArenaAccent {
   key: ArenaAccentKey;
-  /** Saturated-enough detail (LIVE tint, badge text, stroke). */
+  /** Saturated-enough detail (line, badge text, stroke, LIVE tint). */
   ink: string;
-  /** Soft fill for blobs / chip plates (~12–18% visual weight). */
+  /** Soft fill for chips / selected rows / blobs (~12–18% visual weight). */
   soft: string;
-  /** Deeper plate for dark-mode surfaces. */
+  /** Deeper plate for dark-mode surfaces / edges. */
   deep: string;
 }
 
 const LIGHT: Record<ArenaAccentKey, ArenaAccent> = {
-  coral: { key: 'coral', ink: '#E56A4F', soft: 'rgba(255,118,87,0.16)', deep: 'rgba(229,106,79,0.22)' },
-  sky: { key: 'sky', ink: '#5AA0D0', soft: 'rgba(121,189,232,0.18)', deep: 'rgba(90,160,208,0.22)' },
-  lime: { key: 'lime', ink: '#7FA84A', soft: 'rgba(185,215,122,0.22)', deep: 'rgba(127,168,74,0.22)' },
-  lavender: { key: 'lavender', ink: '#8B7BC4', soft: 'rgba(183,166,232,0.20)', deep: 'rgba(139,123,196,0.24)' },
-  yellow: { key: 'yellow', ink: '#C9A24A', soft: 'rgba(242,201,109,0.22)', deep: 'rgba(201,162,74,0.22)' },
+  coral: {
+    key: 'coral',
+    ink: '#E56A4F',
+    soft: 'rgba(229,106,79,0.14)',
+    deep: 'rgba(229,106,79,0.22)',
+  },
+  amber: {
+    key: 'amber',
+    ink: '#C9922E',
+    soft: 'rgba(201,146,46,0.14)',
+    deep: 'rgba(201,146,46,0.22)',
+  },
+  blue: {
+    key: 'blue',
+    ink: '#3D7EB8',
+    soft: 'rgba(61,126,184,0.14)',
+    deep: 'rgba(61,126,184,0.22)',
+  },
+  violet: {
+    key: 'violet',
+    ink: '#7A63B8',
+    soft: 'rgba(122,99,184,0.14)',
+    deep: 'rgba(122,99,184,0.22)',
+  },
+  teal: {
+    key: 'teal',
+    ink: '#2F8F86',
+    soft: 'rgba(47,143,134,0.14)',
+    deep: 'rgba(47,143,134,0.22)',
+  },
+  rose: {
+    key: 'rose',
+    ink: '#C45B7A',
+    soft: 'rgba(196,91,122,0.14)',
+    deep: 'rgba(196,91,122,0.22)',
+  },
 };
 
 const DARK: Record<ArenaAccentKey, ArenaAccent> = {
-  coral: { key: 'coral', ink: '#FF8B72', soft: 'rgba(255,118,87,0.14)', deep: 'rgba(255,118,87,0.18)' },
-  sky: { key: 'sky', ink: '#8AC8EE', soft: 'rgba(121,189,232,0.14)', deep: 'rgba(121,189,232,0.18)' },
-  lime: { key: 'lime', ink: '#C2DC8E', soft: 'rgba(185,215,122,0.14)', deep: 'rgba(185,215,122,0.18)' },
-  lavender: { key: 'lavender', ink: '#C4B6F0', soft: 'rgba(183,166,232,0.14)', deep: 'rgba(183,166,232,0.18)' },
-  yellow: { key: 'yellow', ink: '#F0D28A', soft: 'rgba(242,201,109,0.14)', deep: 'rgba(242,201,109,0.18)' },
+  coral: {
+    key: 'coral',
+    ink: '#FF8B72',
+    soft: 'rgba(255,139,114,0.16)',
+    deep: 'rgba(255,139,114,0.22)',
+  },
+  amber: {
+    key: 'amber',
+    ink: '#E8C06A',
+    soft: 'rgba(232,192,106,0.16)',
+    deep: 'rgba(232,192,106,0.22)',
+  },
+  blue: {
+    key: 'blue',
+    ink: '#7BB4E0',
+    soft: 'rgba(123,180,224,0.16)',
+    deep: 'rgba(123,180,224,0.22)',
+  },
+  violet: {
+    key: 'violet',
+    ink: '#B8A4E8',
+    soft: 'rgba(184,164,232,0.16)',
+    deep: 'rgba(184,164,232,0.22)',
+  },
+  teal: {
+    key: 'teal',
+    ink: '#5CBCB2',
+    soft: 'rgba(92,188,178,0.16)',
+    deep: 'rgba(92,188,178,0.22)',
+  },
+  rose: {
+    key: 'rose',
+    ink: '#E08AA5',
+    soft: 'rgba(224,138,165,0.16)',
+    deep: 'rgba(224,138,165,0.22)',
+  },
 };
 
-/** Hood → accent. Culture/entertainment share lavender/coral; sport → lime. */
+/** Hood → accent. Culture/entertainment share violet/coral; sport → teal. */
 const HOOD_ACCENT: Record<string, ArenaAccentKey> = {
-  techtakes: 'sky',
-  startups: 'yellow',
-  campushustle: 'yellow',
-  movies: 'lavender',
+  techtakes: 'blue',
+  startups: 'amber',
+  campushustle: 'amber',
+  movies: 'violet',
   gaming: 'coral',
-  football: 'lime',
-  goatalk: 'coral',
+  football: 'teal',
+  goatalk: 'rose',
 };
 
-const KEYS: readonly ArenaAccentKey[] = ['coral', 'sky', 'lime', 'lavender', 'yellow'];
+const KEYS: readonly ArenaAccentKey[] = ['coral', 'amber', 'blue', 'violet', 'teal', 'rose'];
+
+/** Top-3 race identity — fixed, not hashed, so the chart is readable at a glance. */
+const RACE_RANK_KEY: Record<1 | 2 | 3, ArenaAccentKey> = {
+  1: 'coral',
+  2: 'blue',
+  3: 'violet',
+};
 
 function hashString(input: string): number {
   let h = 0;
@@ -77,6 +149,25 @@ export function arenaAccentForId(id: string, scheme: ColorScheme): ArenaAccent {
   return table[KEYS[hashString(id) % KEYS.length]!];
 }
 
+/**
+ * Ranking-race line color.
+ * #1/#2/#3 always get distinct accents.
+ * #4–#10 stay muted (null) until selected — then a tasteful topic accent.
+ */
+export function trendRaceLineAccent(input: {
+  rank: number;
+  selected: boolean;
+  topicId: string;
+  scheme: ColorScheme;
+}): ArenaAccent | null {
+  const table = arenaAccentPalette(input.scheme);
+  if (input.rank === 1 || input.rank === 2 || input.rank === 3) {
+    return table[RACE_RANK_KEY[input.rank]];
+  }
+  if (input.selected) return arenaAccentForId(input.topicId, input.scheme);
+  return null;
+}
+
 /** Pulse badge accents — rising/hot/clash map to the soft Arena set. */
 export function pulseAccent(
   pulse: 'clash' | 'hot' | 'rising' | null,
@@ -85,6 +176,53 @@ export function pulseAccent(
   if (!pulse) return null;
   const table = arenaAccentPalette(scheme);
   if (pulse === 'rising') return table.coral;
-  if (pulse === 'hot') return table.yellow;
-  return table.lavender;
+  if (pulse === 'hot') return table.amber;
+  return table.rose;
+}
+
+/**
+ * Semantic accents for live battle moments.
+ * Meaning first — not decoration everywhere.
+ */
+export type ArenaMomentAccentKind =
+  | 'FAST_RISING'
+  | 'TOP_ARGUMENT'
+  | 'BEST_EVIDENCE'
+  | 'BEST_REBUTTAL'
+  | 'CROWD_FAVORITE'
+  | 'BACKUP'
+  | 'JUDGING'
+  | 'RESULT'
+  | 'EVIDENCE_SURGE'
+  | 'CLASH'
+  | 'PHASE';
+
+export function battleMomentAccent(
+  kind: ArenaMomentAccentKind,
+  scheme: ColorScheme,
+): ArenaAccent {
+  const table = arenaAccentPalette(scheme);
+  switch (kind) {
+    case 'FAST_RISING':
+      return table.coral;
+    case 'CLASH':
+    case 'TOP_ARGUMENT':
+    case 'BEST_REBUTTAL':
+      return table.amber;
+    case 'BACKUP':
+      return table.blue;
+    case 'BEST_EVIDENCE':
+    case 'EVIDENCE_SURGE':
+      return table.teal;
+    case 'CROWD_FAVORITE':
+      // Pulse label is "Crowd Lost It" — violet/rose energy.
+      return table.rose;
+    case 'JUDGING':
+    case 'PHASE':
+      return table.violet;
+    case 'RESULT':
+      return table.amber;
+    default:
+      return table.blue;
+  }
 }

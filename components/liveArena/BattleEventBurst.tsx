@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { BattleBurstKind } from '../../utils/battleMoment';
-import { typeScale, useThemeColors } from '../../theme';
+import { battleMomentAccent, typeScale, useThemeColors } from '../../theme';
 import { CrossedSwords } from '../clash/CrossedSwords';
 import { notify as hapticNotify, tap as hapticTap } from '../../utils/haptics';
 
@@ -22,6 +22,28 @@ export interface BattleEventBurstProps {
   kind: BattleBurstKind | null;
   /** Change to replay. */
   triggerKey: string | number | null;
+}
+
+function accentKindForBurst(
+  kind: BattleBurstKind,
+): Parameters<typeof battleMomentAccent>[0] {
+  switch (kind) {
+    case 'backup_arrived':
+    case 'backup_called':
+      return 'BACKUP';
+    case 'receipts':
+      return 'EVIDENCE_SURGE';
+    case 'fast_rising':
+      return 'FAST_RISING';
+    case 'judging':
+      return 'JUDGING';
+    case 'result':
+      return 'RESULT';
+    case 'mindshift':
+      return 'PHASE';
+    default:
+      return 'CLASH';
+  }
 }
 
 export function BattleEventBurst({
@@ -92,6 +114,7 @@ export function BattleEventBurst({
   if (!kind || triggerKey == null) return null;
 
   const mark = markFor(kind);
+  const accent = battleMomentAccent(accentKindForBurst(kind), t.scheme);
 
   return (
     <View pointerEvents="none" style={styles.wrap} accessibilityElementsHidden>
@@ -100,15 +123,15 @@ export function BattleEventBurst({
           <CrossedSwords
             triggerKey={swordKey || null}
             size={36}
-            color={t.textPrimary}
+            color={accent.ink}
             cooldownMs={400}
           />
         ) : (
-          <Text allowFontScaling={false} style={[styles.mark, { color: t.textPrimary }]}>
+          <Text allowFontScaling={false} style={[styles.mark, { color: accent.ink }]}>
             {mark}
           </Text>
         )}
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textSecondary }]}>
+        <Text allowFontScaling={false} style={[styles.label, { color: accent.ink }]}>
           {labelFor(kind)}
         </Text>
       </Animated.View>

@@ -180,14 +180,15 @@ export function ArenaTopicDeckCard({
           styles.active,
           {
             backgroundColor: surface,
-            borderColor: 'transparent',
+            borderColor: accent.ink,
             shadowColor: t.shadowColor,
             borderRadius: corner,
-            borderWidth: 0,
+            borderWidth: StyleSheet.hairlineWidth,
           },
         ]}
       >
         <AccentBlob color={accent.soft} />
+        <View style={[styles.accentStrip, { backgroundColor: accent.ink }]} />
         <CardDoodle color={accent.ink} />
 
         <View style={styles.swordSlot} pointerEvents="none">

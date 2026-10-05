@@ -11,7 +11,7 @@ import {
   trendingDemoActive,
   type ArenaTrendingBattle,
 } from '../../services/arenaTrendService';
-import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import { layout, radius, space, trendRaceLineAccent, typeScale, useThemeColors } from '../../theme';
 import { formatRankDelta, trendRaceStage } from '../../utils/arenaTrendRank';
 import { ARENA_TREND_DEMO_LABEL } from '../../utils/arenaTrendDevFixture';
 import { momentumLabel } from '../../utils/arenaTrendScore';
@@ -161,7 +161,21 @@ export function TrendingBattlesSection({
       ) : null}
 
       <View style={styles.preview}>
-        <Text allowFontScaling={false} style={[styles.previewRank, { color: t.textMuted }]}>
+        <Text
+          allowFontScaling={false}
+          style={[
+            styles.previewRank,
+            {
+              color:
+                trendRaceLineAccent({
+                  rank: selected.rank,
+                  selected: true,
+                  topicId: selected.topicId,
+                  scheme: t.scheme,
+                })?.ink ?? t.textMuted,
+            },
+          ]}
+        >
           {`#${selected.rank}`}
         </Text>
         <View style={styles.previewCopy}>
@@ -183,6 +197,12 @@ export function TrendingBattlesSection({
       <View style={styles.list}>
         {battles.map((battle) => {
           const activeRow = battle.topicId === selected.topicId;
+          const rowAccent = trendRaceLineAccent({
+            rank: battle.rank,
+            selected: activeRow,
+            topicId: battle.topicId,
+            scheme: t.scheme,
+          });
           return (
             <Pressable
               key={battle.topicId}
@@ -193,12 +213,37 @@ export function TrendingBattlesSection({
               style={[
                 styles.row,
                 {
-                  backgroundColor: activeRow ? t.surfaceMuted : 'transparent',
-                  borderColor: activeRow ? t.border : 'transparent',
+                  backgroundColor: activeRow
+                    ? (rowAccent?.soft ?? t.surfaceMuted)
+                    : 'transparent',
+                  borderColor: activeRow ? (rowAccent?.ink ?? t.border) : 'transparent',
                 },
               ]}
             >
-              <Text allowFontScaling={false} style={[styles.rank, { color: t.textMuted }]}>
+              <View
+                style={[
+                  styles.rowMark,
+                  {
+                    backgroundColor: activeRow
+                      ? (rowAccent?.ink ?? t.textMuted)
+                      : battle.rank <= 3
+                        ? (rowAccent?.ink ?? t.textMuted)
+                        : 'transparent',
+                  },
+                ]}
+              />
+              <Text
+                allowFontScaling={false}
+                style={[
+                  styles.rank,
+                  {
+                    color:
+                      battle.rank <= 3 || activeRow
+                        ? (rowAccent?.ink ?? t.textMuted)
+                        : t.textMuted,
+                  },
+                ]}
+              >
                 {battle.rank}
               </Text>
               <Text
@@ -210,7 +255,15 @@ export function TrendingBattlesSection({
               </Text>
               <Text
                 allowFontScaling={false}
-                style={[styles.delta, { color: t.textSecondary }]}
+                style={[
+                  styles.delta,
+                  {
+                    color:
+                      activeRow || battle.rank <= 3
+                        ? (rowAccent?.ink ?? t.textSecondary)
+                        : t.textSecondary,
+                  },
+                ]}
               >
                 {formatRankDelta(battle.rankDeltaKind, battle.rankDelta)}
               </Text>
@@ -304,6 +357,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  rowMark: {
+    width: 3,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginVertical: 2,
   },
   rank: {
     ...typeScale.dataLg,
