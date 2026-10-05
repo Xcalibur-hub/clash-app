@@ -102,8 +102,8 @@ export const CREATOR_MODULE_REGISTRY: readonly CreatorModuleDefinition[] = [
   {
     type: 'WORLD_DROPS',
     title: 'World Drops',
-    sectionTitle: 'WORLD DROPS',
-    availability: 'planned',
+    sectionTitle: 'HIDDEN IN THE WORLD',
+    availability: 'supported',
     priority: 100,
   },
 ] as const;

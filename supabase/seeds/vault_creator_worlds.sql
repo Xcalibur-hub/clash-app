@@ -32,6 +32,11 @@ end $$;
 -- ── Wipe previous vault-world fixture namespace ──────────────────────────────
 delete from public.vault_community_replies
  where community_id like 'devfx_vw_%' or id like 'devfx_vw_%';
+-- Phase 15.3 — Creator World Drop fixtures + their claims
+delete from public.world_drop_claims
+ where drop_id like 'wd_devfx_%' or profile_id like 'devfx_vw_%';
+delete from public.world_drops
+ where id like 'wd_devfx_%' or creator_id like 'devfx_vw_%';
 delete from public.vault_community_posts
  where community_id like 'devfx_vw_%' or id like 'devfx_vw_%';
 delete from public.vault_community_memberships
@@ -128,7 +133,36 @@ values
   ('devfx_vw_noah_course', 'devfx_vw_noah', 'public-media',
    'devfx_vw_noah/devfx_vw_noah_course/devfx_vw_noah_course.png', 'image', 'image/png', 'public', 'ready', now(), 1),
   ('devfx_vw_noah_prod', 'devfx_vw_noah', 'public-media',
-   'devfx_vw_noah/devfx_vw_noah_prod/devfx_vw_noah_prod.png', 'image', 'image/png', 'public', 'ready', now(), 1);
+   'devfx_vw_noah/devfx_vw_noah_prod/devfx_vw_noah_prod.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  -- Phase 15.3 — richer demo media + Creator World Drop artifacts
+  ('devfx_vw_maya_comm', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_comm/devfx_vw_maya_comm.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_bts', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_bts/devfx_vw_maya_bts.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_still1', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_still1/devfx_vw_maya_still1.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_still2', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_still2/devfx_vw_maya_still2.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_maya_artifact', 'devfx_vw_maya', 'public-media',
+   'devfx_vw_maya/devfx_vw_maya_artifact/devfx_vw_maya_artifact.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_leo_sheet', 'devfx_vw_leo', 'public-media',
+   'devfx_vw_leo/devfx_vw_leo_sheet/devfx_vw_leo_sheet.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_leo_portrait', 'devfx_vw_leo', 'public-media',
+   'devfx_vw_leo/devfx_vw_leo_portrait/devfx_vw_leo_portrait.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_leo_detail', 'devfx_vw_leo', 'public-media',
+   'devfx_vw_leo/devfx_vw_leo_detail/devfx_vw_leo_detail.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_leo_hunt', 'devfx_vw_leo', 'public-media',
+   'devfx_vw_leo/devfx_vw_leo_hunt/devfx_vw_leo_hunt.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_aria_album', 'devfx_vw_aria', 'public-media',
+   'devfx_vw_aria/devfx_vw_aria_album/devfx_vw_aria_album.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_aria_track', 'devfx_vw_aria', 'public-media',
+   'devfx_vw_aria/devfx_vw_aria_track/devfx_vw_aria_track.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_noah_interior', 'devfx_vw_noah', 'public-media',
+   'devfx_vw_noah/devfx_vw_noah_interior/devfx_vw_noah_interior.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_noah_material', 'devfx_vw_noah', 'public-media',
+   'devfx_vw_noah/devfx_vw_noah_material/devfx_vw_noah_material.png', 'image', 'image/png', 'public', 'ready', now(), 1),
+  ('devfx_vw_noah_blueprint', 'devfx_vw_noah', 'public-media',
+   'devfx_vw_noah/devfx_vw_noah_blueprint/devfx_vw_noah_blueprint.png', 'image', 'image/png', 'public', 'ready', now(), 1);
 
 -- ── Vaults ──────────────────────────────────────────────────────────────────
 insert into public.creator_vaults (id, creator_id, title, description, status)
@@ -341,6 +375,66 @@ select p.id, f.following_id
   from public.profiles p
   cross join (values ('devfx_vw_maya'), ('devfx_vw_leo')) as f(following_id)
  where p.auth_user_id = '00000000-0000-4000-a000-0000000000de'
+on conflict do nothing;
+
+-- Phase 15.3 — attach demo media to community posts so the feed is visual.
+update public.vault_community_posts
+   set media_object_id = 'devfx_vw_maya_comm'
+ where id = 'devfx_vw_maya_cmt_ann';
+update public.vault_community_posts
+   set media_object_id = 'devfx_vw_leo_sheet'
+ where id = 'devfx_vw_leo_cmt_p1';
+update public.vault_community_posts
+   set media_object_id = 'devfx_vw_aria_album'
+ where id = 'devfx_vw_aria_cmt_p1';
+
+-- ── Creator World Drops (Phase 15.3) ────────────────────────────────────────
+-- Coarse destinations only: the raw coordinates below are public city centres
+-- and `world_fuzz_location` snaps them to a cell before persistence.
+insert into public.world_drops
+  (id, mission_id, author_id, creator_id, media_object_id, caption, clue,
+   drop_type, reward_type, reward_ref, reward_payload,
+   approx_location, location_cell, location_label,
+   status, published_at, expires_at)
+values
+  ('wd_devfx_maya_missing_frame', null, 'devfx_vw_maya', 'devfx_vw_maya', 'devfx_vw_maya_artifact',
+   'The Missing Frame', 'The frame that was cut from Midnight Files lives somewhere in the house.',
+   'SECRET_DROP', 'COLLECTIBLE', 'The Missing Frame',
+   '{"artifact":"missing_frame","index":"02"}'::jsonb,
+   public.world_fuzz_location(19.08, 72.88),
+   extensions.ST_GeoHash(public.world_fuzz_location(19.08, 72.88)::extensions.geometry, 6),
+   'Mumbai', 'PUBLISHED', now() - interval '2 days', now() + interval '28 days'),
+
+  ('wd_devfx_leo_midnight_hunt', null, 'devfx_vw_leo', 'devfx_vw_leo', 'devfx_vw_leo_hunt',
+   'Midnight Photo Hunt', 'Find the frame nobody else noticed. One street, one hour after dark.',
+   'CHALLENGE', 'CHALLENGE_STATUS', 'Midnight Photo Hunt', null,
+   public.world_fuzz_location(51.51, -0.13),
+   extensions.ST_GeoHash(public.world_fuzz_location(51.51, -0.13)::extensions.geometry, 6),
+   'London', 'PUBLISHED', now() - interval '1 day', now() + interval '20 days'),
+
+  ('wd_devfx_aria_hidden_track', null, 'devfx_vw_aria', 'devfx_vw_aria', 'devfx_vw_aria_track',
+   'Hidden Track', 'A track that never made the album — the last mix is still inside the After Hours vault.',
+   'COLLECTIBLE', 'CONTENT_UNLOCK', 'devfx_vw_aria_col_drop', null,
+   public.world_fuzz_location(35.68, 139.69),
+   extensions.ST_GeoHash(public.world_fuzz_location(35.68, 139.69)::extensions.geometry, 6),
+   'Tokyo', 'PUBLISHED', now() - interval '12 hours', now() + interval '14 days'),
+
+  ('wd_devfx_noah_blueprint_07', null, 'devfx_vw_noah', 'devfx_vw_noah', 'devfx_vw_noah_blueprint',
+   'Blueprint 07', 'Sheet 07 of the motion system — the revision that fixed the easing.',
+   'COLLECTIBLE', 'COLLECTIBLE', 'Blueprint 07',
+   '{"artifact":"blueprint_07","sheet":"07"}'::jsonb,
+   public.world_fuzz_location(52.52, 13.4),
+   extensions.ST_GeoHash(public.world_fuzz_location(52.52, 13.4)::extensions.geometry, 6),
+   'Berlin', 'PUBLISHED', now() - interval '3 days', now() + interval '30 days')
+on conflict (id) do nothing;
+
+-- One already-discovered artifact so the collection is visible locally
+-- (Aria found Maya's secret). Server-side claim rows only — nothing faked.
+insert into public.world_drop_claims
+  (drop_id, profile_id, reward_type, reward_ref, reward_payload, claimed_at)
+values
+  ('wd_devfx_maya_missing_frame', 'devfx_vw_aria', 'COLLECTIBLE', 'The Missing Frame',
+   '{"artifact":"missing_frame","index":"02"}'::jsonb, now() - interval '1 day')
 on conflict do nothing;
 
 commit;

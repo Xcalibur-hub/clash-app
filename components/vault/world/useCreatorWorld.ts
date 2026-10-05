@@ -28,6 +28,7 @@ export interface CreatorWorldModel {
   courses: CreatorWorldData['courses'];
   products: CreatorWorldData['products'];
   community: CreatorWorldData['community'];
+  worldDrops: CreatorWorldData['worldDrops'];
   isSelf: boolean;
   modules: CreatorWorldModule[];
   heroUrl: string | null;
@@ -101,8 +102,9 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
         courseCount: data?.courses.length ?? 0,
         storeCount: data?.products.length ?? 0,
         communityReady: (data?.community ?? null) !== null,
+        worldDropCount: data?.worldDrops.length ?? 0,
       }),
-    [liveDrops.length, data?.collections.length, data?.services.length, data?.courses.length, data?.products.length, data?.community],
+    [liveDrops.length, data?.collections.length, data?.services.length, data?.courses.length, data?.products.length, data?.community, data?.worldDrops.length],
   );
 
   const heroUrl = React.useMemo(() => {
@@ -134,6 +136,7 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
     courses: fallback.courses,
     products: fallback.products,
     community: fallback.community,
+    worldDrops: fallback.worldDrops,
     isSelf: fallback.isSelf,
     modules,
     heroUrl,

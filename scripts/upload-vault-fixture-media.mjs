@@ -1,7 +1,13 @@
 /**
  * LOCAL ONLY — upload cinematic synthetic PNG posters for vault_creator_worlds.sql.
- * Scene-aware compositions (doorways, streets, studio rings, architecture) —
- * not flat gradient blocks. Refuses non-local API URLs / missing local Docker.
+ * Scene-aware compositions (doorways, streets, studio rings, architecture,
+ * contact sheets, artifacts) — not flat gradient blocks. Refuses non-local API
+ * URLs / missing local Docker.
+ *
+ * VIDEO: no encoder (ffmpeg) is guaranteed on a local machine, and a static
+ * image labelled as video would be a lie — so this script ships real images
+ * only. Where the media model supports video, fixtures use explicit poster
+ * stills instead of fake video bytes.
  */
 import { createClient } from '@supabase/supabase-js';
 import { spawnSync } from 'node:child_process';
@@ -40,7 +46,23 @@ const POSTERS = [
   // Noah — architecture / design
   { path: 'devfx_vw_noah/devfx_vw_noah_free/devfx_vw_noah_free.png', mood: 'arch', scene: 'facade', seed: 411 },
   { path: 'devfx_vw_noah/devfx_vw_noah_course/devfx_vw_noah_course.png', mood: 'arch', scene: 'blueprint', seed: 422 },
-  { path: 'devfx_vw_noah/devfx_vw_noah_prod/devfx_vw_noah_prod.png', mood: 'artifactClean', scene: 'uiKit', seed: 433 },
+  { path: 'devfx_vw_noah/devfx_vw_noah_prod/devfx_vw_noah_prod.png', mood: 'artifactClean', scene: 'uiKit', seed: 433 },  { path: 'devfx_vw_noah/devfx_vw_noah_interior/devfx_vw_noah_interior.png', mood: 'arch', scene: 'interior', seed: 444 },
+  { path: 'devfx_vw_noah/devfx_vw_noah_material/devfx_vw_noah_material.png', mood: 'artifactClean', scene: 'material', seed: 455 },
+  // Phase 15.3 - richer demo media + Creator World Drop artifacts.
+  // The subscriber still lands in private-media; every other asset stays public.
+  { path: 'devfx_vw_maya/devfx_vw_maya_sub/devfx_vw_maya_sub.png', mood: 'horror', scene: 'window', seed: 199, bucket: 'private-media' },
+  { path: 'devfx_vw_maya/devfx_vw_maya_comm/devfx_vw_maya_comm.png', mood: 'horror', scene: 'communityHero', seed: 201 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_bts/devfx_vw_maya_bts.png', mood: 'horrorWarm', scene: 'btsDirecting', seed: 212 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_still1/devfx_vw_maya_still1.png', mood: 'horror', scene: 'doorway', seed: 223 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_still2/devfx_vw_maya_still2.png', mood: 'horror', scene: 'fogHall', seed: 234 },
+  { path: 'devfx_vw_maya/devfx_vw_maya_artifact/devfx_vw_maya_artifact.png', mood: 'horrorWarm', scene: 'artifactFrame', seed: 245 },
+  { path: 'devfx_vw_leo/devfx_vw_leo_sheet/devfx_vw_leo_sheet.png', mood: 'street', scene: 'contactSheet', seed: 241 },
+  { path: 'devfx_vw_leo/devfx_vw_leo_portrait/devfx_vw_leo_portrait.png', mood: 'streetCool', scene: 'streetPortrait', seed: 252 },
+  { path: 'devfx_vw_leo/devfx_vw_leo_detail/devfx_vw_leo_detail.png', mood: 'street', scene: 'neonRain', seed: 263 },
+  { path: 'devfx_vw_leo/devfx_vw_leo_hunt/devfx_vw_leo_hunt.png', mood: 'streetCool', scene: 'photoHunt', seed: 274 },
+  { path: 'devfx_vw_aria/devfx_vw_aria_album/devfx_vw_aria_album.png', mood: 'studio', scene: 'albumArt', seed: 351 },
+  { path: 'devfx_vw_aria/devfx_vw_aria_track/devfx_vw_aria_track.png', mood: 'artifactWarm', scene: 'hiddenTrack', seed: 362 },
+  { path: 'devfx_vw_noah/devfx_vw_noah_blueprint/devfx_vw_noah_blueprint.png', mood: 'arch', scene: 'blueprintArtifact', seed: 466 },
 ];
 
 const PALETTES = {
@@ -259,7 +281,76 @@ function sceneMask(scene, vx, vy, seed) {
         vy > 0.35 && vy < 0.55 && hash(Math.floor(vx * 8) * 17 + seed) > 0.55 ? 0.75 : 0;
       return Math.max(panel * 0.6, chips * panel);
     }
-    default:
+    case 'communityHero': {
+      const crowd = hash(Math.floor(vx * 22) * 53 + Math.floor(vy * 16) + seed) > 0.72 ? 0.6 : 0;
+      const pool = Math.exp(-((vx - 0.5) ** 2) * 5 - ((vy - 0.78) ** 2) * 8) * 0.6;
+      const beam = Math.exp(-((vx - 0.5) ** 2) * 30) * (1 - vy) * 0.5;
+      return Math.max(crowd, pool, beam);
+    }
+    case 'btsDirecting': {
+      const monitor = smoothstep(0.18, 0.24, vx) * (1 - smoothstep(0.62, 0.68, vx)) *
+        smoothstep(0.3, 0.36, vy) * (1 - smoothstep(0.62, 0.68, vy));
+      const glare = Math.exp(-((vx - 0.4) ** 2) * 60 - ((vy - 0.44) ** 2) * 90);
+      const rig = Math.abs(vx - 0.78) < 0.02 ? 0.8 : 0;
+      return Math.max(monitor * 0.7, glare, rig);
+    }
+    case 'artifactFrame': {
+      const inside = Math.abs(vx - 0.5) < 0.3 && Math.abs(vy - 0.5) < 0.34;
+      const edge =
+        Math.abs(Math.abs(vx - 0.5) - 0.3) < 0.012 || Math.abs(Math.abs(vy - 0.5) - 0.34) < 0.012 ? 0.95 : 0;
+      const burn = hash(Math.floor(vy * 60) * 31 + seed) > 0.94 ? 0.8 : 0;
+      return Math.max(edge, inside ? 0.55 : 0.1, burn);
+    }
+    case 'photoHunt': {
+      const grid =
+        Math.abs(Math.sin(vx * Math.PI * 14)) < 0.06 || Math.abs(Math.sin(vy * Math.PI * 18)) < 0.06 ? 0.4 : 0.12;
+      const road = Math.abs(vy - (0.35 + vx * 0.3)) < 0.02 ? 0.7 : 0;
+      const pin = Math.exp(-((vx - 0.62) ** 2) * 700 - ((vy - 0.4) ** 2) * 700);
+      return Math.max(grid, road, pin);
+    }
+    case 'hiddenTrack': {
+      const reel = Math.exp(-((vx - 0.5) ** 2) * 24 - ((vy - 0.46) ** 2) * 24) * 0.7;
+      const groove =
+        Math.abs(Math.sin(Math.sqrt((vx - 0.5) ** 2 + (vy - 0.46) ** 2) * 150)) * reel * 0.7;
+      const spark = Math.exp(-((vx - 0.72) ** 2) * 90 - ((vy - 0.66) ** 2) * 90);
+      return Math.max(reel, groove, spark);
+    }
+    case 'blueprintArtifact': {
+      const sheet =
+        smoothstep(0.14, 0.2, vx) * (1 - smoothstep(0.8, 0.86, vx)) *
+        smoothstep(0.16, 0.22, vy) * (1 - smoothstep(0.8, 0.86, vy));
+      const lines =
+        Math.abs(Math.sin(vx * Math.PI * 20)) < 0.05 || Math.abs(Math.sin(vy * Math.PI * 22)) < 0.05 ? 0.5 : 0.14;
+      const block = vx > 0.34 && vx < 0.58 && vy > 0.4 && vy < 0.58 ? 0.85 : 0;
+      return Math.max(sheet * lines, block);
+    }
+    case 'contactSheet': {
+      const inside =
+        (vx * 4) % 1 > 0.08 && (vx * 4) % 1 < 0.92 && (vy * 6) % 1 > 0.1 && (vy * 6) % 1 < 0.9;
+      const cell = hash(Math.floor(vx * 4) * 97 + Math.floor(vy * 6) * 13 + seed);
+      return inside ? 0.25 + cell * 0.6 : 0.08;
+    }
+    case 'albumArt': {
+      const sleeve =
+        smoothstep(0.1, 0.16, vx) * (1 - smoothstep(0.84, 0.9, vx)) *
+        smoothstep(0.12, 0.18, vy) * (1 - smoothstep(0.82, 0.88, vy));
+      const mark = Math.exp(-((vx - 0.5) ** 2) * 26 - ((vy - 0.5) ** 2) * 26);
+      const band = Math.abs(vy - 0.36) < 0.02 && vx > 0.2 && vx < 0.8 ? 0.8 : 0;
+      return Math.max(sleeve * 0.5, mark, band);
+    }
+    case 'interior': {
+      const vanishing = Math.exp(-((vx - 0.5) ** 2) * 40 - ((vy - 0.48) ** 2) * 30);
+      const ceiling = (1 - smoothstep(0.42, 0.46, vy)) * 0.3;
+      const wall = Math.abs(vx - 0.5) > 0.3 ? 0.35 : 0;
+      const floor = smoothstep(0.62, 0.68, vy) * 0.3;
+      return Math.max(vanishing, ceiling, wall, floor);
+    }
+    case 'material': {
+      const inside =
+        (vx * 3) % 1 > 0.06 && (vx * 3) % 1 < 0.94 && (vy * 4) % 1 > 0.08 && (vy * 4) % 1 < 0.92;
+      const swatch = hash(Math.floor(vx * 3) * 37 + Math.floor(vy * 4) * 71 + seed);
+      return inside ? 0.3 + swatch * 0.55 : 0.06;
+    }    default:
       return 0.35 + 0.3 * Math.sin(vx * 6 + s) * Math.cos(vy * 5);
   }
 }
@@ -360,7 +451,8 @@ async function main() {
   let uploaded = 0;
   for (const poster of POSTERS) {
     const body = composePoster(720, 960, poster.mood, poster.scene, poster.seed);
-    const { error } = await supabase.storage.from('public-media').upload(poster.path, body, {
+    const bucket = poster.bucket ?? 'public-media';
+    const { error } = await supabase.storage.from(bucket).upload(poster.path, body, {
       contentType: 'image/png',
       upsert: true,
       cacheControl: '3600',
@@ -368,7 +460,7 @@ async function main() {
     if (error) fail(`${poster.path}: ${error.message}`);
     uploaded += 1;
   }
-  console.log(`upload-vault-fixture-media: uploaded ${uploaded} cinematic scene posters`);
+  console.log(`upload-vault-fixture-media: uploaded ${uploaded} cinematic scene posters (public + private)`);
 }
 
 if (process.argv[1]?.includes('upload-vault-fixture-media')) {

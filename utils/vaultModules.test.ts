@@ -43,7 +43,6 @@ describe('Creator World modules', () => {
       storeCount: 0,
       aiReady: true,
       liveReady: true,
-      worldDropCount: 5,
       experienceCount: 3,
     });
     assert.deepEqual(
@@ -65,12 +64,25 @@ describe('Creator World modules', () => {
     );
   });
 
-  it('marks SERVICES COURSES STORE COMMUNITY supported', () => {
+  it('surfaces WORLD_DROPS once a creator hides something (Phase 15.3)', () => {
+    const mods = resolveCreatorWorldModules({
+      contentCount: 0,
+      collectionCount: 0,
+      worldDropCount: 2,
+    });
+    assert.deepEqual(
+      mods.map((m) => m.type),
+      ['WORLD_DROPS'],
+    );
+  });
+
+  it('marks SERVICES COURSES STORE COMMUNITY WORLD_DROPS supported', () => {
     assert.equal(isCreatorModuleSupported('CONTENT'), true);
     assert.equal(isCreatorModuleSupported('SERVICES'), true);
     assert.equal(isCreatorModuleSupported('COURSES'), true);
     assert.equal(isCreatorModuleSupported('STORE'), true);
     assert.equal(isCreatorModuleSupported('COMMUNITY'), true);
+    assert.equal(isCreatorModuleSupported('WORLD_DROPS'), true);
     assert.equal(isCreatorModuleSupported('AI'), false);
   });
 });

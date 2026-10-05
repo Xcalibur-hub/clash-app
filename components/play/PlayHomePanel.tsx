@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ExploreDiscoveryCard } from '../explore/ExploreDiscoveryCard';
+import { WorldDropsShelf } from './WorldDropsShelf';
 import { analytics } from '../../services/analytics';
 import {
   fetchPlayHome,
@@ -180,6 +181,8 @@ export function PlayHomePanel(): React.JSX.Element {
           );
         })}
       </View>
+
+      <WorldDropsShelf />
 
       {loading ? <ActivityIndicator color={t.textPrimary} style={{ marginTop: space.lg }} /> : null}
       {error ? (

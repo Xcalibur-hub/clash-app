@@ -14,6 +14,7 @@ import { GalleryShelf } from './GalleryShelf';
 import { SeriesComposition } from './SeriesComposition';
 import { SessionInvite } from './SessionInvite';
 import { CommunityChapterCard } from '../community/CommunityChapterCard';
+import { WorldDropsChapter } from './WorldDropsChapter';
 
 export interface WorldChapterProps {
   row: WorldRow;
@@ -29,6 +30,8 @@ export interface WorldChapterProps {
   onOpenProduct: (id: string) => void;
   onOpenCommunity: () => void;
   onCreate: () => void;
+  onOpenWorldDrop: (dropId: string) => void;
+  onManageWorldDrops: () => void;
 }
 
 /** Renders a single world chapter with its own composition. */
@@ -45,6 +48,8 @@ export const WorldChapter = React.memo(function WorldChapter({
   onOpenProduct,
   onOpenCommunity,
   onCreate,
+  onOpenWorldDrop,
+  onManageWorldDrops,
 }: WorldChapterProps): React.JSX.Element | null {
   const t = useThemeColors();
   const radius = personalityRadius(personality);
@@ -154,6 +159,21 @@ export const WorldChapter = React.memo(function WorldChapter({
           onEnter={onOpenCommunity}
         />
       );
+    case 'worldDrops':
+      return (
+        <WorldDropsChapter
+          items={row.items}
+          isSelf={isSelf}
+          tint={creatorTint}
+          onOpen={onOpenWorldDrop}
+          onFind={() => {
+            const firstDrop = row.items[0];
+            if (firstDrop) onOpenWorldDrop(firstDrop.id);
+          }}
+          onManage={onManageWorldDrops}
+        />
+      );
+
     case 'empty':
       return (
         <EmptyState

@@ -87,6 +87,11 @@ export type WorldDropStatus = Schema['Enums']['world_drop_status'];
 export type WorldMissionRow = Schema['Tables']['world_missions']['Row'];
 export type WorldDropRow = Schema['Tables']['world_drops']['Row'];
 
+// ── Creator World Drops vocabulary (Phase 15.3) ─────────────────────────────
+export type WorldDropType = Schema['Enums']['world_drop_type'];
+export type WorldDropReward = Schema['Enums']['world_drop_reward'];
+export type WorldDropClaimRow = Schema['Tables']['world_drop_claims']['Row'];
+
 // ── Sponsor attribution vocabulary (Phase 10 Step 1) ────────────────────────
 export type AdvertiserStatus = Schema['Enums']['advertiser_status'];
 export type SponsorCampaignStatus = Schema['Enums']['sponsor_campaign_status'];

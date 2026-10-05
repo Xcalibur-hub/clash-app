@@ -9,6 +9,7 @@ import { vaultOfferPriceLabel, type VaultOfferAccess } from '../../utils/vaultMo
 import { creatorWorldChapterTitle, vaultAccessMeta, vaultTintWash } from '../../utils/vaultPresentation';
 import { vaultDropDisplayAccess, vaultPublicVisualMedia } from '../../utils/vaultAccess';
 import { buildWorldRows } from '../../utils/vaultWorldRows';
+import { creatorDropMediaUrl } from '../../services/creatorWorldDropService';
 import { worldPersonality } from '../../utils/vaultWorldPersonality';
 import { layout, space, useThemeColors } from '../../theme';
 import { EmptyState } from '../shared/EmptyState';
@@ -55,6 +56,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         services: world.services,
         courses: world.courses,
         products: world.products,
+        worldDrops: world.worldDrops,
         communityReady: world.community !== null,
         personality,
       },
@@ -83,6 +85,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         serviceMedia: (service) => vaultCoverUrl(service.coverMedia),
         courseMedia: (course) => vaultCoverUrl(course.coverMedia),
         productMedia: (product) => vaultCoverUrl(product.coverMedia),
+        worldDropMedia: (drop) => creatorDropMediaUrl(drop.media),
         priceLabel: (input) =>
           vaultOfferPriceLabel({
             accessType: input.accessType as VaultOfferAccess,
@@ -180,6 +183,8 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
               if (world.community) router.push(`/vault/community/${world.community.id}`);
             }}
             onCreate={() => router.push('/vault/compose')}
+            onOpenWorldDrop={(id) => router.push(`/world/drop/${id}`)}
+            onManageWorldDrops={() => router.push('/vault/studio')}
           />
         )}
         ListHeaderComponent={

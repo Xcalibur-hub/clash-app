@@ -13,6 +13,7 @@ export type ExploreCardKind =
   | 'VAULT'
   | 'CHALLENGE'
   | 'TREASURE'
+  | 'DROP'
   | 'CREATOR'
   | 'CLASH';
 
@@ -34,6 +35,7 @@ const KIND_LABEL: Record<ExploreCardKind, string> = {
   VAULT: 'VAULT PREVIEW',
   CHALLENGE: 'CHALLENGE',
   TREASURE: 'TREASURE',
+  DROP: 'WORLD DROP',
   CREATOR: 'CREATOR',
   CLASH: 'CLASH',
 };

@@ -3640,56 +3640,123 @@ export type Database = {
           },
         ]
       }
+      world_drop_claims: {
+        Row: {
+          claimed_at: string
+          drop_id: string
+          profile_id: string
+          reward_payload: Json | null
+          reward_ref: string | null
+          reward_type: Database["public"]["Enums"]["world_drop_reward"]
+        }
+        Insert: {
+          claimed_at?: string
+          drop_id: string
+          profile_id: string
+          reward_payload?: Json | null
+          reward_ref?: string | null
+          reward_type: Database["public"]["Enums"]["world_drop_reward"]
+        }
+        Update: {
+          claimed_at?: string
+          drop_id?: string
+          profile_id?: string
+          reward_payload?: Json | null
+          reward_ref?: string | null
+          reward_type?: Database["public"]["Enums"]["world_drop_reward"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "world_drop_claims_drop_id_fkey"
+            columns: ["drop_id"]
+            isOneToOne: false
+            referencedRelation: "world_drops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "world_drop_claims_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       world_drops: {
         Row: {
           approx_location: unknown
           author_id: string
           caption: string
+          clue: string | null
           created_at: string
+          creator_id: string | null
           deleted_at: string | null
+          drop_type: Database["public"]["Enums"]["world_drop_type"]
           expires_at: string | null
           id: string
           location_cell: string
           location_label: string | null
-          media_object_id: string
+          media_object_id: string | null
           mission_id: string | null
           published_at: string | null
+          reward_payload: Json | null
+          reward_ref: string | null
+          reward_type: Database["public"]["Enums"]["world_drop_reward"]
           status: Database["public"]["Enums"]["world_drop_status"]
         }
         Insert: {
           approx_location: unknown
           author_id: string
           caption?: string
+          clue?: string | null
           created_at?: string
+          creator_id?: string | null
           deleted_at?: string | null
+          drop_type?: Database["public"]["Enums"]["world_drop_type"]
           expires_at?: string | null
           id: string
           location_cell: string
           location_label?: string | null
-          media_object_id: string
+          media_object_id?: string | null
           mission_id?: string | null
           published_at?: string | null
+          reward_payload?: Json | null
+          reward_ref?: string | null
+          reward_type?: Database["public"]["Enums"]["world_drop_reward"]
           status?: Database["public"]["Enums"]["world_drop_status"]
         }
         Update: {
           approx_location?: unknown
           author_id?: string
           caption?: string
+          clue?: string | null
           created_at?: string
+          creator_id?: string | null
           deleted_at?: string | null
+          drop_type?: Database["public"]["Enums"]["world_drop_type"]
           expires_at?: string | null
           id?: string
           location_cell?: string
           location_label?: string | null
-          media_object_id?: string
+          media_object_id?: string | null
           mission_id?: string | null
           published_at?: string | null
+          reward_payload?: Json | null
+          reward_ref?: string | null
+          reward_type?: Database["public"]["Enums"]["world_drop_reward"]
           status?: Database["public"]["Enums"]["world_drop_status"]
         }
         Relationships: [
           {
             foreignKeyName: "world_drops_author_id_fkey"
             columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "world_drops_creator_id_fkey"
+            columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -3958,6 +4025,10 @@ export type Database = {
       }
       claim_treasure_reward: {
         Args: { p_hunt_id: string }
+        Returns: Json
+      }
+      claim_world_drop: {
+        Args: { p_drop_id: string }
         Returns: Json
       }
       clash_identities_revealed_for: {
@@ -4249,6 +4320,41 @@ export type Database = {
           status: Database["public"]["Enums"]["vault_offer_status"]
           title: string
           updated_at: string
+        }
+      }
+      create_creator_world_drop: {
+        Args: {
+          p_caption: string
+          p_clue: string
+          p_drop_type: Database["public"]["Enums"]["world_drop_type"]
+          p_expires_at?: string
+          p_latitude?: number
+          p_location_label?: string
+          p_longitude?: number
+          p_media_object_id?: string
+          p_reward_ref?: string
+          p_reward_type: Database["public"]["Enums"]["world_drop_reward"]
+        }
+        Returns: {
+          approx_location: unknown
+          author_id: string
+          caption: string
+          clue: string | null
+          created_at: string
+          creator_id: string | null
+          deleted_at: string | null
+          drop_type: Database["public"]["Enums"]["world_drop_type"]
+          expires_at: string | null
+          id: string
+          location_cell: string
+          location_label: string | null
+          media_object_id: string | null
+          mission_id: string | null
+          published_at: string | null
+          reward_payload: Json | null
+          reward_ref: string | null
+          reward_type: Database["public"]["Enums"]["world_drop_reward"]
+          status: Database["public"]["Enums"]["world_drop_status"]
         }
       }
       create_media_upload: {
@@ -4595,6 +4701,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_my_world_artifacts: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       get_teleport_candidate: {
         Args: { p_exclude_ids?: string[] }
         Returns: Json
@@ -4772,7 +4882,15 @@ export type Database = {
         }
         Returns: Json
       }
+      list_creator_world_drops: {
+        Args: { p_creator_id: string; p_limit?: number }
+        Returns: Json
+      }
       list_explore_vault_previews: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
+      list_explore_world_drops: {
         Args: { p_limit?: number }
         Returns: Json
       }
@@ -5219,6 +5337,33 @@ export type Database = {
           status: Database["public"]["Enums"]["vault_offer_status"]
           title: string
           updated_at: string
+        }
+      }
+      set_creator_world_drop_status: {
+        Args: {
+          p_drop_id: string
+          p_status: Database["public"]["Enums"]["world_drop_status"]
+        }
+        Returns: {
+          approx_location: unknown
+          author_id: string
+          caption: string
+          clue: string | null
+          created_at: string
+          creator_id: string | null
+          deleted_at: string | null
+          drop_type: Database["public"]["Enums"]["world_drop_type"]
+          expires_at: string | null
+          id: string
+          location_cell: string
+          location_label: string | null
+          media_object_id: string | null
+          mission_id: string | null
+          published_at: string | null
+          reward_payload: Json | null
+          reward_ref: string | null
+          reward_type: Database["public"]["Enums"]["world_drop_reward"]
+          status: Database["public"]["Enums"]["world_drop_status"]
         }
       }
       set_service_request_status: {
@@ -5760,6 +5905,10 @@ export type Database = {
         Args: { p_limit?: number; p_mission_id: string }
         Returns: Json
       }
+      world_my_creator_drops: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       world_my_drops: {
         Args: { p_limit?: number }
         Returns: Json
@@ -5946,7 +6095,18 @@ export type Database = {
       vault_subscription_source: "test" | "admin" | "promo" | "payment"
       vault_subscription_status: "active" | "trial" | "cancelled" | "expired"
       verdict_winner: "A" | "B" | "DRAW"
+      world_drop_reward:
+        | "BADGE"
+        | "COLLECTIBLE"
+        | "CONTENT_UNLOCK"
+        | "WORLD_ACCESS"
+        | "CHALLENGE_STATUS"
       world_drop_status: "DRAFT" | "PUBLISHED" | "EXPIRED" | "REMOVED"
+      world_drop_type:
+        | "SECRET_DROP"
+        | "CHALLENGE"
+        | "COLLECTIBLE"
+        | "CREATOR_UNLOCK"
       world_mission_status: "DRAFT" | "ACTIVE" | "ENDED" | "CANCELLED"
     }
     CompositeTypes: {
@@ -6259,7 +6419,20 @@ export const Constants = {
       vault_subscription_source: ["test", "admin", "promo", "payment"],
       vault_subscription_status: ["active", "trial", "cancelled", "expired"],
       verdict_winner: ["A", "B", "DRAW"],
+      world_drop_reward: [
+        "BADGE",
+        "COLLECTIBLE",
+        "CONTENT_UNLOCK",
+        "WORLD_ACCESS",
+        "CHALLENGE_STATUS",
+      ],
       world_drop_status: ["DRAFT", "PUBLISHED", "EXPIRED", "REMOVED"],
+      world_drop_type: [
+        "SECRET_DROP",
+        "CHALLENGE",
+        "COLLECTIBLE",
+        "CREATOR_UNLOCK",
+      ],
       world_mission_status: ["DRAFT", "ACTIVE", "ENDED", "CANCELLED"],
     },
   },

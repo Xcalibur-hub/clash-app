@@ -9,6 +9,7 @@ import type { CreatorModuleType } from './vaultModules';
 import type { WorldPersonality } from './vaultWorldPersonality';
 import type { StorefrontDrop, VaultCollection } from '../services/vaultMappers';
 import type { CreatorCourse, CreatorProduct, CreatorService } from '../services/vaultCommerceMappers';
+import type { CreatorWorldDrop } from '../services/creatorWorldDropMappers';
 
 export interface WorldDropItem {
   id: string;
@@ -36,6 +37,16 @@ export interface WorldOfferItem {
   meta: string;
 }
 
+export interface WorldDropChapterItem {
+  id: string;
+  caption: string;
+  mediaUrl: string | null;
+  tint: string | null;
+  place: string | null;
+  type: string;
+  claimed: boolean;
+}
+
 export type WorldRow =
   | { kind: 'chapter'; index: number; module: CreatorModuleType; title: string; count: number | null }
   | { kind: 'drops'; drops: WorldDropItem[]; personality: WorldPersonality }
@@ -44,6 +55,7 @@ export type WorldRow =
   | { kind: 'courses'; items: WorldOfferItem[] }
   | { kind: 'products'; items: WorldOfferItem[] }
   | { kind: 'community' }
+  | { kind: 'worldDrops'; items: WorldDropChapterItem[] }
   | { kind: 'empty' };
 
 export interface WorldRowsInput {
@@ -53,6 +65,7 @@ export interface WorldRowsInput {
   services: readonly CreatorService[];
   courses: readonly CreatorCourse[];
   products: readonly CreatorProduct[];
+  worldDrops: readonly CreatorWorldDrop[];
   communityReady: boolean;
   personality: WorldPersonality;
 }
@@ -69,6 +82,7 @@ export interface WorldRowsDeps {
   serviceMedia: (service: CreatorService) => string | null;
   courseMedia: (course: CreatorCourse) => string | null;
   productMedia: (product: CreatorProduct) => string | null;
+  worldDropMedia: (drop: CreatorWorldDrop) => string | null;
   priceLabel: (input: {
     accessType: string;
     priceAmountMinor: number | null;
@@ -236,6 +250,29 @@ export function buildWorldRows(input: WorldRowsInput, deps: WorldRowsDeps): Worl
     if (mod.type === 'COMMUNITY' && input.communityReady) {
       rows.push({ kind: 'chapter', index: chapterIndex, module: mod.type, title, count: null });
       rows.push({ kind: 'community' });
+      continue;
+    }
+
+    if (mod.type === 'WORLD_DROPS' && input.worldDrops.length > 0) {
+      rows.push({
+        kind: 'chapter',
+        index: chapterIndex,
+        module: mod.type,
+        title,
+        count: input.worldDrops.length,
+      });
+      rows.push({
+        kind: 'worldDrops',
+        items: input.worldDrops.map((drop) => ({
+          id: drop.id,
+          caption: drop.caption,
+          mediaUrl: deps.worldDropMedia(drop),
+          tint: drop.creatorTint,
+          place: drop.locationLabel,
+          type: drop.dropType,
+          claimed: drop.claimed,
+        })),
+      });
     }
   }
 

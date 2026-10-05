@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlowButton } from '../../../components/shared/GlowButton';
+import { WorldArtifactsSection } from '../../../components/play/WorldArtifactsSection';
 import { fetchMyPlay, type MyPlay } from '../../../services/playService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../../theme';
 
@@ -163,6 +164,8 @@ export default function MyPlayScreen(): React.JSX.Element {
           )),
         ]}
       </Section>
+
+      <WorldArtifactsSection />
 
       <Section title="Rewards">
         {(data?.rewards ?? []).map((r) => (

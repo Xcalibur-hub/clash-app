@@ -13,6 +13,7 @@ const deps: WorldRowsDeps = {
   serviceMedia: () => null,
   courseMedia: () => null,
   productMedia: () => null,
+  worldDropMedia: () => null,
   priceLabel: () => 'Free',
 };
 
@@ -42,6 +43,7 @@ function input(partial: Partial<WorldRowsInput>): WorldRowsInput {
     services: [],
     courses: [],
     products: [],
+    worldDrops: [],
     communityReady: false,
     personality: 'cinematic',
     ...partial,
@@ -99,6 +101,41 @@ describe('creator world rows', () => {
       withRoom.map((row) => row.kind),
       ['chapter', 'community'],
     );
+  });
+
+  it('renders a world-drops chapter with its artifacts', () => {
+    const rows = buildWorldRows(
+      input({
+        modules: [{ type: 'WORLD_DROPS' }],
+        worldDrops: [
+          {
+            id: 'wd1',
+            caption: 'The Missing Frame',
+            dropType: 'SECRET_DROP',
+            claimed: false,
+            creatorTint: '#C45C26',
+            locationLabel: 'Mumbai',
+            media: null,
+          } as never,
+        ],
+      }),
+      deps,
+    );
+    assert.deepEqual(
+      rows.map((row) => row.kind),
+      ['chapter', 'worldDrops'],
+    );
+    const row = rows[1];
+    if (row.kind === 'worldDrops') {
+      assert.equal(row.items[0]?.caption, 'The Missing Frame');
+      assert.equal(row.items[0]?.place, 'Mumbai');
+      assert.equal(row.items[0]?.claimed, false);
+    }
+  });
+
+  it('omits the world-drops chapter when nothing is hidden', () => {
+    const rows = buildWorldRows(input({ modules: [{ type: 'WORLD_DROPS' }] }), deps);
+    assert.deepEqual(rows, [{ kind: 'empty' }]);
   });
 
   it('resolves collection membership from the injected resolver', () => {

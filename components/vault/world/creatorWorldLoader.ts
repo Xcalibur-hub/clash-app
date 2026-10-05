@@ -23,6 +23,8 @@ import type {
   VaultSubscriptionState,
 } from '../../../services/vaultMappers';
 import type { CreatorCourse, CreatorProduct, CreatorService } from '../../../services/vaultCommerceMappers';
+import { fetchCreatorWorldDrops } from '../../../services/creatorWorldDropService';
+import type { CreatorWorldDrop } from '../../../services/creatorWorldDropMappers';
 
 export type CreatorWorldPhase = 'loading' | 'ready' | 'none' | 'blocked' | 'error';
 
@@ -38,6 +40,7 @@ export interface CreatorWorldData {
   courses: CreatorCourse[];
   products: CreatorProduct[];
   community: CommunitySummary | null;
+  worldDrops: CreatorWorldDrop[];
   isSelf: boolean;
   isGuest: boolean;
 }
@@ -55,6 +58,7 @@ export function emptyCreatorWorldData(phase: CreatorWorldPhase): CreatorWorldDat
     courses: [],
     products: [],
     community: null,
+    worldDrops: [],
     isSelf: false,
     isGuest: true,
   };
@@ -77,7 +81,7 @@ export async function fetchCreatorWorld(creatorId: string): Promise<CreatorWorld
     safety.blockedProfileIds.includes(creatorId) || safety.blockingProfileIds.includes(creatorId);
   if (blocked) return { ...base, phase: 'blocked' };
 
-  const [drops, cols, subs, services, courses, products, community] = await Promise.all([
+  const [drops, cols, subs, services, courses, products, community, worldDrops] = await Promise.all([
     fetchStorefront(vault.id),
     fetchCollections(vault.id),
     fetchSubscriptionState(vault.id),
@@ -85,6 +89,7 @@ export async function fetchCreatorWorld(creatorId: string): Promise<CreatorWorld
     fetchCreatorCourses(creatorId),
     fetchCreatorProducts(creatorId),
     fetchCreatorCommunity(creatorId),
+    fetchCreatorWorldDrops(creatorId).catch(() => [] as CreatorWorldDrop[]),
   ]);
 
   return {
@@ -96,5 +101,6 @@ export async function fetchCreatorWorld(creatorId: string): Promise<CreatorWorld
     courses,
     products,
     community,
+    worldDrops,
   };
 }
