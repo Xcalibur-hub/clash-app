@@ -217,7 +217,7 @@ export function VaultHome(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingHorizontal: layout.screenX, gap: space.lg },
+  content: { paddingHorizontal: layout.screenX, gap: space.md },
   masthead: { gap: 4 },
   mastheadRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md },
   eyebrow: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },

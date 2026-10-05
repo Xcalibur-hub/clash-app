@@ -108,7 +108,33 @@ export function personalityScatter(personality: WorldPersonality, index: number)
   return pattern[index % pattern.length];
 }
 
+/** Degrees of print tilt — contact sheets only. */
+export function personalityTilt(personality: WorldPersonality, index: number): number {
+  if (personality !== 'contact') return 0;
+  const pattern = [-2.4, 1.8, -1.4, 2.2, -1.8, 1.2];
+  return pattern[index % pattern.length];
+}
+
 /** True when a world draws a faint film grain / grid overlay. */
 export function personalityHasTexture(personality: WorldPersonality): boolean {
   return personality === 'cinematic' || personality === 'blueprint';
+}
+
+/** Media crop language per personality. */
+export type PersonalityMediaShape = 'rect' | 'circle' | 'film';
+
+export function personalityMediaShape(personality: WorldPersonality): PersonalityMediaShape {
+  switch (personality) {
+    case 'studio':
+      return 'circle';
+    case 'cinematic':
+      return 'film';
+    default:
+      return 'rect';
+  }
+}
+
+/** Whether collage captions sit outside the media plane. */
+export function personalityNameOutside(personality: WorldPersonality): boolean {
+  return personality === 'contact' || personality === 'blueprint' || personality === 'editorial';
 }

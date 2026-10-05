@@ -46,6 +46,7 @@ export const SeriesComposition = React.memo(function SeriesComposition({
             }))}
             radius={radius}
             scatter={scatter}
+            shape="film"
             onOpen={onOpen}
           />
           {collection.description ? (

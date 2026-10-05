@@ -18,8 +18,7 @@ export interface CurriculumProps {
 }
 
 /**
- * A masterclass curriculum: large chapter numerals, editorial rows, hairline
- * separators. Reads like a book's table of contents, not a lesson marketplace.
+ * Masterclass curriculum — giant numerals, hairline rows, book TOC energy.
  */
 export const Curriculum = React.memo(function Curriculum({
   items,
@@ -28,7 +27,7 @@ export const Curriculum = React.memo(function Curriculum({
   const t = useThemeColors();
 
   return (
-    <View style={[styles.wrap, { borderColor: t.border }]}>
+    <View style={styles.wrap}>
       {items.map((item, index) => (
         <Pressable
           key={item.id}
@@ -75,18 +74,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    paddingVertical: space.md,
+    paddingVertical: space.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   index: {
-    ...typeScale.data,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 1,
-    width: 30,
+    fontFamily: typeScale.display.fontFamily,
+    fontSize: 34,
+    lineHeight: 36,
+    fontWeight: '800',
+    letterSpacing: -1,
+    width: 56,
   },
-  body: { flex: 1, gap: 2 },
-  title: { ...typeScale.cardTitle, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  body: { flex: 1, gap: 3 },
+  title: { ...typeScale.cardTitle, fontSize: 17, fontWeight: '700', letterSpacing: -0.25 },
   meta: { ...typeScale.caption, letterSpacing: 0.3 },
   done: { ...typeScale.caption, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
 });

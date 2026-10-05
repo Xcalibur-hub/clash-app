@@ -2,6 +2,7 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
+  FadeInUp,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -9,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackIcon } from '../../shared/icons';
-import { layout, space, useThemeColors } from '../../../theme';
+import { duration, layout, space, useThemeColors } from '../../../theme';
 import { tap as hapticTap } from '../../../utils/haptics';
 import { WorldHeroCopy } from './WorldHeroCopy';
 import { WorldHeroMeta } from './WorldHeroMeta';
@@ -39,7 +40,7 @@ export interface WorldHeroProps {
   scrollY?: SharedValue<number>;
 }
 
-/** Near-full-screen world entrance: cinematic media with a slow parallax + poster. */
+/** Near-full-bleed album/film opener — parallax media + overlapping poster. */
 export function WorldHero({
   creatorName,
   identity,
@@ -67,13 +68,14 @@ export function WorldHero({
   const { width } = useWindowDimensions();
   const fallbackScroll = useSharedValue(0);
   const y = scrollY ?? fallbackScroll;
-  const height = Math.round(Math.min(width * 1.18, 560));
+  const height = Math.round(Math.min(width * 1.22, 580));
   const fallback = accent || (t.scheme === 'light' ? '#2C3340' : '#141418');
   const parallax = useAnimatedStyle(() => {
     if (reduced) return { transform: [{ scale: 1 }] };
     const offset = Math.max(0, Math.min(y.value, height)) * 0.28;
-    return { transform: [{ translateY: offset }, { scale: 1.12 }] };
+    return { transform: [{ translateY: offset }, { scale: 1.14 }] };
   });
+  const posterEnter = reduced ? undefined : FadeInUp.delay(90).duration(duration.base);
 
   return (
     <View style={styles.wrap}>
@@ -84,8 +86,6 @@ export function WorldHero({
             height,
             marginHorizontal: -layout.screenX,
             backgroundColor: fallback,
-            borderBottomLeftRadius: 18,
-            borderBottomRightRadius: 18,
           },
         ]}
       >
@@ -97,14 +97,17 @@ export function WorldHero({
             style={StyleSheet.absoluteFill}
           />
         )}
-        <LinearGradient colors={['rgba(0,0,0,0.30)', 'transparent', 'rgba(0,0,0,0.86)']} style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          colors={['rgba(0,0,0,0.28)', 'transparent', 'rgba(0,0,0,0.88)']}
+          style={StyleSheet.absoluteFill}
+        />
 
         <Pressable
           onPress={() => {
             hapticTap();
             onBack();
           }}
-          style={[styles.back, { top: insets.top + space.xs, left: layout.screenX }]}
+          style={[styles.back, { top: Math.max(insets.top, topInset) + space.xs, left: layout.screenX }]}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >
@@ -124,7 +127,9 @@ export function WorldHero({
         />
 
         {posterUrl ? (
-          <WorldHeroPoster mediaUrl={posterUrl} label={posterLabel} accent={fallback} onPress={onPosterPress} />
+          <Animated.View entering={posterEnter} style={styles.posterSlot}>
+            <WorldHeroPoster mediaUrl={posterUrl} label={posterLabel} accent={fallback} onPress={onPosterPress} />
+          </Animated.View>
         ) : null}
       </View>
 
@@ -132,8 +137,9 @@ export function WorldHero({
     </View>
   );
 }
+
 const styles = StyleSheet.create({
-  wrap: { gap: 0 },
+  wrap: { gap: 0, marginBottom: space.sm },
   bleed: { justifyContent: 'flex-end', overflow: 'hidden' },
   back: {
     position: 'absolute',
@@ -144,5 +150,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(9,9,11,0.42)',
+  },
+  posterSlot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
 });

@@ -10,7 +10,7 @@ export interface WorldHeroPosterProps {
   onPress?: () => void;
 }
 
-/** The overlapping "latest" poster that breaks the hero's bottom edge. */
+/** Overlapping latest poster — breaks the hero's bottom edge like a film print. */
 export function WorldHeroPoster({
   mediaUrl,
   label,
@@ -22,10 +22,12 @@ export function WorldHeroPoster({
       <EditorialMedia
         mediaUrl={mediaUrl}
         accent={accent}
-        height={150}
-        width={112}
-        radius={6}
+        height={156}
+        width={116}
+        radius={3}
+        shape="film"
         hairline
+        badge="01"
         kicker="LATEST"
         title={label ?? null}
         onPress={() => {
@@ -37,5 +39,11 @@ export function WorldHeroPoster({
 }
 
 const styles = StyleSheet.create({
-  poster: { position: 'absolute', right: layout.screenX, bottom: -26, zIndex: 3 },
+  poster: {
+    position: 'absolute',
+    right: layout.screenX,
+    bottom: -32,
+    zIndex: 3,
+    transform: [{ rotate: '2.5deg' }],
+  },
 });

@@ -77,7 +77,7 @@ export function WorldHeroCopy({
 }
 
 const styles = StyleSheet.create({
-  copy: { gap: 4, paddingHorizontal: layout.screenX, paddingBottom: 104, zIndex: 2 },
+  copy: { gap: 5, paddingHorizontal: layout.screenX, paddingBottom: 118, zIndex: 2 },
   eyebrow: {
     ...typeScale.caption,
     fontSize: 10,
@@ -87,10 +87,10 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typeScale.display,
-    fontSize: 40,
-    lineHeight: 42,
+    fontSize: 44,
+    lineHeight: 46,
     fontWeight: '800',
-    letterSpacing: -1.4,
+    letterSpacing: -1.6,
     color: '#FAFAF8',
   },
   identity: { ...typeScale.body, fontSize: 15, color: 'rgba(250,250,248,0.86)', maxWidth: 300 },

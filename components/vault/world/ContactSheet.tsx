@@ -10,11 +10,11 @@ export interface ContactSheetProps {
   onOpen: (id: string) => void;
 }
 
-const TILT = [-1.6, 1.2, -0.9, 1.8, -1.2, 0.8];
+const TILT = [-2.2, 1.6, -1.3, 2.4, -1.8, 1.1];
+const OFFSET_Y = [0, 10, -8, 14, -6, 8];
 
 /**
- * Contact sheet — prints laid out like a photographer's proof sheet, each with a
- * small rotation. Used by the tactile "contact" worlds (Leo).
+ * Photographer's proof sheet — paper-matted prints, slight rotations, captions under.
  */
 export const ContactSheet = React.memo(function ContactSheet({
   items,
@@ -30,23 +30,32 @@ export const ContactSheet = React.memo(function ContactSheet({
       {rows.map((row, rowIndex) => (
         <View key={rowIndex} style={styles.row}>
           {row.map((item, colIndex) => {
-            const tilt = TILT[(rowIndex * columns + colIndex) % TILT.length];
+            const i = rowIndex * columns + colIndex;
+            const tilt = TILT[i % TILT.length];
+            const lift = OFFSET_Y[i % OFFSET_Y.length];
             return (
               <View
                 key={item.id}
-                style={[styles.print, { transform: [{ rotate: `${tilt}deg` }] }]}
+                style={[
+                  styles.print,
+                  {
+                    marginTop: lift,
+                    transform: [{ rotate: `${tilt}deg` }],
+                  },
+                ]}
               >
                 <EditorialMedia
                   mediaUrl={item.mediaUrl}
                   accent={item.tint}
-                  height={150}
+                  height={158}
                   width="100%"
-                  radius={4}
+                  radius={3}
+                  paper
                   hairline
-                  badge={String(rowIndex * columns + colIndex + 1).padStart(2, '0')}
+                  badge={String(i + 1).padStart(2, '0')}
                   onPress={() => onOpen(item.id)}
                 />
-                <Text allowFontScaling={false} style={[styles.caption, { color: t.textMuted }]} numberOfLines={1}>
+                <Text allowFontScaling={false} style={[styles.caption, { color: t.textMuted }]} numberOfLines={2}>
                   {item.title}
                 </Text>
               </View>
@@ -64,8 +73,13 @@ export const ContactSheet = React.memo(function ContactSheet({
 });
 
 const styles = StyleSheet.create({
-  sheet: { gap: space.lg },
-  row: { flexDirection: 'row', gap: space.md },
-  print: { flex: 1, gap: 4 },
-  caption: { ...typeScale.caption, fontSize: 10, letterSpacing: 0.4 },
+  sheet: { gap: space.lg, paddingVertical: space.xs },
+  row: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
+  print: { flex: 1, gap: 6 },
+  caption: {
+    ...typeScale.caption,
+    fontSize: 11,
+    letterSpacing: 0.2,
+    fontStyle: 'italic',
+  },
 });

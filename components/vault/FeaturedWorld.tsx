@@ -1,22 +1,26 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import type { VaultCreatorWorldCard } from '../../services/vaultHomeService';
+import { creatorIdentityLine, worldHappeningLine } from '../../utils/vaultPresentation';
 import {
-  creatorIdentityLine,
-  worldHappeningLine,
-} from '../../utils/vaultPresentation';
-import { duration, radius, space, typeScale, useThemeColors } from '../../theme';
+  personalityHasTexture,
+  personalityMediaShape,
+  personalityRadius,
+  worldPersonality,
+} from '../../utils/vaultWorldPersonality';
+import { duration, layout, space, typeScale, useThemeColors } from '../../theme';
 import { PressableScale } from '../shared/PressableScale';
 import { tap as hapticTap } from '../../utils/haptics';
+import { EditorialMedia } from './world/EditorialMedia';
 
 export interface FeaturedWorldProps {
   creator: VaultCreatorWorldCard;
   onEnter: () => void;
 }
 
-/** Featured Creator World — Explore hero language: rounded media, gradient scrim, layered type. */
+/** Featured world — magazine opener, not a rounded feed card. */
 export const FeaturedWorld = React.memo(function FeaturedWorld({
   creator,
   onEnter,
@@ -24,26 +28,30 @@ export const FeaturedWorld = React.memo(function FeaturedWorld({
   const t = useThemeColors();
   const reduced = useReducedMotion();
   const { width } = useWindowDimensions();
-  const height = Math.round(Math.min(width * 1.05, 420));
+  const height = Math.round(Math.min(width * 1.12, 460));
+  const personality = worldPersonality({
+    creatorId: creator.creatorId,
+    handle: creator.handle,
+    name: creator.name,
+  });
   const identity = creatorIdentityLine(creator.bio, 'Creator');
   const happening = worldHappeningLine(creator);
   const fallback = creator.tint || (t.scheme === 'light' ? '#2C3340' : '#1A1A20');
+  const texture = personalityHasTexture(personality)
+    ? personality === 'blueprint'
+      ? 'grid'
+      : 'grain'
+    : null;
+  const shape = personalityMediaShape(personality);
 
   return (
-    <Animated.View entering={reduced ? undefined : FadeIn.duration(duration.slow)}>
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(duration.slow)} style={styles.wrap}>
       <PressableScale
         onPress={() => {
           hapticTap();
           onEnter();
         }}
-        style={[
-          styles.wrap,
-          {
-            height,
-            borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
-            backgroundColor: fallback,
-          },
-        ]}
+        style={[styles.bleed, { height, backgroundColor: fallback }]}
         accessibilityLabel={`Enter ${creator.name}'s world`}
       >
         {creator.mediaUrl ? (
@@ -54,7 +62,10 @@ export const FeaturedWorld = React.memo(function FeaturedWorld({
             style={StyleSheet.absoluteFill}
           />
         )}
-        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.82)']} style={styles.scrim} />
+        {texture === 'grain' ? <View style={styles.grain} pointerEvents="none" /> : null}
+        {texture === 'grid' ? <View style={styles.grid} pointerEvents="none" /> : null}
+        <LinearGradient colors={['rgba(0,0,0,0.18)', 'transparent', 'rgba(0,0,0,0.88)']} style={StyleSheet.absoluteFill} />
+
         <View style={styles.copy}>
           <Text allowFontScaling={false} style={styles.kind}>
             FEATURED WORLD
@@ -70,50 +81,71 @@ export const FeaturedWorld = React.memo(function FeaturedWorld({
           <Text allowFontScaling={false} style={styles.identity} numberOfLines={1}>
             {identity}
           </Text>
-          <View style={styles.ctaPill}>
-            <Text allowFontScaling={false} style={styles.cta}>
-              ENTER →
-            </Text>
-          </View>
+          <Text allowFontScaling={false} style={styles.enter}>
+            ENTER →
+          </Text>
         </View>
       </PressableScale>
+
+      {creator.mediaUrl ? (
+        <Animated.View
+          entering={reduced ? undefined : FadeInUp.delay(80).duration(duration.base)}
+          style={styles.floatPoster}
+        >
+          <EditorialMedia
+            mediaUrl={creator.mediaUrl}
+            accent={creator.tint}
+            height={shape === 'circle' ? 120 : 138}
+            width={shape === 'circle' ? 120 : 104}
+            radius={personalityRadius(personality)}
+            shape={shape === 'circle' ? 'circle' : shape === 'film' ? 'film' : 'rect'}
+            paper={personality === 'contact'}
+            texture={texture}
+            badge="01"
+            onPress={onEnter}
+          />
+        </Animated.View>
+      ) : null}
     </Animated.View>
   );
 });
 
 const styles = StyleSheet.create({
-  wrap: {
-    width: '100%',
-    borderRadius: 14,
+  wrap: { marginBottom: space.md },
+  bleed: {
+    width: 'auto',
+    marginHorizontal: -layout.screenX,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
   },
-  scrim: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '72%',
+  grain: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.04)', opacity: 0.4 },
+  grid: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
+    opacity: 0.5,
   },
   copy: {
     flex: 1,
     justifyContent: 'flex-end',
-    padding: space.lg,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.xl + 28,
     gap: 4,
   },
   kind: {
     ...typeScale.caption,
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     color: 'rgba(255,255,255,0.78)',
   },
   name: {
     ...typeScale.display,
-    fontSize: 34,
-    lineHeight: 36,
+    fontSize: 40,
+    lineHeight: 42,
     fontWeight: '800',
-    letterSpacing: -1.1,
+    letterSpacing: -1.3,
     color: '#FAFAF8',
   },
   happening: {
@@ -129,19 +161,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.72)',
   },
-  ctaPill: {
-    alignSelf: 'flex-start',
-    marginTop: space.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  cta: {
+  enter: {
     ...typeScale.caption,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.9,
+    letterSpacing: 1.2,
     color: '#FAFAF8',
+    marginTop: space.sm,
+  },
+  floatPoster: {
+    position: 'absolute',
+    right: layout.screenX * 0.2,
+    bottom: -18,
+    zIndex: 3,
+    transform: [{ rotate: '3deg' }],
   },
 });

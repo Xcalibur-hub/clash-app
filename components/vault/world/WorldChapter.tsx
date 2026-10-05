@@ -1,10 +1,10 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { CommunitySummary } from '../../../services/vaultCommunityMappers';
 import type { WorldRow } from '../../../utils/vaultWorldRows';
 import type { WorldPersonality } from '../../../utils/vaultWorldPersonality';
 import { personalityRadius, personalityScatter } from '../../../utils/vaultWorldPersonality';
-import { space } from '../../../theme';
+import { space, typeScale, useThemeColors } from '../../../theme';
 import { EmptyState } from '../../shared/EmptyState';
 import { VaultIcon } from '../../shared/icons';
 import { ChapterHeading } from './ChapterHeading';
@@ -46,6 +46,7 @@ export const WorldChapter = React.memo(function WorldChapter({
   onOpenCommunity,
   onCreate,
 }: WorldChapterProps): React.JSX.Element | null {
+  const t = useThemeColors();
   const radius = personalityRadius(personality);
   const scatter = [0, 1, 2, 3, 4, 5, 6, 7].map((index) => personalityScatter(personality, index));
 
@@ -91,18 +92,41 @@ export const WorldChapter = React.memo(function WorldChapter({
       return (
         <View style={styles.stack}>
           {row.items.map((course, index) => (
-            <EditorialMedia
-              key={course.id}
-              mediaUrl={course.mediaUrl}
-              accent={creatorTint}
-              height={300}
-              radius={radius}
-              badge={String(index + 1).padStart(2, '0')}
-              kicker="MASTERCLASS"
-              title={course.title}
-              meta={course.meta}
-              onPress={() => onOpenCourse(course.id)}
-            />
+            <View key={course.id} style={styles.course}>
+              <EditorialMedia
+                mediaUrl={course.mediaUrl}
+                accent={creatorTint}
+                height={personality === 'studio' ? 240 : 280}
+                width={personality === 'studio' ? 240 : '100%'}
+                radius={radius}
+                shape={personality === 'cinematic' ? 'film' : personality === 'studio' ? 'circle' : 'rect'}
+                texture={personality === 'blueprint' ? 'grid' : personality === 'cinematic' ? 'grain' : null}
+                style={personality === 'studio' ? styles.courseCircle : undefined}
+                onPress={() => onOpenCourse(course.id)}
+              />
+              <View style={styles.courseCopy}>
+                <Text allowFontScaling={false} style={[styles.courseIndex, { color: t.textMuted }]}>
+                  {String(index + 1).padStart(2, '0')}
+                </Text>
+                <View style={styles.courseText}>
+                  <Text allowFontScaling={false} style={[styles.courseKicker, { color: t.textMuted }]}>
+                    MASTERCLASS
+                  </Text>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.courseTitle, { color: t.textPrimary }]}
+                    numberOfLines={2}
+                  >
+                    {course.title}
+                  </Text>
+                  {course.meta ? (
+                    <Text allowFontScaling={false} style={[styles.courseMeta, { color: t.textMuted }]} numberOfLines={1}>
+                      {course.meta}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            </View>
           ))}
         </View>
       );
@@ -135,7 +159,11 @@ export const WorldChapter = React.memo(function WorldChapter({
         <EmptyState
           icon={VaultIcon}
           title={isSelf ? 'Your Vault is ready' : 'Nothing inside yet'}
-          body={isSelf ? 'Share something your followers will not find in Arena.' : 'This creator has not posted a Drop yet.'}
+          body={
+            isSelf
+              ? 'Share something your followers will not find in Arena.'
+              : 'This creator has not posted a Drop yet.'
+          }
           actionLabel={isSelf ? 'Create first Drop' : undefined}
           onAction={isSelf ? onCreate : undefined}
         />
@@ -145,6 +173,33 @@ export const WorldChapter = React.memo(function WorldChapter({
       return null;
   }
 });
+
 const styles = StyleSheet.create({
-  stack: { gap: space.lg },
+  stack: { gap: space.xl },
+  course: { gap: space.md },
+  courseCircle: { alignSelf: 'center' },
+  courseCopy: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
+  courseIndex: {
+    fontFamily: typeScale.display.fontFamily,
+    fontSize: 36,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -1,
+    width: 58,
+  },
+  courseText: { flex: 1, gap: 3, paddingTop: 4 },
+  courseKicker: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  courseTitle: {
+    ...typeScale.title,
+    fontSize: 24,
+    lineHeight: 27,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  courseMeta: { ...typeScale.caption, letterSpacing: 0.3 },
 });

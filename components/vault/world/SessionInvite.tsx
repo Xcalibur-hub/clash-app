@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { space, typeScale, useThemeColors } from '../../../theme';
+import { tap as hapticTap } from '../../../utils/haptics';
 import { EditorialMedia } from './EditorialMedia';
 
 export interface SessionItem {
@@ -20,13 +21,13 @@ export interface SessionInviteProps {
 }
 
 /**
- * Services as access to the creator: a square portrait plane beside strong
- * typography and a REQUEST affordance — never inventory listings.
+ * Access to the creator — large portrait + editorial type + REQUEST.
+ * Not a marketplace listing; no inventory card chrome.
  */
 export const SessionInvite = React.memo(function SessionInvite({
   items,
   creatorName,
-  radius = 8,
+  radius = 4,
   onOpen,
 }: SessionInviteProps): React.JSX.Element {
   const t = useThemeColors();
@@ -34,23 +35,30 @@ export const SessionInvite = React.memo(function SessionInvite({
 
   return (
     <View style={styles.wrap}>
-      {items.map((item, index) => (
-        <View key={item.id} style={[styles.invite, { borderColor: t.border }]}>
+      {items.map((item) => (
+        <Pressable
+          key={item.id}
+          onPress={() => {
+            hapticTap();
+            onOpen(item.id);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Request session: ${item.title}`}
+          style={styles.invite}
+        >
           <EditorialMedia
             mediaUrl={item.mediaUrl}
             accent={item.tint}
-            height={112}
-            width={96}
+            height={168}
+            width={128}
             radius={radius}
-            hairline
-            badge={String(index + 1).padStart(2, '0')}
             onPress={() => onOpen(item.id)}
           />
           <View style={styles.body}>
             <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-              {`WITH ${first.toUpperCase()}`}
+              {`WORK WITH ${first.toUpperCase()}`}
             </Text>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
+            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={3}>
               {item.title}
             </Text>
             {item.subtitle ? (
@@ -63,31 +71,52 @@ export const SessionInvite = React.memo(function SessionInvite({
                 <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
                   {item.meta}
                 </Text>
-              ) : null}
+              ) : (
+                <View />
+              )}
               <Text allowFontScaling={false} style={[styles.cta, { color: t.textPrimary }]}>
-                REQUEST →
+                REQUEST SESSION →
               </Text>
             </View>
           </View>
-        </View>
+        </Pressable>
       ))}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.lg },
+  wrap: { gap: space.xl },
   invite: {
     flexDirection: 'row',
     gap: space.md,
-    paddingBottom: space.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: 'stretch',
   },
-  body: { flex: 1, gap: 3 },
+  body: {
+    flex: 1,
+    gap: 4,
+    justifyContent: 'center',
+    paddingVertical: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(127,127,127,0.28)',
+    paddingBottom: space.md,
+  },
   kicker: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  title: { ...typeScale.title, fontSize: 22, lineHeight: 25, fontWeight: '800', letterSpacing: -0.5 },
+  title: {
+    ...typeScale.display,
+    fontSize: 26,
+    lineHeight: 28,
+    fontWeight: '800',
+    letterSpacing: -0.7,
+  },
   sub: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
-  footer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.sm, marginTop: space.xs },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    marginTop: space.sm,
+  },
   meta: { ...typeScale.caption, letterSpacing: 0.3, flexShrink: 1 },
   cta: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
 });

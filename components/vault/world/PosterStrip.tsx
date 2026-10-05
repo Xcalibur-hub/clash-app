@@ -1,7 +1,7 @@
 import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { space, typeScale, useThemeColors } from '../../../theme';
-import { EditorialMedia } from './EditorialMedia';
+import { EditorialMedia, type EditorialMediaShape } from './EditorialMedia';
 
 export interface PosterStripItem {
   id: string;
@@ -18,19 +18,22 @@ export interface PosterStripProps {
   frameWidth?: number;
   /** Per-index vertical offsets — gives the tactile worlds a scattered feel. */
   scatter?: readonly number[];
+  shape?: EditorialMediaShape;
+  paper?: boolean;
   onOpen: (id: string) => void;
 }
 
 /**
- * A horizontal film strip of poster frames. Each frame is numbered like a
- * contact sheet; captions sit beneath the image instead of inside it.
+ * Horizontal film / poster strip. Captions sit beneath the image, not inside a card.
  */
 export const PosterStrip = React.memo(function PosterStrip({
   items,
-  radius = 8,
-  frameHeight = 168,
-  frameWidth = 124,
+  radius = 4,
+  frameHeight = 176,
+  frameWidth = 128,
   scatter,
+  shape = 'rect',
+  paper = false,
   onOpen,
 }: PosterStripProps): React.JSX.Element {
   const t = useThemeColors();
@@ -52,7 +55,9 @@ export const PosterStrip = React.memo(function PosterStrip({
               height={frameHeight}
               width={frameWidth}
               radius={radius}
-              hairline
+              shape={shape}
+              paper={paper}
+              hairline={!paper}
               badge={String(index + 1).padStart(2, '0')}
               onPress={() => onOpen(item.id)}
             />
@@ -72,7 +77,7 @@ export const PosterStrip = React.memo(function PosterStrip({
 });
 
 const styles = StyleSheet.create({
-  strip: { gap: space.sm, paddingRight: space.xl, paddingBottom: 4 },
+  strip: { gap: space.md, paddingRight: space.xl, paddingBottom: 6, paddingTop: 4 },
   frame: { gap: 6 },
   caption: { ...typeScale.meta, fontSize: 12, lineHeight: 15 },
   meta: { ...typeScale.caption, fontSize: 10, letterSpacing: 0.6 },

@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   personalityCollageOrder,
+  personalityMediaShape,
+  personalityNameOutside,
   personalityRadius,
   personalityScatter,
+  personalityTilt,
   worldPersonality,
   type WorldPersonality,
 } from './vaultWorldPersonality.ts';
@@ -52,5 +55,15 @@ describe('creator world personality', () => {
     assert.equal(personalityScatter('studio', 1), 0);
     assert.notEqual(personalityScatter('cinematic', 1), 0);
     assert.notEqual(personalityScatter('contact', 1), 0);
+  });
+
+  it('assigns media language per personality', () => {
+    assert.equal(personalityMediaShape('studio'), 'circle');
+    assert.equal(personalityMediaShape('cinematic'), 'film');
+    assert.equal(personalityMediaShape('blueprint'), 'rect');
+    assert.equal(personalityTilt('contact', 0) !== 0, true);
+    assert.equal(personalityTilt('blueprint', 0), 0);
+    assert.equal(personalityNameOutside('contact'), true);
+    assert.equal(personalityNameOutside('cinematic'), false);
   });
 });
