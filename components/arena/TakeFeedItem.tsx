@@ -272,12 +272,13 @@ function MediaFeedCard({
             comment={topComment}
             author={topCommentAuthor}
             clashCount={take.clashes}
+            pulse={pulse}
             onOpen={onOpenDetail}
             onMedia
           />
         ) : take.clashes > 0 ? (
           <Text allowFontScaling={false} style={styles.clashHint}>
-            {`⚔ ${compact(take.clashes)} in the fight`}
+            {`⚔ CLASH ACTIVE · ${compact(take.clashes)} in the fight`}
           </Text>
         ) : null}
 
@@ -360,6 +361,7 @@ function TextFeedCard({
   const cardW = Math.round(width * 0.92);
   const [swordKey, setSwordKey] = React.useState(0);
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
+  const pulse = takePulse(take);
 
   return (
     <PressableScale
@@ -382,6 +384,7 @@ function TextFeedCard({
       <View style={styles.textTop}>
         <Text allowFontScaling={false} style={[styles.hoodCaps, { color: accent.ink }]}>
           {hood.toUpperCase()}
+          {pulse ? ` · ${pulseLabel(pulse)}` : ''}
         </Text>
         <Pressable
           onPress={() => {
@@ -411,11 +414,12 @@ function TextFeedCard({
           comment={topComment}
           author={topCommentAuthor}
           clashCount={take.clashes}
+          pulse={pulse}
           onOpen={onOpenDetail}
         />
       ) : take.clashes > 0 ? (
         <Text allowFontScaling={false} style={[styles.clashHintText, { color: t.textMuted }]}>
-          {`⚔ ${compact(take.clashes)} in the fight`}
+          {`⚔ CLASH ACTIVE · ${compact(take.clashes)} in the fight`}
         </Text>
       ) : null}
 

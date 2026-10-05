@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedValue } from 'react-native-reanimated';
 import { EvidenceComposerSheet } from '../../../components/liveArena/EvidenceComposerSheet';
+import { BattleEventBurst } from '../../../components/liveArena/BattleEventBurst';
 import { LiveEvidenceCard } from '../../../components/liveArena/LiveEvidenceCard';
 import { LiveRoomAtmosphere } from '../../../components/liveArena/LiveRoomAtmosphere';
 import { LiveRoomComposer } from '../../../components/liveArena/LiveRoomComposer';
@@ -65,6 +66,7 @@ import {
   type LiveRoomEvent,
 } from '../../../utils/liveRoomEvents';
 import { latestBattleEvent } from '../../../utils/arenaGameState';
+import { battleEventBurstKind, type BattleBurstKind } from '../../../utils/battleMoment';
 import { replyPreview, selectThreadRoots } from '../../../utils/liveRoomThread';
 import {
   pulseLeaderChanges,
@@ -174,6 +176,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const [backupOpen, setBackupOpen] = React.useState(false);
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [backupBanner, setBackupBanner] = React.useState<LiveRoomEvent | null>(null);
+  const [backupSignalSent, setBackupSignalSent] = React.useState(false);
+  const [burst, setBurst] = React.useState<{ kind: BattleBurstKind; key: string } | null>(null);
   const seenBackupEvent = React.useRef<string | null>(null);
   const dismissedInvite = React.useRef<string | null>(null);
   const prevStatus = React.useRef<ArenaRoomStatus | null>(null);
@@ -218,10 +222,22 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     if (!newest || seenBackupEvent.current === newest.id) return;
     seenBackupEvent.current = newest.id;
     const mapped = latestBattleEvent([newest]);
-    if (!mapped) return;
-    setBackupBanner(mapped);
-    const timer = setTimeout(() => setBackupBanner(null), 6000);
-    return () => clearTimeout(timer);
+    if (mapped) {
+      setBackupBanner(mapped);
+      const timer = setTimeout(() => setBackupBanner(null), 6000);
+      const burstKind = battleEventBurstKind(newest.kind);
+      if (burstKind) {
+        setBurst({ kind: burstKind, key: newest.id });
+        setTimeout(() => setBurst(null), 1600);
+      }
+      return () => clearTimeout(timer);
+    }
+    const burstKind = battleEventBurstKind(newest.kind);
+    if (burstKind) {
+      setBurst({ kind: burstKind, key: newest.id });
+      const timer = setTimeout(() => setBurst(null), 1600);
+      return () => clearTimeout(timer);
+    }
   }, [backup.events]);
 
   // A live call for this viewer surfaces itself, once per invitation.
@@ -279,6 +295,16 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     if (!next) return;
     setPhaseBanner(next);
     const id = setTimeout(() => setPhaseBanner(null), 3_200);
+    if (next.kind === 'judging') {
+      setBurst({ kind: 'judging', key: `phase-judging-${Date.now()}` });
+      setTimeout(() => setBurst(null), 1600);
+    } else if (next.kind === 'result') {
+      setBurst({ kind: 'result', key: `phase-result-${Date.now()}` });
+      setTimeout(() => setBurst(null), 1600);
+    } else if (next.kind === 'final_arguments') {
+      setBurst({ kind: 'clash', key: `phase-final-${Date.now()}` });
+      setTimeout(() => setBurst(null), 1600);
+    }
     return () => clearTimeout(id);
   }, [room?.status]);
 
@@ -312,6 +338,10 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
           }),
         );
         setTimeout(() => setPhaseBanner(null), 2_800);
+        if (change.category === 'FAST_RISING') {
+          setBurst({ kind: 'fast_rising', key: `pulse-rising-${change.authorName}` });
+          setTimeout(() => setBurst(null), 1400);
+        }
       }
     } catch {
       /* pulse is additive presentation */
@@ -395,6 +425,22 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     return bestId;
   }, [messages, pulse?.leaders, room?.result?.bestArgumentMessageId]);
 
+  const crowdHighlightId = React.useMemo(() => {
+    const crowd = pulse?.leaders.find((l) => l.category === 'CROWD_FAVORITE' && l.messageId);
+    return crowd?.messageId ?? null;
+  }, [pulse?.leaders]);
+
+  const crowdMoment = React.useMemo(() => {
+    const crowd = pulse?.leaders.find((l) => l.category === 'CROWD_FAVORITE');
+    if (!crowd?.preview) return null;
+    return {
+      author: crowd.author ? `@${crowd.author.handle || crowd.author.name}` : null,
+      preview: crowd.preview,
+    };
+  }, [pulse?.leaders]);
+
+  const storyEvent = phaseBanner ?? backupBanner;
+
   const accepting = room?.status === 'OPEN' || room?.status === 'FINAL_ARGUMENTS';
   const settled = room?.status === 'SETTLED';
   const judging = room?.status === 'JUDGING';
@@ -409,6 +455,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const renderMessage = React.useCallback(
     ({ item }: ListRenderItemInfo<ArenaMessage>) => {
       const isHighlight = item.id === highlightId;
+      const isCrowd = item.id === crowdHighlightId && item.id !== highlightId;
       const parentId = item.parentMessageId;
       const parent = parentId ? byId.get(parentId) ?? null : null;
       const parentUnavailable = Boolean(parentId && !parent);
@@ -439,8 +486,11 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
           canReply={accepting && isDebater}
           canReact={!settled && isDebater}
           canMarkEvidence={!settled && isDebater}
-          highlighted={isHighlight}
-          highlightLabel={isHighlight ? 'Top argument' : null}
+          highlighted={isHighlight || isCrowd}
+          highlightLabel={
+            isHighlight ? 'Top argument' : isCrowd ? '💀 Crowd lost it' : null
+          }
+          entertainmentHighlight={isCrowd}
           ownStance={item.isOwn ? room?.viewer?.stance ?? null : null}
           onReply={setReplyTo}
           onReact={(message, emoji) => {
@@ -481,6 +531,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     [
       accepting,
       byId,
+      crowdHighlightId,
       evidenceByMessage.map,
       expandedReplies,
       highlightId,
@@ -631,9 +682,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   };
 
   const floatingEvent =
-    phaseBanner ??
-    backupBanner ??
-    (newCount > 0 && !atLiveEdge ? newArgumentsEvent(newCount) : null);
+    newCount > 0 && !atLiveEdge ? newArgumentsEvent(newCount) : null;
 
   const emptyFloor =
     messages.length === 0 && !threadLocked ? (
@@ -656,6 +705,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         paddingTop={insets.top}
         roomIndex={roomIndex ?? 0}
         presence={presence}
+        debaterCount={backup.load?.debaterCount ?? null}
+        spectatorCount={backup.load?.spectatorCount ?? null}
         scrollY={scrollY}
         onBack={() => {
           if (router.canGoBack()) router.back();
@@ -671,6 +722,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       {!settled ? (
         <LiveRoomPulseStrip
           pulse={pulse}
+          liveEvent={storyEvent}
           onOpen={() => {
             setPulseOpen(true);
             analytics.track('room_pulse_opened', { realm: 'arena' });
@@ -678,6 +730,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
           }}
         />
       ) : null}
+
+      <BattleEventBurst kind={burst?.kind ?? null} triggerKey={burst?.key ?? null} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -701,6 +755,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                   viewer={room.viewer}
                   topicTitle={room.topic.title}
                   roomIndex={roomIndex ?? 0}
+                  crowdMoment={crowdMoment}
                   busy={voting}
                   onRecordFinal={(stance) => {
                     setVoting(true);
@@ -783,10 +838,11 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                 <View style={styles.backupBar}>
                   <VaultActionButton
                     label="CALL BACKUP"
-                    tone="quiet"
+                    tone="solid"
                     compact
                     onPress={() => {
                       hapticTap();
+                      setBackupSignalSent(false);
                       setBackupOpen(true);
                       void backup.refreshCandidates();
                     }}
@@ -795,7 +851,11 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                     <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
                       {`Room full · ${backup.load.spectatorCount} watching`}
                     </Text>
-                  ) : null}
+                  ) : (
+                    <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
+                      Bring someone into the fight
+                    </Text>
+                  )}
                 </View>
               ) : null}
               {bottom}
@@ -843,12 +903,23 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         candidates={backup.candidates}
         loading={backup.loadingCandidates}
         policy={backup.policy}
-        onClose={() => setBackupOpen(false)}
+        signalSent={backupSignalSent}
+        onClose={() => {
+          setBackupOpen(false);
+          setBackupSignalSent(false);
+        }}
         onCall={(recipientId) => {
           analytics.track('arena_backup_requested', { realm: 'arena' });
           void backup.call(recipientId).then((ok) => {
-            if (!ok) analytics.track('arena_backup_call_failed', { realm: 'arena' });
-            setBackupOpen(false);
+            if (!ok) {
+              analytics.track('arena_backup_call_failed', { realm: 'arena' });
+              return;
+            }
+            setBackupSignalSent(true);
+            setTimeout(() => {
+              setBackupOpen(false);
+              setBackupSignalSent(false);
+            }, 1200);
           });
         }}
         onPolicy={(policy) => {

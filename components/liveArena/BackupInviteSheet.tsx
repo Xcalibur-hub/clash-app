@@ -1,10 +1,11 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, StyleSheet, Text, View } from 'react-native';
 import type { ArenaBackupInvite } from '../../services/arenaGameService';
 import {
   callSecondsLeft,
   incomingCallBody,
   incomingCallHeadline,
+  incomingCallTopic,
   roomFullCopy,
 } from '../../utils/arenaGameState';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
@@ -22,10 +23,7 @@ export interface BackupInviteSheetProps {
 
 /**
  * "ROOM 7 NEEDS YOU" — an incoming call.
- *
- * The stance is chosen here because a debater always argues a side; the call
- * itself never decided that for anyone. A saturated room is reported as
- * saturated rather than quietly letting someone in.
+ * Stance is chosen here; the call never decides a side for anyone.
  */
 export function BackupInviteSheet({
   visible,
@@ -39,6 +37,9 @@ export function BackupInviteSheet({
   const t = useThemeColors();
   if (!invite) return null;
   const seconds = invite.expiresAt !== null ? callSecondsLeft(invite.expiresAt, now) : null;
+  const caller = invite.caller?.handle
+    ? `@${invite.caller.handle}`
+    : invite.caller?.name ?? 'Someone';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -48,10 +49,13 @@ export function BackupInviteSheet({
             <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
               {incomingCallHeadline(roomIndex)}
             </Text>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-              {incomingCallBody(invite.topicTitle, invite.caller?.name ?? 'Someone')}
+            <Text allowFontScaling={false} style={[styles.topic, { color: t.textPrimary }]}>
+              {incomingCallTopic(invite.topicTitle)}
             </Text>
             <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+              {incomingCallBody(invite.topicTitle, caller)}
+            </Text>
+            <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
               {invite.acceptingDebaters
                 ? seconds !== null
                   ? `${seconds}s left to answer.`
@@ -59,17 +63,24 @@ export function BackupInviteSheet({
                 : roomFullCopy()}
             </Text>
 
-            <View style={styles.stances}>
-              {(['AGREE', 'UNSURE', 'DISAGREE'] as const).map((stance) => (
-                <VaultActionButton
-                  key={stance}
-                  label={stance}
-                  tone="quiet"
-                  compact
-                  onPress={() => onJoin(invite.inviteId, stance)}
-                />
-              ))}
-            </View>
+            {invite.acceptingDebaters ? (
+              <>
+                <Text allowFontScaling={false} style={[styles.stanceHint, { color: t.textMuted }]}>
+                  JOIN BATTLE — pick your stance
+                </Text>
+                <View style={styles.stances}>
+                  {(['AGREE', 'UNSURE', 'DISAGREE'] as const).map((stance) => (
+                    <VaultActionButton
+                      key={stance}
+                      label={busy ? 'Joining…' : stance}
+                      compact
+                      onPress={() => onJoin(invite.inviteId, stance)}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
             <VaultActionButton
               label={busy ? 'Working…' : 'NOT NOW'}
               tone="quiet"
@@ -92,8 +103,21 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   content: { padding: space.lg, gap: space.sm },
-  kicker: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 1.6 },
-  title: { ...typeScale.display, fontSize: 21, fontWeight: '800', letterSpacing: -0.4 },
-  body: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
+  kicker: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 1.8 },
+  topic: {
+    ...typeScale.display,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    lineHeight: 28,
+  },
+  body: { ...typeScale.meta, fontSize: 14, lineHeight: 20 },
+  stanceHint: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    marginTop: space.xs,
+  },
   stances: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
 });

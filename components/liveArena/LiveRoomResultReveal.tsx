@@ -30,6 +30,8 @@ export interface LiveRoomResultRevealProps {
   viewer: ArenaRoomViewer | null;
   topicTitle?: string | null;
   roomIndex?: number | null;
+  /** Optional crowd moment from real pulse leaders. */
+  crowdMoment?: { author: string | null; preview: string | null } | null;
   busy?: boolean;
   onRecordFinal: (stance: Stance) => void;
 }
@@ -48,6 +50,7 @@ export function LiveRoomResultReveal({
   viewer,
   topicTitle = null,
   roomIndex = null,
+  crowdMoment = null,
   busy = false,
   onRecordFinal,
 }: LiveRoomResultRevealProps): React.JSX.Element {
@@ -113,8 +116,13 @@ export function LiveRoomResultReveal({
         ]}
       >
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          ROOM DECIDED
+          {roomIndex != null ? `ROOM ${roomIndex} DECIDED` : 'ROOM DECIDED'}
         </Text>
+        {topicTitle ? (
+          <Text allowFontScaling={false} style={[styles.topic, { color: t.textSecondary }]} numberOfLines={2}>
+            {topicTitle}
+          </Text>
+        ) : null}
 
         <View style={styles.headline}>
           <Text allowFontScaling={false} style={[styles.side, { color: t.textPrimary }]}>
@@ -201,13 +209,32 @@ export function LiveRoomResultReveal({
           style={[styles.card, { backgroundColor: softFill(t), borderColor: t.border }]}
         >
           <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-            MINDSHIFT
+            BIGGEST MINDSHIFT
           </Text>
           <Text allowFontScaling={false} style={[styles.mindshift, { color: t.textPrimary }]}>
             {changedPercent}%
           </Text>
           <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]}>
             changed their mind in this room
+          </Text>
+        </Animated.View>
+      ) : null}
+
+      {crowdMoment?.preview ? (
+        <Animated.View
+          entering={reduced ? undefined : FadeIn.delay(360).duration(260)}
+          style={[styles.card, { backgroundColor: softFill(t), borderColor: t.borderStrong }]}
+        >
+          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+            💀 CROWD MOMENT
+          </Text>
+          {crowdMoment.author ? (
+            <Text allowFontScaling={false} style={[styles.authorName, { color: t.textPrimary }]}>
+              {crowdMoment.author}
+            </Text>
+          ) : null}
+          <Text allowFontScaling={false} style={[styles.quote, { color: t.textPrimary }]}>
+            {crowdMoment.preview}
           </Text>
         </Animated.View>
       ) : null}
@@ -246,6 +273,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   eyebrow: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
+  topic: { ...typeScale.meta, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   headline: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm, flexWrap: 'wrap' },
   side: {
     ...typeScale.display,

@@ -66,15 +66,15 @@ export function backupPolicyLabel(policy: ArenaBackupPolicy): string {
   }
 }
 
-/** "Arena Expert · Same hood · Strong debater" — real reasons only. */
+/** "Useful evidence · Photography · Debater" — real reasons only. */
 export function candidateSubtitle(input: {
   standing: ArenaStanding;
   reasons: string[];
 }): string {
-  const reason = input.reasons[0] ?? standingLabel(input.standing);
-  return input.reasons.length > 0
-    ? `${reason} · ${standingLabel(input.standing)}`
-    : standingLabel(input.standing);
+  const standing = standingLabel(input.standing);
+  if (input.reasons.length === 0) return standing;
+  const reasons = input.reasons.slice(0, 2).join(' · ');
+  return `${reasons} · ${standing}`;
 }
 
 /** "ROOM 7 NEEDS YOU" — the room's place in the day, never a fake id. */
@@ -83,7 +83,11 @@ export function incomingCallHeadline(roomIndex: number): string {
 }
 
 export function incomingCallBody(topicTitle: string, callerName: string): string {
-  return `${callerName} called you into "${topicTitle}".`;
+  return `${callerName} called you into the fight.`;
+}
+
+export function incomingCallTopic(topicTitle: string): string {
+  return topicTitle.trim() || 'Arena battle';
 }
 
 export function arrivalBanner(handle: string): string {
@@ -135,6 +139,16 @@ export function battleEventToRoomEvent(input: {
       return {
         kind: 'evidence_surge',
         label: count !== null ? `${count} receipts just landed` : 'Receipts are landing',
+      };
+    }
+    case 'FAST_RISING_CHANGED': {
+      const name =
+        typeof input.payload.authorName === 'string' && input.payload.authorName.trim()
+          ? input.payload.authorName.trim()
+          : input.actorName;
+      return {
+        kind: 'pulse_rising',
+        label: name ? `${name} is Fast Rising` : 'Fast Rising just shifted',
       };
     }
     case 'JUDGING_STARTED':

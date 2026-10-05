@@ -25,6 +25,9 @@ export interface LiveRoomHeaderProps {
   paddingTop: number;
   roomIndex?: number | null;
   presence?: readonly ArenaRoomPresence[];
+  /** Real capacity from server load when available. */
+  debaterCount?: number | null;
+  spectatorCount?: number | null;
   scrollY?: SharedValue<number>;
   onBack: () => void;
   onPulsePress?: () => void;
@@ -35,6 +38,8 @@ export function LiveRoomHeader({
   paddingTop,
   roomIndex = null,
   presence = [],
+  debaterCount = null,
+  spectatorCount = null,
   scrollY,
   onBack,
   onPulsePress,
@@ -52,6 +57,13 @@ export function LiveRoomHeader({
         : room.secondsRemaining > 0
           ? secondsClock(room.secondsRemaining)
           : null;
+
+  const crowdLine = (() => {
+    if (debaterCount != null && spectatorCount != null) {
+      return `${debaterCount} debating · ${spectatorCount} watching`;
+    }
+    return `${room.participantCount} here`;
+  })();
 
   const detailStyle = useAnimatedStyle(() => {
     if (reduced || !scrollY) return { opacity: 1, maxHeight: 140 };
@@ -91,7 +103,7 @@ export function LiveRoomHeader({
         <Text allowFontScaling={false} style={[styles.liveLine, { color: t.textSecondary }]}>
           {live ? 'LIVE' : room.status === 'SETTLED' ? 'SETTLED' : 'ROOM'}
           {roomIndex != null ? ` · Room ${roomIndex}` : ''}
-          {` · ${room.participantCount} here`}
+          {` · ${crowdLine}`}
           {countdown ? ` · ${countdown}` : ''}
         </Text>
         {onPulsePress ? (

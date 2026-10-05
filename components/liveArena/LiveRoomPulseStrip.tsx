@@ -1,37 +1,46 @@
 /**
- * Compact Room Pulse story strip — "what is happening in this battle".
- * Real pulse leaders only; categories omitted when empty.
+ * Cinematic "What's happening" — one featured moment + optional secondary.
+ * Tap opens full Room Pulse. Not a horizontal analytics dashboard.
  */
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { ArenaPulseLeader, ArenaRoomPulse } from '../../services/liveArenaService';
-import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ArenaRoomPulse } from '../../services/liveArenaService';
+import {
+  liveEventToMoment,
+  selectFeaturedPulseMoments,
+  type BattleMomentModel,
+} from '../../utils/battleMoment';
+import type { LiveRoomEvent } from '../../utils/liveRoomEvents';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
+import { BattleMoment } from './BattleMoment';
 
 export interface LiveRoomPulseStripProps {
   pulse: ArenaRoomPulse | null;
+  /** Brief event that can temporarily take the featured slot. */
+  liveEvent?: LiveRoomEvent | null;
   onOpen: () => void;
-}
-
-const STORY: Record<string, string> = {
-  FAST_RISING: '🔥 FAST RISING',
-  TOP_ARGUMENT: '⚔ TOP ARGUMENT',
-  BEST_EVIDENCE: '🧾 BEST EVIDENCE',
-  BEST_REBUTTAL: '↩ BEST REBUTTAL',
-  CROWD_FAVORITE: '★ CROWD FAVORITE',
-};
-
-function storyLabel(leader: ArenaPulseLeader): string {
-  return STORY[leader.category] ?? leader.label.toUpperCase();
 }
 
 export function LiveRoomPulseStrip({
   pulse,
+  liveEvent = null,
   onOpen,
 }: LiveRoomPulseStripProps): React.JSX.Element | null {
   const t = useThemeColors();
-  const leaders = pulse?.leaders ?? [];
-  if (leaders.length === 0) return null;
+  const pulseMoments = React.useMemo(
+    () => selectFeaturedPulseMoments(pulse?.leaders ?? [], 2),
+    [pulse?.leaders],
+  );
+  const eventMoment = liveEvent ? liveEventToMoment(liveEvent) : null;
+
+  const featured: BattleMomentModel | null = eventMoment ?? pulseMoments[0] ?? null;
+  const secondary: BattleMomentModel | null =
+    eventMoment && pulseMoments[0]
+      ? pulseMoments[0]
+      : pulseMoments[1] ?? null;
+
+  if (!featured) return null;
 
   return (
     <View style={styles.wrap}>
@@ -45,59 +54,34 @@ export function LiveRoomPulseStrip({
         style={styles.head}
       >
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-          ROOM PULSE
+          WHAT'S HAPPENING
         </Text>
         <Text allowFontScaling={false} style={[styles.more, { color: t.textSecondary }]}>
-          See all →
+          Pulse →
         </Text>
       </Pressable>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
-      >
-        {leaders.slice(0, 4).map((leader) => (
-          <Pressable
-            key={leader.category}
-            onPress={() => {
-              hapticTap();
-              onOpen();
-            }}
-            style={[
-              styles.card,
-              {
-                backgroundColor: t.scheme === 'dark' ? 'rgba(255,255,255,0.05)' : t.surfaceMuted,
-                borderColor: t.border,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={`${storyLabel(leader)}. ${leader.author?.name ?? 'Someone'}`}
-          >
-            <Text allowFontScaling={false} style={[styles.cat, { color: t.textMuted }]} numberOfLines={1}>
-              {storyLabel(leader)}
-            </Text>
-            <Text allowFontScaling={false} style={[styles.who, { color: t.textPrimary }]} numberOfLines={1}>
-              {leader.author?.name ?? 'Someone'}
-            </Text>
-            {leader.preview ? (
-              <Text allowFontScaling={false} style={[styles.preview, { color: t.textSecondary }]} numberOfLines={2}>
-                {leader.preview}
-              </Text>
-            ) : null}
-          </Pressable>
-        ))}
-      </ScrollView>
+
+      <View style={styles.stack}>
+        <BattleMoment moment={featured} prominence="primary" onPress={onOpen} />
+        {secondary ? (
+          <BattleMoment moment={secondary} prominence="secondary" onPress={onOpen} />
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6, paddingTop: space.xs, paddingBottom: space.sm },
+  wrap: {
+    gap: 8,
+    paddingTop: space.xs,
+    paddingBottom: space.sm,
+    paddingHorizontal: layout.screenX,
+  },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: space.md,
   },
   kicker: {
     ...typeScale.caption,
@@ -106,21 +90,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   more: { ...typeScale.caption, fontSize: 11, fontWeight: '600' },
-  row: { gap: space.sm, paddingHorizontal: space.md },
-  card: {
-    width: 168,
-    minHeight: 92,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: space.sm,
-    gap: 3,
-  },
-  cat: {
-    ...typeScale.caption,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-  who: { ...typeScale.label, fontSize: 14, fontWeight: '800' },
-  preview: { ...typeScale.meta, fontSize: 12, lineHeight: 16 },
+  stack: { gap: 6 },
 });

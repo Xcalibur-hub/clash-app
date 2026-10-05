@@ -33,10 +33,10 @@ describe('arena standing copy', () => {
 });
 
 describe('backup candidates', () => {
-  it('leads with a real reason, then the standing', () => {
+  it('leads with real reasons, then the standing', () => {
     assert.equal(
       candidateSubtitle({ standing: 'DEBATER', reasons: ['Strong debater', 'From this Hood'] }),
-      'Strong debater · Debater',
+      'Strong debater · From this Hood · Debater',
     );
   });
 
@@ -54,7 +54,7 @@ describe('incoming call copy', () => {
   it('names the caller and the battle', () => {
     assert.equal(
       incomingCallBody('Pixel takes better photos than iPhone', 'Arena Caller'),
-      'Arena Caller called you into "Pixel takes better photos than iPhone".',
+      'Arena Caller called you into the fight.',
     );
   });
 

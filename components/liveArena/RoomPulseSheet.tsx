@@ -167,8 +167,11 @@ function PulseNode({ leader }: { leader: ArenaPulseLeader }): React.JSX.Element 
       ]}
     >
       <Text allowFontScaling={false} style={[styles.nodeCat, { color: t.textMuted }]}>
-        {leader.category === 'FAST_RISING' ? '⚡ ' : ''}
-        {leader.label}
+        {leader.category === 'CROWD_FAVORITE'
+          ? '💀 Crowd lost it'
+          : leader.category === 'FAST_RISING'
+            ? '🔥 Fast Rising'
+            : leader.label}
       </Text>
       <Avatar
         name={leader.author?.name ?? 'Someone'}

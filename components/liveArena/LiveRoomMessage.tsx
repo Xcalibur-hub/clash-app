@@ -9,6 +9,8 @@ import { tap as hapticTap } from '../../utils/haptics';
 import { CommentMedia } from '../arena/CommentMedia';
 import { Avatar } from '../shared/Avatar';
 import { MoreIcon } from '../shared/icons';
+import { ArenaReactionPicker } from './ArenaReactionPicker';
+import { clashStampForEmoji } from './ClashSticker';
 import { LiveEvidenceCard } from './LiveEvidenceCard';
 import { softFill, STANCE_LABEL } from './liveArenaStyles';
 
@@ -27,6 +29,8 @@ export interface LiveRoomMessageProps {
   /** Real highlight only — best argument or top reaction signal. */
   highlighted?: boolean;
   highlightLabel?: string | null;
+  /** Entertainment highlight (crowd moment) — different tone from best argument. */
+  entertainmentHighlight?: boolean;
   /** Own stance cue only (privacy — never other members' stances). */
   ownStance?: Stance | null;
   /** Ranked reply preview nested under a root argument. */
@@ -55,6 +59,12 @@ function toTakeMedia(message: ArenaMessage): TakeMedia | null {
   };
 }
 
+function isMemeLead(message: ArenaMessage, media: TakeMedia | null): boolean {
+  if (!media) return false;
+  if (message.kind === 'gif' || media.kind === 'gif') return true;
+  return !message.body?.trim() && media.kind === 'image';
+}
+
 /** Argument card — event conversation, not generic chat. */
 export function LiveRoomMessage({
   message,
@@ -67,6 +77,7 @@ export function LiveRoomMessage({
   canMarkEvidence = false,
   highlighted = false,
   highlightLabel = null,
+  entertainmentHighlight = false,
   ownStance = null,
   nestedReplies = [],
   hiddenReplyCount = 0,
@@ -81,6 +92,7 @@ export function LiveRoomMessage({
 }: LiveRoomMessageProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
+  const [pickerOpen, setPickerOpen] = React.useState(false);
 
   if (message.kind === 'system') {
     return (
@@ -94,15 +106,38 @@ export function LiveRoomMessage({
 
   const author = message.author;
   const media = toTakeMedia(message);
+  const memeLead = isMemeLead(message, media);
   const own = message.isOwn;
   const pending = message.pending === true;
   const isReply = Boolean(parent) || parentUnavailable || Boolean(message.parentMessageId);
   const replyTotal = Math.max(message.replyCount ?? 0, nestedReplies.length + hiddenReplyCount);
   const showReactButton = canReact && Boolean(onReact) && !pending;
-  const staticReactions = showReactButton
-    ? message.reactions.filter((reaction) => reaction.emoji !== DEFAULT_REACTION)
-    : message.reactions;
   const reactionTotal = message.reactions.reduce((sum, r) => sum + r.count, 0);
+  const viewerActive = message.reactions.filter((r) => r.viewerReacted).map((r) => r.emoji);
+  const cooked = message.reactions.find((r) => r.emoji === DEFAULT_REACTION);
+
+  const mediaBlock =
+    media != null ? (
+      <View style={[styles.media, memeLead && styles.mediaLead]}>
+        <CommentMedia media={media} compact={isReply && !memeLead} />
+      </View>
+    ) : null;
+
+  const textBlock =
+    message.body && message.body.trim() ? (
+      <Text
+        allowFontScaling={false}
+        style={[
+          styles.text,
+          { color: t.textPrimary },
+          isReply && styles.textCompact,
+          highlighted && styles.textStrong,
+          memeLead && styles.textUnderMeme,
+        ]}
+      >
+        {message.body}
+      </Text>
+    ) : null;
 
   return (
     <Animated.View
@@ -112,6 +147,7 @@ export function LiveRoomMessage({
         pending && styles.pending,
         isReply && styles.rowReply,
         highlighted && styles.rowHighlight,
+        entertainmentHighlight && styles.rowCrowd,
       ]}
     >
       <Pressable
@@ -136,15 +172,16 @@ export function LiveRoomMessage({
         style={[
           styles.plate,
           {
-            backgroundColor: highlighted
-              ? softFill(t)
-              : own
-                ? softFill(t)
-                : t.surfaceElevated,
-            borderColor: highlighted ? t.borderStrong : t.border,
+            backgroundColor: highlighted ? softFill(t) : own ? softFill(t) : t.surfaceElevated,
+            borderColor: entertainmentHighlight
+              ? t.borderStrong
+              : highlighted
+                ? t.borderStrong
+                : t.border,
           },
           isReply && styles.plateReply,
           own && styles.plateOwn,
+          memeLead && styles.plateMeme,
         ]}
       >
         {highlighted && highlightLabel ? (
@@ -204,32 +241,24 @@ export function LiveRoomMessage({
                 {parentUnavailable || !parent
                   ? '[argument unavailable]'
                   : `${parent.author ? `@${parent.author.handle ?? parent.author.name}: ` : ''}${
-                      parent.body || 'attachment'
+                      parent.body || (parent.mediaUrl ? 'GIF / media' : 'attachment')
                     }`}
               </Text>
             </View>
           </View>
         ) : null}
 
-        {message.body ? (
-          <Text
-            allowFontScaling={false}
-            style={[
-              styles.text,
-              { color: t.textPrimary },
-              isReply && styles.textCompact,
-              highlighted && styles.textStrong,
-            ]}
-          >
-            {message.body}
-          </Text>
-        ) : null}
-
-        {media ? (
-          <View style={styles.media}>
-            <CommentMedia media={media} compact={isReply} />
-          </View>
-        ) : null}
+        {memeLead ? (
+          <>
+            {mediaBlock}
+            {textBlock}
+          </>
+        ) : (
+          <>
+            {textBlock}
+            {mediaBlock}
+          </>
+        )}
 
         {evidence.length > 0 ? (
           <View style={styles.evidenceStack}>
@@ -249,26 +278,90 @@ export function LiveRoomMessage({
 
         <View style={styles.actions}>
           {showReactButton && onReact ? (
-            <ReactionButton message={message} onReact={() => onReact(message, DEFAULT_REACTION)} />
-          ) : null}
-          {staticReactions.map((reaction) => (
-            <View
-              key={reaction.emoji}
-              style={[styles.chip, { backgroundColor: softFill(t), borderColor: t.border }]}
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                onReact(message, DEFAULT_REACTION);
+              }}
+              onLongPress={() => {
+                hapticTap();
+                setPickerOpen(true);
+              }}
+              delayLongPress={220}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="React — long press for more"
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: cooked?.viewerReacted ? t.surfaceMuted : 'transparent',
+                  borderColor: cooked?.viewerReacted ? t.borderStrong : t.border,
+                },
+              ]}
             >
               <Text allowFontScaling={false} style={styles.chipEmoji}>
-                {reaction.emoji}
+                {DEFAULT_REACTION}
               </Text>
-              <Text allowFontScaling={false} style={[styles.chipCount, { color: t.textMuted }]}>
-                {reaction.count}
+              {cooked && cooked.count > 0 ? (
+                <Text allowFontScaling={false} style={[styles.chipCount, { color: t.textSecondary }]}>
+                  {cooked.count}
+                </Text>
+              ) : null}
+            </Pressable>
+          ) : null}
+
+          {message.reactions
+            .filter((reaction) => reaction.emoji !== DEFAULT_REACTION || !showReactButton)
+            .map((reaction) => (
+              <Pressable
+                key={reaction.emoji}
+                disabled={!showReactButton || !onReact}
+                onPress={() => {
+                  if (!onReact) return;
+                  hapticTap();
+                  onReact(message, reaction.emoji);
+                }}
+                accessibilityRole={showReactButton ? 'button' : undefined}
+                accessibilityLabel={`${clashStampForEmoji(reaction.emoji)} ${reaction.count}`}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: reaction.viewerReacted ? t.surfaceMuted : softFill(t),
+                    borderColor: reaction.viewerReacted ? t.borderStrong : t.border,
+                  },
+                ]}
+              >
+                <Text allowFontScaling={false} style={styles.chipEmoji}>
+                  {reaction.emoji}
+                </Text>
+                <Text allowFontScaling={false} style={[styles.chipCount, { color: t.textMuted }]}>
+                  {reaction.count}
+                </Text>
+              </Pressable>
+            ))}
+
+          {showReactButton && onReact ? (
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                setPickerOpen(true);
+              }}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Open reaction picker"
+            >
+              <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
+                + React
               </Text>
-            </View>
-          ))}
-          {!showReactButton && reactionTotal > 0 && staticReactions.length === 0 ? (
+            </Pressable>
+          ) : null}
+
+          {!showReactButton && reactionTotal > 0 && message.reactions.length === 0 ? (
             <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
               {DEFAULT_REACTION} {reactionTotal}
             </Text>
           ) : null}
+
           {canReply && onReply && !pending ? (
             <Pressable
               onPress={() => {
@@ -312,7 +405,7 @@ export function LiveRoomMessage({
                   numberOfLines={3}
                   style={[styles.nestedBody, { color: t.textSecondary }]}
                 >
-                  {reply.body || (reply.mediaUrl ? 'attachment' : '')}
+                  {reply.body || (reply.mediaUrl ? 'GIF / media' : '')}
                 </Text>
               </View>
             ))}
@@ -333,48 +426,16 @@ export function LiveRoomMessage({
           </View>
         ) : null}
       </View>
-    </Animated.View>
-  );
-}
 
-function ReactionButton({
-  message,
-  onReact,
-}: {
-  message: ArenaMessage;
-  onReact: () => void;
-}): React.JSX.Element {
-  const t = useThemeColors();
-  const mine = message.reactions.find((reaction) => reaction.emoji === DEFAULT_REACTION);
-  const active = mine?.viewerReacted === true;
-
-  return (
-    <Pressable
-      onPress={() => {
-        hapticTap();
-        onReact();
-      }}
-      hitSlop={6}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={active ? 'Remove reaction' : 'React to this argument'}
-      style={[
-        styles.chip,
-        {
-          backgroundColor: active ? t.surfaceMuted : 'transparent',
-          borderColor: active ? t.borderStrong : t.border,
-        },
-      ]}
-    >
-      <Text allowFontScaling={false} style={styles.chipEmoji}>
-        {DEFAULT_REACTION}
-      </Text>
-      {mine && mine.count > 0 ? (
-        <Text allowFontScaling={false} style={[styles.chipCount, { color: t.textSecondary }]}>
-          {mine.count}
-        </Text>
+      {showReactButton && onReact ? (
+        <ArenaReactionPicker
+          visible={pickerOpen}
+          activeEmojis={viewerActive}
+          onClose={() => setPickerOpen(false)}
+          onPick={(emoji) => onReact(message, emoji)}
+        />
       ) : null}
-    </Pressable>
+    </Animated.View>
   );
 }
 
@@ -390,6 +451,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   rowHighlight: { marginVertical: 4 },
+  rowCrowd: { marginVertical: 6 },
   pending: { opacity: 0.55 },
   plate: {
     flex: 1,
@@ -407,6 +469,7 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
   },
   plateOwn: { borderBottomRightRadius: 8 },
+  plateMeme: { paddingTop: space.sm },
   topLabel: {
     ...typeScale.caption,
     fontSize: 10,
@@ -433,7 +496,9 @@ const styles = StyleSheet.create({
   text: { ...typeScale.body, fontSize: 16, lineHeight: 23 },
   textCompact: { fontSize: 14, lineHeight: 20 },
   textStrong: { fontWeight: '600' },
+  textUnderMeme: { fontSize: 14, lineHeight: 20, marginTop: 2 },
   media: { marginTop: 2, alignSelf: 'stretch', maxWidth: '100%' },
+  mediaLead: { marginTop: 0, marginBottom: 2 },
   evidenceStack: { gap: 6, marginTop: 4 },
   actions: {
     flexDirection: 'row',

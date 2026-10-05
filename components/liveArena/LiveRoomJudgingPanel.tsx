@@ -73,14 +73,18 @@ export function LiveRoomJudgingPanel({
     >
       <View style={styles.head}>
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          JUDGING
+          THE ROOM IS DECIDING
         </Text>
         {room.secondsRemaining > 0 ? (
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text allowFontScaling={false} style={[styles.meta, { color: t.textPrimary }]}>
             {secondsLabel(room.secondsRemaining)} left
           </Text>
         ) : null}
       </View>
+
+      <Text allowFontScaling={false} style={[styles.ceremony, { color: t.textSecondary }]}>
+        Cast your judgement. Ballots stay private until the room settles.
+      </Text>
 
       {!isDebater ? (
         <Text allowFontScaling={false} style={[styles.note, { color: t.textSecondary }]}>
@@ -253,7 +257,8 @@ const styles = StyleSheet.create({
   },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
-  meta: { ...typeScale.caption, fontSize: 11 },
+  ceremony: { ...typeScale.meta, fontSize: 12, lineHeight: 17, marginBottom: 2 },
+  meta: { ...typeScale.caption, fontSize: 11, fontWeight: '700' },
   question: { ...typeScale.label, fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
   note: { ...typeScale.meta, fontSize: 13 },
   recorded: { ...typeScale.caption, fontSize: 11, lineHeight: 16 },
