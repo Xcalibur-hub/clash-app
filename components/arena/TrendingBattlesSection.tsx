@@ -8,10 +8,12 @@ import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { analytics } from '../../services/analytics';
 import {
   fetchTrendingBattles,
+  trendingDemoActive,
   type ArenaTrendingBattle,
 } from '../../services/arenaTrendService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { formatRankDelta } from '../../utils/arenaTrendRank';
+import { ARENA_TREND_DEMO_LABEL } from '../../utils/arenaTrendDevFixture';
 import { momentumLabel } from '../../utils/arenaTrendScore';
 import { tap as hapticTap } from '../../utils/haptics';
 import { VaultActionButton } from '../vault/VaultActionButton';
@@ -35,8 +37,10 @@ export function TrendingBattlesSection({
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [scrubIndex, setScrubIndex] = React.useState<number | null>(null);
   const [failed, setFailed] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
   const [active, setActive] = React.useState(AppState.currentState === 'active');
   const viewed = React.useRef(false);
+  const demo = trendingDemoActive();
 
   const load = React.useCallback(async (): Promise<void> => {
     try {
@@ -47,15 +51,18 @@ export function TrendingBattlesSection({
         if (prev && next.some((b) => b.topicId === prev)) return prev;
         return next[0]?.topicId ?? null;
       });
-      if (next.length > 0 && !viewed.current) {
+      // Demo data must never appear in analytics as real Arena activity.
+      if (next.length > 0 && !viewed.current && !demo) {
         viewed.current = true;
         analytics.track('arena_trending_viewed', { realm: 'arena' });
       }
     } catch {
       setBattles([]);
       setFailed(true);
+    } finally {
+      setLoaded(true);
     }
-  }, []);
+  }, [demo]);
 
   React.useEffect(() => {
     const sub = AppState.addEventListener('change', (status: AppStateStatus) => {
@@ -76,8 +83,29 @@ export function TrendingBattlesSection({
     return () => clearInterval(id);
   }, [active, load]);
 
+  // A hard read failure hides the module; an empty Arena shows a calm plate so
+  // the section is visibly present instead of silently missing.
   if (failed) return null;
-  if (battles.length === 0) return null;
+  if (!loaded) return null;
+
+  if (battles.length === 0) {
+    return (
+      <Animated.View
+        entering={reduced ? undefined : FadeIn.duration(240)}
+        style={[styles.wrap, { borderColor: t.border, backgroundColor: t.surface }]}
+      >
+        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          TRENDING NOW
+        </Text>
+        <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+          No live battles right now
+        </Text>
+        <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+          The ranking race starts the moment an Arena topic opens.
+        </Text>
+      </Animated.View>
+    );
+  }
 
   const selected = battles.find((b) => b.topicId === selectedId) ?? battles[0];
 
@@ -85,7 +113,7 @@ export function TrendingBattlesSection({
     hapticTap();
     setSelectedId(topicId);
     setScrubIndex(null);
-    analytics.track('arena_trending_topic_selected', { realm: 'arena' });
+    if (!demo) analytics.track('arena_trending_topic_selected', { realm: 'arena' });
   };
 
   return (
@@ -93,9 +121,20 @@ export function TrendingBattlesSection({
       entering={reduced ? undefined : FadeIn.duration(240)}
       style={[styles.wrap, { borderColor: t.border, backgroundColor: t.surface }]}
     >
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-        TRENDING NOW
-      </Text>
+      <View style={styles.headRow}>
+        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          TRENDING NOW
+        </Text>
+        {demo ? (
+          <Text
+            allowFontScaling={false}
+            style={[styles.demoBadge, { color: t.textPrimary, borderColor: t.borderStrong }]}
+            accessibilityLabel="Development preview using demo data"
+          >
+            {ARENA_TREND_DEMO_LABEL}
+          </Text>
+        ) : null}
+      </View>
       <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
         What the internet is fighting about
       </Text>
@@ -176,7 +215,7 @@ export function TrendingBattlesSection({
         label="ENTER BATTLE"
         onPress={() => {
           hapticTap();
-          analytics.track('arena_trending_enter_battle', { realm: 'arena' });
+          if (!demo) analytics.track('arena_trending_enter_battle', { realm: 'arena' });
           onEnter(selected);
         }}
       />
@@ -199,6 +238,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.4,
   },
+  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  demoBadge: {
+    ...typeScale.caption,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.sm,
+    paddingVertical: 3,
+  },
+  emptyTitle: { ...typeScale.label, fontSize: 15, fontWeight: '800' },
+  emptyBody: { ...typeScale.meta, fontSize: 12, lineHeight: 17 },
   title: {
     ...typeScale.section,
     fontSize: 18,

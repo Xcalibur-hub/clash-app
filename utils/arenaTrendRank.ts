@@ -127,4 +127,89 @@ export function shortTitle(title: string, max = 22): string {
   return `${clean.slice(0, Math.max(1, max - 1)).trimEnd()}…`;
 }
 
+/**
+ * How much of the ranking race can honestly be drawn yet.
+ *
+ *   EMPTY        no ranked topics at all
+ *   LIVE_MARKERS current ranks only — history is still building, so no line
+ *   FIRST_POINT  one bucket: a marker per topic, still no line
+ *   FIRST_LINES  two buckets: the first real segments exist
+ *   RACE         three or more buckets: the race proper
+ */
+export type TrendRaceStage = 'EMPTY' | 'LIVE_MARKERS' | 'FIRST_POINT' | 'FIRST_LINES' | 'RACE';
+
+export function trendRaceStage(input: {
+  topicCount: number;
+  pointCounts: readonly number[];
+}): TrendRaceStage {
+  if (input.topicCount <= 0) return 'EMPTY';
+  const maxPoints = input.pointCounts.reduce((best, next) => (next > best ? next : best), 0);
+  if (maxPoints <= 0) return 'LIVE_MARKERS';
+  if (maxPoints === 1) return 'FIRST_POINT';
+  if (maxPoints === 2) return 'FIRST_LINES';
+  return 'RACE';
+}
+
+/** True when at least one historical point exists but no line can be drawn yet. */
+export function isEarlyHistory(stage: TrendRaceStage): boolean {
+  return stage === 'LIVE_MARKERS' || stage === 'FIRST_POINT';
+}
+
+export interface TrendRaceCaption {
+  /** Replaces the "rank / hh:mm" meta row while history is thin. */
+  kicker: string;
+  note: string;
+}
+
+/**
+ * Early-history copy. It says exactly what is on screen: a live ranking with a
+ * trend line that has not started yet.
+ */
+export function trendRaceCaption(stage: TrendRaceStage): TrendRaceCaption | null {
+  if (stage === 'EMPTY') return null;
+  if (stage === 'LIVE_MARKERS') {
+    return { kicker: 'LIVE RANKING', note: 'Building today’s trend history…' };
+  }
+  if (stage === 'FIRST_POINT') {
+    return { kicker: 'LIVE RANKING', note: 'First snapshot in — the line starts soon.' };
+  }
+  return null;
+}
+
+/** Does any topic actually overtake another inside the window? */
+export function raceHasCrossings(seriesList: readonly (readonly RankPoint[])[]): boolean {
+  const ordered = seriesList
+    .map((points) => [...points].sort((a, b) => a.t - b.t))
+    .filter((points) => points.length >= 2);
+  if (ordered.length < 2) return false;
+
+  const buckets = new Set<number>();
+  for (const points of ordered) for (const point of points) buckets.add(point.t);
+  const timeline = [...buckets].sort((a, b) => a - b);
+  if (timeline.length < 2) return false;
+
+  const rankAt = (points: readonly RankPoint[], t: number): number | null => {
+    const hit = points.find((point) => point.t === t);
+    return hit ? hit.v : null;
+  };
+
+  // Relative order between two topics flipping across buckets means a crossing.
+  for (let i = 0; i < ordered.length; i += 1) {
+    for (let j = i + 1; j < ordered.length; j += 1) {
+      let previous: number | null = null;
+      for (const bucket of timeline) {
+        const a = rankAt(ordered[i], bucket);
+        const b = rankAt(ordered[j], bucket);
+        if (a == null || b == null) continue;
+        const sign = a < b ? -1 : a > b ? 1 : 0;
+        if (sign !== 0) {
+          if (previous != null && sign !== previous) return true;
+          previous = sign;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 export type { ArenaTrendMomentum };

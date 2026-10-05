@@ -1,8 +1,14 @@
 /**
  * Arena trending battles API — live ranking race from server snapshots.
  */
+import Constants from 'expo-constants';
 import type { ArenaTrendMomentum } from '../utils/arenaTrendScore';
 import type { RankDeltaKind } from '../utils/arenaTrendRank';
+import {
+  arenaTrendDemoActive,
+  arenaTrendDemoBattles,
+  isArenaTrendDemoVariant,
+} from '../utils/arenaTrendDevFixture';
 import { requireSupabase, requestError } from './supabaseClient';
 
 /** series.v is historical RANK (1 = top), not attention. */
@@ -106,8 +112,31 @@ function toBattle(value: unknown): ArenaTrendingBattle | null {
   };
 }
 
-/** Cheap Top-10 ranking race + historical ranks. Empty when nothing to show. */
+/**
+ * Is the development-only preview active? Never true in a production or preview
+ * app variant, and never true in a release bundle (`__DEV__` gate).
+ */
+export function trendingDemoActive(): boolean {
+  const extra = Constants.expoConfig?.extra as { appVariant?: unknown } | undefined;
+  const variant = isArenaTrendDemoVariant(extra?.appVariant) ? extra.appVariant : 'development';
+  return arenaTrendDemoActive({
+    dev: typeof __DEV__ !== 'undefined' && __DEV__ === true,
+    variant,
+    envFlag: process.env.EXPO_PUBLIC_ARENA_TREND_DEMO ?? null,
+  });
+}
+
+/**
+ * Cheap Top-10 ranking race + historical ranks. Empty when nothing to show.
+ *
+ * In development with the demo toggle on, this returns a deterministic fixture
+ * instead of calling the RPC: no server read, no writes, no analytics, and no
+ * effect on any real ranking.
+ */
 export async function fetchTrendingBattles(limit = 10): Promise<ArenaTrendingBattle[]> {
+  // `__DEV__` first, so a production bundle can drop the fixture branch entirely.
+  if (__DEV__ === true && trendingDemoActive()) return arenaTrendDemoBattles();
+
   const { data, error } = await client().rpc('list_arena_trending_battles', {
     p_limit: Math.min(10, Math.max(1, limit)),
   });

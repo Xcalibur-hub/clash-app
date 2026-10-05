@@ -18,6 +18,21 @@ history and drives the (still-deferred) media cleanup seam. It is bounded (the
 `limit` argument) and idempotent: a repeated run never writes a second verdict,
 reputation event or notification, and one failing Clash never blocks the batch.
 
+It also drives **Arena trend snapshots** and the Arena game-layer sweeps:
+
+| Key | What it does |
+|--|--|
+| `arena_rooms_transitioned` | phase transitions (`transition_due_arena_rooms`) |
+| `arena_trends` | `refresh_arena_trend_snapshots(10, 36)` — skipped unless the newest bucket is 9+ minutes old |
+| `arena_backup_invites_expired` | retires un-answered Call Backup invitations |
+| `arena_fun_moments_awarded` | settled-room crowd moments (entertainment facet) |
+
+Verified on the local stack: `cron.job` holds exactly one active
+`clash-maintenance` job (`* * * * *`), `pg_get_functiondef` shows
+`run_maintenance` calling `refresh_arena_trend_snapshots`, `cron.job_run_details`
+shows a successful run every minute, and calling
+`refresh_arena_trend_snapshots(10, 36)` writes one bucket per live topic.
+
 ## Apply it
 
 Local:
