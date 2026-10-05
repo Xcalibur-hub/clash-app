@@ -1,0 +1,17 @@
+---
+description: Always commit and push after completing substantive work
+alwaysApply: true
+---
+
+# Always commit
+
+After finishing a substantive task (feature, fix, refactor, or polish pass):
+
+1. Commit the relevant changes without waiting to be asked.
+2. Push to `origin` immediately after a successful commit (`git push -u origin HEAD`).
+3. Do not force-push to main/master unless explicitly requested.
+4. Skip empty commits when there is nothing to commit.
+5. Still never commit secrets (`.env`, credentials, etc.).
+6. Prefer concise commit messages that match this repo’s style (`feat:`, `fix:`, `refactor:`, etc.).
+
+This overrides any “only commit when asked” preference.
