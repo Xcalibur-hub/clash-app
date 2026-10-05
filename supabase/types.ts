@@ -92,6 +92,16 @@ export type WorldDropType = Schema['Enums']['world_drop_type'];
 export type WorldDropReward = Schema['Enums']['world_drop_reward'];
 export type WorldDropClaimRow = Schema['Tables']['world_drop_claims']['Row'];
 
+// ── Interactive Creator Live vocabulary (Phase 15.4) ────────────────────────
+export type CreatorLiveStatus = Schema['Enums']['creator_live_status'];
+export type CreatorLiveAccess = Schema['Enums']['creator_live_access'];
+export type CreatorLiveInteractionType = Schema['Enums']['creator_live_interaction_type'];
+export type CreatorLiveInteractionStatus = Schema['Enums']['creator_live_interaction_status'];
+/** The closed set of identifiers a crowd/game action may ever emit. */
+export type CreatorLiveActionKind = Schema['Enums']['creator_live_action_kind'];
+export type CreatorLiveSessionRow = Schema['Tables']['creator_live_sessions']['Row'];
+export type CreatorLiveInteractionRow = Schema['Tables']['creator_live_interactions']['Row'];
+
 // ── Sponsor attribution vocabulary (Phase 10 Step 1) ────────────────────────
 export type AdvertiserStatus = Schema['Enums']['advertiser_status'];
 export type SponsorCampaignStatus = Schema['Enums']['sponsor_campaign_status'];

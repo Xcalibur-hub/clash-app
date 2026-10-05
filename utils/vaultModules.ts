@@ -96,7 +96,7 @@ export const CREATOR_MODULE_REGISTRY: readonly CreatorModuleDefinition[] = [
     type: 'LIVE',
     title: 'Live',
     sectionTitle: 'LIVE',
-    availability: 'planned',
+    availability: 'supported',
     priority: 90,
   },
   {

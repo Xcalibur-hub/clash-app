@@ -42,7 +42,6 @@ describe('Creator World modules', () => {
       courseCount: 0,
       storeCount: 0,
       aiReady: true,
-      liveReady: true,
       experienceCount: 3,
     });
     assert.deepEqual(
@@ -76,13 +75,26 @@ describe('Creator World modules', () => {
     );
   });
 
-  it('marks SERVICES COURSES STORE COMMUNITY WORLD_DROPS supported', () => {
+  it('surfaces LIVE once a creator goes live or schedules one (Phase 15.4)', () => {
+    const mods = resolveCreatorWorldModules({
+      contentCount: 0,
+      collectionCount: 0,
+      liveReady: true,
+    });
+    assert.deepEqual(
+      mods.map((m) => m.type),
+      ['LIVE'],
+    );
+  });
+
+  it('marks SERVICES COURSES STORE COMMUNITY WORLD_DROPS LIVE supported', () => {
     assert.equal(isCreatorModuleSupported('CONTENT'), true);
     assert.equal(isCreatorModuleSupported('SERVICES'), true);
     assert.equal(isCreatorModuleSupported('COURSES'), true);
     assert.equal(isCreatorModuleSupported('STORE'), true);
     assert.equal(isCreatorModuleSupported('COMMUNITY'), true);
     assert.equal(isCreatorModuleSupported('WORLD_DROPS'), true);
+    assert.equal(isCreatorModuleSupported('LIVE'), true);
     assert.equal(isCreatorModuleSupported('AI'), false);
   });
 });

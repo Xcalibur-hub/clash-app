@@ -57,6 +57,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
         courses: world.courses,
         products: world.products,
         worldDrops: world.worldDrops,
+        liveSessions: world.liveSessions,
         communityReady: world.community !== null,
         personality,
       },
@@ -185,6 +186,8 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
             onCreate={() => router.push('/vault/compose')}
             onOpenWorldDrop={(id) => router.push(`/world/drop/${id}`)}
             onManageWorldDrops={() => router.push('/vault/studio')}
+            onOpenLive={(sessionId) => router.push(`/vault/live/${sessionId}`)}
+            onManageLive={() => router.push('/vault/studio')}
           />
         )}
         ListHeaderComponent={

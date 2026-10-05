@@ -10,6 +10,7 @@ import type { WorldPersonality } from './vaultWorldPersonality';
 import type { StorefrontDrop, VaultCollection } from '../services/vaultMappers';
 import type { CreatorCourse, CreatorProduct, CreatorService } from '../services/vaultCommerceMappers';
 import type { CreatorWorldDrop } from '../services/creatorWorldDropMappers';
+import type { CreatorLiveSession } from '../services/creatorLiveMappers';
 
 export interface WorldDropItem {
   id: string;
@@ -56,6 +57,7 @@ export type WorldRow =
   | { kind: 'products'; items: WorldOfferItem[] }
   | { kind: 'community' }
   | { kind: 'worldDrops'; items: WorldDropChapterItem[] }
+  | { kind: 'live'; sessions: CreatorLiveSession[] }
   | { kind: 'empty' };
 
 export interface WorldRowsInput {
@@ -66,6 +68,7 @@ export interface WorldRowsInput {
   courses: readonly CreatorCourse[];
   products: readonly CreatorProduct[];
   worldDrops: readonly CreatorWorldDrop[];
+  liveSessions: readonly CreatorLiveSession[];
   communityReady: boolean;
   personality: WorldPersonality;
 }
@@ -273,6 +276,21 @@ export function buildWorldRows(input: WorldRowsInput, deps: WorldRowsDeps): Worl
           claimed: drop.claimed,
         })),
       });
+    }
+
+    // Only a live or scheduled session earns a chapter: an archive does not.
+    const liveNow = input.liveSessions.filter(
+      (session) => session.status === 'LIVE' || session.status === 'SCHEDULED',
+    );
+    if (mod.type === 'LIVE' && liveNow.length > 0) {
+      rows.push({
+        kind: 'chapter',
+        index: chapterIndex,
+        module: mod.type,
+        title,
+        count: null,
+      });
+      rows.push({ kind: 'live', sessions: liveNow });
     }
   }
 

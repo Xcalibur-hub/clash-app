@@ -29,6 +29,7 @@ export interface CreatorWorldModel {
   products: CreatorWorldData['products'];
   community: CreatorWorldData['community'];
   worldDrops: CreatorWorldData['worldDrops'];
+  liveSessions: CreatorWorldData['liveSessions'];
   isSelf: boolean;
   modules: CreatorWorldModule[];
   heroUrl: string | null;
@@ -103,8 +104,20 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
         storeCount: data?.products.length ?? 0,
         communityReady: (data?.community ?? null) !== null,
         worldDropCount: data?.worldDrops.length ?? 0,
+        liveReady: (data?.liveSessions ?? []).some(
+          (session) => session.status === 'LIVE' || session.status === 'SCHEDULED',
+        ),
       }),
-    [liveDrops.length, data?.collections.length, data?.services.length, data?.courses.length, data?.products.length, data?.community, data?.worldDrops.length],
+    [
+      liveDrops.length,
+      data?.collections.length,
+      data?.services.length,
+      data?.courses.length,
+      data?.products.length,
+      data?.community,
+      data?.worldDrops.length,
+      data?.liveSessions,
+    ],
   );
 
   const heroUrl = React.useMemo(() => {
@@ -137,6 +150,7 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
     products: fallback.products,
     community: fallback.community,
     worldDrops: fallback.worldDrops,
+    liveSessions: fallback.liveSessions,
     isSelf: fallback.isSelf,
     modules,
     heroUrl,

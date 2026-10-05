@@ -37,6 +37,15 @@ delete from public.world_drop_claims
  where drop_id like 'wd_devfx_%' or profile_id like 'devfx_vw_%';
 delete from public.world_drops
  where id like 'wd_devfx_%' or creator_id like 'devfx_vw_%';
+-- Phase 15.4 — Interactive Live fixtures
+delete from public.creator_live_events where session_id like 'cls_devfx_%';
+delete from public.creator_live_votes where interaction_id like 'cli_devfx_%';
+delete from public.creator_live_interactions
+ where id like 'cli_devfx_%' or session_id like 'cls_devfx_%' or creator_id like 'devfx_vw_%';
+delete from public.creator_live_viewers
+ where session_id like 'cls_devfx_%' or profile_id like 'devfx_vw_%';
+delete from public.creator_live_sessions
+ where id like 'cls_devfx_%' or creator_id like 'devfx_vw_%';
 delete from public.vault_community_posts
  where community_id like 'devfx_vw_%' or id like 'devfx_vw_%';
 delete from public.vault_community_memberships
@@ -436,6 +445,59 @@ values
   ('wd_devfx_maya_missing_frame', 'devfx_vw_aria', 'COLLECTIBLE', 'The Missing Frame',
    '{"artifact":"missing_frame","index":"02"}'::jsonb, now() - interval '1 day')
 on conflict do nothing;
+
+-- ── Interactive Live fixtures (Phase 15.4) ─────────────────────────────────
+-- Maya is live now with a poll and a crowd action; Aria is live with a choice;
+-- Leo has one scheduled for tomorrow night. Covers reuse the 15.3 artwork.
+insert into public.creator_live_sessions
+  (id, creator_id, vault_id, title, description, cover_media_object_id,
+   stream_url, provider, access, status,
+   allow_polls, allow_choices, allow_crowd_actions, allow_game_actions,
+   scheduled_at, started_at)
+values
+  ('cls_devfx_maya', 'devfx_vw_maya', 'devfx_vw_maya_vault',
+   'We are filming Episode 05', 'Basement or attic? You decide.',
+   'devfx_vw_maya_comm', null, 'standby', 'FREE', 'LIVE',
+   true, true, true, true, null, now() - interval '12 minutes'),
+  ('cls_devfx_aria', 'devfx_vw_aria', 'devfx_vw_aria_vault',
+   'Finish this track with me', 'Two ways the drums can go.',
+   'devfx_vw_aria_album', null, 'standby', 'FREE', 'LIVE',
+   true, true, false, false, null, now() - interval '5 minutes'),
+  ('cls_devfx_leo', 'devfx_vw_leo', 'devfx_vw_leo_vault',
+   'Night photography walk', 'Lights down, camera up.',
+   'devfx_vw_leo_sheet', null, 'standby', 'FREE', 'SCHEDULED',
+   true, true, false, false, now() + interval '1 day', null);
+
+insert into public.creator_live_interactions
+  (id, session_id, creator_id, type, prompt, options, action_kind, threshold,
+   status, tallies, total_votes, closes_at)
+values
+  ('cli_devfx_maya_poll', 'cls_devfx_maya', 'devfx_vw_maya', 'POLL',
+   'Where should we film next?',
+   '[{"id":"basement","label":"Basement"},{"id":"attic","label":"Attic"}]'::jsonb,
+   null, null, 'OPEN', '{"basement":1,"attic":1}'::jsonb, 2, null),
+  ('cli_devfx_maya_lights', 'cls_devfx_maya', 'devfx_vw_maya', 'CROWD_ACTION',
+   'Turn the lights off', null, 'LIGHTS_OFF', 5,
+   'OPEN', '{"support":1}'::jsonb, 1, null),
+  ('cli_devfx_aria_drums', 'cls_devfx_aria', 'devfx_vw_aria', 'CHOICE',
+   'Heavy or minimal?',
+   '[{"id":"heavy","label":"Heavy drums"},{"id":"minimal","label":"Minimal drums"}]'::jsonb,
+   null, null, 'OPEN', '{}'::jsonb, 0, null);
+
+-- Server-side seed votes so the tallies are not empty on first load.
+insert into public.creator_live_votes (interaction_id, profile_id, option_id)
+values
+  ('cli_devfx_maya_poll', 'devfx_vw_aria', 'basement'),
+  ('cli_devfx_maya_poll', 'devfx_vw_leo', 'attic'),
+  ('cli_devfx_maya_lights', 'devfx_vw_noah', null);
+
+-- A small watch count (aggregate only — the roster is never exposed).
+insert into public.creator_live_viewers (session_id, profile_id, last_seen_at)
+values
+  ('cls_devfx_maya', 'devfx_vw_aria', now()),
+  ('cls_devfx_maya', 'devfx_vw_leo', now()),
+  ('cls_devfx_maya', 'devfx_vw_noah', now()),
+  ('cls_devfx_aria', 'devfx_vw_maya', now());
 
 commit;
 

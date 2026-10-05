@@ -1263,6 +1263,301 @@ export type Database = {
           },
         ]
       }
+      creator_live_events: {
+        Row: {
+          action_kind:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          created_at: string
+          id: string
+          interaction_id: string | null
+          kind: string
+          payload: Json
+          session_id: string
+        }
+        Insert: {
+          action_kind?:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          created_at?: string
+          id: string
+          interaction_id?: string | null
+          kind: string
+          payload?: Json
+          session_id: string
+        }
+        Update: {
+          action_kind?:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          created_at?: string
+          id?: string
+          interaction_id?: string | null
+          kind?: string
+          payload?: Json
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_live_events_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "creator_live_interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_live_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "creator_live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_live_interactions: {
+        Row: {
+          action_kind:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          closed_at: string | null
+          closes_at: string | null
+          created_at: string
+          creator_id: string
+          duration_seconds: number | null
+          id: string
+          opened_at: string
+          options: Json | null
+          prompt: string
+          result: Json | null
+          session_id: string
+          status: Database["public"]["Enums"]["creator_live_interaction_status"]
+          tallies: Json
+          threshold: number | null
+          total_votes: number
+          trigger_count: number
+          triggered_at: string | null
+          type: Database["public"]["Enums"]["creator_live_interaction_type"]
+        }
+        Insert: {
+          action_kind?:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          closed_at?: string | null
+          closes_at?: string | null
+          created_at?: string
+          creator_id: string
+          duration_seconds?: number | null
+          id: string
+          opened_at?: string
+          options?: Json | null
+          prompt: string
+          result?: Json | null
+          session_id: string
+          status?: Database["public"]["Enums"]["creator_live_interaction_status"]
+          tallies?: Json
+          threshold?: number | null
+          total_votes?: number
+          trigger_count?: number
+          triggered_at?: string | null
+          type: Database["public"]["Enums"]["creator_live_interaction_type"]
+        }
+        Update: {
+          action_kind?:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          closed_at?: string | null
+          closes_at?: string | null
+          created_at?: string
+          creator_id?: string
+          duration_seconds?: number | null
+          id?: string
+          opened_at?: string
+          options?: Json | null
+          prompt?: string
+          result?: Json | null
+          session_id?: string
+          status?: Database["public"]["Enums"]["creator_live_interaction_status"]
+          tallies?: Json
+          threshold?: number | null
+          total_votes?: number
+          trigger_count?: number
+          triggered_at?: string | null
+          type?: Database["public"]["Enums"]["creator_live_interaction_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_live_interactions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_live_interactions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "creator_live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_live_sessions: {
+        Row: {
+          access: Database["public"]["Enums"]["creator_live_access"]
+          allow_choices: boolean
+          allow_crowd_actions: boolean
+          allow_game_actions: boolean
+          allow_polls: boolean
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          description: string
+          ended_at: string | null
+          id: string
+          provider: string
+          scheduled_at: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["creator_live_status"]
+          stream_url: string | null
+          title: string
+          updated_at: string
+          vault_id: string
+        }
+        Insert: {
+          access?: Database["public"]["Enums"]["creator_live_access"]
+          allow_choices?: boolean
+          allow_crowd_actions?: boolean
+          allow_game_actions?: boolean
+          allow_polls?: boolean
+          cover_media_object_id?: string | null
+          created_at?: string
+          creator_id: string
+          description?: string
+          ended_at?: string | null
+          id: string
+          provider?: string
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["creator_live_status"]
+          stream_url?: string | null
+          title: string
+          updated_at?: string
+          vault_id: string
+        }
+        Update: {
+          access?: Database["public"]["Enums"]["creator_live_access"]
+          allow_choices?: boolean
+          allow_crowd_actions?: boolean
+          allow_game_actions?: boolean
+          allow_polls?: boolean
+          cover_media_object_id?: string | null
+          created_at?: string
+          creator_id?: string
+          description?: string
+          ended_at?: string | null
+          id?: string
+          provider?: string
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["creator_live_status"]
+          stream_url?: string | null
+          title?: string
+          updated_at?: string
+          vault_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_live_sessions_cover_media_object_id_fkey"
+            columns: ["cover_media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_live_sessions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_live_sessions_vault_id_fkey"
+            columns: ["vault_id"]
+            isOneToOne: false
+            referencedRelation: "creator_vaults"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_live_viewers: {
+        Row: {
+          last_seen_at: string
+          profile_id: string
+          session_id: string
+        }
+        Insert: {
+          last_seen_at?: string
+          profile_id: string
+          session_id: string
+        }
+        Update: {
+          last_seen_at?: string
+          profile_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_live_viewers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_live_viewers_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "creator_live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_live_votes: {
+        Row: {
+          created_at: string
+          interaction_id: string
+          option_id: string | null
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          interaction_id: string
+          option_id?: string | null
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          interaction_id?: string
+          option_id?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_live_votes_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "creator_live_interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_live_votes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_products: {
         Row: {
           access_type: Database["public"]["Enums"]["vault_offer_access"]
@@ -4075,6 +4370,32 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      close_creator_live_interaction: {
+        Args: { p_interaction_id: string }
+        Returns: {
+          action_kind:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          closed_at: string | null
+          closes_at: string | null
+          created_at: string
+          creator_id: string
+          duration_seconds: number | null
+          id: string
+          opened_at: string
+          options: Json | null
+          prompt: string
+          result: Json | null
+          session_id: string
+          status: Database["public"]["Enums"]["creator_live_interaction_status"]
+          tallies: Json
+          threshold: number | null
+          total_votes: number
+          trigger_count: number
+          triggered_at: string | null
+          type: Database["public"]["Enums"]["creator_live_interaction_type"]
+        }
+      }
       close_prediction_games: {
         Args: { p_limit?: number }
         Returns: number
@@ -4260,6 +4581,76 @@ export type Database = {
           status: Database["public"]["Enums"]["vault_offer_status"]
           title: string
           updated_at: string
+        }
+      }
+      create_creator_live_interaction: {
+        Args: {
+          p_action_kind?: Database["public"]["Enums"]["creator_live_action_kind"]
+          p_duration_seconds?: number
+          p_options?: Json
+          p_prompt: string
+          p_session_id: string
+          p_threshold?: number
+          p_type: Database["public"]["Enums"]["creator_live_interaction_type"]
+        }
+        Returns: {
+          action_kind:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          closed_at: string | null
+          closes_at: string | null
+          created_at: string
+          creator_id: string
+          duration_seconds: number | null
+          id: string
+          opened_at: string
+          options: Json | null
+          prompt: string
+          result: Json | null
+          session_id: string
+          status: Database["public"]["Enums"]["creator_live_interaction_status"]
+          tallies: Json
+          threshold: number | null
+          total_votes: number
+          trigger_count: number
+          triggered_at: string | null
+          type: Database["public"]["Enums"]["creator_live_interaction_type"]
+        }
+      }
+      create_creator_live_session: {
+        Args: {
+          p_access?: Database["public"]["Enums"]["creator_live_access"]
+          p_allow_choices?: boolean
+          p_allow_crowd_actions?: boolean
+          p_allow_game_actions?: boolean
+          p_allow_polls?: boolean
+          p_cover_media_object_id?: string
+          p_description?: string
+          p_provider?: string
+          p_scheduled_at?: string
+          p_stream_url?: string
+          p_title: string
+        }
+        Returns: {
+          access: Database["public"]["Enums"]["creator_live_access"]
+          allow_choices: boolean
+          allow_crowd_actions: boolean
+          allow_game_actions: boolean
+          allow_polls: boolean
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          description: string
+          ended_at: string | null
+          id: string
+          provider: string
+          scheduled_at: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["creator_live_status"]
+          stream_url: string | null
+          title: string
+          updated_at: string
+          vault_id: string
         }
       }
       create_creator_product: {
@@ -4559,6 +4950,58 @@ export type Database = {
           void_commission_minor: number
         }[]
       }
+      creator_live_close_interaction: {
+        Args: { p_actor: string; p_interaction_id: string }
+        Returns: {
+          action_kind:
+            | Database["public"]["Enums"]["creator_live_action_kind"]
+            | null
+          closed_at: string | null
+          closes_at: string | null
+          created_at: string
+          creator_id: string
+          duration_seconds: number | null
+          id: string
+          opened_at: string
+          options: Json | null
+          prompt: string
+          result: Json | null
+          session_id: string
+          status: Database["public"]["Enums"]["creator_live_interaction_status"]
+          tallies: Json
+          threshold: number | null
+          total_votes: number
+          trigger_count: number
+          triggered_at: string | null
+          type: Database["public"]["Enums"]["creator_live_interaction_type"]
+        }
+      }
+      creator_live_events_since: {
+        Args: { p_after?: string; p_limit?: number; p_session_id: string }
+        Returns: Json
+      }
+      creator_live_interaction_card: {
+        Args: {
+          p_interaction: Database["public"]["Tables"]["creator_live_interactions"]["Row"]
+          p_viewer?: string
+        }
+        Returns: Json
+      }
+      creator_live_options_valid: {
+        Args: { p_options: Json }
+        Returns: boolean
+      }
+      creator_live_session_card: {
+        Args: {
+          p_session: Database["public"]["Tables"]["creator_live_sessions"]["Row"]
+          p_viewer?: string
+        }
+        Returns: Json
+      }
+      creator_live_viewer_can_access: {
+        Args: { p_session_id: string; p_viewer: string }
+        Returns: boolean
+      }
       creator_my_coupons: {
         Args: { p_campaign_id?: string }
         Returns: {
@@ -4596,6 +5039,30 @@ export type Database = {
       delete_vault_drop: {
         Args: { p_drop_id: string }
         Returns: undefined
+      }
+      end_creator_live_session: {
+        Args: { p_session_id: string }
+        Returns: {
+          access: Database["public"]["Enums"]["creator_live_access"]
+          allow_choices: boolean
+          allow_crowd_actions: boolean
+          allow_game_actions: boolean
+          allow_polls: boolean
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          description: string
+          ended_at: string | null
+          id: string
+          provider: string
+          scheduled_at: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["creator_live_status"]
+          stream_url: string | null
+          title: string
+          updated_at: string
+          vault_id: string
+        }
       }
       enter_vault_community: {
         Args: { p_community_id: string }
@@ -4667,6 +5134,10 @@ export type Database = {
       }
       get_challenge_detail: {
         Args: { p_challenge_id: string }
+        Returns: Json
+      }
+      get_creator_live_session: {
+        Args: { p_session_id: string }
         Returns: Json
       }
       get_explore_country: {
@@ -4882,6 +5353,14 @@ export type Database = {
         }
         Returns: Json
       }
+      list_creator_live_interactions: {
+        Args: { p_limit?: number; p_session_id: string }
+        Returns: Json
+      }
+      list_creator_live_sessions: {
+        Args: { p_creator_id: string; p_limit?: number }
+        Returns: Json
+      }
       list_creator_world_drops: {
         Args: { p_creator_id: string; p_limit?: number }
         Returns: Json
@@ -4908,6 +5387,10 @@ export type Database = {
       }
       list_meet_signals: {
         Args: { p_after?: string; p_session_id: string }
+        Returns: Json
+      }
+      list_my_creator_live_sessions: {
+        Args: { p_limit?: number }
         Returns: Json
       }
       list_my_sponsor_campaigns: {
@@ -5201,6 +5684,14 @@ export type Database = {
         Args: { p_drop_id: string }
         Returns: undefined
       }
+      report_creator_live_session: {
+        Args: {
+          p_detail?: string
+          p_reason: Database["public"]["Enums"]["report_reason"]
+          p_session_id: string
+        }
+        Returns: string
+      }
       report_meet_session: {
         Args: {
           p_detail?: string
@@ -5471,6 +5962,30 @@ export type Database = {
         }
         Returns: string
       }
+      start_creator_live_session: {
+        Args: { p_session_id: string }
+        Returns: {
+          access: Database["public"]["Enums"]["creator_live_access"]
+          allow_choices: boolean
+          allow_crowd_actions: boolean
+          allow_game_actions: boolean
+          allow_polls: boolean
+          cover_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          description: string
+          ended_at: string | null
+          id: string
+          provider: string
+          scheduled_at: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["creator_live_status"]
+          stream_url: string | null
+          title: string
+          updated_at: string
+          vault_id: string
+        }
+      }
       submit_arena_argument_vote: {
         Args: { p_message_id: string; p_room_id: string }
         Returns: Json
@@ -5499,6 +6014,10 @@ export type Database = {
           p_challenge_id: string
           p_media_object_id: string
         }
+        Returns: Json
+      }
+      submit_creator_live_vote: {
+        Args: { p_interaction_id: string; p_option_id?: string }
         Returns: Json
       }
       submit_judgement: {
@@ -5544,6 +6063,10 @@ export type Database = {
       toggle_take_reaction: {
         Args: { p_take_id: string }
         Returns: Json
+      }
+      touch_creator_live_viewer: {
+        Args: { p_session_id: string }
+        Returns: number
       }
       transition_due_arena_rooms: {
         Args: { p_limit?: number }
@@ -5948,6 +6471,27 @@ export type Database = {
       commission_ledger_status: "PENDING" | "APPROVED" | "REJECTED" | "VOID"
       commission_type: "FIXED_PER_CONVERSION" | "PERCENTAGE" | "NONE"
       coupon_code_status: "ACTIVE" | "PAUSED" | "EXPIRED" | "REVOKED"
+      creator_live_access: "FREE" | "SUBSCRIBER"
+      creator_live_action_kind:
+        | "LIGHTS_OFF"
+        | "LIGHTS_ON"
+        | "OPEN_LEFT_DOOR"
+        | "OPEN_RIGHT_DOOR"
+        | "FOG_BURST"
+        | "MUSIC_STING"
+        | "CAMERA_CUT"
+        | "HOLD_FRAME"
+      creator_live_interaction_status:
+        | "OPEN"
+        | "CLOSED"
+        | "TRIGGERED"
+        | "CANCELLED"
+      creator_live_interaction_type:
+        | "POLL"
+        | "CHOICE"
+        | "CROWD_ACTION"
+        | "GAME_ACTION"
+      creator_live_status: "SCHEDULED" | "LIVE" | "ENDED" | "CANCELLED"
       explore_challenge_status: "scheduled" | "active" | "ended" | "cancelled"
       explore_challenge_type: "GLOBAL" | "COUNTRY" | "CREATOR"
       explore_clue_type: "TEXT_ANSWER" | "CONTENT_FIND" | "MULTIPLE_CHOICE"
@@ -6003,6 +6547,7 @@ export type Database = {
         | "treasure_reward"
         | "community_announcement"
         | "community_reply"
+        | "creator_live"
       profile_role: "viewer" | "creator" | "moderator" | "admin"
       rank_name:
         | "Rookie"
@@ -6038,6 +6583,7 @@ export type Database = {
         | "meet_message"
         | "community_post"
         | "community_reply"
+        | "creator_live_session"
       reputation_kind:
         | "clash_participation"
         | "clash_win"
@@ -6259,6 +6805,30 @@ export const Constants = {
       commission_ledger_status: ["PENDING", "APPROVED", "REJECTED", "VOID"],
       commission_type: ["FIXED_PER_CONVERSION", "PERCENTAGE", "NONE"],
       coupon_code_status: ["ACTIVE", "PAUSED", "EXPIRED", "REVOKED"],
+      creator_live_access: ["FREE", "SUBSCRIBER"],
+      creator_live_action_kind: [
+        "LIGHTS_OFF",
+        "LIGHTS_ON",
+        "OPEN_LEFT_DOOR",
+        "OPEN_RIGHT_DOOR",
+        "FOG_BURST",
+        "MUSIC_STING",
+        "CAMERA_CUT",
+        "HOLD_FRAME",
+      ],
+      creator_live_interaction_status: [
+        "OPEN",
+        "CLOSED",
+        "TRIGGERED",
+        "CANCELLED",
+      ],
+      creator_live_interaction_type: [
+        "POLL",
+        "CHOICE",
+        "CROWD_ACTION",
+        "GAME_ACTION",
+      ],
+      creator_live_status: ["SCHEDULED", "LIVE", "ENDED", "CANCELLED"],
       explore_challenge_status: ["scheduled", "active", "ended", "cancelled"],
       explore_challenge_type: ["GLOBAL", "COUNTRY", "CREATOR"],
       explore_clue_type: ["TEXT_ANSWER", "CONTENT_FIND", "MULTIPLE_CHOICE"],
@@ -6317,6 +6887,7 @@ export const Constants = {
         "treasure_reward",
         "community_announcement",
         "community_reply",
+        "creator_live",
       ],
       profile_role: ["viewer", "creator", "moderator", "admin"],
       rank_name: [
@@ -6355,6 +6926,7 @@ export const Constants = {
         "meet_message",
         "community_post",
         "community_reply",
+        "creator_live_session",
       ],
       reputation_kind: [
         "clash_participation",

@@ -15,6 +15,7 @@ import { SeriesComposition } from './SeriesComposition';
 import { SessionInvite } from './SessionInvite';
 import { CommunityChapterCard } from '../community/CommunityChapterCard';
 import { WorldDropsChapter } from './WorldDropsChapter';
+import { LiveChapter } from '../live/LiveChapter';
 
 export interface WorldChapterProps {
   row: WorldRow;
@@ -32,6 +33,8 @@ export interface WorldChapterProps {
   onCreate: () => void;
   onOpenWorldDrop: (dropId: string) => void;
   onManageWorldDrops: () => void;
+  onOpenLive: (sessionId: string) => void;
+  onManageLive: () => void;
 }
 
 /** Renders a single world chapter with its own composition. */
@@ -50,6 +53,8 @@ export const WorldChapter = React.memo(function WorldChapter({
   onCreate,
   onOpenWorldDrop,
   onManageWorldDrops,
+  onOpenLive,
+  onManageLive,
 }: WorldChapterProps): React.JSX.Element | null {
   const t = useThemeColors();
   const radius = personalityRadius(personality);
@@ -171,6 +176,17 @@ export const WorldChapter = React.memo(function WorldChapter({
             if (firstDrop) onOpenWorldDrop(firstDrop.id);
           }}
           onManage={onManageWorldDrops}
+        />
+      );
+
+    case 'live':
+      return (
+        <LiveChapter
+          sessions={row.sessions}
+          personality={personality}
+          isSelf={isSelf}
+          onOpen={onOpenLive}
+          onManage={onManageLive}
         />
       );
 

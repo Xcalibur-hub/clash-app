@@ -44,6 +44,7 @@ function input(partial: Partial<WorldRowsInput>): WorldRowsInput {
     courses: [],
     products: [],
     worldDrops: [],
+    liveSessions: [],
     communityReady: false,
     personality: 'cinematic',
     ...partial,
@@ -136,6 +137,41 @@ describe('creator world rows', () => {
   it('omits the world-drops chapter when nothing is hidden', () => {
     const rows = buildWorldRows(input({ modules: [{ type: 'WORLD_DROPS' }] }), deps);
     assert.deepEqual(rows, [{ kind: 'empty' }]);
+  });
+
+  it('adds a live chapter only while a session is live or scheduled', () => {
+    const live = buildWorldRows(
+      input({
+        modules: [{ type: 'LIVE' }],
+        liveSessions: [{ id: 'cls_1', status: 'LIVE', title: 'Filming Episode 05' } as never],
+      }),
+      deps,
+    );
+    assert.deepEqual(
+      live.map((row) => row.kind),
+      ['chapter', 'live'],
+    );
+
+    const scheduled = buildWorldRows(
+      input({
+        modules: [{ type: 'LIVE' }],
+        liveSessions: [{ id: 'cls_2', status: 'SCHEDULED', title: 'Friday session' } as never],
+      }),
+      deps,
+    );
+    assert.deepEqual(
+      scheduled.map((row) => row.kind),
+      ['chapter', 'live'],
+    );
+
+    const archived = buildWorldRows(
+      input({
+        modules: [{ type: 'LIVE' }],
+        liveSessions: [{ id: 'cls_3', status: 'ENDED', title: 'Old session' } as never],
+      }),
+      deps,
+    );
+    assert.deepEqual(archived, [{ kind: 'empty' }]);
   });
 
   it('resolves collection membership from the injected resolver', () => {
