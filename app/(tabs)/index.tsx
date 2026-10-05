@@ -321,6 +321,11 @@ export default function ArenaScreen(): React.JSX.Element {
   const header = React.useMemo(
     () => (
       <View style={styles.hero}>
+        <TrendingBattlesSection
+          refreshToken={refreshKey}
+          onEnter={openTrendingBattle}
+        />
+
         {liveTopics.length > 0 ? (
           <ArenaTopicDeck
             topics={liveTopics}
@@ -337,11 +342,6 @@ export default function ArenaScreen(): React.JSX.Element {
             }}
           />
         ) : null}
-
-        <TrendingBattlesSection
-          refreshToken={refreshKey}
-          onEnter={openTrendingBattle}
-        />
 
         <FreshTakesSection
           items={freshItems}

@@ -102,8 +102,8 @@ describe('crossings', () => {
 });
 
 describe('development fixture', () => {
-  it('is off by default', () => {
-    assert.equal(ARENA_TREND_DEMO_ENABLED, false);
+  it('is on by default while ranking-race UI is being validated on-device', () => {
+    assert.equal(ARENA_TREND_DEMO_ENABLED, true);
   });
 
   it('can never activate without __DEV__', () => {

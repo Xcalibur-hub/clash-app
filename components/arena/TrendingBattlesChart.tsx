@@ -2,11 +2,28 @@
  * Live Top-10 ranking race chart.
  * Y = rank (#1 at top). Lines cross when topics overtake each other.
  * Real snapshot ranks only — no decorative paths.
+ *
+ * IMPORTANT (native): never put React.Fragment inside <Svg>.
+ * react-native-svg silently drops Fragment children on Android/iOS —
+ * wrap sibling SVG nodes in <G> instead (see CityDonut / ExploreGlobe).
  */
 import React from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
-import type { ArenaTrendPoint, ArenaTrendingBattle } from '../../services/arenaTrendService';
+import {
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import Svg, { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg';
+import type { ArenaTrendingBattle } from '../../services/arenaTrendService';
+import {
+  buildRankPath,
+  TREND_RACE_CHART_HEIGHT,
+  TREND_RACE_PAD,
+  trendRaceRankY,
+  trendRaceXFor,
+} from '../../utils/arenaTrendChartPath';
 import {
   shortTitle,
   trendRaceCaption,
@@ -23,35 +40,14 @@ export interface TrendingBattlesChartProps {
   onSelectTopic?: (topicId: string) => void;
 }
 
-/** Tall enough on a phone to read as a real ranking race, not a sparkline. */
-const H = 228;
-const PAD = { top: 12, right: 112, bottom: 22, left: 34 };
-const MAX_RANK = 10;
-const LABEL_GAP = 14;
+export { TREND_RACE_CHART_HEIGHT, buildRankPath };
+
+const H = TREND_RACE_CHART_HEIGHT;
+const PAD = TREND_RACE_PAD;
+const LABEL_GAP = 15;
 const Y_TICKS = [1, 2, 3, 5, 7, 10] as const;
 
-function rankY(rank: number, height: number): number {
-  const innerH = Math.max(1, height - PAD.top - PAD.bottom);
-  const clamped = Math.min(MAX_RANK, Math.max(1, rank));
-  // #1 at top, #10 at bottom
-  return PAD.top + ((clamped - 1) / (MAX_RANK - 1)) * innerH;
-}
-
-function buildRankPath(
-  points: readonly ArenaTrendPoint[],
-  xFor: (t: number) => number,
-  height: number,
-): string {
-  if (points.length === 0) return '';
-  return points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${xFor(p.t).toFixed(1)},${rankY(p.v, height).toFixed(1)}`)
-    .join(' ');
-}
-
-/** Nudge overlapping end labels apart so #1/#2/#3 stay readable. */
-function spreadLabelYs(
-  items: readonly { id: string; y: number }[],
-): Map<string, number> {
+function spreadLabelYs(items: readonly { id: string; y: number }[]): Map<string, number> {
   const sorted = [...items].sort((a, b) => a.y - b.y);
   const ys = sorted.map((item) => item.y);
   for (let i = 1; i < ys.length; i += 1) {
@@ -79,7 +75,9 @@ export function TrendingBattlesChart({
   onSelectTopic,
 }: TrendingBattlesChartProps): React.JSX.Element | null {
   const t = useThemeColors();
-  const [width, setWidth] = React.useState(320);
+  const { width: windowWidth } = useWindowDimensions();
+  // Seed with a real phone width so the first paint already has non-zero SVG geometry.
+  const [width, setWidth] = React.useState(() => Math.max(280, windowWidth - 48));
 
   const stage: TrendRaceStage = trendRaceStage({
     topicCount: battles.length,
@@ -100,17 +98,23 @@ export function TrendingBattlesChart({
     () => [...new Set(allTimes)].sort((a, b) => a - b),
     [allTimes],
   );
-  const minT = bucketTimes.length ? bucketTimes[0] : 0;
-  const maxT = bucketTimes.length ? bucketTimes[bucketTimes.length - 1] : 1;
-  const innerW = Math.max(1, width - PAD.left - PAD.right);
-  const spanT = Math.max(1, maxT - minT);
-  const xFor = React.useCallback(
-    (value: number): number => {
-      if (bucketTimes.length <= 1) return width - PAD.right;
-      return PAD.left + ((value - minT) / spanT) * innerW;
-    },
-    [bucketTimes.length, innerW, minT, spanT, width],
+  const minT = bucketTimes.length ? bucketTimes[0]! : 0;
+  const maxT = bucketTimes.length ? bucketTimes[bucketTimes.length - 1]! : 1;
+  const xFor = React.useMemo(
+    () => trendRaceXFor(width, minT, maxT, bucketTimes.length),
+    [bucketTimes.length, maxT, minT, width],
   );
+
+  const pathsById = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (!hasLines) return map;
+    for (const battle of battles) {
+      if (battle.series.length < 2) continue;
+      const d = buildRankPath(battle.series, xFor, H);
+      if (d) map.set(battle.topicId, d);
+    }
+    return map;
+  }, [battles, hasLines, xFor]);
 
   const labelYs = React.useMemo(() => {
     const seeds: { id: string; y: number }[] = [];
@@ -120,7 +124,7 @@ export function TrendingBattlesChart({
       if (!selected && !top3) continue;
       const last = battle.series[battle.series.length - 1];
       const markerRank = last ? last.v : battle.rank;
-      seeds.push({ id: battle.topicId, y: rankY(markerRank, H) });
+      seeds.push({ id: battle.topicId, y: trendRaceRankY(markerRank, H) });
     }
     return spreadLabelYs(seeds);
   }, [battles, selectedId]);
@@ -148,6 +152,8 @@ export function TrendingBattlesChart({
 
   const onTouch = (x: number): void => {
     if (!onScrubIndex || bucketTimes.length < 2) return;
+    const innerW = Math.max(1, width - PAD.left - PAD.right);
+    const spanT = Math.max(1, maxT - minT);
     const tAt = minT + ((x - PAD.left) / innerW) * spanT;
     let best = 0;
     let bestDist = Infinity;
@@ -164,7 +170,7 @@ export function TrendingBattlesChart({
   if (stage === 'EMPTY') return null;
 
   return (
-    <View style={styles.wrap} onLayout={onLayout}>
+    <View style={styles.wrap}>
       <View style={styles.meta}>
         <Text allowFontScaling={false} style={[styles.axis, { color: t.textMuted }]}>
           {caption ? caption.kicker : 'RANK'}
@@ -187,55 +193,64 @@ export function TrendingBattlesChart({
       ) : null}
 
       <View
-        style={styles.chartHit}
+        style={[styles.chartFrame, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}
+        onLayout={onLayout}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
         onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
         accessibilityLabel="Live topic ranking race chart"
       >
-        <Svg width={width} height={H}>
+        <Svg
+          width={width}
+          height={H}
+          viewBox={`0 0 ${width} ${H}`}
+          style={{ width, height: H }}
+        >
           {Y_TICKS.map((rank) => (
-            <React.Fragment key={rank}>
+            <G key={`tick-${rank}`}>
               <Line
                 x1={PAD.left}
                 x2={width - PAD.right}
-                y1={rankY(rank, H)}
-                y2={rankY(rank, H)}
-                stroke={t.border}
-                strokeWidth={StyleSheet.hairlineWidth}
-                strokeOpacity={rank <= 3 ? 0.9 : 0.55}
+                y1={trendRaceRankY(rank, H)}
+                y2={trendRaceRankY(rank, H)}
+                stroke={t.borderStrong}
+                strokeWidth={1}
+                strokeOpacity={rank <= 3 ? 0.85 : 0.45}
               />
               <SvgText
-                x={4}
-                y={rankY(rank, H) + 3}
+                x={6}
+                y={trendRaceRankY(rank, H) + 3}
                 fill={rank <= 3 ? t.textSecondary : t.textMuted}
-                fontSize={rank <= 3 ? 10 : 9}
+                fontSize={rank <= 3 ? 11 : 9}
                 fontWeight="700"
               >
                 {`#${rank}`}
               </SvgText>
-            </React.Fragment>
+            </G>
           ))}
 
           {battles.map((battle) => {
             const selected = battle.topicId === selectedId;
             const top3 = battle.rank <= 3;
-            const opacity = selected ? 1 : top3 ? 0.78 : 0.26;
-            const strokeW = selected ? 2.8 : top3 ? 2 : 1.05;
+            const pathD = pathsById.get(battle.topicId) ?? '';
+            const canDrawLine = pathD.length > 0;
+            const opacity = selected ? 1 : top3 ? 0.85 : 0.35;
+            const strokeW = selected ? 3 : top3 ? 2.25 : 1.25;
             const last = battle.series[battle.series.length - 1];
-            const canDrawLine = hasLines && battle.series.length >= 2;
             const markerRank = last ? last.v : battle.rank;
             const endX = last ? xFor(last.t) : width - PAD.right;
-            const endY = rankY(markerRank, H);
+            const endY = trendRaceRankY(markerRank, H);
             const labelY = labelYs.get(battle.topicId) ?? endY;
             const showLabel = selected || top3;
+            const stroke = selected || top3 ? t.textPrimary : t.textMuted;
+
             return (
-              <React.Fragment key={battle.topicId}>
+              <G key={battle.topicId}>
                 {canDrawLine ? (
                   <Path
-                    d={buildRankPath(battle.series, xFor, H)}
-                    stroke={selected || top3 ? t.textPrimary : t.textMuted}
+                    d={pathD}
+                    stroke={stroke}
                     strokeWidth={strokeW}
                     strokeOpacity={opacity}
                     fill="none"
@@ -243,32 +258,30 @@ export function TrendingBattlesChart({
                     strokeLinejoin="round"
                     onPress={() => onSelectTopic?.(battle.topicId)}
                   />
-                ) : null}
-
-                {!canDrawLine ? (
+                ) : (
                   <Circle
                     cx={endX}
                     cy={endY}
                     r={selected ? 4.5 : top3 ? 3.4 : 2.4}
                     fill={t.surfaceElevated}
-                    stroke={selected || top3 ? t.textPrimary : t.textMuted}
+                    stroke={stroke}
                     strokeWidth={selected ? 2 : 1.2}
                     opacity={opacity}
                     onPress={() => onSelectTopic?.(battle.topicId)}
                   />
-                ) : null}
+                )}
 
                 {showLabel ? (
-                  <>
+                  <G>
                     {canDrawLine ? (
                       <Circle
                         cx={endX}
                         cy={endY}
-                        r={selected ? 4.8 : 3.4}
+                        r={selected ? 5 : 3.6}
                         fill={t.surfaceElevated}
                         stroke={t.textPrimary}
-                        strokeWidth={selected ? 2 : 1.5}
-                        opacity={opacity}
+                        strokeWidth={selected ? 2.2 : 1.6}
+                        opacity={1}
                         onPress={() => onSelectTopic?.(battle.topicId)}
                       />
                     ) : null}
@@ -282,9 +295,9 @@ export function TrendingBattlesChart({
                     >
                       {shortTitle(battle.title, selected ? 16 : 13)}
                     </SvgText>
-                  </>
+                  </G>
                 ) : null}
-              </React.Fragment>
+              </G>
             );
           })}
 
@@ -295,7 +308,7 @@ export function TrendingBattlesChart({
               y1={PAD.top}
               y2={H - PAD.bottom}
               stroke={t.borderStrong}
-              strokeWidth={StyleSheet.hairlineWidth}
+              strokeWidth={1}
             />
           ) : null}
         </Svg>
@@ -334,7 +347,7 @@ function formatClock(ms: number): string {
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6 },
+  wrap: { gap: 8, width: '100%' },
   meta: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -344,7 +357,15 @@ const styles = StyleSheet.create({
   axis: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   value: { ...typeScale.label, fontSize: 13, fontWeight: '800' },
   earlyNote: { ...typeScale.meta, fontSize: 11, paddingHorizontal: 2, marginTop: -2 },
-  chartHit: { height: H, marginHorizontal: -2 },
+  chartFrame: {
+    width: '100%',
+    height: H,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
   timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -12,7 +12,7 @@ import {
   type ArenaTrendingBattle,
 } from '../../services/arenaTrendService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
-import { formatRankDelta } from '../../utils/arenaTrendRank';
+import { formatRankDelta, trendRaceStage } from '../../utils/arenaTrendRank';
 import { ARENA_TREND_DEMO_LABEL } from '../../utils/arenaTrendDevFixture';
 import { momentumLabel } from '../../utils/arenaTrendScore';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -82,8 +82,6 @@ export function TrendingBattlesSection({
     return () => clearInterval(id);
   }, [active, load]);
 
-  // A hard read failure hides the module; an empty Arena shows a calm plate so
-  // the section is visibly present instead of silently missing.
   if (failed) return null;
   if (!loaded) return null;
 
@@ -106,7 +104,12 @@ export function TrendingBattlesSection({
     );
   }
 
-  const selected = battles.find((b) => b.topicId === selectedId) ?? battles[0];
+  const selected = battles.find((b) => b.topicId === selectedId) ?? battles[0]!;
+  const stage = trendRaceStage({
+    topicCount: battles.length,
+    pointCounts: battles.map((b) => b.series.length),
+  });
+  const snapshotCount = battles.reduce((best, b) => Math.max(best, b.series.length), 0);
 
   const selectTopic = (topicId: string): void => {
     hapticTap();
@@ -138,6 +141,7 @@ export function TrendingBattlesSection({
         What the internet is fighting about
       </Text>
 
+      {/* Graph first — hero discovery, not buried under a selected-topic card. */}
       <TrendingBattlesChart
         battles={battles}
         selectedId={selected.topicId}
@@ -145,6 +149,16 @@ export function TrendingBattlesSection({
         onScrubIndex={setScrubIndex}
         onSelectTopic={selectTopic}
       />
+
+      {__DEV__ && demo ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.devDiag, { color: t.textMuted }]}
+          accessibilityLabel={`Demo diagnostic: ${battles.length} topics, ${snapshotCount} snapshots, ${stage}`}
+        >
+          {`DEMO: ${battles.length} topics · ${snapshotCount} snapshots · ${stage}`}
+        </Text>
+      ) : null}
 
       <View style={styles.preview}>
         <Text allowFontScaling={false} style={[styles.previewRank, { color: t.textMuted }]}>
@@ -255,6 +269,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.4,
     marginBottom: space.xs,
+  },
+  devDiag: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    paddingHorizontal: 2,
+    marginTop: -2,
   },
   preview: {
     flexDirection: 'row',

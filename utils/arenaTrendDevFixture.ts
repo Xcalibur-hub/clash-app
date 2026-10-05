@@ -19,8 +19,8 @@
 
 import type { ArenaTrendingBattle } from '../services/arenaTrendService';
 
-/** Flip to `true` for on-device inspection. Ignored outside development. */
-export const ARENA_TREND_DEMO_ENABLED = false;
+/** Flip to `true` for on-device inspection without an env restart. Ignored outside development. */
+export const ARENA_TREND_DEMO_ENABLED = true;
 
 export const ARENA_TREND_DEMO_LABEL = 'DEMO DATA';
 
