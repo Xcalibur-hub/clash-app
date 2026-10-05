@@ -55,10 +55,19 @@ import { CreatorDropRow } from './CreatorDropRow';
 import { CommunityStudio } from './CommunityStudio';
 import { WorldDropsStudio } from './WorldDropsStudio';
 import { LiveStudio } from './LiveStudio';
+import { AiStudio } from './AiStudio';
 import { VaultActionButton } from './VaultActionButton';
 import { VaultFormSheet } from './VaultFormSheet';
 
-type StudioTab = 'drops' | 'services' | 'courses' | 'shop' | 'community' | 'world' | 'live';
+type StudioTab =
+  | 'drops'
+  | 'services'
+  | 'courses'
+  | 'shop'
+  | 'community'
+  | 'world'
+  | 'live'
+  | 'ai';
 type Phase = 'loading' | 'ready';
 
 const TABS: readonly { key: StudioTab; label: string }[] = [
@@ -69,6 +78,7 @@ const TABS: readonly { key: StudioTab; label: string }[] = [
   { key: 'community', label: 'Community' },
   { key: 'world', label: 'World' },
   { key: 'live', label: 'Live' },
+  { key: 'ai', label: 'AI' },
 ];
 
 /** Creator-only management surface for Vault offerings. */
@@ -449,6 +459,7 @@ export function CreatorStudio(): React.JSX.Element {
         {tab === 'community' ? <CommunityStudio /> : null}
         {tab === 'world' ? <WorldDropsStudio /> : null}
         {tab === 'live' ? <LiveStudio /> : null}
+        {tab === 'ai' ? <AiStudio /> : null}
       </ScrollView>
 
       <VaultFormSheet

@@ -46,6 +46,13 @@ delete from public.creator_live_viewers
  where session_id like 'cls_devfx_%' or profile_id like 'devfx_vw_%';
 delete from public.creator_live_sessions
  where id like 'cls_devfx_%' or creator_id like 'devfx_vw_%';
+
+-- Phase 15.5 — Creator AI fixtures
+delete from public.creator_ai_messages
+ where conversation_id in (select id from public.creator_ai_conversations where creator_id like 'devfx_vw_%');
+delete from public.creator_ai_conversations where creator_id like 'devfx_vw_%' or profile_id like 'devfx_vw_%';
+delete from public.creator_ai_knowledge where creator_id like 'devfx_vw_%';
+delete from public.creator_ai_profiles where creator_id like 'devfx_vw_%';
 delete from public.vault_community_posts
  where community_id like 'devfx_vw_%' or id like 'devfx_vw_%';
 delete from public.vault_community_memberships
@@ -498,6 +505,49 @@ values
   ('cls_devfx_maya', 'devfx_vw_leo', now()),
   ('cls_devfx_maya', 'devfx_vw_noah', now()),
   ('cls_devfx_aria', 'devfx_vw_maya', now());
+
+-- ── Creator AI fixtures (Phase 15.5) ───────────────────────────────────────
+-- Maya and Aria have an AI version; Leo and Noah deliberately do not, so the
+-- chapter's "only when enabled" rule is visible locally. Every entry is creator
+-- approved; the member-only note exists to exercise the entitlement filter.
+insert into public.creator_ai_profiles
+  (creator_id, enabled, display_name, description, welcome_message, instructions,
+   access, starters, artwork_media_object_id)
+values
+  ('devfx_vw_maya', true, 'Maya AI',
+   'An AI version of Maya built from her filmmaking notes and published Vault material.',
+   'Ask me about the Midnight Files, or how a scene gets built.',
+   'Speak in short, filmic sentences. Never more than a few lines. Talk about craft, not gossip.',
+   'FREE',
+   '["How do you build suspense?","How did you approach The Missing Frame?","What makes a horror scene uncomfortable?"]'::jsonb,
+   'devfx_vw_maya_comm'),
+  ('devfx_vw_aria', true, 'Aria AI',
+   'An AI version of Aria built from her production notes and published material.',
+   'Tell me what you are working on.',
+   'Warm, technical, brief. Talk about sound and arrangement, never about people.',
+   'FREE',
+   '["How do you start a track?","How do you choose drum textures?","How do you know when a song is finished?"]'::jsonb,
+   'devfx_vw_aria_album');
+
+insert into public.creator_ai_knowledge (id, creator_id, kind, title, body, source_id, access)
+values
+  ('cak_devfx_maya_suspense', 'devfx_vw_maya', 'NOTE', 'Building suspense',
+   'Suspense is a promise you keep delaying. Hold the frame longer than is comfortable, then cut before the release arrives.', null, 'FREE'),
+  ('cak_devfx_maya_frame', 'devfx_vw_maya', 'NOTE', 'The Missing Frame',
+   'The Missing Frame started as a single shot of an open door. Everything else was written to earn that door.', null, 'FREE'),
+  ('cak_devfx_maya_discomfort', 'devfx_vw_maya', 'NOTE', 'Discomfort',
+   'Discomfort comes from the wrong duration, not the wrong image. Sound does the rest.', null, 'FREE'),
+  ('cak_devfx_maya_members', 'devfx_vw_maya', 'NOTE', 'Members: basement breakdown',
+   'The basement sequence was lit with one practical and no fill. Members get the full lighting plot with the episode notes.', null, 'SUBSCRIBER'),
+  ('cak_devfx_maya_drop', 'devfx_vw_maya', 'VAULT_DROP', 'I found this tape behind the wall.', null, 'devfx_vw_maya_drop_free', 'FREE'),
+  ('cak_devfx_maya_col', 'devfx_vw_maya', 'COLLECTION', 'Midnight Files', null, 'devfx_vw_maya_col', 'SUBSCRIBER'),
+  ('cak_devfx_aria_start', 'devfx_vw_aria', 'NOTE', 'Starting a track',
+   'Start with the drum texture, never the melody. The texture decides the tempo you actually hear.', null, 'FREE'),
+  ('cak_devfx_aria_drums', 'devfx_vw_aria', 'NOTE', 'Drum textures',
+   'I layer a close mic with a room mic and pull the close mic back until the room wins.', null, 'FREE'),
+  ('cak_devfx_aria_finished', 'devfx_vw_aria', 'NOTE', 'Knowing when it is finished',
+   'A track is finished when removing anything makes it worse. Then I stop.', null, 'FREE'),
+  ('cak_devfx_aria_drop', 'devfx_vw_aria', 'VAULT_DROP', 'Unreleased demo — keep the hiss.', null, 'devfx_vw_aria_drop', 'FREE');
 
 commit;
 

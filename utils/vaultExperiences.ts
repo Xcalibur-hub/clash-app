@@ -34,7 +34,7 @@ export const VAULT_EXPERIENCE_REGISTRY: readonly VaultExperienceDefinition[] = [
   { type: 'COLLECTION', label: 'Collection', availability: 'enterable' },
   { type: 'INTERACTIVE_STORY', label: 'Interactive story', availability: 'planned' },
   { type: 'AI_FILM', label: 'AI film', availability: 'planned' },
-  { type: 'CREATOR_AI', label: 'Creator AI', availability: 'planned' },
+  { type: 'CREATOR_AI', label: 'Creator AI', availability: 'enterable' },
   { type: 'LIVE_CONTROL', label: 'Live control', availability: 'planned' },
   { type: 'MINI_GAME', label: 'Mini game', availability: 'planned' },
   { type: 'ANONYMOUS_ROOM', label: 'Pseudonymous room', availability: 'planned' },
@@ -79,6 +79,8 @@ export function vaultExperienceHref(ref: VaultExperienceRef): string | null {
       return `/vault/service/${ref.id}`;
     case 'PRODUCT':
       return `/vault/product/${ref.id}`;
+    case 'CREATOR_AI':
+      return `/vault/ai/${ref.id}`;
     default:
       return null;
   }

@@ -1141,6 +1141,181 @@ export type Database = {
           },
         ]
       }
+      creator_ai_conversations: {
+        Row: {
+          created_at: string
+          creator_id: string
+          id: string
+          last_message_at: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          id: string
+          last_message_at?: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          id?: string
+          last_message_at?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_ai_conversations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_ai_conversations_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_ai_knowledge: {
+        Row: {
+          access: Database["public"]["Enums"]["creator_ai_access"]
+          body: string | null
+          created_at: string
+          creator_id: string
+          id: string
+          kind: Database["public"]["Enums"]["creator_ai_knowledge_kind"]
+          source_id: string | null
+          title: string
+        }
+        Insert: {
+          access?: Database["public"]["Enums"]["creator_ai_access"]
+          body?: string | null
+          created_at?: string
+          creator_id: string
+          id: string
+          kind: Database["public"]["Enums"]["creator_ai_knowledge_kind"]
+          source_id?: string | null
+          title: string
+        }
+        Update: {
+          access?: Database["public"]["Enums"]["creator_ai_access"]
+          body?: string | null
+          created_at?: string
+          creator_id?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["creator_ai_knowledge_kind"]
+          source_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_ai_knowledge_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_ai_messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          model: string | null
+          provider: string | null
+          role: Database["public"]["Enums"]["creator_ai_role"]
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id: string
+          model?: string | null
+          provider?: string | null
+          role: Database["public"]["Enums"]["creator_ai_role"]
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          provider?: string | null
+          role?: Database["public"]["Enums"]["creator_ai_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "creator_ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_ai_profiles: {
+        Row: {
+          access: Database["public"]["Enums"]["creator_ai_access"]
+          artwork_media_object_id: string | null
+          created_at: string
+          creator_id: string
+          description: string
+          display_name: string
+          enabled: boolean
+          instructions: string
+          starters: Json
+          updated_at: string
+          welcome_message: string
+        }
+        Insert: {
+          access?: Database["public"]["Enums"]["creator_ai_access"]
+          artwork_media_object_id?: string | null
+          created_at?: string
+          creator_id: string
+          description?: string
+          display_name: string
+          enabled?: boolean
+          instructions?: string
+          starters?: Json
+          updated_at?: string
+          welcome_message?: string
+        }
+        Update: {
+          access?: Database["public"]["Enums"]["creator_ai_access"]
+          artwork_media_object_id?: string | null
+          created_at?: string
+          creator_id?: string
+          description?: string
+          display_name?: string
+          enabled?: boolean
+          instructions?: string
+          starters?: Json
+          updated_at?: string
+          welcome_message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_ai_profiles_artwork_media_object_id_fkey"
+            columns: ["artwork_media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_ai_profiles_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_commission_ledger: {
         Row: {
           advertiser_id: string
@@ -4126,6 +4301,16 @@ export type Database = {
           updated_at: string
         }
       }
+      add_creator_ai_knowledge: {
+        Args: {
+          p_access?: Database["public"]["Enums"]["creator_ai_access"]
+          p_body?: string
+          p_kind: Database["public"]["Enums"]["creator_ai_knowledge_kind"]
+          p_source_id?: string
+          p_title: string
+        }
+        Returns: string
+      }
       add_drop_to_collection: {
         Args: { p_collection_id: string; p_drop_id: string }
         Returns: undefined
@@ -4915,6 +5100,34 @@ export type Database = {
         }
         Returns: string
       }
+      creator_ai_begin_turn: {
+        Args: { p_body: string; p_conversation_id: string }
+        Returns: Json
+      }
+      creator_ai_finish_turn: {
+        Args: {
+          p_body: string
+          p_conversation_id: string
+          p_model?: string
+          p_provider?: string
+        }
+        Returns: Json
+      }
+      creator_ai_knowledge_visible: {
+        Args: {
+          p_knowledge: Database["public"]["Tables"]["creator_ai_knowledge"]["Row"]
+          p_viewer: string
+        }
+        Returns: boolean
+      }
+      creator_ai_profile_card: {
+        Args: { p_creator_id: string; p_viewer?: string }
+        Returns: Json
+      }
+      creator_ai_viewer_can_access: {
+        Args: { p_creator_id: string; p_viewer: string }
+        Returns: boolean
+      }
       creator_campaign_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -5136,6 +5349,10 @@ export type Database = {
         Args: { p_challenge_id: string }
         Returns: Json
       }
+      get_creator_ai: {
+        Args: { p_creator_id: string }
+        Returns: Json
+      }
       get_creator_live_session: {
         Args: { p_session_id: string }
         Returns: Json
@@ -5166,6 +5383,10 @@ export type Database = {
       }
       get_meet_session: {
         Args: { p_session_id: string }
+        Returns: Json
+      }
+      get_my_creator_ai: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       get_my_play: {
@@ -5351,6 +5572,10 @@ export type Database = {
           p_limit?: number
           p_sort?: string
         }
+        Returns: Json
+      }
+      list_creator_ai_messages: {
+        Args: { p_before?: string; p_conversation_id: string; p_limit?: number }
         Returns: Json
       }
       list_creator_live_interactions: {
@@ -5664,6 +5889,10 @@ export type Database = {
           occurred_at: string
         }
       }
+      remove_creator_ai_knowledge: {
+        Args: { p_knowledge_id: string }
+        Returns: boolean
+      }
       remove_creator_from_campaign: {
         Args: { p_campaign_id: string; p_creator_profile_id: string }
         Returns: {
@@ -5683,6 +5912,14 @@ export type Database = {
       remove_world_drop: {
         Args: { p_drop_id: string }
         Returns: undefined
+      }
+      report_creator_ai_message: {
+        Args: {
+          p_detail?: string
+          p_message_id: string
+          p_reason: Database["public"]["Enums"]["report_reason"]
+        }
+        Returns: string
       }
       report_creator_live_session: {
         Args: {
@@ -5961,6 +6198,10 @@ export type Database = {
           p_take_id: string
         }
         Returns: string
+      }
+      start_creator_ai_conversation: {
+        Args: { p_creator_id: string }
+        Returns: Json
       }
       start_creator_live_session: {
         Args: { p_session_id: string }
@@ -6292,6 +6533,19 @@ export type Database = {
         }
         Returns: Json
       }
+      upsert_creator_ai_profile: {
+        Args: {
+          p_access?: Database["public"]["Enums"]["creator_ai_access"]
+          p_artwork_media_object_id?: string
+          p_description?: string
+          p_display_name: string
+          p_enabled?: boolean
+          p_instructions?: string
+          p_starters?: Json
+          p_welcome_message?: string
+        }
+        Returns: Json
+      }
       vault_assert_owned_public_cover: {
         Args: { p_media_id: string; p_owner: string }
         Returns: undefined
@@ -6471,6 +6725,9 @@ export type Database = {
       commission_ledger_status: "PENDING" | "APPROVED" | "REJECTED" | "VOID"
       commission_type: "FIXED_PER_CONVERSION" | "PERCENTAGE" | "NONE"
       coupon_code_status: "ACTIVE" | "PAUSED" | "EXPIRED" | "REVOKED"
+      creator_ai_access: "FREE" | "SUBSCRIBER"
+      creator_ai_knowledge_kind: "NOTE" | "VAULT_DROP" | "COLLECTION" | "COURSE"
+      creator_ai_role: "user" | "assistant"
       creator_live_access: "FREE" | "SUBSCRIBER"
       creator_live_action_kind:
         | "LIGHTS_OFF"
@@ -6584,6 +6841,7 @@ export type Database = {
         | "community_post"
         | "community_reply"
         | "creator_live_session"
+        | "creator_ai_message"
       reputation_kind:
         | "clash_participation"
         | "clash_win"
@@ -6805,6 +7063,9 @@ export const Constants = {
       commission_ledger_status: ["PENDING", "APPROVED", "REJECTED", "VOID"],
       commission_type: ["FIXED_PER_CONVERSION", "PERCENTAGE", "NONE"],
       coupon_code_status: ["ACTIVE", "PAUSED", "EXPIRED", "REVOKED"],
+      creator_ai_access: ["FREE", "SUBSCRIBER"],
+      creator_ai_knowledge_kind: ["NOTE", "VAULT_DROP", "COLLECTION", "COURSE"],
+      creator_ai_role: ["user", "assistant"],
       creator_live_access: ["FREE", "SUBSCRIBER"],
       creator_live_action_kind: [
         "LIGHTS_OFF",
@@ -6927,6 +7188,7 @@ export const Constants = {
         "community_post",
         "community_reply",
         "creator_live_session",
+        "creator_ai_message",
       ],
       reputation_kind: [
         "clash_participation",

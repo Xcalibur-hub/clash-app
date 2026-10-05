@@ -25,8 +25,10 @@ import type {
 import type { CreatorCourse, CreatorProduct, CreatorService } from '../../../services/vaultCommerceMappers';
 import { fetchCreatorWorldDrops } from '../../../services/creatorWorldDropService';
 import { fetchCreatorLiveSessions } from '../../../services/creatorLiveService';
+import { fetchCreatorAi } from '../../../services/creatorAiService';
 import type { CreatorWorldDrop } from '../../../services/creatorWorldDropMappers';
 import type { CreatorLiveSession } from '../../../services/creatorLiveMappers';
+import type { CreatorAiProfile } from '../../../services/creatorAiMappers';
 
 export type CreatorWorldPhase = 'loading' | 'ready' | 'none' | 'blocked' | 'error';
 
@@ -44,6 +46,7 @@ export interface CreatorWorldData {
   community: CommunitySummary | null;
   worldDrops: CreatorWorldDrop[];
   liveSessions: CreatorLiveSession[];
+  aiProfile: CreatorAiProfile | null;
   isSelf: boolean;
   isGuest: boolean;
 }
@@ -63,6 +66,7 @@ export function emptyCreatorWorldData(phase: CreatorWorldPhase): CreatorWorldDat
     community: null,
     worldDrops: [],
     liveSessions: [],
+    aiProfile: null,
     isSelf: false,
     isGuest: true,
   };
@@ -85,8 +89,18 @@ export async function fetchCreatorWorld(creatorId: string): Promise<CreatorWorld
     safety.blockedProfileIds.includes(creatorId) || safety.blockingProfileIds.includes(creatorId);
   if (blocked) return { ...base, phase: 'blocked' };
 
-  const [drops, cols, subs, services, courses, products, community, worldDrops, liveSessions] =
-    await Promise.all([
+  const [
+    drops,
+    cols,
+    subs,
+    services,
+    courses,
+    products,
+    community,
+    worldDrops,
+    liveSessions,
+    aiProfile,
+  ] = await Promise.all([
       fetchStorefront(vault.id),
       fetchCollections(vault.id),
       fetchSubscriptionState(vault.id),
@@ -96,6 +110,7 @@ export async function fetchCreatorWorld(creatorId: string): Promise<CreatorWorld
       fetchCreatorCommunity(creatorId),
       fetchCreatorWorldDrops(creatorId).catch(() => [] as CreatorWorldDrop[]),
       fetchCreatorLiveSessions(creatorId).catch(() => [] as CreatorLiveSession[]),
+      fetchCreatorAi(creatorId).catch(() => null as CreatorAiProfile | null),
     ]);
 
   return {
@@ -109,5 +124,6 @@ export async function fetchCreatorWorld(creatorId: string): Promise<CreatorWorld
     community,
     worldDrops,
     liveSessions,
+    aiProfile,
   };
 }

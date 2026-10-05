@@ -89,7 +89,7 @@ export const CREATOR_MODULE_REGISTRY: readonly CreatorModuleDefinition[] = [
     type: 'AI',
     title: 'Creator AI',
     sectionTitle: 'CREATOR AI',
-    availability: 'planned',
+    availability: 'supported',
     priority: 80,
   },
   {

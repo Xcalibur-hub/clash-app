@@ -384,3 +384,12 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.vault-media-access]
 enabled = true
 verify_jwt = true
+
+# ── Creator AI ──────────────────────────────────────────────────────────────
+# The only place an AI provider is called. Provider credentials live in this
+# function's environment (`CREATOR_AI_API_KEY`, optional `CREATOR_AI_BASE_URL`
+# and `CREATOR_AI_MODEL`) and are never shipped to Expo. With no key set the
+# function answers "AI provider not configured" instead of inventing a reply.
+[functions.creator-ai]
+enabled = true
+verify_jwt = true

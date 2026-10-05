@@ -45,6 +45,7 @@ function input(partial: Partial<WorldRowsInput>): WorldRowsInput {
     products: [],
     worldDrops: [],
     liveSessions: [],
+    aiProfile: null,
     communityReady: false,
     personality: 'cinematic',
     ...partial,
@@ -172,6 +173,35 @@ describe('creator world rows', () => {
       deps,
     );
     assert.deepEqual(archived, [{ kind: 'empty' }]);
+  });
+
+  it('adds the AI chapter only while the creator has it switched on', () => {
+    const on = buildWorldRows(
+      input({
+        modules: [{ type: 'AI' }],
+        aiProfile: {
+          creatorId: 'maya',
+          creatorName: 'Maya',
+          displayName: 'Maya AI',
+          enabled: true,
+          starters: [],
+        } as never,
+      }),
+      deps,
+    );
+    assert.deepEqual(
+      on.map((row) => row.kind),
+      ['chapter', 'ai'],
+    );
+
+    const off = buildWorldRows(
+      input({
+        modules: [{ type: 'AI' }],
+        aiProfile: { creatorId: 'maya', displayName: 'Maya AI', enabled: false } as never,
+      }),
+      deps,
+    );
+    assert.deepEqual(off, [{ kind: 'empty' }]);
   });
 
   it('resolves collection membership from the injected resolver', () => {

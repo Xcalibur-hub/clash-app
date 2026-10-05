@@ -30,6 +30,7 @@ export interface CreatorWorldModel {
   community: CreatorWorldData['community'];
   worldDrops: CreatorWorldData['worldDrops'];
   liveSessions: CreatorWorldData['liveSessions'];
+  aiProfile: CreatorWorldData['aiProfile'];
   isSelf: boolean;
   modules: CreatorWorldModule[];
   heroUrl: string | null;
@@ -107,6 +108,7 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
         liveReady: (data?.liveSessions ?? []).some(
           (session) => session.status === 'LIVE' || session.status === 'SCHEDULED',
         ),
+        aiReady: (data?.aiProfile ?? null) !== null && data?.aiProfile?.enabled === true,
       }),
     [
       liveDrops.length,
@@ -117,6 +119,7 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
       data?.community,
       data?.worldDrops.length,
       data?.liveSessions,
+      data?.aiProfile,
     ],
   );
 
@@ -151,6 +154,7 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
     community: fallback.community,
     worldDrops: fallback.worldDrops,
     liveSessions: fallback.liveSessions,
+    aiProfile: fallback.aiProfile,
     isSelf: fallback.isSelf,
     modules,
     heroUrl,

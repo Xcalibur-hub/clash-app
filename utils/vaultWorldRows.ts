@@ -11,6 +11,7 @@ import type { StorefrontDrop, VaultCollection } from '../services/vaultMappers';
 import type { CreatorCourse, CreatorProduct, CreatorService } from '../services/vaultCommerceMappers';
 import type { CreatorWorldDrop } from '../services/creatorWorldDropMappers';
 import type { CreatorLiveSession } from '../services/creatorLiveMappers';
+import type { CreatorAiProfile } from '../services/creatorAiMappers';
 
 export interface WorldDropItem {
   id: string;
@@ -58,6 +59,7 @@ export type WorldRow =
   | { kind: 'community' }
   | { kind: 'worldDrops'; items: WorldDropChapterItem[] }
   | { kind: 'live'; sessions: CreatorLiveSession[] }
+  | { kind: 'ai'; profile: CreatorAiProfile }
   | { kind: 'empty' };
 
 export interface WorldRowsInput {
@@ -69,6 +71,8 @@ export interface WorldRowsInput {
   products: readonly CreatorProduct[];
   worldDrops: readonly CreatorWorldDrop[];
   liveSessions: readonly CreatorLiveSession[];
+  /** Viewer-safe AI card; null when the creator has not enabled an AI. */
+  aiProfile: CreatorAiProfile | null;
   communityReady: boolean;
   personality: WorldPersonality;
 }
@@ -291,6 +295,18 @@ export function buildWorldRows(input: WorldRowsInput, deps: WorldRowsDeps): Worl
         count: null,
       });
       rows.push({ kind: 'live', sessions: liveNow });
+    }
+
+    // The AI chapter appears only while the creator has it switched on.
+    if (mod.type === 'AI' && input.aiProfile !== null && input.aiProfile.enabled) {
+      rows.push({
+        kind: 'chapter',
+        index: chapterIndex,
+        module: mod.type,
+        title,
+        count: null,
+      });
+      rows.push({ kind: 'ai', profile: input.aiProfile });
     }
   }
 

@@ -19,9 +19,17 @@ describe('Vault experiences', () => {
   });
 
   it('does not invent routes for planned experience types', () => {
-    assert.equal(isVaultExperienceEnterable('CREATOR_AI'), false);
-    assert.equal(vaultExperienceHref({ type: 'CREATOR_AI', id: 'x' }), null);
+    assert.equal(isVaultExperienceEnterable('AI_FILM'), false);
+    assert.equal(vaultExperienceHref({ type: 'AI_FILM', id: 'x' }), null);
+    assert.equal(isVaultExperienceEnterable('INTERACTIVE_STORY'), false);
+    assert.equal(vaultExperienceHref({ type: 'INTERACTIVE_STORY', id: 'x' }), null);
     assert.equal(vaultExperienceHref({ type: 'WORLD_DROP', id: 'w' }), null);
+  });
+
+  it('routes Creator AI into the creator AI room (Phase 15.5)', () => {
+    assert.equal(isVaultExperienceEnterable('CREATOR_AI'), true);
+    assert.equal(vaultExperienceHref({ type: 'CREATOR_AI', id: 'maya' }), '/vault/ai/maya');
+    assert.equal(vaultExperienceHref({ type: 'CREATOR_AI', id: '' }), null);
   });
 
   it('labels access without inventing entitlement', () => {

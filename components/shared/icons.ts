@@ -46,6 +46,8 @@ export { default as StoreIcon } from 'lucide-react-native/icons/store';
 export { default as ReceiptIcon } from 'lucide-react-native/icons/receipt';
 export { default as KeyIcon } from 'lucide-react-native/icons/key-round';
 export { default as ShieldCheckIcon } from 'lucide-react-native/icons/shield-check';
+export { default as SparklesIcon } from 'lucide-react-native/icons/sparkles';
+export { default as BotIcon } from 'lucide-react-native/icons/bot';
 // Lucide v1 renamed `edit-2` → `square-pen`; the old path still ships types but no
 // runtime file, which resolves in tsc yet breaks the Metro bundle.
 export { default as EditIcon } from 'lucide-react-native/icons/square-pen';
