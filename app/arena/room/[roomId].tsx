@@ -75,7 +75,8 @@ import {
 import { tap as hapticTap } from '../../../utils/haptics';
 
 const REPLY_PREVIEW_LIMIT = 3;
-const PULSE_REFRESH_MS = 15_000;
+const PULSE_REFRESH_MS_DEBATER = 20_000;
+const PULSE_REFRESH_MS_SPECTATOR = 45_000;
 
 interface SafetyTarget {
   user: User;
@@ -353,9 +354,11 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   React.useEffect(() => {
     if (!room) return;
     void loadPulse();
-    const id = setInterval(() => void loadPulse(), PULSE_REFRESH_MS);
+    const interval =
+      room.viewer?.role === 'spectator' ? PULSE_REFRESH_MS_SPECTATOR : PULSE_REFRESH_MS_DEBATER;
+    const id = setInterval(() => void loadPulse(), interval);
     return () => clearInterval(id);
-  }, [loadPulse, room?.roomId, room?.status]);
+  }, [loadPulse, room?.roomId, room?.status, room?.viewer?.role]);
 
   React.useEffect(() => {
     if (messages.length === 0) return;

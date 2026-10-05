@@ -888,6 +888,16 @@ export async function fetchMessagesSince(
   return fetchMessages(roomId, undefined, limit, after);
 }
 
+/** Single-message hydrate for realtime INSERT — avoids full-page refetch. */
+export async function fetchMessage(messageId: string): Promise<ArenaMessage | null> {
+  const { data, error } = await client().rpc('get_arena_room_message', {
+    p_message_id: messageId,
+  });
+  if (error) throw requestError(error);
+  if (data == null) return null;
+  return toMessage(data);
+}
+
 const PULSE_CATEGORIES = [
   'TOP_ARGUMENT',
   'BEST_EVIDENCE',

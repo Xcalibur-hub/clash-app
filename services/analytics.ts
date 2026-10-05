@@ -44,6 +44,7 @@ export type AnalyticsEvent =
   | 'onboarding_completed'
   | 'auth_completed'
   | 'arena_viewed'
+  | 'arena_trending_entered'
   | 'arena_topic_viewed'
   | 'arena_room_joined'
   | 'arena_message_sent'

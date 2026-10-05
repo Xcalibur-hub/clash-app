@@ -9,6 +9,7 @@ import { ArenaTopicDeck } from '../../components/liveArena/ArenaTopicDeck';
 import { FreshTakesSection } from '../../components/arena/FreshTakesSection';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { TakeFeedItem } from '../../components/arena/TakeFeedItem';
+import { TrendingBattlesSection } from '../../components/arena/TrendingBattlesSection';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
 import { ArenaIcon, CompassIcon, UserIcon } from '../../components/shared/icons';
@@ -17,6 +18,7 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { currentViewerProfileId, toggleTakeReaction } from '../../services/apiService';
 import { analytics } from '../../services/analytics';
 import { fetchLiveTopics, type LiveArenaTopic, type Stance } from '../../services/liveArenaService';
+import type { ArenaTrendingBattle } from '../../services/arenaTrendService';
 import { fetchFollowState, fetchFollowingIds } from '../../services/socialService';
 import { errorText } from '../../services/supabaseClient';
 import {
@@ -305,6 +307,17 @@ export default function ArenaScreen(): React.JSX.Element {
     [dispatch, openClash, openDetail, openMenu, requireAuth, shareTake, state, toggleReaction],
   );
 
+  const openTrendingBattle = React.useCallback(
+    (battle: ArenaTrendingBattle): void => {
+      if (!requireAuth()) return;
+      hapticPress();
+      analytics.track('arena_trending_entered', { realm: 'arena' });
+      if (battle.hotRoomId) openRoom(battle.hotRoomId);
+      else openTopic(battle.topicId);
+    },
+    [openRoom, openTopic, requireAuth],
+  );
+
   const header = React.useMemo(
     () => (
       <View style={styles.hero}>
@@ -324,6 +337,11 @@ export default function ArenaScreen(): React.JSX.Element {
             }}
           />
         ) : null}
+
+        <TrendingBattlesSection
+          refreshToken={refreshKey}
+          onEnter={openTrendingBattle}
+        />
 
         <FreshTakesSection
           items={freshItems}
@@ -365,6 +383,8 @@ export default function ArenaScreen(): React.JSX.Element {
       openMenu,
       openRoom,
       openTopic,
+      openTrendingBattle,
+      refreshKey,
       requireAuth,
       scope,
       shareTake,

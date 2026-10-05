@@ -2,6 +2,7 @@ import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import {
   fetchEvidence,
+  fetchMessage,
   fetchMessages,
   fetchMessagesSince,
   fetchMindshiftStats,
@@ -30,8 +31,10 @@ import { mergeMessagesById } from '../utils/liveRoomThread';
 
 /** How many arguments one page of the thread carries. */
 const PAGE = 40;
-/** Realtime bursts are coalesced into a single refresh of the newest page. */
-const REFRESH_DEBOUNCE_MS = 350;
+/** Coalesce realtime INSERT ids before hydrating. */
+const HYDRATE_DEBOUNCE_MS = 280;
+/** Periodic rollup refresh for reactions/reply counts (not every INSERT). */
+const RECONCILE_MS = 30_000;
 
 export interface LiveArenaRoomController {
   room: ArenaRoom | null;
@@ -135,10 +138,29 @@ export function useLiveArenaRoom(
   );
 
   /**
-   * Gap-aware thread refresh after realtime hints / reconnect.
-   * 1) gap-fetch messages newer than the last confirmed server timestamp
-   * 2) re-read newest page for reaction/replyCount rollups
-   * Merge + dedupe by id; server timestamps + ids own ordering.
+   * Lightweight INSERT hydrate: fetch only the new message id(s).
+   * Full newest-page reconcile runs on a slow timer / reconnect — not every post.
+   */
+  const hydrateInserted = React.useCallback(async (ids: string[]): Promise<void> => {
+    if (ids.length === 0) return;
+    try {
+      const unique = [...new Set(ids)].slice(0, 12);
+      const rows = await Promise.all(
+        unique.map((id) => fetchMessage(id).catch(() => null)),
+      );
+      if (!mounted.current) return;
+      const next = rows.filter((row): row is ArenaMessage => row != null);
+      if (next.length === 0) return;
+      setThreadLocked(false);
+      setMessages((current) => mergeMessages(current, next));
+    } catch (caught) {
+      if (!mounted.current) return;
+      if (isMembershipRefusal(caught)) setThreadLocked(true);
+    }
+  }, []);
+
+  /**
+   * Gap-aware + newest-page reconcile after reconnect / periodic drift repair.
    */
   const refreshThread = React.useCallback(async (): Promise<void> => {
     try {
@@ -227,20 +249,31 @@ export function useLiveArenaRoom(
     void load('initial');
   }, [load]);
 
-  // Realtime: coalesce a burst of INSERTs into one read of the newest page.
+  // Realtime: hydrate only the inserted ids (coalesced). Full reconcile is slow-path.
   React.useEffect(() => {
-    const scheduleRefresh = (): void => {
-      if (refreshTimer.current) clearTimeout(refreshTimer.current);
-      refreshTimer.current = setTimeout(() => {
-        void refreshThread();
-      }, REFRESH_DEBOUNCE_MS);
+    const pending = new Set<string>();
+    const flush = (): void => {
+      const ids = [...pending];
+      pending.clear();
+      void hydrateInserted(ids);
     };
-    const unsubscribe = subscribeRoomMessages(roomId, scheduleRefresh);
+    const scheduleHydrate = (id: string): void => {
+      pending.add(id);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      refreshTimer.current = setTimeout(flush, HYDRATE_DEBOUNCE_MS);
+    };
+    const unsubscribe = subscribeRoomMessages(roomId, (event) => {
+      scheduleHydrate(event.id);
+    });
+    const reconcile = setInterval(() => {
+      void refreshThread();
+    }, RECONCILE_MS);
     return () => {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      clearInterval(reconcile);
       unsubscribe();
     };
-  }, [roomId, refreshThread]);
+  }, [hydrateInserted, refreshThread, roomId]);
 
   // Coming back from the background: gap-fetch missed messages, then refresh room.
   React.useEffect(() => {
