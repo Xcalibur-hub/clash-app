@@ -1,9 +1,11 @@
 /**
- * Arena trending battles API — server snapshots only.
+ * Arena trending battles API — live ranking race from server snapshots.
  */
 import type { ArenaTrendMomentum } from '../utils/arenaTrendScore';
+import type { RankDeltaKind } from '../utils/arenaTrendRank';
 import { requireSupabase, requestError } from './supabaseClient';
 
+/** series.v is historical RANK (1 = top), not attention. */
 export interface ArenaTrendPoint {
   t: number;
   v: number;
@@ -15,13 +17,17 @@ export interface ArenaTrendingBattle {
   title: string;
   hood: string | null;
   attentionScore: number;
+  weightedScore: number;
   momentum: ArenaTrendMomentum;
+  rankDelta: number | null;
+  rankDeltaKind: RankDeltaKind;
   changePercent: number | null;
   topicStatus: string;
   participantCount: number;
   activeRoomCount: number;
   hotRoomId: string | null;
   series: ArenaTrendPoint[];
+  historyReady: boolean;
 }
 
 function client() {
@@ -55,6 +61,19 @@ function toMomentum(value: unknown): ArenaTrendMomentum {
   return 'STEADY';
 }
 
+function toDeltaKind(value: unknown): RankDeltaKind {
+  if (
+    value === 'UP' ||
+    value === 'DOWN' ||
+    value === 'FLAT' ||
+    value === 'NEW' ||
+    value === 'INSUFFICIENT'
+  ) {
+    return value;
+  }
+  return 'INSUFFICIENT';
+}
+
 function toBattle(value: unknown): ArenaTrendingBattle | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -73,17 +92,21 @@ function toBattle(value: unknown): ArenaTrendingBattle | null {
     title,
     hood: str(record.hood),
     attentionScore: num(record.attentionScore) ?? 0,
+    weightedScore: num(record.weightedScore) ?? num(record.attentionScore) ?? 0,
     momentum: toMomentum(record.momentum),
+    rankDelta: num(record.rankDelta),
+    rankDeltaKind: toDeltaKind(record.rankDeltaKind),
     changePercent: num(record.changePercent),
     topicStatus: str(record.topicStatus) ?? 'live',
     participantCount: num(record.participantCount) ?? 0,
     activeRoomCount: num(record.activeRoomCount) ?? 0,
     hotRoomId: str(record.hotRoomId),
     series,
+    historyReady: record.historyReady === true || series.length >= 2,
   };
 }
 
-/** Cheap Top-10 + graph history. Never invents battles when empty. */
+/** Cheap Top-10 ranking race + historical ranks. Empty when nothing to show. */
 export async function fetchTrendingBattles(limit = 10): Promise<ArenaTrendingBattle[]> {
   const { data, error } = await client().rpc('list_arena_trending_battles', {
     p_limit: Math.min(10, Math.max(1, limit)),

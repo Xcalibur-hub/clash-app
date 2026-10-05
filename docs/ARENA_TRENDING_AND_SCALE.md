@@ -1,5 +1,41 @@
 # Arena Trending + 1K scale path
 
+## Ranking race (Phase 4.1)
+
+Home chart Y-axis is **rank** (#1 at top), not raw attention.
+
+### Current Top 10
+
+Recency-weighted sum of snapshot attention:
+
+| Age | Weight |
+|--|--|
+| 0–30m | 1.00 |
+| 30–60m | 0.65 |
+| 1–3h | 0.30 |
+| 3–6h | 0.10 |
+
+Tie-break: recent unique actors, then `topic_id`.
+
+### Historical ranks
+
+For each snapshot bucket in the last 6h, rank all topics by that bucket's attention.  
+`series: [{ t, v }]` where **`v` is rank** (1 = top). Lines cross when topics overtake.
+
+### Rank movement
+
+Compare current rank vs rank at the bucket ≈1 hour ago.
+
+- `↑N` / `↓N` places
+- `NEW` when no hour-ago rank but history exists
+- `—` when insufficient
+
+### Client refresh
+
+While Arena Home is focused/active: refetch every **45s**.  
+Paused when AppState is backgrounded.  
+Server snapshots remain ~10 minutes via maintenance.
+
 ## Attention formula (server-authoritative)
 
 Per 10-minute bucket, for each `arena_daily_topics` row (all rooms under it):

@@ -4850,6 +4850,10 @@ export type Database = {
         Args: { p_prior: number; p_recent: number; p_sample: number }
         Returns: string
       }
+      arena_trend_recency_weight: {
+        Args: { p_age_minutes: number }
+        Returns: number
+      }
       assert_advertiser_owner: {
         Args: { p_advertiser_id: string }
         Returns: string

@@ -207,6 +207,9 @@ update public.arena_room_messages
    set hidden_at = now()
  where id = (select root_id from rp_ids);
 
+-- Bust shared pulse cache so the moderated exclusion is visible immediately.
+delete from public.arena_room_pulse_cache where room_id = 'rp-r1';
+
 select set_config(
   'request.jwt.claims',
   json_build_object('sub', '00000000-0000-0000-0000-00000000d001', 'role', 'authenticated')::text,

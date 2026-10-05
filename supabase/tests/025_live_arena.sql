@@ -863,7 +863,7 @@ select ok(public.run_maintenance(50) ? 'arena_rooms_transitioned',
 select is(
   (select array(select jsonb_object_keys(public.run_maintenance(50)) order by 1)),
   ARRAY['arena_backup_invites_expired', 'arena_fun_moments_awarded',
-        'arena_rooms_transitioned', 'clashes_settled', 'media', 'meet_signals_pruned',
+        'arena_rooms_transitioned', 'arena_trends', 'clashes_settled', 'media', 'meet_signals_pruned',
         'prediction_games_closed', 'rate_limits_pruned', 'takes_expired',
         'vault_drops_expired', 'vault_subscriptions_expired', 'world_drops_expired'],
   'run_maintenance preserves every existing key and adds the arena game keys'
