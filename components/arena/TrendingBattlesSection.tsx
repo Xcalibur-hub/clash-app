@@ -18,7 +18,6 @@ import { momentumLabel } from '../../utils/arenaTrendScore';
 import { tap as hapticTap } from '../../utils/haptics';
 import { VaultActionButton } from '../vault/VaultActionButton';
 import { TrendingBattlesChart } from './TrendingBattlesChart';
-import { softFill } from '../liveArena/liveArenaStyles';
 
 export interface TrendingBattlesSectionProps {
   onEnter: (battle: ArenaTrendingBattle) => void;
@@ -92,7 +91,7 @@ export function TrendingBattlesSection({
     return (
       <Animated.View
         entering={reduced ? undefined : FadeIn.duration(240)}
-        style={[styles.wrap, { borderColor: t.border, backgroundColor: t.surface }]}
+        style={[styles.wrap, { borderColor: t.border, backgroundColor: t.background }]}
       >
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
           TRENDING NOW
@@ -119,7 +118,7 @@ export function TrendingBattlesSection({
   return (
     <Animated.View
       entering={reduced ? undefined : FadeIn.duration(240)}
-      style={[styles.wrap, { borderColor: t.border, backgroundColor: t.surface }]}
+      style={[styles.wrap, { borderColor: t.border, backgroundColor: t.background }]}
     >
       <View style={styles.headRow}>
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
@@ -128,7 +127,7 @@ export function TrendingBattlesSection({
         {demo ? (
           <Text
             allowFontScaling={false}
-            style={[styles.demoBadge, { color: t.textPrimary, borderColor: t.borderStrong }]}
+            style={[styles.demoBadge, { color: t.textMuted, borderColor: t.border }]}
             accessibilityLabel="Development preview using demo data"
           >
             {ARENA_TREND_DEMO_LABEL}
@@ -147,12 +146,7 @@ export function TrendingBattlesSection({
         onSelectTopic={selectTopic}
       />
 
-      <View
-        style={[
-          styles.preview,
-          { backgroundColor: softFill(t), borderColor: t.border },
-        ]}
-      >
+      <View style={styles.preview}>
         <Text allowFontScaling={false} style={[styles.previewRank, { color: t.textMuted }]}>
           {`#${selected.rank}`}
         </Text>
@@ -185,8 +179,8 @@ export function TrendingBattlesSection({
               style={[
                 styles.row,
                 {
-                  backgroundColor: activeRow ? softFill(t) : 'transparent',
-                  borderColor: activeRow ? t.borderStrong : 'transparent',
+                  backgroundColor: activeRow ? t.surfaceMuted : 'transparent',
+                  borderColor: activeRow ? t.border : 'transparent',
                 },
               ]}
             >
@@ -226,24 +220,27 @@ export function TrendingBattlesSection({
 const styles = StyleSheet.create({
   wrap: {
     marginHorizontal: layout.screenX,
+    marginTop: space.sm,
     marginBottom: space.lg,
-    padding: space.md,
+    paddingTop: space.md,
+    paddingBottom: space.md,
+    paddingHorizontal: space.md,
     gap: space.sm,
-    borderRadius: radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   kicker: {
     ...typeScale.caption,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 1.6,
   },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   demoBadge: {
     ...typeScale.caption,
     fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.pill,
     paddingHorizontal: space.sm,
@@ -253,36 +250,35 @@ const styles = StyleSheet.create({
   emptyBody: { ...typeScale.meta, fontSize: 12, lineHeight: 17 },
   title: {
     ...typeScale.section,
-    fontSize: 18,
-    lineHeight: 23,
+    fontSize: 22,
+    lineHeight: 27,
     fontWeight: '800',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
     marginBottom: space.xs,
   },
   preview: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    padding: space.sm,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: space.sm,
+    paddingHorizontal: 2,
   },
   previewRank: {
     ...typeScale.dataLg,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    width: 36,
+    width: 40,
     textAlign: 'center',
   },
   previewCopy: { flex: 1, gap: 2 },
   previewTitle: { ...typeScale.label, fontSize: 15, fontWeight: '800', lineHeight: 19 },
   previewMeta: { ...typeScale.caption, fontSize: 11, fontWeight: '600' },
-  list: { gap: 2, marginTop: 2 },
+  list: { gap: 0, marginTop: 2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: space.sm,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,

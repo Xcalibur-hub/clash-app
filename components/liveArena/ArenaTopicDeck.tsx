@@ -31,8 +31,8 @@ import { ArenaTopicDeckCard, type DeckCardTone } from './ArenaTopicDeckCard';
 import { ArenaTopicDeckPagination } from './ArenaTopicDeckPagination';
 import { useLiveTopicPreview } from '../../hooks/useLiveTopicPreview';
 
-/** Designed stage — tall immersive hero + peeks. */
-const STAGE_HEIGHT = 540;
+/** Compact stage so Trending Now enters the viewport sooner on phones. */
+const STAGE_HEIGHT = 404;
 const MAX_VISIBLE = 3;
 const SWIPE_RATIO = 0.18;
 const VELOCITY = 620;
@@ -348,23 +348,23 @@ function slotLayouts(stageWidth: number): [SlotLayout, SlotLayout, SlotLayout] {
   return [
     {
       width: activeW,
-      height: 360,
+      height: 292,
       left: Math.round((stageWidth - activeW) / 2),
-      top: 72,
+      top: 48,
       rotate: -0.4,
     },
     {
       width: nextW,
-      height: 176,
+      height: 148,
       left: Math.round(stageWidth * 0.36),
-      top: 4,
+      top: 2,
       rotate: 2.8,
     },
     {
       width: thirdW,
-      height: 148,
+      height: 124,
       left: Math.round(stageWidth * 0.06),
-      top: 300,
+      top: 246,
       rotate: -2.2,
     },
   ];
@@ -416,9 +416,9 @@ function DeckLayer({
       return {
         zIndex: 40,
         left: Math.round((stageWidth - hero.width) / 2),
-        top: 48,
+        top: 28,
         width: hero.width,
-        height: hero.height + 28,
+        height: hero.height + 16,
         transform: [{ rotate: '0deg' }, { scale: 1 }],
       };
     }
@@ -538,9 +538,9 @@ function hoodDisplayName(hood: string): string {
 
 const styles = StyleSheet.create({
   section: {
-    paddingTop: space.md,
-    paddingBottom: space.md,
-    gap: space.sm,
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
+    gap: space.xs,
   },
   header: {
     paddingHorizontal: layout.screenX,
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chip: {
-    minHeight: 34,
+    minHeight: 32,
     paddingHorizontal: space.md,
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
   empty: {
     marginHorizontal: layout.screenX,
     borderRadius: radius.lg,
-    paddingVertical: space.xl,
+    paddingVertical: space.lg,
     paddingHorizontal: space.md,
     alignItems: 'center',
   },

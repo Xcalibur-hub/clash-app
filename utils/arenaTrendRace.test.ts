@@ -113,14 +113,14 @@ describe('development fixture', () => {
     );
   });
 
-  it('can never activate in preview or production variants', () => {
+  it('activates under __DEV__ even when Metro defaults appVariant to production', () => {
     assert.equal(
-      arenaTrendDemoEnabled({ dev: true, variant: 'production', toggle: true, envFlag: '1' }),
-      false,
+      arenaTrendDemoEnabled({ dev: true, variant: 'production', toggle: false, envFlag: '1' }),
+      true,
     );
     assert.equal(
-      arenaTrendDemoEnabled({ dev: true, variant: 'preview', toggle: true, envFlag: '1' }),
-      false,
+      arenaTrendDemoEnabled({ dev: true, variant: 'preview', toggle: true, envFlag: null }),
+      true,
     );
   });
 

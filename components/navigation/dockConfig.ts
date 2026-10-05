@@ -15,9 +15,10 @@ export const DOCK_HEIGHT = 52;
 
 /**
  * Breathing room above the dock top edge (not including safe-area inset).
- * Scroll screens should use: insets.bottom + dockContentClearance()
+ * Scroll screens should use: insets.bottom + DOCK_SCROLL_CLEARANCE
+ * Sized so feed/trending content clears the floating capsule without huge padding.
  */
-export const DOCK_TOP_GAP = 36;
+export const DOCK_TOP_GAP = 48;
 
 /**
  * Bottom clearance for scrollable tab screens so content clears the floating

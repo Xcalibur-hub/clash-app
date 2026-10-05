@@ -113,8 +113,9 @@ function toBattle(value: unknown): ArenaTrendingBattle | null {
 }
 
 /**
- * Is the development-only preview active? Never true in a production or preview
- * app variant, and never true in a release bundle (`__DEV__` gate).
+ * Is the development-only preview active? Never true in a release bundle
+ * (`__DEV__` gate). Enable with `EXPO_PUBLIC_ARENA_TREND_DEMO=1` or the
+ * fixture toggle.
  */
 export function trendingDemoActive(): boolean {
   const extra = Constants.expoConfig?.extra as { appVariant?: unknown } | undefined;

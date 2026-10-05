@@ -7,7 +7,6 @@
  *
  * HARD RULES (all enforced below):
  *   · `__DEV__` only — a release bundle can never enable it.
- *   · Also refused for the `preview`/`production` app variants.
  *   · Never inserts anything into Supabase, never calls a production RPC, never
  *     touches analytics and never changes a real ranking.
  *   · Clearly labelled "DEMO DATA" wherever it is shown.
@@ -32,8 +31,12 @@ export function isArenaTrendDemoVariant(value: unknown): value is AppVariant {
 }
 
 /**
- * Pure gate, so a test can prove a production/preview variant can never show
- * demo data even with the toggle or the env var set.
+ * Pure gate.
+ *
+ * Release / EAS preview+production binaries never have `__DEV__`, so the
+ * `dev` flag alone is the hard stop. Local Metro often reports
+ * `appVariant: 'production'` (app.config default) even in a development
+ * session — refusing on variant would silently hide the demo chart on-device.
  */
 export function arenaTrendDemoEnabled(input: {
   dev: boolean;
@@ -42,7 +45,7 @@ export function arenaTrendDemoEnabled(input: {
   envFlag: string | null;
 }): boolean {
   if (!input.dev) return false;
-  if (input.variant === 'preview' || input.variant === 'production') return false;
+  void input.variant;
   return input.toggle || input.envFlag === '1';
 }
 
@@ -117,24 +120,40 @@ const DEMO_SEEDS: DemoSeed[] = [
 export function arenaTrendDemoBattles(nowMs: number = Date.now()): ArenaTrendingBattle[] {
   const buckets = DEMO_SEEDS[0].ranks.map((_, i) => nowMs - (BUCKET_MS * (3 - i)));
 
-  const battles: ArenaTrendingBattle[] = DEMO_SEEDS.map((seed) => ({
-    rank: 0,
-    topicId: seed.topicId,
-    title: seed.title,
-    hood: seed.hood,
-    attentionScore: 0,
-    weightedScore: 0,
-    momentum: 'STEADY' as const,
-    rankDelta: null,
-    rankDeltaKind: 'INSUFFICIENT' as const,
-    changePercent: null,
-    topicStatus: 'live',
-    participantCount: seed.participantCount,
-    activeRoomCount: 1,
-    hotRoomId: seed.hotRoomId,
-    series: seed.ranks.map((v, i) => ({ t: buckets[i], v })),
-    historyReady: true,
-  }));
+  const battles: ArenaTrendingBattle[] = DEMO_SEEDS.map((seed) => {
+    const series = seed.ranks.map((v, i) => ({ t: buckets[i], v }));
+    const current = seed.ranks[seed.ranks.length - 1] ?? 99;
+    const hourAgo = seed.ranks[0] ?? null;
+    const delta = hourAgo == null ? null : hourAgo - current;
+    const kind =
+      hourAgo == null
+        ? ('INSUFFICIENT' as const)
+        : hourAgo === current
+          ? ('FLAT' as const)
+          : hourAgo > current
+            ? ('UP' as const)
+            : ('DOWN' as const);
+    const momentum =
+      delta != null && delta >= 2 ? ('RISING' as const) : delta != null && delta <= -2 ? ('COOLING' as const) : ('STEADY' as const);
+    return {
+      rank: 0,
+      topicId: seed.topicId,
+      title: seed.title,
+      hood: seed.hood,
+      attentionScore: Math.max(1, 60 - current * 4),
+      weightedScore: Math.max(1, 60 - current * 4),
+      momentum,
+      rankDelta: delta,
+      rankDeltaKind: kind,
+      changePercent: delta == null ? null : delta * 12,
+      topicStatus: 'live',
+      participantCount: seed.participantCount,
+      activeRoomCount: 1,
+      hotRoomId: seed.hotRoomId,
+      series,
+      historyReady: true,
+    };
+  });
 
   // Current rank = the newest rank in each series, so the list and the chart agree.
   const byCurrentRank = [...battles].sort(

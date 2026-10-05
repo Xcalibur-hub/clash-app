@@ -8,7 +8,6 @@ import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import type { ArenaTrendPoint, ArenaTrendingBattle } from '../../services/arenaTrendService';
 import {
-  isEarlyHistory,
   shortTitle,
   trendRaceCaption,
   trendRaceStage,
@@ -24,9 +23,12 @@ export interface TrendingBattlesChartProps {
   onSelectTopic?: (topicId: string) => void;
 }
 
-const H = 176;
-const PAD = { top: 10, right: 108, bottom: 20, left: 28 };
+/** Tall enough on a phone to read as a real ranking race, not a sparkline. */
+const H = 228;
+const PAD = { top: 12, right: 112, bottom: 22, left: 34 };
 const MAX_RANK = 10;
+const LABEL_GAP = 14;
+const Y_TICKS = [1, 2, 3, 5, 7, 10] as const;
 
 function rankY(rank: number, height: number): number {
   const innerH = Math.max(1, height - PAD.top - PAD.bottom);
@@ -46,6 +48,29 @@ function buildRankPath(
     .join(' ');
 }
 
+/** Nudge overlapping end labels apart so #1/#2/#3 stay readable. */
+function spreadLabelYs(
+  items: readonly { id: string; y: number }[],
+): Map<string, number> {
+  const sorted = [...items].sort((a, b) => a.y - b.y);
+  const ys = sorted.map((item) => item.y);
+  for (let i = 1; i < ys.length; i += 1) {
+    if (ys[i] - ys[i - 1] < LABEL_GAP) ys[i] = ys[i - 1] + LABEL_GAP;
+  }
+  const maxY = H - PAD.bottom + 4;
+  for (let i = ys.length - 2; i >= 0; i -= 1) {
+    if (ys[i + 1] > maxY) ys[i + 1] = maxY;
+    if (ys[i + 1] - ys[i] < LABEL_GAP) ys[i] = ys[i + 1] - LABEL_GAP;
+  }
+  if (ys[0] < PAD.top) {
+    const shift = PAD.top - ys[0];
+    for (let i = 0; i < ys.length; i += 1) ys[i] += shift;
+  }
+  const out = new Map<string, number>();
+  sorted.forEach((item, i) => out.set(item.id, ys[i]));
+  return out;
+}
+
 export function TrendingBattlesChart({
   battles,
   selectedId,
@@ -60,7 +85,6 @@ export function TrendingBattlesChart({
     topicCount: battles.length,
     pointCounts: battles.map((b) => b.series.length),
   });
-  // A line needs two real points. One snapshot is a marker, not a history.
   const hasLines = stage === 'FIRST_LINES' || stage === 'RACE';
   const caption = trendRaceCaption(stage);
 
@@ -80,8 +104,6 @@ export function TrendingBattlesChart({
   const maxT = bucketTimes.length ? bucketTimes[bucketTimes.length - 1] : 1;
   const innerW = Math.max(1, width - PAD.left - PAD.right);
   const spanT = Math.max(1, maxT - minT);
-  // With a single snapshot there is no time axis yet, so the marker sits at
-  // "now" — the current ranking — rather than pretending to be a line start.
   const xFor = React.useCallback(
     (value: number): number => {
       if (bucketTimes.length <= 1) return width - PAD.right;
@@ -89,6 +111,19 @@ export function TrendingBattlesChart({
     },
     [bucketTimes.length, innerW, minT, spanT, width],
   );
+
+  const labelYs = React.useMemo(() => {
+    const seeds: { id: string; y: number }[] = [];
+    for (const battle of battles) {
+      const selected = battle.topicId === selectedId;
+      const top3 = battle.rank <= 3;
+      if (!selected && !top3) continue;
+      const last = battle.series[battle.series.length - 1];
+      const markerRank = last ? last.v : battle.rank;
+      seeds.push({ id: battle.topicId, y: rankY(markerRank, H) });
+    }
+    return spreadLabelYs(seeds);
+  }, [battles, selectedId]);
 
   const scrubBucketT = React.useMemo(() => {
     if (!hasLines || bucketTimes.length === 0) return null;
@@ -126,14 +161,13 @@ export function TrendingBattlesChart({
     onScrubIndex(best);
   };
 
-  // Nothing to rank at all: the section owns that state, not the chart.
   if (stage === 'EMPTY') return null;
 
   return (
     <View style={styles.wrap} onLayout={onLayout}>
       <View style={styles.meta}>
         <Text allowFontScaling={false} style={[styles.axis, { color: t.textMuted }]}>
-          {caption ? caption.kicker : 'rank'}
+          {caption ? caption.kicker : 'RANK'}
         </Text>
         {scrubBucketT != null ? (
           <Text allowFontScaling={false} style={[styles.value, { color: t.textPrimary }]}>
@@ -161,48 +195,40 @@ export function TrendingBattlesChart({
         accessibilityLabel="Live topic ranking race chart"
       >
         <Svg width={width} height={H}>
-          {[1, 4, 7, 10].map((rank) => (
-            <Line
-              key={rank}
-              x1={PAD.left}
-              x2={width - PAD.right}
-              y1={rankY(rank, H)}
-              y2={rankY(rank, H)}
-              stroke={t.border}
-              strokeWidth={StyleSheet.hairlineWidth}
-            />
+          {Y_TICKS.map((rank) => (
+            <React.Fragment key={rank}>
+              <Line
+                x1={PAD.left}
+                x2={width - PAD.right}
+                y1={rankY(rank, H)}
+                y2={rankY(rank, H)}
+                stroke={t.border}
+                strokeWidth={StyleSheet.hairlineWidth}
+                strokeOpacity={rank <= 3 ? 0.9 : 0.55}
+              />
+              <SvgText
+                x={4}
+                y={rankY(rank, H) + 3}
+                fill={rank <= 3 ? t.textSecondary : t.textMuted}
+                fontSize={rank <= 3 ? 10 : 9}
+                fontWeight="700"
+              >
+                {`#${rank}`}
+              </SvgText>
+            </React.Fragment>
           ))}
-          <SvgText
-            x={4}
-            y={rankY(1, H) + 3}
-            fill={t.textMuted}
-            fontSize={9}
-            fontWeight="700"
-          >
-            #1
-          </SvgText>
-          <SvgText
-            x={4}
-            y={rankY(10, H) + 3}
-            fill={t.textMuted}
-            fontSize={9}
-            fontWeight="700"
-          >
-            #10
-          </SvgText>
 
           {battles.map((battle) => {
             const selected = battle.topicId === selectedId;
             const top3 = battle.rank <= 3;
-            const opacity = selected ? 1 : top3 ? 0.72 : 0.28;
-            const strokeW = selected ? 2.6 : top3 ? 1.8 : 1.1;
+            const opacity = selected ? 1 : top3 ? 0.78 : 0.26;
+            const strokeW = selected ? 2.8 : top3 ? 2 : 1.05;
             const last = battle.series[battle.series.length - 1];
-            // A line needs two real points; the last real point — or the current
-            // rank when history has not started — is the endpoint marker.
             const canDrawLine = hasLines && battle.series.length >= 2;
             const markerRank = last ? last.v : battle.rank;
             const endX = last ? xFor(last.t) : width - PAD.right;
             const endY = rankY(markerRank, H);
+            const labelY = labelYs.get(battle.topicId) ?? endY;
             const showLabel = selected || top3;
             return (
               <React.Fragment key={battle.topicId}>
@@ -219,8 +245,6 @@ export function TrendingBattlesChart({
                   />
                 ) : null}
 
-                {/* Early history: every ranked topic gets its marker, so the
-                    current ranking is visible without a fabricated line. */}
                 {!canDrawLine ? (
                   <Circle
                     cx={endX}
@@ -240,23 +264,23 @@ export function TrendingBattlesChart({
                       <Circle
                         cx={endX}
                         cy={endY}
-                        r={selected ? 4.5 : 3.2}
+                        r={selected ? 4.8 : 3.4}
                         fill={t.surfaceElevated}
                         stroke={t.textPrimary}
-                        strokeWidth={selected ? 2 : 1.4}
+                        strokeWidth={selected ? 2 : 1.5}
                         opacity={opacity}
                         onPress={() => onSelectTopic?.(battle.topicId)}
                       />
                     ) : null}
                     <SvgText
                       x={endX + 8}
-                      y={endY + 3}
+                      y={labelY + 3}
                       fill={selected ? t.textPrimary : t.textSecondary}
-                      fontSize={10}
+                      fontSize={selected ? 11 : 10}
                       fontWeight="700"
                       onPress={() => onSelectTopic?.(battle.topicId)}
                     >
-                      {`#${battle.rank} ${shortTitle(battle.title, selected ? 18 : 14)}`}
+                      {shortTitle(battle.title, selected ? 16 : 13)}
                     </SvgText>
                   </>
                 ) : null}
@@ -266,16 +290,8 @@ export function TrendingBattlesChart({
 
           {scrubBucketT != null && scrubIndex != null ? (
             <Line
-              x1={
-                PAD.left +
-                ((scrubBucketT - minT) / Math.max(1, maxT - minT)) *
-                  Math.max(1, width - PAD.left - PAD.right)
-              }
-              x2={
-                PAD.left +
-                ((scrubBucketT - minT) / Math.max(1, maxT - minT)) *
-                  Math.max(1, width - PAD.left - PAD.right)
-              }
+              x1={xFor(scrubBucketT)}
+              x2={xFor(scrubBucketT)}
               y1={PAD.top}
               y2={H - PAD.bottom}
               stroke={t.borderStrong}
@@ -300,12 +316,12 @@ export function TrendingBattlesChart({
         </View>
       ) : null}
 
-      <View style={styles.timeRow}>
+      <View style={[styles.timeRow, { paddingLeft: PAD.left, paddingRight: PAD.right }]}>
         <Text allowFontScaling={false} style={[styles.axis, { color: t.textMuted }]}>
-          earlier
+          EARLIER
         </Text>
         <Text allowFontScaling={false} style={[styles.axis, { color: t.textMuted }]}>
-          now
+          NOW
         </Text>
       </View>
     </View>
@@ -318,21 +334,20 @@ function formatClock(ms: number): string {
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 4 },
+  wrap: { gap: 6 },
   meta: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
     paddingHorizontal: 2,
   },
-  axis: { ...typeScale.caption, fontSize: 10, fontWeight: '700', letterSpacing: 0.6 },
+  axis: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   value: { ...typeScale.label, fontSize: 13, fontWeight: '800' },
   earlyNote: { ...typeScale.meta, fontSize: 11, paddingHorizontal: 2, marginTop: -2 },
-  chartHit: { height: H },
+  chartHit: { height: H, marginHorizontal: -2 },
   timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 2,
     marginTop: -space.xs,
   },
   scrubBoard: { gap: 2, paddingHorizontal: 2, paddingTop: 2 },

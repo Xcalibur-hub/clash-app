@@ -40,7 +40,7 @@ import {
 import { useAuth } from '../../store/AuthProvider';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
-import { DOCK_SCROLL_CLEARANCE } from '../../components/navigation/dockConfig';
+import { dockBottomPadding } from '../../components/navigation/dockConfig';
 
 const EMPTY_SET: ReadonlySet<string> = new Set<string>();
 
@@ -477,7 +477,7 @@ export default function ArenaScreen(): React.JSX.Element {
         renderItem={renderItem}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + DOCK_SCROLL_CLEARANCE }]}
+        contentContainerStyle={[styles.list, { paddingBottom: dockBottomPadding(insets.bottom) }]}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={() => {
@@ -522,7 +522,7 @@ function FeedSkeleton(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { flexGrow: 1 },
-  hero: { paddingBottom: space.sm, gap: space.md },
+  hero: { paddingBottom: space.xs, gap: space.sm },
   feedHead: {
     paddingTop: space.sm,
     paddingBottom: space.md,

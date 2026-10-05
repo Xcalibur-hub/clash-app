@@ -54,6 +54,10 @@ export function writeLocalEnv() {
 
 EXPO_PUBLIC_SUPABASE_URL=${apiUrl}
 EXPO_PUBLIC_SUPABASE_ANON_KEY=${anon}
+
+# Dev-only: completed ranking-race chart without waiting for real snapshots.
+# Set to 0 to use live Supabase trend history instead.
+EXPO_PUBLIC_ARENA_TREND_DEMO=1
 `;
 
   writeFileSync(ENV_LOCAL, body, 'utf8');
