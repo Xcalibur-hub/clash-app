@@ -19,12 +19,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { analytics } from '../../services/analytics';
-import {
-  fetchFeaturedGifs,
-  isGifSearchConfigured,
-  searchGifs,
-  type TenorGif,
-} from '../../services/tenorService';
+import { getGifProvider } from '../../services/gif';
+import type { TenorGif } from '../../services/tenorService';
+import { isGifSearchConfigured } from '../../services/tenorService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { CloseIcon, SearchIcon } from '../shared/icons';
@@ -73,8 +70,18 @@ export function GifPickerSheet({
       setLoadingMore(true);
     }
     try {
-      const page = q.trim() ? await searchGifs(q, pos) : await fetchFeaturedGifs(pos);
-      setResults((prev) => (append ? [...prev, ...page.results] : page.results));
+      const provider = getGifProvider();
+      const page = q.trim() ? await provider.search(q, pos) : await provider.trending(pos);
+      const mapped: TenorGif[] = page.results.map((g) => ({
+        id: g.id,
+        provider: 'tenor',
+        previewUrl: g.previewUrl,
+        url: g.url,
+        width: g.width,
+        height: g.height,
+        description: g.description,
+      }));
+      setResults((prev) => (append ? [...prev, ...mapped] : mapped));
       setNext(page.next);
       setState(page.results.length === 0 && !append ? 'empty' : 'ready');
     } catch (err) {

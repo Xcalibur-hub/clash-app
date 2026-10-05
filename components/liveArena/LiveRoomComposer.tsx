@@ -16,10 +16,14 @@ import {
   type ArenaMediaAttachment,
 } from '../../services/liveArenaService';
 import { errorText } from '../../services/supabaseClient';
-import type { TenorGif } from '../../services/tenorService';
+import type { NormalizedGifMedia } from '../../services/gif';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
-import { GifPickerSheet } from '../arena/GifPickerSheet';
+import {
+  ExpressiveMediaTray,
+  type ExpressiveMainTab,
+  type ExpressiveMediaPick,
+} from '../arena/ExpressiveMediaTray';
 import { TakeMediaPreview } from '../arena/TakeMediaPreview';
 import { CloseIcon, ImageIcon, StickerIcon, VideoIcon } from '../shared/icons';
 
@@ -27,6 +31,7 @@ export interface ComposedArgument {
   body: string;
   media?: ArenaMediaAttachment;
   gif?: ArenaGifAttachment;
+  reshareSourceMessageId?: string;
 }
 
 export interface LiveRoomComposerProps {
@@ -48,6 +53,9 @@ export interface LiveRoomComposerProps {
   onSend: (argument: ComposedArgument) => Promise<boolean>;
   onAddProof: () => void;
   onError?: (message: string) => void;
+  /** Opens tray on Meme / GIF / Sticker from message long-press. */
+  expressiveTab?: ExpressiveMainTab | null;
+  onExpressiveTabConsumed?: () => void;
 }
 
 /**
@@ -71,14 +79,19 @@ export function LiveRoomComposer({
   onSend,
   onAddProof,
   onError,
+  expressiveTab = null,
+  onExpressiveTabConsumed,
 }: LiveRoomComposerProps): React.JSX.Element {
   const t = useThemeColors();
   const { pickImage, pickVideo } = useMediaPicker();
   const inputRef = React.useRef<TextInput>(null);
   const [draft, setDraft] = React.useState('');
   const [media, setMedia] = React.useState<PickedMedia | null>(null);
-  const [gif, setGif] = React.useState<TenorGif | null>(null);
-  const [gifOpen, setGifOpen] = React.useState(false);
+  const [gif, setGif] = React.useState<NormalizedGifMedia | null>(null);
+  const [reshareId, setReshareId] = React.useState<string | null>(null);
+  const [readyMedia, setReadyMedia] = React.useState<ArenaMediaAttachment | null>(null);
+  const [trayOpen, setTrayOpen] = React.useState(false);
+  const [trayTab, setTrayTab] = React.useState<ExpressiveMainTab>('gifs');
   const [uploading, setUploading] = React.useState(false);
 
   React.useEffect(() => {
@@ -89,14 +102,24 @@ export function LiveRoomComposer({
     return undefined;
   }, [disabled, focusToken]);
 
-  const hasAttachment = Boolean(media) || Boolean(gif);
+  const hasAttachment = Boolean(media) || Boolean(gif) || Boolean(reshareId) || Boolean(readyMedia);
   const busy = sending || uploading;
   const canSend = (draft.trim().length > 0 || hasAttachment) && !busy && !disabled;
   const remaining = ARENA_MESSAGE_MAX - draft.length;
 
+  React.useEffect(() => {
+    if (expressiveTab) {
+      setTrayTab(expressiveTab);
+      setTrayOpen(true);
+      onExpressiveTabConsumed?.();
+    }
+  }, [expressiveTab, onExpressiveTabConsumed]);
+
   const clearAttachments = (): void => {
     setMedia(null);
     setGif(null);
+    setReshareId(null);
+    setReadyMedia(null);
   };
 
   const attach = async (kind: 'image' | 'video'): Promise<void> => {
@@ -117,8 +140,8 @@ export function LiveRoomComposer({
     if (!canSend) return;
     hapticPress();
     onTypingClear?.();
-    let attachment: ArenaMediaAttachment | undefined;
-    if (media) {
+    let attachment: ArenaMediaAttachment | undefined = readyMedia ?? undefined;
+    if (!attachment && media) {
       setUploading(true);
       try {
         attachment = await uploadArenaMedia(media);
@@ -132,7 +155,10 @@ export function LiveRoomComposer({
     const sent = await onSend({
       body: draft.trim().slice(0, ARENA_MESSAGE_MAX),
       ...(attachment ? { media: attachment } : {}),
-      ...(gif ? { gif: { provider: 'tenor', externalId: gif.id, url: gif.previewUrl } } : {}),
+      ...(gif
+        ? { gif: { provider: 'tenor', externalId: gif.id, url: gif.previewUrl } }
+        : {}),
+      ...(reshareId ? { reshareSourceMessageId: reshareId } : {}),
     });
     if (sent) {
       onTypingClear?.();
@@ -209,6 +235,20 @@ export function LiveRoomComposer({
           </View>
         ) : null}
 
+        {readyMedia ? (
+          <View style={[styles.gif, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
+            <Image source={{ uri: readyMedia.url }} style={styles.gifImage} resizeMode="cover" />
+            <Pressable
+              onPress={clearAttachments}
+              style={styles.gifRemove}
+              accessibilityRole="button"
+              accessibilityLabel="Remove meme"
+            >
+              <CloseIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
+            </Pressable>
+          </View>
+        ) : null}
+
         {gif ? (
           <View style={[styles.gif, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
             <Image source={{ uri: gif.previewUrl }} style={styles.gifImage} resizeMode="cover" />
@@ -232,10 +272,11 @@ export function LiveRoomComposer({
               <VideoIcon size={18} color={t.textSecondary} strokeWidth={2} />
             </ToolButton>
             <ToolButton
-              label="Attach GIF"
+              label="Memes, GIFs, and stickers"
               onPress={() => {
                 hapticTap();
-                setGifOpen(true);
+                setTrayTab('gifs');
+                setTrayOpen(true);
               }}
               disabled={busy}
             >
@@ -284,17 +325,50 @@ export function LiveRoomComposer({
         </View>
       </View>
 
-      <GifPickerSheet
-        visible={gifOpen}
-        source="comment"
-        onClose={() => setGifOpen(false)}
-        onSelect={(selected) => {
-          setMedia(null);
-          setGif(selected);
-        }}
+      <ExpressiveMediaTray
+        visible={trayOpen}
+        source="room"
+        initialMainTab={trayTab}
+        onClose={() => setTrayOpen(false)}
+        onSelect={(pick) => void applyExpressivePick(pick)}
       />
     </View>
   );
+
+  async function applyExpressivePick(pick: ExpressiveMediaPick): Promise<void> {
+    setMedia(null);
+    setGif(null);
+    setReshareId(null);
+    setReadyMedia(null);
+    if (pick.channel === 'meme' && 'upload' in pick) {
+      await attach('image');
+      return;
+    }
+    if (pick.channel === 'gif' || pick.channel === 'sticker') {
+      setGif(pick.media);
+      return;
+    }
+    if (pick.channel !== 'meme') return;
+    if (pick.trending) {
+      setReshareId(pick.trending.messageId);
+      return;
+    }
+    if (pick.saved?.sourceMessageId) {
+      setReshareId(pick.saved.sourceMessageId);
+      return;
+    }
+    if (pick.saved?.mediaObjectId) {
+      setReadyMedia({
+        mediaObjectId: pick.saved.mediaObjectId,
+        url: pick.saved.mediaUrl,
+        kind: 'image',
+      });
+      return;
+    }
+    if (pick.media) {
+      setGif(pick.media);
+    }
+  }
 }
 
 function ToolButton({

@@ -952,6 +952,8 @@ export interface PostArenaMessageInput {
   parentMessageId?: string | null;
   media?: ArenaMediaAttachment;
   gif?: ArenaGifAttachment;
+  /** Reshare a public CLASH meme/GIF (trending/saved). */
+  reshareSourceMessageId?: string | null;
 }
 
 /**
@@ -961,6 +963,47 @@ export interface PostArenaMessageInput {
  * payload, so the author card has to be supplied by the caller (it is always the
  * viewer). Reactions start empty and vote counts stay withheld until settlement.
  */
+/** Reshare a trending/saved CLASH meme or GIF (public source only). */
+export async function postClashMediaReshare(
+  roomId: string,
+  sourceMessageId: string,
+  parentMessageId?: string | null,
+  body = '',
+  author: ArenaAuthor | null = null,
+): Promise<ArenaMessage> {
+  const { data, error } = await (
+    client() as unknown as {
+      rpc: (n: string, a: Record<string, unknown>) => Promise<{ data: unknown; error: import('@supabase/supabase-js').PostgrestError | null }>;
+    }
+  ).rpc('post_arena_clash_media_reshare', {
+    p_room_id: roomId,
+    p_source_message_id: sourceMessageId,
+    ...(parentMessageId ? { p_parent_message_id: parentMessageId } : {}),
+    p_body: body.slice(0, ARENA_MESSAGE_MAX),
+  });
+  if (error) throw requestError(error);
+  const rows = data as Array<Record<string, unknown>> | null;
+  const row = rows?.[0];
+  if (!row) bad('post_arena_clash_media_reshare');
+  return {
+    id: String(row.id),
+    roomId: String(row.room_id),
+    kind: row.kind as ArenaMessageKind,
+    body: String(row.body ?? ''),
+    parentMessageId: (row.parent_message_id as string | null) ?? null,
+    createdAt: Date.parse(String(row.created_at)),
+    mediaUrl: (row.media_url as string | null) ?? null,
+    mediaKind: (row.media_kind as MediaKind | null) ?? null,
+    gifProvider: (row.gif_provider as string | null) ?? null,
+    gifExternalId: (row.gif_external_id as string | null) ?? null,
+    isOwn: true,
+    author,
+    reactions: [],
+    replyCount: 0,
+    argumentVotes: null,
+  };
+}
+
 export async function postMessage(
   input: PostArenaMessageInput,
   author: ArenaAuthor | null = null,

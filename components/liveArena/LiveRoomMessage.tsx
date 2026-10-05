@@ -7,6 +7,7 @@ import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { CommentMedia } from '../arena/CommentMedia';
+import { MessageExpressiveSheet } from '../arena/MessageExpressiveSheet';
 import { Avatar } from '../shared/Avatar';
 import { MoreIcon } from '../shared/icons';
 import { ArenaReactionPicker } from './ArenaReactionPicker';
@@ -38,6 +39,9 @@ export interface LiveRoomMessageProps {
   hiddenReplyCount?: number;
   onExpandReplies?: () => void;
   onReply?: (message: ArenaMessage) => void;
+  onExpressiveReply?: (message: ArenaMessage, mode: 'meme' | 'gif' | 'sticker') => void;
+  /** When false, GIF previews in this row stay static. */
+  mediaVisible?: boolean;
   onReact?: (message: ArenaMessage, emoji: string) => void;
   onOpenProfile?: (profileId: string) => void;
   onReport?: (message: ArenaMessage) => void;
@@ -83,6 +87,8 @@ export function LiveRoomMessage({
   hiddenReplyCount = 0,
   onExpandReplies,
   onReply,
+  onExpressiveReply,
+  mediaVisible = true,
   onReact,
   onOpenProfile,
   onReport,
@@ -93,6 +99,7 @@ export function LiveRoomMessage({
   const t = useThemeColors();
   const reduced = useReducedMotion();
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [expressiveOpen, setExpressiveOpen] = React.useState(false);
 
   if (message.kind === 'system') {
     return (
@@ -119,7 +126,7 @@ export function LiveRoomMessage({
   const mediaBlock =
     media != null ? (
       <View style={[styles.media, memeLead && styles.mediaLead]}>
-        <CommentMedia media={media} compact={isReply && !memeLead} />
+        <CommentMedia media={media} compact={isReply && !memeLead} animateGif={mediaVisible} />
       </View>
     ) : null;
 
@@ -168,7 +175,13 @@ export function LiveRoomMessage({
         />
       </Pressable>
 
-      <View
+      <Pressable
+        onLongPress={() => {
+          if (pending) return;
+          hapticTap();
+          setExpressiveOpen(true);
+        }}
+        delayLongPress={280}
         style={[
           styles.plate,
           {
@@ -425,7 +438,15 @@ export function LiveRoomMessage({
             ) : null}
           </View>
         ) : null}
-      </View>
+      </Pressable>
+
+      <MessageExpressiveSheet
+        visible={expressiveOpen}
+        onClose={() => setExpressiveOpen(false)}
+        onReply={() => onReply?.(message)}
+        onExpressive={(mode) => onExpressiveReply?.(message, mode)}
+        onReport={onReport ? () => onReport(message) : undefined}
+      />
 
       {showReactButton && onReact ? (
         <ArenaReactionPicker

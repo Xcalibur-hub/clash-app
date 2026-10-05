@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ARENA_REACTIONS,
+  QUICK_ARENA_REACTIONS,
   arrivalBanner,
   backupPolicyLabel,
   battleEventToRoomEvent,
@@ -119,7 +120,7 @@ describe('battle events become room banners', () => {
 
 describe('reaction palette', () => {
   it('stays compact and expressive', () => {
-    assert.equal(ARENA_REACTIONS.length, 7);
+    assert.equal(ARENA_REACTIONS.length, 11);
     assert.equal(ARENA_REACTIONS[0].emoji, '🔥');
     assert.ok(ARENA_REACTIONS.some((entry) => entry.label === 'Receipts'));
   });
@@ -127,5 +128,11 @@ describe('reaction palette', () => {
   it('offers no emoji twice', () => {
     const unique = new Set(ARENA_REACTIONS.map((entry) => entry.emoji));
     assert.equal(unique.size, ARENA_REACTIONS.length);
+  });
+
+  it('keeps quick reactions inside the palette', () => {
+    for (const emoji of QUICK_ARENA_REACTIONS) {
+      assert.ok(ARENA_REACTIONS.some((entry) => entry.emoji === emoji));
+    }
   });
 });

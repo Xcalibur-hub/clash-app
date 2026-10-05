@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { QuickReactionRow } from '../arena/QuickReactionRow';
 import { ARENA_REACTIONS } from '../../utils/arenaGameState';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -49,6 +50,12 @@ export function ArenaReactionPicker({
           <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
             React · not a vote
           </Text>
+          <QuickReactionRow
+            onPick={(emoji) => {
+              onPick(emoji);
+              onClose();
+            }}
+          />
           <View style={styles.row}>
             {ARENA_REACTIONS.map((reaction) => {
               const selected = active.has(reaction.emoji);

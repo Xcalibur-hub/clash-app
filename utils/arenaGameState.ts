@@ -38,7 +38,14 @@ export const ARENA_REACTIONS: { emoji: string; label: string }[] = [
   { emoji: '🤯', label: 'Plot twist' },
   { emoji: '⚔', label: 'Called out' },
   { emoji: '🧠', label: 'Changed my mind' },
+  { emoji: '😂', label: 'Dead' },
+  { emoji: '🤡', label: 'Clown' },
+  { emoji: '🫡', label: 'Respect' },
+  { emoji: '😭', label: 'Wheeze' },
 ];
+
+/** Fast row in the reaction picker — subset of server vocabulary. */
+export const QUICK_ARENA_REACTIONS: readonly string[] = ['💀', '😂', '🤡', '🔥', '🫡', '😭'];
 
 export const ARENA_BACKUP_TTL_MS = 10 * 60 * 1000;
 

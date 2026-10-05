@@ -73,6 +73,7 @@ import {
   type PulseLeader,
 } from '../../../utils/roomPulseScore';
 import { tap as hapticTap } from '../../../utils/haptics';
+import type { ExpressiveMainTab } from '../../../components/arena/ExpressiveMediaTray';
 
 const REPLY_PREVIEW_LIMIT = 3;
 const PULSE_REFRESH_MS_DEBATER = 20_000;
@@ -159,6 +160,16 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   } = useLiveArenaRoom(roomId, viewerAuthor);
 
   const [replyTo, setReplyTo] = React.useState<ArenaMessage | null>(null);
+  const [expressiveTab, setExpressiveTab] = React.useState<ExpressiveMainTab | null>(null);
+  const [visibleMessageIds, setVisibleMessageIds] = React.useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const viewabilityConfig = React.useRef({ itemVisiblePercentThreshold: 35 }).current;
+  const onViewableItemsChanged = React.useRef(
+    ({ viewableItems }: { viewableItems: { item: ArenaMessage }[] }) => {
+      setVisibleMessageIds(new Set(viewableItems.map((row) => row.item.id)));
+    },
+  ).current;
   const [proofOpen, setProofOpen] = React.useState(false);
   const [joinOpen, setJoinOpen] = React.useState(false);
   const [joining, setJoining] = React.useState(false);
@@ -496,6 +507,12 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
           entertainmentHighlight={isCrowd}
           ownStance={item.isOwn ? room?.viewer?.stance ?? null : null}
           onReply={setReplyTo}
+          mediaVisible={visibleMessageIds.has(item.id)}
+          onExpressiveReply={(message, mode) => {
+            setReplyTo(message);
+            setExpressiveTab(mode === 'gif' ? 'gifs' : mode === 'meme' ? 'memes' : 'stickers');
+            setComposerFocus((n) => n + 1);
+          }}
           onReact={(message, emoji) => {
             void react(message.id, emoji).then(() => void loadPulse());
           }}
@@ -535,6 +552,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       accepting,
       byId,
       crowdHighlightId,
+      visibleMessageIds,
       evidenceByMessage.map,
       expandedReplies,
       highlightId,
@@ -645,6 +663,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
             focusToken={composerFocus}
             replyingTo={replyTo?.author?.name ?? null}
             replyingToMessageId={replyTo?.id ?? null}
+            expressiveTab={expressiveTab}
+            onExpressiveTabConsumed={() => setExpressiveTab(null)}
             sending={sending}
             onCancelReply={() => setReplyTo(null)}
             onTypingActivity={onComposerActivity}
@@ -656,6 +676,9 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                 parentMessageId: replyTo?.id ?? null,
                 ...(argument.media ? { media: argument.media } : {}),
                 ...(argument.gif ? { gif: argument.gif } : {}),
+                ...(argument.reshareSourceMessageId
+                  ? { reshareSourceMessageId: argument.reshareSourceMessageId }
+                  : {}),
               });
               if (ok) {
                 setReplyTo(null);
@@ -795,6 +818,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                   data={threadRoots}
                   keyExtractor={(item) => item.id}
                   renderItem={renderMessage}
+                  viewabilityConfig={viewabilityConfig}
+                  onViewableItemsChanged={onViewableItemsChanged}
                   initialNumToRender={12}
                   maxToRenderPerBatch={10}
                   windowSize={7}

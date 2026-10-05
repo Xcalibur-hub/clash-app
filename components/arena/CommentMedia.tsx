@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import type { TakeMedia as TakeMediaModel } from '../../store';
 import { radius, useThemeColors } from '../../theme';
 import { PlayIcon } from '../shared/icons';
@@ -17,12 +18,17 @@ const MAX_RATIO = 1.85;
 export function CommentMedia({
   media,
   compact = false,
+  /** When false, GIF previews stay static (off-screen / perf). */
+  animateGif = true,
 }: {
   media: TakeMediaModel;
   /** Deeper nest levels use a slightly shorter max height. */
   compact?: boolean;
+  animateGif?: boolean;
 }): React.JSX.Element | null {
   const t = useThemeColors();
+  const reducedMotion = useReducedMotion();
+  const playGif = animateGif && !reducedMotion;
   const hasUrl = Boolean(media.url);
   const isVideo = media.kind === 'video';
   const isGif = media.kind === 'gif';
@@ -68,11 +74,19 @@ export function CommentMedia({
       accessibilityRole="image"
       accessibilityLabel={isVideo ? 'Video reply' : isGif ? 'GIF reply' : 'Image reply'}
     >
-      <Image
-        source={{ uri: media.url as string }}
-        resizeMode="contain"
-        style={StyleSheet.absoluteFill}
-      />
+      {isGif && !playGif ? (
+        <View style={[StyleSheet.absoluteFill, styles.gifPaused, { backgroundColor: t.surfaceMuted }]}>
+          <Text allowFontScaling={false} style={[styles.gifPausedText, { color: t.textMuted }]}>
+            GIF
+          </Text>
+        </View>
+      ) : (
+        <Image
+          source={{ uri: media.url as string }}
+          resizeMode="contain"
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       {isVideo ? (
         <View style={styles.play} pointerEvents="none">
           <PlayIcon size={22} color="#FAFAF8" strokeWidth={2.4} />
@@ -137,4 +151,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.4,
   },
+  gifPaused: { alignItems: 'center', justifyContent: 'center' },
+  gifPausedText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6 },
 });

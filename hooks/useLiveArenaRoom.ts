@@ -8,6 +8,7 @@ import {
   fetchMindshiftStats,
   fetchRoom,
   markEvidenceUseful,
+  postClashMediaReshare,
   postMessage,
   reactMessage,
   recordFinalStance,
@@ -309,15 +310,16 @@ export function useLiveArenaRoom(
     async (input: Omit<PostArenaMessageInput, 'roomId'>): Promise<boolean> => {
       if (sending) return false;
       const temporaryId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const isReshare = Boolean(input.reshareSourceMessageId);
       const placeholder: ArenaMessage = {
         id: temporaryId,
         roomId,
-        kind: input.gif ? 'gif' : input.media ? 'media' : 'text',
+        kind: isReshare || input.gif ? 'gif' : input.media ? 'media' : 'text',
         body: input.body,
         parentMessageId: input.parentMessageId ?? null,
         createdAt: Date.now(),
         mediaUrl: input.gif?.url ?? input.media?.url ?? null,
-        mediaKind: input.gif ? 'gif' : (input.media?.kind ?? null),
+        mediaKind: isReshare || input.gif ? 'gif' : (input.media?.kind ?? null),
         gifProvider: input.gif?.provider ?? null,
         gifExternalId: input.gif?.externalId ?? null,
         isOwn: true,
@@ -330,7 +332,15 @@ export function useLiveArenaRoom(
       setSending(true);
       setMessages((current) => mergeMessages(current, [placeholder]));
       try {
-        const posted = await postMessage({ ...input, roomId }, authorRef.current);
+        const posted = input.reshareSourceMessageId
+          ? await postClashMediaReshare(
+              roomId,
+              input.reshareSourceMessageId,
+              input.parentMessageId ?? null,
+              input.body,
+              authorRef.current,
+            )
+          : await postMessage({ ...input, roomId }, authorRef.current);
         if (!mounted.current) return true;
         setMessages((current) => [
           ...mergeMessages(
