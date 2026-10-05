@@ -52,6 +52,7 @@ delete from public.creator_ai_messages
  where conversation_id in (select id from public.creator_ai_conversations where creator_id like 'devfx_vw_%');
 delete from public.creator_ai_conversations where creator_id like 'devfx_vw_%' or profile_id like 'devfx_vw_%';
 delete from public.creator_ai_knowledge where creator_id like 'devfx_vw_%';
+delete from public.digital_creator_sessions where creator_id like 'devfx_vw_%' or profile_id like 'devfx_vw_%';
 delete from public.creator_ai_profiles where creator_id like 'devfx_vw_%';
 delete from public.vault_community_posts
  where community_id like 'devfx_vw_%' or id like 'devfx_vw_%';
@@ -510,9 +511,16 @@ values
 -- Maya and Aria have an AI version; Leo and Noah deliberately do not, so the
 -- chapter's "only when enabled" rule is visible locally. Every entry is creator
 -- approved; the member-only note exists to exercise the entitlement filter.
+-- Creator AI. The digital-version columns stay honest: no avatar provider is
+-- configured on a developer machine, so `avatar_provider = 'none'` and both
+-- capabilities are off. The room therefore demonstrates the real "Avatar
+-- provider not connected / text AI remains available" state instead of showing
+-- a poster dressed up as rendered video.
 insert into public.creator_ai_profiles
   (creator_id, enabled, display_name, description, welcome_message, instructions,
-   access, starters, artwork_media_object_id)
+   access, starters, artwork_media_object_id,
+   avatar_display_name, avatar_media_object_id, avatar_provider,
+   avatar_enabled, voice_enabled, text_fallback_enabled)
 values
   ('devfx_vw_maya', true, 'Maya AI',
    'An AI version of Maya built from her filmmaking notes and published Vault material.',
@@ -520,14 +528,16 @@ values
    'Speak in short, filmic sentences. Never more than a few lines. Talk about craft, not gossip.',
    'FREE',
    '["How do you build suspense?","How did you approach The Missing Frame?","What makes a horror scene uncomfortable?"]'::jsonb,
-   'devfx_vw_maya_comm'),
+   'devfx_vw_maya_comm',
+   'Digital Maya', 'devfx_vw_maya_comm', 'none', false, false, true),
   ('devfx_vw_aria', true, 'Aria AI',
    'An AI version of Aria built from her production notes and published material.',
    'Tell me what you are working on.',
    'Warm, technical, brief. Talk about sound and arrangement, never about people.',
    'FREE',
    '["How do you start a track?","How do you choose drum textures?","How do you know when a song is finished?"]'::jsonb,
-   'devfx_vw_aria_album');
+   'devfx_vw_aria_album',
+   'Digital Aria', 'devfx_vw_aria_album', 'none', false, false, true);
 
 insert into public.creator_ai_knowledge (id, creator_id, kind, title, body, source_id, access)
 values

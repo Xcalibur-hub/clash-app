@@ -5,6 +5,13 @@
  * configuration: they deliberately have no place in any client type below.
  */
 
+import {
+  parseDigitalCreatorBlock,
+  parseDigitalCreatorConfig,
+  type DigitalCreatorBlock,
+  type DigitalCreatorConfig,
+} from './digitalCreatorMappers';
+
 export type CreatorAiAccess = 'FREE' | 'SUBSCRIBER';
 export type CreatorAiKnowledgeKind = 'NOTE' | 'VAULT_DROP' | 'COLLECTION' | 'COURSE';
 export type CreatorAiMessageRole = 'user' | 'assistant';
@@ -38,6 +45,8 @@ export interface CreatorAiProfile {
   enabled: boolean;
   starters: string[];
   artwork: CreatorAiMedia | null;
+  /** The creator's digital version, when they expressed one. Viewer-safe. */
+  digital: DigitalCreatorBlock | null;
   viewerAccess: boolean;
   canChat: boolean;
   isOwner: boolean;
@@ -55,6 +64,8 @@ export interface CreatorAiConfig {
   artwork: CreatorAiMedia | null;
   /** The creator's own media id, so re-saving never silently drops the artwork. */
   artworkMediaObjectId: string | null;
+  /** The creator's own provider connection. Never shown to a viewer. */
+  digital: DigitalCreatorConfig;
   knowledge: CreatorAiKnowledge[];
 }
 
@@ -173,6 +184,7 @@ export function parseCreatorAiProfile(value: unknown): CreatorAiProfile | null {
     enabled: bool(r.enabled),
     starters: parseStarters(r.starters),
     artwork: parseCreatorAiMedia(r.artwork),
+    digital: parseDigitalCreatorBlock(r.digital),
     viewerAccess: bool(r.viewerAccess),
     canChat: bool(r.canChat),
     isOwner: bool(r.isOwner),
@@ -214,6 +226,7 @@ export function parseCreatorAiConfig(value: unknown): CreatorAiConfig | null {
       artwork: null,
       artworkMediaObjectId: null,
       knowledge: [],
+      digital: parseDigitalCreatorConfig(null),
     };
   }
   const knowledge = Array.isArray(r.knowledge)
@@ -233,6 +246,7 @@ export function parseCreatorAiConfig(value: unknown): CreatorAiConfig | null {
     artwork: parseCreatorAiMedia(r.artwork),
     artworkMediaObjectId: str(r.artworkMediaObjectId),
     knowledge,
+    digital: parseDigitalCreatorConfig(r.digital),
   };
 }
 

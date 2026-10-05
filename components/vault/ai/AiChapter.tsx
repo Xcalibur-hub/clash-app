@@ -2,7 +2,9 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { CreatorAiProfile } from '../../../services/creatorAiMappers';
 import { creatorAiArtworkUrl } from '../../../services/creatorAiService';
+import { digitalCreatorArtworkUrl } from '../../../services/digitalCreatorService';
 import { aiChapterCopy, aiDisclosureLabel } from '../../../utils/creatorAiState';
+import { digitalDisclosurePlate, digitalUnavailableNote } from '../../../utils/digitalCreatorState';
 import { personalityRadius, type WorldPersonality } from '../../../utils/vaultWorldPersonality';
 import { space, typeScale, useThemeColors } from '../../../theme';
 import { VaultActionButton } from '../VaultActionButton';
@@ -20,6 +22,10 @@ export interface AiChapterProps {
  * "TALK TO MAYA" — an editorial plate, not a feature card. The disclosure badge
  * is part of the composition rather than an overlay, so the AI framing is
  * unavoidable from the first glance.
+ *
+ * When the creator has expressed a digital version the plate becomes the digital
+ * version's: the stage artwork leads, and an unconnected provider says so
+ * instead of showing a portrait that pretends to be live.
  */
 export function AiChapter({
   profile,
@@ -33,23 +39,30 @@ export function AiChapter({
     displayName: profile.displayName,
     creatorName: profile.creatorName,
   });
-  const artwork = creatorAiArtworkUrl(profile.artwork);
+  const digital = profile.digital;
+  const artwork =
+    digitalCreatorArtworkUrl(digital?.artwork) ?? creatorAiArtworkUrl(profile.artwork);
   const radius = personalityRadius(personality);
   const locked = !isSelf && !profile.viewerAccess;
+  const digitalName = digital?.displayName ?? profile.displayName;
+  const subject = digitalName.toUpperCase().replace(/^DIGITAL\s+/, '');
+  const headline = digital?.configured ? `TALK TO\n${subject}` : copy.headline;
 
   return (
     <View style={[styles.wrap, { borderColor: t.border, borderRadius: radius }]}>
       <View style={styles.row}>
         <View style={styles.copy}>
           <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-            {copy.kicker}
+            {digital?.configured ? digitalDisclosurePlate(digitalName, profile.creatorName) : copy.kicker}
           </Text>
           <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
-            {copy.headline}
+            {headline}
           </Text>
           <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
-            {profile.description ||
-              `Built from ${profile.creatorName ?? 'this creator'}'s creator-approved material.`}
+            {digital?.configured && !digital.available
+              ? digitalUnavailableNote(null)
+              : profile.description ||
+                `Built from ${profile.creatorName ?? 'this creator'}'s creator-approved material.`}
           </Text>
         </View>
         {artwork ? (

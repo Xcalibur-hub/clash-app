@@ -1263,46 +1263,83 @@ export type Database = {
         Row: {
           access: Database["public"]["Enums"]["creator_ai_access"]
           artwork_media_object_id: string | null
+          avatar_display_name: string | null
+          avatar_enabled: boolean
+          avatar_external_id: string | null
+          avatar_media_object_id: string | null
+          avatar_provider: string
           created_at: string
           creator_id: string
           description: string
           display_name: string
           enabled: boolean
           instructions: string
+          likeness_consent_at: string | null
+          likeness_consent_version: string | null
           starters: Json
+          text_fallback_enabled: boolean
           updated_at: string
+          voice_enabled: boolean
+          voice_external_id: string | null
           welcome_message: string
         }
         Insert: {
           access?: Database["public"]["Enums"]["creator_ai_access"]
           artwork_media_object_id?: string | null
+          avatar_display_name?: string | null
+          avatar_enabled?: boolean
+          avatar_external_id?: string | null
+          avatar_media_object_id?: string | null
+          avatar_provider?: string
           created_at?: string
           creator_id: string
           description?: string
           display_name: string
           enabled?: boolean
           instructions?: string
+          likeness_consent_at?: string | null
+          likeness_consent_version?: string | null
           starters?: Json
+          text_fallback_enabled?: boolean
           updated_at?: string
+          voice_enabled?: boolean
+          voice_external_id?: string | null
           welcome_message?: string
         }
         Update: {
           access?: Database["public"]["Enums"]["creator_ai_access"]
           artwork_media_object_id?: string | null
+          avatar_display_name?: string | null
+          avatar_enabled?: boolean
+          avatar_external_id?: string | null
+          avatar_media_object_id?: string | null
+          avatar_provider?: string
           created_at?: string
           creator_id?: string
           description?: string
           display_name?: string
           enabled?: boolean
           instructions?: string
+          likeness_consent_at?: string | null
+          likeness_consent_version?: string | null
           starters?: Json
+          text_fallback_enabled?: boolean
           updated_at?: string
+          voice_enabled?: boolean
+          voice_external_id?: string | null
           welcome_message?: string
         }
         Relationships: [
           {
             foreignKeyName: "creator_ai_profiles_artwork_media_object_id_fkey"
             columns: ["artwork_media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_ai_profiles_avatar_media_object_id_fkey"
+            columns: ["avatar_media_object_id"]
             isOneToOne: false
             referencedRelation: "media_objects"
             referencedColumns: ["id"]
@@ -1901,6 +1938,60 @@ export type Database = {
             foreignKeyName: "creator_vaults_creator_id_fkey"
             columns: ["creator_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digital_creator_sessions: {
+        Row: {
+          creator_id: string
+          ended_at: string | null
+          expires_at: string
+          id: string
+          mode: string
+          profile_id: string
+          provider: string
+          provider_session_ref: string | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          creator_id: string
+          ended_at?: string | null
+          expires_at: string
+          id: string
+          mode: string
+          profile_id: string
+          provider: string
+          provider_session_ref?: string | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          creator_id?: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          mode?: string
+          profile_id?: string
+          provider?: string
+          provider_session_ref?: string | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digital_creator_sessions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digital_creator_sessions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -5253,6 +5344,14 @@ export type Database = {
         Args: { p_drop_id: string }
         Returns: undefined
       }
+      digital_creator_session_card: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
+      disconnect_creator_digital_version: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       end_creator_live_session: {
         Args: { p_session_id: string }
         Returns: {
@@ -5276,6 +5375,10 @@ export type Database = {
           updated_at: string
           vault_id: string
         }
+      }
+      end_digital_creator_session: {
+        Args: { p_session_id: string }
+        Returns: boolean
       }
       enter_vault_community: {
         Args: { p_community_id: string }
@@ -6022,6 +6125,21 @@ export type Database = {
           updated_at: string
         }
       }
+      set_creator_digital_version: {
+        Args: {
+          p_avatar_enabled?: boolean
+          p_avatar_external_id?: string
+          p_avatar_media_object_id?: string
+          p_confirm_likeness_consent?: boolean
+          p_consent_version?: string
+          p_display_name?: string
+          p_provider: string
+          p_text_fallback_enabled?: boolean
+          p_voice_enabled?: boolean
+          p_voice_external_id?: string
+        }
+        Returns: Json
+      }
       set_creator_product_status: {
         Args: {
           p_product_id: string
@@ -6226,6 +6344,10 @@ export type Database = {
           updated_at: string
           vault_id: string
         }
+      }
+      start_digital_creator_session: {
+        Args: { p_creator_id: string; p_mode?: string }
+        Returns: Json
       }
       submit_arena_argument_vote: {
         Args: { p_message_id: string; p_room_id: string }

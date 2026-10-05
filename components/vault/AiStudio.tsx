@@ -14,11 +14,18 @@ import { fetchStorefront } from '../../services/vaultService';
 import { fetchCreatorCourses } from '../../services/vaultCommerceService';
 import { aiDisclosureLabel } from '../../utils/creatorAiState';
 import { errorText } from '../../services/supabaseClient';
+import {
+  disconnectCreatorDigitalVersion,
+  saveCreatorDigitalVersion,
+} from '../../services/digitalCreatorService';
+import type { SaveDigitalCreatorInput } from '../../services/digitalCreatorMappers';
 import { showNotice, useClash } from '../../store';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { SparklesIcon } from '../shared/icons';
 import { VaultActionButton } from './VaultActionButton';
 import { AiProfileFormSheet } from './ai/AiProfileFormSheet';
+import { DigitalCreatorConnectSheet } from './ai/DigitalCreatorConnectSheet';
+import { DigitalVersionPanel } from './ai/DigitalVersionPanel';
 import { AiKnowledgeSheet, type AiKnowledgeSource } from './ai/AiKnowledgeSheet';
 
 type Phase = 'loading' | 'ready';
@@ -35,6 +42,7 @@ export function AiStudio(): React.JSX.Element {
   const [busy, setBusy] = React.useState(false);
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [knowledgeOpen, setKnowledgeOpen] = React.useState(false);
+  const [digitalOpen, setDigitalOpen] = React.useState(false);
   const [creatorId, setCreatorId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (): Promise<void> => {
@@ -176,6 +184,25 @@ export function AiStudio(): React.JSX.Element {
         />
       </View>
 
+      {config?.hasProfile ? (
+        <DigitalVersionPanel
+          config={config.digital}
+          displayName={config.displayName}
+          creatorName={config.displayName}
+          busy={busy}
+          onConnect={() => setDigitalOpen(true)}
+          onPreview={() => {
+            if (creatorId) router.push(`/vault/ai/${creatorId}`);
+          }}
+          onDisconnect={() =>
+            void run(
+              () => disconnectCreatorDigitalVersion(),
+              'Digital version disconnected. Text AI still works.',
+            )
+          }
+        />
+      ) : null}
+
       {knowledge.length > 0 ? (
         <View style={styles.list}>
           {knowledge.map((entry) => (
@@ -233,6 +260,20 @@ export function AiStudio(): React.JSX.Element {
           void run(() => addCreatorAiKnowledge(input), 'Knowledge added.');
         }}
       />
+
+      {config?.hasProfile ? (
+        <DigitalCreatorConnectSheet
+          visible={digitalOpen}
+          busy={busy}
+          config={config.digital}
+          displayName={config.displayName}
+          onClose={() => setDigitalOpen(false)}
+          onSubmit={(input: SaveDigitalCreatorInput) => {
+            setDigitalOpen(false);
+            void run(() => saveCreatorDigitalVersion(input), 'Digital version saved.');
+          }}
+        />
+      ) : null}
     </View>
   );
 }

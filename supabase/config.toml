@@ -393,3 +393,13 @@ verify_jwt = true
 [functions.creator-ai]
 enabled = true
 verify_jwt = true
+
+# ── Digital Creator (avatar / voice rendering) ──────────────────────────────
+# Renders an already-authorized Creator AI reply. The only place a rendering
+# provider is called; `DIGITAL_CREATOR_API_KEY` (and optional
+# `DIGITAL_CREATOR_BASE_URL`) belong to this function's environment and never to
+# the database, the client, or a log line. With no key configured the function
+# answers "not connected" and the room stays text-only rather than faking media.
+[functions.digital-creator]
+enabled = true
+verify_jwt = true

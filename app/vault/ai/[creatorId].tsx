@@ -10,9 +10,17 @@ import { AiDisclosure } from '../../../components/vault/ai/AiDisclosure';
 import { AiMessageBubble } from '../../../components/vault/ai/AiMessageBubble';
 import { AiProviderNotice } from '../../../components/vault/ai/AiProviderNotice';
 import { AiStarterRow } from '../../../components/vault/ai/AiStarterRow';
+import { DigitalModeSwitch } from '../../../components/vault/ai/DigitalModeSwitch';
+import { DigitalRoom } from '../../../components/vault/ai/DigitalRoom';
 import { useCreatorAi } from '../../../hooks/useCreatorAi';
+import { useDigitalCreator } from '../../../hooks/useDigitalCreator';
 import { creatorAiArtworkUrl } from '../../../services/creatorAiService';
 import { canSendAiMessage, aiDisclosureLabel } from '../../../utils/creatorAiState';
+import {
+  availableDigitalModes,
+  resolveDigitalCapability,
+  type DigitalRoomMode,
+} from '../../../utils/digitalCreatorState';
 import { worldPersonality } from '../../../utils/vaultWorldPersonality';
 import { layout, space, typeScale, useThemeColors } from '../../../theme';
 import { tap as hapticTap } from '../../../utils/haptics';
@@ -29,7 +37,9 @@ export default function CreatorAiScreen(): React.JSX.Element {
   const t = useThemeColors();
 
   const ai = useCreatorAi(creatorId);
+  const digital = useDigitalCreator(creatorId);
   const [draft, setDraft] = React.useState('');
+  const [roomMode, setRoomMode] = React.useState<DigitalRoomMode>('TEXT');
   const scroller = React.useRef<ScrollView | null>(null);
 
   const profile = ai.profile;
@@ -73,9 +83,66 @@ export default function CreatorAiScreen(): React.JSX.Element {
   }
 
   const artwork = creatorAiArtworkUrl(profile.artwork);
+  const digitalModes = availableDigitalModes(profile.digital, digital.status);
+  const capability = resolveDigitalCapability(
+    profile.digital,
+    profile.digital?.preferredMode ?? 'TEXT',
+    digital.status,
+  ).capability;
+  const enterTalk = React.useCallback((): void => {
+    if (capability === 'TEXT' || profile.isOwner) {
+      setRoomMode('TEXT');
+      return;
+    }
+    void digital.enter(capability === 'AVATAR' ? 'AVATAR' : 'VOICE').then((ok) => {
+      setRoomMode(ok ? 'TALK' : 'TEXT');
+    });
+  }, [capability, digital.enter, profile.isOwner]);
+
+  // §22: a reply is rendered only once, only while a session is open, and only
+  // after our own pipeline produced it.
+  const renderedFor = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (roomMode !== 'TALK' || digital.session === null) return;
+    const latest = [...ai.messages].reverse().find((entry) => entry.role === 'assistant');
+    if (!latest || renderedFor.current === latest.id) return;
+    renderedFor.current = latest.id;
+    void digital.render(latest.id);
+  }, [ai.messages, roomMode, digital.session, digital.render]);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.background }}>
+      {roomMode === 'TALK' ? (
+        <View
+          style={{
+            flex: 1,
+            paddingTop: insets.top + space.sm,
+            paddingHorizontal: layout.screenX,
+          }}
+        >
+          <DigitalRoom
+            profile={profile}
+            controller={digital}
+            personality={personality}
+            capability={capability}
+            modes={digitalModes}
+            mode={roomMode}
+            onModeChange={(next) => {
+              if (next === 'TALK') {
+                enterTalk();
+                return;
+              }
+              void digital.leave();
+              setRoomMode('TEXT');
+            }}
+            onPickStarter={(starter) => {
+              setDraft(starter);
+              void digital.leave();
+              setRoomMode('TEXT');
+            }}
+          />
+        </View>
+      ) : (
       <ScrollView
         ref={(node) => {
           scroller.current = node;
@@ -183,9 +250,20 @@ export default function CreatorAiScreen(): React.JSX.Element {
           disabled={!canSend}
           onPick={(starter) => setDraft(starter)}
         />
-      </ScrollView>
 
-      {gating.canChat ? (
+        {digitalModes.length > 1 ? (
+          <DigitalModeSwitch
+            modes={digitalModes}
+            active={roomMode}
+            onChange={(next) => {
+              if (next === 'TALK') enterTalk();
+            }}
+          />
+        ) : null}
+      </ScrollView>
+      )}
+
+      {gating.canChat && roomMode === 'TEXT' ? (
         <View
           style={[
             styles.composer,
