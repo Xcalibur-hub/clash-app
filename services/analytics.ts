@@ -124,7 +124,18 @@ export type AnalyticsEvent =
   | 'meet_video_left'
   | 'meet_video_reported'
   | 'meet_video_blocked'
-  | 'meet_video_connection_failed';
+  | 'meet_video_connection_failed'
+  // Phase 14 — Arena game layer. No message text, no stance, ever.
+  | 'arena_backup_requested'
+  | 'arena_backup_accepted'
+  | 'arena_backup_declined'
+  | 'arena_backup_expired'
+  | 'arena_backup_call_failed'
+  | 'arena_backup_preference_changed'
+  | 'arena_evidence_submitted'
+  | 'arena_room_capacity_reached'
+  | 'arena_judging_started'
+  | 'arena_room_settled';
 
 /** Allowed property keys — anything else is dropped. */
 const ALLOWED_PROP_KEYS = new Set([

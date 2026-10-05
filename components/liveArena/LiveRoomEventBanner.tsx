@@ -22,6 +22,16 @@ function markFor(kind: LiveRoomEvent['kind']): string {
       return '◆';
     case 'pulse_rising':
       return '↑';
+    case 'backup_called':
+      return '⚔';
+    case 'backup_arrived':
+      return '🛡';
+    case 'backup_expired':
+      return '·';
+    case 'evidence_surge':
+      return '🧾';
+    case 'phase':
+      return '·';
     case 'pulse_updated':
       return '·';
     default:

@@ -26,6 +26,11 @@ import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResu
 import { LiveRoomSkeleton } from '../../../components/liveArena/LiveRoomSkeleton';
 import { LiveRoomTypingCue } from '../../../components/liveArena/LiveRoomTypingCue';
 import { RoomPulseSheet } from '../../../components/liveArena/RoomPulseSheet';
+import { VaultActionButton } from '../../../components/vault/VaultActionButton';
+import {
+  BackupInviteSheet,
+  CallBackupSheet,
+} from '../../../components/liveArena/CallBackupSheet';
 import {
   JoinDebateSheet,
   SpectatorJoinBar,
@@ -35,6 +40,7 @@ import { EmptyState } from '../../../components/shared/EmptyState';
 import { Notice } from '../../../components/shared/Notice';
 import { ArenaIcon } from '../../../components/shared/icons';
 import { useClock } from '../../../hooks/useClock';
+import { useArenaBackup } from '../../../hooks/useArenaBackup';
 import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
 import { useRoomTyping } from '../../../hooks/useRoomTyping';
 import { analytics } from '../../../services/analytics';
@@ -58,6 +64,7 @@ import {
   pulseChangeEvent,
   type LiveRoomEvent,
 } from '../../../utils/liveRoomEvents';
+import { latestBattleEvent } from '../../../utils/arenaGameState';
 import { replyPreview, selectThreadRoots } from '../../../utils/liveRoomThread';
 import {
   pulseLeaderChanges,
@@ -164,6 +171,11 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const [pulse, setPulse] = React.useState<ArenaRoomPulse | null>(null);
   const [pulseLoading, setPulseLoading] = React.useState(false);
   const [expandedReplies, setExpandedReplies] = React.useState<Set<string>>(new Set());
+  const [backupOpen, setBackupOpen] = React.useState(false);
+  const [inviteOpen, setInviteOpen] = React.useState(false);
+  const [backupBanner, setBackupBanner] = React.useState<LiveRoomEvent | null>(null);
+  const seenBackupEvent = React.useRef<string | null>(null);
+  const dismissedInvite = React.useRef<string | null>(null);
   const prevStatus = React.useRef<ArenaRoomStatus | null>(null);
   const prevPulseLeaders = React.useRef<PulseLeader[]>([]);
   const seenIds = React.useRef<Set<string>>(new Set());
@@ -196,6 +208,35 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     (message: string) => dispatch(showNotice(message)),
     [dispatch],
   );
+
+  const backup = useArenaBackup(roomId);
+
+  // A stored battle moment is shown once, briefly, then it stops competing for
+  // attention — the room's own phase banner always wins.
+  React.useEffect(() => {
+    const newest = backup.events[backup.events.length - 1];
+    if (!newest || seenBackupEvent.current === newest.id) return;
+    seenBackupEvent.current = newest.id;
+    const mapped = latestBattleEvent([newest]);
+    if (!mapped) return;
+    setBackupBanner(mapped);
+    const timer = setTimeout(() => setBackupBanner(null), 6000);
+    return () => clearTimeout(timer);
+  }, [backup.events]);
+
+  // A live call for this viewer surfaces itself, once per invitation.
+  React.useEffect(() => {
+    const invite = backup.activeInvite;
+    if (!invite || dismissedInvite.current === invite.inviteId) return;
+    setInviteOpen(true);
+  }, [backup.activeInvite]);
+
+  // Capacity is a real, server-reported fact worth measuring.
+  React.useEffect(() => {
+    if (backup.load?.saturated) {
+      analytics.track('arena_room_capacity_reached', { realm: 'arena' });
+    }
+  }, [backup.load?.saturated]);
 
   React.useEffect(() => {
     if (!room?.topicId) return;
@@ -532,7 +573,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         <SpectatorJoinBar
           busy={joining}
           roomFull={roomFullOnUpgrade}
-          roomIndex={roomIndex}
+          roomIndex={roomIndex ?? 0}
           onJoinPress={() => setJoinOpen(true)}
         />
       );
@@ -591,6 +632,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
 
   const floatingEvent =
     phaseBanner ??
+    backupBanner ??
     (newCount > 0 && !atLiveEdge ? newArgumentsEvent(newCount) : null);
 
   const emptyFloor =
@@ -612,7 +654,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       <LiveRoomHeader
         room={room}
         paddingTop={insets.top}
-        roomIndex={roomIndex}
+        roomIndex={roomIndex ?? 0}
         presence={presence}
         scrollY={scrollY}
         onBack={() => {
@@ -658,7 +700,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                   stats={stats}
                   viewer={room.viewer}
                   topicTitle={room.topic.title}
-                  roomIndex={roomIndex}
+                  roomIndex={roomIndex ?? 0}
                   busy={voting}
                   onRecordFinal={(stance) => {
                     setVoting(true);
@@ -736,7 +778,28 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
             ) : (
               <View style={styles.flex} />
             )}
-            <View style={{ paddingBottom: Math.max(insets.bottom, space.sm) }}>{bottom}</View>
+            <View style={{ paddingBottom: Math.max(insets.bottom, space.sm) }}>
+              {isDebater && accepting ? (
+                <View style={styles.backupBar}>
+                  <VaultActionButton
+                    label="CALL BACKUP"
+                    tone="quiet"
+                    compact
+                    onPress={() => {
+                      hapticTap();
+                      setBackupOpen(true);
+                      void backup.refreshCandidates();
+                    }}
+                  />
+                  {backup.load?.saturated ? (
+                    <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
+                      {`Room full · ${backup.load.spectatorCount} watching`}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+              {bottom}
+            </View>
           </>
         )}
       </KeyboardAvoidingView>
@@ -751,7 +814,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       <JoinDebateSheet
         visible={joinOpen}
         busy={joining}
-        roomIndex={roomIndex}
+        roomIndex={roomIndex ?? 0}
         onClose={() => setJoinOpen(false)}
         onChoose={(stance) => {
           setJoining(true);
@@ -770,8 +833,60 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         visible={pulseOpen}
         pulse={pulse}
         loading={pulseLoading}
-        roomIndex={roomIndex}
+        roomIndex={roomIndex ?? 0}
         onClose={() => setPulseOpen(false)}
+      />
+
+      <CallBackupSheet
+        visible={backupOpen}
+        busy={backup.busy}
+        roomIndex={roomIndex ?? 0}
+        candidates={backup.candidates}
+        loading={backup.loadingCandidates}
+        policy={backup.policy}
+        onClose={() => setBackupOpen(false)}
+        onCall={(recipientId) => {
+          analytics.track('arena_backup_requested', { realm: 'arena' });
+          void backup.call(recipientId).then((ok) => {
+            if (!ok) analytics.track('arena_backup_call_failed', { realm: 'arena' });
+            setBackupOpen(false);
+          });
+        }}
+        onPolicy={(policy) => {
+          analytics.track('arena_backup_preference_changed', { realm: 'arena' });
+          void backup.setPolicy(policy);
+        }}
+      />
+
+      <BackupInviteSheet
+        visible={inviteOpen && backup.activeInvite !== null}
+        busy={backup.busy}
+        invite={backup.activeInvite}
+        roomIndex={roomIndex ?? 0}
+        now={now}
+        onClose={() => {
+          if (backup.activeInvite) {
+            dismissedInvite.current = backup.activeInvite.inviteId;
+            // "NOT NOW" is a decline: the caller is not told, and the call ends.
+            analytics.track('arena_backup_declined', { realm: 'arena' });
+            void backup.answer(backup.activeInvite.inviteId, false);
+          }
+          setInviteOpen(false);
+        }}
+        onJoin={(inviteId, stance) => {
+          analytics.track('arena_backup_accepted', { realm: 'arena' });
+          void backup.answer(inviteId, true, stance).then((result) => {
+            if (result?.status === 'ACCEPTED') {
+              setInviteOpen(false);
+              dismissedInvite.current = inviteId;
+              if (result.roomId && result.roomId !== roomId) {
+                router.replace(`/arena/room/${result.roomId}`);
+              } else {
+                void refresh();
+              }
+            }
+          });
+        }}
       />
 
       <PostActionsSheet
@@ -797,4 +912,5 @@ const styles = StyleSheet.create({
   locked: { paddingHorizontal: layout.screenX, paddingVertical: space.sm },
   lockedText: { ...typeScale.caption, fontSize: 12, lineHeight: 17 },
   older: { marginVertical: space.sm },
+  backupBar: { paddingHorizontal: layout.screenX, paddingBottom: space.xs, gap: 4 },
 });

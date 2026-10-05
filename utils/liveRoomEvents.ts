@@ -9,7 +9,13 @@ export type LiveRoomEventKind =
   | 'judging'
   | 'result'
   | 'pulse_rising'
-  | 'pulse_updated';
+  | 'pulse_updated'
+  /** Phase 14 — server-stored battle moments, rendered by the same banner. */
+  | 'backup_called'
+  | 'backup_arrived'
+  | 'backup_expired'
+  | 'evidence_surge'
+  | 'phase';
 
 export interface LiveRoomEvent {
   kind: LiveRoomEventKind;

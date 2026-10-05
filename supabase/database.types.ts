@@ -72,6 +72,100 @@ export type Database = {
           },
         ]
       }
+      arena_backup_invites: {
+        Row: {
+          arrived_at: string | null
+          caller_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          recipient_id: string
+          responded_at: string | null
+          room_id: string
+          status: Database["public"]["Enums"]["arena_backup_status"]
+          topic_id: string
+        }
+        Insert: {
+          arrived_at?: string | null
+          caller_id: string
+          created_at?: string
+          expires_at?: string
+          id: string
+          recipient_id: string
+          responded_at?: string | null
+          room_id: string
+          status?: Database["public"]["Enums"]["arena_backup_status"]
+          topic_id: string
+        }
+        Update: {
+          arrived_at?: string | null
+          caller_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          recipient_id?: string
+          responded_at?: string | null
+          room_id?: string
+          status?: Database["public"]["Enums"]["arena_backup_status"]
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_backup_invites_caller_id_fkey"
+            columns: ["caller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_backup_invites_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_backup_invites_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_backup_invites_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "arena_daily_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_backup_preferences: {
+        Row: {
+          policy: Database["public"]["Enums"]["arena_backup_policy"]
+          profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          policy?: Database["public"]["Enums"]["arena_backup_policy"]
+          profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          policy?: Database["public"]["Enums"]["arena_backup_policy"]
+          profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_backup_preferences_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       arena_daily_topics: {
         Row: {
           closes_at: string
@@ -150,6 +244,71 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_room_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          kind: Database["public"]["Enums"]["arena_room_event_kind"]
+          payload: Json
+          room_id: string
+          subject_id: string | null
+          topic_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          id: string
+          kind: Database["public"]["Enums"]["arena_room_event_kind"]
+          payload?: Json
+          room_id: string
+          subject_id?: string | null
+          topic_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["arena_room_event_kind"]
+          payload?: Json
+          room_id?: string
+          subject_id?: string | null
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_room_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_events_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_events_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_room_events_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "arena_daily_topics"
             referencedColumns: ["id"]
           },
         ]
@@ -3182,6 +3341,35 @@ export type Database = {
           },
         ]
       }
+      profile_reputation_facets: {
+        Row: {
+          facet: Database["public"]["Enums"]["reputation_facet"]
+          profile_id: string
+          score: number
+          updated_at: string
+        }
+        Insert: {
+          facet: Database["public"]["Enums"]["reputation_facet"]
+          profile_id: string
+          score?: number
+          updated_at?: string
+        }
+        Update: {
+          facet?: Database["public"]["Enums"]["reputation_facet"]
+          profile_id?: string
+          score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_reputation_facets_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           auth_user_id: string | null
@@ -4373,9 +4561,243 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      pg_all_foreign_keys: {
+        Row: {
+          fk_columns: unknown[] | null
+          fk_constraint_name: unknown | null
+          fk_schema_name: unknown | null
+          fk_table_name: unknown | null
+          fk_table_oid: unknown | null
+          is_deferrable: boolean | null
+          is_deferred: boolean | null
+          match_type: string | null
+          on_delete: string | null
+          on_update: string | null
+          pk_columns: unknown[] | null
+          pk_constraint_name: unknown | null
+          pk_index_name: unknown | null
+          pk_schema_name: unknown | null
+          pk_table_name: unknown | null
+          pk_table_oid: unknown | null
+        }
+        Relationships: []
+      }
+      tap_funky: {
+        Row: {
+          args: string | null
+          is_definer: boolean | null
+          is_strict: boolean | null
+          is_visible: boolean | null
+          kind: unknown | null
+          langoid: unknown | null
+          name: unknown | null
+          oid: unknown | null
+          owner: unknown | null
+          returns: string | null
+          returns_set: boolean | null
+          schema: unknown | null
+          volatility: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      _cleanup: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      _contract_on: {
+        Args: { "": string }
+        Returns: unknown
+      }
+      _currtest: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      _db_privs: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown[]
+      }
+      _definer: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _dexists: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _expand_context: {
+        Args: { "": string }
+        Returns: string
+      }
+      _expand_on: {
+        Args: { "": string }
+        Returns: string
+      }
+      _expand_vol: {
+        Args: { "": string }
+        Returns: string
+      }
+      _ext_exists: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _extensions: {
+        Args: Record<PropertyKey, never> | { "": unknown }
+        Returns: unknown[]
+      }
+      _funkargs: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      _get: {
+        Args: { "": string }
+        Returns: number
+      }
+      _get_db_owner: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      _get_dtype: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      _get_language_owner: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      _get_latest: {
+        Args: { "": string }
+        Returns: number[]
+      }
+      _get_note: {
+        Args: { "": number } | { "": string }
+        Returns: string
+      }
+      _get_opclass_owner: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      _get_rel_owner: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      _get_schema_owner: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      _get_tablespace_owner: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      _get_type_owner: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      _got_func: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _grolist: {
+        Args: { "": unknown }
+        Returns: unknown[]
+      }
+      _has_group: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _has_role: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _has_user: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _inherited: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _is_schema: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _is_super: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _is_trusted: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _is_verbose: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      _lang: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      _opc_exists: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _parts: {
+        Args: { "": unknown }
+        Returns: unknown[]
+      }
+      _pg_sv_type_array: {
+        Args: { "": unknown[] }
+        Returns: unknown[]
+      }
+      _prokind: {
+        Args: { p_oid: unknown }
+        Returns: unknown
+      }
+      _query: {
+        Args: { "": string }
+        Returns: string
+      }
+      _refine_vol: {
+        Args: { "": string }
+        Returns: string
+      }
+      _relexists: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _returns: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      _retval: {
+        Args: { "": string }
+        Returns: string
+      }
+      _strict: {
+        Args: { "": unknown }
+        Returns: boolean
+      }
+      _table_privs: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown[]
+      }
+      _temptypes: {
+        Args: { "": string }
+        Returns: string
+      }
+      _todo: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      _typename: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      _vol: {
+        Args: { "": unknown }
+        Returns: string
+      }
       ack_meet_video_safety: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -4457,6 +4879,26 @@ export type Database = {
         Args: { p_author: string; p_viewer: string }
         Returns: boolean
       }
+      arena_backup_policy_for: {
+        Args: { p_profile_id: string }
+        Returns: Database["public"]["Enums"]["arena_backup_policy"]
+      }
+      arena_backup_reasons: {
+        Args: { p_candidate: string; p_topic_id: string; p_viewer: string }
+        Returns: Json
+      }
+      arena_event: {
+        Args: {
+          p_actor?: string
+          p_dedupe_key?: string
+          p_kind: Database["public"]["Enums"]["arena_room_event_kind"]
+          p_payload?: Json
+          p_room_id: string
+          p_subject?: string
+          p_topic_id: string
+        }
+        Returns: string
+      }
       arena_evidence_payload: {
         Args: {
           p_evidence: Database["public"]["Tables"]["arena_room_evidence"]["Row"]
@@ -4476,6 +4918,14 @@ export type Database = {
         Args: { p_room_id: string }
         Returns: boolean
       }
+      arena_may_be_called: {
+        Args: { p_profile_id: string }
+        Returns: boolean
+      }
+      arena_may_call_backup: {
+        Args: { p_profile_id: string }
+        Returns: boolean
+      }
       arena_message_payload: {
         Args: {
           p_message: Database["public"]["Tables"]["arena_room_messages"]["Row"]
@@ -4488,11 +4938,28 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: string
       }
+      arena_notify: {
+        Args: {
+          p_actor: string
+          p_entity_id: string
+          p_kind: Database["public"]["Enums"]["notification_kind"]
+          p_recipient: string
+        }
+        Returns: undefined
+      }
       arena_profile_json: {
         Args: { p_profile_id: string }
         Returns: Json
       }
+      arena_reaction_vocabulary: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       arena_result_payload: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      arena_room_load: {
         Args: { p_room_id: string }
         Returns: Json
       }
@@ -4506,6 +4973,10 @@ export type Database = {
           p_viewer: string
         }
         Returns: Json
+      }
+      arena_standing_for: {
+        Args: { p_profile_id: string }
+        Returns: Database["public"]["Enums"]["arena_standing"]
       }
       arena_topic_payload: {
         Args: {
@@ -4574,6 +5045,14 @@ export type Database = {
           status: Database["public"]["Enums"]["campaign_creator_status"]
         }
       }
+      award_arena_fun_moment: {
+        Args: { p_room_id: string }
+        Returns: boolean
+      }
+      award_arena_fun_moments: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       block_meet_peer: {
         Args: { p_session_id: string }
         Returns: Json
@@ -4581,6 +5060,14 @@ export type Database = {
       block_profile: {
         Args: { p_target_id: string }
         Returns: undefined
+      }
+      call_arena_backup: {
+        Args: { p_recipient_id: string; p_room_id: string }
+        Returns: Json
+      }
+      can: {
+        Args: { "": unknown[] }
+        Returns: string
       }
       can_access_course_lesson: {
         Args: { p_lesson_id: string; p_viewer: string }
@@ -4593,6 +5080,14 @@ export type Database = {
       can_use_video_meet: {
         Args: { p_profile: string }
         Returns: boolean
+      }
+      cancel_arena_backup: {
+        Args: { p_invite_id: string }
+        Returns: Json
+      }
+      casts_are: {
+        Args: { "": string[] }
+        Returns: string
       }
       claim_treasure_reward: {
         Args: { p_hunt_id: string }
@@ -4675,6 +5170,32 @@ export type Database = {
       close_prediction_games: {
         Args: { p_limit?: number }
         Returns: number
+      }
+      col_is_null: {
+        Args:
+          | {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+          | { column_name: unknown; description?: string; table_name: unknown }
+        Returns: string
+      }
+      col_not_null: {
+        Args:
+          | {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+          | { column_name: unknown; description?: string; table_name: unknown }
+        Returns: string
+      }
+      collect_tap: {
+        Args: Record<PropertyKey, never> | { "": string[] }
+        Returns: string
       }
       complete_content_clue: {
         Args: { p_clue_id: string; p_content_id: string; p_hunt_id: string }
@@ -5344,6 +5865,18 @@ export type Database = {
         Args: { p_drop_id: string }
         Returns: undefined
       }
+      diag: {
+        Args:
+          | Record<PropertyKey, never>
+          | Record<PropertyKey, never>
+          | { msg: string }
+          | { msg: unknown }
+        Returns: string
+      }
+      diag_test_name: {
+        Args: { "": string }
+        Returns: string
+      }
       digital_creator_session_card: {
         Args: { p_session_id: string }
         Returns: Json
@@ -5351,6 +5884,14 @@ export type Database = {
       disconnect_creator_digital_version: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      do_tap: {
+        Args: Record<PropertyKey, never> | { "": string } | { "": unknown }
+        Returns: string[]
+      }
+      domains_are: {
+        Args: { "": unknown[] }
+        Returns: string
       }
       end_creator_live_session: {
         Args: { p_session_id: string }
@@ -5383,6 +5924,14 @@ export type Database = {
       enter_vault_community: {
         Args: { p_community_id: string }
         Returns: Json
+      }
+      enums_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      expire_arena_backup_invites: {
+        Args: { p_limit?: number }
+        Returns: number
       }
       expire_stale_takes: {
         Args: { p_limit?: number }
@@ -5428,13 +5977,45 @@ export type Database = {
           vault_id: string
         }[]
       }
+      extensions_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      fail: {
+        Args: Record<PropertyKey, never> | { "": string }
+        Returns: string
+      }
       fail_media_upload: {
         Args: { p_media_id: string }
         Returns: undefined
       }
+      findfuncs: {
+        Args: { "": string }
+        Returns: string[]
+      }
+      finish: {
+        Args: { exception_on_failure?: boolean }
+        Returns: string[]
+      }
       follow_profile: {
         Args: { p_target_id: string }
         Returns: undefined
+      }
+      foreign_tables_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      format_type_string: {
+        Args: { "": string }
+        Returns: string
+      }
+      functions_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      get_arena_backup_preference: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_arena_room: {
         Args: { p_room_id: string }
@@ -5488,6 +6069,10 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: Json
       }
+      get_my_arena_reputation: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_my_creator_ai: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -5508,9 +6093,197 @@ export type Database = {
         Args: { p_hunt_id: string }
         Returns: Json
       }
+      groups_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      has_check: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_composite: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_domain: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_enum: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_extension: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_fk: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_foreign_table: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_function: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_group: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_inherited_tables: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_language: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_materialized_view: {
+        Args: { "": unknown }
+        Returns: string
+      }
       has_meet_video_safety_ack: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      has_opclass: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_pk: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_relation: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_role: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_schema: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_sequence: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_table: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_tablespace: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_type: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_unique: {
+        Args: { "": string }
+        Returns: string
+      }
+      has_user: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      has_view: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_composite: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_domain: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_enum: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_extension: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_fk: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_foreign_table: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_function: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_group: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_inherited_tables: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_language: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_materialized_view: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_opclass: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_pk: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_relation: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_role: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_schema: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_sequence: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_table: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_tablespace: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_type: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_user: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hasnt_view: {
+        Args: { "": unknown }
+        Returns: string
       }
       hide_vault_community_post: {
         Args: { p_hidden: boolean; p_post_id: string }
@@ -5554,9 +6327,25 @@ export type Database = {
         }
         Returns: Json
       }
+      in_todo: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      index_is_primary: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      index_is_unique: {
+        Args: { "": unknown }
+        Returns: string
+      }
       is_advertiser_owner: {
         Args: { p_advertiser_id: string }
         Returns: boolean
+      }
+      is_aggregate: {
+        Args: { "": unknown }
+        Returns: string
       }
       is_allowed_http_url: {
         Args: { p_url: string }
@@ -5570,13 +6359,85 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: boolean
       }
+      is_clustered: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      is_definer: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      is_empty: {
+        Args: { "": string }
+        Returns: string
+      }
       is_hood_moderator: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: boolean
       }
+      is_normal_function: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      is_partitioned: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      is_procedure: {
+        Args: { "": unknown }
+        Returns: string
+      }
       is_staff: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      is_strict: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      is_superuser: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      is_window: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      isnt_aggregate: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      isnt_definer: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      isnt_empty: {
+        Args: { "": string }
+        Returns: string
+      }
+      isnt_normal_function: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      isnt_partitioned: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      isnt_procedure: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      isnt_strict: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      isnt_superuser: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      isnt_window: {
+        Args: { "": unknown }
+        Returns: string
       }
       join_arena_topic: {
         Args: {
@@ -5608,6 +6469,14 @@ export type Database = {
         Args: { p_hunt_id: string }
         Returns: Json
       }
+      language_is_trusted: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      languages_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
       leave_hood: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: undefined
@@ -5618,6 +6487,14 @@ export type Database = {
       }
       leave_meet_session: {
         Args: { p_reason?: string; p_session_id: string }
+        Returns: Json
+      }
+      list_arena_backup_candidates: {
+        Args: { p_limit?: number; p_room_id: string }
+        Returns: Json
+      }
+      list_arena_room_events: {
+        Args: { p_after?: string; p_limit?: number; p_room_id: string }
         Returns: Json
       }
       list_arena_room_evidence: {
@@ -5717,6 +6594,10 @@ export type Database = {
         Args: { p_after?: string; p_session_id: string }
         Returns: Json
       }
+      list_my_arena_backup_invites: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       list_my_creator_live_sessions: {
         Args: { p_limit?: number }
         Returns: Json
@@ -5763,9 +6644,17 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      lives_ok: {
+        Args: { "": string }
+        Returns: string
+      }
       mark_arena_evidence_useful: {
         Args: { p_evidence_id: string }
         Returns: Json
+      }
+      materialized_views_are: {
+        Args: { "": unknown[] }
+        Returns: string
       }
       meet_create_session: {
         Args: {
@@ -5822,6 +6711,30 @@ export type Database = {
         }
         Returns: Json
       }
+      no_plan: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean[]
+      }
+      num_failed: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      ok: {
+        Args: { "": boolean }
+        Returns: string
+      }
+      opclasses_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      operators_are: {
+        Args: { "": string[] }
+        Returns: string
+      }
+      os_name: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       owns_campaign_via_advertiser: {
         Args: { p_campaign_id: string }
         Returns: boolean
@@ -5829,6 +6742,10 @@ export type Database = {
       owns_profile: {
         Args: { p_profile_id: string }
         Returns: boolean
+      }
+      pass: {
+        Args: Record<PropertyKey, never> | { "": string }
+        Returns: string
       }
       pause_sponsor_campaign: {
         Args: { p_campaign_id: string }
@@ -5845,6 +6762,22 @@ export type Database = {
           title: string
           updated_at: string
         }
+      }
+      pg_version: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      pg_version_num: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      pgtap_version: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      plan: {
+        Args: { "": number }
+        Returns: string
       }
       play_next_clue_payload: {
         Args: { p_hunt_id: string; p_progress: number }
@@ -6040,6 +6973,14 @@ export type Database = {
         }
         Returns: Json
       }
+      reputation_facet_for: {
+        Args: { p_kind: Database["public"]["Enums"]["reputation_kind"] }
+        Returns: Database["public"]["Enums"]["reputation_facet"]
+      }
+      reputation_facet_json: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
       request_creator_service: {
         Args: { p_message: string; p_service_id: string }
         Returns: {
@@ -6055,6 +6996,14 @@ export type Database = {
       }
       resolve_prediction_game: {
         Args: { p_game_id: string; p_winning_option_id: string }
+        Returns: Json
+      }
+      respond_arena_backup: {
+        Args: {
+          p_accept: boolean
+          p_invite_id: string
+          p_stance?: Database["public"]["Enums"]["take_stance"]
+        }
         Returns: Json
       }
       resume_sponsor_campaign: {
@@ -6073,9 +7022,21 @@ export type Database = {
           updated_at: string
         }
       }
+      roles_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
       run_maintenance: {
         Args: { p_limit?: number }
         Returns: Json
+      }
+      runtests: {
+        Args: Record<PropertyKey, never> | { "": string } | { "": unknown }
+        Returns: string[]
+      }
+      schemas_are: {
+        Args: { "": unknown[] }
+        Returns: string
       }
       search_explore: {
         Args: { p_limit?: number; p_query: string }
@@ -6083,6 +7044,14 @@ export type Database = {
       }
       send_meet_message: {
         Args: { p_body: string; p_session_id: string }
+        Returns: Json
+      }
+      sequences_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      set_arena_backup_preference: {
+        Args: { p_policy: Database["public"]["Enums"]["arena_backup_policy"] }
         Returns: Json
       }
       set_course_lesson_status: {
@@ -6283,6 +7252,13 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      skip: {
+        Args:
+          | { "": number }
+          | { "": string }
+          | { how_many: number; why: string }
+        Returns: string
+      }
       sponsor_calc_commission_minor: {
         Args: {
           p_commission_type: Database["public"]["Enums"]["commission_type"]
@@ -6407,6 +7383,14 @@ export type Database = {
         Args: { p_answer: string; p_clue_id: string; p_hunt_id: string }
         Returns: Json
       }
+      tables_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
+      tablespaces_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
       take_hood: {
         Args: { p_take_id: string }
         Returns: Database["public"]["Enums"]["hood_id"]
@@ -6414,6 +7398,26 @@ export type Database = {
       take_stance_payload: {
         Args: { p_row: Database["public"]["Tables"]["take_stances"]["Row"] }
         Returns: Json
+      }
+      throws_ok: {
+        Args: { "": string }
+        Returns: string
+      }
+      todo: {
+        Args:
+          | { how_many: number }
+          | { how_many: number; why: string }
+          | { how_many: number; why: string }
+          | { why: string }
+        Returns: boolean[]
+      }
+      todo_end: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean[]
+      }
+      todo_start: {
+        Args: Record<PropertyKey, never> | { "": string }
+        Returns: boolean[]
       }
       toggle_challenge_entry_reaction: {
         Args: { p_entry_id: string }
@@ -6438,6 +7442,10 @@ export type Database = {
       try_meet_match: {
         Args: { p_queue_id: string }
         Returns: Json
+      }
+      types_are: {
+        Args: { "": unknown[] }
+        Returns: string
       }
       unblock_profile: {
         Args: { p_target_id: string }
@@ -6668,6 +7676,10 @@ export type Database = {
         }
         Returns: Json
       }
+      users_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
       vault_assert_owned_public_cover: {
         Args: { p_media_id: string; p_owner: string }
         Returns: undefined
@@ -6765,6 +7777,10 @@ export type Database = {
         Args: { p_creator_id: string }
         Returns: boolean
       }
+      views_are: {
+        Args: { "": unknown[] }
+        Returns: string
+      }
       watch_arena_room: {
         Args: { p_room_id: string }
         Returns: Json
@@ -6828,15 +7844,33 @@ export type Database = {
     }
     Enums: {
       advertiser_status: "DRAFT" | "ACTIVE" | "PAUSED" | "SUSPENDED"
+      arena_backup_policy: "EVERYONE" | "FOLLOWING" | "NOBODY"
+      arena_backup_status:
+        | "PENDING"
+        | "ACCEPTED"
+        | "DECLINED"
+        | "EXPIRED"
+        | "CANCELLED"
       arena_evidence_kind: "image" | "video" | "link"
       arena_message_kind: "text" | "media" | "gif" | "system"
       arena_participant_role: "debater" | "spectator"
+      arena_room_event_kind:
+        | "BACKUP_CALLED"
+        | "BACKUP_ARRIVED"
+        | "BACKUP_DECLINED"
+        | "BACKUP_EXPIRED"
+        | "EVIDENCE_SURGED"
+        | "FAST_RISING_CHANGED"
+        | "PHASE_CHANGED"
+        | "JUDGING_STARTED"
+        | "RESULT_SETTLED"
       arena_room_status:
         | "OPEN"
         | "FINAL_ARGUMENTS"
         | "JUDGING"
         | "SETTLED"
         | "CANCELLED"
+      arena_standing: "NEWCOMER" | "CONTRIBUTOR" | "DEBATER" | "VETERAN"
       arena_topic_status: "scheduled" | "live" | "closed"
       arena_winning_side: "AGREE" | "DISAGREE" | "DRAW"
       attribution_method: "REFERRAL" | "COUPON" | "UNATTRIBUTED"
@@ -6927,6 +7961,8 @@ export type Database = {
         | "community_announcement"
         | "community_reply"
         | "creator_live"
+        | "arena_backup_request"
+        | "arena_backup_arrival"
       profile_role: "viewer" | "creator" | "moderator" | "admin"
       rank_name:
         | "Rookie"
@@ -6964,6 +8000,13 @@ export type Database = {
         | "community_reply"
         | "creator_live_session"
         | "creator_ai_message"
+        | "arena_backup_invite"
+      reputation_facet:
+        | "DEBATE"
+        | "MIND_IMPACT"
+        | "EVIDENCE"
+        | "TRUST"
+        | "ENTERTAINMENT"
       reputation_kind:
         | "clash_participation"
         | "clash_win"
@@ -6972,6 +8015,9 @@ export type Database = {
         | "arena_winning_side"
         | "arena_best_argument"
         | "arena_useful_evidence"
+        | "arena_backup_arrival"
+        | "arena_crowd_favorite"
+        | "arena_mind_impact"
       sponsor_campaign_status:
         | "DRAFT"
         | "ACTIVE"
@@ -7036,7 +8082,9 @@ export type Database = {
       world_mission_status: "DRAFT" | "ACTIVE" | "ENDED" | "CANCELLED"
     }
     CompositeTypes: {
-      [_ in never]: never
+      _time_trial_type: {
+        a_time: number | null
+      }
     }
   }
 }
@@ -7165,9 +8213,28 @@ export const Constants = {
   public: {
     Enums: {
       advertiser_status: ["DRAFT", "ACTIVE", "PAUSED", "SUSPENDED"],
+      arena_backup_policy: ["EVERYONE", "FOLLOWING", "NOBODY"],
+      arena_backup_status: [
+        "PENDING",
+        "ACCEPTED",
+        "DECLINED",
+        "EXPIRED",
+        "CANCELLED",
+      ],
       arena_evidence_kind: ["image", "video", "link"],
       arena_message_kind: ["text", "media", "gif", "system"],
       arena_participant_role: ["debater", "spectator"],
+      arena_room_event_kind: [
+        "BACKUP_CALLED",
+        "BACKUP_ARRIVED",
+        "BACKUP_DECLINED",
+        "BACKUP_EXPIRED",
+        "EVIDENCE_SURGED",
+        "FAST_RISING_CHANGED",
+        "PHASE_CHANGED",
+        "JUDGING_STARTED",
+        "RESULT_SETTLED",
+      ],
       arena_room_status: [
         "OPEN",
         "FINAL_ARGUMENTS",
@@ -7175,6 +8242,7 @@ export const Constants = {
         "SETTLED",
         "CANCELLED",
       ],
+      arena_standing: ["NEWCOMER", "CONTRIBUTOR", "DEBATER", "VETERAN"],
       arena_topic_status: ["scheduled", "live", "closed"],
       arena_winning_side: ["AGREE", "DISAGREE", "DRAW"],
       attribution_method: ["REFERRAL", "COUPON", "UNATTRIBUTED"],
@@ -7271,6 +8339,8 @@ export const Constants = {
         "community_announcement",
         "community_reply",
         "creator_live",
+        "arena_backup_request",
+        "arena_backup_arrival",
       ],
       profile_role: ["viewer", "creator", "moderator", "admin"],
       rank_name: [
@@ -7311,6 +8381,14 @@ export const Constants = {
         "community_reply",
         "creator_live_session",
         "creator_ai_message",
+        "arena_backup_invite",
+      ],
+      reputation_facet: [
+        "DEBATE",
+        "MIND_IMPACT",
+        "EVIDENCE",
+        "TRUST",
+        "ENTERTAINMENT",
       ],
       reputation_kind: [
         "clash_participation",
@@ -7320,6 +8398,9 @@ export const Constants = {
         "arena_winning_side",
         "arena_best_argument",
         "arena_useful_evidence",
+        "arena_backup_arrival",
+        "arena_crowd_favorite",
+        "arena_mind_impact",
       ],
       sponsor_campaign_status: [
         "DRAFT",
