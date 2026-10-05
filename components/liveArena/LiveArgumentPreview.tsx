@@ -3,7 +3,7 @@
  * Real server snippets only — never invented debate text.
  */
 import React from 'react';
-import { AppState, StyleSheet, Text, View } from 'react-native';
+import { AppState, Image, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -136,12 +136,13 @@ function ExcerptBlock({
   animate: boolean;
 }): React.JSX.Element {
   const t = useThemeColors();
-  const body =
-    excerpt.text.trim().length > 0
-      ? `“${excerpt.text.trim()}”`
-      : excerpt.kind === 'gif'
-        ? 'GIF reply'
-        : '…';
+  const hasText = excerpt.text.trim().length > 0;
+  const body = hasText
+    ? `“${excerpt.text.trim()}”`
+    : excerpt.kind === 'gif'
+      ? 'GIF reply'
+      : '…';
+  const gif = excerpt.gifUrl?.trim() || null;
 
   return (
     <Animated.View
@@ -151,6 +152,9 @@ function ExcerptBlock({
     >
       <View style={[styles.edge, { backgroundColor: edgeColor }]} />
       <View style={styles.excerptBody}>
+        {gif ? (
+          <Image source={{ uri: gif }} style={styles.gif} resizeMode="cover" />
+        ) : null}
         <Text allowFontScaling={false} numberOfLines={3} style={[styles.quote, { color: t.textPrimary }]}>
           {body}
         </Text>
@@ -185,6 +189,13 @@ const styles = StyleSheet.create({
   excerptBody: {
     flex: 1,
     gap: 2,
+  },
+  gif: {
+    width: '100%',
+    height: 72,
+    borderRadius: radius.md,
+    marginBottom: 4,
+    backgroundColor: 'rgba(0,0,0,0.08)',
   },
   quote: {
     ...typeScale.body,

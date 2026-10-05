@@ -84,7 +84,7 @@ export function RoomPulseSheet({
               : 'Room Pulse'}
           </Text>
           <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-            Strongest arguments right now
+            {settled ? 'How this battle landed' : 'What is happening in this battle'}
           </Text>
 
           {loading && leaders.length === 0 ? (

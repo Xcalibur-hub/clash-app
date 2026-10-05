@@ -23,6 +23,7 @@ import {
 import { compact, timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { resolveStillUrl } from '../../utils/mediaStill';
+import { pulseLabel, takePulse } from '../../utils/takePulse';
 import { CrossedSwords } from '../clash/CrossedSwords';
 import { Avatar } from '../shared/Avatar';
 import { Squiggle } from '../shared/Doodles';
@@ -37,6 +38,7 @@ import {
 } from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
 import { TakeActionRow } from './TakeActionRow';
+import { TakeStoryBeat } from './TakeStoryBeat';
 
 export interface TakeFeedItemProps {
   take: Take;
@@ -69,6 +71,8 @@ function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
     isSaved,
     hasReacted,
     commentCount,
+    topComment,
+    topCommentAuthor,
     onOpenDetail,
     onOpenClash,
     onReact,
@@ -95,6 +99,8 @@ function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
       isSaved={isSaved}
       hasReacted={hasReacted}
       commentCount={commentCount}
+      topComment={topComment}
+      topCommentAuthor={topCommentAuthor}
       onOpenDetail={onOpenDetail}
       onOpenClash={onOpenClash}
       onReact={onReact}
@@ -110,6 +116,8 @@ function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
       isSaved={isSaved}
       hasReacted={hasReacted}
       commentCount={commentCount}
+      topComment={topComment}
+      topCommentAuthor={topCommentAuthor}
       onOpenDetail={onOpenDetail}
       onOpenClash={onOpenClash}
       onReact={onReact}
@@ -135,13 +143,15 @@ function MediaFeedCard({
   isSaved,
   hasReacted,
   commentCount,
+  topComment,
+  topCommentAuthor,
   onOpenDetail,
   onOpenClash,
   onReact,
   onSave,
   onShare,
   onMore,
-}: Omit<TakeFeedItemProps, 'topComment' | 'topCommentAuthor' | 'index'>): React.JSX.Element {
+}: Omit<TakeFeedItemProps, 'index'>): React.JSX.Element {
   const t = useThemeColors();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -154,6 +164,7 @@ function MediaFeedCard({
   const height = Math.min(560, Math.max(420, Math.round(width * 1.15)));
   const showImage = Boolean(still) && !failed;
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
+  const pulse = takePulse(take);
 
   React.useEffect(() => {
     setFailed(false);
@@ -233,6 +244,7 @@ function MediaFeedCard({
             </Text>
             <Text allowFontScaling={false} style={styles.hoodOnMedia} numberOfLines={1}>
               {hood} · {timeAgo(take.createdAt)}
+              {pulse ? ` · ${pulseLabel(pulse)}` : ''}
             </Text>
           </View>
         </Pressable>
@@ -254,6 +266,20 @@ function MediaFeedCard({
         <Text allowFontScaling style={styles.mediaHeadline} numberOfLines={4}>
           {take.text}
         </Text>
+
+        {topComment ? (
+          <TakeStoryBeat
+            comment={topComment}
+            author={topCommentAuthor}
+            clashCount={take.clashes}
+            onOpen={onOpenDetail}
+            onMedia
+          />
+        ) : take.clashes > 0 ? (
+          <Text allowFontScaling={false} style={styles.clashHint}>
+            {`⚔ ${compact(take.clashes)} in the fight`}
+          </Text>
+        ) : null}
 
         <View style={styles.overlayActions}>
           <OverlayAction
@@ -319,13 +345,15 @@ function TextFeedCard({
   isSaved,
   hasReacted,
   commentCount,
+  topComment,
+  topCommentAuthor,
   onOpenDetail,
   onOpenClash,
   onReact,
   onSave,
   onShare,
   onMore,
-}: Omit<TakeFeedItemProps, 'topComment' | 'topCommentAuthor' | 'index'>): React.JSX.Element {
+}: Omit<TakeFeedItemProps, 'index'>): React.JSX.Element {
   const t = useThemeColors();
   const { width } = useWindowDimensions();
   const accent = arenaAccentForHood(take.hood, t.scheme, take.id);
@@ -377,6 +405,19 @@ function TextFeedCard({
       </Text>
 
       <Squiggle size={110} color={accent.ink} opacity={0.28} style={styles.textDoodle} />
+
+      {topComment ? (
+        <TakeStoryBeat
+          comment={topComment}
+          author={topCommentAuthor}
+          clashCount={take.clashes}
+          onOpen={onOpenDetail}
+        />
+      ) : take.clashes > 0 ? (
+        <Text allowFontScaling={false} style={[styles.clashHintText, { color: t.textMuted }]}>
+          {`⚔ ${compact(take.clashes)} in the fight`}
+        </Text>
+      ) : null}
 
       <View style={styles.textFooter}>
         <View style={styles.textAuthor}>
@@ -530,6 +571,20 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     fontWeight: '700',
     letterSpacing: -0.3,
+  },
+  clashHint: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    color: 'rgba(250,250,248,0.72)',
+  },
+  clashHintText: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginTop: space.sm,
   },
   overlayActions: {
     flexDirection: 'row',

@@ -21,6 +21,7 @@ import { LiveRoomEventBanner } from '../../../components/liveArena/LiveRoomEvent
 import { LiveRoomHeader } from '../../../components/liveArena/LiveRoomHeader';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
 import { LiveRoomMessage } from '../../../components/liveArena/LiveRoomMessage';
+import { LiveRoomPulseStrip } from '../../../components/liveArena/LiveRoomPulseStrip';
 import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResultReveal';
 import { LiveRoomSkeleton } from '../../../components/liveArena/LiveRoomSkeleton';
 import { LiveRoomTypingCue } from '../../../components/liveArena/LiveRoomTypingCue';
@@ -54,6 +55,7 @@ import { layout, space, typeScale, useThemeColors } from '../../../theme';
 import {
   newArgumentsEvent,
   phaseEventForStatus,
+  pulseChangeEvent,
   type LiveRoomEvent,
 } from '../../../utils/liveRoomEvents';
 import { replyPreview, selectThreadRoots } from '../../../utils/liveRoomThread';
@@ -262,11 +264,12 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       setPulse(next);
       if (changes.length === 1) {
         const change = changes[0];
-        const label =
-          change.category === 'FAST_RISING'
-            ? `${change.authorName} is now Fast Rising`
-            : 'Room Pulse updated';
-        setPhaseBanner({ kind: 'new_arguments', label });
+        setPhaseBanner(
+          pulseChangeEvent({
+            category: change.category,
+            authorName: change.authorName,
+          }),
+        );
         setTimeout(() => setPhaseBanner(null), 2_800);
       }
     } catch {
@@ -336,6 +339,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
 
   const highlightId = React.useMemo(() => {
     if (room?.result?.bestArgumentMessageId) return room.result.bestArgumentMessageId;
+    const pulseTop = pulse?.leaders.find((l) => l.category === 'TOP_ARGUMENT' && l.messageId);
+    if (pulseTop?.messageId) return pulseTop.messageId;
     let bestId: string | null = null;
     let bestScore = 0;
     for (const message of messages) {
@@ -347,7 +352,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       }
     }
     return bestId;
-  }, [messages, room?.result?.bestArgumentMessageId]);
+  }, [messages, pulse?.leaders, room?.result?.bestArgumentMessageId]);
 
   const accepting = room?.status === 'OPEN' || room?.status === 'FINAL_ARGUMENTS';
   const settled = room?.status === 'SETTLED';
@@ -621,6 +626,17 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         }}
       />
 
+      {!settled ? (
+        <LiveRoomPulseStrip
+          pulse={pulse}
+          onOpen={() => {
+            setPulseOpen(true);
+            analytics.track('room_pulse_opened', { realm: 'arena' });
+            void loadPulse();
+          }}
+        />
+      ) : null}
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -641,6 +657,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                   result={room.result}
                   stats={stats}
                   viewer={room.viewer}
+                  topicTitle={room.topic.title}
+                  roomIndex={roomIndex}
                   busy={voting}
                   onRecordFinal={(stance) => {
                     setVoting(true);

@@ -7,7 +7,9 @@ export type LiveRoomEventKind =
   | 'new_arguments'
   | 'final_arguments'
   | 'judging'
-  | 'result';
+  | 'result'
+  | 'pulse_rising'
+  | 'pulse_updated';
 
 export interface LiveRoomEvent {
   kind: LiveRoomEventKind;
@@ -28,10 +30,10 @@ export function phaseEventForStatus(
 ): LiveRoomEvent | null {
   if (!previous || previous === status) return null;
   if (status === 'FINAL_ARGUMENTS') {
-    return { kind: 'final_arguments', label: 'Final arguments started' };
+    return { kind: 'final_arguments', label: 'Final arguments — last stand' };
   }
   if (status === 'JUDGING') {
-    return { kind: 'judging', label: 'Judging is open' };
+    return { kind: 'judging', label: 'Judging is open — the room decides' };
   }
   if (status === 'SETTLED') {
     return { kind: 'result', label: 'Result is in' };
@@ -45,5 +47,22 @@ export function newArgumentsEvent(count: number): LiveRoomEvent | null {
   return {
     kind: 'new_arguments',
     label: `${count} new argument${count === 1 ? '' : 's'}`,
+  };
+}
+
+/** Pulse leader change — Fast Rising or other real category shifts. */
+export function pulseChangeEvent(input: {
+  category: string;
+  authorName: string;
+}): LiveRoomEvent {
+  if (input.category === 'FAST_RISING') {
+    return {
+      kind: 'pulse_rising',
+      label: `${input.authorName} is Fast Rising`,
+    };
+  }
+  return {
+    kind: 'pulse_updated',
+    label: 'Room Pulse updated',
   };
 }

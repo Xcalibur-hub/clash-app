@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Share, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -14,10 +14,12 @@ import type {
   ArenaRoomViewer,
   Stance,
 } from '../../services/liveArenaService';
+import { analytics } from '../../services/analytics';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
-import { notify as hapticNotify } from '../../utils/haptics';
+import { notify as hapticNotify, tap as hapticTap } from '../../utils/haptics';
 import { StanceChoiceRow } from '../arena/StanceChoiceRow';
 import { Avatar } from '../shared/Avatar';
+import { GlowButton } from '../shared/GlowButton';
 import { softFill, STANCE_LABEL, winningSideLabel } from './liveArenaStyles';
 
 export interface LiveRoomResultRevealProps {
@@ -26,6 +28,8 @@ export interface LiveRoomResultRevealProps {
   stats: ArenaMindshiftStats | null;
   /** Null for a non-member reading a public result. */
   viewer: ArenaRoomViewer | null;
+  topicTitle?: string | null;
+  roomIndex?: number | null;
   busy?: boolean;
   onRecordFinal: (stance: Stance) => void;
 }
@@ -42,6 +46,8 @@ export function LiveRoomResultReveal({
   result,
   stats,
   viewer,
+  topicTitle = null,
+  roomIndex = null,
   busy = false,
   onRecordFinal,
 }: LiveRoomResultRevealProps): React.JSX.Element {
@@ -77,6 +83,26 @@ export function LiveRoomResultReveal({
 
   const agreeShare = totalVotes > 0 ? result.agreeVotes / totalVotes : 0.5;
 
+  const onShare = async (): Promise<void> => {
+    hapticTap();
+    const title = topicTitle?.trim() || 'Arena battle';
+    const room = roomIndex != null ? `Room ${roomIndex}` : 'Room';
+    const headline = isDraw ? 'DRAW' : `${winningSideLabel(result.winningSide).toUpperCase()} WON`;
+    const pct = winnerPercent != null ? ` · ${winnerPercent}%` : '';
+    const mind =
+      changedPercent != null ? `\nMindshift ${changedPercent}%` : '';
+    const best = result.bestArgumentBody
+      ? `\nBest argument: "${result.bestArgumentBody.slice(0, 120)}"`
+      : '';
+    const message = `CLASH — ${title}\n${room} decided\n${headline}${pct}\n${result.participantCount.toLocaleString()} participated${mind}${best}\n\nWatch on CLASH.`;
+    try {
+      await Share.share({ message });
+      analytics.track('arena_result_shared', { realm: 'arena' });
+    } catch {
+      /* dismissed */
+    }
+  };
+
   return (
     <View style={styles.wrap}>
       <Animated.View
@@ -87,7 +113,7 @@ export function LiveRoomResultReveal({
         ]}
       >
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          RESULT
+          ROOM DECIDED
         </Text>
 
         <View style={styles.headline}>
@@ -138,6 +164,7 @@ export function LiveRoomResultReveal({
         <Text allowFontScaling={false} style={[styles.sub, { color: t.textMuted }]}>
           {result.participantCount.toLocaleString()} participants
         </Text>
+        <GlowButton label="Share result" onPress={() => void onShare()} compact tone="glass" />
       </Animated.View>
 
       {result.bestArgumentBody || result.bestArgumentAuthor ? (

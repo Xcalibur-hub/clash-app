@@ -59,6 +59,7 @@ export type AnalyticsEvent =
   | 'clash_judgement_completed'
   | 'clash_verdict_viewed'
   | 'clash_result_shared'
+  | 'arena_result_shared'
   | 'world_opened'
   | 'world_drop_opened'
   | 'world_drop_created'
