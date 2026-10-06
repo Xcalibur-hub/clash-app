@@ -19,9 +19,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { analytics } from '../../services/analytics';
-import { getGifProvider } from '../../services/gif';
+import { getGifProvider, getGifProviderStatus } from '../../services/gif';
 import type { TenorGif } from '../../services/tenorService';
-import { isGifSearchConfigured } from '../../services/tenorService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { CloseIcon, SearchIcon } from '../shared/icons';
@@ -58,7 +57,7 @@ export function GifPickerSheet({
   const col = Math.max(140, Math.floor((width - pad * 2 - gap) / 2));
 
   const load = React.useCallback(async (q: string, pos?: string, append = false) => {
-    if (!isGifSearchConfigured()) {
+    if (!getGifProviderStatus().configured) {
       setState('unconfigured');
       setResults([]);
       return;
@@ -191,10 +190,10 @@ export function GifPickerSheet({
           {state === 'unconfigured' ? (
             <View style={styles.message}>
               <Text allowFontScaling={false} style={[styles.messageTitle, { color: t.textPrimary }]}>
-                GIF search needs a key
+                GIF search isn’t set up
               </Text>
               <Text allowFontScaling={false} style={[styles.messageBody, { color: t.textMuted }]}>
-                Set EXPO_PUBLIC_TENOR_API_KEY in your env to enable Tenor.
+                {getGifProviderStatus().setupHint}
               </Text>
             </View>
           ) : state === 'loading' && results.length === 0 ? (

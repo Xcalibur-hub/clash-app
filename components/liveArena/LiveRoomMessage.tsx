@@ -6,10 +6,12 @@ import type { TakeMedia } from '../../store/types';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
+import { ClashNativeStickerCard } from '../arena/ClashNativeStickerCard';
 import { CommentMedia } from '../arena/CommentMedia';
 import { MessageExpressiveSheet } from '../arena/MessageExpressiveSheet';
 import { Avatar } from '../shared/Avatar';
 import { MoreIcon } from '../shared/icons';
+import { parseClashStickerBody } from '../../utils/clashNativeStickers';
 import { ArenaReactionPicker } from './ArenaReactionPicker';
 import { clashStampForEmoji } from './ClashSticker';
 import { LiveEvidenceCard } from './LiveEvidenceCard';
@@ -113,7 +115,8 @@ export function LiveRoomMessage({
 
   const author = message.author;
   const media = toTakeMedia(message);
-  const memeLead = isMemeLead(message, media);
+  const stickerParsed = parseClashStickerBody(message.body);
+  const memeLead = Boolean(stickerParsed) || isMemeLead(message, media);
   const own = message.isOwn;
   const pending = message.pending === true;
   const isReply = Boolean(parent) || parentUnavailable || Boolean(message.parentMessageId);
@@ -123,6 +126,12 @@ export function LiveRoomMessage({
   const viewerActive = message.reactions.filter((r) => r.viewerReacted).map((r) => r.emoji);
   const cooked = message.reactions.find((r) => r.emoji === DEFAULT_REACTION);
 
+  const stickerBlock = stickerParsed ? (
+    <View style={[styles.sticker, memeLead && styles.mediaLead]}>
+      <ClashNativeStickerCard sticker={stickerParsed.sticker} size={isReply ? 'sm' : 'md'} />
+    </View>
+  ) : null;
+
   const mediaBlock =
     media != null ? (
       <View style={[styles.media, memeLead && styles.mediaLead]}>
@@ -130,8 +139,9 @@ export function LiveRoomMessage({
       </View>
     ) : null;
 
+  const displayText = stickerParsed ? stickerParsed.text : (message.body ?? '').trim();
   const textBlock =
-    message.body && message.body.trim() ? (
+    displayText.length > 0 ? (
       <Text
         allowFontScaling={false}
         style={[
@@ -142,7 +152,7 @@ export function LiveRoomMessage({
           memeLead && styles.textUnderMeme,
         ]}
       >
-        {message.body}
+        {displayText}
       </Text>
     ) : null;
 
@@ -263,12 +273,14 @@ export function LiveRoomMessage({
 
         {memeLead ? (
           <>
+            {stickerBlock}
             {mediaBlock}
             {textBlock}
           </>
         ) : (
           <>
             {textBlock}
+            {stickerBlock}
             {mediaBlock}
           </>
         )}
@@ -418,7 +430,13 @@ export function LiveRoomMessage({
                   numberOfLines={3}
                   style={[styles.nestedBody, { color: t.textSecondary }]}
                 >
-                  {reply.body || (reply.mediaUrl ? 'GIF / media' : '')}
+                  {(() => {
+                    const nestedSticker = parseClashStickerBody(reply.body);
+                    if (nestedSticker) {
+                      return nestedSticker.text || nestedSticker.sticker.label;
+                    }
+                    return reply.body || (reply.mediaUrl ? 'GIF / media' : '');
+                  })()}
                 </Text>
               </View>
             ))}
@@ -519,6 +537,7 @@ const styles = StyleSheet.create({
   textStrong: { fontWeight: '600' },
   textUnderMeme: { fontSize: 14, lineHeight: 20, marginTop: 2 },
   media: { marginTop: 2, alignSelf: 'stretch', maxWidth: '100%' },
+  sticker: { marginTop: 2, width: 148, maxWidth: '70%' },
   mediaLead: { marginTop: 0, marginBottom: 2 },
   evidenceStack: { gap: 6, marginTop: 4 },
   actions: {

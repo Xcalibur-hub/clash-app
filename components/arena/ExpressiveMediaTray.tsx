@@ -25,22 +25,37 @@ import {
   type SavedExpressiveMedia,
   type TrendingClashMeme,
 } from '../../services/expressiveMediaService';
-import { getGifProvider, type NormalizedGifMedia } from '../../services/gif';
+import {
+  getGifProvider,
+  getGifProviderStatus,
+  type NormalizedGifMedia,
+} from '../../services/gif';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import {
   pushExpressiveRecent,
   readExpressiveRecent,
   type ExpressiveRecentItem,
 } from '../../utils/expressiveMediaRecent';
+import {
+  CLASH_NATIVE_STICKERS,
+  clashStickerBySlug,
+  clashStickerUri,
+  filterClashStickers,
+  isClashStickerUri,
+  slugFromClashStickerUri,
+  type ClashNativeSticker,
+} from '../../utils/clashNativeStickers';
 import { tap as hapticTap } from '../../utils/haptics';
-import { CLASH_NATIVE_STICKERS, clashStickerAsGif } from '../../utils/clashNativeStickers';
+import { ClashNativeStickerCard } from './ClashNativeStickerCard';
 import { CloseIcon, SearchIcon } from '../shared/icons';
 
 export type ExpressiveMainTab = 'memes' | 'gifs' | 'stickers';
 export type ExpressiveSubTab = 'search' | 'trending' | 'recent' | 'saved';
 
 export type ExpressiveMediaPick =
-  | { channel: 'gif' | 'sticker'; media: NormalizedGifMedia }
+  | { channel: 'gif'; media: NormalizedGifMedia }
+  | { channel: 'sticker'; clash: ClashNativeSticker }
+  | { channel: 'sticker'; media: NormalizedGifMedia }
   | { channel: 'meme'; upload: true }
   | {
       channel: 'meme';
@@ -60,6 +75,7 @@ export interface ExpressiveMediaTrayProps {
 
 type GridItem =
   | { key: string; kind: 'gif'; media: NormalizedGifMedia }
+  | { key: string; kind: 'clash-sticker'; sticker: ClashNativeSticker }
   | { key: string; kind: 'meme-upload' }
   | { key: string; kind: 'trending'; meme: TrendingClashMeme }
   | { key: string; kind: 'saved'; saved: SavedExpressiveMedia }
@@ -80,8 +96,14 @@ export function ExpressiveMediaTray({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const provider = React.useMemo(() => getGifProvider(), []);
+  const gifStatus = React.useMemo(() => getGifProviderStatus(), []);
 
-  const [mainTab, setMainTab] = React.useState<ExpressiveMainTab>(initialMainTab);
+  const resolvedInitial = React.useMemo((): ExpressiveMainTab => {
+    if (initialMainTab === 'gifs' && !gifStatus.configured) return 'stickers';
+    return initialMainTab;
+  }, [gifStatus.configured, initialMainTab]);
+
+  const [mainTab, setMainTab] = React.useState<ExpressiveMainTab>(resolvedInitial);
   const [subTab, setSubTab] = React.useState<ExpressiveSubTab>('trending');
   const [query, setQuery] = React.useState('');
   const debounced = useDebouncedValue(query, 320);
@@ -98,21 +120,23 @@ export function ExpressiveMediaTray({
 
   const gap = 8;
   const pad = space.md;
-  const col = Math.max(108, Math.floor((width - pad * 2 - gap * 2) / 3));
+  const col = Math.max(100, Math.floor((width - pad * 2 - gap * 2) / 3));
 
   React.useEffect(() => {
     if (!visible) return;
-    setMainTab(initialMainTab);
-    setSubTab(initialMainTab === 'memes' ? 'trending' : 'trending');
+    setMainTab(resolvedInitial);
+    setSubTab('trending');
+    setQuery('');
     void readExpressiveRecent().then(setRecent);
     analytics.track('gif_picker_opened', { realm: 'arena', source });
-  }, [visible, initialMainTab, source]);
+  }, [visible, resolvedInitial, source]);
 
   const loadGifs = React.useCallback(
     async (append: boolean, pos?: string) => {
       if (!provider.isConfigured()) {
         setGifState('unconfigured');
         setGifItems([]);
+        setGifNext(null);
         return;
       }
       if (!append) {
@@ -159,7 +183,8 @@ export function ExpressiveMediaTray({
       if (mainTab === 'memes' && subTab === 'trending') {
         const rows = await listTrendingClashMemes(PAGE);
         setTrendingMemes(rows);
-        setAuxState(rows.length ? 'ready' : 'empty');
+        // Upload tile always makes this surface usable.
+        setAuxState('ready');
         return;
       }
       setAuxState('ready');
@@ -170,20 +195,43 @@ export function ExpressiveMediaTray({
 
   React.useEffect(() => {
     if (!visible) return;
-    if (mainTab === 'gifs' || mainTab === 'stickers') {
+    if (mainTab === 'gifs') {
       if (subTab === 'search' || subTab === 'trending') {
         void loadGifs(false);
       } else {
         void loadAux();
       }
-    } else if (mainTab === 'memes') {
-      if (subTab === 'trending' || subTab === 'saved' || subTab === 'recent') {
-        void loadAux();
-      } else if (subTab === 'search') {
-        void loadGifs(false);
-      }
+      return;
     }
-  }, [visible, mainTab, subTab, debounced, loadAux, loadGifs]);
+    if (mainTab === 'stickers') {
+      if (subTab === 'saved' || subTab === 'recent') {
+        void loadAux();
+      } else if (subTab === 'search' || subTab === 'trending') {
+        // Native pack is always ready; optionally enrich with provider stickers.
+        setAuxState('ready');
+        if (provider.isConfigured()) {
+          void loadGifs(false);
+        } else {
+          setGifState('unconfigured');
+          setGifItems([]);
+        }
+      }
+      return;
+    }
+    // memes
+    if (subTab === 'trending' || subTab === 'saved' || subTab === 'recent') {
+      void loadAux();
+    } else if (subTab === 'search') {
+      void loadGifs(false);
+    }
+  }, [visible, mainTab, subTab, debounced, loadAux, loadGifs, provider]);
+
+  const nativeStickers = React.useMemo(() => {
+    if (mainTab !== 'stickers') return [] as ClashNativeSticker[];
+    if (subTab === 'search') return filterClashStickers(debounced);
+    if (subTab === 'trending') return [...CLASH_NATIVE_STICKERS];
+    return [];
+  }, [debounced, mainTab, subTab]);
 
   const gridData = React.useMemo((): GridItem[] => {
     if (mainTab === 'memes') {
@@ -201,24 +249,53 @@ export function ExpressiveMediaTray({
       if (subTab === 'recent') {
         return recent
           .filter((r) => r.kind === 'meme' || r.kind === 'gif')
-          .map((recentRow) => ({ key: dedupeRecent(recentRow), kind: 'recent' as const, recent: recentRow }));
+          .map((recentRow) => ({
+            key: dedupeRecent(recentRow),
+            kind: 'recent' as const,
+            recent: recentRow,
+          }));
       }
       if (subTab === 'search') {
-        return gifItems.map((media) => ({ key: `g-${media.id}`, kind: 'gif' as const, media }));
+        if (!gifStatus.configured) return [{ key: 'upload', kind: 'meme-upload' }];
+        return [
+          { key: 'upload', kind: 'meme-upload' },
+          ...gifItems.map((media) => ({ key: `g-${media.id}`, kind: 'gif' as const, media })),
+        ];
       }
       return [{ key: 'upload', kind: 'meme-upload' }];
     }
+
     if (mainTab === 'stickers') {
-      const native = CLASH_NATIVE_STICKERS.map((s) => clashStickerAsGif(s));
-      const fromProvider =
-        subTab === 'search' || subTab === 'trending'
-          ? gifItems
-          : subTab === 'recent'
-            ? recent.filter((r) => r.kind === 'sticker').map(recentToGif)
-            : saved.filter((s) => s.kind === 'sticker').map(savedToGif);
-      const merged = [...native, ...fromProvider];
-      return merged.map((media) => ({ key: `s-${media.provider}-${media.id}`, kind: 'gif' as const, media }));
+      if (subTab === 'saved') {
+        return saved
+          .filter((s) => s.kind === 'sticker')
+          .map((savedRow) => ({ key: savedRow.id, kind: 'saved' as const, saved: savedRow }));
+      }
+      if (subTab === 'recent') {
+        return recent
+          .filter((r) => r.kind === 'sticker')
+          .map((recentRow) => ({
+            key: dedupeRecent(recentRow),
+            kind: 'recent' as const,
+            recent: recentRow,
+          }));
+      }
+      const nativeItems: GridItem[] = nativeStickers.map((sticker) => ({
+        key: `clash-${sticker.slug}`,
+        kind: 'clash-sticker',
+        sticker,
+      }));
+      const providerItems: GridItem[] =
+        gifStatus.configured && (subTab === 'trending' || subTab === 'search')
+          ? gifItems.map((media) => ({
+              key: `s-${media.provider}-${media.id}`,
+              kind: 'gif' as const,
+              media,
+            }))
+          : [];
+      return [...nativeItems, ...providerItems];
     }
+
     // gifs
     if (subTab === 'saved') {
       return saved
@@ -228,10 +305,23 @@ export function ExpressiveMediaTray({
     if (subTab === 'recent') {
       return recent
         .filter((r) => r.kind === 'gif')
-        .map((recentRow) => ({ key: dedupeRecent(recentRow), kind: 'recent' as const, recent: recentRow }));
+        .map((recentRow) => ({
+          key: dedupeRecent(recentRow),
+          kind: 'recent' as const,
+          recent: recentRow,
+        }));
     }
     return gifItems.map((media) => ({ key: `g-${media.id}`, kind: 'gif' as const, media }));
-  }, [gifItems, mainTab, recent, saved, subTab, trendingMemes]);
+  }, [
+    gifItems,
+    gifStatus.configured,
+    mainTab,
+    nativeStickers,
+    recent,
+    saved,
+    subTab,
+    trendingMemes,
+  ]);
 
   const pickGif = async (media: NormalizedGifMedia, kind: 'gif' | 'sticker'): Promise<void> => {
     hapticTap();
@@ -242,7 +332,21 @@ export function ExpressiveMediaTray({
       previewUrl: media.previewUrl,
       url: media.url,
     });
-    onSelect({ channel: kind, media });
+    onSelect(kind === 'gif' ? { channel: 'gif', media } : { channel: 'sticker', media });
+    onClose();
+  };
+
+  const pickClashSticker = async (sticker: ClashNativeSticker): Promise<void> => {
+    hapticTap();
+    const uri = clashStickerUri(sticker.slug);
+    await pushExpressiveRecent({
+      kind: 'sticker',
+      provider: 'clash',
+      externalId: sticker.slug,
+      previewUrl: uri,
+      url: uri,
+    });
+    onSelect({ channel: 'sticker', clash: sticker });
     onClose();
   };
 
@@ -251,6 +355,10 @@ export function ExpressiveMediaTray({
       hapticTap();
       onSelect({ channel: 'meme', upload: true });
       onClose();
+      return;
+    }
+    if (item.kind === 'clash-sticker') {
+      await pickClashSticker(item.sticker);
       return;
     }
     if (item.kind === 'gif') {
@@ -266,6 +374,14 @@ export function ExpressiveMediaTray({
     if (item.kind === 'saved') {
       hapticTap();
       const s = item.saved;
+      if (s.kind === 'sticker' && (s.provider === 'clash' || isClashStickerUri(s.previewUrl))) {
+        const slug = s.externalId || slugFromClashStickerUri(s.previewUrl);
+        const sticker = slug ? clashStickerBySlug(slug) : null;
+        if (sticker) {
+          await pickClashSticker(sticker);
+          return;
+        }
+      }
       if (s.kind === 'gif' || s.kind === 'sticker') {
         await pickGif(
           {
@@ -287,6 +403,13 @@ export function ExpressiveMediaTray({
     }
     if (item.kind === 'recent') {
       const r = item.recent;
+      if (r.kind === 'sticker' && (r.provider === 'clash' || isClashStickerUri(r.previewUrl))) {
+        const sticker = clashStickerBySlug(r.externalId);
+        if (sticker) {
+          await pickClashSticker(sticker);
+          return;
+        }
+      }
       if (r.kind === 'gif' || r.kind === 'sticker') {
         await pickGif(
           {
@@ -330,8 +453,49 @@ export function ExpressiveMediaTray({
           <Text allowFontScaling={false} style={[styles.uploadText, { color: t.textSecondary }]}>
             + Upload
           </Text>
+          <Text allowFontScaling={false} style={[styles.uploadHint, { color: t.textMuted }]}>
+            Image meme
+          </Text>
         </Pressable>
       );
+    }
+    if (item.kind === 'clash-sticker') {
+      return (
+        <Pressable
+          onPress={() => void onGridPress(item)}
+          onLongPress={() => void toggleSaveClash(item.sticker)}
+          style={{ width: col }}
+          accessibilityRole="button"
+          accessibilityLabel={`Sticker ${item.sticker.label}`}
+        >
+          <ClashNativeStickerCard sticker={item.sticker} size="md" />
+        </Pressable>
+      );
+    }
+    if (
+      (item.kind === 'saved' || item.kind === 'recent') &&
+      ((item.kind === 'saved' && item.saved.kind === 'sticker' && item.saved.provider === 'clash') ||
+        (item.kind === 'recent' &&
+          item.recent.kind === 'sticker' &&
+          item.recent.provider === 'clash'))
+    ) {
+      const slug =
+        item.kind === 'saved'
+          ? item.saved.externalId
+          : item.recent.externalId;
+      const sticker = clashStickerBySlug(slug);
+      if (sticker) {
+        return (
+          <Pressable
+            onPress={() => void onGridPress(item)}
+            style={{ width: col }}
+            accessibilityRole="button"
+            accessibilityLabel={`Sticker ${sticker.label}`}
+          >
+            <ClashNativeStickerCard sticker={sticker} size="md" />
+          </Pressable>
+        );
+      }
     }
     const uri =
       item.kind === 'trending'
@@ -354,12 +518,32 @@ export function ExpressiveMediaTray({
     );
   };
 
-  const state: LoadState =
-    mainTab === 'memes' && (subTab === 'trending' || subTab === 'saved' || subTab === 'recent')
-      ? auxState
-      : gifState;
-
   const showSearch = subTab === 'search';
+  const gifsBlocked = mainTab === 'gifs' && (subTab === 'search' || subTab === 'trending');
+  const memesSearchBlocked = mainTab === 'memes' && subTab === 'search' && !gifStatus.configured;
+
+  let bodyState: LoadState = 'ready';
+  if (mainTab === 'gifs' && (subTab === 'search' || subTab === 'trending')) {
+    bodyState = gifState;
+  } else if (mainTab === 'memes' && subTab === 'search' && gifStatus.configured) {
+    bodyState = gifState === 'loading' ? 'loading' : 'ready';
+  } else if (
+    (mainTab === 'memes' || mainTab === 'stickers') &&
+    (subTab === 'saved' || subTab === 'recent')
+  ) {
+    bodyState = auxState;
+  } else if (mainTab === 'memes' && subTab === 'trending') {
+    bodyState = auxState === 'loading' ? 'loading' : 'ready';
+  } else if (mainTab === 'stickers' && (subTab === 'trending' || subTab === 'search')) {
+    bodyState = gridData.length ? 'ready' : 'empty';
+  }
+
+  const emptyCopy = (): string => {
+    if (subTab === 'recent') return 'Nothing recent yet — pick a sticker, GIF, or meme first.';
+    if (subTab === 'saved') return 'Long-press a sticker or meme to save it here.';
+    if (mainTab === 'stickers') return 'No stickers match that search.';
+    return 'Nothing here yet.';
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -380,7 +564,8 @@ export function ExpressiveMediaTray({
               onPress={() => {
                 hapticTap();
                 setMainTab(tab);
-                setSubTab(tab === 'memes' ? 'trending' : 'trending');
+                setSubTab('trending');
+                setQuery('');
               }}
               style={[styles.mainTab, mainTab === tab && { borderBottomColor: t.accent }]}
             >
@@ -423,7 +608,13 @@ export function ExpressiveMediaTray({
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder={mainTab === 'stickers' ? 'Search stickers…' : 'Search GIFs…'}
+              placeholder={
+                mainTab === 'stickers'
+                  ? 'Search CLASH stickers…'
+                  : mainTab === 'memes'
+                    ? 'Search GIF memes…'
+                    : `Search ${gifStatus.label}…`
+              }
               placeholderTextColor={t.textMuted}
               style={[styles.searchInput, { color: t.textPrimary }]}
               autoCorrect={false}
@@ -432,50 +623,120 @@ export function ExpressiveMediaTray({
           </View>
         ) : null}
 
-        {state === 'loading' ? (
+        {gifsBlocked && bodyState === 'unconfigured' ? (
+          <View style={styles.center}>
+            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+              GIF search isn’t set up
+            </Text>
+            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+              {gifStatus.setupHint} Stickers and image memes still work without it.
+            </Text>
+            <View style={styles.ctaRow}>
+              <Pressable
+                onPress={() => {
+                  hapticTap();
+                  setMainTab('stickers');
+                  setSubTab('trending');
+                }}
+                style={[styles.cta, { backgroundColor: t.pill }]}
+              >
+                <Text allowFontScaling={false} style={[styles.ctaText, { color: t.pillText }]}>
+                  Open stickers
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  hapticTap();
+                  setMainTab('memes');
+                  setSubTab('trending');
+                }}
+                style={[styles.cta, { borderColor: t.border, borderWidth: StyleSheet.hairlineWidth }]}
+              >
+                <Text allowFontScaling={false} style={[styles.ctaText, { color: t.textPrimary }]}>
+                  Upload a meme
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : memesSearchBlocked ? (
+          <View style={styles.center}>
+            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+              GIF meme search needs {gifStatus.label}
+            </Text>
+            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+              {gifStatus.setupHint} You can still upload image memes from Trending.
+            </Text>
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                setSubTab('trending');
+              }}
+              style={[styles.cta, { backgroundColor: t.pill, marginTop: space.md }]}
+            >
+              <Text allowFontScaling={false} style={[styles.ctaText, { color: t.pillText }]}>
+                Back to trending memes
+              </Text>
+            </Pressable>
+          </View>
+        ) : bodyState === 'loading' ? (
           <View style={styles.center}>
             <ActivityIndicator color={t.textMuted} />
           </View>
-        ) : state === 'unconfigured' ? (
+        ) : bodyState === 'empty' ? (
           <View style={styles.center}>
-            <Text allowFontScaling={false} style={{ color: t.textMuted, textAlign: 'center' }}>
-              GIF search is not configured. Add EXPO_PUBLIC_TENOR_API_KEY for this build.
+            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+              {emptyCopy()}
             </Text>
           </View>
-        ) : state === 'empty' ? (
+        ) : bodyState === 'error' ? (
           <View style={styles.center}>
-            <Text allowFontScaling={false} style={{ color: t.textMuted }}>
-              Nothing here yet — try search or send one first.
-            </Text>
-          </View>
-        ) : state === 'error' ? (
-          <View style={styles.center}>
-            <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
               Could not load media. Try again.
             </Text>
           </View>
         ) : (
-          <FlatList
-            data={gridData}
-            keyExtractor={(item) => item.key}
-            numColumns={3}
-            columnWrapperStyle={{ gap, paddingHorizontal: pad }}
-            contentContainerStyle={{ gap, paddingBottom: insets.bottom + space.lg }}
-            renderItem={renderItem}
-            onEndReached={() => {
-              if ((mainTab === 'gifs' || mainTab === 'stickers') && gifNext && !loadingMore) {
-                void loadGifs(true, gifNext);
-              }
-            }}
-            onEndReachedThreshold={0.4}
-            initialNumToRender={12}
-            maxToRenderPerBatch={12}
-            windowSize={5}
-            removeClippedSubviews
-          />
+          <>
+            {mainTab === 'memes' && subTab === 'trending' && trendingMemes.length === 0 ? (
+              <Text allowFontScaling={false} style={[styles.banner, { color: t.textMuted }]}>
+                Upload an image meme — trending fills from real Arena reactions, not fake counts.
+              </Text>
+            ) : null}
+            {mainTab === 'stickers' && subTab === 'trending' ? (
+              <Text allowFontScaling={false} style={[styles.banner, { color: t.textMuted }]}>
+                CLASH stickers · works offline from the GIF provider
+                {gifStatus.configured ? ` · + ${gifStatus.label}` : ''}
+              </Text>
+            ) : null}
+            <FlatList
+              data={gridData}
+              keyExtractor={(item) => item.key}
+              numColumns={3}
+              columnWrapperStyle={{ gap, paddingHorizontal: pad }}
+              contentContainerStyle={{ gap, paddingBottom: insets.bottom + space.lg }}
+              renderItem={renderItem}
+              onEndReached={() => {
+                if (
+                  gifStatus.configured &&
+                  (mainTab === 'gifs' || mainTab === 'stickers') &&
+                  (subTab === 'trending' || subTab === 'search') &&
+                  gifNext &&
+                  !loadingMore
+                ) {
+                  void loadGifs(true, gifNext);
+                }
+              }}
+              onEndReachedThreshold={0.4}
+              initialNumToRender={12}
+              maxToRenderPerBatch={12}
+              windowSize={5}
+              removeClippedSubviews
+            />
+          </>
         )}
         <Text allowFontScaling={false} style={[styles.attribution, { color: t.textMuted }]}>
-          GIFs via Tenor · CLASH memes from the Arena
+          {gifStatus.configured
+            ? `GIFs via ${gifStatus.label} · CLASH stickers & memes`
+            : 'CLASH stickers & memes · GIF search not configured'}
         </Text>
       </View>
     </Modal>
@@ -486,28 +747,20 @@ function dedupeRecent(r: ExpressiveRecentItem): string {
   return `${r.kind}:${r.provider}:${r.externalId}`;
 }
 
-function recentToGif(r: ExpressiveRecentItem): NormalizedGifMedia {
-  return {
-    id: r.externalId,
-    provider: 'tenor',
-    previewUrl: r.previewUrl,
-    url: r.url,
-    width: 1,
-    height: 1,
-    description: '',
-  };
-}
-
-function savedToGif(s: SavedExpressiveMedia): NormalizedGifMedia {
-  return {
-    id: s.externalId,
-    provider: 'tenor',
-    previewUrl: s.previewUrl,
-    url: s.mediaUrl,
-    width: 1,
-    height: 1,
-    description: '',
-  };
+async function toggleSaveClash(sticker: ClashNativeSticker): Promise<void> {
+  hapticTap();
+  const uri = clashStickerUri(sticker.slug);
+  try {
+    await toggleSavedExpressiveMedia({
+      kind: 'sticker',
+      provider: 'clash',
+      externalId: sticker.slug,
+      previewUrl: uri,
+      mediaUrl: uri,
+    });
+  } catch {
+    /* best-effort */
+  }
 }
 
 async function toggleSaveFromItem(item: GridItem): Promise<void> {
@@ -532,6 +785,8 @@ async function toggleSaveFromItem(item: GridItem): Promise<void> {
         mediaUrl: meme.mediaUrl,
         sourceMessageId: meme.messageId,
       });
+    } else if (item.kind === 'clash-sticker') {
+      await toggleSaveClash(item.sticker);
     }
   } catch {
     /* best-effort */
@@ -571,15 +826,32 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   searchInput: { flex: 1, ...typeScale.body, fontSize: 15, paddingVertical: 0 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: 10 },
+  emptyTitle: { ...typeScale.title, fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  emptyBody: { ...typeScale.body, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  ctaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 4 },
+  cta: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+  },
+  ctaText: { ...typeScale.caption, fontSize: 12, fontWeight: '800' },
+  banner: {
+    ...typeScale.caption,
+    fontSize: 11,
+    paddingHorizontal: space.md,
+    paddingBottom: space.sm,
+  },
   tile: { borderRadius: radius.md, overflow: 'hidden' },
   uploadTile: {
     borderWidth: StyleSheet.hairlineWidth,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
-  uploadText: { ...typeScale.caption, fontWeight: '700' },
+  uploadText: { ...typeScale.caption, fontWeight: '800', fontSize: 13 },
+  uploadHint: { ...typeScale.caption, fontSize: 10 },
   thumb: { width: '100%', height: '100%' },
   attribution: { ...typeScale.caption, fontSize: 10, textAlign: 'center', paddingBottom: 8 },
 });

@@ -16,9 +16,14 @@ import {
   type ArenaMediaAttachment,
 } from '../../services/liveArenaService';
 import { errorText } from '../../services/supabaseClient';
-import type { NormalizedGifMedia } from '../../services/gif';
+import { getGifProviderStatus, type NormalizedGifMedia } from '../../services/gif';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
+import {
+  encodeClashStickerBody,
+  type ClashNativeSticker,
+} from '../../utils/clashNativeStickers';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
+import { ClashNativeStickerCard } from '../arena/ClashNativeStickerCard';
 import {
   ExpressiveMediaTray,
   type ExpressiveMainTab,
@@ -88,10 +93,14 @@ export function LiveRoomComposer({
   const [draft, setDraft] = React.useState('');
   const [media, setMedia] = React.useState<PickedMedia | null>(null);
   const [gif, setGif] = React.useState<NormalizedGifMedia | null>(null);
+  const [clashSticker, setClashSticker] = React.useState<ClashNativeSticker | null>(null);
   const [reshareId, setReshareId] = React.useState<string | null>(null);
+  const [resharePreview, setResharePreview] = React.useState<string | null>(null);
   const [readyMedia, setReadyMedia] = React.useState<ArenaMediaAttachment | null>(null);
   const [trayOpen, setTrayOpen] = React.useState(false);
-  const [trayTab, setTrayTab] = React.useState<ExpressiveMainTab>('gifs');
+  const [trayTab, setTrayTab] = React.useState<ExpressiveMainTab>(() =>
+    getGifProviderStatus().configured ? 'gifs' : 'stickers',
+  );
   const [uploading, setUploading] = React.useState(false);
 
   React.useEffect(() => {
@@ -102,7 +111,12 @@ export function LiveRoomComposer({
     return undefined;
   }, [disabled, focusToken]);
 
-  const hasAttachment = Boolean(media) || Boolean(gif) || Boolean(reshareId) || Boolean(readyMedia);
+  const hasAttachment =
+    Boolean(media) ||
+    Boolean(gif) ||
+    Boolean(clashSticker) ||
+    Boolean(reshareId) ||
+    Boolean(readyMedia);
   const busy = sending || uploading;
   const canSend = (draft.trim().length > 0 || hasAttachment) && !busy && !disabled;
   const remaining = ARENA_MESSAGE_MAX - draft.length;
@@ -118,7 +132,9 @@ export function LiveRoomComposer({
   const clearAttachments = (): void => {
     setMedia(null);
     setGif(null);
+    setClashSticker(null);
     setReshareId(null);
+    setResharePreview(null);
     setReadyMedia(null);
   };
 
@@ -129,6 +145,7 @@ export function LiveRoomComposer({
       const picked = kind === 'image' ? await pickImage() : await pickVideo();
       if (picked) {
         setGif(null);
+        setClashSticker(null);
         setMedia(picked);
       }
     } catch (error) {
@@ -152,13 +169,16 @@ export function LiveRoomComposer({
       }
       setUploading(false);
     }
+    const body = clashSticker
+      ? encodeClashStickerBody(clashSticker.slug, draft).slice(0, ARENA_MESSAGE_MAX)
+      : draft.trim().slice(0, ARENA_MESSAGE_MAX);
     const sent = await onSend({
-      body: draft.trim().slice(0, ARENA_MESSAGE_MAX),
-      ...(attachment ? { media: attachment } : {}),
-      ...(gif
+      body,
+      ...(attachment && !clashSticker ? { media: attachment } : {}),
+      ...(gif && !clashSticker
         ? { gif: { provider: 'tenor', externalId: gif.id, url: gif.previewUrl } }
         : {}),
-      ...(reshareId ? { reshareSourceMessageId: reshareId } : {}),
+      ...(reshareId && !clashSticker ? { reshareSourceMessageId: reshareId } : {}),
     });
     if (sent) {
       onTypingClear?.();
@@ -235,14 +255,34 @@ export function LiveRoomComposer({
           </View>
         ) : null}
 
-        {readyMedia ? (
+        {readyMedia || resharePreview ? (
           <View style={[styles.gif, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
-            <Image source={{ uri: readyMedia.url }} style={styles.gifImage} resizeMode="cover" />
+            <Image
+              source={{ uri: (readyMedia?.url ?? resharePreview) as string }}
+              style={styles.gifImage}
+              resizeMode="cover"
+            />
             <Pressable
               onPress={clearAttachments}
               style={styles.gifRemove}
               accessibilityRole="button"
               accessibilityLabel="Remove meme"
+            >
+              <CloseIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {clashSticker ? (
+          <View style={styles.stickerPreview}>
+            <View style={styles.stickerCard}>
+              <ClashNativeStickerCard sticker={clashSticker} size="sm" />
+            </View>
+            <Pressable
+              onPress={clearAttachments}
+              style={styles.gifRemove}
+              accessibilityRole="button"
+              accessibilityLabel="Remove sticker"
             >
               <CloseIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
             </Pressable>
@@ -275,7 +315,7 @@ export function LiveRoomComposer({
               label="Memes, GIFs, and stickers"
               onPress={() => {
                 hapticTap();
-                setTrayTab('gifs');
+                setTrayTab(getGifProviderStatus().configured ? 'gifs' : 'stickers');
                 setTrayOpen(true);
               }}
               disabled={busy}
@@ -338,23 +378,35 @@ export function LiveRoomComposer({
   async function applyExpressivePick(pick: ExpressiveMediaPick): Promise<void> {
     setMedia(null);
     setGif(null);
+    setClashSticker(null);
     setReshareId(null);
+    setResharePreview(null);
     setReadyMedia(null);
     if (pick.channel === 'meme' && 'upload' in pick) {
       await attach('image');
       return;
     }
-    if (pick.channel === 'gif' || pick.channel === 'sticker') {
+    if (pick.channel === 'sticker' && 'clash' in pick && pick.clash) {
+      setClashSticker(pick.clash);
+      return;
+    }
+    if (pick.channel === 'gif' && pick.media) {
+      setGif(pick.media);
+      return;
+    }
+    if (pick.channel === 'sticker' && 'media' in pick && pick.media) {
       setGif(pick.media);
       return;
     }
     if (pick.channel !== 'meme') return;
     if (pick.trending) {
       setReshareId(pick.trending.messageId);
+      setResharePreview(pick.trending.previewUrl);
       return;
     }
     if (pick.saved?.sourceMessageId) {
       setReshareId(pick.saved.sourceMessageId);
+      setResharePreview(pick.saved.previewUrl);
       return;
     }
     if (pick.saved?.mediaObjectId) {
@@ -441,6 +493,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   gifImage: { width: 140, height: 104 },
+  stickerPreview: { alignSelf: 'flex-start', width: 112, position: 'relative' },
+  stickerCard: { width: 112 },
   gifRemove: {
     position: 'absolute',
     top: 6,
