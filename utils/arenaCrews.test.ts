@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ARENA_CREW_SPECIALTIES } from '../services/arenaCrewService.ts';
+import { ARENA_CREW_SPECIALTIES } from './arenaCrewSpecialties.ts';
 
 describe('arena crew specialties', () => {
   it('ships the product specialty list', () => {

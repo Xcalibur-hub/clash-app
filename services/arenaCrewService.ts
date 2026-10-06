@@ -5,6 +5,8 @@
  */
 import { requestError, requireSupabase } from './supabaseClient';
 
+import { ARENA_CREW_SPECIALTIES } from '../utils/arenaCrewSpecialties';
+
 export type ArenaCrewJoinMode = 'OPEN' | 'REQUEST' | 'INVITE_ONLY';
 export type ArenaCrewMemberRole = 'OWNER' | 'MODERATOR' | 'MEMBER';
 
@@ -191,18 +193,4 @@ export async function listMyArenaCrews(): Promise<ArenaCrew[]> {
   return asCrewList(await crewRpc('list_my_arena_crews'));
 }
 
-export const ARENA_CREW_SPECIALTIES = [
-  'Tech',
-  'Gaming',
-  'Politics',
-  'Sports',
-  'Finance',
-  'Science',
-  'Movies',
-  'Music',
-  'Culture',
-  'Cars',
-  'History',
-  'Design',
-  'General',
-] as const;
+export { ARENA_CREW_SPECIALTIES } from '../utils/arenaCrewSpecialties';
