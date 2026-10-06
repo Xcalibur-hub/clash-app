@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   mergeMessagesById,
   rankReplies,
+  removeUnavailableMessages,
   replyPreview,
   selectThreadRoots,
 } from './liveRoomThread.ts';
@@ -95,5 +96,25 @@ describe('deleted parent', () => {
     const orphan = msg('orphan', { parent: 'gone', createdAt: 5 });
     const roots = selectThreadRoots([orphan]);
     assert.equal(roots[0]?.id, 'orphan');
+  });
+});
+
+describe('visibility reconciliation', () => {
+  it('removes hidden rows from the checked window only', () => {
+    const current = [
+      msg('visible'),
+      msg('hidden'),
+      msg('unchecked'),
+      msg('pending', { pending: true }),
+    ];
+    const reconciled = removeUnavailableMessages(
+      current,
+      ['visible', 'hidden', 'pending'],
+      ['visible'],
+    );
+    assert.deepEqual(
+      reconciled.map((message) => message.id),
+      ['visible', 'unchecked', 'pending'],
+    );
   });
 });

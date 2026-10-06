@@ -898,6 +898,23 @@ export async function fetchMessage(messageId: string): Promise<ArenaMessage | nu
   return toMessage(data);
 }
 
+/**
+ * Recheck a bounded set of rendered rows against current moderation visibility.
+ * Returning ids only keeps the periodic reconciliation cheap.
+ */
+export async function fetchVisibleMessageIds(
+  roomId: string,
+  messageIds: readonly string[],
+): Promise<string[]> {
+  if (messageIds.length === 0) return [];
+  const { data, error } = await client().rpc('get_arena_room_message_visibility', {
+    p_room_id: roomId,
+    p_message_ids: [...new Set(messageIds)].slice(0, 100),
+  });
+  if (error) throw requestError(error);
+  return Array.isArray(data) ? data.filter((id): id is string => typeof id === 'string') : [];
+}
+
 const PULSE_CATEGORIES = [
   'TOP_ARGUMENT',
   'BEST_EVIDENCE',

@@ -5802,6 +5802,10 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: Json
       }
+      get_arena_room_message_visibility: {
+        Args: { p_message_ids: string[]; p_room_id: string }
+        Returns: string[]
+      }
       get_arena_room_pulse: {
         Args: { p_room_id: string }
         Returns: Json

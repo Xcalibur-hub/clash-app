@@ -5,6 +5,7 @@ import {
   fetchMessage,
   fetchMessages,
   fetchMessagesSince,
+  fetchVisibleMessageIds,
   fetchMindshiftStats,
   fetchRoom,
   markEvidenceUseful,
@@ -28,7 +29,7 @@ import {
 } from '../services/liveArenaService';
 import { errorText, SupabaseError } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
-import { mergeMessagesById } from '../utils/liveRoomThread';
+import { mergeMessagesById, removeUnavailableMessages } from '../utils/liveRoomThread';
 
 /** How many arguments one page of the thread carries. */
 const PAGE = 40;
@@ -36,6 +37,8 @@ const PAGE = 40;
 const HYDRATE_DEBOUNCE_MS = 280;
 /** Periodic rollup refresh for reactions/reply counts (not every INSERT). */
 const RECONCILE_MS = 30_000;
+/** Rows checked per interval; rotates through long loaded threads. */
+const VISIBILITY_BATCH = 100;
 
 export interface LiveArenaRoomController {
   room: ArenaRoom | null;
@@ -120,6 +123,7 @@ export function useLiveArenaRoom(
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const authorRef = React.useRef<ArenaAuthor | null>(viewerAuthor);
   const messagesRef = React.useRef<ArenaMessage[]>([]);
+  const visibilityCursor = React.useRef(0);
   authorRef.current = viewerAuthor;
   messagesRef.current = messages;
 
@@ -178,6 +182,42 @@ export function useLiveArenaRoom(
     } catch (caught) {
       if (!mounted.current) return;
       if (isMembershipRefusal(caught)) setThreadLocked(true);
+    }
+  }, [roomId]);
+
+  /** Phase/result refresh is independent of message traffic. */
+  const refreshRoomState = React.useCallback(async (): Promise<void> => {
+    try {
+      const next = await fetchRoom(roomId);
+      if (!mounted.current) return;
+      setRoom(next);
+      setError(null);
+      if (next.status === 'SETTLED' || next.viewer?.finalStance) {
+        const nextStats = await fetchMindshiftStats(roomId).catch(() => null);
+        if (mounted.current) setStats(nextStats);
+      } else if (mounted.current) {
+        setStats(null);
+      }
+    } catch {
+      // Periodic drift repair is best-effort; explicit refresh still surfaces errors.
+    }
+  }, [roomId]);
+
+  /** Eventually evict messages hidden by moderation or a new block/mute. */
+  const reconcileVisibility = React.useCallback(async (): Promise<void> => {
+    const ids = messagesRef.current
+      .filter((message) => !message.pending)
+      .map((message) => message.id);
+    if (ids.length === 0) return;
+    const start = visibilityCursor.current % ids.length;
+    const checked = [...ids.slice(start), ...ids.slice(0, start)].slice(0, VISIBILITY_BATCH);
+    visibilityCursor.current = (start + checked.length) % ids.length;
+    try {
+      const visible = await fetchVisibleMessageIds(roomId, checked);
+      if (!mounted.current) return;
+      setMessages((current) => removeUnavailableMessages(current, checked, visible));
+    } catch (caught) {
+      if (mounted.current && isMembershipRefusal(caught)) setThreadLocked(true);
     }
   }, [roomId]);
 
@@ -247,6 +287,7 @@ export function useLiveArenaRoom(
     setStats(null);
     setThreadLocked(false);
     setHasOlder(true);
+    visibilityCursor.current = 0;
     void load('initial');
   }, [load]);
 
@@ -266,15 +307,29 @@ export function useLiveArenaRoom(
     const unsubscribe = subscribeRoomMessages(roomId, (event) => {
       scheduleHydrate(event.id);
     });
+    let reconciling = false;
+    const reconcileAll = async (): Promise<void> => {
+      if (reconciling) return;
+      reconciling = true;
+      try {
+        await Promise.allSettled([
+          refreshThread(),
+          refreshRoomState(),
+          reconcileVisibility(),
+        ]);
+      } finally {
+        reconciling = false;
+      }
+    };
     const reconcile = setInterval(() => {
-      void refreshThread();
+      void reconcileAll();
     }, RECONCILE_MS);
     return () => {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
       clearInterval(reconcile);
       unsubscribe();
     };
-  }, [hydrateInserted, refreshThread, roomId]);
+  }, [hydrateInserted, reconcileVisibility, refreshRoomState, refreshThread, roomId]);
 
   // Coming back from the background: gap-fetch missed messages, then refresh room.
   React.useEffect(() => {
@@ -285,10 +340,11 @@ export function useLiveArenaRoom(
       if (status === 'active' && wasAway) {
         void refreshThread();
         void load('refresh');
+        void reconcileVisibility();
       }
     });
     return () => subscription.remove();
-  }, [load, refreshThread]);
+  }, [load, reconcileVisibility, refreshThread]);
 
   const loadOlder = React.useCallback(async (): Promise<void> => {
     if (loadingOlder || !hasOlder || threadLocked || messages.length === 0) return;

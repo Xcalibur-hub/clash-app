@@ -90,3 +90,19 @@ export function mergeMessagesById<T extends ThreadMessageLike & { pending?: bool
     b.createdAt === a.createdAt ? b.id.localeCompare(a.id) : b.createdAt - a.createdAt,
   );
 }
+
+/**
+ * Apply a bounded server visibility check without disturbing messages that were
+ * outside the checked window. Pending optimistic rows are never removed here.
+ */
+export function removeUnavailableMessages<T extends ThreadMessageLike>(
+  current: readonly T[],
+  checkedIds: readonly string[],
+  visibleIds: readonly string[],
+): T[] {
+  const checked = new Set(checkedIds);
+  const visible = new Set(visibleIds);
+  return current.filter(
+    (message) => message.pending || !checked.has(message.id) || visible.has(message.id),
+  );
+}
