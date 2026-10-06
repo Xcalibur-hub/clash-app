@@ -5,8 +5,6 @@
  */
 import { requestError, requireSupabase } from './supabaseClient';
 
-import { ARENA_CREW_SPECIALTIES } from '../utils/arenaCrewSpecialties';
-
 export type ArenaCrewJoinMode = 'OPEN' | 'REQUEST' | 'INVITE_ONLY';
 export type ArenaCrewMemberRole = 'OWNER' | 'MODERATOR' | 'MEMBER';
 
