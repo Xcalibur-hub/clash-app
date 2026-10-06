@@ -3,36 +3,15 @@
  * Membership/create/join/leave/follow/invite/request via SECURITY DEFINER RPCs.
  * No client writes; no invented reputation.
  */
+import {
+  parseArenaCrewList,
+  parseArenaCrewPayload,
+  type ArenaCrew,
+  type ArenaCrewJoinMode,
+} from '../utils/arenaCrewPayload';
 import { requestError, requireSupabase } from './supabaseClient';
 
-export type ArenaCrewJoinMode = 'OPEN' | 'REQUEST' | 'INVITE_ONLY';
-export type ArenaCrewMemberRole = 'OWNER' | 'MODERATOR' | 'MEMBER';
-
-export interface ArenaCrewViewer {
-  isMember: boolean;
-  role: ArenaCrewMemberRole | null;
-  isFollowing: boolean;
-}
-
-export interface ArenaCrew {
-  id: string;
-  slug: string;
-  name: string;
-  bio: string;
-  avatarUrl: string | null;
-  bannerUrl: string | null;
-  specialties: string[];
-  joinMode: ArenaCrewJoinMode;
-  memberCount: number;
-  followerCount: number;
-  totalReputation: number;
-  seasonalRating: number;
-  wins: number;
-  losses: number;
-  streak: number;
-  createdAt: string;
-  viewer: ArenaCrewViewer;
-}
+export type { ArenaCrew, ArenaCrewJoinMode, ArenaCrewMemberRole, ArenaCrewViewer } from '../utils/arenaCrewPayload';
 
 type RpcResult = { data: unknown; error: { message: string; code?: string; details?: string; hint?: string; name?: string } | null };
 
@@ -44,45 +23,6 @@ async function crewRpc(name: string, args: Record<string, unknown> = {}): Promis
   ).rpc(name, args);
   if (error) throw requestError(error as import('@supabase/supabase-js').PostgrestError);
   return data;
-}
-
-function asCrew(row: unknown): ArenaCrew | null {
-  if (!row || typeof row !== 'object') return null;
-  const r = row as Record<string, unknown>;
-  if (typeof r.id !== 'string' || typeof r.slug !== 'string' || typeof r.name !== 'string') return null;
-  const viewerRaw = (r.viewer && typeof r.viewer === 'object' ? r.viewer : {}) as Record<string, unknown>;
-  const role = viewerRaw.role;
-  return {
-    id: r.id,
-    slug: r.slug,
-    name: r.name,
-    bio: String(r.bio ?? ''),
-    avatarUrl: typeof r.avatarUrl === 'string' ? r.avatarUrl : null,
-    bannerUrl: typeof r.bannerUrl === 'string' ? r.bannerUrl : null,
-    specialties: Array.isArray(r.specialties) ? r.specialties.map(String) : [],
-    joinMode: (r.joinMode as ArenaCrewJoinMode) ?? 'OPEN',
-    memberCount: Number(r.memberCount) || 0,
-    followerCount: Number(r.followerCount) || 0,
-    totalReputation: Number(r.totalReputation) || 0,
-    seasonalRating: Number(r.seasonalRating) || 1000,
-    wins: Number(r.wins) || 0,
-    losses: Number(r.losses) || 0,
-    streak: Number(r.streak) || 0,
-    createdAt: String(r.createdAt ?? ''),
-    viewer: {
-      isMember: Boolean(viewerRaw.isMember),
-      role:
-        role === 'OWNER' || role === 'MODERATOR' || role === 'MEMBER'
-          ? role
-          : null,
-      isFollowing: Boolean(viewerRaw.isFollowing),
-    },
-  };
-}
-
-function asCrewList(data: unknown): ArenaCrew[] {
-  if (!Array.isArray(data)) return [];
-  return data.map(asCrew).filter((c): c is ArenaCrew => c !== null);
 }
 
 export async function createArenaCrew(input: {
@@ -99,31 +39,31 @@ export async function createArenaCrew(input: {
     p_join_mode: input.joinMode ?? 'OPEN',
     p_specialties: input.specialties ?? [],
   });
-  const crew = asCrew(data);
+  const crew = parseArenaCrewPayload(data);
   if (!crew) throw new Error('create_arena_crew returned unexpected payload');
   return crew;
 }
 
 export async function joinArenaCrew(crewId: string): Promise<ArenaCrew> {
-  const crew = asCrew(await crewRpc('join_arena_crew', { p_crew_id: crewId }));
+  const crew = parseArenaCrewPayload(await crewRpc('join_arena_crew', { p_crew_id: crewId }));
   if (!crew) throw new Error('join_arena_crew returned unexpected payload');
   return crew;
 }
 
 export async function leaveArenaCrew(crewId: string): Promise<ArenaCrew> {
-  const crew = asCrew(await crewRpc('leave_arena_crew', { p_crew_id: crewId }));
+  const crew = parseArenaCrewPayload(await crewRpc('leave_arena_crew', { p_crew_id: crewId }));
   if (!crew) throw new Error('leave_arena_crew returned unexpected payload');
   return crew;
 }
 
 export async function followArenaCrew(crewId: string): Promise<ArenaCrew> {
-  const crew = asCrew(await crewRpc('follow_arena_crew', { p_crew_id: crewId }));
+  const crew = parseArenaCrewPayload(await crewRpc('follow_arena_crew', { p_crew_id: crewId }));
   if (!crew) throw new Error('follow_arena_crew returned unexpected payload');
   return crew;
 }
 
 export async function unfollowArenaCrew(crewId: string): Promise<ArenaCrew> {
-  const crew = asCrew(await crewRpc('unfollow_arena_crew', { p_crew_id: crewId }));
+  const crew = parseArenaCrewPayload(await crewRpc('unfollow_arena_crew', { p_crew_id: crewId }));
   if (!crew) throw new Error('unfollow_arena_crew returned unexpected payload');
   return crew;
 }
@@ -141,7 +81,7 @@ export async function respondArenaCrewInvite(inviteId: string, accept: boolean):
     p_invite_id: inviteId,
     p_accept: accept,
   });
-  const crew = asCrew(data);
+  const crew = parseArenaCrewPayload(data);
   if (crew) return crew;
   const row = data as { id?: string; status?: string } | null;
   return { id: String(row?.id ?? ''), status: String(row?.status ?? '') };
@@ -163,14 +103,14 @@ export async function decideArenaCrewJoinRequest(
     p_request_id: requestId,
     p_approve: approve,
   });
-  const crew = asCrew(data);
+  const crew = parseArenaCrewPayload(data);
   if (crew) return crew;
   const row = data as { id?: string; status?: string } | null;
   return { id: String(row?.id ?? ''), status: String(row?.status ?? '') };
 }
 
 export async function getArenaCrew(slug: string): Promise<ArenaCrew | null> {
-  return asCrew(await crewRpc('get_arena_crew', { p_slug: slug }));
+  return parseArenaCrewPayload(await crewRpc('get_arena_crew', { p_slug: slug }));
 }
 
 export async function listArenaCrews(opts?: {
@@ -178,7 +118,7 @@ export async function listArenaCrews(opts?: {
   offset?: number;
   specialty?: string | null;
 }): Promise<ArenaCrew[]> {
-  return asCrewList(
+  return parseArenaCrewList(
     await crewRpc('list_arena_crews', {
       p_limit: opts?.limit ?? 24,
       p_offset: opts?.offset ?? 0,
@@ -188,7 +128,7 @@ export async function listArenaCrews(opts?: {
 }
 
 export async function listMyArenaCrews(): Promise<ArenaCrew[]> {
-  return asCrewList(await crewRpc('list_my_arena_crews'));
+  return parseArenaCrewList(await crewRpc('list_my_arena_crews'));
 }
 
 export { ARENA_CREW_SPECIALTIES } from '../utils/arenaCrewSpecialties';
