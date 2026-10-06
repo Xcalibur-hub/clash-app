@@ -20,7 +20,9 @@ import { notify as hapticNotify, tap as hapticTap } from '../../utils/haptics';
 import { StanceChoiceRow } from '../arena/StanceChoiceRow';
 import { Avatar } from '../shared/Avatar';
 import { GlowButton } from '../shared/GlowButton';
+import { ClashMatchupBar } from './ClashMatchupBar';
 import { softFill, STANCE_LABEL, winningSideLabel } from './liveArenaStyles';
+import { arenaSidesForTheme } from '../../theme/arenaSides';
 
 export interface LiveRoomResultRevealProps {
   result: ArenaResult;
@@ -34,6 +36,8 @@ export interface LiveRoomResultRevealProps {
   crowdMoment?: { author: string | null; preview: string | null } | null;
   busy?: boolean;
   onRecordFinal: (stance: Stance) => void;
+  /** Next Clash loop — Arena home / next battle. */
+  onNextClash?: () => void;
 }
 
 /**
@@ -53,8 +57,10 @@ export function LiveRoomResultReveal({
   crowdMoment = null,
   busy = false,
   onRecordFinal,
+  onNextClash,
 }: LiveRoomResultRevealProps): React.JSX.Element {
   const t = useThemeColors();
+  const sides = arenaSidesForTheme(t);
   const reduced = useReducedMotion();
   const phase = useSharedValue(reduced ? 1 : 0);
   const isDraw = result.winningSide === 'DRAW';
@@ -67,6 +73,9 @@ export function LiveRoomResultReveal({
         ? result.disagreeVotes
         : Math.max(result.agreeVotes, result.disagreeVotes);
   const winnerPercent = totalVotes > 0 ? Math.round((winnerVotes / totalVotes) * 100) : null;
+  const agreeShare = totalVotes > 0 ? result.agreeVotes / totalVotes : null;
+  const winnerTone =
+    result.winningSide === 'AGREE' ? sides.a : result.winningSide === 'DISAGREE' ? sides.b : null;
 
   const changedPercent = stats?.changedPercent ?? result.mindshiftChangedPercent;
   const needsFinalStance =
@@ -83,8 +92,6 @@ export function LiveRoomResultReveal({
     opacity: phase.value,
     transform: [{ translateY: (1 - phase.value) * 10 }],
   }));
-
-  const agreeShare = totalVotes > 0 ? result.agreeVotes / totalVotes : 0.5;
 
   const onShare = async (): Promise<void> => {
     hapticTap();
@@ -116,7 +123,7 @@ export function LiveRoomResultReveal({
         ]}
       >
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          {roomIndex != null ? `ROOM ${roomIndex} DECIDED` : 'ROOM DECIDED'}
+          {roomIndex != null ? `ROOM ${roomIndex} DECIDED` : '◆ ROOM DECIDED'}
         </Text>
         {topicTitle ? (
           <Text allowFontScaling={false} style={[styles.topic, { color: t.textSecondary }]} numberOfLines={2}>
@@ -125,11 +132,18 @@ export function LiveRoomResultReveal({
         ) : null}
 
         <View style={styles.headline}>
-          <Text allowFontScaling={false} style={[styles.side, { color: t.textPrimary }]}>
-            {winningSideLabel(result.winningSide)}
+          <Text
+            allowFontScaling={false}
+            style={[styles.side, { color: winnerTone?.ink ?? t.textPrimary }]}
+          >
+            {isDraw
+              ? 'DRAW'
+              : result.winningSide === 'AGREE'
+                ? 'SIDE A WON'
+                : 'SIDE B WON'}
           </Text>
           {!isDraw && winnerPercent !== null ? (
-            <Text allowFontScaling={false} style={[styles.percent, { color: t.textSecondary }]}>
+            <Text allowFontScaling={false} style={[styles.percent, { color: winnerTone?.ink ?? t.textSecondary }]}>
               {winnerPercent}%
             </Text>
           ) : null}
@@ -140,39 +154,18 @@ export function LiveRoomResultReveal({
             ? totalVotes === 0
               ? 'Nobody cast a side vote.'
               : 'The room split evenly.'
-            : `${winnerVotes} of ${totalVotes} votes`}
+            : `${winnerVotes} of ${totalVotes} judgements · ${winningSideLabel(result.winningSide)}`}
         </Text>
 
-        {totalVotes > 0 ? (
-          <View style={[styles.bar, { backgroundColor: t.surfaceMuted }]}>
-            <View
-              style={[
-                styles.barFill,
-                { flex: Math.max(agreeShare, 0.03), backgroundColor: t.textPrimary },
-              ]}
-            />
-            <View
-              style={[
-                styles.barFill,
-                { flex: Math.max(1 - agreeShare, 0.03), backgroundColor: t.borderStrong },
-              ]}
-            />
-          </View>
-        ) : null}
+        <ClashMatchupBar size="room" agreeShare={agreeShare} />
 
-        <View style={styles.tally}>
-          <Text allowFontScaling={false} style={[styles.tallyText, { color: t.textSecondary }]}>
-            Agree {totalVotes > 0 ? `${Math.round(agreeShare * 100)}%` : '—'}
-          </Text>
-          <Text allowFontScaling={false} style={[styles.tallyText, { color: t.textMuted }]}>
-            Disagree{' '}
-            {totalVotes > 0 ? `${Math.round((1 - agreeShare) * 100)}%` : '—'}
-          </Text>
-        </View>
         <Text allowFontScaling={false} style={[styles.sub, { color: t.textMuted }]}>
           {result.participantCount.toLocaleString()} participants
         </Text>
         <GlowButton label="Share result" onPress={() => void onShare()} compact tone="glass" />
+        {onNextClash ? (
+          <GlowButton label="NEXT CLASH →" onPress={onNextClash} compact />
+        ) : null}
       </Animated.View>
 
       {result.bestArgumentBody || result.bestArgumentAuthor ? (

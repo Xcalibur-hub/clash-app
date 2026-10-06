@@ -73,7 +73,7 @@ export function LiveRoomJudgingPanel({
     >
       <View style={styles.head}>
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          THE ROOM IS DECIDING
+          JUDGE THIS CLASH
         </Text>
         {room.secondsRemaining > 0 ? (
           <Text allowFontScaling={false} style={[styles.meta, { color: t.textPrimary }]}>
@@ -82,27 +82,30 @@ export function LiveRoomJudgingPanel({
         ) : null}
       </View>
 
-      <Text allowFontScaling={false} style={[styles.ceremony, { color: t.textSecondary }]}>
-        Cast your judgement. Ballots stay private until the room settles.
+      <Text allowFontScaling={false} style={[styles.ceremony, { color: t.textPrimary }]}>
+        Who made the better case?
+      </Text>
+      <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+        This is judgement — not a reaction. Ballots stay private until the room settles.
       </Text>
 
       {!isDebater ? (
         <Text allowFontScaling={false} style={[styles.note, { color: t.textSecondary }]}>
-          Only debaters vote in this room.
+          Only fighters vote in this room. Keep watching the ceremony.
         </Text>
       ) : (
         <>
           <Text allowFontScaling={false} style={[styles.question, { color: t.textPrimary }]}>
-            Which side argued better?
+            WHO COOKED?
           </Text>
           {hasSideVote ? (
             <Text allowFontScaling={false} style={[styles.recorded, { color: t.textMuted }]}>
-              Your side vote is in. Results open when the room settles.
+              Your judgement is in. Results open when the room settles.
             </Text>
           ) : (
             <View style={styles.sides}>
               <SideButton
-                label="Agree"
+                label="Side A · Agree"
                 disabled={busy}
                 onPress={() => {
                   hapticJudge();
@@ -110,7 +113,7 @@ export function LiveRoomJudgingPanel({
                 }}
               />
               <SideButton
-                label="Disagree"
+                label="Side B · Disagree"
                 disabled={busy}
                 onPress={() => {
                   hapticJudge();

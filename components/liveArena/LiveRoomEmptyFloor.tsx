@@ -73,7 +73,7 @@ export function LiveRoomEmptyFloor({
           style={[styles.cta, { backgroundColor: t.clashFill }]}
         >
           <Text allowFontScaling={false} style={[styles.ctaText, { color: t.clashText }]}>
-            Start an argument
+            OPEN THE FLOOR
           </Text>
         </Pressable>
       ) : null}
@@ -85,11 +85,11 @@ export function LiveRoomEmptyFloor({
             onJoinDebate();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Join this debate"
+          accessibilityLabel="Pick a side"
           style={[styles.cta, { backgroundColor: softFill(t), borderColor: t.borderStrong, borderWidth: StyleSheet.hairlineWidth }]}
         >
           <Text allowFontScaling={false} style={[styles.ctaTextAlt, { color: t.textPrimary }]}>
-            Join this debate
+            PICK A SIDE
           </Text>
         </Pressable>
       ) : null}

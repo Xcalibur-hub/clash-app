@@ -92,7 +92,7 @@ export function TrendingBattlesSection({
         style={[styles.wrap, { borderColor: t.border, backgroundColor: t.background }]}
       >
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-          TRENDING NOW
+          WHAT THE INTERNET IS FIGHTING ABOUT
         </Text>
         <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
           No live battles right now
@@ -125,7 +125,7 @@ export function TrendingBattlesSection({
     >
       <View style={styles.headRow}>
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-          TRENDING NOW
+          WHAT THE INTERNET IS FIGHTING ABOUT
         </Text>
         {demo ? (
           <Text
@@ -273,7 +273,7 @@ export function TrendingBattlesSection({
       </View>
 
       <VaultActionButton
-        label="ENTER BATTLE"
+        label="WATCH CLASH"
         onPress={() => {
           hapticTap();
           if (!demo) analytics.track('arena_trending_enter_battle', { realm: 'arena' });

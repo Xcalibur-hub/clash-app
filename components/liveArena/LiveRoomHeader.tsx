@@ -15,10 +15,11 @@ import type { ArenaRoom, ArenaRoomPresence } from '../../services/liveArenaServi
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { BackIcon } from '../shared/icons';
+import { ClashMatchupBar } from './ClashMatchupBar';
 import { LivePulse } from './LivePulse';
 import { LiveRoomPhaseRail } from './LiveRoomPhaseRail';
 import { LiveRoomPresenceStrip } from './LiveRoomPresenceStrip';
-import { secondsLabel } from './liveArenaStyles';
+import { roomStatusLabel, secondsLabel } from './liveArenaStyles';
 
 export interface LiveRoomHeaderProps {
   room: ArenaRoom;
@@ -49,6 +50,14 @@ export function LiveRoomHeader({
   const live =
     room.status === 'OPEN' || room.status === 'FINAL_ARGUMENTS' || room.status === 'JUDGING';
 
+  const roleLine = (() => {
+    if (!room.viewer) return null;
+    if (room.status === 'JUDGING' && room.viewer.role === 'debater') return 'JUDGE';
+    if (room.viewer.role === 'spectator') return 'WATCHER';
+    if (room.viewer.role === 'debater') return 'FIGHTER';
+    return null;
+  })();
+
   const countdown =
     room.status === 'FINAL_ARGUMENTS' && room.secondsToJudging > 0
       ? secondsClock(room.secondsToJudging)
@@ -60,10 +69,21 @@ export function LiveRoomHeader({
 
   const crowdLine = (() => {
     if (debaterCount != null && spectatorCount != null) {
-      return `${debaterCount} debating · ${spectatorCount} watching`;
+      return `${debaterCount} fighting · ${spectatorCount} watching`;
     }
-    return `${room.participantCount} here`;
+    return `${room.participantCount} in the room`;
   })();
+
+  const phaseHint =
+    room.status === 'JUDGING'
+      ? 'Judging open — cast your ballot'
+      : room.status === 'FINAL_ARGUMENTS'
+        ? 'Final arguments'
+        : room.status === 'SETTLED'
+          ? 'Room decided'
+          : live
+            ? 'Live clash'
+            : roomStatusLabel(room.status);
 
   const detailStyle = useAnimatedStyle(() => {
     if (reduced || !scrollY) return { opacity: 1, maxHeight: 140 };
@@ -101,8 +121,9 @@ export function LiveRoomHeader({
       <View style={styles.metaRow}>
         {live ? <LivePulse /> : null}
         <Text allowFontScaling={false} style={[styles.liveLine, { color: t.textSecondary }]}>
-          {live ? 'LIVE' : room.status === 'SETTLED' ? 'SETTLED' : 'ROOM'}
+          {live ? 'LIVE' : room.status === 'SETTLED' ? 'DECIDED' : 'ROOM'}
           {roomIndex != null ? ` · Room ${roomIndex}` : ''}
+          {roleLine ? ` · ${roleLine}` : ''}
           {` · ${crowdLine}`}
           {countdown ? ` · ${countdown}` : ''}
         </Text>
@@ -123,6 +144,21 @@ export function LiveRoomHeader({
             <View style={[styles.pulseDot, { backgroundColor: t.textPrimary }]} />
           </Pressable>
         ) : null}
+      </View>
+
+      <View style={styles.matchup}>
+        <ClashMatchupBar
+          size="room"
+          agreeShare={
+            room.status === 'SETTLED' && room.result
+              ? (() => {
+                  const total = room.result.agreeVotes + room.result.disagreeVotes;
+                  return total > 0 ? room.result.agreeVotes / total : null;
+                })()
+              : null
+          }
+          storyBeat={phaseHint}
+        />
       </View>
 
       <Animated.View style={[styles.detail, detailStyle]}>
@@ -202,5 +238,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   pulseDot: { width: 6, height: 6, borderRadius: 3 },
+  matchup: {
+    paddingLeft: 28,
+    paddingRight: 4,
+  },
   detail: { gap: space.sm, overflow: 'hidden', paddingLeft: 28 },
 });

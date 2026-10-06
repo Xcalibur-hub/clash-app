@@ -34,6 +34,7 @@ import { tap as hapticTap } from '../../utils/haptics';
 import { CrossedSwords } from '../clash/CrossedSwords';
 import { Avatar } from '../shared/Avatar';
 import { PressableScale } from '../shared/PressableScale';
+import { ClashMatchupBar } from './ClashMatchupBar';
 import { LiveArgumentPreview } from './LiveArgumentPreview';
 import { LivePulse } from './LivePulse';
 import { phaseLabel, secondsLabel, softFill, STANCE_LABEL } from './liveArenaStyles';
@@ -231,6 +232,19 @@ export function ArenaTopicDeckCard({
           </Text>
         </Animated.View>
 
+        <View style={styles.matchupSlot}>
+          <ClashMatchupBar
+            size="card"
+            storyBeat={
+              burstText?.trim() ||
+              (signals[0] ? `${signals[0]!.emoji} ×${signals[0]!.count} on the floor` : null) ||
+              (excerpts[0]
+                ? `"${excerpts[0]!.text.slice(0, 72)}${excerpts[0]!.text.length > 72 ? '…' : ''}"`
+                : null)
+            }
+          />
+        </View>
+
         <Animated.View
           entering={reduced ? undefined : FadeIn.delay(420).duration(360)}
           style={styles.previewSlot}
@@ -259,32 +273,35 @@ export function ArenaTopicDeckCard({
             </View>
           ) : null}
           <Text allowFontScaling={false} style={[styles.participant, { color: t.textSecondary }]}>
-            {plural(topic.participantCount, 'arguing now', 'arguing now')}
+            {plural(topic.participantCount, 'in the fight', 'in the fight')}
           </Text>
         </View>
 
         <View style={styles.cta}>
           {settled ? (
-            <PrimaryButton label="See result" onPress={onEnter} />
+            <PrimaryButton label="SEE THE VERDICT" onPress={onEnter} />
           ) : isDebater ? (
             <View style={styles.joinedBlock}>
               {stance ? (
                 <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
-                  You · {STANCE_LABEL[stance]}
+                  You · {STANCE_LABEL[stance]} · Fighter
                 </Text>
               ) : null}
-              <PrimaryButton label="Enter Room" onPress={onEnter} />
+              <PrimaryButton label="ENTER CLASH" onPress={onEnter} />
             </View>
           ) : isSpectator ? (
             <View style={styles.joinedBlock}>
               <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
-                Watching
+                Watcher
               </Text>
-              <PrimaryButton label="Watch Room" onPress={onEnter} />
-              <SecondaryButton label="Join Debate" onPress={onJoinDebate} />
+              <PrimaryButton label="WATCH CLASH" onPress={onEnter} />
+              <SecondaryButton label="PICK A SIDE" onPress={onJoinDebate} />
             </View>
           ) : canJoin ? (
             <View style={styles.gate}>
+              <Text allowFontScaling={false} style={[styles.gateHint, { color: t.textMuted }]}>
+                Pick a side to fight · or just watch
+              </Text>
               <View style={[styles.stanceRow, { backgroundColor: softFill(t) }]}>
                 <StancePill label="Agree" onPress={() => onChoose('AGREE')} />
                 <View style={[styles.stanceDiv, { backgroundColor: t.borderStrong }]} />
@@ -298,17 +315,17 @@ export function ArenaTopicDeckCard({
                   onWatch();
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Watch live"
+                accessibilityLabel="Watch Clash"
                 hitSlop={10}
                 style={styles.watchLink}
               >
                 <Text allowFontScaling={false} style={[styles.watchText, { color: accent.ink }]}>
-                  Watch →
+                  WATCH CLASH →
                 </Text>
               </Pressable>
             </View>
           ) : (
-            <SecondaryButton label="See how it ended" onPress={onOpen} />
+            <SecondaryButton label="SEE HOW IT ENDED" onPress={onOpen} />
           )}
         </View>
       </Pressable>
@@ -590,6 +607,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.35,
     zIndex: 1,
   },
+  matchupSlot: {
+    marginTop: space.sm,
+    zIndex: 1,
+  },
   previewSlot: {
     marginTop: space.sm,
     zIndex: 1,
@@ -636,6 +657,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   gate: { gap: space.sm, alignItems: 'center' },
+  gateHint: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '600',
+    alignSelf: 'stretch',
+    textAlign: 'center',
+  },
   stanceRow: {
     flexDirection: 'row',
     alignItems: 'center',

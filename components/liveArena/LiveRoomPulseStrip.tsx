@@ -54,10 +54,10 @@ export function LiveRoomPulseStrip({
         style={styles.head}
       >
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-          WHAT'S HAPPENING
+          LIVE BATTLE
         </Text>
         <Text allowFontScaling={false} style={[styles.more, { color: t.textSecondary }]}>
-          Pulse →
+          Full pulse →
         </Text>
       </Pressable>
 

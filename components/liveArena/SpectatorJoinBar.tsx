@@ -45,8 +45,6 @@ export function SpectatorJoinBar({
   onJoinPress,
 }: SpectatorJoinBarProps): React.JSX.Element {
   const t = useThemeColors();
-  const watchingLabel =
-    roomIndex != null ? `Watching Room ${roomIndex}` : 'Watching';
 
   return (
     <View style={styles.wrap}>
@@ -61,7 +59,11 @@ export function SpectatorJoinBar({
         ]}
       >
         <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
-          {roomFull ? 'This room filled up while you were watching.' : watchingLabel}
+          {roomFull
+            ? 'This room filled up while you were watching.'
+            : roomIndex != null
+              ? `WATCHER · Room ${roomIndex}`
+              : 'WATCHER'}
         </Text>
         {!roomFull ? (
           <Pressable
@@ -71,14 +73,14 @@ export function SpectatorJoinBar({
             }}
             disabled={busy}
             accessibilityRole="button"
-            accessibilityLabel="Join this debate"
+            accessibilityLabel="Pick a side and join"
             style={[styles.cta, { backgroundColor: t.clashFill }]}
           >
             {busy ? (
               <ActivityIndicator color={t.clashText} />
             ) : (
               <Text allowFontScaling={false} style={[styles.ctaText, { color: t.clashText }]}>
-                Join this debate
+                PICK A SIDE
               </Text>
             )}
           </Pressable>
@@ -113,10 +115,13 @@ export function JoinDebateSheet({
           onPress={() => undefined}
         >
           <Text allowFontScaling={false} style={[styles.sheetKicker, { color: t.textMuted }]}>
-            {roomIndex != null ? `Join Room ${roomIndex}` : 'Join this debate'}
+            {roomIndex != null ? `ENTER CLASH · Room ${roomIndex}` : 'ENTER CLASH'}
           </Text>
           <Text allowFontScaling={false} style={[styles.sheetTitle, { color: t.textPrimary }]}>
-            Choose your stance
+            Pick a side
+          </Text>
+          <Text allowFontScaling={false} style={[styles.sheetHint, { color: t.textMuted }]}>
+            Private stance. React anytime — judging comes later.
           </Text>
           <Text allowFontScaling={false} style={[styles.sheetBody, { color: t.textMuted }]}>
             Your stance stays private. Capacity is checked by the server.
@@ -240,6 +245,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   sheetTitle: { ...typeScale.section, fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  sheetHint: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
   sheetBody: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
   choices: { gap: space.sm, marginTop: space.xs },
   choiceHit: { width: '100%' },

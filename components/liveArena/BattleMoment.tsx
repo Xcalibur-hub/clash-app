@@ -1,6 +1,6 @@
 /**
  * Shared visual language for meaningful Arena room moments.
- * One story beat — not an analytics card.
+ * Mini event cards — stronger than comments, not analytics widgets.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -39,9 +39,11 @@ export function BattleMoment({
         styles.plate,
         primary ? styles.platePrimary : styles.plateSecondary,
         {
-          backgroundColor: accent.soft,
+          backgroundColor: primary ? accent.soft : t.surfaceElevated,
           borderColor: primary ? accent.ink : t.border,
+          shadowColor: t.shadowColor,
         },
+        primary && styles.plateShadow,
       ]}
     >
       <View style={[styles.edge, { backgroundColor: accent.ink }]} />
@@ -75,6 +77,11 @@ export function BattleMoment({
             {moment.preview}
           </Text>
         ) : null}
+        {primary && moment.entertainment ? (
+          <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+            Crowd signal · not a vote
+          </Text>
+        ) : null}
       </View>
     </Animated.View>
   );
@@ -103,43 +110,57 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   platePrimary: {
-    paddingVertical: space.sm,
+    paddingVertical: space.md,
     paddingRight: space.md,
-    minHeight: 72,
+    minHeight: 88,
   },
   plateSecondary: {
     paddingVertical: space.xs + 2,
     paddingRight: space.sm,
   },
+  plateShadow: {
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
   edge: {
-    width: 3,
+    width: 4,
     alignSelf: 'stretch',
   },
   copy: {
     flex: 1,
-    gap: 2,
-    paddingLeft: space.sm,
+    gap: 3,
+    paddingLeft: space.sm + 2,
     justifyContent: 'center',
   },
   kicker: {
     ...typeScale.caption,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
   who: {
     ...typeScale.label,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
   },
   preview: {
     ...typeScale.meta,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '500',
   },
   previewPrimary: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  hint: {
+    ...typeScale.caption,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginTop: 2,
   },
 });

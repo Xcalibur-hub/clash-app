@@ -26,6 +26,7 @@ import { LiveRoomPulseStrip } from '../../../components/liveArena/LiveRoomPulseS
 import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResultReveal';
 import { LiveRoomSkeleton } from '../../../components/liveArena/LiveRoomSkeleton';
 import { LiveRoomTypingCue } from '../../../components/liveArena/LiveRoomTypingCue';
+import { RoomCastStrip } from '../../../components/liveArena/RoomCastStrip';
 import { RoomPulseSheet } from '../../../components/liveArena/RoomPulseSheet';
 import { VaultActionButton } from '../../../components/vault/VaultActionButton';
 import {
@@ -757,6 +758,12 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         />
       ) : null}
 
+      {pulse?.leaders?.length ? (
+        <View style={styles.castPad}>
+          <RoomCastStrip leaders={pulse.leaders} />
+        </View>
+      ) : null}
+
       <BattleEventBurst kind={burst?.kind ?? null} triggerKey={burst?.key ?? null} />
 
       <KeyboardAvoidingView
@@ -786,6 +793,10 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                   onRecordFinal={(stance) => {
                     setVoting(true);
                     void recordFinal(stance).finally(() => setVoting(false));
+                  }}
+                  onNextClash={() => {
+                    hapticTap();
+                    router.replace('/(tabs)');
                   }}
                 />
                 {orphanEvidence}
@@ -1005,6 +1016,10 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
+  castPad: {
+    paddingHorizontal: layout.screenX,
+    paddingBottom: space.xs,
+  },
   list: { paddingHorizontal: layout.screenX, paddingVertical: space.sm, flexGrow: 1 },
   orphanWrap: { gap: space.xs, paddingHorizontal: layout.screenX, paddingVertical: space.xs },
   locked: { paddingHorizontal: layout.screenX, paddingVertical: space.sm },
