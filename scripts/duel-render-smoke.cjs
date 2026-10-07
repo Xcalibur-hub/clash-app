@@ -25,7 +25,7 @@ const fade = { duration() { return this; } };
 Module._load = function(request, parent, isMain) {
   if (request === 'react-native') return RN;
   if (request === 'react-native-svg') return originalLoad.call(this, 'react-native-svg/lib/commonjs/ReactNativeSVG.web.js', parent, isMain);
-  if (request === 'react-native-reanimated') return { __esModule: true, default: { View: RN.View }, FadeInDown: fade, useReducedMotion: () => true };
+  if (request === 'react-native-reanimated') return { __esModule: true, default: { View: RN.View }, FadeIn: fade, FadeInDown: fade, useReducedMotion: () => true };
   if (request === 'expo-linear-gradient') return { LinearGradient: ({ children, style }) => React.createElement(RN.View, { style }, children) };
   if (request === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
   const resolved = Module._resolveFilename(request, parent).replaceAll('\\','/');
@@ -75,9 +75,9 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   if (name === 'spectator') { assert.match(html, /WATCHING/); assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat/); }
   if (name === 'fighter') { assert.match(html, /FIGHTER A/); assert.match(html, /Fighter composer/); assert.match(html, /Reply to this argument/); }
   if (name === 'judging') assert.match(html, /Judge Kevin, Fighter A, made the stronger case/);
-  if (name === 'draw') { assert.match(html, /Draw/); assert.match(html, /Kevin: 2/); }
+  if (name === 'draw') { assert.match(html, /Draw|VERDICT/); assert.match(html, /50%/); assert.match(html, /4 judgment/); }
   if (name === 'cancelled') assert.match(html, /Clash cancelled/);
-  if (name === 'error') assert.match(html, /couldn&#x27;t be loaded/);
+  if (name === 'error') assert.match(html, /Couldn&#x27;t load the Clash/);
   if (name === 'loading') assert.match(html, /Loading Clash transcript/);
   if (name === 'locked') { assert.match(html, /Watch this Clash as a spectator/); assert.doesNotMatch(html, /Automation is already/); }
   if (name === 'moderated') assert.doesNotMatch(html, /Automation is already/);

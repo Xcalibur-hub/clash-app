@@ -37,7 +37,8 @@ test('fighter role cannot self-judge even if a permission flag is stale', () => 
 });
 test('spectators watch and only judge within the canonical voting window', () => {
   const d = { ...duel(), mayJudge: true };
-  assert.equal(duelPresentation(d, 'judging').role, 'WATCHING');
+  assert.equal(duelPresentation(d, 'judging').role, 'JUDGING OPEN');
+  assert.equal(duelPresentation(d, 'open').role, 'WATCHING');
   assert.equal(duelPresentation(d, 'open').canPublish, false);
   for (const phase of ['scheduled','open','final_arguments','closed'] as const) assert.equal(duelPresentation(d, phase).canJudge, false);
   assert.equal(duelPresentation(d, 'judging').canJudge, true);
@@ -63,7 +64,7 @@ test('canonical cancellation and settlement override stale Room phase', () => {
 });
 test('winner comes exclusively from canonical verdict, never reactions', () => {
   const d = { ...duel(), status: 'settled' as const, verdict: { winnerSide: 'B' as const, verdictLabel: 'STRONG', jurySize: 3, sideAScore: 1, sideBScore: 2 } };
-  assert.equal(duelResultTitle(d), 'Rohan wins');
+  assert.equal(duelResultTitle(d), 'Rohan made the stronger case');
 });
 test('transcript keeps fighter replies in actual chronological sequence', () => {
   const rows = [message('last','author',52,'counter'), message('crowd','spectator',30), message('counter','challenger',28,'first'), message('first','author',12)];
@@ -88,7 +89,8 @@ test('timestamps use actual created time and omit invalid dates', () => {
   assert.equal(typeof duelTimestamp(Date.UTC(2026,9,7,12,28)), 'string');
 });
 test('empty states do not claim a removed fighter never posted', () => {
-  assert.match(duelEmptyText(duel(), 'open', 'transcript'), /visible arguments/);
+  assert.match(duelEmptyText(duel(), 'open', 'transcript'), /FLOOR IS OPEN/);
+  assert.match(duelEmptyText(duel(), 'open', 'transcript'), /first argument/);
   assert.match(duelEmptyText(duel(), 'scheduled', 'transcript'), /when the Clash opens/);
   assert.match(duelEmptyText({ ...duel(), status: 'cancelled' }, 'closed', 'transcript'), /No visible arguments/);
   assert.match(duelEmptyText(duel(), 'open', 'evidence'), /No visible evidence/);

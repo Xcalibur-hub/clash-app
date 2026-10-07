@@ -9,7 +9,13 @@ export function duelFighterSide(duel: ArenaDuel, authorId: string | null | undef
 }
 export function duelPresentation(duel: ArenaDuel, phase: ArenaPhase) {
   const side = duel.viewerRelationship === 'fighter_a' ? 'A' : duel.viewerRelationship === 'fighter_b' ? 'B' : null;
-  const role = side ? `YOU'RE FIGHTING · FIGHTER ${side}` : duel.viewerRelationship === 'staff' ? 'MODERATOR · WATCHING' : 'WATCHING';
+  const role = side
+    ? `YOU'RE FIGHTING · FIGHTER ${side}`
+    : duel.viewerRelationship === 'staff'
+      ? 'MODERATOR · WATCHING'
+      : duel.status === 'open' && phase === 'judging'
+        ? 'JUDGING OPEN'
+        : 'WATCHING';
   const stage = duel.status === 'cancelled' ? 'Cancelled' : duel.status === 'settled' ? 'Complete'
     : phase === 'scheduled' ? 'Waiting' : phase === 'closed' ? 'Awaiting verdict'
     : phase === 'judging' ? 'Judging' : phase === 'final_arguments' ? 'Final arguments' : 'Live';
@@ -45,12 +51,13 @@ export function duelTimestamp(createdAt: number): string | null {
 export function duelResultTitle(duel: ArenaDuel): string | null {
   if (duel.status === 'cancelled') return 'Clash cancelled';
   if (duel.status !== 'settled' || !duel.verdict) return null;
-  return duel.verdict.winnerSide === 'DRAW' ? 'Draw'
-    : `${duel.verdict.winnerSide === 'A' ? duel.fighterA.name : duel.fighterB.name} wins`;
+  return duel.verdict.winnerSide === 'DRAW'
+    ? 'Draw'
+    : `${duel.verdict.winnerSide === 'A' ? duel.fighterA.name : duel.fighterB.name} made the stronger case`;
 }
 export function duelEmptyText(duel: ArenaDuel, phase: ArenaPhase, kind: 'transcript' | 'evidence'): string {
   if (kind === 'evidence') return 'No visible evidence yet. Evidence shared by the fighters will appear here.';
   if (duel.status !== 'open') return 'No visible arguments in this transcript.';
   if (phase === 'scheduled') return 'The transcript will begin when the Clash opens.';
-  return `${duel.fighterA.name} and ${duel.fighterB.name} have no visible arguments here yet.`;
+  return 'THE FLOOR IS OPEN\n\nWaiting for the first argument.';
 }

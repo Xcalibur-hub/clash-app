@@ -679,6 +679,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
             showGeneric={atLiveEdge}
           />
           <LiveRoomComposer
+            variant={isDuel ? 'duel' : 'default'}
             focusToken={composerFocus}
             replyingTo={replyTo?.author?.name ?? null}
             replyingToMessageId={replyTo?.id ?? null}

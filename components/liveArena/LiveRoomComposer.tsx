@@ -40,6 +40,8 @@ export interface ComposedArgument {
 }
 
 export interface LiveRoomComposerProps {
+  /** Flatter, feed-native chrome for canonical DUEL Rooms. */
+  variant?: 'default' | 'duel';
   /** The room stopped accepting arguments (JUDGING / SETTLED / CANCELLED). */
   disabled?: boolean;
   disabledReason?: string;
@@ -72,6 +74,7 @@ export interface LiveRoomComposerProps {
  * `ready` and public. A failed post keeps the draft and the attachment intact.
  */
 export function LiveRoomComposer({
+  variant = 'default',
   disabled = false,
   disabledReason,
   replyingTo = null,
@@ -87,6 +90,7 @@ export function LiveRoomComposer({
   expressiveTab = null,
   onExpressiveTabConsumed,
 }: LiveRoomComposerProps): React.JSX.Element {
+  const duelChrome = variant === 'duel';
   const t = useThemeColors();
   const { pickImage, pickVideo } = useMediaPicker();
   const inputRef = React.useRef<TextInput>(null);
@@ -198,7 +202,7 @@ export function LiveRoomComposer({
   }
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, duelChrome && styles.wrapDuel]}>
       {replyingTo ? (
         <View style={styles.replyRow}>
           <Text allowFontScaling={false} style={[styles.replyLabel, { color: t.textMuted }]}>
@@ -224,8 +228,9 @@ export function LiveRoomComposer({
       <View
         style={[
           styles.box,
+          duelChrome && styles.boxDuel,
           {
-            backgroundColor: t.surfaceElevated,
+            backgroundColor: duelChrome ? t.surfaceMuted : t.surfaceElevated,
             borderColor: t.border,
             shadowColor: t.shadowColor,
           },
@@ -242,10 +247,10 @@ export function LiveRoomComposer({
               value.trim().length > 0 || hasAttachment,
             );
           }}
-          placeholder="Add your argument…"
+          placeholder={duelChrome ? 'Make your case…' : 'Add your argument…'}
           placeholderTextColor={t.textMuted}
           multiline
-          style={[styles.input, { color: t.textPrimary }]}
+          style={[styles.input, duelChrome && styles.inputDuel, { color: t.textPrimary }]}
           accessibilityLabel="Write an argument"
         />
 
@@ -456,6 +461,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderTopWidth: 0,
   },
+  wrapDuel: {
+    paddingHorizontal: 0,
+    paddingTop: space.sm,
+  },
   closed: {
     marginHorizontal: space.md,
     marginBottom: space.xs,
@@ -484,7 +493,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
+  boxDuel: {
+    borderRadius: 12,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
   input: { ...typeScale.body, fontSize: 15, paddingVertical: 6, minHeight: 40, maxHeight: 132 },
+  inputDuel: { fontSize: 16, lineHeight: 22, minHeight: 44, maxHeight: 140 },
   preview: { borderRadius: radius.md, overflow: 'hidden' },
   gif: {
     alignSelf: 'flex-start',

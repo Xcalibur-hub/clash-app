@@ -212,7 +212,7 @@ export function LiveRoomMessage({
           own && styles.plateOwn,
           memeLead && styles.plateMeme,
           duelFighter && styles.duelPlate,
-          duelFighter && { backgroundColor: 'transparent', borderColor: t.borderStrong },
+          duelFighter && { backgroundColor: 'transparent', borderColor: t.border },
         ]}
       >
         {highlighted && highlightLabel ? (
@@ -234,9 +234,18 @@ export function LiveRoomMessage({
             accessibilityRole={duelFighter ? 'button' : undefined}
             accessibilityLabel={duelFighter ? `Open ${duelFighter.name}, Fighter ${duelFighter.side}'s profile` : undefined}
           >
-            <Text allowFontScaling={Boolean(duelFighter)} style={[styles.name, { color: t.textPrimary }]}>
-              {duelFighter ? `${duelFighter.name} · FIGHTER ${duelFighter.side}` : author?.handle ? `@${author.handle}` : author?.name ?? 'Someone'}
-            </Text>
+            {duelFighter ? (
+              <Text allowFontScaling style={[styles.name, styles.duelName, { color: t.textPrimary }]}>
+                {duelFighter.name}
+                <Text style={[styles.duelSideCue, { color: t.textMuted }]}>
+                  {` · FIGHTER ${duelFighter.side}`}
+                </Text>
+              </Text>
+            ) : (
+              <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
+                {author?.handle ? `@${author.handle}` : author?.name ?? 'Someone'}
+              </Text>
+            )}
           </Pressable>
           {own && ownStance ? (
             <Text allowFontScaling={false} style={[styles.stanceCue, { color: t.textMuted }]}>
@@ -328,7 +337,7 @@ export function LiveRoomMessage({
               accessibilityLabel="React — long press for more"
               style={[
                 styles.chip,
-                duelFighter && { minHeight: 44 },
+                duelFighter && styles.duelChip,
                 {
                   backgroundColor: cooked?.viewerReacted ? t.surfaceMuted : 'transparent',
                   borderColor: cooked?.viewerReacted ? t.borderStrong : t.border,
@@ -492,10 +501,26 @@ export function LiveRoomMessage({
 }
 
 const styles = StyleSheet.create({
-  duelRow: { marginLeft: 0, paddingVertical: space.md },
-  duelText: { fontSize: 17, lineHeight: 25, fontWeight: '500' },
-  duelPlate: { borderRadius: 0, borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 0, paddingVertical: space.sm, maxWidth: '100%', gap: space.sm },
+  duelRow: { marginLeft: 0, paddingVertical: space.lg },
+  duelText: { fontSize: 17, lineHeight: 26, fontWeight: '400', letterSpacing: 0.1 },
+  duelPlate: {
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 0,
+    paddingVertical: space.md,
+    maxWidth: '100%',
+    gap: space.md,
+  },
+  duelName: { fontSize: 14, fontWeight: '700' },
+  duelSideCue: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
+  duelChip: {
+    minHeight: 36,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
   row: {
     flexDirection: 'row',
     gap: space.sm,

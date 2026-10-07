@@ -21,6 +21,82 @@ export interface ClashMatchupBarProps {
   storyBeat?: string | null;
 }
 
+function DuelMatchup({
+  duel,
+  onOpenProfile,
+}: {
+  duel: ArenaDuel;
+  onOpenProfile?: (id: string) => void;
+}): React.JSX.Element {
+  const t = useThemeColors();
+  const sides = [
+    { side: 'A' as const, fighter: duel.fighterA, position: duel.sourceText },
+    { side: 'B' as const, fighter: duel.fighterB, position: duel.counterPosition },
+  ];
+
+  return (
+    <View style={styles.duelWrap}>
+      <View style={styles.duelRow}>
+        {sides.map(({ side, fighter, position }, index) => (
+          <React.Fragment key={side}>
+            {index === 1 ? (
+              <Text
+                allowFontScaling={false}
+                style={[styles.duelVs, { color: t.textMuted }]}
+                accessibilityLabel="versus"
+              >
+                VS
+              </Text>
+            ) : null}
+            <View style={styles.duelCol}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open Fighter ${side}, ${fighter.name}'s profile`}
+                disabled={!onOpenProfile}
+                onPress={() => onOpenProfile?.(fighter.id)}
+                style={styles.fighterHit}
+              >
+                <Avatar name={fighter.name} tint={fighter.tint ?? t.textMuted} size={36} />
+                <Text
+                  allowFontScaling
+                  numberOfLines={1}
+                  style={[styles.duelName, { color: t.textPrimary }]}
+                >
+                  {fighter.name}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                  style={[styles.duelHandle, { color: t.textMuted }]}
+                >
+                  @{fighter.handle}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.duelSideLabel, { color: t.textMuted }]}
+                >
+                  FIGHTER {side}
+                </Text>
+              </Pressable>
+              <Text
+                selectable
+                style={[styles.duelPosition, { color: t.textSecondary }]}
+                numberOfLines={3}
+              >
+                {position?.trim()
+                  ? `“${position.trim()}”`
+                  : side === 'A'
+                    ? 'Source Take'
+                    : 'Counter-position not provided'}
+              </Text>
+            </View>
+          </React.Fragment>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function ClashMatchupBar({
   agreeShare = null,
   size = 'card',
@@ -35,24 +111,7 @@ export function ClashMatchupBar({
   const room = size === 'room';
   const showSplit = agreeShare != null && Number.isFinite(agreeShare);
 
-  if (duel) return <View style={styles.duelWrap}>
-    {([['A', duel.fighterA, duel.sourceText], ['B', duel.fighterB, duel.counterPosition]] as const).map(([side, fighter, position], index) => <React.Fragment key={side}>
-      {index === 1 && <Text style={[typeScale.caption, { color: t.textSecondary }]}>versus</Text>}
-      <View style={styles.duelSide}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Open Fighter ${side}, ${fighter.name}'s profile`}
-          disabled={!onOpenProfile} onPress={() => onOpenProfile?.(fighter.id)} style={styles.fighterHit}>
-          <Avatar name={fighter.name} tint={fighter.tint ?? t.textMuted} size={32} />
-          <View style={{ flex: 1 }}>
-            <Text style={[typeScale.label, { color: t.textPrimary }]}>{fighter.name}</Text>
-            <Text style={[typeScale.caption, { color: t.textSecondary }]}>@{fighter.handle} · FIGHTER {side}</Text>
-          </View>
-        </Pressable>
-        <Text selectable style={[typeScale.body, { color: t.textSecondary }]} numberOfLines={2}>
-          {position?.trim() || (side === 'A' ? 'Source Take' : 'Counter-position not provided')}
-        </Text>
-      </View>
-    </React.Fragment>)}
-  </View>;
+  if (duel) return <DuelMatchup duel={duel} onOpenProfile={onOpenProfile} />;
 
   return (
     <View style={[styles.wrap, room && styles.wrapRoom]}>
@@ -120,8 +179,56 @@ export function ClashMatchupBar({
 
 const styles = StyleSheet.create({
   duelWrap: { gap: space.sm },
-  duelSide: { gap: space.xs },
-  fighterHit: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  duelRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space.xs,
+  },
+  duelCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: space.sm,
+  },
+  fighterHit: {
+    minHeight: 44,
+    alignItems: 'center',
+    gap: 4,
+  },
+  duelName: {
+    ...typeScale.label,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+    width: '100%',
+  },
+  duelHandle: {
+    ...typeScale.caption,
+    fontSize: 12,
+    textAlign: 'center',
+    width: '100%',
+  },
+  duelSideLabel: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+  },
+  duelPosition: {
+    ...typeScale.body,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  duelVs: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    alignSelf: 'center',
+    paddingHorizontal: 2,
+    marginTop: 28,
+  },
   wrap: { gap: 8 },
   wrapRoom: { gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
