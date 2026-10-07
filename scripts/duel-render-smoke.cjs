@@ -25,7 +25,17 @@ const fade = { duration() { return this; } };
 Module._load = function(request, parent, isMain) {
   if (request === 'react-native') return RN;
   if (request === 'react-native-svg') return originalLoad.call(this, 'react-native-svg/lib/commonjs/ReactNativeSVG.web.js', parent, isMain);
-  if (request === 'react-native-reanimated') return { __esModule: true, default: { View: RN.View }, FadeIn: fade, FadeInDown: fade, useReducedMotion: () => true };
+  if (request === 'react-native-reanimated') return {
+    __esModule: true,
+    default: { View: RN.View, Text: RN.Text, createAnimatedComponent: (c) => c },
+    FadeIn: fade, FadeInDown: fade, ZoomIn: fade, SlideInLeft: fade, SlideInRight: fade,
+    Easing: { inOut: (e) => e, out: (e) => e, sin: {}, quad: {}, cubic: {}, back: () => ({}) },
+    useReducedMotion: () => true,
+    useSharedValue: (v) => ({ value: v }),
+    useAnimatedStyle: () => ({}),
+    withRepeat: (v) => v, withTiming: (v) => v, withDelay: (_d, v) => v, withSpring: (v) => v, withSequence: (...v) => v[0],
+    runOnJS: (fn) => fn,
+  };
   if (request === 'expo-linear-gradient') return { LinearGradient: ({ children, style }) => React.createElement(RN.View, { style }, children) };
   if (request === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
   const resolved = Module._resolveFilename(request, parent).replaceAll('\\','/');
@@ -71,7 +81,7 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   RN.AppRegistry.registerComponent(name, () => () => React.createElement(RN.View, { style: { height: 844, width: 390 } }, React.createElement(DuelRoomExperience, { ...base, ...overrides })));
   const { element, getStyleElement } = RN.AppRegistry.getApplication(name);
   const html = renderToStaticMarkup(element);
-  assert.match(html, /Kevin/); assert.match(html, /Rohan/); assert.match(html, /Transcript/); assert.doesNotMatch(html, /SECRET HIDDEN CITATION|permission denied for table|999/);
+  assert.match(html, /Kevin/); assert.match(html, /Rohan/); assert.match(html, /Arguments|Transcript/); assert.doesNotMatch(html, /SECRET HIDDEN CITATION|permission denied for table|999/);
   if (name === 'spectator') { assert.match(html, /WATCHING/); assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat/); }
   if (name === 'fighter') { assert.match(html, /FIGHTER A/); assert.match(html, /Fighter composer/); assert.match(html, /Reply to this argument/); }
   if (name === 'judging') assert.match(html, /Judge Kevin, Fighter A, made the stronger case/);

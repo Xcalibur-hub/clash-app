@@ -163,7 +163,13 @@ export function LiveRoomMessage({
 
   return (
     <Animated.View
-      entering={duelFighter || reduced || pending ? undefined : FadeInDown.duration(200)}
+      entering={
+        reduced || pending
+          ? undefined
+          : duelFighter
+            ? FadeInDown.springify().damping(18).stiffness(260)
+            : FadeInDown.duration(200)
+      }
       style={[
         styles.row,
         pending && styles.pending,

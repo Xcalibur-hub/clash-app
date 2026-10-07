@@ -11,12 +11,17 @@ import {
 } from 'react-native';
 import type { ArenaEvidence, ArenaMessage, ArenaRoom } from '../../services/liveArenaService';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { duelAtmosphereMood } from '../../utils/arenaAtmosphere';
 import { duelEmptyText, duelEvidence, duelFighterSide, duelPresentation, duelTranscript } from '../../utils/duelPresentation';
+import { press as hapticPress } from '../../utils/haptics';
 import { BackIcon } from '../shared/icons';
+import { PressableScale } from '../shared/PressableScale';
 import { SegmentedTabs } from '../shared/SegmentedTabs';
-import { ClashMatchupBar } from './ClashMatchupBar';
+import { AnimatedMatchup } from './AnimatedMatchup';
+import { ArenaAtmosphere } from './ArenaAtmosphere';
 import { DuelRoomOutcome } from './DuelRoomOutcome';
 import { LiveEvidenceCard } from './LiveEvidenceCard';
+import { LivePulse } from './LivePulse';
 import { LiveRoomMessage, type LiveRoomMessageProps } from './LiveRoomMessage';
 import { softFill } from './liveArenaStyles';
 
@@ -87,6 +92,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const propositionLong = proposition.length > 120;
   const live = duel.status === 'open' && (room.phase === 'open' || room.phase === 'final_arguments');
   const statusLabel = live ? 'LIVE' : presentation.stage.toUpperCase();
+  const atmosphereMood = duelAtmosphereMood(duel, room.phase);
 
   const renderItem = React.useCallback(({ item }: ListRenderItemInfo<Entry>) => {
     if (item.kind === 'evidence') {
@@ -144,7 +150,8 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
-      <View style={[styles.top, { paddingTop: props.paddingTop, borderColor: t.border }]}>
+      <ArenaAtmosphere mood={atmosphereMood} energy={live ? 0.4 : atmosphereMood === 'judging' ? 0.12 : 0.22} />
+      <View style={[styles.top, styles.layer, { paddingTop: props.paddingTop, borderColor: t.border }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -163,19 +170,18 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
               : statusLabel
           }
         >
-          {live ? <View style={[styles.liveDot, { backgroundColor: t.danger }]} /> : null}
+          {live ? <LivePulse dotOnly size={6} /> : null}
           <Text
-            allowFontScaling={false}
             style={[styles.status, { color: live ? t.textPrimary : t.textSecondary }]}
           >
             {statusLabel}
           </Text>
           {props.spectatorCount !== null ? (
             <>
-              <Text allowFontScaling={false} style={[styles.statusSep, { color: t.textMuted }]}>
+              <Text style={[styles.statusSep, { color: t.textMuted }]}>
                 ·
               </Text>
-              <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
+              <Text style={[styles.watching, { color: t.textMuted }]}>
                 {props.spectatorCount} watching
               </Text>
             </>
@@ -185,7 +191,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         <View style={styles.topSpacer} />
       </View>
 
-      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={[styles.root, styles.layer]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
           key={tab}
           ref={list}
@@ -236,7 +242,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                 </Pressable>
               ) : null}
 
-              <ClashMatchupBar duel={duel} onOpenProfile={props.onOpenProfile} />
+              <AnimatedMatchup duel={duel} onOpenProfile={props.onOpenProfile} />
 
               <View style={styles.roleRow}>
                 <Text
@@ -289,7 +295,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
               <SegmentedTabs
                 value={tab}
                 items={[
-                  { key: 'transcript', label: 'Transcript' },
+                  { key: 'transcript', label: 'Arguments' },
                   { key: 'evidence', label: 'Evidence' },
                 ]}
                 label="Clash content"
@@ -342,13 +348,14 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                       : 'This transcript is available to Room members.'}
                   </Text>
                   {duel.status === 'open' && room.phase !== 'closed' ? (
-                    <Pressable
+                    <PressableScale
                       accessibilityRole="button"
                       accessibilityLabel="Watch this Clash as a spectator"
                       disabled={watching}
                       style={[styles.primaryAction, { borderColor: t.borderStrong }]}
                       onPress={() => {
                         if (joining.current) return;
+                        hapticPress();
                         joining.current = true;
                         setWatching(true);
                         setWatchError(false);
@@ -364,7 +371,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                       <Text style={[styles.primaryActionText, { color: t.textPrimary }]}>
                         {watching ? 'Entering…' : 'Watch Clash'}
                       </Text>
-                    </Pressable>
+                    </PressableScale>
                   ) : null}
                   {watchError ? (
                     <Text accessibilityRole="alert" style={[styles.emptyBody, { color: t.textSecondary }]}>
@@ -436,6 +443,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  layer: { zIndex: 1 },
   top: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -477,10 +485,10 @@ const styles = StyleSheet.create({
   context: { gap: space.md, paddingTop: space.lg, paddingBottom: space.md },
   proposition: {
     ...typeScale.title,
-    fontSize: 24,
-    lineHeight: 31,
+    fontSize: 26,
+    lineHeight: 32,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   roleRow: { gap: space.xs },
   roleChip: {

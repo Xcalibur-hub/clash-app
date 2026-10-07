@@ -17,7 +17,7 @@ export interface RealmTabBarProps extends BottomTabBarProps {
   ShiftIcon: LucideIcon;
 }
 
-const DOCK_BG = '#1A1A1C';
+const DOCK_BG = 'rgba(24,24,27,0.92)';
 const DOCK_ICON = 'rgba(255,255,255,0.48)';
 const DOCK_ICON_ON = '#111113';
 

@@ -8,12 +8,25 @@ import { createArenaChallenge, listArenaChallenges, resolveArenaChallenge } from
 import { errorText } from '../../services/supabaseClient';
 import { challengeCanAct, validCounterPosition, type ArenaChallenge } from '../../utils/arenaChallengePayload';
 import { space, typeScale, useThemeColors } from '../../theme';
+import { press as hapticPress } from '../../utils/haptics';
+import { PressableScale } from '../shared/PressableScale';
 
 export function ChallengeTakeButton({ takeId }: { takeId: string }): React.JSX.Element {
   const router = useRouter(); const requireAuth = useRequireAuth(); const t = useThemeColors();
-  return <Pressable accessibilityRole="button" onPress={() => { if (requireAuth()) router.push({ pathname: '/take/[takeId]', params: { takeId, challenge: '1' } }); }} style={styles.button}>
-    <Text style={[styles.label, { color: t.textPrimary }]}>{'⚔ CHALLENGE'}</Text>
-  </Pressable>;
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel="Challenge this take"
+      onPress={() => {
+        if (!requireAuth()) return;
+        hapticPress();
+        router.push({ pathname: '/take/[takeId]', params: { takeId, challenge: '1' } });
+      }}
+      style={styles.button}
+    >
+      <Text style={[styles.label, { color: t.textPrimary }]}>{'⚔ Challenge'}</Text>
+    </PressableScale>
+  );
 }
 
 export function TakeChallenges({ take, openComposer }: { take: Take; openComposer: boolean }): React.JSX.Element | null {

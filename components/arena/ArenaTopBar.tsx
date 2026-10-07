@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { selectViewer, useClash } from '../../store';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -10,24 +11,44 @@ import { useSidebar } from '../navigation/SidebarContext';
 
 export interface ArenaTopBarProps {
   paddingTop: number;
+  /** Optional context line under the brand. */
+  contextLine?: string;
 }
 
 /**
- * Minimal Arena chrome — brand + circular actions.
- * Hero content (Today's Arena) should appear immediately below.
+ * Arena brand hero chrome — large CLASH mark + light actions.
  */
-export function ArenaTopBar({ paddingTop }: ArenaTopBarProps): React.JSX.Element {
+export function ArenaTopBar({
+  paddingTop,
+  contextLine = 'THE INTERNET IS FIGHTING ABOUT',
+}: ArenaTopBarProps): React.JSX.Element {
   const { state } = useClash();
   const viewer = selectViewer(state);
   const { open } = useSidebar();
   const router = useRouter();
   const t = useThemeColors();
+  const reduced = useReducedMotion();
 
   return (
-    <View style={[styles.wrap, { paddingTop: paddingTop + 2 }]}>
-      <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
-        CLASH
-      </Text>
+    <View style={[styles.wrap, { paddingTop: paddingTop + 4 }]}>
+      <View style={styles.brandBlock}>
+        <Animated.Text
+          entering={reduced ? undefined : FadeIn.duration(280)}
+          style={[styles.brand, { color: t.textPrimary }]}
+          accessibilityRole="header"
+        >
+          CLASH
+        </Animated.Text>
+        {contextLine ? (
+          <Animated.Text
+            entering={reduced ? undefined : FadeIn.delay(80).duration(320)}
+            style={[styles.context, { color: t.textMuted }]}
+            numberOfLines={1}
+          >
+            {contextLine}
+          </Animated.Text>
+        ) : null}
+      </View>
       <View style={styles.actions}>
         <Pressable
           onPress={() => {
@@ -50,7 +71,7 @@ export function ArenaTopBar({ paddingTop }: ArenaTopBarProps): React.JSX.Element
           accessibilityLabel="Open menu"
           hitSlop={8}
         >
-          <Avatar name={viewer.name} tint={viewer.tint} size={32} />
+          <Avatar name={viewer.name} tint={viewer.tint} size={34} />
         </Pressable>
       </View>
     </View>
@@ -62,16 +83,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingBottom: space.sm,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    zIndex: 2,
   },
+  brandBlock: { flex: 1, minWidth: 0, gap: 2, paddingRight: space.sm },
   brand: {
-    ...typeScale.label,
-    fontSize: 15,
-    letterSpacing: 1.8,
+    ...typeScale.title,
+    fontSize: 34,
+    lineHeight: 38,
+    letterSpacing: -0.8,
     fontWeight: '800',
   },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  context: {
+    ...typeScale.caption,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+  },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: 4 },
   iconBtn: {
     width: 36,
     height: 36,

@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
 import { ArenaTopicDeck } from '../../components/liveArena/ArenaTopicDeck';
+import { ArenaAtmosphere } from '../../components/liveArena/ArenaAtmosphere';
+import { LiveClashHero } from '../../components/liveArena/LiveClashHero';
 import { FreshTakesSection } from '../../components/arena/FreshTakesSection';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { TakeFeedItem } from '../../components/arena/TakeFeedItem';
@@ -318,9 +320,22 @@ export default function ArenaScreen(): React.JSX.Element {
     [openRoom, openTopic, requireAuth],
   );
 
+  const heroTopic = liveTopics[0] ?? null;
+
   const header = React.useMemo(
     () => (
       <View style={styles.hero}>
+        {heroTopic ? (
+          <LiveClashHero
+            topic={heroTopic}
+            onWatch={() => openTopic(heroTopic.id)}
+            onEnter={() => {
+              if (heroTopic.viewerRoomId) openRoom(heroTopic.viewerRoomId);
+              else openTopic(heroTopic.id);
+            }}
+          />
+        ) : null}
+
         <TrendingBattlesSection
           refreshToken={refreshKey}
           onEnter={openTrendingBattle}
@@ -363,10 +378,10 @@ export default function ArenaScreen(): React.JSX.Element {
         />
 
         <View style={styles.feedHead}>
-          <Text allowFontScaling={false} style={[styles.feedTitle, { color: theme.textPrimary }]}>
+          <Text style={[styles.feedTitle, { color: theme.textPrimary }]}>
             Your Feed
           </Text>
-          <Text allowFontScaling={false} style={[styles.feedSub, { color: theme.textMuted }]}>
+          <Text style={[styles.feedSub, { color: theme.textMuted }]}>
             Takes from across CLASH
           </Text>
           <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
@@ -376,6 +391,7 @@ export default function ArenaScreen(): React.JSX.Element {
     [
       dispatch,
       freshItems,
+      heroTopic,
       liveTopics,
       now,
       openClash,
@@ -470,6 +486,7 @@ export default function ArenaScreen(): React.JSX.Element {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} />
       <ArenaTopBar paddingTop={insets.top} />
       <FlatList
         data={listData}
@@ -486,6 +503,7 @@ export default function ArenaScreen(): React.JSX.Element {
         initialNumToRender={6}
         maxToRenderPerBatch={8}
         windowSize={9}
+        style={styles.listLayer}
       />
       <PostActionsSheet
         visible={menu !== null}
@@ -521,23 +539,24 @@ function FeedSkeleton(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  listLayer: { zIndex: 1 },
   list: { flexGrow: 1 },
-  hero: { paddingBottom: space.xs, gap: space.sm },
+  hero: { paddingBottom: space.xs, gap: space.md },
   feedHead: {
-    paddingTop: space.sm,
+    paddingTop: space.md,
     paddingBottom: space.md,
-    gap: 4,
+    gap: 6,
   },
   feedTitle: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.4,
+    ...typeScale.label,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
     paddingHorizontal: layout.screenX,
   },
   feedSub: {
     ...typeScale.meta,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
     paddingHorizontal: layout.screenX,
     marginBottom: space.xs,
