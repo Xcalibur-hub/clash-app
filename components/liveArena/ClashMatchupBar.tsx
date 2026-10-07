@@ -7,6 +7,8 @@ import { arenaSidesForTheme } from '../../theme/arenaSides';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 
 export interface ClashMatchupBarProps {
+  fighterAName?: string;
+  fighterBName?: string;
   /** Optional settled split 0–1 for Agree share. Omit while live (privacy). */
   agreeShare?: number | null;
   /** Compact for cards; room for headers. */
@@ -19,6 +21,8 @@ export function ClashMatchupBar({
   agreeShare = null,
   size = 'card',
   storyBeat = null,
+  fighterAName,
+  fighterBName,
 }: ClashMatchupBarProps): React.JSX.Element {
   const t = useThemeColors();
   const { a, b } = arenaSidesForTheme(t);
@@ -30,10 +34,10 @@ export function ClashMatchupBar({
       <View style={styles.row}>
         <View style={[styles.side, { backgroundColor: a.soft, borderColor: a.ink }]}>
           <Text allowFontScaling={false} style={[styles.sideKey, { color: a.ink }]}>
-            {a.label}
+            {fighterAName ? 'FIGHTER A' : a.label}
           </Text>
           <Text allowFontScaling={false} style={[styles.sideName, { color: t.textPrimary }]}>
-            {a.stanceLabel}
+            {fighterAName ?? a.stanceLabel}
           </Text>
           {showSplit ? (
             <Text allowFontScaling={false} style={[styles.pct, { color: a.ink }]}>
@@ -46,10 +50,10 @@ export function ClashMatchupBar({
         </Text>
         <View style={[styles.side, { backgroundColor: b.soft, borderColor: b.ink }]}>
           <Text allowFontScaling={false} style={[styles.sideKey, { color: b.ink }]}>
-            {b.label}
+            {fighterBName ? 'FIGHTER B' : b.label}
           </Text>
           <Text allowFontScaling={false} style={[styles.sideName, { color: t.textPrimary }]}>
-            {b.stanceLabel}
+            {fighterBName ?? b.stanceLabel}
           </Text>
           {showSplit ? (
             <Text allowFontScaling={false} style={[styles.pct, { color: b.ink }]}>

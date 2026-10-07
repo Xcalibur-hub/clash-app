@@ -149,6 +149,9 @@ export interface ClashParticipant {
 
 /** Authoritative Clash screen payload — identities only when the server says revealed. */
 export interface ClashView {
+  /** Null for historical Clashes without live infrastructure. */
+  roomId: string | null;
+  battleMode: 'LEGACY' | 'DUEL';
   clashId: string;
   takeId: string;
   mode: ClashMode;
@@ -252,12 +255,15 @@ function toClashView(payload: Json | null): ClashView {
     opensAt === null ||
     closesAt === null ||
     typeof sideAText !== 'string' ||
-    typeof sideBText !== 'string'
+    typeof sideBText !== 'string' ||
+    (r.battleMode === 'DUEL' && (typeof r.roomId !== 'string' || !r.roomId))
   ) {
     throw new SupabaseError('clash_view returned an unexpected payload', 'bad_payload');
   }
   return {
     clashId,
+    roomId: typeof r.roomId === 'string' ? r.roomId : null,
+    battleMode: r.battleMode === 'DUEL' ? 'DUEL' : 'LEGACY',
     takeId,
     mode,
     status,
@@ -334,6 +340,13 @@ export async function fetchClashById(clashId: string): Promise<ClashDetail | nul
 }
 
 /** Authoritative Clash screen read. Identities are present only when revealed. */
+export async function fetchClashView(clashId: string): Promise<ClashView | null> {
+  const { data, error } = await requireSupabase().rpc('clash_view', { p_clash_id: clashId });
+  if (error) throw requestError(error);
+  return data === null ? null : toClashView(data);
+}
+
+/** Authoritative Clash screen read for an existing Take. */
 export async function fetchClashViewForTake(takeId: string): Promise<ClashView | null> {
   const { data, error } = await requireSupabase().rpc('clash_view_for_take', { p_take_id: takeId });
   if (error) throw requestError(error);

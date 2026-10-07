@@ -130,13 +130,15 @@ select ok(
 -- connection against the same key. It must wait and reject after the first commit.
 create extension if not exists dblink with schema extensions;
 select is(
-  extensions.dblink_connect('p0-rate-1', 'dbname=' || current_database()),
+  extensions.dblink_connect('p0-rate-1', 'host=127.0.0.1 port=5432 user=postgres password=postgres dbname=' || current_database()),
   'OK', 'first concurrent rate-limit connection opens'
 );
 select is(
-  extensions.dblink_connect('p0-rate-2', 'dbname=' || current_database()),
+  extensions.dblink_connect('p0-rate-2', 'host=127.0.0.1 port=5432 user=postgres password=postgres dbname=' || current_database()),
   'OK', 'second concurrent rate-limit connection opens'
 );
+select extensions.dblink_exec('p0-rate-1',
+  'delete from public.rate_limit_events where actor_id = ''p0-race'' and action = ''same-key''');
 select is(extensions.dblink_exec('p0-rate-1', 'begin'), 'BEGIN',
   'first concurrent caller begins');
 select is(
@@ -162,9 +164,9 @@ select lives_ok(
   $$ select * from extensions.dblink_get_result('p0-rate-2', false) as result(status text) $$,
   'second concurrent result is collected without aborting pgTAP'
 );
-select like(
+select matches(
   extensions.dblink_error_message('p0-rate-2'),
-  '%rate limit exceeded: same-key%',
+  'rate limit exceeded: same-key',
   'second concurrent caller is rejected after serialization'
 );
 select is(

@@ -21,6 +21,7 @@
  */
 
 import type { Json } from '../supabase/types';
+import { parseArenaDuelRoom, type ArenaDuel } from '../utils/arenaDuelPayload';
 import type { MediaKind } from '../store/types';
 import type { Stance } from './mindshiftService';
 import {
@@ -173,6 +174,9 @@ export interface ArenaResult {
 }
 
 export interface ArenaRoom {
+  roomMode: 'GROUP' | 'DUEL';
+  clashId: string | null;
+  duel: ArenaDuel | null;
   roomId: string;
   topicId: string;
   status: ArenaRoomStatus;
@@ -484,7 +488,10 @@ function toRoom(payload: Json | null): ArenaRoom {
     bad('get_arena_room');
   }
   const topicClosesAt = millis(topicRecord.closesAt) ?? closesAt;
+  let duelFields: ReturnType<typeof parseArenaDuelRoom>;
+  try { duelFields = parseArenaDuelRoom(record); } catch { bad('get_arena_room duel'); }
   return {
+    ...duelFields,
     roomId,
     topicId,
     status,
@@ -509,7 +516,7 @@ function toRoom(payload: Json | null): ArenaRoom {
       closesAt: topicClosesAt,
     },
     viewer: toRoomViewer(record.viewer),
-    result: toResult(record.result),
+    result: duelFields.roomMode === 'DUEL' ? null : toResult(record.result),
   };
 }
 

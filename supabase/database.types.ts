@@ -166,6 +166,298 @@ export type Database = {
           },
         ]
       }
+      arena_crew_follows: {
+        Row: {
+          created_at: string
+          crew_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          crew_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          crew_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_crew_follows_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "arena_crews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_crew_follows_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_crew_invites: {
+        Row: {
+          created_at: string
+          crew_id: string
+          expires_at: string
+          id: string
+          inviter_id: string
+          recipient_id: string
+          responded_at: string | null
+          status: Database["public"]["Enums"]["arena_crew_invite_status"]
+        }
+        Insert: {
+          created_at?: string
+          crew_id: string
+          expires_at?: string
+          id: string
+          inviter_id: string
+          recipient_id: string
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["arena_crew_invite_status"]
+        }
+        Update: {
+          created_at?: string
+          crew_id?: string
+          expires_at?: string
+          id?: string
+          inviter_id?: string
+          recipient_id?: string
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["arena_crew_invite_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_crew_invites_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "arena_crews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_crew_invites_inviter_id_fkey"
+            columns: ["inviter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_crew_invites_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_crew_join_requests: {
+        Row: {
+          created_at: string
+          crew_id: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          requester_id: string
+          status: Database["public"]["Enums"]["arena_crew_request_status"]
+        }
+        Insert: {
+          created_at?: string
+          crew_id: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id: string
+          requester_id: string
+          status?: Database["public"]["Enums"]["arena_crew_request_status"]
+        }
+        Update: {
+          created_at?: string
+          crew_id?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          requester_id?: string
+          status?: Database["public"]["Enums"]["arena_crew_request_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_crew_join_requests_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "arena_crews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_crew_join_requests_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_crew_join_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_crew_leave_cooldowns: {
+        Row: {
+          join_after: string
+          left_at: string
+          left_crew_id: string | null
+          profile_id: string
+        }
+        Insert: {
+          join_after: string
+          left_at?: string
+          left_crew_id?: string | null
+          profile_id: string
+        }
+        Update: {
+          join_after?: string
+          left_at?: string
+          left_crew_id?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_crew_leave_cooldowns_left_crew_id_fkey"
+            columns: ["left_crew_id"]
+            isOneToOne: false
+            referencedRelation: "arena_crews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_crew_leave_cooldowns_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_crew_memberships: {
+        Row: {
+          crew_id: string
+          is_primary: boolean
+          joined_at: string
+          left_at: string | null
+          profile_id: string
+          role: Database["public"]["Enums"]["arena_crew_member_role"]
+        }
+        Insert: {
+          crew_id: string
+          is_primary?: boolean
+          joined_at?: string
+          left_at?: string | null
+          profile_id: string
+          role?: Database["public"]["Enums"]["arena_crew_member_role"]
+        }
+        Update: {
+          crew_id?: string
+          is_primary?: boolean
+          joined_at?: string
+          left_at?: string | null
+          profile_id?: string
+          role?: Database["public"]["Enums"]["arena_crew_member_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_crew_memberships_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "arena_crews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_crew_memberships_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_crews: {
+        Row: {
+          archived_at: string | null
+          avatar_url: string | null
+          banner_url: string | null
+          bio: string
+          created_at: string
+          created_by: string
+          follower_count: number
+          id: string
+          join_mode: Database["public"]["Enums"]["arena_crew_join_mode"]
+          losses: number
+          member_count: number
+          name: string
+          seasonal_rating: number
+          slug: string
+          specialties: string[]
+          streak: number
+          total_reputation: number
+          updated_at: string
+          wins: number
+        }
+        Insert: {
+          archived_at?: string | null
+          avatar_url?: string | null
+          banner_url?: string | null
+          bio?: string
+          created_at?: string
+          created_by: string
+          follower_count?: number
+          id: string
+          join_mode?: Database["public"]["Enums"]["arena_crew_join_mode"]
+          losses?: number
+          member_count?: number
+          name: string
+          seasonal_rating?: number
+          slug: string
+          specialties?: string[]
+          streak?: number
+          total_reputation?: number
+          updated_at?: string
+          wins?: number
+        }
+        Update: {
+          archived_at?: string | null
+          avatar_url?: string | null
+          banner_url?: string | null
+          bio?: string
+          created_at?: string
+          created_by?: string
+          follower_count?: number
+          id?: string
+          join_mode?: Database["public"]["Enums"]["arena_crew_join_mode"]
+          losses?: number
+          member_count?: number
+          name?: string
+          seasonal_rating?: number
+          slug?: string
+          specialties?: string[]
+          streak?: number
+          total_reputation?: number
+          updated_at?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_crews_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       arena_daily_topics: {
         Row: {
           closes_at: string
@@ -724,6 +1016,7 @@ export type Database = {
       arena_rooms: {
         Row: {
           capacity: number
+          clash_id: string | null
           closes_at: string
           created_at: string
           id: string
@@ -734,6 +1027,7 @@ export type Database = {
         }
         Insert: {
           capacity?: number
+          clash_id?: string | null
           closes_at: string
           created_at?: string
           id: string
@@ -744,6 +1038,7 @@ export type Database = {
         }
         Update: {
           capacity?: number
+          clash_id?: string | null
           closes_at?: string
           created_at?: string
           id?: string
@@ -754,10 +1049,78 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "arena_rooms_clash_id_fkey"
+            columns: ["clash_id"]
+            isOneToOne: true
+            referencedRelation: "clashes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "arena_rooms_topic_id_fkey"
             columns: ["topic_id"]
             isOneToOne: false
             referencedRelation: "arena_daily_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_saved_expressive_media: {
+        Row: {
+          created_at: string
+          external_id: string
+          id: string
+          kind: string
+          media_object_id: string | null
+          media_url: string
+          preview_url: string
+          profile_id: string
+          provider: string
+          source_message_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          external_id: string
+          id?: string
+          kind: string
+          media_object_id?: string | null
+          media_url: string
+          preview_url: string
+          profile_id: string
+          provider: string
+          source_message_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          external_id?: string
+          id?: string
+          kind?: string
+          media_object_id?: string | null
+          media_url?: string
+          preview_url?: string
+          profile_id?: string
+          provider?: string
+          source_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_saved_expressive_media_media_object_id_fkey"
+            columns: ["media_object_id"]
+            isOneToOne: false
+            referencedRelation: "media_objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_saved_expressive_media_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_saved_expressive_media_source_message_id_fkey"
+            columns: ["source_message_id"]
+            isOneToOne: false
+            referencedRelation: "arena_room_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -896,6 +1259,7 @@ export type Database = {
           challenger_id: string
           closes_at: string
           created_at: string
+          duel_key: string | null
           id: string
           mode: Database["public"]["Enums"]["clash_mode"]
           opens_at: string
@@ -908,6 +1272,7 @@ export type Database = {
           challenger_id: string
           closes_at: string
           created_at?: string
+          duel_key?: string | null
           id: string
           mode?: Database["public"]["Enums"]["clash_mode"]
           opens_at?: string
@@ -920,6 +1285,7 @@ export type Database = {
           challenger_id?: string
           closes_at?: string
           created_at?: string
+          duel_key?: string | null
           id?: string
           mode?: Database["public"]["Enums"]["clash_mode"]
           opens_at?: string
@@ -4721,6 +5087,14 @@ export type Database = {
         Args: { p_author: string; p_viewer: string }
         Returns: boolean
       }
+      arena_assert_crew_join_allowed: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
+      arena_assert_crew_specialties: {
+        Args: { p_specialties: string[] }
+        Returns: string[]
+      }
       arena_attention_score: {
         Args: {
           p_evidence_authors: number
@@ -4737,6 +5111,28 @@ export type Database = {
       arena_backup_reasons: {
         Args: { p_candidate: string; p_topic_id: string; p_viewer: string }
         Returns: Json
+      }
+      arena_crew_notify: {
+        Args: {
+          p_actor: string
+          p_entity: Database["public"]["Enums"]["report_target"]
+          p_entity_id: string
+          p_kind: Database["public"]["Enums"]["notification_kind"]
+          p_recipient: string
+        }
+        Returns: undefined
+      }
+      arena_crew_payload: {
+        Args: { p_crew: Database["public"]["Tables"]["arena_crews"]["Row"] }
+        Returns: Json
+      }
+      arena_crew_role: {
+        Args: { p_crew_id: string }
+        Returns: Database["public"]["Enums"]["arena_crew_member_role"]
+      }
+      arena_crew_specialty_vocabulary: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
       }
       arena_event: {
         Args: {
@@ -4760,6 +5156,17 @@ export type Database = {
       arena_evidence_room: {
         Args: { p_evidence_id: string }
         Returns: string
+      }
+      arena_group_room_payload: {
+        Args: {
+          p_room: Database["public"]["Tables"]["arena_rooms"]["Row"]
+          p_viewer: string
+        }
+        Returns: Json
+      }
+      arena_is_crew_member: {
+        Args: { p_crew_id: string }
+        Returns: boolean
       }
       arena_is_room_debater: {
         Args: { p_room_id: string }
@@ -4857,6 +5264,10 @@ export type Database = {
       assert_advertiser_owner: {
         Args: { p_advertiser_id: string }
         Returns: string
+      }
+      assert_arena_duel_integrity: {
+        Args: { p_clash_id: string }
+        Returns: undefined
       }
       assert_campaign_owner: {
         Args: { p_campaign_id: string }
@@ -4980,6 +5391,10 @@ export type Database = {
         Args: { p_take_id: string }
         Returns: Json
       }
+      clash_view_legacy: {
+        Args: { p_clash_id: string }
+        Returns: Json
+      }
       cleanup_meet_signals: {
         Args: { p_limit?: number }
         Returns: number
@@ -5069,6 +5484,16 @@ export type Database = {
           updated_at: string
         }
       }
+      create_arena_crew: {
+        Args: {
+          p_bio?: string
+          p_join_mode?: Database["public"]["Enums"]["arena_crew_join_mode"]
+          p_name: string
+          p_slug: string
+          p_specialties?: string[]
+        }
+        Returns: Json
+      }
       create_arena_daily_topic: {
         Args: {
           p_closes_at?: string
@@ -5079,6 +5504,14 @@ export type Database = {
           p_opens_at?: string
           p_status?: Database["public"]["Enums"]["arena_topic_status"]
           p_title: string
+        }
+        Returns: Json
+      }
+      create_arena_duel: {
+        Args: {
+          p_fighter_b_id: string
+          p_request_key: string
+          p_take_id: string
         }
         Returns: Json
       }
@@ -5678,6 +6111,10 @@ export type Database = {
           token: string
         }[]
       }
+      decide_arena_crew_join_request: {
+        Args: { p_approve: boolean; p_request_id: string }
+        Returns: Json
+      }
       delete_media: {
         Args: { p_media_id: string }
         Returns: undefined
@@ -5786,12 +6223,24 @@ export type Database = {
         Args: { p_media_id: string }
         Returns: undefined
       }
+      filter_arena_room_pulse: {
+        Args: { p_payload: Json; p_viewer: string }
+        Returns: Json
+      }
+      follow_arena_crew: {
+        Args: { p_crew_id: string }
+        Returns: Json
+      }
       follow_profile: {
         Args: { p_target_id: string }
         Returns: undefined
       }
       get_arena_backup_preference: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_arena_crew: {
+        Args: { p_slug: string }
         Returns: Json
       }
       get_arena_room: {
@@ -5924,6 +6373,10 @@ export type Database = {
         }
         Returns: Json
       }
+      invite_to_arena_crew: {
+        Args: { p_crew_id: string; p_recipient_id: string }
+        Returns: Json
+      }
       is_advertiser_owner: {
         Args: { p_advertiser_id: string }
         Returns: boolean
@@ -5947,6 +6400,18 @@ export type Database = {
       is_staff: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      join_arena_crew: {
+        Args: { p_crew_id: string }
+        Returns: Json
+      }
+      join_arena_group_topic: {
+        Args: {
+          p_role?: Database["public"]["Enums"]["arena_participant_role"]
+          p_stance?: Database["public"]["Enums"]["take_stance"]
+          p_topic_id: string
+        }
+        Returns: Json
       }
       join_arena_topic: {
         Args: {
@@ -5978,6 +6443,10 @@ export type Database = {
         Args: { p_hunt_id: string }
         Returns: Json
       }
+      leave_arena_crew: {
+        Args: { p_crew_id: string }
+        Returns: Json
+      }
       leave_hood: {
         Args: { p_hood: Database["public"]["Enums"]["hood_id"] }
         Returns: undefined
@@ -5992,6 +6461,10 @@ export type Database = {
       }
       list_arena_backup_candidates: {
         Args: { p_limit?: number; p_room_id: string }
+        Returns: Json
+      }
+      list_arena_crews: {
+        Args: { p_limit?: number; p_offset?: number; p_specialty?: string }
         Returns: Json
       }
       list_arena_room_events: {
@@ -6013,6 +6486,10 @@ export type Database = {
       }
       list_arena_room_presence: {
         Args: { p_limit?: number; p_room_id: string }
+        Returns: Json
+      }
+      list_arena_saved_expressive_media: {
+        Args: { p_limit?: number; p_offset?: number }
         Returns: Json
       }
       list_arena_topic_rooms: {
@@ -6103,6 +6580,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      list_my_arena_crews: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       list_my_creator_live_sessions: {
         Args: { p_limit?: number }
         Returns: Json
@@ -6126,6 +6607,10 @@ export type Database = {
       }
       list_play_home: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      list_trending_clash_memes: {
+        Args: { p_limit?: number }
         Returns: Json
       }
       list_vault_community_posts: {
@@ -6248,6 +6733,29 @@ export type Database = {
       poll_meet_queue: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      post_arena_clash_media_reshare: {
+        Args: {
+          p_body?: string
+          p_parent_message_id?: string
+          p_room_id: string
+          p_source_message_id: string
+        }
+        Returns: {
+          author_id: string
+          body: string
+          created_at: string
+          gif_external_id: string | null
+          gif_provider: string | null
+          hidden_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["arena_message_kind"]
+          media_kind: Database["public"]["Enums"]["media_kind"] | null
+          media_object_id: string | null
+          media_url: string | null
+          parent_message_id: string | null
+          room_id: string
+        }[]
       }
       post_arena_room_message: {
         Args: {
@@ -6438,6 +6946,10 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: Json
       }
+      request_arena_crew_join: {
+        Args: { p_crew_id: string }
+        Returns: Json
+      }
       request_creator_service: {
         Args: { p_message: string; p_service_id: string }
         Returns: {
@@ -6461,6 +6973,10 @@ export type Database = {
           p_invite_id: string
           p_stance?: Database["public"]["Enums"]["take_stance"]
         }
+        Returns: Json
+      }
+      respond_arena_crew_invite: {
+        Args: { p_accept: boolean; p_invite_id: string }
         Returns: Json
       }
       resume_sponsor_campaign: {
@@ -6677,6 +7193,10 @@ export type Database = {
           vault_id: string
         }
       }
+      settle_arena_group_room: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
       settle_arena_room: {
         Args: { p_room_id: string }
         Returns: Json
@@ -6686,6 +7206,10 @@ export type Database = {
         Returns: Json
       }
       settle_clash: {
+        Args: { p_clash_id: string }
+        Returns: Json
+      }
+      settle_clash_legacy: {
         Args: { p_clash_id: string }
         Returns: Json
       }
@@ -6825,6 +7349,18 @@ export type Database = {
         Args: { p_row: Database["public"]["Tables"]["take_stances"]["Row"] }
         Returns: Json
       }
+      toggle_arena_saved_expressive_media: {
+        Args: {
+          p_external_id: string
+          p_kind: string
+          p_media_object_id?: string
+          p_media_url: string
+          p_preview_url: string
+          p_provider: string
+          p_source_message_id?: string
+        }
+        Returns: Json
+      }
       toggle_challenge_entry_reaction: {
         Args: { p_entry_id: string }
         Returns: Json
@@ -6852,6 +7388,10 @@ export type Database = {
       unblock_profile: {
         Args: { p_target_id: string }
         Returns: undefined
+      }
+      unfollow_arena_crew: {
+        Args: { p_crew_id: string }
+        Returns: Json
       }
       unfollow_profile: {
         Args: { p_target_id: string }
@@ -7245,6 +7785,19 @@ export type Database = {
         | "DECLINED"
         | "EXPIRED"
         | "CANCELLED"
+      arena_crew_invite_status:
+        | "PENDING"
+        | "ACCEPTED"
+        | "DECLINED"
+        | "EXPIRED"
+        | "CANCELLED"
+      arena_crew_join_mode: "OPEN" | "REQUEST" | "INVITE_ONLY"
+      arena_crew_member_role: "OWNER" | "MODERATOR" | "MEMBER"
+      arena_crew_request_status:
+        | "PENDING"
+        | "APPROVED"
+        | "DECLINED"
+        | "CANCELLED"
       arena_evidence_kind: "image" | "video" | "link"
       arena_message_kind: "text" | "media" | "gif" | "system"
       arena_participant_role: "debater" | "spectator"
@@ -7357,6 +7910,10 @@ export type Database = {
         | "creator_live"
         | "arena_backup_request"
         | "arena_backup_arrival"
+        | "arena_crew_invite"
+        | "arena_crew_join_request"
+        | "arena_crew_join_accepted"
+        | "arena_crew_join_declined"
       profile_role: "viewer" | "creator" | "moderator" | "admin"
       rank_name:
         | "Rookie"
@@ -7395,6 +7952,9 @@ export type Database = {
         | "creator_live_session"
         | "creator_ai_message"
         | "arena_backup_invite"
+        | "arena_crew"
+        | "arena_crew_invite"
+        | "arena_crew_join_request"
       reputation_facet:
         | "DEBATE"
         | "MIND_IMPACT"
@@ -7613,6 +8173,21 @@ export const Constants = {
         "EXPIRED",
         "CANCELLED",
       ],
+      arena_crew_invite_status: [
+        "PENDING",
+        "ACCEPTED",
+        "DECLINED",
+        "EXPIRED",
+        "CANCELLED",
+      ],
+      arena_crew_join_mode: ["OPEN", "REQUEST", "INVITE_ONLY"],
+      arena_crew_member_role: ["OWNER", "MODERATOR", "MEMBER"],
+      arena_crew_request_status: [
+        "PENDING",
+        "APPROVED",
+        "DECLINED",
+        "CANCELLED",
+      ],
       arena_evidence_kind: ["image", "video", "link"],
       arena_message_kind: ["text", "media", "gif", "system"],
       arena_participant_role: ["debater", "spectator"],
@@ -7733,6 +8308,10 @@ export const Constants = {
         "creator_live",
         "arena_backup_request",
         "arena_backup_arrival",
+        "arena_crew_invite",
+        "arena_crew_join_request",
+        "arena_crew_join_accepted",
+        "arena_crew_join_declined",
       ],
       profile_role: ["viewer", "creator", "moderator", "admin"],
       rank_name: [
@@ -7774,6 +8353,9 @@ export const Constants = {
         "creator_live_session",
         "creator_ai_message",
         "arena_backup_invite",
+        "arena_crew",
+        "arena_crew_invite",
+        "arena_crew_join_request",
       ],
       reputation_facet: [
         "DEBATE",

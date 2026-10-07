@@ -93,6 +93,17 @@ values
   ('tr-msg-1', 'tr-a2', '💀', now() - interval '11 minutes'),
   ('tr-msg-1', 'tr-a2', '🤯', now() - interval '11 minutes');
 
+-- The writer counts the last completed ten-minute bucket, not a rolling
+-- now()-10m window. Anchor fixture activity inside that bucket so the relative
+-- ranking assertion is stable at every wall-clock minute.
+create temporary table tr_fixture_clock as
+ select to_timestamp(floor(extract(epoch from now()) / 600) * 600) - interval '5 minutes' as activity_at;
+update public.arena_room_participants set joined_at=(select activity_at from tr_fixture_clock)
+ where room_id in ('tr-room-hot','tr-room-cool');
+update public.arena_room_messages set created_at=(select activity_at from tr_fixture_clock)
+ where room_id in ('tr-room-hot','tr-room-cool');
+update public.arena_room_message_reactions set created_at=(select activity_at from tr_fixture_clock)
+ where message_id in ('tr-msg-1','tr-msg-2');
 select public.refresh_arena_trend_snapshots(10, 36);
 
 select is(

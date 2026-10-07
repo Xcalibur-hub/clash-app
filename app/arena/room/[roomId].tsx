@@ -21,6 +21,8 @@ import { LiveRoomEmptyFloor } from '../../../components/liveArena/LiveRoomEmptyF
 import { LiveRoomEventBanner } from '../../../components/liveArena/LiveRoomEventBanner';
 import { LiveRoomHeader } from '../../../components/liveArena/LiveRoomHeader';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
+import { DuelRoomOutcome } from '../../../components/liveArena/DuelRoomOutcome';
+import { submitJudgement } from '../../../services/clashEngineService';
 import { LiveRoomMessage } from '../../../components/liveArena/LiveRoomMessage';
 import { LiveRoomPulseStrip } from '../../../components/liveArena/LiveRoomPulseStrip';
 import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResultReveal';
@@ -459,7 +461,10 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const accepting = room?.status === 'OPEN' || room?.status === 'FINAL_ARGUMENTS';
   const settled = room?.status === 'SETTLED';
   const judging = room?.status === 'JUDGING';
-  const isDebater = room?.viewer?.role === 'debater';
+  const isDuel = room?.roomMode === 'DUEL';
+  const isDebater = isDuel
+    ? room?.duel?.viewerRelationship === 'fighter_a' || room?.duel?.viewerRelationship === 'fighter_b'
+    : room?.viewer?.role === 'debater';
   const isSpectator = room?.viewer?.role === 'spectator';
 
   const openProfile = React.useCallback(
@@ -624,7 +629,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     ) : null;
 
   const bottom = (() => {
-    if (judging && isDebater) {
+    if (judging && isDebater && !isDuel) {
       return (
         <LiveRoomJudgingPanel
           room={room}
@@ -641,7 +646,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         />
       );
     }
-    if (isSpectator) {
+    if (isSpectator && !isDuel) {
       return (
         <SpectatorJoinBar
           busy={joining}
@@ -717,7 +722,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         presence={presence}
         participantCount={room.participantCount}
         isDebater={isDebater}
-        isSpectator={isSpectator}
+        isSpectator={isSpectator && !isDuel}
         accepting={accepting}
         onStartArgument={() => setComposerFocus((n) => n + 1)}
         onJoinDebate={() => setJoinOpen(true)}
@@ -873,7 +878,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
               <View style={styles.flex} />
             )}
             <View style={{ paddingBottom: Math.max(insets.bottom, space.sm) }}>
-              {isDebater && accepting ? (
+              {isDebater && accepting && !isDuel ? (
                 <View style={styles.backupBar}>
                   <VaultActionButton
                     label="CALL BACKUP"
@@ -898,6 +903,10 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                 </View>
               ) : null}
               {bottom}
+              {room.duel ? <DuelRoomOutcome duel={room.duel} phase={room.phase} onJudge={async side => {
+                await submitJudgement(room.duel!.clashId, side);
+                await refresh();
+              }} /> : null}
             </View>
           </>
         )}

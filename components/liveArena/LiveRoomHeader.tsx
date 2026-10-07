@@ -51,6 +51,9 @@ export function LiveRoomHeader({
     room.status === 'OPEN' || room.status === 'FINAL_ARGUMENTS' || room.status === 'JUDGING';
 
   const roleLine = (() => {
+    if (room.duel) return room.duel.viewerRelationship === 'fighter_a' ? 'FIGHTER A'
+      : room.duel.viewerRelationship === 'fighter_b' ? 'FIGHTER B'
+      : room.duel.viewerRelationship === 'staff' ? 'MODERATOR' : 'WATCHER';
     if (!room.viewer) return null;
     if (room.status === 'JUDGING' && room.viewer.role === 'debater') return 'JUDGE';
     if (room.viewer.role === 'spectator') return 'WATCHER';
@@ -76,7 +79,7 @@ export function LiveRoomHeader({
 
   const phaseHint =
     room.status === 'JUDGING'
-      ? 'Judging open — cast your ballot'
+      ? room.duel && !room.duel.mayJudge ? 'Public judging' : 'Judging open — cast your ballot'
       : room.status === 'FINAL_ARGUMENTS'
         ? 'Final arguments'
         : room.status === 'SETTLED'
@@ -148,6 +151,8 @@ export function LiveRoomHeader({
 
       <View style={styles.matchup}>
         <ClashMatchupBar
+          fighterAName={room.duel?.fighterA.name}
+          fighterBName={room.duel?.fighterB.name}
           size="room"
           agreeShare={
             room.status === 'SETTLED' && room.result
