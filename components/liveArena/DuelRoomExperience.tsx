@@ -19,11 +19,15 @@ import { PressableScale } from '../shared/PressableScale';
 import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { AnimatedMatchup } from './AnimatedMatchup';
 import { ArenaAtmosphere } from './ArenaAtmosphere';
+import { CrowdShell } from './CrowdShell';
+import { DuelDevPanel } from './DuelDevPanel';
 import { DuelRoomOutcome } from './DuelRoomOutcome';
 import { LiveEvidenceCard } from './LiveEvidenceCard';
 import { LivePulse } from './LivePulse';
 import { LiveRoomMessage, type LiveRoomMessageProps } from './LiveRoomMessage';
 import { softFill } from './liveArenaStyles';
+
+type DuelTab = 'transcript' | 'crowd' | 'evidence';
 
 type Entry = { kind: 'message'; id: string; createdAt: number; message: ArenaMessage }
   | { kind: 'evidence'; id: string; createdAt: number; evidence: ArenaEvidence };
@@ -58,7 +62,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const duel = room.duel!; // Only mounted after the canonical gate in the route.
   const t = useThemeColors();
   const presentation = duelPresentation(duel, room.phase);
-  const [tab, setTab] = React.useState<'transcript' | 'evidence'>('transcript');
+  const [tab, setTab] = React.useState<DuelTab>('transcript');
   const [propositionExpanded, setPropositionExpanded] = React.useState(false);
   const [watching, setWatching] = React.useState(false);
   const [watchError, setWatchError] = React.useState(false);
@@ -81,6 +85,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
     return map;
   }, [safeEvidence]);
   const entries = React.useMemo<Entry[]>(() => {
+    if (tab === 'crowd') return [];
     const proof: Entry[] = safeEvidence.filter(item => tab === 'evidence' || !item.messageId)
       .map(item => ({ kind: 'evidence', id: `evidence:${item.id}`, createdAt: item.createdAt, evidence: item }));
     if (tab === 'evidence') return proof;
@@ -93,6 +98,14 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const live = duel.status === 'open' && (room.phase === 'open' || room.phase === 'final_arguments');
   const statusLabel = live ? 'LIVE' : presentation.stage.toUpperCase();
   const atmosphereMood = duelAtmosphereMood(duel, room.phase);
+  const judgingFocus = room.phase === 'judging' && duel.status === 'open';
+  const lastSide = React.useMemo(() => {
+    for (let i = transcript.length - 1; i >= 0; i -= 1) {
+      const side = duelFighterSide(duel, transcript[i]?.author?.id);
+      if (side) return side;
+    }
+    return null;
+  }, [duel, transcript]);
 
   const renderItem = React.useCallback(({ item }: ListRenderItemInfo<Entry>) => {
     if (item.kind === 'evidence') {
@@ -150,8 +163,11 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
-      <ArenaAtmosphere mood={atmosphereMood} energy={live ? 0.4 : atmosphereMood === 'judging' ? 0.12 : 0.22} />
-      <View style={[styles.top, styles.layer, { paddingTop: props.paddingTop, borderColor: t.border }]}>
+      <ArenaAtmosphere
+        mood={atmosphereMood}
+        energy={judgingFocus ? 0.08 : live ? 0.42 : atmosphereMood === 'verdict' ? 0.3 : 0.2}
+      />
+      <View style={[styles.top, styles.layer, { paddingTop: props.paddingTop }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -242,22 +258,22 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                 </Pressable>
               ) : null}
 
-              <AnimatedMatchup duel={duel} onOpenProfile={props.onOpenProfile} />
+              <AnimatedMatchup
+                duel={duel}
+                onOpenProfile={props.onOpenProfile}
+                size="stage"
+                highlightSide={judgingFocus ? null : lastSide}
+              />
 
               <View style={styles.roleRow}>
                 <Text
-                  allowFontScaling={false}
                   accessibilityLiveRegion="polite"
                   style={[styles.roleChip, { color: t.textSecondary, borderColor: t.border }]}
                 >
                   {presentation.role}
                 </Text>
-                {!live ? (
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.phaseHint, { color: t.textMuted }]}
-                    numberOfLines={2}
-                  >
+                {!live || judgingFocus ? (
+                  <Text style={[styles.phaseHint, { color: t.textMuted }]} numberOfLines={2}>
                     {presentation.hint}
                   </Text>
                 ) : null}
@@ -296,12 +312,13 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                 value={tab}
                 items={[
                   { key: 'transcript', label: 'Arguments' },
+                  { key: 'crowd', label: 'Crowd' },
                   { key: 'evidence', label: 'Evidence' },
                 ]}
                 label="Clash content"
                 onChange={next => {
                   followLatest.current = false;
-                  setTab(next);
+                  setTab(next as DuelTab);
                 }}
               />
 
@@ -387,13 +404,19 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                   </Text>
                   {retry}
                 </>
+              ) : tab === 'crowd' ? (
+                <CrowdShell />
               ) : (
                 <>
                   {tab === 'transcript' && duel.status === 'open' && room.phase !== 'scheduled' ? (
                     <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>THE FLOOR IS OPEN</Text>
                   ) : null}
                   <Text style={[styles.emptyBody, { color: t.textSecondary }]}>
-                    {duelEmptyText(duel, room.phase, tab).replace(/^THE FLOOR IS OPEN\n\n/, '')}
+                    {duelEmptyText(
+                      duel,
+                      room.phase,
+                      tab === 'evidence' ? 'evidence' : 'transcript',
+                    ).replace(/^THE FLOOR IS OPEN\n\n/, '')}
                   </Text>
                 </>
               )}
@@ -407,7 +430,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
             { borderColor: t.border, paddingBottom: Math.max(props.paddingBottom, space.sm) },
           ]}
         >
-          {presentation.canPublish ? (
+          {presentation.canPublish && tab === 'transcript' ? (
             props.composer
           ) : (
             <Pressable
@@ -437,6 +460,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           )}
         </View>
       </KeyboardAvoidingView>
+      <DuelDevPanel room={room} />
     </View>
   );
 }
@@ -449,8 +473,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.sm,
     paddingHorizontal: layout.screenX,
-    paddingBottom: space.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: space.xs,
     minHeight: 44,
   },
   backHit: {
@@ -482,13 +505,13 @@ const styles = StyleSheet.create({
   },
   topSpacer: { minWidth: 44 },
   content: { paddingHorizontal: layout.screenX, flexGrow: 1 },
-  context: { gap: space.md, paddingTop: space.lg, paddingBottom: space.md },
+  context: { gap: space.md, paddingTop: space.md, paddingBottom: space.sm },
   proposition: {
     ...typeScale.title,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: '700',
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   roleRow: { gap: space.xs },
   roleChip: {

@@ -10,17 +10,36 @@ import { ClashMatchupBar } from './ClashMatchupBar';
 export interface AnimatedMatchupProps {
   duel: ArenaDuel;
   onOpenProfile?: (id: string) => void;
+  highlightSide?: 'A' | 'B' | null;
+  size?: 'card' | 'room' | 'stage';
 }
 
-export function AnimatedMatchup({ duel, onOpenProfile }: AnimatedMatchupProps): React.JSX.Element {
+export function AnimatedMatchup({
+  duel,
+  onOpenProfile,
+  highlightSide = null,
+  size = 'stage',
+}: AnimatedMatchupProps): React.JSX.Element {
   const reduced = useReducedMotion();
   if (reduced) {
-    return <ClashMatchupBar duel={duel} onOpenProfile={onOpenProfile} />;
+    return (
+      <ClashMatchupBar
+        duel={duel}
+        onOpenProfile={onOpenProfile}
+        size={size}
+        highlightSide={highlightSide}
+      />
+    );
   }
   return (
     <Animated.View entering={FadeInDown.springify().damping(18).stiffness(240)}>
       <Animated.View entering={ZoomIn.delay(80).springify().damping(16)}>
-        <ClashMatchupBar duel={duel} onOpenProfile={onOpenProfile} />
+        <ClashMatchupBar
+          duel={duel}
+          onOpenProfile={onOpenProfile}
+          size={size}
+          highlightSide={highlightSide}
+        />
       </Animated.View>
     </Animated.View>
   );

@@ -23,19 +23,42 @@ let theme;
 const noop = () => {};
 const fade = { duration() { return this; } };
 Module._load = function(request, parent, isMain) {
-  if (request === 'react-native') return RN;
+  if (request === 'react-native') {
+    return {
+      ...RN,
+      Modal: ({ children, visible }) => (visible ? React.createElement(RN.View, null, children) : null),
+    };
+  }
   if (request === 'react-native-svg') return originalLoad.call(this, 'react-native-svg/lib/commonjs/ReactNativeSVG.web.js', parent, isMain);
   if (request === 'react-native-reanimated') return {
     __esModule: true,
     default: { View: RN.View, Text: RN.Text, createAnimatedComponent: (c) => c },
     FadeIn: fade, FadeInDown: fade, ZoomIn: fade, SlideInLeft: fade, SlideInRight: fade,
+    Extrapolation: { CLAMP: 'clamp' },
     Easing: { inOut: (e) => e, out: (e) => e, sin: {}, quad: {}, cubic: {}, back: () => ({}) },
     useReducedMotion: () => true,
     useSharedValue: (v) => ({ value: v }),
     useAnimatedStyle: () => ({}),
+    interpolate: () => 0,
     withRepeat: (v) => v, withTiming: (v) => v, withDelay: (_d, v) => v, withSpring: (v) => v, withSequence: (...v) => v[0],
     runOnJS: (fn) => fn,
   };
+  if (request === 'react-native-gesture-handler') {
+    const passthrough = ({ children }) => children ?? null;
+    return {
+      GestureDetector: passthrough,
+      Gesture: {
+        Pan: () => ({
+          enabled() { return this; },
+          activeOffsetX() { return this; },
+          failOffsetY() { return this; },
+          onBegin() { return this; },
+          onUpdate() { return this; },
+          onEnd() { return this; },
+        }),
+      },
+    };
+  }
   if (request === 'expo-linear-gradient') return { LinearGradient: ({ children, style }) => React.createElement(RN.View, { style }, children) };
   if (request === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
   const resolved = Module._resolveFilename(request, parent).replaceAll('\\','/');
@@ -82,8 +105,12 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   const { element, getStyleElement } = RN.AppRegistry.getApplication(name);
   const html = renderToStaticMarkup(element);
   assert.match(html, /Kevin/); assert.match(html, /Rohan/); assert.match(html, /Arguments|Transcript/); assert.doesNotMatch(html, /SECRET HIDDEN CITATION|permission denied for table|999/);
-  if (name === 'spectator') { assert.match(html, /WATCHING/); assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat/); }
-  if (name === 'fighter') { assert.match(html, /FIGHTER A/); assert.match(html, /Fighter composer/); assert.match(html, /Reply to this argument/); }
+  if (name === 'spectator') {
+    assert.match(html, /WATCHING/);
+    assert.match(html, /Crowd/);
+    assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat/);
+  }
+  if (name === 'fighter') { assert.match(html, /FIGHTER A|Fighter A/); assert.match(html, /Fighter composer/); assert.match(html, /Reply to this argument/); }
   if (name === 'judging') assert.match(html, /Judge Kevin, Fighter A, made the stronger case/);
   if (name === 'draw') { assert.match(html, /Draw|VERDICT/); assert.match(html, /50%/); assert.match(html, /4 judgment/); }
   if (name === 'cancelled') assert.match(html, /Clash cancelled/);
@@ -94,4 +121,47 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   if (out) fs.writeFileSync(path.join(out, `${name}.html`), `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${renderToStaticMarkup(getStyleElement())}<style>html,body{margin:0;background:#09090b;height:100%}*{font-family:Arial,sans-serif!important}</style></head><body>${html}</body></html>`);
   process.stdout.write(`PASS ${name}\n`);
 }
-process.stdout.write('9/9 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');
+
+// Challenge swipe + confirmed overlay smoke (presentation only).
+const { ChallengeSwipeDeck } = require('../components/arena/ChallengeSwipeDeck.tsx');
+const { ClashConfirmedOverlay } = require('../components/arena/ClashConfirmedOverlay.tsx');
+const { CrowdShell } = require('../components/liveArena/CrowdShell.tsx');
+const challenge = {
+  id: 'ch1', takeId: 't1', challengerId: 'b', challengedId: 'a',
+  counterPosition: 'Companies will still need juniors to validate and integrate generated code.',
+  status: 'PENDING', createdAt: new Date().toISOString(),
+  expiresAt: new Date(Date.now() + 86400000).toISOString(), resolvedAt: null,
+  clashId: null, roomId: null, created: true,
+  challenger: { id: 'b', name: 'Rohan', handle: 'rohan' },
+};
+const challengeCases = {
+  'challenge-incoming': React.createElement(ChallengeSwipeDeck, {
+    challenges: [challenge],
+    takeText: 'AI will replace most junior programmers.',
+    onAccept: async () => {},
+    onPass: async () => {},
+  }),
+  'challenge-confirmed': React.createElement(ClashConfirmedOverlay, {
+    visible: true,
+    fighterA: { name: 'Kevin', handle: 'kevin' },
+    fighterB: { name: 'Rohan', handle: 'rohan' },
+  }),
+  'crowd-shell': React.createElement(CrowdShell, {}),
+};
+for (const [name, element] of Object.entries(challengeCases)) {
+  const html = renderToStaticMarkup(React.createElement(RN.View, { style: { width: 390, minHeight: 640 } }, element));
+  if (name === 'challenge-incoming') {
+    assert.match(html, /Rohan/);
+    assert.match(html, /ACCEPT/);
+    assert.match(html, /PASS/);
+    assert.match(html, /COUNTER-POSITION|counter-position|Counter/i);
+  }
+  if (name === 'challenge-confirmed') assert.match(html, /CLASH CONFIRMED/);
+  if (name === 'crowd-shell') {
+    assert.match(html, /CROWD/);
+    assert.doesNotMatch(html, /Send|Post a message|Compose/);
+  }
+  if (out) fs.writeFileSync(path.join(out, `${name}.html`), `<!doctype html><html><body>${html}</body></html>`);
+  process.stdout.write(`PASS ${name}\n`);
+}
+process.stdout.write('12/12 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');
