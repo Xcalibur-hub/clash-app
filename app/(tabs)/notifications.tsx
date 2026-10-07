@@ -59,6 +59,12 @@ export default function NotificationsTab(): React.JSX.Element {
     }
 
     switch (item.kind) {
+      case 'challenge_received':
+        if (item.entityId) router.push(`/take/${item.entityId}`);
+        break;
+      case 'challenge_accepted':
+        if (item.entityId) router.push(`/arena/room/${item.entityId}`);
+        break;
       case 'new_follower':
         if (item.actorId) router.push(`/profile/${item.actorId}`);
         break;

@@ -166,6 +166,74 @@ export type Database = {
           },
         ]
       }
+      arena_challenges: {
+        Row: {
+          challenged_id: string
+          challenger_id: string
+          clash_id: string | null
+          counter_position: string
+          created_at: string
+          expires_at: string
+          id: string
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["arena_challenge_status"]
+          take_id: string
+        }
+        Insert: {
+          challenged_id: string
+          challenger_id: string
+          clash_id?: string | null
+          counter_position: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["arena_challenge_status"]
+          take_id: string
+        }
+        Update: {
+          challenged_id?: string
+          challenger_id?: string
+          clash_id?: string | null
+          counter_position?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["arena_challenge_status"]
+          take_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_challenges_challenged_id_fkey"
+            columns: ["challenged_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_challenges_challenger_id_fkey"
+            columns: ["challenger_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_challenges_clash_id_fkey"
+            columns: ["clash_id"]
+            isOneToOne: true
+            referencedRelation: "clashes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_challenges_take_id_fkey"
+            columns: ["take_id"]
+            isOneToOne: false
+            referencedRelation: "takes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       arena_crew_follows: {
         Row: {
           created_at: string
@@ -5112,6 +5180,17 @@ export type Database = {
         Args: { p_candidate: string; p_topic_id: string; p_viewer: string }
         Returns: Json
       }
+      arena_challenge_duration: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      arena_challenge_payload: {
+        Args: {
+          p: Database["public"]["Tables"]["arena_challenges"]["Row"]
+          p_created?: boolean
+        }
+        Returns: Json
+      }
       arena_crew_notify: {
         Args: {
           p_actor: string
@@ -5395,6 +5474,10 @@ export type Database = {
         Args: { p_clash_id: string }
         Returns: Json
       }
+      clash_view_phase1: {
+        Args: { p_clash_id: string }
+        Returns: Json
+      }
       cleanup_meet_signals: {
         Args: { p_limit?: number }
         Returns: number
@@ -5483,6 +5566,10 @@ export type Database = {
           status: Database["public"]["Enums"]["advertiser_status"]
           updated_at: string
         }
+      }
+      create_arena_challenge: {
+        Args: { p_counter_position: string; p_take_id: string }
+        Returns: Json
       }
       create_arena_crew: {
         Args: {
@@ -6175,6 +6262,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      expire_arena_take_challenges: {
+        Args: { p_take_id: string }
+        Returns: undefined
+      }
       expire_stale_takes: {
         Args: { p_limit?: number }
         Returns: number
@@ -6461,6 +6552,15 @@ export type Database = {
       }
       list_arena_backup_candidates: {
         Args: { p_limit?: number; p_room_id: string }
+        Returns: Json
+      }
+      list_arena_challenges: {
+        Args: {
+          p_before_created_at?: string
+          p_before_id?: string
+          p_limit?: number
+          p_take_id: string
+        }
         Returns: Json
       }
       list_arena_crews: {
@@ -6962,6 +7062,10 @@ export type Database = {
           status: Database["public"]["Enums"]["vault_service_request_status"]
           updated_at: string
         }
+      }
+      resolve_arena_challenge: {
+        Args: { p_action: string; p_challenge_id: string }
+        Returns: Json
       }
       resolve_prediction_game: {
         Args: { p_game_id: string; p_winning_option_id: string }
@@ -7785,6 +7889,12 @@ export type Database = {
         | "DECLINED"
         | "EXPIRED"
         | "CANCELLED"
+      arena_challenge_status:
+        | "PENDING"
+        | "ACCEPTED"
+        | "PASSED"
+        | "CANCELLED"
+        | "EXPIRED"
       arena_crew_invite_status:
         | "PENDING"
         | "ACCEPTED"
@@ -7914,6 +8024,8 @@ export type Database = {
         | "arena_crew_join_request"
         | "arena_crew_join_accepted"
         | "arena_crew_join_declined"
+        | "challenge_received"
+        | "challenge_accepted"
       profile_role: "viewer" | "creator" | "moderator" | "admin"
       rank_name:
         | "Rookie"
@@ -8173,6 +8285,13 @@ export const Constants = {
         "EXPIRED",
         "CANCELLED",
       ],
+      arena_challenge_status: [
+        "PENDING",
+        "ACCEPTED",
+        "PASSED",
+        "CANCELLED",
+        "EXPIRED",
+      ],
       arena_crew_invite_status: [
         "PENDING",
         "ACCEPTED",
@@ -8312,6 +8431,8 @@ export const Constants = {
         "arena_crew_join_request",
         "arena_crew_join_accepted",
         "arena_crew_join_declined",
+        "challenge_received",
+        "challenge_accepted",
       ],
       profile_role: ["viewer", "creator", "moderator", "admin"],
       rank_name: [

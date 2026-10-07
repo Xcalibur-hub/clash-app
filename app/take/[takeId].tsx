@@ -16,6 +16,7 @@ import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { RebuttalInput } from '../../components/arena/RebuttalInput';
 import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
 import { TakeActionRow } from '../../components/arena/TakeActionRow';
+import { TakeChallenges } from '../../components/arena/TakeChallenges';
 import { TakeDetailHero } from '../../components/arena/TakeDetailHero';
 import { Avatar } from '../../components/shared/Avatar';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -24,7 +25,7 @@ import { BackIcon, MoreIcon } from '../../components/shared/icons';
 import { HOOD_LABEL } from '../../data/hoods';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useTakeReaction } from '../../hooks/useTakeReaction';
-import { toggleUpvote } from '../../services/apiService';
+import { toggleUpvote, fetchTakeById, fetchProfilesByIds } from '../../services/apiService';
 import { ClashModeSheet } from '../../components/clash/ClashModeSheet';
 import { startClash, type ClashMode } from '../../services/clashEngineService';
 import { analytics } from '../../services/analytics';
@@ -46,6 +47,7 @@ import {
   type ChallengerComment,
   type CommentSort,
   type User,
+  type Take,
 } from '../../store';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import {
@@ -74,7 +76,7 @@ export interface MenuTarget {
  * Backend / reply / clash logic unchanged.
  */
 export default function TakeDetailScreen(): React.JSX.Element {
-  const { takeId } = useLocalSearchParams<{ takeId: string | string[] }>();
+  const { takeId, challenge } = useLocalSearchParams<{ takeId: string | string[]; challenge?: string }>();
   const id = Array.isArray(takeId) ? takeId[0] : takeId;
   const { state, dispatch } = useClash();
   const { signedIn, loading: authLoading } = useAuth();
@@ -94,8 +96,19 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const clashCommentRef = React.useRef<ChallengerComment | null>(null);
   const clashStartingRef = React.useRef(false);
 
-  const take = state.takes.find((item) => item.id === id);
-  const author = take ? selectAuthor(state, take.authorId) : undefined;
+  const [remoteContext, setRemoteContext] = React.useState<{ take: Take; author: User } | null>(null);
+  const take = state.takes.find((item) => item.id === id) ?? (remoteContext?.take.id === id ? remoteContext.take : undefined);
+  const author = take ? selectAuthor(state, take.authorId) ?? (remoteContext?.author.id === take.authorId ? remoteContext.author : undefined) : undefined;
+  React.useEffect(() => {
+    if (!id || (take && author)) return;
+    let active = true;
+    void fetchTakeById(id).then(async found => {
+      if (!found) return;
+      const [profile] = await fetchProfilesByIds([found.authorId]);
+      if (active && profile) setRemoteContext({ take: found, author: profile });
+    }).catch(e => { if (active) dispatch(showNotice(errorText(e))); });
+    return () => { active = false; };
+  }, [id, take, author, dispatch]);
 
   React.useEffect(() => {
     clashCommentRef.current = clashComment;
@@ -359,6 +372,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
           <MindshiftPanel takeId={take.id} />
 
+          <TakeChallenges take={take} openComposer={challenge === '1'} />
           <TakeActionRow
             reactions={take.reactions}
             commentCount={comments.length}

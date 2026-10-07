@@ -17,6 +17,10 @@ export interface NotificationRowProps {
 function describe(notification: AppNotification, actor: User | undefined): { title: string; subtitle?: string } {
   const who = actor ? `@${actor.handle}` : 'Someone';
   switch (notification.kind) {
+    case 'challenge_received':
+      return { title: `${who} challenged your Take`, subtitle: 'Review the counter-position' };
+    case 'challenge_accepted':
+      return { title: `${who} accepted your Challenge`, subtitle: 'Open your duel Room' };
     case 'new_follower':
       return { title: `${who} followed you` };
     case 'comment':

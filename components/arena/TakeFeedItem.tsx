@@ -39,6 +39,7 @@ import {
 } from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
 import { TakeActionRow } from './TakeActionRow';
+import { ChallengeTakeButton } from './TakeChallenges';
 import { TakeStoryBeat } from './TakeStoryBeat';
 
 export interface TakeFeedItemProps {
@@ -131,6 +132,7 @@ function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
   return (
     <Animated.View entering={entering} style={styles.wrap}>
       {body}
+      {!isViewer && <ChallengeTakeButton takeId={take.id} />}
     </Animated.View>
   );
 }
