@@ -7,7 +7,9 @@ import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
 import { ArenaTopicDeck } from '../../components/liveArena/ArenaTopicDeck';
 import { ArenaAtmosphere } from '../../components/liveArena/ArenaAtmosphere';
+import { ArenaEntrance } from '../../components/liveArena/ArenaEntrance';
 import { LiveClashHero } from '../../components/liveArena/LiveClashHero';
+import { consumeArenaEntrance } from '../../utils/arenaEntranceState';
 import { FreshTakesSection } from '../../components/arena/FreshTakesSection';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { TakeFeedItem } from '../../components/arena/TakeFeedItem';
@@ -75,8 +77,15 @@ export default function ArenaScreen(): React.JSX.Element {
   const [menu, setMenu] = React.useState<FeedMenu | null>(null);
   /** Today's live Topic(s). Empty when none is running — the card simply hides. */
   const [liveTopics, setLiveTopics] = React.useState<LiveArenaTopic[]>([]);
+  const [entrance, setEntrance] = React.useState(false);
   /** Guards against double taps racing the reaction RPC for the same Take. */
   const reactionInFlight = React.useRef<Set<string>>(new Set());
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (consumeArenaEntrance()) setEntrance(true);
+    }, []),
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -487,7 +496,7 @@ export default function ArenaScreen(): React.JSX.Element {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} />
-      <ArenaTopBar paddingTop={insets.top} />
+      <ArenaTopBar paddingTop={insets.top} contextLine="ARENA" />
       <FlatList
         data={listData}
         keyExtractor={(take) => take.id}
@@ -503,7 +512,7 @@ export default function ArenaScreen(): React.JSX.Element {
         initialNumToRender={6}
         maxToRenderPerBatch={8}
         windowSize={9}
-        style={styles.listLayer}
+        style={[styles.listLayer, entrance && styles.listDimmed]}
       />
       <PostActionsSheet
         visible={menu !== null}
@@ -515,6 +524,7 @@ export default function ArenaScreen(): React.JSX.Element {
         onMutated={() => setRefreshKey((k) => k + 1)}
       />
       <Notice offset={0} />
+      <ArenaEntrance active={entrance} onDone={() => setEntrance(false)} />
     </View>
   );
 }
@@ -540,6 +550,7 @@ function FeedSkeleton(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listLayer: { zIndex: 1 },
+  listDimmed: { opacity: 0.35 },
   list: { flexGrow: 1 },
   hero: { paddingBottom: space.xs, gap: space.md },
   feedHead: {

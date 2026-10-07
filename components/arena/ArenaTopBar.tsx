@@ -20,7 +20,7 @@ export interface ArenaTopBarProps {
  */
 export function ArenaTopBar({
   paddingTop,
-  contextLine = 'THE INTERNET IS FIGHTING ABOUT',
+  contextLine = 'ARENA',
 }: ArenaTopBarProps): React.JSX.Element {
   const { state } = useClash();
   const viewer = selectViewer(state);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
 import { switchRealm, useClash, type Realm } from '../../store';
+import { requestArenaEntrance } from '../../utils/arenaEntranceState';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { REALM_SHIFT_MS, REALM_SHIFT_REPEAT_MS, type RealmDirection } from './RealmPortal';
 
@@ -41,6 +42,7 @@ export function useRealmSwitch(): RealmSwitch {
       sessionShifted = true;
       setFirst(isFirst);
       setDirection(realm === 'vault' ? 'arena-to-vault' : 'vault-to-arena');
+      if (realm === 'arena') requestArenaEntrance();
       setShifting(true);
       dispatch(switchRealm(realm));
       const ms = isFirst ? REALM_SHIFT_MS : REALM_SHIFT_REPEAT_MS;

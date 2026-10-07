@@ -122,10 +122,15 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   process.stdout.write(`PASS ${name}\n`);
 }
 
-// Challenge swipe + confirmed overlay smoke (presentation only).
-const { ChallengeSwipeDeck } = require('../components/arena/ChallengeSwipeDeck.tsx');
+// Full-screen Challenge + confirmed + entrance smoke (presentation only).
+const { FullScreenChallengeDeck } = require('../components/arena/FullScreenChallengeDeck.tsx');
 const { ClashConfirmedOverlay } = require('../components/arena/ClashConfirmedOverlay.tsx');
 const { CrowdShell } = require('../components/liveArena/CrowdShell.tsx');
+const { ArenaEntrance } = require('../components/liveArena/ArenaEntrance.tsx');
+const { DuelEntrance } = require('../components/liveArena/DuelEntrance.tsx');
+const {
+  consumeArenaEntrance, peekArenaEntrancePending, requestArenaEntrance, resetArenaEntranceForTests,
+} = require('../utils/arenaEntranceState.ts');
 const challenge = {
   id: 'ch1', takeId: 't1', challengerId: 'b', challengedId: 'a',
   counterPosition: 'Companies will still need juniors to validate and integrate generated code.',
@@ -135,9 +140,11 @@ const challenge = {
   challenger: { id: 'b', name: 'Rohan', handle: 'rohan' },
 };
 const challengeCases = {
-  'challenge-incoming': React.createElement(ChallengeSwipeDeck, {
-    challenges: [challenge],
+  'challenge-fullscreen': React.createElement(FullScreenChallengeDeck, {
+    visible: true,
+    challenges: [challenge, { ...challenge, id: 'ch2', challenger: { id: 'c', name: 'Maya', handle: 'maya' } }],
     takeText: 'AI will replace most junior programmers.',
+    onClose: noop,
     onAccept: async () => {},
     onPass: async () => {},
   }),
@@ -147,21 +154,36 @@ const challengeCases = {
     fighterB: { name: 'Rohan', handle: 'rohan' },
   }),
   'crowd-shell': React.createElement(CrowdShell, {}),
+  'arena-entrance': React.createElement(ArenaEntrance, { active: true, onDone: noop }),
+  'duel-entrance': React.createElement(DuelEntrance, {
+    active: true, onDone: noop, proposition: duel.sourceText, duel,
+  }),
 };
 for (const [name, element] of Object.entries(challengeCases)) {
-  const html = renderToStaticMarkup(React.createElement(RN.View, { style: { width: 390, minHeight: 640 } }, element));
-  if (name === 'challenge-incoming') {
+  const html = renderToStaticMarkup(React.createElement(RN.View, { style: { width: 390, minHeight: 780 } }, element));
+  if (name === 'challenge-fullscreen') {
     assert.match(html, /Rohan/);
     assert.match(html, /ACCEPT/);
     assert.match(html, /PASS/);
-    assert.match(html, /COUNTER-POSITION|counter-position|Counter/i);
+    assert.match(html, /CHALLENGE/);
+    assert.match(html, /THEIR TAKE|YOUR TAKE/);
+    assert.match(html, /2 PENDING|PENDING/);
   }
-  if (name === 'challenge-confirmed') assert.match(html, /CLASH CONFIRMED/);
+  if (name === 'challenge-confirmed') assert.match(html, /CONFIRMED|ENTERING ARENA/);
   if (name === 'crowd-shell') {
     assert.match(html, /CROWD/);
     assert.doesNotMatch(html, /Send|Post a message|Compose/);
   }
+  if (name === 'arena-entrance') assert.match(html, /ARENA/);
+  if (name === 'duel-entrance') assert.match(html, /ENTERING ARENA|Kevin|Rohan/);
   if (out) fs.writeFileSync(path.join(out, `${name}.html`), `<!doctype html><html><body>${html}</body></html>`);
   process.stdout.write(`PASS ${name}\n`);
 }
-process.stdout.write('12/12 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');
+resetArenaEntranceForTests();
+assert.equal(consumeArenaEntrance(), true);
+assert.equal(consumeArenaEntrance(), false);
+requestArenaEntrance();
+assert.equal(peekArenaEntrancePending(), true);
+assert.equal(consumeArenaEntrance(), true);
+process.stdout.write('PASS arena-entrance-gate\n');
+process.stdout.write('15/15 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');

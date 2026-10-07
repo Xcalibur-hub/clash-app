@@ -11,7 +11,7 @@ import { challengeCanAct, validCounterPosition, type ArenaChallenge } from '../.
 import { space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
-import { ChallengeSwipeDeck } from './ChallengeSwipeDeck';
+import { FullScreenChallengeDeck } from './FullScreenChallengeDeck';
 import { ClashConfirmedOverlay, type ClashConfirmedFighter } from './ClashConfirmedOverlay';
 
 export function ChallengeTakeButton({ takeId }: { takeId: string }): React.JSX.Element {
@@ -56,6 +56,7 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
     fighterA: ClashConfirmedFighter;
     fighterB: ClashConfirmedFighter;
   } | null>(null);
+  const [deckOpen, setDeckOpen] = React.useState(false);
   const working = React.useRef(false);
   const generation = React.useRef(0);
   const focused = React.useRef(false);
@@ -107,6 +108,7 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
     setComposer(false);
     setText('');
     setConfirmed(null);
+    setDeckOpen(false);
   }, [take.id, viewerId]);
 
   React.useEffect(() => {
@@ -115,7 +117,8 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
 
   React.useEffect(() => {
     if (!confirmed) return undefined;
-    const delay = reduced ? 120 : 900;
+    setDeckOpen(false);
+    const delay = reduced ? 160 : 1100;
     const id = setTimeout(() => {
       const roomId = confirmed.roomId;
       setConfirmed(null);
@@ -253,20 +256,43 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
         fighterB={confirmed?.fighterB ?? { name: '', handle: '' }}
       />
 
+      <FullScreenChallengeDeck
+        visible={deckOpen && !confirmed}
+        challenges={pending}
+        takeText={take.text}
+        busy={busy}
+        error={error}
+        onClose={() => setDeckOpen(false)}
+        onAccept={onAccept}
+        onPass={onPass}
+      />
+
       {isAuthor ? (
         <>
           <Text style={[styles.heading, { color: t.textPrimary }]}>Incoming Challenges</Text>
           {!loaded ? (
             button('Reload Challenges', () => void load())
+          ) : pending.length > 0 ? (
+            <View style={styles.reviewBlock}>
+              <Text style={[styles.body, { color: t.textSecondary, paddingHorizontal: space.md }]}>
+                {pending.length} pending Challenge{pending.length === 1 ? '' : 's'} waiting for you.
+              </Text>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={`Review ${pending.length} pending challenges`}
+                onPress={() => {
+                  hapticPress();
+                  setDeckOpen(true);
+                }}
+                style={[styles.reviewBtn, { borderColor: t.borderStrong, backgroundColor: t.surfaceElevated }]}
+              >
+                <Text style={[styles.reviewLabel, { color: t.textPrimary }]}>Review Challenges</Text>
+              </PressableScale>
+            </View>
           ) : (
-            <ChallengeSwipeDeck
-              challenges={pending}
-              takeText={take.text}
-              busy={busy}
-              error={error}
-              onAccept={onAccept}
-              onPass={onPass}
-            />
+            <Text style={[styles.body, { color: t.textMuted, paddingHorizontal: space.md }]}>
+              No pending Challenges.
+            </Text>
           )}
           {history.length > 0 ? (
             <View style={styles.history}>
@@ -397,6 +423,16 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
 
 const styles = StyleSheet.create({
   section: { gap: space.sm, paddingVertical: space.md, borderTopWidth: StyleSheet.hairlineWidth },
+  reviewBlock: { gap: space.sm, paddingBottom: space.sm },
+  reviewBtn: {
+    marginHorizontal: space.md,
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewLabel: { ...typeScale.label, fontSize: 15, fontWeight: '800', letterSpacing: 0.4 },
   heading: {
     ...typeScale.title,
     fontSize: 20,

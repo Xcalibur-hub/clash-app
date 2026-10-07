@@ -21,6 +21,7 @@ import { AnimatedMatchup } from './AnimatedMatchup';
 import { ArenaAtmosphere } from './ArenaAtmosphere';
 import { CrowdShell } from './CrowdShell';
 import { DuelDevPanel } from './DuelDevPanel';
+import { DuelEntrance } from './DuelEntrance';
 import { DuelRoomOutcome } from './DuelRoomOutcome';
 import { LiveEvidenceCard } from './LiveEvidenceCard';
 import { LivePulse } from './LivePulse';
@@ -66,6 +67,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const [propositionExpanded, setPropositionExpanded] = React.useState(false);
   const [watching, setWatching] = React.useState(false);
   const [watchError, setWatchError] = React.useState(false);
+  const [entrance, setEntrance] = React.useState(true);
   const joining = React.useRef(false);
   const [visibleIds, setVisibleIds] = React.useState<ReadonlySet<string>>(new Set());
   const list = React.useRef<FlatList<Entry>>(null);
@@ -461,6 +463,12 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         </View>
       </KeyboardAvoidingView>
       <DuelDevPanel room={room} />
+      <DuelEntrance
+        duel={duel}
+        proposition={proposition}
+        active={entrance}
+        onDone={() => setEntrance(false)}
+      />
     </View>
   );
 }
@@ -505,13 +513,13 @@ const styles = StyleSheet.create({
   },
   topSpacer: { minWidth: 44 },
   content: { paddingHorizontal: layout.screenX, flexGrow: 1 },
-  context: { gap: space.md, paddingTop: space.md, paddingBottom: space.sm },
+  context: { gap: space.lg, paddingTop: space.md, paddingBottom: space.sm },
   proposition: {
     ...typeScale.title,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
   },
   roleRow: { gap: space.xs },
   roleChip: {

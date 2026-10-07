@@ -1,9 +1,16 @@
 /**
- * Short post-ACCEPT beat before entering the canonical duel Room.
+ * Accept beat: confirmed → fighters enter → ENTERING ARENA (~800–1200ms total handled by parent).
  */
 import React from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, ZoomIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  SlideInLeft,
+  SlideInRight,
+  ZoomIn,
+  useReducedMotion,
+} from 'react-native-reanimated';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { Avatar } from '../shared/Avatar';
 import { ArenaAtmosphere } from '../liveArena/ArenaAtmosphere';
@@ -32,21 +39,28 @@ export function ClashConfirmedOverlay({
   return (
     <Modal visible transparent animationType={reduced ? 'none' : 'fade'} statusBarTranslucent>
       <View style={[styles.root, { backgroundColor: t.background }]} accessibilityViewIsModal>
-        <ArenaAtmosphere mood="live" energy={0.35} />
+        <ArenaAtmosphere mood="live" energy={0.5} />
         <View style={styles.content}>
           <Animated.Text
-            entering={reduced ? undefined : FadeIn.duration(220)}
+            entering={reduced ? undefined : FadeIn.duration(200)}
             style={[styles.kicker, { color: t.textMuted }]}
+          >
+            CLASH
+          </Animated.Text>
+          <Animated.Text
+            entering={reduced ? undefined : FadeInDown.delay(40).springify().damping(16)}
+            style={[styles.title, { color: t.textPrimary }]}
             accessibilityRole="header"
           >
-            CLASH CONFIRMED
+            CONFIRMED
           </Animated.Text>
+
           <View style={styles.row}>
             <Animated.View
-              entering={reduced ? undefined : ZoomIn.delay(60).springify().damping(14)}
+              entering={reduced ? undefined : SlideInLeft.delay(80).springify().damping(15)}
               style={styles.col}
             >
-              <Avatar name={fighterA.name} tint={fighterA.tint ?? t.textMuted} size={72} />
+              <Avatar name={fighterA.name} tint={fighterA.tint ?? t.textMuted} size={80} />
               <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
                 {fighterA.name}
               </Text>
@@ -55,16 +69,16 @@ export function ClashConfirmedOverlay({
               </Text>
             </Animated.View>
             <Animated.Text
-              entering={reduced ? undefined : FadeIn.delay(120).duration(200)}
+              entering={reduced ? undefined : ZoomIn.delay(140).springify().damping(13)}
               style={[styles.vs, { color: t.textSecondary }]}
             >
               VS
             </Animated.Text>
             <Animated.View
-              entering={reduced ? undefined : ZoomIn.delay(100).springify().damping(14)}
+              entering={reduced ? undefined : SlideInRight.delay(100).springify().damping(15)}
               style={styles.col}
             >
-              <Avatar name={fighterB.name} tint={fighterB.tint ?? t.textMuted} size={72} />
+              <Avatar name={fighterB.name} tint={fighterB.tint ?? t.textMuted} size={80} />
               <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
                 {fighterB.name}
               </Text>
@@ -73,6 +87,13 @@ export function ClashConfirmedOverlay({
               </Text>
             </Animated.View>
           </View>
+
+          <Animated.Text
+            entering={reduced ? undefined : FadeIn.delay(280).duration(240)}
+            style={[styles.enter, { color: t.textSecondary }]}
+          >
+            ENTERING ARENA
+          </Animated.Text>
         </View>
       </View>
     </Modal>
@@ -88,10 +109,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   kicker: {
-    ...typeScale.label,
+    ...typeScale.caption,
     fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 1.6,
+    letterSpacing: 2,
+  },
+  title: {
+    ...typeScale.title,
+    fontSize: 36,
+    lineHeight: 40,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    marginTop: -12,
   },
   row: {
     flexDirection: 'row',
@@ -100,12 +129,19 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   col: { flex: 1, alignItems: 'center', gap: 6, minWidth: 0 },
-  name: { ...typeScale.label, fontSize: 16, fontWeight: '700', textAlign: 'center', width: '100%' },
+  name: { ...typeScale.label, fontSize: 17, fontWeight: '700', textAlign: 'center', width: '100%' },
   handle: { ...typeScale.caption, fontSize: 13, textAlign: 'center', width: '100%' },
   vs: {
     ...typeScale.caption,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
+  },
+  enter: {
+    ...typeScale.caption,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.6,
+    marginTop: space.md,
   },
 });
