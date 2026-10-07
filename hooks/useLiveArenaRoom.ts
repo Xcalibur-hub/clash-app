@@ -123,9 +123,11 @@ export function useLiveArenaRoom(
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const authorRef = React.useRef<ArenaAuthor | null>(viewerAuthor);
   const messagesRef = React.useRef<ArenaMessage[]>([]);
+  const roomRef = React.useRef<ArenaRoom | null>(room);
   const visibilityCursor = React.useRef(0);
   authorRef.current = viewerAuthor;
   messagesRef.current = messages;
+  roomRef.current = room;
 
   React.useEffect(() => {
     mounted.current = true;
@@ -137,7 +139,8 @@ export function useLiveArenaRoom(
 
   const notify = React.useCallback(
     (caught: unknown) => {
-      dispatch(showNotice(errorText(caught)));
+      dispatch(showNotice(roomRef.current?.roomMode === 'DUEL'
+        ? 'That action could not be completed. Please try again.' : errorText(caught)));
     },
     [dispatch],
   );

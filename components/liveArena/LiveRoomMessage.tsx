@@ -5,6 +5,7 @@ import type { ArenaEvidence, ArenaMessage, Stance } from '../../services/liveAre
 import type { TakeMedia } from '../../store/types';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { timeAgo } from '../../utils/format';
+import { duelTimestamp } from '../../utils/duelPresentation';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ClashNativeStickerCard } from '../arena/ClashNativeStickerCard';
 import { CommentMedia } from '../arena/CommentMedia';
@@ -20,6 +21,7 @@ import { softFill, STANCE_LABEL } from './liveArenaStyles';
 const DEFAULT_REACTION = '🔥';
 
 export interface LiveRoomMessageProps {
+  duelFighter?: { side: 'A' | 'B'; name: string; handle: string };
   message: ArenaMessage;
   now: number;
   parent?: ArenaMessage | null;
@@ -73,6 +75,7 @@ function isMemeLead(message: ArenaMessage, media: TakeMedia | null): boolean {
 
 /** Argument card — event conversation, not generic chat. */
 export function LiveRoomMessage({
+  duelFighter,
   message,
   now,
   parent = null,
@@ -143,13 +146,15 @@ export function LiveRoomMessage({
   const textBlock =
     displayText.length > 0 ? (
       <Text
-        allowFontScaling={false}
+        allowFontScaling={Boolean(duelFighter)}
+        selectable={Boolean(duelFighter)}
         style={[
           styles.text,
           { color: t.textPrimary },
           isReply && styles.textCompact,
           highlighted && styles.textStrong,
           memeLead && styles.textUnderMeme,
+          duelFighter && styles.duelText,
         ]}
       >
         {displayText}
@@ -158,13 +163,14 @@ export function LiveRoomMessage({
 
   return (
     <Animated.View
-      entering={reduced || pending ? undefined : FadeInDown.duration(200)}
+      entering={duelFighter || reduced || pending ? undefined : FadeInDown.duration(200)}
       style={[
         styles.row,
         pending && styles.pending,
         isReply && styles.rowReply,
         highlighted && styles.rowHighlight,
         entertainmentHighlight && styles.rowCrowd,
+        duelFighter && styles.duelRow,
       ]}
     >
       <Pressable
@@ -176,12 +182,12 @@ export function LiveRoomMessage({
         disabled={!author || !onOpenProfile}
         accessibilityRole={author && onOpenProfile ? 'button' : undefined}
         accessibilityLabel={author ? `Open ${author.name}'s profile` : undefined}
-        hitSlop={4}
+        hitSlop={6}
       >
         <Avatar
           name={author?.name ?? 'Someone'}
           tint={author?.avatarTint ?? '#71717A'}
-          size={isReply ? 26 : 34}
+          size={duelFighter ? 34 : isReply ? 26 : 34}
         />
       </Pressable>
 
@@ -205,6 +211,8 @@ export function LiveRoomMessage({
           isReply && styles.plateReply,
           own && styles.plateOwn,
           memeLead && styles.plateMeme,
+          duelFighter && styles.duelPlate,
+          duelFighter && { backgroundColor: 'transparent', borderColor: t.borderStrong },
         ]}
       >
         {highlighted && highlightLabel ? (
@@ -222,10 +230,12 @@ export function LiveRoomMessage({
             }}
             disabled={!author || !onOpenProfile}
             hitSlop={4}
-            style={styles.nameHit}
+            style={[styles.nameHit, duelFighter && { minHeight: 44, justifyContent: 'center' }]}
+            accessibilityRole={duelFighter ? 'button' : undefined}
+            accessibilityLabel={duelFighter ? `Open ${duelFighter.name}, Fighter ${duelFighter.side}'s profile` : undefined}
           >
-            <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
-              {author?.handle ? `@${author.handle}` : author?.name ?? 'Someone'}
+            <Text allowFontScaling={Boolean(duelFighter)} style={[styles.name, { color: t.textPrimary }]}>
+              {duelFighter ? `${duelFighter.name} · FIGHTER ${duelFighter.side}` : author?.handle ? `@${author.handle}` : author?.name ?? 'Someone'}
             </Text>
           </Pressable>
           {own && ownStance ? (
@@ -234,7 +244,7 @@ export function LiveRoomMessage({
             </Text>
           ) : null}
           <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-            {pending ? 'sending…' : timeAgo(message.createdAt, now)}
+            {pending ? 'sending…' : duelFighter ? duelTimestamp(message.createdAt) : timeAgo(message.createdAt, now)}
           </Text>
           {onReport ? (
             <Pressable
@@ -245,7 +255,7 @@ export function LiveRoomMessage({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="More options"
-              style={styles.more}
+              style={[styles.more, duelFighter && { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' }]}
             >
               <MoreIcon size={16} color={t.textMuted} strokeWidth={2} />
             </Pressable>
@@ -318,6 +328,7 @@ export function LiveRoomMessage({
               accessibilityLabel="React — long press for more"
               style={[
                 styles.chip,
+                duelFighter && { minHeight: 44 },
                 {
                   backgroundColor: cooked?.viewerReacted ? t.surfaceMuted : 'transparent',
                   borderColor: cooked?.viewerReacted ? t.borderStrong : t.border,
@@ -396,6 +407,7 @@ export function LiveRoomMessage({
               hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel="Reply to this argument"
+              style={duelFighter ? { minHeight: 44, justifyContent: 'center' } : undefined}
             >
               <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
                 Reply
@@ -459,6 +471,7 @@ export function LiveRoomMessage({
       </Pressable>
 
       <MessageExpressiveSheet
+        canReply={duelFighter ? canReply : true}
         visible={expressiveOpen}
         onClose={() => setExpressiveOpen(false)}
         onReply={() => onReply?.(message)}
@@ -479,6 +492,10 @@ export function LiveRoomMessage({
 }
 
 const styles = StyleSheet.create({
+  duelRow: { marginLeft: 0, paddingVertical: space.md },
+  duelText: { fontSize: 17, lineHeight: 25, fontWeight: '500' },
+  duelPlate: { borderRadius: 0, borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 0, paddingVertical: space.sm, maxWidth: '100%', gap: space.sm },
   row: {
     flexDirection: 'row',
     gap: space.sm,

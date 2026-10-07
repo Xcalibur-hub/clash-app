@@ -2,11 +2,15 @@
  * Side A vs Side B matchup — broadcast identity without leaking live tallies.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Avatar } from '../shared/Avatar';
+import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { arenaSidesForTheme } from '../../theme/arenaSides';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 
 export interface ClashMatchupBarProps {
+  duel?: ArenaDuel;
+  onOpenProfile?: (id: string) => void;
   fighterAName?: string;
   fighterBName?: string;
   /** Optional settled split 0–1 for Agree share. Omit while live (privacy). */
@@ -23,11 +27,32 @@ export function ClashMatchupBar({
   storyBeat = null,
   fighterAName,
   fighterBName,
+  duel,
+  onOpenProfile,
 }: ClashMatchupBarProps): React.JSX.Element {
   const t = useThemeColors();
   const { a, b } = arenaSidesForTheme(t);
   const room = size === 'room';
   const showSplit = agreeShare != null && Number.isFinite(agreeShare);
+
+  if (duel) return <View style={styles.duelWrap}>
+    {([['A', duel.fighterA, duel.sourceText], ['B', duel.fighterB, duel.counterPosition]] as const).map(([side, fighter, position], index) => <React.Fragment key={side}>
+      {index === 1 && <Text style={[typeScale.caption, { color: t.textSecondary }]}>versus</Text>}
+      <View style={styles.duelSide}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Open Fighter ${side}, ${fighter.name}'s profile`}
+          disabled={!onOpenProfile} onPress={() => onOpenProfile?.(fighter.id)} style={styles.fighterHit}>
+          <Avatar name={fighter.name} tint={fighter.tint ?? t.textMuted} size={32} />
+          <View style={{ flex: 1 }}>
+            <Text style={[typeScale.label, { color: t.textPrimary }]}>{fighter.name}</Text>
+            <Text style={[typeScale.caption, { color: t.textSecondary }]}>@{fighter.handle} · FIGHTER {side}</Text>
+          </View>
+        </Pressable>
+        <Text selectable style={[typeScale.body, { color: t.textSecondary }]} numberOfLines={2}>
+          {position?.trim() || (side === 'A' ? 'Source Take' : 'Counter-position not provided')}
+        </Text>
+      </View>
+    </React.Fragment>)}
+  </View>;
 
   return (
     <View style={[styles.wrap, room && styles.wrapRoom]}>
@@ -94,6 +119,9 @@ export function ClashMatchupBar({
 }
 
 const styles = StyleSheet.create({
+  duelWrap: { gap: space.sm },
+  duelSide: { gap: space.xs },
+  fighterHit: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: space.sm },
   wrap: { gap: 8 },
   wrapRoom: { gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },

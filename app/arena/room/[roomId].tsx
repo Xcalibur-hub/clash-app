@@ -4,6 +4,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -22,6 +23,8 @@ import { LiveRoomEventBanner } from '../../../components/liveArena/LiveRoomEvent
 import { LiveRoomHeader } from '../../../components/liveArena/LiveRoomHeader';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
 import { DuelRoomOutcome } from '../../../components/liveArena/DuelRoomOutcome';
+import { DuelRoomExperience } from '../../../components/liveArena/DuelRoomExperience';
+import { isCanonicalDuel, duelPresentation } from '../../../utils/duelPresentation';
 import { submitJudgement } from '../../../services/clashEngineService';
 import { LiveRoomMessage } from '../../../components/liveArena/LiveRoomMessage';
 import { LiveRoomPulseStrip } from '../../../components/liveArena/LiveRoomPulseStrip';
@@ -44,6 +47,7 @@ import { EmptyState } from '../../../components/shared/EmptyState';
 import { Notice } from '../../../components/shared/Notice';
 import { ArenaIcon } from '../../../components/shared/icons';
 import { useClock } from '../../../hooks/useClock';
+import { useRequireAuth } from '../../../hooks/useRequireAuth';
 import { useArenaBackup } from '../../../hooks/useArenaBackup';
 import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
 import { useRoomTyping } from '../../../hooks/useRoomTyping';
@@ -52,6 +56,7 @@ import {
   fetchRoomPresence,
   fetchRoomPulse,
   fetchTopicRooms,
+  watchRoom,
   type ArenaAuthor,
   type ArenaEvidence,
   type ArenaMessage,
@@ -119,6 +124,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   const { roomId: raw } = useLocalSearchParams<{ roomId: string | string[] }>();
   const roomId = Array.isArray(raw) ? raw[0] : raw;
   const router = useRouter();
+  const requireAuth = useRequireAuth();
   const insets = useSafeAreaInsets();
   const t = useThemeColors();
   const now = useClock(1_000);
@@ -224,8 +230,9 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   });
 
   const notify = React.useCallback(
-    (message: string) => dispatch(showNotice(message)),
-    [dispatch],
+    (message: string) => dispatch(showNotice(room?.roomMode === 'DUEL'
+      ? 'That action could not be completed. Please try again.' : message)),
+    [dispatch, room?.roomMode],
   );
 
   const backup = useArenaBackup(roomId);
@@ -366,7 +373,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   }, [roomId]);
 
   React.useEffect(() => {
-    if (!room) return;
+    if (!room || room.roomMode === 'DUEL') return;
     void loadPulse();
     const interval =
       room.viewer?.role === 'spectator' ? PULSE_REFRESH_MS_SPECTATOR : PULSE_REFRESH_MS_DEBATER;
@@ -458,10 +465,11 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
 
   const storyEvent = phaseBanner ?? backupBanner;
 
-  const accepting = room?.status === 'OPEN' || room?.status === 'FINAL_ARGUMENTS';
+  const accepting = room?.duel ? duelPresentation(room.duel, room.phase).canPublish
+    : room?.status === 'OPEN' || room?.status === 'FINAL_ARGUMENTS';
   const settled = room?.status === 'SETTLED';
   const judging = room?.status === 'JUDGING';
-  const isDuel = room?.roomMode === 'DUEL';
+  const isDuel = room ? isCanonicalDuel(room) : false;
   const isDebater = isDuel
     ? room?.duel?.viewerRelationship === 'fighter_a' || room?.duel?.viewerRelationship === 'fighter_b'
     : room?.viewer?.role === 'debater';
@@ -578,7 +586,8 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
   if (loading && !room) {
     return (
       <View style={[styles.root, { backgroundColor: t.background }]}>
-        <LiveRoomSkeleton paddingTop={insets.top} />
+        <Text accessibilityLiveRegion="polite" style={{ color: t.textSecondary, paddingTop: insets.top }}>Loading Arena room…</Text>
+        <LiveRoomSkeleton paddingTop={0} />
         <Notice offset={0} />
       </View>
     );
@@ -590,10 +599,14 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
         <EmptyState
           icon={ArenaIcon}
           title="Room unavailable"
-          body={error ?? 'This Arena room may have closed or is not open to you.'}
+          body="This Arena room is temporarily unavailable, or is not open to you."
           actionLabel="BACK TO ARENA"
           onAction={() => router.replace('/(tabs)')}
         />
+        <Pressable accessibilityRole="button" accessibilityLabel="Retry opening this Arena room" disabled={refreshing}
+          onPress={() => void refresh()} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: t.textPrimary }}>Retry</Text>
+        </Pressable>
         <Notice offset={0} />
       </View>
     );
@@ -693,7 +706,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                   media_type: argument.gif ? 'gif' : (argument.media?.kind ?? 'none'),
                 });
                 void loadPresence();
-                void loadPulse();
+                if (!isDuel) void loadPulse();
               }
               return ok;
             }}
@@ -705,6 +718,27 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
     }
     return null;
   })();
+
+  if (isDuel && room.duel) return <View style={[styles.root, { backgroundColor: t.background }]}>
+    <DuelRoomExperience key={room.roomId} room={room} messages={messages} evidence={evidence}
+      paddingTop={insets.top} paddingBottom={insets.bottom} spectatorCount={backup.load?.spectatorCount ?? null}
+      loading={loading} refreshing={refreshing} loadingOlder={loadingOlder} hasOlder={hasOlder} threadLocked={threadLocked} error={error}
+      composer={bottom} onRefresh={refresh} onLoadOlder={loadOlder}
+      onWatch={async () => { if (!requireAuth()) return; await watchRoom(room.roomId); await refresh(); }}
+      onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
+      onReturn={() => router.replace('/(tabs)')}
+      onJudge={async side => { await submitJudgement(room.duel!.clashId, side); await refresh(); }}
+      onReply={message => { setReplyTo(message); setComposerFocus(n => n + 1); }}
+      onExpressiveReply={(message, mode) => { setReplyTo(message); setExpressiveTab(mode === 'gif' ? 'gifs' : mode === 'meme' ? 'memes' : 'stickers'); setComposerFocus(n => n + 1); }}
+      onReact={(message, emoji) => { void react(message.id, emoji); }} onOpenProfile={openProfile}
+      onMarkEvidence={item => { void markUseful(item.id); }}
+      onReport={message => { if (message.author) setSafety({ user: asUser(message.author), report: { kind: 'arena_room_message', id: message.id } }); }}
+      onReportEvidence={item => { if (item.author) setSafety({ user: asUser(item.author), report: { kind: 'arena_room_evidence', id: item.id } }); }} />
+    <EvidenceComposerSheet visible={proofOpen} onClose={() => setProofOpen(false)} onSubmit={addEvidence} onError={notify} />
+    <PostActionsSheet visible={safety !== null} target={safety?.user ?? null} isSelf={safety?.user.id === state.viewer.id}
+      following={false} reportTarget={safety?.report ?? null} onClose={() => setSafety(null)} onMutated={() => void refresh()} />
+    <Notice offset={0} />
+  </View>;
 
   const jumpToLatest = (): void => {
     hapticTap();

@@ -32,3 +32,22 @@ test('duplicate fighter identities and invalid verdicts are rejected', () => {
   assert.throws(() => parseArenaDuelRoom({ ...fixture(), duel: { ...fixture().duel,
     status: 'settled', mayJudge: false, verdict: { winnerSide: 'AGREE', jurySize: 2, verdictLabel: 'bad' } } }));
 });
+test('existing source and counter-position pass through without invented summaries', () => {
+  const p = { ...fixture(), duel: { ...fixture().duel, sideAText: 'Original Take', sideBText: 'Accepted counter-position', fighterA: { id: 'a', name: 'A', handle: 'a', tint: '#aaa' } } };
+  assert.equal(parseArenaDuelRoom(p).duel?.sourceText, 'Original Take');
+  assert.equal(parseArenaDuelRoom(p).duel?.counterPosition, 'Accepted counter-position');
+  assert.equal(parseArenaDuelRoom(p).duel?.fighterA.tint, '#aaa');
+  assert.throws(() => parseArenaDuelRoom({ ...p, duel: { ...p.duel, sideBText: { text: 'forged' } } }));
+});
+test('older Phase 1 payloads have no fabricated positions or score split', () => {
+  const d = parseArenaDuelRoom(fixture()).duel!;
+  assert.equal(d.sourceText, ''); assert.equal(d.counterPosition, '');
+});
+test('settled ballot split must be a complete, nonnegative canonical jury tally', () => {
+  const p = { ...fixture(), duel: { ...fixture().duel, status: 'settled', mayJudge: false,
+    verdict: { winnerSide: 'A', verdictLabel: 'STRONG', jurySize: 3, sideAScore: 2, sideBScore: 1 } } };
+  assert.equal(parseArenaDuelRoom(p).duel?.verdict?.sideBScore, 1);
+  for (const split of [{ sideAScore: 4 }, { sideAScore: -1 }, { sideAScore: 1.5 }, { sideBScore: undefined }]) {
+    assert.throws(() => parseArenaDuelRoom({ ...p, duel: { ...p.duel, verdict: { ...p.duel.verdict, ...split } } }));
+  }
+});

@@ -12,6 +12,7 @@ export interface MessageExpressiveSheetProps {
   onReply: () => void;
   onExpressive: (mode: ExpressiveReplyMode) => void;
   onReport?: () => void;
+  canReply?: boolean;
 }
 
 export function MessageExpressiveSheet({
@@ -20,6 +21,7 @@ export function MessageExpressiveSheet({
   onReply,
   onExpressive,
   onReport,
+  canReply = true,
 }: MessageExpressiveSheetProps): React.JSX.Element {
   const t = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -34,10 +36,12 @@ export function MessageExpressiveSheet({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Dismiss" />
       <View style={[styles.sheet, { backgroundColor: t.surfaceElevated, paddingBottom: insets.bottom + space.md }]}>
-        <Action label="Reply" onPress={() => { hapticTap(); onClose(); onReply(); }} />
-        <Action label="Meme" hint="Image or trending" onPress={() => pick('meme')} />
-        <Action label="GIF" onPress={() => pick('gif')} />
-        <Action label="Sticker" onPress={() => pick('sticker')} />
+        {canReply && <>
+          <Action label="Reply" onPress={() => { hapticTap(); onClose(); onReply(); }} />
+          <Action label="Meme" hint="Image or trending" onPress={() => pick('meme')} />
+          <Action label="GIF" onPress={() => pick('gif')} />
+          <Action label="Sticker" onPress={() => pick('sticker')} />
+        </>}
         {onReport ? (
           <Action label="Report" destructive onPress={() => { hapticTap(); onClose(); onReport(); }} />
         ) : null}
