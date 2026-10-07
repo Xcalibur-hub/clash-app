@@ -1,6 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { duelEmptyText, duelEvidence, duelFighterSide, duelPresentation, duelResultTitle, duelTimestamp, duelTranscript, isCanonicalDuel } from './duelPresentation.ts';
+import {
+  duelActiveSpeakers,
+  duelCurrentArguments,
+  duelEmptyText,
+  duelEvidence,
+  duelFighterSide,
+  duelPresentation,
+  duelResultTitle,
+  duelTimestamp,
+  duelTranscript,
+  isCanonicalDuel,
+} from './duelPresentation.ts';
 import { parseArenaDuelRoom } from './arenaDuelPayload.ts';
 import { removeUnavailableMessages } from './liveRoomThread.ts';
 import type { ArenaDuel } from './arenaDuelPayload';
@@ -25,6 +36,23 @@ test('specialized screen requires both marker and matching canonical link', () =
 test('fighter identities do not depend on arrival or participant ordering', () => {
   assert.equal(duelFighterSide(duel(), 'challenger'), 'B'); assert.equal(duelFighterSide(duel(), 'author'), 'A');
   assert.equal(duelFighterSide(duel(), 'spectator'), null); assert.equal(duelFighterSide(duel(), null), null);
+});
+test('exactly two active speakers — invited users never become Fighter C', () => {
+  const speakers = duelActiveSpeakers(duel());
+  assert.equal(speakers.length, 2);
+  assert.equal(speakers[0].id, 'author');
+  assert.equal(speakers[1].id, 'challenger');
+});
+test('Stage shows only the latest official argument per side', () => {
+  const rows = [
+    message('a1', 'author', 10),
+    message('b1', 'challenger', 20),
+    message('crowd', 'spectator', 25),
+    message('a2', 'author', 30),
+  ];
+  const current = duelCurrentArguments(duel(), rows);
+  assert.equal(current.a?.id, 'a2');
+  assert.equal(current.b?.id, 'b1');
 });
 test('fighter role cannot self-judge even if a permission flag is stale', () => {
   for (const viewerRelationship of ['fighter_a','fighter_b'] as const) {

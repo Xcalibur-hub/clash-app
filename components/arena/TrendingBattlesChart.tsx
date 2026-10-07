@@ -117,11 +117,13 @@ export function TrendingBattlesChart({
   }, [battles, hasLines, xFor]);
 
   const labelYs = React.useMemo(() => {
+    // Topic labels live on the graph (editorial race), not a separate Top 10 list.
+    // Prefer selected + top ranks; include more when density allows.
     const seeds: { id: string; y: number }[] = [];
     for (const battle of battles) {
       const selected = battle.topicId === selectedId;
-      const top3 = battle.rank <= 3;
-      if (!selected && !top3) continue;
+      const labeled = selected || battle.rank <= 6;
+      if (!labeled) continue;
       const last = battle.series[battle.series.length - 1];
       const markerRank = last ? last.v : battle.rank;
       seeds.push({ id: battle.topicId, y: trendRaceRankY(markerRank, H) });
@@ -233,6 +235,7 @@ export function TrendingBattlesChart({
           {battles.map((battle) => {
             const selected = battle.topicId === selectedId;
             const top3 = battle.rank <= 3;
+            const labeled = selected || battle.rank <= 6;
             const accent = trendRaceLineAccent({
               rank: battle.rank,
               selected,
@@ -241,14 +244,14 @@ export function TrendingBattlesChart({
             });
             const pathD = pathsById.get(battle.topicId) ?? '';
             const canDrawLine = pathD.length > 0;
-            const opacity = selected ? 1 : top3 ? 0.92 : 0.32;
-            const strokeW = selected ? 3 : top3 ? 2.35 : 1.2;
+            const opacity = selected ? 1 : top3 ? 0.92 : labeled ? 0.55 : 0.28;
+            const strokeW = selected ? 3 : top3 ? 2.35 : labeled ? 1.6 : 1.1;
             const last = battle.series[battle.series.length - 1];
             const markerRank = last ? last.v : battle.rank;
             const endX = last ? xFor(last.t) : width - PAD.right;
             const endY = trendRaceRankY(markerRank, H);
             const labelY = labelYs.get(battle.topicId) ?? endY;
-            const showLabel = selected || top3;
+            const showLabel = labeled;
             const stroke = accent?.ink ?? t.textMuted;
             const labelFill = accent?.ink ?? (selected ? t.textPrimary : t.textSecondary);
 

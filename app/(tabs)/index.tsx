@@ -5,6 +5,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
+import { ArenaSideRail } from '../../components/arena/ArenaSideRail';
+import { ArenaClashes } from '../../components/arena/ArenaClashes';
+import { ArenaCommunity } from '../../components/arena/ArenaCommunity';
+import { ArenaTopics } from '../../components/arena/ArenaTopics';
 import { ArenaTopicDeck } from '../../components/liveArena/ArenaTopicDeck';
 import { ArenaAtmosphere } from '../../components/liveArena/ArenaAtmosphere';
 import { ArenaEntrance } from '../../components/liveArena/ArenaEntrance';
@@ -43,6 +47,7 @@ import {
 } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { DEFAULT_ARENA_MODE, type ArenaMode } from '../../utils/arenaNav';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 
@@ -69,6 +74,7 @@ export default function ArenaScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const theme = useThemeColors();
 
+  const [arenaMode, setArenaMode] = React.useState<ArenaMode>(DEFAULT_ARENA_MODE);
   const [scope, setScope] = React.useState<FeedScope>('for-you');
   const [followingIds, setFollowingIds] = React.useState<ReadonlySet<string> | null>(null);
   const [followingError, setFollowingError] = React.useState(false);
@@ -331,8 +337,37 @@ export default function ArenaScreen(): React.JSX.Element {
 
   const heroTopic = liveTopics[0] ?? null;
 
-  const header = React.useMemo(
-    () => (
+  const header = React.useMemo(() => {
+    if (arenaMode === 'clashes') {
+      return (
+        <ArenaClashes
+          topics={liveTopics}
+          onEnter={(topic) => {
+            if (topic.viewerRoomId) openRoom(topic.viewerRoomId);
+            else openTopic(topic.id);
+          }}
+          onWatch={(topic) => openTopic(topic.id)}
+        />
+      );
+    }
+    if (arenaMode === 'community') {
+      return <ArenaCommunity onParticipate={() => setArenaMode('for_you')} />;
+    }
+    if (arenaMode === 'topics') {
+      return <ArenaTopics />;
+    }
+    if (arenaMode === 'trending') {
+      return (
+        <View style={styles.hero}>
+          <TrendingBattlesSection
+            refreshToken={refreshKey}
+            onEnter={openTrendingBattle}
+          />
+        </View>
+      );
+    }
+
+    return (
       <View style={styles.hero}>
         {heroTopic ? (
           <LiveClashHero
@@ -344,11 +379,6 @@ export default function ArenaScreen(): React.JSX.Element {
             }}
           />
         ) : null}
-
-        <TrendingBattlesSection
-          refreshToken={refreshKey}
-          onEnter={openTrendingBattle}
-        />
 
         {liveTopics.length > 0 ? (
           <ArenaTopicDeck
@@ -391,33 +421,33 @@ export default function ArenaScreen(): React.JSX.Element {
             Your Feed
           </Text>
           <Text style={[styles.feedSub, { color: theme.textMuted }]}>
-            Takes from across CLASH
+            Takes from interests, follows, and discovery
           </Text>
           <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         </View>
       </View>
-    ),
-    [
-      dispatch,
-      freshItems,
-      heroTopic,
-      liveTopics,
-      now,
-      openClash,
-      openDetail,
-      openMenu,
-      openRoom,
-      openTopic,
-      openTrendingBattle,
-      refreshKey,
-      requireAuth,
-      scope,
-      shareTake,
-      theme.textPrimary,
-      theme.textMuted,
-      toggleReaction,
-    ],
-  );
+    );
+  }, [
+    arenaMode,
+    dispatch,
+    freshItems,
+    heroTopic,
+    liveTopics,
+    now,
+    openClash,
+    openDetail,
+    openMenu,
+    openRoom,
+    openTopic,
+    openTrendingBattle,
+    refreshKey,
+    requireAuth,
+    scope,
+    shareTake,
+    theme.textPrimary,
+    theme.textMuted,
+    toggleReaction,
+  ]);
 
   const empty = React.useMemo(() => {
     if (state.arenaStatus === 'loading') {
@@ -491,7 +521,12 @@ export default function ArenaScreen(): React.JSX.Element {
 
   // Cold-start failure: no mock content underneath — only the error empty state.
   // Featured hero Takes are filtered out so they don't duplicate under Fresh Takes.
-  const listData = state.arenaStatus === 'error' || state.arenaStatus === 'loading' ? [] : listFeed;
+  // Non-feed Arena modes use header-only surfaces (no Take FlatList rows).
+  const feedMode = arenaMode === 'for_you';
+  const listData =
+    !feedMode || state.arenaStatus === 'error' || state.arenaStatus === 'loading'
+      ? []
+      : listFeed;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -502,7 +537,7 @@ export default function ArenaScreen(): React.JSX.Element {
         keyExtractor={(take) => take.id}
         renderItem={renderItem}
         ListHeaderComponent={header}
-        ListEmptyComponent={empty}
+        ListEmptyComponent={feedMode ? empty : null}
         contentContainerStyle={[styles.list, { paddingBottom: dockBottomPadding(insets.bottom) }]}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
@@ -513,6 +548,11 @@ export default function ArenaScreen(): React.JSX.Element {
         maxToRenderPerBatch={8}
         windowSize={9}
         style={[styles.listLayer, entrance && styles.listDimmed]}
+      />
+      <ArenaSideRail
+        mode={arenaMode}
+        onChange={setArenaMode}
+        bottomOffset={dockBottomPadding(insets.bottom) + 24}
       />
       <PostActionsSheet
         visible={menu !== null}

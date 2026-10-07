@@ -61,3 +61,27 @@ export function duelEmptyText(duel: ArenaDuel, phase: ArenaPhase, kind: 'transcr
   if (phase === 'scheduled') return 'The transcript will begin when the Clash opens.';
   return 'THE FLOOR IS OPEN\n\nWaiting for the first argument.';
 }
+
+/** Exactly two official active speakers — Side A and Side B. Invited users never become Fighter C. */
+export function duelActiveSpeakers(duel: ArenaDuel): readonly [ArenaDuel['fighterA'], ArenaDuel['fighterB']] {
+  return [duel.fighterA, duel.fighterB];
+}
+
+/** Latest official argument per side for the Stage — not the full history. */
+export function duelCurrentArguments(
+  duel: ArenaDuel,
+  messages: readonly ArenaMessage[],
+): { a: ArenaMessage | null; b: ArenaMessage | null } {
+  const transcript = duelTranscript(duel, messages);
+  let a: ArenaMessage | null = null;
+  let b: ArenaMessage | null = null;
+  for (let i = transcript.length - 1; i >= 0; i -= 1) {
+    const message = transcript[i]!;
+    if (message.kind === 'system') continue;
+    const side = duelFighterSide(duel, message.author?.id);
+    if (side === 'A' && !a) a = message;
+    if (side === 'B' && !b) b = message;
+    if (a && b) break;
+  }
+  return { a, b };
+}

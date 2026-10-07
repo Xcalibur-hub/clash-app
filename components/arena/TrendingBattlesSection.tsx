@@ -3,7 +3,7 @@
  * Server snapshots + 45s client refresh while focused. Hides on hard failure.
  */
 import React from 'react';
-import { AppState, type AppStateStatus, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, type AppStateStatus, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { analytics } from '../../services/analytics';
 import {
@@ -18,6 +18,8 @@ import { momentumLabel } from '../../utils/arenaTrendScore';
 import { tap as hapticTap } from '../../utils/haptics';
 import { VaultActionButton } from '../vault/VaultActionButton';
 import { TrendingBattlesChart } from './TrendingBattlesChart';
+
+/** Trending topics live on the graph — never a duplicate numbered list underneath. */
 
 export interface TrendingBattlesSectionProps {
   onEnter: (battle: ArenaTrendingBattle) => void;
@@ -160,7 +162,11 @@ export function TrendingBattlesSection({
         </Text>
       ) : null}
 
-      <View style={styles.preview}>
+      {/* Selected topic detail — graph labels are the ranking UI; no duplicate Top 10 list. */}
+      <View
+        style={styles.preview}
+        accessibilityLabel={`Selected topic rank ${selected.rank}. ${selected.title}`}
+      >
         <Text
           allowFontScaling={false}
           style={[
@@ -192,84 +198,6 @@ export function TrendingBattlesSection({
             {selected.participantCount > 0 ? ` · ${selected.participantCount} here` : ''}
           </Text>
         </View>
-      </View>
-
-      <View style={styles.list}>
-        {battles.map((battle) => {
-          const activeRow = battle.topicId === selected.topicId;
-          const rowAccent = trendRaceLineAccent({
-            rank: battle.rank,
-            selected: activeRow,
-            topicId: battle.topicId,
-            scheme: t.scheme,
-          });
-          return (
-            <Pressable
-              key={battle.topicId}
-              onPress={() => selectTopic(battle.topicId)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: activeRow }}
-              accessibilityLabel={`Rank ${battle.rank}. ${battle.title}. ${formatRankDelta(battle.rankDeltaKind, battle.rankDelta)}. ${momentumLabel(battle.momentum)}`}
-              style={[
-                styles.row,
-                {
-                  backgroundColor: activeRow
-                    ? (rowAccent?.soft ?? t.surfaceMuted)
-                    : 'transparent',
-                  borderColor: activeRow ? (rowAccent?.ink ?? t.border) : 'transparent',
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.rowMark,
-                  {
-                    backgroundColor: activeRow
-                      ? (rowAccent?.ink ?? t.textMuted)
-                      : battle.rank <= 3
-                        ? (rowAccent?.ink ?? t.textMuted)
-                        : 'transparent',
-                  },
-                ]}
-              />
-              <Text
-                allowFontScaling={false}
-                style={[
-                  styles.rank,
-                  {
-                    color:
-                      battle.rank <= 3 || activeRow
-                        ? (rowAccent?.ink ?? t.textMuted)
-                        : t.textMuted,
-                  },
-                ]}
-              >
-                {battle.rank}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[styles.rowTitle, { color: t.textPrimary }]}
-                numberOfLines={2}
-              >
-                {battle.title}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[
-                  styles.delta,
-                  {
-                    color:
-                      activeRow || battle.rank <= 3
-                        ? (rowAccent?.ink ?? t.textSecondary)
-                        : t.textSecondary,
-                  },
-                ]}
-              >
-                {formatRankDelta(battle.rankDeltaKind, battle.rankDelta)}
-              </Text>
-            </Pressable>
-          );
-        })}
       </View>
 
       <VaultActionButton
@@ -348,35 +276,4 @@ const styles = StyleSheet.create({
   previewCopy: { flex: 1, gap: 2 },
   previewTitle: { ...typeScale.label, fontSize: 15, fontWeight: '800', lineHeight: 19 },
   previewMeta: { ...typeScale.caption, fontSize: 11, fontWeight: '600' },
-  list: { gap: 0, marginTop: 2 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    paddingVertical: 9,
-    paddingHorizontal: space.sm,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  rowMark: {
-    width: 3,
-    alignSelf: 'stretch',
-    borderRadius: 2,
-    marginVertical: 2,
-  },
-  rank: {
-    ...typeScale.dataLg,
-    fontSize: 14,
-    fontWeight: '800',
-    width: 22,
-    textAlign: 'center',
-  },
-  rowTitle: { ...typeScale.label, fontSize: 14, fontWeight: '700', lineHeight: 18, flex: 1 },
-  delta: {
-    ...typeScale.caption,
-    fontSize: 12,
-    fontWeight: '800',
-    minWidth: 36,
-    textAlign: 'right',
-  },
 });

@@ -33,7 +33,7 @@ Module._load = function(request, parent, isMain) {
   if (request === 'react-native-reanimated') return {
     __esModule: true,
     default: { View: RN.View, Text: RN.Text, createAnimatedComponent: (c) => c },
-    FadeIn: fade, FadeInDown: fade, ZoomIn: fade, SlideInLeft: fade, SlideInRight: fade,
+    FadeIn: fade, FadeInDown: fade, FadeOut: fade, ZoomIn: fade, SlideInLeft: fade, SlideInRight: fade,
     Extrapolation: { CLAMP: 'clamp' },
     Easing: { inOut: (e) => e, out: (e) => e, sin: {}, quad: {}, cubic: {}, back: () => ({}) },
     useReducedMotion: () => true,
@@ -104,13 +104,26 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   RN.AppRegistry.registerComponent(name, () => () => React.createElement(RN.View, { style: { height: 844, width: 390 } }, React.createElement(DuelRoomExperience, { ...base, ...overrides })));
   const { element, getStyleElement } = RN.AppRegistry.getApplication(name);
   const html = renderToStaticMarkup(element);
-  assert.match(html, /Kevin/); assert.match(html, /Rohan/); assert.match(html, /Arguments|Transcript/); assert.doesNotMatch(html, /SECRET HIDDEN CITATION|permission denied for table|999/);
-  if (name === 'spectator') {
-    assert.match(html, /WATCHING/);
-    assert.match(html, /Crowd/);
-    assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat/);
+  assert.doesNotMatch(html, /SECRET HIDDEN CITATION|permission denied for table|999/);
+  // Stadium: no permanent Arguments|Crowd|Evidence tab bar.
+  assert.doesNotMatch(html, /Clash content/);
+  if (name !== 'error' && name !== 'loading' && name !== 'locked') {
+    assert.match(html, /Kevin/);
+    assert.match(html, /Rohan/);
   }
-  if (name === 'fighter') { assert.match(html, /FIGHTER A|Fighter A/); assert.match(html, /Fighter composer/); assert.match(html, /Reply to this argument/); }
+  if (name === 'spectator') {
+    assert.match(html, /WATCHING|Clash stage|LIVE/);
+    assert.match(html, /CROWD|Live crowd/);
+    assert.match(html, /BACK KEVIN|Back Kevin|BACKING|View argument history/i);
+    assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat|52%|48%/);
+    // Current Stage arguments — not a mixed Crowd chronology.
+    assert.match(html, /Automation is already handling routine coding tasks/);
+    assert.match(html, /integration, validation and judgement still need people/);
+  }
+  if (name === 'fighter') {
+    assert.match(html, /FIGHTER A|Fighter A|YOU'RE FIGHTING/);
+    assert.match(html, /Fighter composer/);
+  }
   if (name === 'judging') assert.match(html, /Judge Kevin, Fighter A, made the stronger case/);
   if (name === 'draw') { assert.match(html, /Draw|VERDICT/); assert.match(html, /50%/); assert.match(html, /4 judgment/); }
   if (name === 'cancelled') assert.match(html, /Clash cancelled/);
