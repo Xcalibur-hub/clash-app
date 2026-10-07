@@ -1,10 +1,9 @@
 /**
- * Crowd shell — thin re-export of CrowdStreamShell for existing smoke/tests.
- * Prefer CrowdStreamShell in Stadium layouts.
+ * Crowd shell — thin re-export of LiveCrowdLayer for existing smoke/tests.
  */
 import React from 'react';
-import { CrowdStreamShell } from './CrowdStreamShell';
+import { LiveCrowdLayer } from './LiveCrowdLayer';
 
 export function CrowdShell(): React.JSX.Element {
-  return <CrowdStreamShell />;
+  return <LiveCrowdLayer />;
 }

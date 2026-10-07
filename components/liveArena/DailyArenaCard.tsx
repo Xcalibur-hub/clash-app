@@ -107,11 +107,11 @@ export function DailyArenaCard({
                 onEnter();
               }}
               accessibilityRole="button"
-              accessibilityLabel={settled ? 'See the verdict' : 'Enter your room'}
+              accessibilityLabel={settled ? 'See the verdict' : 'Enter Clash'}
               style={[styles.primary, { backgroundColor: t.pill }]}
             >
               <Text allowFontScaling={false} style={[styles.primaryText, { color: t.pillText }]}>
-                {settled ? 'See the verdict' : 'Enter your room'}
+                {settled ? 'See the verdict' : 'Enter Clash'}
               </Text>
             </Pressable>
           </View>

@@ -1,5 +1,5 @@
 /**
- * Contextual Clash overflow — report / rules / share.
+ * Contextual Clash overflow — history / rules / share / report.
  * Keeps secondary actions off the permanent Stage chrome.
  */
 import React from 'react';
@@ -9,6 +9,7 @@ import { layout, space, typeScale, useThemeColors } from '../../theme';
 export interface ClashMoreSheetProps {
   visible: boolean;
   onClose: () => void;
+  onArgumentHistory?: () => void;
   onShare?: () => void;
   onReport?: () => void;
 }
@@ -16,6 +17,7 @@ export interface ClashMoreSheetProps {
 export function ClashMoreSheet({
   visible,
   onClose,
+  onArgumentHistory,
   onShare,
   onReport,
 }: ClashMoreSheetProps): React.JSX.Element {
@@ -23,8 +25,17 @@ export function ClashMoreSheet({
 
   const rows: { label: string; onPress?: () => void; hint?: string }[] = [
     {
+      label: 'Argument history',
+      onPress: onArgumentHistory
+        ? () => {
+            onClose();
+            onArgumentHistory();
+          }
+        : undefined,
+    },
+    {
       label: 'Rules',
-      hint: 'Exactly two active speakers. Crowd never decides the verdict.',
+      hint: 'Exactly two active speakers. Crowd never decides the verdict. Backing is not judgement.',
     },
     { label: 'Share', onPress: onShare },
     { label: 'Report', onPress: onReport },
@@ -41,8 +52,8 @@ export function ClashMoreSheet({
               accessibilityLabel={row.label}
               disabled={!row.onPress && !row.hint}
               onPress={() => {
-                row.onPress?.();
-                onClose();
+                if (row.onPress) row.onPress();
+                else onClose();
               }}
               style={styles.row}
             >

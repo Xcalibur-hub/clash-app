@@ -1,6 +1,6 @@
 /**
- * Canonical Duel room — Stadium / Stage architecture.
- * Official arguments stay on Stage; Crowd is a separate live stream.
+ * Canonical Duel — immersive full-screen Clash event.
+ * Official arguments on Stage; Crowd is a separate live layer.
  * No permanent Arguments | Crowd | Evidence tab bar.
  */
 import React from 'react';
@@ -18,11 +18,11 @@ import type { ArenaEvidence, ArenaMessage, ArenaRoom } from '../../services/live
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { duelAtmosphereMood } from '../../utils/arenaAtmosphere';
 import {
-  duelCurrentArguments,
+  duelLatestMoment,
   duelPresentation,
   duelTranscript,
 } from '../../utils/duelPresentation';
-import { press as hapticPress } from '../../utils/haptics';
+import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { BackIcon } from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
 import { ArenaAtmosphere } from './ArenaAtmosphere';
@@ -31,7 +31,7 @@ import { ClashMoreSheet } from './ClashMoreSheet';
 import { DuelDevPanel } from './DuelDevPanel';
 import { DuelEntrance } from './DuelEntrance';
 import { DuelRoomOutcome } from './DuelRoomOutcome';
-import { LiveClashStadium } from './LiveClashStadium';
+import { ImmersiveClash } from './ImmersiveClash';
 import { softFill } from './liveArenaStyles';
 import type { LiveRoomMessageProps } from './LiveRoomMessage';
 
@@ -80,7 +80,7 @@ function DuelLoadingBones(): React.JSX.Element {
   );
 }
 
-/** Duel specialization over the existing Room stream; no new subscriptions or writes. */
+/** Duel specialization — immersive Clash canvas; no new subscriptions or writes. */
 export function DuelRoomExperience(props: Props): React.JSX.Element {
   const { room, messages } = props;
   const duel = room.duel!;
@@ -94,13 +94,14 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const [entrance, setEntrance] = React.useState(true);
   const [keyboardOpen, setKeyboardOpen] = React.useState(false);
   const joining = React.useRef(false);
+  const lastMomentId = React.useRef<string | null>(null);
 
   const transcript = React.useMemo(
     () => duelTranscript(duel, messages),
     [duel, messages],
   );
-  const current = React.useMemo(
-    () => duelCurrentArguments(duel, messages),
+  const moment = React.useMemo(
+    () => duelLatestMoment(duel, messages),
     [duel, messages],
   );
 
@@ -125,6 +126,14 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       hide.remove();
     };
   }, []);
+
+  React.useEffect(() => {
+    const id = moment.message?.id ?? null;
+    if (id && lastMomentId.current && lastMomentId.current !== id && live) {
+      hapticTap();
+    }
+    lastMomentId.current = id;
+  }, [live, moment.message?.id]);
 
   const canBack =
     !presentation.side &&
@@ -161,8 +170,8 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>Watch this Clash</Text>
           <Text style={[styles.emptyBody, { color: t.textSecondary }]}>
             {duel.status === 'open' && room.phase !== 'closed'
-              ? 'Enter as a spectator to read the transcript. Watching does not make you a fighter.'
-              : 'This transcript is available to Room members.'}
+              ? 'Enter as a spectator to follow the Clash. Watching does not make you a fighter.'
+              : 'This Clash is available to members.'}
           </Text>
           {duel.status === 'open' && room.phase !== 'closed' ? (
             <PressableScale
@@ -255,33 +264,23 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       <ArenaAtmosphere
         mood={atmosphereMood}
         energy={
-          judgingFocus ? 0.08 : live ? 0.42 : atmosphereMood === 'verdict' ? 0.3 : 0.2
+          judgingFocus ? 0.08 : live ? 0.38 : atmosphereMood === 'verdict' ? 0.28 : 0.18
         }
       />
-      <View style={[styles.top, styles.layer, { paddingTop: props.paddingTop }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          style={styles.backHit}
-          onPress={props.onBack}
-        >
-          <BackIcon size={20} color={t.textPrimary} />
-        </Pressable>
-        <View style={styles.topSpacer} />
-      </View>
 
       <KeyboardAvoidingView
         style={[styles.root, styles.layer]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <LiveClashStadium
+        <ImmersiveClash
           duel={duel}
           proposition={proposition}
           live={live}
           statusLabel={statusLabel}
           spectatorCount={props.spectatorCount}
-          argumentA={current.a}
-          argumentB={current.b}
+          focusSide={moment.side}
+          latestMessage={moment.message}
+          paddingTop={props.paddingTop}
           judgingFocus={judgingFocus || Boolean(duel.verdict)}
           condensed={keyboardOpen && presentation.canPublish}
           backingSide={backingSide}
@@ -289,6 +288,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
             setBackingSide((prev) => (prev === side ? null : side))
           }
           canBack={canBack}
+          onBack={props.onBack}
           onOpenProfile={props.onOpenProfile}
           onViewHistory={() => setHistoryOpen(true)}
           onMore={() => setMoreOpen(true)}
@@ -298,31 +298,31 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           }
           stageFooter={
             showOutcome ? (
-              <DuelRoomOutcome
-                key={duel.clashId}
-                duel={duel}
-                phase={room.phase}
-                onJudge={props.onJudge}
-                onReview={() => setHistoryOpen(true)}
-                onReturn={props.onReturn}
-              />
+              <View style={styles.outcome}>
+                <DuelRoomOutcome
+                  key={duel.clashId}
+                  duel={duel}
+                  phase={room.phase}
+                  onJudge={props.onJudge}
+                  onReview={() => setHistoryOpen(true)}
+                  onReturn={props.onReturn}
+                />
+              </View>
+            ) : null
+          }
+          fighterComposer={
+            presentation.canPublish ? (
+              <View
+                style={{
+                  paddingHorizontal: layout.screenX,
+                  paddingBottom: Math.max(props.paddingBottom, space.sm),
+                }}
+              >
+                {props.composer}
+              </View>
             ) : null
           }
         />
-
-        {presentation.canPublish ? (
-          <View
-            style={[
-              styles.bottom,
-              {
-                borderColor: t.border,
-                paddingBottom: Math.max(props.paddingBottom, space.sm),
-              },
-            ]}
-          >
-            {props.composer}
-          </View>
-        ) : null}
       </KeyboardAvoidingView>
 
       <ArgumentHistorySheet
@@ -334,6 +334,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       <ClashMoreSheet
         visible={moreOpen}
         onClose={() => setMoreOpen(false)}
+        onArgumentHistory={() => setHistoryOpen(true)}
         onShare={() => {
           void Share.share({
             message: `CLASH — ${proposition}\n${duel.fighterA.name} vs ${duel.fighterB.name}`,
@@ -342,7 +343,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         onReport={
           props.onReport
             ? () => {
-                const target = current.a ?? current.b;
+                const target = moment.message;
                 if (target) props.onReport?.(target);
               }
             : undefined
@@ -377,7 +378,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
-  topSpacer: { flex: 1 },
   locked: {
     flex: 1,
     paddingHorizontal: layout.screenX,
@@ -415,8 +415,8 @@ const styles = StyleSheet.create({
   bones: { gap: space.sm, width: '100%', paddingTop: space.md },
   boneLine: { height: 14, borderRadius: 6 },
   boneBlock: { height: 72, borderRadius: 8, marginVertical: space.xs },
-  bottom: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+  outcome: {
     paddingHorizontal: layout.screenX,
+    paddingBottom: space.sm,
   },
 });

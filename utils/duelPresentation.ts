@@ -85,3 +85,36 @@ export function duelCurrentArguments(
   }
   return { a, b };
 }
+
+/**
+ * Newest canonical fighter argument — the Stage "moment".
+ * Not typing/turn/timer state (backend does not expose those).
+ */
+export function duelLatestMoment(
+  duel: ArenaDuel,
+  messages: readonly ArenaMessage[],
+): { side: 'A' | 'B' | null; message: ArenaMessage | null } {
+  const transcript = duelTranscript(duel, messages);
+  for (let i = transcript.length - 1; i >= 0; i -= 1) {
+    const message = transcript[i]!;
+    if (message.kind === 'system') continue;
+    const side = duelFighterSide(duel, message.author?.id);
+    if (side) return { side, message };
+  }
+  return { side: null, message: null };
+}
+
+/** Collapse long Stage arguments so the live canvas stays intact. */
+export const DUEL_STAGE_ARGUMENT_PREVIEW = 220;
+
+export function duelArgumentPreview(
+  body: string,
+  limit = DUEL_STAGE_ARGUMENT_PREVIEW,
+): { preview: string; truncated: boolean } {
+  const text = body.trim();
+  if (text.length <= limit) return { preview: text, truncated: false };
+  const cut = text.slice(0, limit);
+  const soft = cut.lastIndexOf(' ');
+  const preview = (soft > limit * 0.55 ? cut.slice(0, soft) : cut).trimEnd();
+  return { preview: `${preview}…`, truncated: true };
+}

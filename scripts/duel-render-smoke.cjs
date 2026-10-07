@@ -112,13 +112,14 @@ for (const [name, overrides] of Object.entries(scenarios)) {
     assert.match(html, /Rohan/);
   }
   if (name === 'spectator') {
-    assert.match(html, /WATCHING|Clash stage|LIVE/);
-    assert.match(html, /CROWD|Live crowd/);
-    assert.match(html, /BACK KEVIN|Back Kevin|BACKING|View argument history/i);
+    assert.match(html, /LIVE|Live Clash/);
+    assert.match(html, /CROWD|Live crowd|Crowd/);
+    assert.match(html, /BACK KEVIN|Back Kevin|BACKING/i);
     assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat|52%|48%/);
-    // Current Stage arguments — not a mixed Crowd chronology.
-    assert.match(html, /Automation is already handling routine coding tasks/);
+    assert.doesNotMatch(html, /Backing supports a side during the Clash/);
+    // Newest moment owns the Stage (Alex/Rohan posted last in fixture).
     assert.match(html, /integration, validation and judgement still need people/);
+    assert.match(html, /— Rohan|Rohan/);
   }
   if (name === 'fighter') {
     assert.match(html, /FIGHTER A|Fighter A|YOU'RE FIGHTING/);
@@ -184,8 +185,10 @@ for (const [name, element] of Object.entries(challengeCases)) {
   }
   if (name === 'challenge-confirmed') assert.match(html, /CONFIRMED|ENTERING ARENA/);
   if (name === 'crowd-shell') {
-    assert.match(html, /CROWD/);
+    assert.match(html, /Crowd|CROWD/);
     assert.doesNotMatch(html, /Send|Post a message|Compose/);
+    assert.doesNotMatch(html, /nah that actually changed my mind/);
+    assert.doesNotMatch(html, /DEV LAYOUT/);
   }
   if (name === 'arena-entrance') assert.match(html, /ARENA/);
   if (name === 'duel-entrance') assert.match(html, /ENTERING ARENA|Kevin|Rohan/);

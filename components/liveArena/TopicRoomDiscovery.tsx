@@ -120,7 +120,7 @@ export function TopicRoomDiscovery({
 
           <View style={styles.ctaRow}>
             <PrimaryCta
-              label={isSpectator ? 'Watch Room' : 'Enter Room'}
+              label={isSpectator ? 'Watch Clash' : 'Enter Clash'}
               onPress={() => onEnterRoom(assigned.roomId)}
               busy={busy}
             />
@@ -232,7 +232,7 @@ export function TopicRoomDiscovery({
           })}
           {isDebater ? (
             <Text allowFontScaling={false} style={[styles.debaterNote, { color: t.textMuted }]}>
-              You’re debating in your assigned room — pick Enter Room above.
+              You’re debating in your assigned Clash — pick Enter Clash above.
             </Text>
           ) : null}
         </View>

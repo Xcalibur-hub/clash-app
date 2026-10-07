@@ -2,10 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   duelActiveSpeakers,
+  duelArgumentPreview,
   duelCurrentArguments,
   duelEmptyText,
   duelEvidence,
   duelFighterSide,
+  duelLatestMoment,
   duelPresentation,
   duelResultTitle,
   duelTimestamp,
@@ -53,6 +55,25 @@ test('Stage shows only the latest official argument per side', () => {
   const current = duelCurrentArguments(duel(), rows);
   assert.equal(current.a?.id, 'a2');
   assert.equal(current.b?.id, 'b1');
+});
+test('newest fighter argument determines Stage focus — crowd never wins the moment', () => {
+  const rows = [
+    message('a1', 'author', 10),
+    message('b1', 'challenger', 20),
+    message('crowd', 'spectator', 99),
+  ];
+  const moment = duelLatestMoment(duel(), rows);
+  assert.equal(moment.side, 'B');
+  assert.equal(moment.message?.id, 'b1');
+  assert.equal(duelLatestMoment(duel(), []).side, null);
+});
+test('long Stage arguments collapse without dropping accessibility to the full text', () => {
+  const long = 'word '.repeat(80).trim();
+  const { preview, truncated } = duelArgumentPreview(long, 40);
+  assert.equal(truncated, true);
+  assert.ok(preview.length < long.length);
+  assert.match(preview, /…$/);
+  assert.deepEqual(duelArgumentPreview('short'), { preview: 'short', truncated: false });
 });
 test('fighter role cannot self-judge even if a permission flag is stale', () => {
   for (const viewerRelationship of ['fighter_a','fighter_b'] as const) {
