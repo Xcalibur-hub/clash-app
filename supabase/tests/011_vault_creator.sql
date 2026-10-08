@@ -297,8 +297,8 @@ select ok((select deleted_at is not null from public.vault_drops where caption =
 select is((select status::text from public.vault_drops where caption = 'Second free drop'), 'removed', 'the status becomes removed');
 
 -- a removed drop is not merely hidden from the feed: it reads as inaccessible
-select is(public.can_access_vault_drop('v-viewer', (select id from public.vault_drops where caption = 'Second free drop')), false, 'a removed drop is inaccessible to others');
-select is(public.can_access_vault_drop('v-creator-a', (select id from public.vault_drops where caption = 'Second free drop')), false, 'even the creator loses access to a tombstoned drop');
+select is(public.can_access_vault_drop_internal('v-viewer', (select id from public.vault_drops where caption = 'Second free drop')), false, 'a removed drop is inaccessible to others');
+select is(public.can_access_vault_drop_internal('v-creator-a', (select id from public.vault_drops where caption = 'Second free drop')), false, 'even the creator loses access to a tombstoned drop');
 
 -- only the owner can remove
 select set_config('role', 'authenticated', true);

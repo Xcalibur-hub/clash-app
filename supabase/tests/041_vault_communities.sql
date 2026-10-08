@@ -79,17 +79,17 @@ values
   ('cc-mod-post', 'cc-cmt-sub', 'cc-maya', 'discussion', 'Moderation target');
 
 -- ── Access predicate ────────────────────────────────────────────────────────
-select is(public.vault_community_viewer_can_access('cc-maya', 'cc-cmt-sub'), true, 'a creator always reaches their own community');
-select is(public.vault_community_viewer_can_access('cc-fan', 'cc-cmt-pub'), true, 'any signed-in user reaches a public community');
-select is(public.vault_community_viewer_can_access(null, 'cc-cmt-pub'), false, 'a guest reaches nothing');
-select is(public.vault_community_viewer_can_access('cc-fan', 'cc-cmt-sub'), true, 'an active subscriber reaches a subscriber community');
-select is(public.vault_community_viewer_can_access('cc-rate', 'cc-cmt-sub'), false, 'a non-subscriber cannot reach a subscriber community');
-select is(public.vault_community_viewer_can_access('cc-fan', 'cc-cmt-fol'), true, 'a follower reaches a follower community');
-select is(public.vault_community_viewer_can_access('cc-rate', 'cc-cmt-fol'), false, 'a non-follower cannot reach a follower community');
-select is(public.vault_community_viewer_can_access('cc-fan', 'cc-cmt-blocked'), false, 'a blocked pair is never permitted');
+select is(public.vault_community_viewer_can_access_internal('cc-maya', 'cc-cmt-sub'), true, 'a creator always reaches their own community');
+select is(public.vault_community_viewer_can_access_internal('cc-fan', 'cc-cmt-pub'), true, 'any signed-in user reaches a public community');
+select is(public.vault_community_viewer_can_access_internal(null, 'cc-cmt-pub'), false, 'a guest reaches nothing');
+select is(public.vault_community_viewer_can_access_internal('cc-fan', 'cc-cmt-sub'), true, 'an active subscriber reaches a subscriber community');
+select is(public.vault_community_viewer_can_access_internal('cc-rate', 'cc-cmt-sub'), false, 'a non-subscriber cannot reach a subscriber community');
+select is(public.vault_community_viewer_can_access_internal('cc-fan', 'cc-cmt-fol'), true, 'a follower reaches a follower community');
+select is(public.vault_community_viewer_can_access_internal('cc-rate', 'cc-cmt-fol'), false, 'a non-follower cannot reach a follower community');
+select is(public.vault_community_viewer_can_access_internal('cc-fan', 'cc-cmt-blocked'), false, 'a blocked pair is never permitted');
 
 -- ── Expired entitlement denies access ───────────────────────────────────────
-select is(public.vault_community_viewer_can_access('cc-expired', 'cc-cmt-sub'), false, 'a lapsed subscription is denied');
+select is(public.vault_community_viewer_can_access_internal('cc-expired', 'cc-cmt-sub'), false, 'a lapsed subscription is denied');
 
 -- ── Writes as the fan (subscriber + follower) ───────────────────────────────
 select set_config('role', 'authenticated', true);

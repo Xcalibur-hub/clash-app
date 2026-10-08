@@ -63,14 +63,14 @@ select lives_ok($$ select public.publish_vault_drop((select id from public.vault
 reset role;
 
 -- ── access: free content ────────────────────────────────────────────────────
-select is(public.can_access_vault_drop(null, (select id from public.vault_drops where caption = 'V2 free drop')), true, 'a guest may read a live free drop');
-select is(public.can_access_vault_drop('v2-stranger', (select id from public.vault_drops where caption = 'V2 free drop')), true, 'a signed-in stranger may read a live free drop');
-select is(public.can_access_vault_drop('v2-creator', (select id from public.vault_drops where caption = 'V2 free drop')), true, 'the creator reads their own free drop');
+select is(public.can_access_vault_drop_internal(null, (select id from public.vault_drops where caption = 'V2 free drop')), true, 'a guest may read a live free drop');
+select is(public.can_access_vault_drop_internal('v2-stranger', (select id from public.vault_drops where caption = 'V2 free drop')), true, 'a signed-in stranger may read a live free drop');
+select is(public.can_access_vault_drop_internal('v2-creator', (select id from public.vault_drops where caption = 'V2 free drop')), true, 'the creator reads their own free drop');
 
 -- ── access: subscriber content ──────────────────────────────────────────────
-select is(public.can_access_vault_drop(null, (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a guest cannot reach subscriber content');
-select is(public.can_access_vault_drop('v2-stranger', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a non-subscriber cannot reach subscriber content');
-select is(public.can_access_vault_drop('v2-creator', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the creator always reaches their own subscriber drop');
+select is(public.can_access_vault_drop_internal(null, (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a guest cannot reach subscriber content');
+select is(public.can_access_vault_drop_internal('v2-stranger', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a non-subscriber cannot reach subscriber content');
+select is(public.can_access_vault_drop_internal('v2-creator', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the creator always reaches their own subscriber drop');
 
 -- ── a normal client cannot award itself an entitlement ──────────────────────
 select set_config('role', 'authenticated', true);
@@ -95,9 +95,9 @@ select lives_ok(
 select is((select count(*)::int from public.vault_subscriptions), 1, 'exactly one entitlement row exists');
 select is((select status::text from public.vault_subscriptions limit 1), 'active', 'the entitlement is active');
 select is((select source::text from public.vault_subscriptions limit 1), 'test', 'the entitlement is stamped as a test grant');
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the subscriber can now read subscriber content');
-select is(public.can_access_vault_drop('v2-stranger', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'another non-subscriber still cannot');
-select is(public.can_access_vault_drop(null, (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a guest still cannot');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the subscriber can now read subscriber content');
+select is(public.can_access_vault_drop_internal('v2-stranger', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'another non-subscriber still cannot');
+select is(public.can_access_vault_drop_internal(null, (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a guest still cannot');
 
 -- granting again renews in place instead of creating a second entitlement
 select lives_ok(
@@ -151,13 +151,13 @@ select lives_ok(
 );
 select is((select status::text from public.vault_subscriptions limit 1), 'cancelled', 'the row is cancelled, not deleted');
 select is((select cancelled_at is not null from public.vault_subscriptions limit 1), true, 'cancelled_at is stamped');
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a cancelled entitlement denies access');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a cancelled entitlement denies access');
 
 select lives_ok(
   $$ select public.vault_grant_test_subscription((select id from public.creator_vaults where creator_id = 'v2-creator'), 'v2-fan', 30) $$,
   'renewing revives access'
 );
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the renewed entitlement works');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the renewed entitlement works');
 select is((select cancelled_at from public.vault_subscriptions limit 1), null, 'renewal clears the cancellation stamp');
 
 -- a lapse denies access immediately — the clock is read, not the status alone
@@ -165,41 +165,41 @@ select is((select cancelled_at from public.vault_subscriptions limit 1), null, '
 update public.vault_subscriptions
    set started_at = now() - interval '60 days',
        current_period_end = now() - interval '1 hour';
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'an expired period denies access before any sweep runs');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'an expired period denies access before any sweep runs');
 select is(public.expire_vault_subscriptions(10), 1, 'the sweep moves the lapsed row to expired');
 select is((select status::text from public.vault_subscriptions limit 1), 'expired', 'the status now agrees with the clock');
 select is(public.expire_vault_subscriptions(10), 0, 'the subscription sweep is idempotent');
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'access stays denied');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'access stays denied');
 
 -- ── blocks close the Vault, in both directions ─────────────────────────────
 select lives_ok(
   $$ select public.vault_grant_test_subscription((select id from public.creator_vaults where creator_id = 'v2-creator'), 'v2-fan', 30) $$,
   're-entitle the fan for the block test'
 );
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the entitled fan reads the drop before any block');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the entitled fan reads the drop before any block');
 
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000402","role":"authenticated"}', true);
 select lives_ok($$ select public.block_profile('v2-creator') $$, 'the subscriber blocks the creator');
 reset role;
 
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a block beats a live entitlement for private content');
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 free drop')), false, 'a block also closes free vault content');
-select is(public.can_access_vault_drop('v2-creator', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the creator still reaches their own content while blocked');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a block beats a live entitlement for private content');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 free drop')), false, 'a block also closes free vault content');
+select is(public.can_access_vault_drop_internal('v2-creator', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the creator still reaches their own content while blocked');
 
 -- the other direction: a creator-side block hides the vault from that viewer
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000401","role":"authenticated"}', true);
 select lives_ok($$ select public.block_profile('v2-blocker') $$, 'the creator blocks a viewer');
 reset role;
-select is(public.can_access_vault_drop('v2-blocker', (select id from public.vault_drops where caption = 'V2 free drop')), false, 'a creator-side block hides the vault from that viewer');
+select is(public.can_access_vault_drop_internal('v2-blocker', (select id from public.vault_drops where caption = 'V2 free drop')), false, 'a creator-side block hides the vault from that viewer');
 
 -- unblocking restores the entitled read
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000402","role":"authenticated"}', true);
 select lives_ok($$ select public.unblock_profile('v2-creator') $$, 'the subscriber unblocks');
 reset role;
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'unblocking restores the entitled read');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'unblocking restores the entitled read');
 
 -- ── RLS: what each role can actually read ───────────────────────────────────
 select set_config('role', 'anon', true);
@@ -240,7 +240,7 @@ select lives_ok(
   'the creator shelves the subscriber drop'
 );
 reset role;
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the entitled subscriber reads it while it is live');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the entitled subscriber reads it while it is live');
 
 -- Age the drop past its window. The database owns published_at/expires_at, so
 -- moving both together is the only way to simulate the clock here.
@@ -248,7 +248,7 @@ update public.vault_drops
    set published_at = now() - interval '8 days', expires_at = now() - interval '1 day'
  where caption = 'V2 subscriber drop';
 
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'a collected drop past its window stays readable — collection permanence');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'a collected drop past its window stays readable — collection permanence');
 select ok(public.expire_vault_drops(10) >= 1, 'the expiry sweep closes the window');
 select is((select status::text from public.vault_drops where caption = 'V2 subscriber drop'), 'expired', 'the drop is now expired');
 select is((select count(*)::int from public.vault_drops where caption = 'V2 subscriber drop'), 1, 'expiry never deletes the row');
@@ -257,9 +257,9 @@ select is((select count(*)::int from public.vault_collection_items i
   join public.vault_collections c on c.id = i.collection_id
  where c.creator_id = 'v2-creator'), 1, 'the collection item survives expiry');
 select is((select count(*)::int from public.vault_collections where creator_id = 'v2-creator'), 1, 'the collection itself survives expiry');
-select is(public.can_access_vault_drop('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the subscriber still reads it through the collection');
-select is(public.can_access_vault_drop('v2-stranger', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a non-subscriber cannot reach it through the collection');
-select is(public.can_access_vault_drop(null, (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a guest cannot reach it through the collection');
+select is(public.can_access_vault_drop_internal('v2-fan', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the subscriber still reads it through the collection');
+select is(public.can_access_vault_drop_internal('v2-stranger', (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a non-subscriber cannot reach it through the collection');
+select is(public.can_access_vault_drop_internal(null, (select id from public.vault_drops where caption = 'V2 subscriber drop')), false, 'a guest cannot reach it through the collection');
 select is(public.expire_vault_drops(10), 0, 'the drop sweep is idempotent');
 
 -- the expired drop leaves the guest feed, and stays manageable for its creator
@@ -272,15 +272,15 @@ select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000401","role":"authenticated"}', true);
 select isnt_empty($$ select * from public.vault_drops where caption = 'V2 subscriber drop' $$, 'the creator can still manage their expired drop');
 reset role;
-select is(public.can_access_vault_drop('v2-creator', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the creator still reaches the expired content');
+select is(public.can_access_vault_drop_internal('v2-creator', (select id from public.vault_drops where caption = 'V2 subscriber drop')), true, 'the creator still reaches the expired content');
 
 -- a drop nobody collected leaves the feed for good
 update public.vault_drops
    set published_at = now() - interval '8 days', expires_at = now() - interval '1 day'
  where caption = 'V2 free drop';
 select is(public.expire_vault_drops(10), 1, 'the free drop window closes too');
-select is(public.can_access_vault_drop('v2-stranger', (select id from public.vault_drops where caption = 'V2 free drop')), false, 'an expired, uncollected drop is no longer readable');
-select is(public.can_access_vault_drop(null, (select id from public.vault_drops where caption = 'V2 free drop')), false, 'nor is it readable by a guest');
+select is(public.can_access_vault_drop_internal('v2-stranger', (select id from public.vault_drops where caption = 'V2 free drop')), false, 'an expired, uncollected drop is no longer readable');
+select is(public.can_access_vault_drop_internal(null, (select id from public.vault_drops where caption = 'V2 free drop')), false, 'nor is it readable by a guest');
 
 -- ── the frozen Arena scheduler: old keys preserved, Vault keys added ────────
 select ok(
