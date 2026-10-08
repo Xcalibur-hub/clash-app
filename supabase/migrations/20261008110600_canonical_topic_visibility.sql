@@ -19,11 +19,6 @@ revoke all on public.arena_readable_topics from public,anon,authenticated,servic
 do $$
 declare r record; definition text; updated text;
 begin
-  definition:=pg_get_functiondef('public.get_arena_topic(text)'::regprocedure);
-  updated:=regexp_replace(definition,'\mbegin\M',
-    E'begin\n  if exists(select 1 from public.arena_daily_topics where id=p_topic_id and status=''scheduled'') and not public.is_staff() then raise exception ''topic is not available'' using errcode=''P0003''; end if;','i');
-  if updated=definition then raise exception 'topic publication guard anchor changed'; end if;
-  execute updated;
   for r in select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and p.proname in ('get_arena_topic',
       'list_arena_topic_rooms','list_arena_trending_battles','list_live_arena_topic_previews','list_live_arena_topics',
@@ -39,6 +34,13 @@ begin
       'public.arena_topic_payload(row(\1.*)::public.arena_daily_topics,','g');
     if updated<>definition then execute updated; end if;
   end loop;
+  -- Insert after rewriting discovery reads: this compatibility check must query
+  -- the underlying scheduled row, which the filtered view intentionally hides.
+  definition:=pg_get_functiondef('public.get_arena_topic(text)'::regprocedure);
+  updated:=regexp_replace(definition,'\mbegin\M',
+    E'begin\n  if exists(select 1 from public.arena_daily_topics where id=p_topic_id and status=''scheduled'') and not public.is_staff() then raise exception ''topic is not available'' using errcode=''P0003''; end if;','i');
+  if updated=definition then raise exception 'topic publication guard anchor changed'; end if;
+  execute updated;
 end $$;
 
 create or replace function public.arena_message_room(p_message_id text)

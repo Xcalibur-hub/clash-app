@@ -107,6 +107,14 @@ if (process.argv.includes('--record-remediation')) {
     'crew_no_anon',not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like '%crew%' and has_function_privilege('anon',p.oid,'execute')));`).trim());
   for(const [name,valid] of Object.entries(secured))assert.equal(valid,true,`Remediation protection differs: ${name}`);
   const records=files.map(file=>`insert into supabase_migrations.schema_migrations(version,name,statements) values(${quote(file.slice(0,14))},${quote(file.slice(15,-4))},array[${quote(fs.readFileSync(path.join(directory,file),'utf8'))}]) on conflict(version) do nothing;`).join('\n');
-  sql('begin;\n'+records+'\ncommit;');
+  const topicFile=files.find(file=>file.startsWith('20261008110600_'));
+  const topicSource=fs.readFileSync(path.join(directory,topicFile),'utf8');
+  assert.ok(topicSource.indexOf("definition:=pg_get_functiondef('public.get_arena_topic(text)'")>topicSource.indexOf('end loop;'), 'Scheduled compatibility guard must follow the discovery rewrite');
+  const installedTopic=functions.find(f=>f.name==='get_arena_topic').source;
+  assert.ok(installedTopic.includes("from public.arena_daily_topics where id=p_topic_id and status='scheduled'"));
+  assert.ok(installedTopic.includes('from public.arena_readable_topics where id = p_topic_id'));
+  // Keep the final verified statement text for this migration's ordering fix.
+  const topicRecord=`update supabase_migrations.schema_migrations set statements=array[${quote(topicSource)}] where version='20261008110600';`;
+  sql('begin;\n'+records+'\n'+topicRecord+'\ncommit;');
   console.log('PASS applied remediation function bodies/security, content policies, private typing and effective grants verified before recording local versions');
 }
