@@ -6849,6 +6849,21 @@ export type Database = {
         Args: { p_target_id: string }
         Returns: undefined
       }
+      get_my_profile: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_tint: string
+          bio: string
+          coins: number
+          handle: string
+          home_hood: Database["public"]["Enums"]["hood_id"]
+          id: string
+          name: string
+          rank: Database["public"]["Enums"]["rank_name"]
+          reputation: number
+          streak: number
+        }[]
+      }
       my_profile_id: {
         Args: Record<PropertyKey, never>
         Returns: string

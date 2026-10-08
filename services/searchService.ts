@@ -6,7 +6,7 @@
  */
 
 import type { Hood, HoodId, Take, User } from '../store/types';
-import { toTake, toUser } from './arenaMappers';
+import { toTake, toUser, PUBLIC_PROFILE_FIELDS } from './arenaMappers';
 import { HOODS } from '../data/hoods';
 import { requestError, requireSupabase } from './supabaseClient';
 
@@ -30,7 +30,7 @@ export async function searchPeople(query: string, limit = 12): Promise<User[]> {
   const like = literalLike(query.trim());
   const { data, error } = await requireSupabase()
     .from('profiles')
-    .select('*')
+    .select(PUBLIC_PROFILE_FIELDS)
     .or(`handle.ilike.${like},name.ilike.${like}`)
     .order('reputation', { ascending: false })
     .limit(limit);
@@ -72,7 +72,7 @@ export async function searchAll(query: string): Promise<SearchResults> {
 export async function fetchActivePeople(limit = 8): Promise<User[]> {
   const { data, error } = await requireSupabase()
     .from('profiles')
-    .select('*')
+    .select(PUBLIC_PROFILE_FIELDS)
     .order('reputation', { ascending: false })
     .order('handle', { ascending: true })
     .limit(limit);

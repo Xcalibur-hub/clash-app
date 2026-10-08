@@ -6,6 +6,7 @@ import {
   toTakeReactionResult,
   toUpvoteResult,
   toUser,
+  PUBLIC_PROFILE_FIELDS,
   type TakeReactionResult,
   type UpvoteResult,
 } from './arenaMappers';
@@ -59,7 +60,7 @@ export async function fetchTakes(
  * a real handle instead of falling back to the viewer.
  */
 export async function fetchProfiles(): Promise<User[]> {
-  const { data, error } = await requireSupabase().from('profiles').select('*').limit(200);
+  const { data, error } = await requireSupabase().from('profiles').select(PUBLIC_PROFILE_FIELDS).limit(200);
 
   if (error) throw requestError(error);
   return data.map(toUser);
@@ -68,7 +69,7 @@ export async function fetchProfiles(): Promise<User[]> {
 /** A specific set of profiles, in id order — for follower/following/mute lists. */
 export async function fetchProfilesByIds(ids: readonly string[]): Promise<User[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await requireSupabase().from('profiles').select('*').in('id', [...ids]);
+  const { data, error } = await requireSupabase().from('profiles').select(PUBLIC_PROFILE_FIELDS).in('id', [...ids]);
 
   if (error) throw requestError(error);
   return data.map(toUser);
@@ -111,28 +112,20 @@ export async function fetchCommentsForTakes(takeIds: readonly string[]): Promise
  * can never fall back to a seeded identity or impersonate another user.
  */
 export async function requireViewerProfileId(): Promise<string> {
-  const uid = await requireUserId();
-  const { data, error } = await requireSupabase()
-    .from('profiles')
-    .select('id')
-    .eq('auth_user_id', uid)
-    .maybeSingle();
+  await requireUserId();
+  const { data, error } = await requireSupabase().rpc('my_profile_id');
   if (error) throw requestError(error);
   if (!data) throw new SupabaseError('Your profile is missing. Sign out and back in.', 'profile_missing');
-  return data.id;
+  return data;
 }
 
 /** The signed-in user's profile id, or null for a guest. Reads-only, never throws. */
 export async function currentViewerProfileId(): Promise<string | null> {
   const uid = await currentUserId();
   if (!uid) return null;
-  const { data, error } = await requireSupabase()
-    .from('profiles')
-    .select('id')
-    .eq('auth_user_id', uid)
-    .maybeSingle();
+  const { data, error } = await requireSupabase().rpc('my_profile_id');
   if (error) throw requestError(error);
-  return data?.id ?? null;
+  return data ?? null;
 }
 
 /**
@@ -142,13 +135,9 @@ export async function currentViewerProfileId(): Promise<string | null> {
 export async function fetchViewerProfile(): Promise<User | null> {
   const uid = await currentUserId();
   if (!uid) return null;
-  const { data, error } = await requireSupabase()
-    .from('profiles')
-    .select('*')
-    .eq('auth_user_id', uid)
-    .maybeSingle();
+  const { data, error } = await requireSupabase().rpc('get_my_profile');
   if (error) throw requestError(error);
-  return data ? toUser(data) : null;
+  return data?.[0] ? toUser(data[0]) : null;
 }
 
 /**

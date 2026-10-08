@@ -81,7 +81,12 @@ export function toComment(row: TableRow<'comments'>): ChallengerComment {
  * columns yet — they belong to the §29 `reputation_events` / `hall_of_fame` tables
  * — so they hydrate empty instead of inventing a number.
  */
-export function toUser(row: TableRow<'profiles'>): User {
+/** This projection is also the database's public SELECT column whitelist. */
+export const PUBLIC_PROFILE_FIELDS = 'id,handle,name,avatar_tint,bio,home_hood,reputation,rank,streak' as const;
+export type PublicProfile = Pick<TableRow<'profiles'>,
+  'id' | 'handle' | 'name' | 'avatar_tint' | 'bio' | 'home_hood' | 'reputation' | 'rank' | 'streak'>;
+
+export function toUser(row: PublicProfile & { coins?: number }): User {
   return {
     id: row.id,
     handle: row.handle,
@@ -91,7 +96,7 @@ export function toUser(row: TableRow<'profiles'>): User {
     hood: row.home_hood ?? 'for-you',
     rank: row.rank,
     reputation: row.reputation,
-    coins: row.coins,
+    coins: row.coins ?? 0,
     clashes: 0,
     wins: 0,
     streak: row.streak,

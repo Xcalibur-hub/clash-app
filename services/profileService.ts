@@ -3,7 +3,7 @@
  * (Supabase); the client never calls the backend directly from UI.
  */
 
-import { toComment, toTake, toUser } from './arenaMappers';
+import { toComment, toTake, toUser, PUBLIC_PROFILE_FIELDS } from './arenaMappers';
 import type { ServerVerdict } from './clashEngineService';
 import { requestError, requireSupabase } from './supabaseClient';
 import type { ChallengerComment, HoodId, Take, User } from '../store/types';
@@ -41,7 +41,7 @@ export interface ProfilePatch {
 }
 
 export async function fetchProfileById(profileId: string): Promise<User | null> {
-  const { data, error } = await requireSupabase().from('profiles').select('*').eq('id', profileId).maybeSingle();
+  const { data, error } = await requireSupabase().from('profiles').select(PUBLIC_PROFILE_FIELDS).eq('id', profileId).maybeSingle();
   if (error) throw requestError(error);
   return data ? toUser(data) : null;
 }
