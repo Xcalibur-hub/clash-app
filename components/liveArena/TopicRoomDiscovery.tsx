@@ -105,7 +105,7 @@ export function TopicRoomDiscovery({
             {assigned.roomIndex != null ? `Room ${assigned.roomIndex}` : 'Your room'}
           </Text>
           <Text allowFontScaling={false} style={[styles.roomMeta, { color: t.textSecondary }]}>
-            {assigned.participantCount} here
+            {assigned.participantCount} joined
             {assigned.capacity != null ? ` · ${assigned.capacity} capacity` : ''}
           </Text>
           {topic.viewerStance ? (
@@ -179,7 +179,7 @@ export function TopicRoomDiscovery({
             const mine = room.isViewerRoom;
             const meta = full
               ? `${room.participantCount} / ${room.capacity} · ${roomStatusLabel(room.status)} · FULL`
-              : `${room.participantCount} here · ${roomStatusLabel(room.status)}`;
+              : `${room.participantCount} joined · ${roomStatusLabel(room.status)}`;
             const cta = mine
               ? isDebater
                 ? 'Enter →'

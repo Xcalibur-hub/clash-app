@@ -72,9 +72,9 @@ export function LiveRoomHeader({
 
   const crowdLine = (() => {
     if (debaterCount != null && spectatorCount != null) {
-      return `${debaterCount} fighting · ${spectatorCount} watching`;
+      return `${debaterCount} fighters · ${spectatorCount} spectators joined`;
     }
-    return `${room.participantCount} in the room`;
+    return `${room.participantCount} joined`;
   })();
 
   const phaseHint =

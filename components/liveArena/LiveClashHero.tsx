@@ -76,7 +76,7 @@ export function LiveClashHero({ topic, onWatch, onEnter }: LiveClashHeroProps): 
 
         <View style={styles.metaRow}>
           <Text style={[styles.meta, { color: t.textSecondary }]}>
-            {plural(topic.participantCount, 'person here', 'people here')}
+            {plural(topic.participantCount, 'person joined', 'people joined')}
           </Text>
           {!closed && topic.secondsRemaining > 0 ? (
             <>

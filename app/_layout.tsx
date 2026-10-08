@@ -7,8 +7,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { initAnalytics } from '../services/analytics';
 import { initSentry, Sentry } from '../services/sentry';
-import { ClashProvider } from '../store';
 import { AuthProvider } from '../store/AuthProvider';
+import { AccountScope } from '../store/AccountScope';
 import { AuthHydrator } from '../store/AuthHydrator';
 import { FontBootstrap, ThemeProvider, useThemeColors } from '../theme';
 import { LocalSupabaseBadge } from '../components/dev/LocalSupabaseBadge';
@@ -61,7 +61,7 @@ function RootLayout(): React.JSX.Element {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <AuthProvider>
-          <ClashProvider>
+          <AccountScope>
             <ThemeProvider>
               <FontBootstrap>
                 <AuthHydrator />
@@ -100,7 +100,7 @@ function RootLayout(): React.JSX.Element {
                 <LocalSupabaseBadge />
               </FontBootstrap>
             </ThemeProvider>
-          </ClashProvider>
+          </AccountScope>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

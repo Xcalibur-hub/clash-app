@@ -195,7 +195,7 @@ export function TrendingBattlesSection({
           <Text allowFontScaling={false} style={[styles.previewMeta, { color: t.textMuted }]}>
             {formatRankDelta(selected.rankDeltaKind, selected.rankDelta)}
             {` · ${momentumLabel(selected.momentum)}`}
-            {selected.participantCount > 0 ? ` · ${selected.participantCount} here` : ''}
+            {selected.participantCount > 0 ? ` · ${selected.participantCount} joined` : ''}
           </Text>
         </View>
       </View>

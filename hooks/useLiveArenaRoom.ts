@@ -145,6 +145,14 @@ export function useLiveArenaRoom(
     [dispatch],
   );
 
+  const clearPrivateThread = React.useCallback(() => {
+    setMessages([]);
+    setEvidence([]);
+    setStats(null);
+    setThreadLocked(true);
+    setHasOlder(false);
+  }, []);
+
   /**
    * Lightweight INSERT hydrate: fetch only the new message id(s).
    * Full newest-page reconcile runs on a slow timer / reconnect — not every post.
@@ -163,7 +171,7 @@ export function useLiveArenaRoom(
       setMessages((current) => mergeMessages(current, next));
     } catch (caught) {
       if (!mounted.current) return;
-      if (isMembershipRefusal(caught)) setThreadLocked(true);
+      if (isMembershipRefusal(caught)) clearPrivateThread();
     }
   }, []);
 
@@ -184,7 +192,7 @@ export function useLiveArenaRoom(
       setMessages((current) => mergeMessages(current, mergeMessages(gap, fresh)));
     } catch (caught) {
       if (!mounted.current) return;
-      if (isMembershipRefusal(caught)) setThreadLocked(true);
+      if (isMembershipRefusal(caught)) clearPrivateThread();
     }
   }, [roomId]);
 
@@ -201,7 +209,12 @@ export function useLiveArenaRoom(
       } else if (mounted.current) {
         setStats(null);
       }
-    } catch {
+    } catch (caught) {
+      if (mounted.current && isMembershipRefusal(caught)) {
+        clearPrivateThread();
+        setRoom(null);
+        setError('This room is unavailable.');
+      }
       // Periodic drift repair is best-effort; explicit refresh still surfaces errors.
     }
   }, [roomId]);
@@ -220,7 +233,7 @@ export function useLiveArenaRoom(
       if (!mounted.current) return;
       setMessages((current) => removeUnavailableMessages(current, checked, visible));
     } catch (caught) {
-      if (mounted.current && isMembershipRefusal(caught)) setThreadLocked(true);
+      if (mounted.current && isMembershipRefusal(caught)) clearPrivateThread();
     }
   }, [roomId]);
 
@@ -246,8 +259,7 @@ export function useLiveArenaRoom(
         if (!mounted.current) return;
 
         if (thread === 'locked') {
-          setThreadLocked(true);
-          setHasOlder(false);
+          clearPrivateThread();
         } else {
           setThreadLocked(false);
           setHasOlder(thread.length >= PAGE);
@@ -271,6 +283,10 @@ export function useLiveArenaRoom(
         }
       } catch (caught) {
         if (!mounted.current) return;
+        if (isMembershipRefusal(caught)) {
+          clearPrivateThread();
+          setRoom(null);
+        }
         setError(errorText(caught));
       } finally {
         if (!mounted.current) return;

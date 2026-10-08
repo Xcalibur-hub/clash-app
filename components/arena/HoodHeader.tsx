@@ -7,7 +7,7 @@ import { GlowButton } from '../shared/GlowButton';
 
 export interface HoodHeaderProps {
   hood: Hood;
-  memberCount: number;
+  memberCount: number | null;
   liveCount: number;
   joined: boolean;
   joining: boolean;
@@ -33,7 +33,7 @@ export function HoodHeader({
       </Text>
       <View style={styles.stats}>
         <Text allowFontScaling={false} style={styles.stat}>
-          {compact(memberCount)} members
+          {memberCount === null ? 'Members unavailable' : `${compact(memberCount)} members`}
         </Text>
         <Text allowFontScaling={false} style={styles.dot}>
           ·

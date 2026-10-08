@@ -51,7 +51,7 @@ export function LiveRoomEmptyFloor({
       ) : null}
 
       <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-        {participantCount > 0 ? `${participantCount} here` : 'Live room'}
+        {participantCount > 0 ? `${participantCount} joined` : 'Live room'}
       </Text>
       <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
         The floor is open

@@ -263,7 +263,7 @@ export default function HoodScreen(): React.JSX.Element {
             </View>
             <HoodHeader
               hood={hood}
-              memberCount={overview?.memberCount ?? hood.members}
+              memberCount={overview?.memberCount ?? null}
               liveCount={overview?.liveCount ?? 0}
               joined={overview?.joined ?? false}
               joining={joining}

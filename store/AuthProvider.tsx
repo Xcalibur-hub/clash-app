@@ -36,10 +36,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       return undefined;
     }
     let active = true;
+    let authEvents = 0;
     void supabase.auth
       .getSession()
       .then(({ data }) => {
-        if (!active) return;
+        if (!active || authEvents > 0) return;
         setSession(data.session ?? null);
         setLoading(false);
       })
@@ -48,6 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      authEvents += 1;
+      if (!active) return;
       setSession(next);
       setLoading(false);
     });

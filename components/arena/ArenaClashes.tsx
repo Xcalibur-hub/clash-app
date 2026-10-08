@@ -130,7 +130,7 @@ function ClashRow({
         )}
         {topic.participantCount > 0 ? (
           <Text style={[styles.meta, { color: t.textMuted }]}>
-            {plural(topic.participantCount, 'here', 'here')}
+            {plural(topic.participantCount, 'joined', 'joined')}
           </Text>
         ) : null}
       </View>

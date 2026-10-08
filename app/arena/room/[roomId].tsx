@@ -121,6 +121,12 @@ function reactionScore(message: ArenaMessage): number {
  * requires a fresh private stance choice — there is no safe reuse path.
  */
 export default function LiveArenaRoomScreen(): React.JSX.Element {
+  const { roomId } = useLocalSearchParams<{ roomId: string | string[] }>();
+  const key = Array.isArray(roomId) ? roomId[0] : roomId;
+  return <RoomScope key={key ?? 'missing-room'} />;
+}
+
+function RoomScope(): React.JSX.Element {
   const { roomId: raw } = useLocalSearchParams<{ roomId: string | string[] }>();
   const roomId = Array.isArray(raw) ? raw[0] : raw;
   const router = useRouter();
@@ -929,7 +935,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
                   />
                   {backup.load?.saturated ? (
                     <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
-                      {`Room full · ${backup.load.spectatorCount} watching`}
+                      {`Room full · ${backup.load.spectatorCount} spectators joined`}
                     </Text>
                   ) : (
                     <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
