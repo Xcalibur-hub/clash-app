@@ -130,3 +130,103 @@ Unrelated Crew discovery/UI work remains unmodified and excluded from these
 commits. No topic onboarding, Step Up, public guest viewing, community judging,
 Convex migration or second general-purpose database was introduced. This report
 does not assert zero vulnerabilities or production readiness.
+
+## Phase 0.5 finalization checkpoint — 2026-10-08
+
+The verification below supplements the earlier report; no Phase 1 work was
+started. The existing branch is `main`. Its remote tip before this checkpoint
+was `42be14c977e392e6289cbd07a73599cd4e59193a`. The six remediation commits,
+in order, are:
+
+- `921dcf322e2fd820c6edfea0765da7997862d9d0` — public profile projections and caller balance.
+- `1e380ce2e8ddbade7fc3305bc370498865997093` — scoped helpers and legacy content visibility.
+- `5952c6328f8bf180c631dd2b97444d7c419c9314` — account/Room isolation and honest counts.
+- `a6766aad89360da06c4174c60c2b24c20c978ad0` — private server-derived typing.
+- `fde917c5ce73e8a01741fc5bfc93609f5f392b94` — verified local ledger and remediation report.
+- `9c9d026e2ec0164ef7e3b27d57f26f7360ab8765` — scheduled-topic guard ordering.
+
+No uncommitted remediation implementation remained. A separate focused report
+commit records this checkpoint. The dirty Crew service, utilities, tests,
+discovery migration and UI directories remain excluded, together with the
+pre-existing `Microsoft/` and `shot.png` artifacts.
+
+### Automated verification rerun
+
+- `npm run typecheck`: passed.
+- `npm run test:unit`: 409 tests / 111 suites passed; zero failures or skips.
+- `npx expo-doctor`: 18/18 checks passed.
+- `supabase test db --db-url postgresql://supabase_admin:postgres@127.0.0.1:55322/postgres`:
+  64 files / 2,501 assertions passed, including concurrency and security tests.
+- Account scope/stale auth callbacks, private typing service, direct anonymous
+  and authenticated PostgREST/RPC adversarial checks: passed.
+- Crowd service: seven checks passed. Duel/component render: 19/19 scenarios
+  passed; these render checks bridge native media/animation.
+- Real local Auth/WebSocket checks: private typing delivery, outsider/anonymous
+  denial, public/private topic isolation, spoofed broadcast rejection, two-way
+  Crowd delivery, spectator Stage write denial, reconnect gap recovery, mute
+  filtering and genuine joined-spectator counts passed.
+- Crowd migration object equivalence and `supabase migration list --local`:
+  passed again after runtime testing. No ledger repair/write was needed.
+
+The initial plain `supabase test db` rerun failed in four concurrency files
+(`053`, `055`, `057`, `059`) because the CLI's non-superuser connection cannot
+use `dblink` when local trust authentication supplies no password credentials.
+The successful full rerun used the existing local test administrator; database
+privileges and server authentication settings were not changed.
+
+### Physical Android results
+
+Executed through ADB on a connected Samsung Galaxy A50 (`SM-A505F`), running
+`com.clash.v2` against current local Metro and local Supabase through port
+forwarding. The independent authenticated peer was a Node Supabase client, not
+a second physical phone.
+
+- Account switching: signed out Local Dev, signed in the disposable Fighter A,
+  then signed out and signed in a disposable spectator. Profile identity changed
+  from LOCAL Crowd Test 0 to LOCAL Crowd Test 2. The same duel changed from
+  `YOU'RE FIGHTING · FIGHTER A` with its official composer to `WATCHING` without
+  that composer. The spectator retained its separate Crowd composer.
+  Restored the original Local Dev account afterwards. Opening the same Room
+  as that nonmember showed only the `Watch this Clash` entry gate: previously
+  loaded Crowd rows and spectator access did not carry over.
+- Private typing: an Android fighter draft was observed by the authenticated
+  peer through server-derived typing hydration. Authorized Fighter B typing
+  appeared as `People are typing…` on Android. The peer explicitly cleared it.
+  Outsider/anonymous denial and spoofing protections were verified by the real
+  WebSocket/API security checks, rather than by a second physical device.
+- Canonical Stage: exactly two fighters were displayed, the official argument
+  appeared above Crowd, and a physical fighter submission became the latest
+  Stage argument. Spectator backing controls remained separate from judging.
+- Crowd: `[LOCAL TEST] Authenticated client to Android` appeared on the phone
+  while the Room was open. The phone sent `Physical Android Crowd check`; the
+  second authenticated client received the Realtime event and verified the
+  persisted message. No production activity was fabricated.
+
+The first device attempt used an old bundle and received profile permission
+errors. Loading the current Metro bundle restored the intended public profile
+projection. UIAutomator hierarchy capture failed with `could not get idle
+state`; device interaction was verified with ADB input and screenshots instead.
+
+The installed development binary also reported missing native `ExpoCamera`
+from the existing Meet video route. Dismissing that error allowed the above
+Arena checks. An offline native rebuild failed because `org.jitsi:webrtc:124.+`
+was not cached; the online retry reached compilation but failed with Windows
+error 1455, `The paging file is too small`, during Java/Kotlin memory allocation.
+No successful fresh Android build is claimed. A matching native development
+binary remains necessary for complete app-wide device verification.
+
+### Deployment and remaining limits
+
+All database operations targeted local Docker or explicit localhost endpoints.
+No hosted migration apply, `db push`, reset or hosted ledger repair was executed.
+The CLI's `Remote` column under `--local` refers to the installed local database;
+the hosted ledger was not independently queried, so changes by other operators
+are outside this verification. GitHub push does not apply these migrations.
+
+Existing data was not reset or removed by this checkpoint. Disposable runtime
+fixtures created for the Android check are retained locally; credentials and
+screenshots are excluded from commits. Account-isolation regression checks also
+cover stale asynchronous callbacks, beyond the physical identity/role checks.
+Transport authorization caching, logical typing-row expiry, coordinated profile
+grant/client deployment and the native binary limitation remain as described
+above. No zero-vulnerability or production-readiness assertion is made.
