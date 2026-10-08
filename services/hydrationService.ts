@@ -14,6 +14,7 @@ import {
   fetchViewerUpvoteIds,
 } from './apiService';
 import { fetchViewerSafetyState } from './safetyService';
+import { fetchPersonalizedArenaTakes } from './arenaInterestService';
 import { isSupabaseConfigured } from './supabaseClient';
 import { logger } from './logger';
 import type { ArenaSnapshot } from '../store/reducer';
@@ -44,7 +45,12 @@ async function loadArenaSnapshot(): Promise<ArenaSnapshot> {
     ...safety.mutedProfileIds,
   ]);
 
-  const takes = await fetchTakes('for-you', [...hidden]);
+  const [general, personalized] = await Promise.all([
+    fetchTakes('for-you', [...hidden]),
+    viewer ? fetchPersonalizedArenaTakes() : Promise.resolve(null),
+  ]);
+  const ranked = personalized?.filter(take => !hidden.has(take.authorId));
+  const takes = [...new Map([...general, ...(ranked ?? [])].map(take => [take.id, take])).values()];
   const [comments, users] = await Promise.all([
     fetchCommentsForTakes(takes.map((take) => take.id)),
     fetchProfiles(),
@@ -56,6 +62,8 @@ async function loadArenaSnapshot(): Promise<ArenaSnapshot> {
 
   return {
     takes,
+    generalTakeIds: general.map(take => take.id),
+    forYouTakeIds: ranked?.map(take => take.id),
     comments: visibleComments,
     users,
     viewer,

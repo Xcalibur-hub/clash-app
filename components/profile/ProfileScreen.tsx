@@ -263,6 +263,11 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
         />
 
         {self ? <AppearanceRow /> : null}
+        {self ? <Pressable accessibilityRole="button" accessibilityLabel="Edit your interests"
+          onPress={() => { hapticTap(); router.push('/interests'); }}
+          style={{ minHeight: 48, justifyContent: 'center' }}>
+          <Text style={{ ...typeScale.cardTitle, color: theme.textPrimary }}>Interests · Personalize For You</Text>
+        </Pressable> : null}
 
         {hasVault !== null && (hasVault || self) ? (
           <Pressable

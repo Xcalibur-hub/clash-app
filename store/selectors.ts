@@ -142,15 +142,21 @@ export function selectFeedForScope(
 ): Take[] {
   const live = selectLiveTakes(state, now);
   const inScope = hood === 'all' ? live : live.filter((take) => take.hood === hood);
+  if (scope === 'for-you' && state.forYouTakeIds) {
+    const byId = new Map(inScope.map(take => [take.id, take]));
+    return state.forYouTakeIds.flatMap(id => { const take = byId.get(id); return take ? [take] : []; });
+  }
+  const generalIds = state.generalTakeIds ? new Set(state.generalTakeIds) : null;
+  const general = generalIds ? inScope.filter(take => generalIds.has(take.id)) : inScope;
 
   if (scope === 'following') {
-    return inScope
+    return general
       .filter((take) => followingIds.has(take.authorId))
       .slice()
       .sort((a, b) => b.createdAt - a.createdAt);
   }
 
-  const list = inScope.slice();
+  const list = general.slice();
   if (scope === 'new') return list.sort((a, b) => b.createdAt - a.createdAt);
   if (scope === 'popular') return list.sort((a, b) => engagement(b) - engagement(a));
   return list.sort((a, b) => heat(b) - heat(a));

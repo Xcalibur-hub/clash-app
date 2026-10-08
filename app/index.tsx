@@ -11,11 +11,13 @@ import { useRouter } from 'expo-router';
 import { AuroraBackground } from '../components/shared/AuroraBackground';
 import { Burst } from '../components/shared/Doodles';
 import { useClash } from '../store';
+import { useAuth } from '../store/AuthProvider';
 import { duration, ease, ink, radius, space, typeScale } from '../theme';
 
 /** Splash (spec §5): animated wordmark, then Arena (or onboarding). */
 export default function SplashScreen(): React.JSX.Element {
   const { state } = useClash();
+  const { signedIn, loading: authLoading } = useAuth();
   const router = useRouter();
   const reduced = useReducedMotion();
   const mark = useSharedValue(0);
@@ -25,16 +27,17 @@ export default function SplashScreen(): React.JSX.Element {
   const speed = reduced ? 0 : 1;
 
   React.useEffect(() => {
+    if (authLoading) return;
     mark.value = withTiming(1, { duration: duration.cinematic * speed, easing: ease.out });
     sub.value = withDelay(200 * speed, withTiming(1, { duration: duration.slow * speed, easing: ease.out }));
     bar.value = withDelay(260 * speed, withTiming(1, { duration: 1300 * speed, easing: ease.inOut }));
 
     const timer = setTimeout(
-      () => router.replace(hasOnboarded ? '/(tabs)' : '/onboard'),
+      () => router.replace(signedIn || hasOnboarded ? '/(tabs)' : '/onboard'),
       reduced ? 400 : 1700,
     );
     return () => clearTimeout(timer);
-  }, [bar, hasOnboarded, mark, reduced, router, speed, sub]);
+  }, [authLoading, signedIn, bar, hasOnboarded, mark, reduced, router, speed, sub]);
 
   const markStyle = useAnimatedStyle(() => ({
     opacity: mark.value,

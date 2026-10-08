@@ -12,6 +12,7 @@ import { AccountScope } from '../store/AccountScope';
 import { AuthHydrator } from '../store/AuthHydrator';
 import { FontBootstrap, ThemeProvider, useThemeColors } from '../theme';
 import { LocalSupabaseBadge } from '../components/dev/LocalSupabaseBadge';
+import { InterestOnboardingGate } from '../components/onboarding/InterestOnboardingGate';
 
 initSentry();
 initAnalytics();
@@ -69,6 +70,7 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="index" />
                   <Stack.Screen name="onboard" />
                   <Stack.Screen name="auth" />
+                  <Stack.Screen name="interests" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="(vault)" />
                   <Stack.Screen
@@ -97,6 +99,7 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="world" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="explore" options={{ animation: 'slide_from_right' }} />
                 </ThemedChrome>
+                <InterestOnboardingGate />
                 <LocalSupabaseBadge />
               </FontBootstrap>
             </ThemeProvider>

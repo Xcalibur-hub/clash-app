@@ -27,6 +27,9 @@ export interface Notice {
  */
 export interface ArenaSnapshot {
   takes: readonly Take[];
+  /** Server ranking snapshot, independent of the unchanged general feed batch. */
+  forYouTakeIds?: readonly string[];
+  generalTakeIds?: readonly string[];
   comments: readonly ChallengerComment[];
   users: readonly User[];
   /** Null when the viewer row is unreachable — keep the current signed-in/guest viewer. */
@@ -46,6 +49,8 @@ export interface ClashState {
   viewer: User;
   users: Readonly<Record<string, User>>;
   takes: readonly Take[];
+  forYouTakeIds?: readonly string[];
+  generalTakeIds?: readonly string[];
   savedTakeIds: readonly string[];
   reactedTakeIds: readonly string[];
   comments: readonly ChallengerComment[];
@@ -203,6 +208,8 @@ export function clashReducer(state: ClashState, action: ClashAction): ClashState
         ...state,
         users,
         takes: action.snapshot.takes,
+        forYouTakeIds: action.snapshot.forYouTakeIds,
+        generalTakeIds: action.snapshot.generalTakeIds,
         comments: action.snapshot.comments,
         viewer: action.snapshot.viewer ?? state.viewer,
         upvotedCommentIds: action.snapshot.upvotedCommentIds,
@@ -274,7 +281,9 @@ export function clashReducer(state: ClashState, action: ClashAction): ClashState
 
     case 'take/create':
       return withNotice(
-        { ...state, takes: [action.take, ...state.takes] },
+        { ...state, takes: [action.take, ...state.takes],
+          forYouTakeIds: state.forYouTakeIds ? [action.take.id, ...state.forYouTakeIds] : undefined,
+          generalTakeIds: state.generalTakeIds ? [action.take.id, ...state.generalTakeIds] : undefined },
         'Take is live.',
       );
 

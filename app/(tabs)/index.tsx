@@ -26,6 +26,8 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { currentViewerProfileId, toggleTakeReaction } from '../../services/apiService';
 import { analytics } from '../../services/analytics';
 import { fetchLiveTopics, type LiveArenaTopic, type Stance } from '../../services/liveArenaService';
+import { fetchInterestCatalogue, fetchMyArenaInterests } from '../../services/arenaInterestService';
+import { prioritizeInterestTopics } from '../../utils/arenaInterests';
 import type { ArenaTrendingBattle } from '../../services/arenaTrendService';
 import { fetchFollowState, fetchFollowingIds } from '../../services/socialService';
 import { errorText } from '../../services/supabaseClient';
@@ -87,6 +89,7 @@ export default function ArenaScreen(): React.JSX.Element {
   const [menu, setMenu] = React.useState<FeedMenu | null>(null);
   /** Today's live Topic(s). Empty when none is running — the card simply hides. */
   const [liveTopics, setLiveTopics] = React.useState<LiveArenaTopic[]>([]);
+  const liveTopicRequest = React.useRef(0);
   const [entrance, setEntrance] = React.useState(false);
   /** Guards against double taps racing the reaction RPC for the same Take. */
   const reactionInFlight = React.useRef<Set<string>>(new Set());
@@ -114,17 +117,22 @@ export default function ArenaScreen(): React.JSX.Element {
    * server's view of their membership.
    */
   const loadLiveTopics = React.useCallback(async (): Promise<void> => {
+    const request = ++liveTopicRequest.current;
     try {
-      setLiveTopics(await fetchLiveTopics());
+      const topics = await fetchLiveTopics();
+      if (!signedIn) { if (request === liveTopicRequest.current) setLiveTopics(topics); return; }
+      const [catalogue, preferences] = await Promise.all([fetchInterestCatalogue(), fetchMyArenaInterests()]);
+      if (request === liveTopicRequest.current) setLiveTopics(prioritizeInterestTopics(topics, catalogue, preferences));
     } catch {
       // A missing Topic is an ordinary day, not an error worth a notice.
-      setLiveTopics([]);
+      if (request === liveTopicRequest.current) setLiveTopics([]);
     }
-  }, []);
+  }, [signedIn]);
 
   useFocusEffect(
     React.useCallback(() => {
       void loadLiveTopics();
+      return () => { liveTopicRequest.current += 1; };
     }, [loadLiveTopics]),
   );
 
