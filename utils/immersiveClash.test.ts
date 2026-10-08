@@ -106,13 +106,13 @@ describe('immersive Clash rules', () => {
     assert.equal(crowdDevLayoutEnabled(false), false);
   });
 
-  it('LiveCrowdLayer gates __DEV__ mocks and labels them as layout-only', () => {
+  it('LiveCrowdLayer renders server rows without development chat fixtures', () => {
     const src = fs.readFileSync(
       path.join(here, '../components/liveArena/LiveCrowdLayer.tsx'),
       'utf8',
     );
-    assert.match(src, /DEV LAYOUT · NOT LIVE CROWD/);
-    assert.match(src, /showDevLayout/);
-    assert.doesNotMatch(src, /fetchCrowd|postCrowd|sendCrowd/);
+    assert.doesNotMatch(src, /DEV_LAYOUT_ROWS|showDevLayout|FloatingReaction/);
+    assert.match(src, /crowd\?\.messages/);
+    assert.match(src, /PUBLIC CHAT/);
   });
 });

@@ -62,6 +62,7 @@ Module._load = function(request, parent, isMain) {
   if (request === 'expo-linear-gradient') return { LinearGradient: ({ children, style }) => React.createElement(RN.View, { style }, children) };
   if (request === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
   const resolved = Module._resolveFilename(request, parent).replaceAll('\\','/');
+  if (resolved.endsWith('/hooks/useArenaCrowd.ts')) return { useArenaCrowd: () => ({ messages: [],context: null,loading: true,error: null,connected: false,sending: false,hasOlder: false,olderBusy: false,refresh: async () => {},loadOlder: async () => {},send: async () => false }) };
   if (theme && resolved === `${root.replaceAll('\\','/')}/theme/index.ts`) return theme;
   if (resolved.endsWith('/utils/haptics.ts')) return { tap: noop, press: noop, judge: noop, notify: noop };
   if (/\/components\/shared\/icons\.tsx?$/.test(resolved) || resolved.includes('/components/shared/icons/')) return new Proxy({}, { get: (_, name) => name === '__esModule' ? false : props => React.createElement(RN.Text, { style: { color: props.color, fontSize: props.size } }, name === 'BackIcon' ? '‹' : '···') });
@@ -202,4 +203,20 @@ requestArenaEntrance();
 assert.equal(peekArenaEntrancePending(), true);
 assert.equal(consumeArenaEntrance(), true);
 process.stdout.write('PASS arena-entrance-gate\n');
-process.stdout.write('15/15 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');
+const { LiveCrowdLayer } = require('../components/liveArena/LiveCrowdLayer.tsx');
+const crowdBase = { messages: [],context: { roomId:'r',canSend:true,spectatorCount:2,serverNow:new Date().toISOString(),closesAt:new Date().toISOString() },loading:false,error:null,connected:true,sending:false,hasOlder:false,olderBusy:false,refresh:async()=>{},loadOlder:async()=>{},send:async()=>true };
+for(const [name,crowd] of Object.entries({
+  'crowd-live': {...crowdBase,messages:[{id:'00000000-0000-0000-0000-000000000001',roomId:'r',body:'A genuine server-provided Crowd row',createdAt:new Date().toISOString(),isOwn:false,author:{id:'s',name:'Sam',handle:'sam',avatarTint:'#aaaaaa'}}]},
+  'crowd-loading': {...crowdBase,context:null,loading:true},
+  'crowd-error': {...crowdBase,error:'Crowd could not update. Try again.'},
+  'crowd-closed': {...crowdBase,context:{...crowdBase.context,canSend:false}},
+})) {
+  const html = renderToStaticMarkup(React.createElement(LiveCrowdLayer,{crowd,onReport:noop}));
+  assert.doesNotMatch(html,/DEV LAYOUT|Spectator posting isn|nah that actually changed/);
+  if(name==='crowd-live') { assert.match(html,/server-provided Crowd row/); assert.match(html,/Send public Crowd message/); assert.match(html,/Report or block/); }
+  if(name==='crowd-loading') assert.match(html,/Loading Crowd/);
+  if(name==='crowd-error') assert.match(html,/Retry/);
+  if(name==='crowd-closed') { assert.match(html,/read-only/); assert.doesNotMatch(html,/Send public Crowd message/); }
+  process.stdout.write(`PASS ${name}\n`);
+}
+process.stdout.write('19/19 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');

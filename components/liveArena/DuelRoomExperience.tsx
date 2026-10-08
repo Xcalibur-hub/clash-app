@@ -34,6 +34,8 @@ import { DuelRoomOutcome } from './DuelRoomOutcome';
 import { ImmersiveClash } from './ImmersiveClash';
 import { softFill } from './liveArenaStyles';
 import type { LiveRoomMessageProps } from './LiveRoomMessage';
+import { useArenaCrowd } from '../../hooks/useArenaCrowd';
+import type { CrowdMessage } from '../../utils/arenaCrowd';
 
 type Actions = Pick<
   LiveRoomMessageProps,
@@ -66,6 +68,7 @@ interface Props extends Actions {
   onLoadOlder: () => Promise<void>;
   onJudge: (side: 'A' | 'B') => Promise<void>;
   onWatch: () => Promise<void>;
+  onReportCrowd?: (message: CrowdMessage) => void;
 }
 
 function DuelLoadingBones(): React.JSX.Element {
@@ -80,10 +83,12 @@ function DuelLoadingBones(): React.JSX.Element {
   );
 }
 
-/** Duel specialization — immersive Clash canvas; no new subscriptions or writes. */
+/** Official Stage and independently authorized public Crowd within one event. */
 export function DuelRoomExperience(props: Props): React.JSX.Element {
   const { room, messages } = props;
   const duel = room.duel!;
+  const crowd = useArenaCrowd(props.threadLocked ? null : room.roomId);
+  React.useEffect(() => { if (props.refreshing) void crowd.refresh(); },[props.refreshing,crowd.refresh]);
   const t = useThemeColors();
   const presentation = duelPresentation(duel, room.phase);
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -270,19 +275,21 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
 
       <KeyboardAvoidingView
         style={[styles.root, styles.layer]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ImmersiveClash
           duel={duel}
           proposition={proposition}
           live={live}
           statusLabel={statusLabel}
-          spectatorCount={props.spectatorCount}
+          spectatorCount={crowd.context?.spectatorCount ?? null}
+          crowd={crowd}
+          onReportCrowd={props.onReportCrowd}
           focusSide={moment.side}
           latestMessage={moment.message}
           paddingTop={props.paddingTop}
           judgingFocus={judgingFocus || Boolean(duel.verdict)}
-          condensed={keyboardOpen && presentation.canPublish}
+          condensed={keyboardOpen}
           backingSide={backingSide}
           onBackSide={(side) =>
             setBackingSide((prev) => (prev === side ? null : side))
@@ -294,7 +301,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           onMore={() => setMoreOpen(true)}
           roleLabel={presentation.role}
           crowdPaddingBottom={
-            presentation.canPublish ? 0 : Math.max(props.paddingBottom, space.sm)
+            presentation.canPublish ? 0 : keyboardOpen ? space.xs : Math.max(props.paddingBottom, space.sm)
           }
           stageFooter={
             showOutcome ? (

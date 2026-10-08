@@ -733,6 +733,7 @@ export default function LiveArenaRoomScreen(): React.JSX.Element {
       onExpressiveReply={(message, mode) => { setReplyTo(message); setExpressiveTab(mode === 'gif' ? 'gifs' : mode === 'meme' ? 'memes' : 'stickers'); setComposerFocus(n => n + 1); }}
       onReact={(message, emoji) => { void react(message.id, emoji); }} onOpenProfile={openProfile}
       onMarkEvidence={item => { void markUseful(item.id); }}
+      onReportCrowd={message => { setSafety({ user: asUser({ ...message.author, rank: 'Rookie' }), report: { kind: 'arena_crowd_message', id: message.id } }); }}
       onReport={message => { if (message.author) setSafety({ user: asUser(message.author), report: { kind: 'arena_room_message', id: message.id } }); }}
       onReportEvidence={item => { if (item.author) setSafety({ user: asUser(item.author), report: { kind: 'arena_room_evidence', id: item.id } }); }} />
     <EvidenceComposerSheet visible={proofOpen} onClose={() => setProofOpen(false)} onSubmit={addEvidence} onError={notify} />

@@ -42,7 +42,7 @@ export function ClashEventHeader({
         accessibilityLiveRegion="polite"
         accessibilityLabel={
           spectatorCount !== null
-            ? `${statusLabel}. ${spectatorCount} watching`
+            ? `${statusLabel}. ${spectatorCount} spectators joined`
             : statusLabel
         }
       >
@@ -59,7 +59,7 @@ export function ClashEventHeader({
               ·
             </Text>
             <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
-              {spectatorCount} watching
+              {spectatorCount} joined
             </Text>
           </>
         ) : null}

@@ -526,6 +526,51 @@ export type Database = {
           },
         ]
       }
+      arena_crowd_messages: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          hidden_at: string | null
+          id: string
+          request_key: string
+          room_id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          request_key: string
+          room_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          request_key?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_crowd_messages_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_crowd_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "arena_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       arena_daily_topics: {
         Row: {
           closes_at: string
@@ -5213,6 +5258,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string[]
       }
+      arena_crowd_access: {
+        Args: { p_room_id: string }
+        Returns: boolean
+      }
+      arena_crowd_payload: {
+        Args: { p: Database["public"]["Tables"]["arena_crowd_messages"]["Row"] }
+        Returns: Json
+      }
       arena_event: {
         Args: {
           p_actor?: string
@@ -6334,6 +6387,14 @@ export type Database = {
         Args: { p_slug: string }
         Returns: Json
       }
+      get_arena_crowd: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      get_arena_crowd_messages: {
+        Args: { p_ids: string[]; p_room_id: string }
+        Returns: Json
+      }
       get_arena_room: {
         Args: { p_room_id: string }
         Returns: Json
@@ -6567,6 +6628,16 @@ export type Database = {
         Args: { p_limit?: number; p_offset?: number; p_specialty?: string }
         Returns: Json
       }
+      list_arena_crowd_messages: {
+        Args: {
+          p_cursor_at?: string
+          p_cursor_id?: string
+          p_direction?: string
+          p_limit?: number
+          p_room_id: string
+        }
+        Returns: Json
+      }
       list_arena_room_events: {
         Args: { p_after?: string; p_limit?: number; p_room_id: string }
         Returns: Json
@@ -6770,6 +6841,10 @@ export type Database = {
         Args: { p_take_id: string }
         Returns: Json
       }
+      moderate_arena_crowd_message: {
+        Args: { p_hidden: boolean; p_message_id: string; p_reason: string }
+        Returns: undefined
+      }
       mute_profile: {
         Args: { p_target_id: string }
         Returns: undefined
@@ -6856,6 +6931,10 @@ export type Database = {
           parent_message_id: string | null
           room_id: string
         }[]
+      }
+      post_arena_crowd_message: {
+        Args: { p_body: string; p_request_key: string; p_room_id: string }
+        Returns: Json
       }
       post_arena_room_message: {
         Args: {
@@ -7433,6 +7512,15 @@ export type Database = {
         Returns: Json
       }
       submit_report: {
+        Args: {
+          p_detail?: string
+          p_reason: Database["public"]["Enums"]["report_reason"]
+          p_target_id: string
+          p_target_kind: Database["public"]["Enums"]["report_target"]
+        }
+        Returns: string
+      }
+      submit_report_before_crowd: {
         Args: {
           p_detail?: string
           p_reason: Database["public"]["Enums"]["report_reason"]
@@ -8067,6 +8155,7 @@ export type Database = {
         | "arena_crew"
         | "arena_crew_invite"
         | "arena_crew_join_request"
+        | "arena_crowd_message"
       reputation_facet:
         | "DEBATE"
         | "MIND_IMPACT"
@@ -8477,6 +8566,7 @@ export const Constants = {
         "arena_crew",
         "arena_crew_invite",
         "arena_crew_join_request",
+        "arena_crowd_message",
       ],
       reputation_facet: [
         "DEBATE",
