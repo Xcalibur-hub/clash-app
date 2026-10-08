@@ -8,7 +8,7 @@ import { GlowButton } from '../shared/GlowButton';
 export interface HoodHeaderProps {
   hood: Hood;
   memberCount: number | null;
-  liveCount: number;
+  liveCount: number | null;
   joined: boolean;
   joining: boolean;
   onToggleJoin: () => void;
@@ -39,7 +39,7 @@ export function HoodHeader({
           ·
         </Text>
         <Text allowFontScaling={false} style={styles.stat}>
-          {liveCount} live
+          {liveCount === null ? 'Live takes unavailable' : `${liveCount} live takes`}
         </Text>
       </View>
       <GlowButton

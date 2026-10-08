@@ -134,9 +134,9 @@ export function trendingDemoActive(): boolean {
  * instead of calling the RPC: no server read, no writes, no analytics, and no
  * effect on any real ranking.
  */
-export async function fetchTrendingBattles(limit = 10): Promise<ArenaTrendingBattle[]> {
+export async function fetchTrendingBattles(limit = 10, serverOnly = false): Promise<ArenaTrendingBattle[]> {
   // `__DEV__` first, so a production bundle can drop the fixture branch entirely.
-  if (__DEV__ === true && trendingDemoActive()) return arenaTrendDemoBattles();
+  if (!serverOnly && __DEV__ === true && trendingDemoActive()) return arenaTrendDemoBattles();
 
   const { data, error } = await client().rpc('list_arena_trending_battles', {
     p_limit: Math.min(10, Math.max(1, limit)),

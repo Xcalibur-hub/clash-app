@@ -364,22 +364,16 @@ export default function ArenaScreen(): React.JSX.Element {
       );
     }
     if (arenaMode === 'community') {
-      return <ArenaCommunity onParticipate={() => setArenaMode('for_you')} />;
+      return <ArenaCommunity refreshToken={refreshKey} onParticipate={() => setArenaMode('for_you')} />;
     }
     if (arenaMode === 'topics') {
-      return <ArenaTopics />;
-    }
-    if (arenaMode === 'trending') {
       return (
-        <View style={styles.hero}>
-          <TrendingBattlesSection
-            refreshToken={refreshKey}
-            onEnter={openTrendingBattle}
-          />
-        </View>
+        <>
+          <ArenaTopics refreshToken={refreshKey} onOpenTopic={openTopic} onOpenRoom={openRoom} />
+          <TrendingBattlesSection refreshToken={refreshKey} onEnter={openTrendingBattle} serverOnly />
+        </>
       );
     }
-
     // For You: keep loading/error above the fold — do not bury status under live hero chrome.
     if (state.arenaStatus === 'loading') {
       return (
@@ -555,6 +549,7 @@ export default function ArenaScreen(): React.JSX.Element {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} />
       <ArenaTopBar paddingTop={insets.top} contextLine="ARENA" />
+      <ArenaSideRail mode={arenaMode} onChange={setArenaMode} />
       <FlatList
         key={arenaMode}
         data={listData}
@@ -573,11 +568,6 @@ export default function ArenaScreen(): React.JSX.Element {
         windowSize={9}
         style={[styles.listLayer, entrance && styles.listDimmed]}
         pointerEvents={entrance ? 'none' : 'auto'}
-      />
-      <ArenaSideRail
-        mode={arenaMode}
-        onChange={setArenaMode}
-        bottomOffset={dockBottomPadding(insets.bottom) + 24}
       />
       <PostActionsSheet
         visible={menu !== null}

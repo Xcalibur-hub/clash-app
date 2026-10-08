@@ -60,11 +60,11 @@ function message(
 }
 
 describe('Arena IA', () => {
-  it('organizes Arena as For You / Clashes / Community / Topics / Trending', () => {
+  it('organizes Arena as Home / Live Clashes / Communities / Topics & Trends', () => {
     assert.equal(DEFAULT_ARENA_MODE, 'for_you');
     assert.deepEqual(
       ARENA_MODES.map((m) => m.id),
-      ['for_you', 'clashes', 'community', 'topics', 'trending'],
+      ['for_you', 'clashes', 'community', 'topics'],
     );
   });
 });

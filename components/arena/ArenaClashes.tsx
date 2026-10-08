@@ -67,10 +67,10 @@ export function ArenaClashes({
         CLASHES
       </Text>
       <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-        Competitive surface
+        Live Clashes
       </Text>
       <Text style={[styles.sub, { color: t.textSecondary }]}>
-        Live rooms and relevant Clashes from real Arena data. No invented scores.
+        Follow upcoming duels and revisit completed Clashes.
       </Text>
 
       {loading ? <Text style={[styles.empty, { color: t.textMuted }]}>Loading Clashes…</Text> : null}

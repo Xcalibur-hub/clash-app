@@ -24,6 +24,7 @@ import { TrendingBattlesChart } from './TrendingBattlesChart';
 export interface TrendingBattlesSectionProps {
   onEnter: (battle: ArenaTrendingBattle) => void;
   refreshToken?: number;
+  serverOnly?: boolean;
 }
 
 const CLIENT_REFRESH_MS = 45_000;
@@ -31,6 +32,7 @@ const CLIENT_REFRESH_MS = 45_000;
 export function TrendingBattlesSection({
   onEnter,
   refreshToken = 0,
+  serverOnly = false,
 }: TrendingBattlesSectionProps): React.JSX.Element | null {
   const t = useThemeColors();
   const reduced = useReducedMotion();
@@ -41,11 +43,14 @@ export function TrendingBattlesSection({
   const [loaded, setLoaded] = React.useState(false);
   const [active, setActive] = React.useState(AppState.currentState === 'active');
   const viewed = React.useRef(false);
-  const demo = trendingDemoActive();
+  const demo = !serverOnly && trendingDemoActive();
+  const request = React.useRef(0);
 
   const load = React.useCallback(async (): Promise<void> => {
+    const generation = ++request.current;
     try {
-      const next = await fetchTrendingBattles(10);
+      const next = await fetchTrendingBattles(10, serverOnly);
+      if (generation !== request.current) return;
       setBattles(next);
       setFailed(false);
       setSelectedId((prev) => {
@@ -58,12 +63,13 @@ export function TrendingBattlesSection({
         analytics.track('arena_trending_viewed', { realm: 'arena' });
       }
     } catch {
+      if (generation !== request.current) return;
       setBattles([]);
       setFailed(true);
     } finally {
-      setLoaded(true);
+      if (generation === request.current) setLoaded(true);
     }
-  }, [demo]);
+  }, [demo, serverOnly]);
 
   React.useEffect(() => {
     const sub = AppState.addEventListener('change', (status: AppStateStatus) => {
@@ -74,6 +80,7 @@ export function TrendingBattlesSection({
 
   React.useEffect(() => {
     void load();
+    return () => { request.current += 1; };
   }, [load, refreshToken]);
 
   React.useEffect(() => {
@@ -84,8 +91,16 @@ export function TrendingBattlesSection({
     return () => clearInterval(id);
   }, [active, load]);
 
-  if (failed) return null;
-  if (!loaded) return null;
+  if (failed || !loaded) {
+    return (
+      <View style={styles.wrap}>
+        <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>Trending</Text>
+        <Text style={[styles.emptyBody, { color: t.textMuted }]}>
+          {failed ? "Couldn't load trends. Pull down to retry." : 'Loading trends…'}
+        </Text>
+      </View>
+    );
+  }
 
   if (battles.length === 0) {
     return (

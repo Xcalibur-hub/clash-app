@@ -1,32 +1,29 @@
 /**
  * Arena primary navigation vocabulary (UI/IA only).
- * Arena = For You / Clashes / Community / Topics / Trending.
+ * Four destinations within the existing Arena screen.
  */
 
 export type ArenaMode =
   | 'for_you'
   | 'clashes'
   | 'community'
-  | 'topics'
-  | 'trending';
+  | 'topics';
 
 export const ARENA_MODES: readonly { id: ArenaMode; label: string }[] = [
-  { id: 'for_you', label: 'FOR YOU' },
-  { id: 'clashes', label: 'CLASHES' },
-  { id: 'community', label: 'COMMUNITY' },
-  { id: 'topics', label: 'TOPICS' },
-  { id: 'trending', label: 'TRENDING' },
+  { id: 'for_you', label: 'Home' },
+  { id: 'clashes', label: 'Live Clashes' },
+  { id: 'community', label: 'Communities' },
+  { id: 'topics', label: 'Topics & Trends' },
 ] as const;
 
 export const DEFAULT_ARENA_MODE: ArenaMode = 'for_you';
 
-/** Icon-first rail; labels expand on press (ExploreModeRail pattern). */
+/** Icons accompanying the persistent destination labels. */
 export const ARENA_MODE_ICONS: Record<ArenaMode, string> = {
   for_you: 'spark',
   clashes: 'swords',
   community: 'users',
   topics: 'hash',
-  trending: 'trend',
 };
 
 export function arenaModeAccessibilityLabel(

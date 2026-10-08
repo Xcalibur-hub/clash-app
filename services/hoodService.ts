@@ -46,12 +46,13 @@ export async function fetchHoodOverview(
 ): Promise<HoodOverview> {
   const client = requireSupabase();
   const [memberCount, liveCount] = await Promise.all([
-    client.from('hood_memberships').select('*', { count: 'exact', head: true }).eq('hood', hood),
+    client.from('hood_memberships').select('hood', { count: 'exact', head: true }).eq('hood', hood),
     client
       .from('takes')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('hood', hood)
       .eq('status', 'active')
+      .filter('is_runtime_fixture', 'eq', false)
       .gt('expires_at', new Date().toISOString()),
   ]);
   if (memberCount.error) throw requestError(memberCount.error);
@@ -92,6 +93,7 @@ export async function fetchHoodSummaries(profileId?: string | null): Promise<Hoo
       .from('takes')
       .select('hood')
       .eq('status', 'active')
+      .filter('is_runtime_fixture', 'eq', false)
       .gt('expires_at', new Date().toISOString()),
   ]);
   if (memberships.error) throw requestError(memberships.error);

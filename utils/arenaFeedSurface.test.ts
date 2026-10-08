@@ -19,7 +19,6 @@ describe('Arena For You feed surface', () => {
     const rows = [{ id: 't1' }, { id: 't2' }];
     assert.deepEqual(arenaFlatListData('for_you', 'ready', rows), rows);
     assert.deepEqual(arenaFlatListData('clashes', 'ready', rows), []);
-    assert.deepEqual(arenaFlatListData('trending', 'ready', rows), []);
   });
 
   it('clears rows while loading or errored so status UI can show', () => {
