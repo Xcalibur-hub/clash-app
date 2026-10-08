@@ -16,7 +16,7 @@ select throws_ok($$select public.save_my_arena_interests(array['technology','fil
 select throws_ok($$select public.save_my_arena_interests(array['technology','film',null],false,0)$$,'22023',null,'null selection');
 select throws_ok($$select public.save_my_arena_interests(array['technology'],true,0)$$,'22023',null,'skip must be explicit zero');
 select is(public.save_my_arena_interests(array['technology','film','sport'],false,0)->>'revision','1','first save atomic');
-select throws_ok($$select public.save_my_arena_interests(array['business','gaming','education'],false,0)$$,'40001',null,'stale concurrent revision rejected');
+select throws_ok($$select public.save_my_arena_interests(array['business','gaming','education'],false,0)$$,'PT409',null,'stale concurrent revision rejected');
 select is(jsonb_array_length(public.get_my_arena_interests()->'topicIds'),3,'failed replacement preserves selection');
 reset role;
 select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000006602","role":"authenticated"}',true);

@@ -14,7 +14,7 @@ select is(extensions.dblink_send_query('interest-c2','select pg_temp.try_interes
 select pg_sleep(0.1);
 select is(extensions.dblink_is_busy('interest-c2'),1,'second session waits for first transaction');
 select extensions.dblink_exec('interest-c1','commit');
-select is((select code from extensions.dblink_get_result('interest-c2') as x(code text)),'40001','parallel stale save rejected');
+select is((select code from extensions.dblink_get_result('interest-c2') as x(code text)),'PT409','parallel stale save rejected');
 select * from extensions.dblink_get_result('interest-c2') as x(code text);
 select is((select count(*)::integer from public.arena_interest_preferences where auth_user_id='00000000-0000-0000-0000-000000006701'),1,'one durable owner row');
 select is((select revision::integer from public.arena_interest_preferences where auth_user_id='00000000-0000-0000-0000-000000006701'),1,'losing save cannot advance revision');
