@@ -1,5 +1,5 @@
 /**
- * Ephemeral typing presence helpers — no draft text, no Postgres writes.
+ * Ephemeral typing presentation helpers — no draft text.
  */
 
 export interface TypingPeer {

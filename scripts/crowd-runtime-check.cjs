@@ -66,6 +66,44 @@ async function main() {
     for(const u of f.users) clients.push(await login(u));
     await rpc(clients[0],'post_arena_room_message',{p_room_id:f.roomId,p_body:'[LOCAL TEST] Official argument remains on the Stage.'});
     for(const i of [2,3]) await rpc(clients[i],'watch_arena_room',{p_room_id:f.roomId});
+    const typingSeen=[0,0]; const typingJoined=[false,false]; const typingChannels=[];
+    for(const [index,who] of [0,2].entries()) {
+      const channel=clients[who].channel(`arena-typing:${f.roomId}`,{config:{private:true}})
+        .on('broadcast',{event:'typing'},()=>{typingSeen[index]++;})
+        .subscribe(state=>{typingJoined[index]=state==='SUBSCRIBED';});
+      typingChannels.push(channel);
+    }
+    await waitFor(()=>typingJoined.every(Boolean),'private typing members authorized');
+    let outsiderDenied=false;
+    clients[4].channel(`arena-typing:${f.roomId}`,{config:{private:true}})
+      .on('broadcast',{event:'typing'},()=>{throw new Error('Private typing hint reached outsider');})
+      .subscribe(state=>{if(state==='CHANNEL_ERROR')outsiderDenied=true;});
+    await waitFor(()=>outsiderDenied,'outsider private channel rejected');
+    const anonymous=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});clients.push(anonymous);
+    let guestDenied=false;
+    anonymous.channel(`arena-typing:${f.roomId}`,{config:{private:true}}).on('broadcast',{event:'typing'},()=>{
+      throw new Error('Private typing hint reached anonymous session');
+    }).subscribe(state=>{if(state==='CHANNEL_ERROR')guestDenied=true;});
+    await waitFor(()=>guestDenied,'anonymous private channel rejected');
+    const publicGuest=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});clients.push(publicGuest);
+    let publicJoined=false;
+    const publicChannel=publicGuest.channel(`arena-typing:${f.roomId}`).subscribe(state=>{publicJoined=state==='SUBSCRIBED';});
+    await waitFor(()=>publicJoined,'public adversarial topic ready');
+    const beforePublicSpoof=typingSeen[0];
+    await publicChannel.send({type:'broadcast',event:'typing',payload:{userId:f.users[1].profileId,name:'Public spoof'}});
+    await pause(500);assert.equal(typingSeen[0],beforePublicSpoof,'public topic must not inject private events');
+    await rpc(clients[0],'set_arena_room_typing',{p_room_id:f.roomId,p_typing:true});
+    await waitFor(()=>typingSeen.every(n=>n>0),'server typing broadcast reaches both members');
+    const genuine=await rpc(clients[2],'get_arena_room_typing',{p_room_id:f.roomId});
+    assert.equal(genuine[0].userId,f.users[0].profileId);
+    assert.equal((await clients[2].rpc('set_arena_room_typing',{p_room_id:f.roomId,p_typing:true})).error?.code,'42501');
+    assert.equal((await clients[4].rpc('get_arena_room_typing',{p_room_id:f.roomId})).error?.code,'42501');
+    const beforeSpoof=typingSeen[0];
+    await typingChannels[1].send({type:'broadcast',event:'typing',payload:{userId:f.users[1].profileId,name:'Spoofed'}});
+    await pause(500); assert.equal(typingSeen[0],beforeSpoof,'client private broadcast must not reach members');
+    await rpc(clients[0],'set_arena_room_typing',{p_room_id:f.roomId,p_typing:false});
+    assert.equal((await rpc(clients[2],'get_arena_room_typing',{p_room_id:f.roomId})).length,0);
+    console.log('PASS private typing two-session delivery, outsider/anonymous denial, public-topic isolation, server identity, spectator authorization and spoofed broadcast denial');
     const seen=[new Set(),new Set(),new Set()];
     const subscribed=[false,false,false]; const databaseReady=[false,false,false];
     for(const [index,who] of [2,3,4].entries()) clients[who].channel(`crowd-check-${index}-${run}`).on('postgres_changes',{
@@ -94,6 +132,21 @@ async function main() {
     assert.deepEqual(filtered.map(m=>m.id),[second.id]); console.log('PASS mute removes already-loaded sender content');
     await rpc(clients[3],'unmute_profile',{p_target_id:f.users[2].profileId});
     assert.equal((await rpc(clients[2],'get_arena_crowd',{p_room_id:f.roomId})).spectatorCount,2); console.log('PASS server count reflects two joined spectators');
+    if(mode!=='--keep-for-device') {
+      await clients[2].removeAllChannels();await clients[2].auth.signOut();
+      must(await clients[2].auth.signInWithPassword({email:f.users[4].email,password:f.users[4].password}));
+      assert.equal((await rpc(clients[2],'get_my_profile'))[0].id,f.users[4].profileId);
+      assert.equal((await clients[2].rpc('get_arena_crowd',{p_room_id:f.roomId})).error?.code,'42501');
+      assert.equal((await clients[2].rpc('get_arena_room_typing',{p_room_id:f.roomId})).error?.code,'42501');
+      console.log('PASS same-client account switch loses previous Room/Crowd/typing authorization');
+      must(await admin.from('takes').update({status:'removed'}).eq('id',f.takeId));
+      assert.equal(must(await clients[3].from('takes').select('id').eq('id',f.takeId)).length,0);
+      assert.equal(await rpc(clients[3],'clash_view',{p_clash_id:duel.clashId}),null);
+      assert.equal((await clients[3].rpc('get_arena_room',{p_room_id:f.roomId})).error?.code,'42501');
+      assert.equal((await clients[3].rpc('list_arena_room_messages',{p_room_id:f.roomId})).error?.code,'42501');
+      assert.equal((await clients[3].rpc('get_arena_crowd',{p_room_id:f.roomId})).error?.code,'42501');
+      console.log('PASS removed source denied through direct REST, legacy Clash, Room, official transcript and Crowd RPCs');
+    }
     if(mode==='--keep-for-device') { fs.writeFileSync(fixturePath,JSON.stringify(f)); console.log(`DEVICE_ROOM ${f.roomId}`); }
   } finally {
     for(const client of clients) { await client.removeAllChannels(); await client.auth.signOut(); }

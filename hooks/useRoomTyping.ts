@@ -17,7 +17,7 @@ export interface UseRoomTypingOptions {
 
 /**
  * Ephemeral typing presence for one room.
- * Never writes Postgres. Never broadcasts draft text.
+ * Server records expire after six seconds. Never broadcasts draft text.
  */
 export function useRoomTyping({
   roomId,

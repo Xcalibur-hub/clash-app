@@ -6864,6 +6864,18 @@ export type Database = {
           streak: number
         }[]
       }
+      get_arena_room_typing: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      set_arena_room_typing: {
+        Args: {
+          p_reply_message_id?: string
+          p_room_id: string
+          p_typing: boolean
+        }
+        Returns: undefined
+      }
       my_profile_id: {
         Args: Record<PropertyKey, never>
         Returns: string

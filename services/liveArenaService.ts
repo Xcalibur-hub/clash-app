@@ -1362,9 +1362,8 @@ export function subscribeRoomMessages(
 }
 
 /**
- * Ephemeral room typing via Realtime Presence.
- * Channel is room-scoped — Room 1 never sees Room 2 typers.
- * Payload never includes draft text or stance.
+ * Server-derived typing on an authorized private broadcast topic.
+ * Broadcasts are hints; identities and reply targets are hydrated through RLS.
  *
  * @returns controllers to set/clear typing + unsubscribe
  */
@@ -1379,66 +1378,75 @@ export function subscribeRoomTyping(
 } {
   const supabase = client();
   const channel = supabase.channel(`arena-typing:${roomId}`, {
-    config: { presence: { key: viewer.userId } },
+    config: { private: true },
   });
 
   let disposed = false;
 
-  const publishPeers = (): void => {
+  let refreshing = false;
+  const publishPeers = async (): Promise<void> => {
     if (disposed) return;
-    const state = channel.presenceState();
-    const peers: ArenaTypingState[] = [];
-    for (const metas of Object.values(state)) {
-      const meta = (metas?.[0] ?? null) as Partial<ArenaTypingState> | null;
-      if (!meta || typeof meta.userId !== 'string') continue;
-      if (meta.typing !== true) continue;
-      peers.push({
-        userId: meta.userId,
-        handle: typeof meta.handle === 'string' ? meta.handle : '',
-        name: typeof meta.name === 'string' ? meta.name : '',
-        avatarTint: typeof meta.avatarTint === 'string' ? meta.avatarTint : '#A1A1AA',
-        replyingToMessageId:
-          typeof meta.replyingToMessageId === 'string' ? meta.replyingToMessageId : null,
-        typing: true,
-      });
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      const { data, error } = await supabase.rpc('get_arena_room_typing', { p_room_id: roomId });
+      if (disposed) return;
+      if (error || !Array.isArray(data)) { onPeers([]); return; }
+      const peers: ArenaTypingState[] = [];
+      for (const value of data) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+        const meta = value as Record<string, Json | undefined>;
+        if (typeof meta.userId !== 'string' || typeof meta.handle !== 'string'
+          || typeof meta.name !== 'string' || typeof meta.avatarTint !== 'string' || meta.typing !== true) continue;
+        if (meta.userId === viewer.userId) continue;
+        peers.push({ userId: meta.userId, handle: meta.handle, name: meta.name,
+          avatarTint: meta.avatarTint, typing: true,
+          replyingToMessageId: typeof meta.replyingToMessageId === 'string' ? meta.replyingToMessageId : null });
+      }
+      onPeers(peers);
+    } catch {
+      if (!disposed) onPeers([]);
+    } finally {
+      refreshing = false;
     }
-    onPeers(peers);
   };
 
-  channel.on('presence', { event: 'sync' }, publishPeers);
-  channel.on('presence', { event: 'join' }, publishPeers);
-  channel.on('presence', { event: 'leave' }, publishPeers);
+  channel.on('broadcast', { event: 'typing' }, () => { void publishPeers(); });
+  // Expiry and authorization revocation are reconciled even without an event.
+  const timer = setInterval(() => { void publishPeers(); }, 3_000);
 
   void (async () => {
     try {
-      const { data } = await supabase.auth.getSession();
-      await supabase.realtime.setAuth(data.session?.access_token ?? null);
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session || disposed) return;
+      await supabase.realtime.setAuth(data.session.access_token);
     } catch {
-      /* allow subscribe; presence stays empty without auth */
+      return;
     }
     if (disposed) return;
-    channel.subscribe();
+    channel.subscribe(status => {
+      if (disposed) return;
+      if (status === 'SUBSCRIBED') void publishPeers();
+      else onPeers([]);
+    });
   })();
 
   const setTyping = (replyingToMessageId: string | null): void => {
     if (disposed) return;
-    void channel.track({
-      userId: viewer.userId,
-      handle: viewer.handle,
-      name: viewer.name,
-      avatarTint: viewer.avatarTint,
-      replyingToMessageId,
-      typing: true,
-    });
+    void supabase.rpc('set_arena_room_typing', {
+      p_room_id: roomId, p_typing: true, p_reply_message_id: replyingToMessageId ?? undefined,
+    }).then(() => undefined, () => undefined);
   };
 
   const clearTyping = (): void => {
-    void channel.untrack();
+    if (disposed) return;
+    void supabase.rpc('set_arena_room_typing', { p_room_id: roomId, p_typing: false })
+      .then(() => undefined, () => undefined);
   };
 
   const unsubscribe = (): void => {
     disposed = true;
-    void channel.untrack();
+    clearInterval(timer);
     void supabase.removeChannel(channel);
   };
 
