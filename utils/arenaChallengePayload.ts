@@ -24,7 +24,7 @@ export function parseArenaChallenge(value: unknown): ArenaChallenge {
   if (Date.parse(p.expiresAt as string) <= Date.parse(p.createdAt as string)
     || (p.resolvedAt !== null && !Number.isFinite(Date.parse(p.resolvedAt as string)))
     || (p.status !== 'PENDING' && p.status !== 'EXPIRED' && p.resolvedAt === null)) throw new Error('Invalid Challenge clock');
-  if (accepted !== Boolean(p.clashId && p.roomId) || (!accepted && (p.clashId !== null || p.roomId !== null))
+  if ((!accepted && (p.clashId !== null || p.roomId !== null)) || (p.roomId !== null && p.clashId === null)
     || (p.status === 'PENDING' && p.resolvedAt !== null)) throw new Error('Invalid Challenge outcome');
   const actor = p.challenger as Record<string, unknown> | null;
   if (!actor || actor.id !== p.challengerId || typeof actor.name !== 'string' || typeof actor.handle !== 'string') {

@@ -7,9 +7,10 @@ const fixture = () => ({ id: 'ch', takeId: 't', challengerId: 'b', challengedId:
 test('pending Challenge preserves source, counter and server identities', () => {
   const ch = parseArenaChallenge(fixture()); assert.equal(ch.challenger.id, 'b'); assert.equal(ch.counterPosition, fixture().counterPosition);
 });
-test('accepted Challenge requires both canonical links', () => {
+test('accepted Challenge without Room stays explicitly non-ready', () => {
   const p = { ...fixture(), status: 'ACCEPTED', resolvedAt: '2026-10-07T10:01:00Z', clashId: 'c', roomId: 'r' };
-  assert.equal(parseArenaChallenge(p).roomId, 'r'); assert.throws(() => parseArenaChallenge({ ...p, roomId: null }));
+  assert.equal(parseArenaChallenge(p).roomId, 'r'); assert.equal(parseArenaChallenge({ ...p, roomId: null }).roomId, null);
+  assert.throws(() => parseArenaChallenge({ ...p, clashId: null }));
 });
 test('terminal non-accepted states cannot carry a battle', () => {
   for (const status of ['PASSED','CANCELLED','EXPIRED']) {

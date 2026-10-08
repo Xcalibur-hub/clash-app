@@ -5,7 +5,7 @@ select extensions.dblink_connect('p2-c1','host=127.0.0.1 port=5432 user=postgres
 select extensions.dblink_connect('p2-c2','host=127.0.0.1 port=5432 user=postgres password=postgres dbname='||current_database());
 select extensions.dblink_exec('p2-c1',$remote$
 do $fixture$ begin
- delete from public.takes where id in('p2-race-1','p2-race-2');
+ delete from public.takes where id in('p2-race-1','p2-race-2','p2-race-3','p2-race-4');
  delete from public.arena_daily_topics where title='Phase 2 concurrent proposition';
  delete from public.rate_limit_events where actor_id in('p2-race-a','p2-race-b','p2-race-c');
  delete from public.profiles where id in('p2-race-a','p2-race-b','p2-race-c');
@@ -14,7 +14,7 @@ do $fixture$ begin
  update public.profiles set id='p2-race-a',handle='p2_race_a',name='Race author' where auth_user_id='00000000-0000-0000-0000-00000000f401';
  update public.profiles set id='p2-race-b',handle='p2_race_b',name='Race challenger' where auth_user_id='00000000-0000-0000-0000-00000000f402';
  update public.profiles set id='p2-race-c',handle='p2_race_c',name='Race competitor' where auth_user_id='00000000-0000-0000-0000-00000000f403';
- insert into public.takes(id,author_id,hood,text) values('p2-race-1','p2-race-a','techtakes','Phase 2 concurrent proposition'),('p2-race-2','p2-race-a','techtakes','Phase 2 concurrent proposition');
+ insert into public.takes(id,author_id,hood,text) values('p2-race-1','p2-race-a','techtakes','Phase 2 concurrent proposition'),('p2-race-2','p2-race-a','techtakes','Phase 2 concurrent proposition'),('p2-race-3','p2-race-a','techtakes','Phase 2 concurrent proposition'),('p2-race-4','p2-race-a','techtakes','Phase 2 concurrent proposition');
 end $fixture$;
 $remote$);
 select * from extensions.dblink('p2-c1',$$select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000f402","role":"authenticated"}',false)$$) as x(claims text);
@@ -84,8 +84,40 @@ select is((select count(*)::integer from public.arena_challenges where take_id='
 select is((select count(*)::integer from public.notifications where kind='challenge_accepted' and recipient_id in('p2-race-b','p2-race-c')),2,'one accepted notification per actual duel');
 select is((select count(*)::integer from public.clashes c left join public.arena_rooms r on r.clash_id=c.id where c.take_id in('p2-race-1','p2-race-2') and r.id is null),0,'no orphan Clash');
 select is((select count(*)::integer from public.arena_rooms r join public.clashes c on c.id=r.clash_id where c.take_id in('p2-race-1','p2-race-2')),2,'no extra or orphan Rooms');
+
+-- Cancel wins first: Accept waits and cannot create a duel afterwards.
+select * from extensions.dblink('p2-c1',$$select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000f402","role":"authenticated"}',false)$$) as x(claims text);
+create temporary table inbox_cancel_first as select payload from extensions.dblink('p2-c1',
+ $$select public.create_arena_challenge('p2-race-3','Cancellation and acceptance must serialize correctly.')$$) as x(payload jsonb);
+select extensions.dblink_exec('p2-c1','begin');
+select * from extensions.dblink('p2-c1',format('select public.resolve_arena_challenge(%L::uuid,''CANCEL'')',(select payload->>'id' from inbox_cancel_first))) as x(payload jsonb);
+select is(extensions.dblink_send_query('p2-c2',format('select public.resolve_arena_challenge(%L::uuid,''ACCEPT'')',(select payload->>'id' from inbox_cancel_first))),1,'Accept races held cancellation');
+select pg_sleep(0.1);
+select is(extensions.dblink_is_busy('p2-c2'),1,'Accept waits on cancellation transaction');
+select extensions.dblink_exec('p2-c1','commit');
+create temporary table inbox_cancel_result as select payload from extensions.dblink_get_result('p2-c2') as x(payload jsonb);
+select * from extensions.dblink_get_result('p2-c2') as x(payload jsonb);
+select is((select payload->>'status' from inbox_cancel_result),'CANCELLED','cancellation winner is deterministic');
+select is((select count(*)::integer from public.clashes where take_id='p2-race-3'),0,'cancel-first race creates no duel');
+-- Accept wins first: Cancel waits and then fails rather than undoing acceptance.
+create temporary table inbox_accept_first as select payload from extensions.dblink('p2-c1',
+ $$select public.create_arena_challenge('p2-race-4','Acceptance and cancellation share the authoritative lock order.')$$) as x(payload jsonb);
+select * from extensions.dblink('p2-c1',$$select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000f401","role":"authenticated"}',false)$$) as x(claims text);
+select * from extensions.dblink('p2-c2',$$select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000f402","role":"authenticated"}',false)$$) as x(claims text);
+select extensions.dblink_exec('p2-c1','begin');
+select * from extensions.dblink('p2-c1',format('select public.resolve_arena_challenge(%L::uuid,''ACCEPT'')',(select payload->>'id' from inbox_accept_first))) as x(payload jsonb);
+select is(extensions.dblink_send_query('p2-c2',format('select public.resolve_arena_challenge(%L::uuid,''CANCEL'')',(select payload->>'id' from inbox_accept_first))),1,'Cancel races held acceptance');
+select pg_sleep(0.1);
+select is(extensions.dblink_is_busy('p2-c2'),1,'Cancel waits on acceptance transaction');
+select extensions.dblink_exec('p2-c1','commit');
+select is((select count(*)::integer from extensions.dblink_get_result('p2-c2',false) as x(payload jsonb)),0,'Cancel cannot reverse accepted challenge');
+select ok(extensions.dblink_error_message('p2-c2') like '%Challenge is terminal%','conflicting cancellation reports terminal conflict');
+select * from extensions.dblink_get_result('p2-c2',false) as x(payload jsonb);
+select is((select status::text from public.arena_challenges where take_id='p2-race-4'),'ACCEPTED','accept-first winner remains accepted');
+select is((select count(*)::integer from public.clashes c join public.arena_rooms r on r.clash_id=c.id where c.take_id='p2-race-4'),1,'accept-first race creates exactly one linked Room');
+
 select extensions.dblink_exec('p2-c1','reset role');
-select extensions.dblink_exec('p2-c1',$$delete from public.takes where id in('p2-race-1','p2-race-2');
+select extensions.dblink_exec('p2-c1',$$delete from public.takes where id in('p2-race-1','p2-race-2','p2-race-3','p2-race-4');
  delete from public.arena_daily_topics where title='Phase 2 concurrent proposition';
  delete from public.rate_limit_events where actor_id in('p2-race-a','p2-race-b','p2-race-c');
  delete from public.profiles where id in('p2-race-a','p2-race-b','p2-race-c');

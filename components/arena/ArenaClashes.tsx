@@ -72,6 +72,11 @@ export function ArenaClashes({
       <Text style={[styles.sub, { color: t.textSecondary }]}>
         Follow upcoming duels and revisit completed Clashes.
       </Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Open Challenge Inbox"
+        style={[styles.row,{borderColor:t.border}]} onPress={()=>{hapticPress();router.push('/arena/challenges');}}>
+        <Text style={[styles.enter,{color:t.textPrimary}]}>CHALLENGE INBOX</Text>
+        <Text style={[styles.empty,{color:t.textMuted}]}>Incoming and outgoing invitations</Text>
+      </Pressable>
 
       {loading ? <Text style={[styles.empty, { color: t.textMuted }]}>Loading Clashes…</Text> : null}
       {!user ? <Text style={[styles.empty, { color: t.textMuted }]}>Sign in to see your Challenges and Clash history.</Text> : null}
