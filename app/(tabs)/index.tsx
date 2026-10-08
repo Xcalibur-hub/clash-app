@@ -48,6 +48,10 @@ import {
 import { useAuth } from '../../store/AuthProvider';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { DEFAULT_ARENA_MODE, type ArenaMode } from '../../utils/arenaNav';
+import {
+  arenaFlatListData,
+  shouldShowArenaFeedEmpty,
+} from '../../utils/arenaFeedSurface';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 
@@ -86,6 +90,7 @@ export default function ArenaScreen(): React.JSX.Element {
   const [entrance, setEntrance] = React.useState(false);
   /** Guards against double taps racing the reaction RPC for the same Take. */
   const reactionInFlight = React.useRef<Set<string>>(new Set());
+  const dismissEntrance = React.useCallback(() => setEntrance(false), []);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -367,6 +372,18 @@ export default function ArenaScreen(): React.JSX.Element {
       );
     }
 
+    // For You: keep loading/error above the fold — do not bury status under live hero chrome.
+    if (state.arenaStatus === 'loading') {
+      return (
+        <View style={styles.hero} accessibilityLabel="Loading Arena feed">
+          <FeedSkeleton />
+        </View>
+      );
+    }
+    if (state.arenaStatus === 'error') {
+      return <View style={styles.hero} />;
+    }
+
     return (
       <View style={styles.hero}>
         {heroTopic ? (
@@ -444,6 +461,7 @@ export default function ArenaScreen(): React.JSX.Element {
     requireAuth,
     scope,
     shareTake,
+    state.arenaStatus,
     theme.textPrimary,
     theme.textMuted,
     toggleReaction,
@@ -520,24 +538,22 @@ export default function ArenaScreen(): React.JSX.Element {
   ]);
 
   // Cold-start failure: no mock content underneath — only the error empty state.
-  // Featured hero Takes are filtered out so they don't duplicate under Fresh Takes.
   // Non-feed Arena modes use header-only surfaces (no Take FlatList rows).
-  const feedMode = arenaMode === 'for_you';
-  const listData =
-    !feedMode || state.arenaStatus === 'error' || state.arenaStatus === 'loading'
-      ? []
-      : listFeed;
+  // Fresh Takes slice may empty listFeed — still not a true empty when feed has items.
+  const listData = arenaFlatListData(arenaMode, state.arenaStatus, listFeed);
+  const showEmpty = shouldShowArenaFeedEmpty(arenaMode, state.arenaStatus, feed.length);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} />
       <ArenaTopBar paddingTop={insets.top} contextLine="ARENA" />
       <FlatList
+        key={arenaMode}
         data={listData}
         keyExtractor={(take) => take.id}
         renderItem={renderItem}
         ListHeaderComponent={header}
-        ListEmptyComponent={feedMode ? empty : null}
+        ListEmptyComponent={showEmpty ? empty : null}
         contentContainerStyle={[styles.list, { paddingBottom: dockBottomPadding(insets.bottom) }]}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
@@ -548,6 +564,7 @@ export default function ArenaScreen(): React.JSX.Element {
         maxToRenderPerBatch={8}
         windowSize={9}
         style={[styles.listLayer, entrance && styles.listDimmed]}
+        pointerEvents={entrance ? 'none' : 'auto'}
       />
       <ArenaSideRail
         mode={arenaMode}
@@ -564,7 +581,7 @@ export default function ArenaScreen(): React.JSX.Element {
         onMutated={() => setRefreshKey((k) => k + 1)}
       />
       <Notice offset={0} />
-      <ArenaEntrance active={entrance} onDone={() => setEntrance(false)} />
+      <ArenaEntrance active={entrance} onDone={dismissEntrance} />
     </View>
   );
 }

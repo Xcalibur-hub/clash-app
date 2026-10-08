@@ -27,6 +27,10 @@ export function ArenaEntrance({ active, onDone }: ArenaEntranceProps): React.JSX
   const reduced = useReducedMotion();
   const progress = useSharedValue(0);
   const doneRef = React.useRef(false);
+  // Parent often passes an inline onDone — keep a stable ref so re-renders
+  // cannot reset the cinematic timer and leave the feed permanently veiled.
+  const onDoneRef = React.useRef(onDone);
+  onDoneRef.current = onDone;
 
   React.useEffect(() => {
     if (!active) return undefined;
@@ -41,10 +45,10 @@ export function ArenaEntrance({ active, onDone }: ArenaEntranceProps): React.JSX
     const id = setTimeout(() => {
       if (doneRef.current) return;
       doneRef.current = true;
-      onDone();
+      onDoneRef.current();
     }, duration + 40);
     return () => clearTimeout(id);
-  }, [active, onDone, progress, reduced]);
+  }, [active, progress, reduced]);
 
   const veil = useAnimatedStyle(() => ({
     opacity: reduced ? 1 - progress.value : Math.max(0, 1 - progress.value * 1.15),
