@@ -3,8 +3,12 @@
  * No fabricated viewers, timers, scores, or momentum.
  */
 import React from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { LiveArenaTopic } from '../../services/liveArenaService';
+import { fetchClashDiscovery } from '../../services/arenaClashDiscoveryService';
+import { useAuth } from '../../store/AuthProvider';
+import { clashDiscoveryDestination, type ClashDiscoveryEntry, type ClashDiscoveryState } from '../../utils/arenaClashDiscovery';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { plural } from '../../utils/format';
 import { press as hapticPress } from '../../utils/haptics';
@@ -29,6 +33,31 @@ export function ArenaClashes({
   onWatch,
 }: ArenaClashesProps): React.JSX.Element {
   const t = useThemeColors();
+  const router = useRouter();
+  const { user } = useAuth();
+  const [discovery, setDiscovery] = React.useState<{ ownerId: string | null; entries: ClashDiscoveryEntry[] }>({ ownerId: null, entries: [] });
+  const entries = discovery.ownerId === (user?.id ?? null) ? discovery.entries : [];
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
+  useFocusEffect(React.useCallback(() => {
+    let active = true;
+    let request = 0;
+    setDiscovery({ ownerId: user?.id ?? null, entries: [] });
+    setLoading(true);
+    setError(false);
+    const load = async (): Promise<void> => {
+      const current = ++request;
+      if (!user) { setLoading(false); return; }
+      try {
+        const result = await fetchClashDiscovery();
+        if (active && current === request) { setDiscovery({ ownerId: user.id, entries: result }); setError(false); }
+      } catch { if (active && current === request) setError(true); }
+      finally { if (active && current === request) setLoading(false); }
+    };
+    void load();
+    const timer = setInterval(() => void load(), 20_000);
+    return () => { active = false; clearInterval(timer); };
+  }, [user?.id]));
   const live = topics.filter(isLive);
   const rest = topics.filter((topic) => !isLive(topic));
 
@@ -44,9 +73,27 @@ export function ArenaClashes({
         Live rooms and relevant Clashes from real Arena data. No invented scores.
       </Text>
 
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
-        LIVE
-      </Text>
+      {loading ? <Text style={[styles.empty, { color: t.textMuted }]}>Loading Clashes…</Text> : null}
+      {!user ? <Text style={[styles.empty, { color: t.textMuted }]}>Sign in to see your Challenges and Clash history.</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={[styles.empty, { color: t.textMuted }]}>Couldn’t load Clashes. Retrying…</Text> : null}
+      {(['PENDING', 'LIVE', 'UPCOMING', 'COMPLETED'] as ClashDiscoveryState[]).map(section => (
+        <View key={section}>
+          <Text style={[styles.section, { color: t.textMuted }]}>{section}</Text>
+          {user && !loading && !error && !entries.some(entry => entry.state === section) ? (
+            <Text style={[styles.empty, { color: t.textMuted }]}>No {section.toLowerCase()} Clashes.</Text>
+          ) : null}
+          {entries.filter(entry => entry.state === section).map(entry => (
+            <Pressable key={entry.id} style={[styles.row, { borderColor: t.border }]}
+              accessibilityRole="button" accessibilityLabel={`${entry.state}. ${entry.title}. ${entry.kind === 'CHALLENGE' ? 'View Take' : 'Open Clash'}`}
+              onPress={() => { hapticPress(); router.push(clashDiscoveryDestination(entry)); }}>
+              <Text style={[styles.phase, { color: t.textMuted }]}>{entry.status.toUpperCase()}</Text>
+              <Text style={[styles.proposition, { color: t.textPrimary }]} numberOfLines={3}>{entry.title}</Text>
+              <Text style={[styles.enter, { color: t.textPrimary }]}>{entry.kind === 'CHALLENGE' ? 'VIEW TAKE · AWAITING ACCEPTANCE' : entry.state === 'COMPLETED' ? 'VIEW CLASH' : 'OPEN CLASH'}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ))}
+      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>LIVE TOPIC ROOMS</Text>
       {live.length === 0 ? (
         <Text style={[styles.empty, { color: t.textMuted }]}>
           No live Clashes right now.
@@ -65,13 +112,6 @@ export function ArenaClashes({
           />
         ))
       )}
-
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
-        INCOMING CHALLENGES
-      </Text>
-      <Text style={[styles.empty, { color: t.textMuted }]}>
-        Challenges appear on your Takes when someone counters you. Nothing pending here.
-      </Text>
 
       <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
         RELEVANT

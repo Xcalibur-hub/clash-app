@@ -87,7 +87,8 @@ function DuelLoadingBones(): React.JSX.Element {
 export function DuelRoomExperience(props: Props): React.JSX.Element {
   const { room, messages } = props;
   const duel = room.duel!;
-  const crowd = useArenaCrowd(props.threadLocked ? null : room.roomId);
+  const cancelled = duel.status === 'cancelled';
+  const crowd = useArenaCrowd(props.threadLocked || cancelled ? null : room.roomId);
   React.useEffect(() => { if (props.refreshing) void crowd.refresh(); },[props.refreshing,crowd.refresh]);
   const t = useThemeColors();
   const presentation = duelPresentation(duel, room.phase);
@@ -284,6 +285,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           statusLabel={statusLabel}
           spectatorCount={crowd.context?.spectatorCount ?? null}
           crowd={crowd}
+          crowdUnavailableReason={cancelled ? 'Crowd chat is unavailable because this Clash was cancelled.' : undefined}
           onReportCrowd={props.onReportCrowd}
           focusSide={moment.side}
           latestMessage={moment.message}

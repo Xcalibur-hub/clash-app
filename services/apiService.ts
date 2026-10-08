@@ -39,6 +39,7 @@ export async function fetchTakes(
     .from('takes')
     .select('*')
     .eq('status', 'active')
+    .filter('is_runtime_fixture', 'eq', false)
     .gt('expires_at', new Date().toISOString());
 
   if (excludeAuthorIds.length > 0) {

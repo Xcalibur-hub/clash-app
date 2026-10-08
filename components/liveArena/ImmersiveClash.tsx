@@ -37,6 +37,7 @@ export interface ImmersiveClashProps {
   stageFooter?: React.ReactNode;
   fighterComposer?: React.ReactNode;
   crowd?: LiveCrowdLayerProps['crowd'];
+  crowdUnavailableReason?: string;
   onReportCrowd?: LiveCrowdLayerProps['onReport'];
 }
 
@@ -63,6 +64,7 @@ export function ImmersiveClash({
   stageFooter,
   fighterComposer,
   crowd,
+  crowdUnavailableReason,
   onReportCrowd,
 }: ImmersiveClashProps): React.JSX.Element {
   const t = useThemeColors();
@@ -125,6 +127,7 @@ export function ImmersiveClash({
 
       <View style={[styles.crowd, { flex: crowdFlex }]}>
         <LiveCrowdLayer
+          unavailableReason={crowdUnavailableReason}
           key={crowd?.identityVersion ?? 0}
           crowd={crowd}
           onReport={onReportCrowd}

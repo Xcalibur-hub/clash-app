@@ -60,7 +60,7 @@ async function main() {
       must(await admin.from('profiles').update({name:`LOCAL Crowd Test ${i}`}).eq('id',user.profileId));
     }
     f.takeId=`crowd-local-${run}`;
-    must(await admin.from('takes').insert({id:f.takeId,author_id:f.users[0].profileId,hood:'techtakes',text:'[LOCAL TEST] Crowd runtime validation — removed after testing'}));
+    must(await admin.from('takes').insert({id:f.takeId,author_id:f.users[0].profileId,hood:'techtakes',is_runtime_fixture:true,text:'[LOCAL TEST] Crowd runtime validation — retained only for verification'}));
     const duel=await rpc(admin,'create_arena_duel',{p_take_id:f.takeId,p_fighter_b_id:f.users[1].profileId,p_request_key:randomUUID()});
     f.roomId=duel.roomId; f.topicId=must(await admin.from('arena_rooms').select('topic_id').eq('id',f.roomId).single()).topic_id;
     for(const u of f.users) clients.push(await login(u));

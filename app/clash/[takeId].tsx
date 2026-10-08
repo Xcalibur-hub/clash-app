@@ -7,7 +7,7 @@
 import React from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ClashArguments } from '../../components/clash/interactive/ClashArguments';
 import { ClashCountdown, countdownUrgency } from '../../components/clash/interactive/ClashCountdown';
@@ -148,6 +148,7 @@ export default function ClashScreen(): React.JSX.Element {
       const next = await fetchClashViewForTake(id);
       setView(next);
       if (!next) return;
+      if (next.battleMode === 'DUEL' && next.roomId) return;
       if (!openedRef.current) {
         openedRef.current = true;
         analytics.track('clash_opened', {
@@ -187,6 +188,7 @@ export default function ClashScreen(): React.JSX.Element {
   React.useEffect(() => {
     if (
       view &&
+      view.battleMode !== 'DUEL' &&
       view.status === 'open' &&
       view.closesAt <= Date.now() &&
       !view.verdict &&
@@ -283,12 +285,16 @@ export default function ClashScreen(): React.JSX.Element {
         <EmptyState
           icon={ArenaIcon}
           title="No Clash here yet"
-          body="A Clash starts when someone challenges this Take with a rebuttal."
+          body="Pending Challenges stay on the Take. A duel starts after the author accepts."
           actionLabel="View Take"
           onAction={() => router.replace(`/take/${id}`)}
         />
       </View>
     );
+  }
+
+  if (view.battleMode === 'DUEL' && view.roomId) {
+    return <Redirect href={`/arena/room/${view.roomId}`} />;
   }
 
   const settled = view.status === 'settled';

@@ -136,9 +136,9 @@ select is((select jury_size from public.verdicts where clash_id = (select id fro
 
 -- reward ledger: 2 rows per juror, matching the contract
 select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 6, '6 ledger rows');
-select is((select count(*)::int from public.reputation_events where kind = 'clash_participation'), 3, '3 participation events');
-select is((select count(*)::int from public.reputation_events where kind = 'clash_win'), 2, '2 win events');
-select is((select count(*)::int from public.reputation_events where kind = 'clash_dissent'), 1, '1 dissent event');
+select is((select count(*)::int from public.reputation_events where kind = 'clash_participation' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 3, '3 participation events');
+select is((select count(*)::int from public.reputation_events where kind = 'clash_win' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 2, '2 win events');
+select is((select count(*)::int from public.reputation_events where kind = 'clash_dissent' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 1, '1 dissent event');
 
 -- derived profile state (winner +120/+40/streak+1, minority +25/+18/streak 0)
 select is((select reputation from public.profiles where id = 't-j1'), 120, 'j1 reputation +120');
@@ -167,8 +167,8 @@ select is((select reputation from public.profiles where id = 't-j1'), 120, 'j1 r
 -- notifications are server-created only
 select is((select count(*)::int from public.notifications where entity_id = (select id from public.clashes where take_id = 't-test-clash')), 6, '6 clash notifications');
 select is((select count(*)::int from public.notifications where kind = 'clash_started' and recipient_id = 't-author'), 1, 'clash_started to author');
-select is((select count(*)::int from public.notifications where kind = 'clash_result'), 2, 'clash_result to both debaters');
-select is((select count(*)::int from public.notifications where kind = 'reputation'), 3, 'reputation to each juror');
+select is((select count(*)::int from public.notifications where kind = 'clash_result' and entity_id = (select id from public.clashes where take_id = 't-test-clash')), 2, 'clash_result to both debaters');
+select is((select count(*)::int from public.notifications where kind = 'reputation' and entity_id = (select id from public.clashes where take_id = 't-test-clash')), 3, 'reputation to each juror');
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000c","role":"authenticated"}', true);
 select throws_ok($$ insert into public.notifications (id, recipient_id, kind) values ('n-forge', 't-j1', 'clash_result') $$, '42501', null, 'client cannot forge notifications');

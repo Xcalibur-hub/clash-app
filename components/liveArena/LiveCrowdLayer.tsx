@@ -8,6 +8,7 @@ import { layout, space, typeScale, useThemeColors } from '../../theme';
 export type CrowdModel = ReturnType<typeof useArenaCrowd>;
 export interface LiveCrowdLayerProps {
   subdued?: boolean; paddingBottom?: number; crowd?: CrowdModel;
+  unavailableReason?: string;
   onReport?: (message: CrowdMessage) => void;
 }
 // This UUID is an idempotency nonce, never an identity or authorization token.
@@ -17,7 +18,7 @@ function requestKey(): string {
     const n = Math.floor(Math.random()*16); return (c==='x' ? n : (n&3)|8).toString(16);
   });
 }
-export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport }: LiveCrowdLayerProps): React.JSX.Element {
+export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,unavailableReason }: LiveCrowdLayerProps): React.JSX.Element {
   const t = useThemeColors(); const [draft,setDraft] = React.useState('');
   const [unseen,setUnseen] = React.useState(false);
   const pending = React.useRef<{ body: string; key: string } | null>(null);
@@ -56,7 +57,7 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport }:
       onContentSizeChange={() => { if(atLatest.current) list.current?.scrollToEnd({animated:false}); }}
       ListHeaderComponent={crowd?.hasOlder ? <Pressable disabled={crowd.olderBusy} accessibilityRole="button" style={styles.hit}
         onPress={() => { atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loading…' : 'Load earlier chat'}</Text></Pressable> : null}
-      ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{crowd?.loading ? 'Loading Crowd…' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.'}</Text>}
+      ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{unavailableReason ?? (crowd?.loading ? 'Loading Crowd…' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.')}</Text>}
       renderItem={({item}) => <View style={styles.row}>
         <Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}]}>
           <Text style={styles.name}>@{item.author.handle}</Text>{'  '}{item.body}

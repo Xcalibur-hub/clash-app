@@ -128,7 +128,11 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   }
   if (name === 'judging') assert.match(html, /Judge Kevin, Fighter A, made the stronger case/);
   if (name === 'draw') { assert.match(html, /Draw|VERDICT/); assert.match(html, /50%/); assert.match(html, /4 judgment/); }
-  if (name === 'cancelled') assert.match(html, /Clash cancelled/);
+  if (name === 'cancelled') {
+    assert.match(html, /Clash cancelled/);
+    assert.match(html, /Crowd chat is unavailable because this Clash was cancelled/);
+    assert.doesNotMatch(html, /Send public Crowd message/);
+  }
   if (name === 'error') assert.match(html, /Couldn&#x27;t load the Clash/);
   if (name === 'loading') assert.match(html, /Loading Clash transcript/);
   if (name === 'locked') { assert.match(html, /Watch this Clash as a spectator/); assert.doesNotMatch(html, /Automation is already/); }
