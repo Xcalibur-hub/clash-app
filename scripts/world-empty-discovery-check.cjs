@@ -16,6 +16,7 @@ const area = section('  const searchThisArea = async', '  const recenter = async
 const locate = section('  const recenter = async', '  const zoomToCluster =');
 assert.match(empty, /No Drops in this area/, 'map-area empty state');
 assert.match(empty, /No Mission Drops yet/, 'mission empty state');
+assert.match(empty, /No active Mission/, 'truthful state when no mission exists');
 assert.match(empty, /No recent Drops yet/, 'recent empty state');
 assert.match(empty, /Explore map area/, 'map discovery action');
 assert.match(empty, /Browse recent Drops/, 'recent discovery action');
@@ -26,4 +27,4 @@ for (const [label, block] of [['filter', filter], ['area', area], ['locate', loc
   assert.match(block, /setDrops\(\[\]\)/, label + ' clears old markers before loading');
 }
 assert.doesNotMatch(empty, /requestForegroundPermission|getOneShotLocation/, 'empty state never requests location');
-console.log('World empty discovery source contract: 12 checks passed (native behavior not tested).');
+console.log('World empty discovery source contract: 13 checks passed (native behavior not tested).');

@@ -560,13 +560,13 @@ export default function WorldScreen(): React.JSX.Element {
             ]}
           >
             <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
-              {filter === 'nearby' ? 'No Drops in this area' : filter === 'mission' ? 'No Mission Drops yet' : 'No recent Drops yet'}
+              {filter === 'nearby' ? 'No Drops in this area' : filter === 'mission' ? (primaryMission ? 'No Mission Drops yet' : 'No active Mission') : 'No recent Drops yet'}
             </Text>
             <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textSecondary }]}>
               {filter === 'nearby'
                 ? 'Try another part of the map or browse recent Drops.'
                 : filter === 'mission'
-                  ? 'This Mission is waiting for its first Drop.'
+                  ? (primaryMission ? 'This Mission is waiting for its first Drop.' : 'Browse recent Drops or explore the map.')
                   : 'Explore the map or join a Mission to get things started.'}
             </Text>
             <View style={styles.emptyActions}>

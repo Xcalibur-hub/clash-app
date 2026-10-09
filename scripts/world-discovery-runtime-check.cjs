@@ -5,7 +5,8 @@ const assert=require('node:assert/strict'),React=require('react');
 for(const ext of ['.ts','.tsx'])Module._extensions[ext]=(m,f)=>m._compile(babel.transformSync(fs.readFileSync(f,'utf8'),{
   filename:f,babelrc:false,configFile:false,presets:['@babel/preset-typescript',['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs'],
 }).code,f);
-let cells=[],index=0,effects=[],notices=[],writes=0,focused=true,accountId='account-a';
+let cells=[],index=0,effects=[],notices=[],writes=0,focused=true,accountId='account-a',authLoading=false,routes=[];
+const router={push:path=>routes.push(path),replace:path=>routes.push(path),back(){},canGoBack:()=>true};
 const hooks={...React,
   useState(v){const i=index++,instance=cells;if(!(i in instance))instance[i]=v;return[instance[i],n=>{writes++;instance[i]=typeof n==='function'?n(instance[i]):n;}];},
   useRef(v){const i=index++;if(!(i in cells))cells[i]={current:v};return cells[i];},
@@ -28,15 +29,14 @@ Module._load=function(r,parent){
  if(own&&r==='react')return hooks;
  if(r==='react-native')return{View:'View',Text:'Text',Pressable:'Button',ActivityIndicator:'Spinner',Platform:{OS:'android'},StyleSheet:{create:x=>x}};
  if(r==='react-native-maps')return{__esModule:true,default:'Map',Circle:'Circle'};
- if(r==='expo-router')return{useRouter:()=>({push(){},replace(){},back(){},canGoBack:()=>true})};
+ if(r==='expo-router')return{useRouter:()=>router};
  if(r==='@react-navigation/native')return{useFocusEffect:fn=>hooks.useFocusEffect(fn)};
- if(own&&r==='./AuthProvider')return{useAuth:()=>({user:accountId?{id:accountId}:null})};
+ if(own&&(r==='./AuthProvider'||r.endsWith('/store/AuthProvider')))return{useAuth:()=>({user:accountId?{id:accountId}:null,signedIn:!!accountId,loading:authLoading})};
  if(own&&r==='./ClashStore')return{ClashProvider:'ClashProvider'};
  if(r==='react-native-safe-area-context')return{useSafeAreaInsets:()=>({top:0,bottom:0})};
  if(own&&r.endsWith('/worldService'))return service;
  if(own&&r.endsWith('/locationService'))return location;
  if(own&&r.endsWith('/useClock'))return{useClock:()=>Date.now()};
- if(own&&r.endsWith('/useRequireAuth'))return{useRequireAuth:()=>()=>true};
  if(own&&r.endsWith('/analytics'))return{analytics:{track(){}}};
  if(own&&r.endsWith('/supabaseClient'))return{errorText:e=>e.message};
  if(own&&r.endsWith('/store'))return{useClash:()=>({dispatch}),showNotice:text=>({text})};
@@ -53,13 +53,15 @@ function render(){index=0;const t=Screen();const run=effects;effects=[];run.forE
 function cleanup(){cells.forEach(c=>c?.cleanup?.());}
 function blur(){focused=false;cells.filter(c=>c?.focus).forEach(c=>{c.cleanup?.();c.cleanup=undefined;});}
 function focus(){render();focused=true;cells.filter(c=>c?.focus).forEach(c=>{c.cleanup=c.fn();});}
-function reset(){cleanup();cells=[];effects=[];requests=[];notices=[];writes=0;focused=true;}
+function reset(){cleanup();cells=[];effects=[];requests=[];notices=[];writes=0;focused=true;routes=[];authLoading=false;}
 function find(t,label){const n=nodes(t).find(n=>n.props?.accessibilityLabel===label);assert.ok(n,'missing '+label);return n;}
 function byType(t,type){return nodes(t).find(n=>n.type===type);}
 function press(label){find(render(),label).props.onPress();}
 function pending(kind){const r=requests.find(r=>r.kind===kind&&!r.used);assert.ok(r,'missing request '+kind);r.used=true;return r;}
 const ids=()=>nodes(render()).filter(n=>n.type==='WorldDropMarker').map(n=>n.props.drop.id);
 const selected=label=>find(render(),label).props.accessibilityState.selected;
+const text=()=>nodes(render()).filter(n=>n.type==='Text').flatMap(n=>React.Children.toArray(n.props.children)).filter(n=>typeof n==='string');
+const hasEmpty=()=>text().some(t=>['No Drops in this area','No Mission Drops yet','No recent Drops yet','No active Mission'].includes(t));
 async function flush(){for(let i=0;i<20;i++)await Promise.resolve();}
 const mission={id:'test-mission',title:'Controlled fixture'};
 async function boot(){render();pending('missions').resolve([mission]);await flush();pending('recent').resolve([]);await flush();}
@@ -89,5 +91,13 @@ function pass(name){passed++;console.log('PASS '+name);}
  press('Use my location to recenter map');pending('permission').resolve('granted');await flush();const blurredGps=pending('gps');render();blur();focus();pending('missions').resolve([mission]);pending('recent').resolve([{id:'no-stale-gps'}]);await flush();blurredGps.resolve({latitude:1,longitude:2});await flush();assert.deepEqual(ids(),['no-stale-gps']);assert.equal(byType(render(),'Circle'),undefined);assert.equal(selected('Recent'),true);pass('GPS completing after blur cannot recenter or replace refocused content');
  reset();await boot();press('Map area');pending('area').resolve([]);await flush();byType(render(),'Map').props.onRegionChangeComplete({latitude:12,longitude:71,latitudeDelta:0.2,longitudeDelta:0.2});render();blur();focus();pending('missions').resolve([mission]);pending('area').resolve([]);await flush();assert.equal(nodes(render()).some(n=>n.props?.accessibilityLabel==='Search this area'),false,'focus has just searched the current viewport');pass('refocus updates query origin and clears a redundant Search this area action');
  blur();focus();const beforePan=pending('area');pending('missions').resolve([mission]);byType(render(),'Map').props.onRegionChangeComplete({latitude:13,longitude:71,latitudeDelta:0.2,longitudeDelta:0.2});render();beforePan.resolve([]);await flush();assert.ok(find(render(),'Search this area'));pass('panning during focus refresh retains Search this area for the newer viewport');
+ reset();await boot();assert.ok(text().includes('No recent Drops yet'));press('Explore map area');assert.equal(selected('Map area'),true);assert.equal(hasEmpty(),false);pending('area').resolve([]);await flush();assert.ok(text().includes('No Drops in this area'));press('Browse recent Drops');assert.equal(selected('Recent'),true);assert.equal(hasEmpty(),false);pending('recent').resolve([]);await flush();assert.ok(text().includes('No recent Drops yet'));pass('empty discovery actions switch modes and hide empty copy until results arrive');
+ press('Recent');pending('recent').resolve([{id:'previous-mode',approxLat:12,approxLng:71}]);await flush();byType(render(),'WorldDropMarker').props.onPress({id:'previous-mode',approxLat:12,approxLng:71});assert.ok(byType(render(),'WorldDropPreview'));byType(render(),'WorldMissionBeacon').props.onPress();assert.deepEqual(ids(),[]);assert.equal(byType(render(),'WorldDropPreview'),undefined);assert.equal(hasEmpty(),false);pending('missions').resolve([mission]);await flush();assert.equal(hasEmpty(),false);pending('mission-drops').resolve([]);await flush();assert.ok(text().includes('No Mission Drops yet'));pass('filter change clears previous markers and preview through both pending mission pages');
+ press('Map area');const emptyOld=pending('area');press('Recent');emptyOld.resolve([]);await flush();assert.equal(hasEmpty(),false);assert.equal(selected('Recent'),true);pending('recent').resolve([{id:'latest-populated'}]);await flush();assert.deepEqual(ids(),['latest-populated']);assert.equal(hasEmpty(),false);pass('old empty response cannot show false empty state while current mode is pending');
+ press('Map area');pending('area').resolve([{id:'before-area-search'}]);await flush();byType(render(),'Map').props.onRegionChangeComplete({latitude:10,longitude:71,latitudeDelta:0.2,longitudeDelta:0.2});press('Search this area');assert.deepEqual(ids(),[]);assert.equal(hasEmpty(),false);pending('area').resolve([]);await flush();assert.ok(text().includes('No Drops in this area'));pass('area search clears previous-mode markers and waits before declaring empty');
+ press('Recent');pending('recent').resolve([{id:'before-locate'}]);await flush();press('Use my location to recenter map');pending('permission').resolve('granted');await flush();pending('gps').resolve({latitude:12,longitude:71});await flush();assert.deepEqual(ids(),[]);assert.equal(hasEmpty(),false);pending('area').resolve([]);await flush();assert.ok(text().includes('No Drops in this area'));pass('explicit Locate clears old markers while its discovery query is pending');
+ render();blur();focus();assert.equal(hasEmpty(),false);pending('missions').resolve([mission]);await flush();assert.equal(hasEmpty(),false);pending('area').resolve([]);await flush();assert.ok(hasEmpty());pass('focus refresh hides previously empty mode until the new query completes');
+ accountId=null;render();press("Join this week's Mission");assert.deepEqual(routes,['/auth']);assert.equal(requests.some(r=>!r.used&&['permission','prompt','gps'].includes(r.kind)),false);accountId='account-a';routes=[];render();press("Join this week's Mission");assert.deepEqual(routes,['/world/compose?missionId=test-mission']);authLoading=true;routes=[];render();press("Join this week's Mission");assert.deepEqual(routes,[]);assert.equal(requests.some(r=>!r.used&&['permission','prompt','gps'].includes(r.kind)),false);pass('real mission auth hook routes guests to auth, signed-in viewers to compose and waits during auth loading');
+ reset();render();pending('missions').resolve([]);await flush();pending('recent').resolve([]);await flush();assert.equal(nodes(render()).some(n=>n.props?.accessibilityLabel==="Join this week's Mission"),false);press('Missions');pending('missions').resolve([]);await flush();assert.ok(text().includes('No active Mission'),'do not describe a nonexistent Mission as waiting for its first Drop');pass('no active mission has truthful copy and no participation action');
  cleanup();console.log(`${passed}/${passed} World runtime checks passed; controlled hook bridge, not device tests.`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
