@@ -9,7 +9,8 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 
-const source = readFileSync(join(__dirname, '..', 'app', 'world', 'index.tsx'), 'utf8');
+// Git may check this screen out with CRLF on Windows; the contract is identical.
+const source = readFileSync(join(__dirname, '..', 'app', 'world', 'index.tsx'), 'utf8').replace(/\r\n/g, '\n');
 const between = (start, end) => {
   const a = source.indexOf(start);
   const b = source.indexOf(end, a + start.length);
