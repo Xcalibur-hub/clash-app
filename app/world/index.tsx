@@ -50,12 +50,12 @@ import { tap as hapticTap } from '../../utils/haptics';
 type WorldFilter = 'nearby' | 'recent' | 'mission';
 
 const FILTERS: readonly { key: WorldFilter; label: string }[] = [
-  { key: 'nearby', label: 'Nearby' },
+  { key: 'nearby', label: 'Map area' },
   { key: 'recent', label: 'Recent' },
   { key: 'mission', label: 'Missions' },
 ];
 
-/** Quiet default — coastal Goa — used when location is unavailable. */
+/** Initial map viewport only; never interpreted as the viewer's location. */
 const FALLBACK_REGION: Region = {
   latitude: 15.4909,
   longitude: 73.8278,
@@ -74,7 +74,7 @@ const PREVIEW_CAMERA_BIAS = 0.16;
 
 /**
  * World map — CONTENT markers only.
- * One-shot location for camera/recenter. No live people. No continuous watch.
+ * Location is requested only after a deliberate recenter tap. No live people or continuous watch.
  */
 export default function WorldScreen(): React.JSX.Element {
   const router = useRouter();
@@ -95,14 +95,15 @@ export default function WorldScreen(): React.JSX.Element {
 
   const [missions, setMissions] = React.useState<WorldMission[]>([]);
   const [drops, setDrops] = React.useState<WorldDrop[]>([]);
-  const [filter, setFilter] = React.useState<WorldFilter>('nearby');
+  const [filter, setFilter] = React.useState<WorldFilter>('recent');
   const [region, setRegion] = React.useState<Region>(FALLBACK_REGION);
   const [queryOrigin, setQueryOrigin] = React.useState<Region>(FALLBACK_REGION);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [searching, setSearching] = React.useState(false);
   const [showSearchArea, setShowSearchArea] = React.useState(false);
-  const [locationDenied, setLocationDenied] = React.useState(false);
+  // No position is read and no permission dialog appears when World opens.
+  const [locationDenied, setLocationDenied] = React.useState(true);
   const [privacyOpen, setPrivacyOpen] = React.useState(false);
   const [viewerDot, setViewerDot] = React.useState<{ latitude: number; longitude: number } | null>(null);
 
@@ -161,33 +162,10 @@ export default function WorldScreen(): React.JSX.Element {
     setLoading(true);
     try {
       await loadMissions();
-      let centre = { latitude: FALLBACK_REGION.latitude, longitude: FALLBACK_REGION.longitude };
-      let permission = await getForegroundPermission();
-      if (permission !== 'granted') {
-        permission = await requestForegroundPermission();
-      }
-      if (permission === 'granted') {
-        setLocationDenied(false);
-        try {
-          const point = await getOneShotLocation();
-          centre = { latitude: point.latitude, longitude: point.longitude };
-          setViewerDot(centre);
-          const next: Region = {
-            ...centre,
-            latitudeDelta: NEARBY_ZOOM.latitudeDelta,
-            longitudeDelta: NEARBY_ZOOM.longitudeDelta,
-          };
-          setRegion(next);
-          setQueryOrigin(next);
-          mapRef.current?.animateToRegion(next, 650);
-        } catch {
-          setLocationDenied(true);
-        }
-      } else {
-        setLocationDenied(true);
-        setFilter('recent');
-      }
-      await loadDropsFor(permission === 'granted' ? 'nearby' : 'recent', centre);
+      // Browsing is permission-free. Only the recenter button requests GPS.
+      // In particular, an already-granted OS permission is not consent to
+      // automatically transmit the viewer's location when this screen opens.
+      await loadDropsFor('recent', FALLBACK_REGION);
     } catch (error) {
       dispatch(showNotice(errorText(error)));
     } finally {
@@ -411,7 +389,7 @@ export default function WorldScreen(): React.JSX.Element {
               onPress={() => void recenter()}
               style={styles.barIcon}
               accessibilityRole="button"
-              accessibilityLabel="Recenter map"
+              accessibilityLabel="Use my location to recenter map"
               hitSlop={8}
             >
               <LocateIcon size={18} color={t.textPrimary} />
@@ -431,7 +409,7 @@ export default function WorldScreen(): React.JSX.Element {
               },
             ]}
           >
-            World shows approximate areas where content was posted. It does not show people's live locations.
+            World shows approximate areas where content was posted, not live people. Opening World never reads your location. Tap the locate icon to request one-time foreground access.
           </Text>
         ) : null}
 
@@ -457,7 +435,7 @@ export default function WorldScreen(): React.JSX.Element {
               },
             ]}
           >
-            Location off — browse Recent or Search this area.
+            Location not in use — browse Recent or Map area, or tap locate to opt in.
           </Text>
         ) : null}
       </View>
