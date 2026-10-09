@@ -28,7 +28,7 @@ Module._load=function(r,parent){
  if(r==='react-native')return{View:'View',Text:'Text',Pressable:'Button',ActivityIndicator:'Spinner',Platform:{OS:'android'},StyleSheet:{create:x=>x}};
  if(r==='react-native-maps')return{__esModule:true,default:'Map',Circle:'Circle'};
  if(r==='expo-router')return{useRouter:()=>({push(){},replace(){},back(){},canGoBack:()=>true})};
- if(r==='@react-navigation/native')return{useFocusEffect:()=>{}};
+ if(r==='@react-navigation/native')return{useFocusEffect:fn=>hooks.useEffect(fn,[fn])};
  if(r==='react-native-safe-area-context')return{useSafeAreaInsets:()=>({top:0,bottom:0})};
  if(own&&r.endsWith('/worldService'))return service;
  if(own&&r.endsWith('/locationService'))return location;
