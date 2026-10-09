@@ -1,3 +1,5 @@
+import { currentUserId } from './supabaseClient';
+import type { OfficialCursor } from '../utils/officialRecovery';
 /**
  * Live Daily Arena API (Phase 13).
  *
@@ -203,6 +205,7 @@ export interface ArenaReaction {
 }
 
 export interface ArenaMessage {
+  preciseCreatedAt?: string;
   id: string;
   roomId: string;
   kind: ArenaMessageKind;
@@ -259,6 +262,7 @@ export interface ArenaTypingState {
 }
 
 export interface ArenaEvidence {
+  preciseCreatedAt?: string;
   id: string;
   roomId: string;
   topicId: string;
@@ -550,6 +554,7 @@ function toMessage(payload: Json | null): ArenaMessage {
     body: str(record.body) ?? '',
     parentMessageId: str(record.parentMessageId),
     createdAt,
+    preciseCreatedAt: str(record.createdAt) ?? undefined,
     mediaUrl: str(record.mediaUrl),
     mediaKind: oneOf(record.mediaKind, MEDIA_KINDS),
     gifProvider: str(record.gifProvider),
@@ -581,6 +586,7 @@ function toEvidence(payload: Json | null): ArenaEvidence {
     mediaUrl: str(record.mediaUrl),
     usefulCount: num(record.usefulCount) ?? 0,
     createdAt: millis(record.createdAt) ?? Date.now(),
+    preciseCreatedAt: str(record.createdAt) ?? undefined,
     isOwn: bool(record.isOwn),
     author: toAuthor(record.author),
     viewerMarkedUseful: bool(record.viewerMarkedUseful),
@@ -971,6 +977,8 @@ export async function fetchRoomPulse(roomId: string): Promise<ArenaRoomPulse> {
 }
 
 export interface PostArenaMessageInput {
+  requestKey?: string;
+  expectedAccountId?: string;
   roomId: string;
   body: string;
   parentMessageId?: string | null;
@@ -994,7 +1002,9 @@ export async function postClashMediaReshare(
   parentMessageId?: string | null,
   body = '',
   author: ArenaAuthor | null = null,
+  requestKey?: string, expectedAccountId?: string,
 ): Promise<ArenaMessage> {
+  if (requestKey) return toMessage(await officialRpc(roomId, 'reshare', {sourceMessageId,body:body.slice(0,ARENA_MESSAGE_MAX),parentId:parentMessageId ?? null},requestKey,expectedAccountId));
   const { data, error } = await (
     client() as unknown as {
       rpc: (n: string, a: Record<string, unknown>) => Promise<{ data: unknown; error: import('@supabase/supabase-js').PostgrestError | null }>;
@@ -1028,11 +1038,49 @@ export async function postClashMediaReshare(
   };
 }
 
+async function officialCall(name:string,args:Record<string,unknown>):Promise<{data:Json;error: Parameters<typeof requestError>[0] | null}> {
+  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
+  try {
+    const call=(client() as unknown as {rpc:(name:string,args:Record<string,unknown>)=>{abortSignal:(signal:AbortSignal)=>PromiseLike<{data:Json;error: Parameters<typeof requestError>[0] | null}>}}).rpc(name,args);
+    return await call.abortSignal(controller.signal);
+  } finally {clearTimeout(timeout);}
+}
+async function officialRpc(roomId: string, operation: string, payload: Record<string, unknown>, requestKey: string, expectedAccountId?: string): Promise<Json> {
+  const account = expectedAccountId ?? await currentUserId();
+  if (!account || await currentUserId() !== account) throw new SupabaseError('Account changed', 'account_changed');
+  const { data, error } = await officialCall('submit_arena_official', {
+    p_room_id:roomId,p_operation:operation,p_payload:payload,p_request_key:requestKey,
+  });
+  if (error) throw requestError(error);
+  if (await currentUserId() !== account) throw new SupabaseError('Account changed', 'account_changed');
+  if (asRecord(data)?.roomId !== roomId) bad('official response identity');
+  return data;
+}
+export async function fetchOfficialPage(roomId: string, stream: 'message', cursor?: OfficialCursor, direction?: 'older'|'newer'): Promise<ArenaMessage[]>;
+export async function fetchOfficialPage(roomId: string, stream: 'evidence', cursor?: OfficialCursor, direction?: 'older'|'newer'): Promise<ArenaEvidence[]>;
+export async function fetchOfficialPage(roomId: string, stream: 'message'|'evidence', cursor?: OfficialCursor, direction: 'older'|'newer' = 'older'): Promise<(ArenaMessage|ArenaEvidence)[]> {
+  const account=await currentUserId();
+  if (!account) throw new SupabaseError('Sign in to read', '42501');
+  const {data,error}=await officialCall('list_arena_official_page',{
+    p_room_id:roomId,p_stream:stream,p_direction:direction,p_limit:40,
+    ...(cursor?{p_cursor_at:cursor.preciseCreatedAt,p_cursor_id:cursor.id}:{}),
+  });
+  if(error) throw requestError(error);
+  if(await currentUserId()!==account) throw new SupabaseError('Account changed','account_changed');
+  if(!Array.isArray(data)) bad('official page');
+  return data.map(row=>{
+    const item=stream==='message'?toMessage(row):toEvidence(row);
+    if(item.roomId!==roomId || !item.preciseCreatedAt) bad('official page identity');
+    return item;
+  });
+}
+
 export async function postMessage(
   input: PostArenaMessageInput,
   author: ArenaAuthor | null = null,
 ): Promise<ArenaMessage> {
   const { roomId, body, parentMessageId, media, gif } = input;
+  if (input.requestKey) return toMessage(await officialRpc(roomId, 'message', {body:body.slice(0,ARENA_MESSAGE_MAX),parentId:parentMessageId ?? null,mediaObjectId:media?.mediaObjectId ?? null,mediaUrl:media?.url ?? gif?.url ?? null,gifProvider:gif?.provider ?? null,gifExternalId:gif?.externalId ?? null},input.requestKey,input.expectedAccountId));
   if (media && gif) {
     throw new SupabaseError('Choose either an upload or a GIF, not both', 'bad_payload');
   }
@@ -1100,7 +1148,17 @@ export async function fetchEvidence(roomId: string, limit = 50): Promise<ArenaEv
   return (data ?? []).map(toEvidence);
 }
 
+export async function fetchEvidenceVisibility(roomId:string, ids:string[]):Promise<string[]> {
+  const account=await currentUserId();
+  const {data,error}=await officialCall('get_arena_official_evidence_visibility',{p_room_id:roomId,p_ids:ids.slice(0,100)});
+  if(await currentUserId()!==account) throw new SupabaseError('Account changed','account_changed');
+  if(error) throw requestError(error);
+  return Array.isArray(data)?data.filter((id):id is string=>typeof id==='string'):[];
+}
+
 export interface SubmitArenaEvidenceInput {
+  requestKey?: string;
+  expectedAccountId?: string;
   roomId: string;
   kind: ArenaEvidenceKind;
   title: string;
@@ -1112,6 +1170,7 @@ export interface SubmitArenaEvidenceInput {
 
 export async function submitEvidence(input: SubmitArenaEvidenceInput): Promise<ArenaEvidence> {
   const { roomId, kind, title, sourceUrl, media } = input;
+  if(input.requestKey) return toEvidence(await officialRpc(roomId,'evidence',{kind,title:title.slice(0,ARENA_EVIDENCE_TITLE_MAX),sourceUrl:sourceUrl ?? null,mediaObjectId:media?.mediaObjectId ?? null,mediaUrl:media?.url ?? null},input.requestKey,input.expectedAccountId));
   const { data, error } = await client().rpc('submit_arena_evidence', {
     p_room_id: roomId,
     p_kind: kind,
@@ -1311,6 +1370,7 @@ export interface ArenaMessageEvent {
 export function subscribeRoomMessages(
   roomId: string,
   onInsert: (event: ArenaMessageEvent) => void,
+  onConnection?: (connected: boolean) => void,
 ): () => void {
   const supabase = client();
   const channel = supabase.channel(`arena-room:${roomId}`);
@@ -1326,13 +1386,14 @@ export function subscribeRoomMessages(
       filter: `room_id=eq.${roomId}`,
     },
     (payload) => {
+      if (disposed) return;
       const row = payload.new as {
         id?: unknown;
         room_id?: unknown;
         author_id?: unknown;
         created_at?: unknown;
       } | null;
-      if (!row || typeof row.id !== 'string' || typeof row.room_id !== 'string') return;
+      if (!row || typeof row.id !== 'string' || row.room_id !== roomId) return;
       onInsert({
         id: row.id,
         roomId: row.room_id,
@@ -1352,7 +1413,7 @@ export function subscribeRoomMessages(
       // RLS stay silent rather than crashing the room screen.
     }
     if (disposed) return;
-    channel.subscribe();
+    channel.subscribe(status => { if (!disposed) onConnection?.(status === 'SUBSCRIBED'); });
   })();
 
   return () => {

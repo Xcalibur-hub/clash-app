@@ -150,6 +150,7 @@ export function LiveRoomComposer({
       if (picked) {
         setGif(null);
         setClashSticker(null);
+        setReadyMedia(null);
         setMedia(picked);
       }
     } catch (error) {
@@ -166,6 +167,7 @@ export function LiveRoomComposer({
       setUploading(true);
       try {
         attachment = await uploadArenaMedia(media);
+        setReadyMedia(attachment);
       } catch (error) {
         setUploading(false);
         onError?.(errorText(error));

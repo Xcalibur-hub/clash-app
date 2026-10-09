@@ -1,3 +1,4 @@
+import { compareOfficial } from './officialRecovery.ts';
 import type { ArenaDuel } from './arenaDuelPayload';
 import type { ArenaEvidence, ArenaMessage, ArenaPhase, ArenaRoom } from '../services/liveArenaService';
 
@@ -35,7 +36,7 @@ export function duelPresentation(duel: ArenaDuel, phase: ArenaPhase) {
  * Input contains only rows cleared by the existing server visibility path. */
 export function duelTranscript(duel: ArenaDuel, messages: readonly ArenaMessage[]): ArenaMessage[] {
   return messages.filter(message => message.kind === 'system' || duelFighterSide(duel, message.author?.id))
-    .slice().sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+    .slice().sort((a, b) => compareOfficial(a,b));
 }
 /** A hidden/evicted parent never leaks through an evidence attachment. */
 export function duelEvidence(duel: ArenaDuel, evidence: readonly ArenaEvidence[], messages: readonly ArenaMessage[]): ArenaEvidence[] {

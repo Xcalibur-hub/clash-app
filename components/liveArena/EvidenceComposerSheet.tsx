@@ -57,9 +57,11 @@ export function EvidenceComposerSheet({
   const [url, setUrl] = React.useState('');
   const [media, setMedia] = React.useState<PickedMedia | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const ready = React.useRef<import('../../services/liveArenaService').ArenaMediaAttachment | null>(null);
 
   React.useEffect(() => {
     if (visible) return;
+    ready.current=null;
     setMode('link');
     setTitle('');
     setUrl('');
@@ -81,7 +83,7 @@ export function EvidenceComposerSheet({
     hapticTap();
     try {
       const picked = kind === 'image' ? await pickImage() : await pickVideo();
-      if (picked) setMedia(picked);
+      if (picked) {ready.current=null;setMedia(picked);}
     } catch (error) {
       onError?.(errorText(error));
     }
@@ -96,7 +98,8 @@ export function EvidenceComposerSheet({
         input = { kind: 'link', title: trimmedTitle, sourceUrl: trimmedUrl };
       } else {
         const picked = media as PickedMedia;
-        const attachment = await uploadArenaMedia(picked);
+        const attachment = ready.current ?? await uploadArenaMedia(picked);
+        ready.current=attachment;
         input = {
           kind: attachment.kind as ArenaEvidenceKind,
           title: trimmedTitle,

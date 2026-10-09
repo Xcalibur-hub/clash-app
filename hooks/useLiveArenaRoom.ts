@@ -1,10 +1,14 @@
+import { currentUserId } from '../services/supabaseClient';
+import { acquireOfficialRequest, confirmOfficialRequest } from '../services/officialRequestStore';
+import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils/officialRecovery';
+import { useFocusEffect } from 'expo-router';
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import {
   fetchEvidence,
+  fetchOfficialPage,
+  fetchEvidenceVisibility,
   fetchMessage,
-  fetchMessages,
-  fetchMessagesSince,
   fetchVisibleMessageIds,
   fetchMindshiftStats,
   fetchRoom,
@@ -120,11 +124,23 @@ export function useLiveArenaRoom(
   const [roomFullOnUpgrade, setRoomFullOnUpgrade] = React.useState(false);
 
   const mounted = React.useRef(true);
+  const accessGeneration = React.useRef(0);
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const authorRef = React.useRef<ArenaAuthor | null>(viewerAuthor);
   const messagesRef = React.useRef<ArenaMessage[]>([]);
+  const evidenceRef = React.useRef<ArenaEvidence[]>([]);
+  evidenceRef.current=evidence;
+  const evidenceVisibilityCursor=React.useRef(0);
   const roomRef = React.useRef<ArenaRoom | null>(room);
   const visibilityCursor = React.useRef(0);
+  const messageCursor = React.useRef<OfficialCursor | null>(null);
+  const evidenceCursor = React.useRef<OfficialCursor | null>(null);
+  const olderEvidence = React.useRef<OfficialCursor | null>(null);
+  const evidenceHasOlder = React.useRef(false);
+  const messageHasOlder = React.useRef(true);
+  const recovering = React.useRef(false);
+  const sendBusy = React.useRef(false);
+  const evidenceBusy = React.useRef(false);
   authorRef.current = viewerAuthor;
   messagesRef.current = messages;
   roomRef.current = room;
@@ -146,6 +162,7 @@ export function useLiveArenaRoom(
   );
 
   const clearPrivateThread = React.useCallback(() => {
+    accessGeneration.current++;
     setMessages([]);
     setEvidence([]);
     setStats(null);
@@ -159,12 +176,13 @@ export function useLiveArenaRoom(
    */
   const hydrateInserted = React.useCallback(async (ids: string[]): Promise<void> => {
     if (ids.length === 0) return;
+    const generation=accessGeneration.current;
     try {
       const unique = [...new Set(ids)].slice(0, 12);
       const rows = await Promise.all(
         unique.map((id) => fetchMessage(id).catch(() => null)),
       );
-      if (!mounted.current) return;
+      if (!mounted.current || generation!==accessGeneration.current) return;
       const next = rows.filter((row): row is ArenaMessage => row != null);
       if (next.length === 0) return;
       setThreadLocked(false);
@@ -179,33 +197,47 @@ export function useLiveArenaRoom(
    * Gap-aware + newest-page reconcile after reconnect / periodic drift repair.
    */
   const refreshThread = React.useCallback(async (): Promise<void> => {
+    if (recovering.current) return;
+    recovering.current = true;
+    const generation=accessGeneration.current;
     try {
-      const newest = messagesRef.current.find((m) => !m.pending)?.createdAt;
-      const [fresh, gap] = await Promise.all([
-        fetchMessages(roomId, undefined, PAGE),
-        newest != null
-          ? fetchMessagesSince(roomId, newest, PAGE).catch(() => [] as ArenaMessage[])
-          : Promise.resolve([] as ArenaMessage[]),
-      ]);
-      if (!mounted.current) return;
-      setThreadLocked(false);
-      setMessages((current) => mergeMessages(current, mergeMessages(gap, fresh)));
+      if (messageCursor.current) await drainOfficialGap(messageCursor.current,
+        async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
+        (rows,cursor) => { setThreadLocked(false); setMessages(old=>mergeMessages(old,rows)); messageCursor.current=cursor; },
+        ()=>mounted.current && generation===accessGeneration.current);
+      if (roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) await drainOfficialGap(evidenceCursor.current,
+        async cursor => (await fetchOfficialPage(roomId,'evidence',cursor,'newer')) as (ArenaEvidence & OfficialCursor)[],
+        (rows,cursor) => { setEvidence(old=>[...new Map([...old,...rows].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a))); evidenceCursor.current=cursor; },
+        ()=>mounted.current && generation===accessGeneration.current);
+      // Rollup refresh never advances the gap cursor past unseen rows.
+      if(messageCursor.current) {
+        const fresh=await fetchOfficialPage(roomId,'message');
+        if(!mounted.current || generation!==accessGeneration.current) return;
+        setMessages(old=>mergeMessages(old,fresh));
+      }
+      if(roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) {
+        const fresh=await fetchOfficialPage(roomId,'evidence');
+        if(!mounted.current || generation!==accessGeneration.current) return;
+        setEvidence(old=>[...new Map([...old,...fresh].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+      }
     } catch (caught) {
       if (!mounted.current) return;
-      if (isMembershipRefusal(caught)) clearPrivateThread();
-    }
-  }, [roomId]);
+      if (isMembershipRefusal(caught) || (caught as {code?:string})?.code==='account_changed') clearPrivateThread();
+      else setError('Transcript could not update. Try again.');
+    } finally { recovering.current=false; }
+  }, [roomId,clearPrivateThread]);
 
   /** Phase/result refresh is independent of message traffic. */
   const refreshRoomState = React.useCallback(async (): Promise<void> => {
+    const generation=accessGeneration.current;
     try {
       const next = await fetchRoom(roomId);
-      if (!mounted.current) return;
+      if (!mounted.current || generation!==accessGeneration.current) return;
       setRoom(next);
       setError(null);
       if (next.status === 'SETTLED' || next.viewer?.finalStance) {
         const nextStats = await fetchMindshiftStats(roomId).catch(() => null);
-        if (mounted.current) setStats(nextStats);
+        if (mounted.current && generation===accessGeneration.current) setStats(nextStats);
       } else if (mounted.current) {
         setStats(null);
       }
@@ -221,6 +253,18 @@ export function useLiveArenaRoom(
 
   /** Eventually evict messages hidden by moderation or a new block/mute. */
   const reconcileVisibility = React.useCallback(async (): Promise<void> => {
+    const evidenceIds=evidenceRef.current.map(row=>row.id);
+    const startEvidence=evidenceIds.length ? evidenceVisibilityCursor.current % evidenceIds.length : 0;
+    const checkedEvidence=[...evidenceIds.slice(startEvidence),...evidenceIds.slice(0,startEvidence)].slice(0,100);
+    evidenceVisibilityCursor.current=startEvidence+checkedEvidence.length;
+    try {
+      if(checkedEvidence.length && roomRef.current?.roomMode==='DUEL') {
+        const visible=new Set(await fetchEvidenceVisibility(roomId,checkedEvidence));
+        if(!mounted.current) return;
+        const checked=new Set(checkedEvidence);
+        setEvidence(old=>old.filter(row=>!checked.has(row.id)||visible.has(row.id)));
+      }
+    } catch(caught) { if(mounted.current && isMembershipRefusal(caught)) clearPrivateThread(); return; }
     const ids = messagesRef.current
       .filter((message) => !message.pending)
       .map((message) => message.id);
@@ -241,33 +285,44 @@ export function useLiveArenaRoom(
     async (mode: 'initial' | 'refresh'): Promise<void> => {
       if (mode === 'initial') setLoading(true);
       else setRefreshing(true);
+      const generation=accessGeneration.current;
       try {
         const next = await fetchRoom(roomId);
-        if (!mounted.current) return;
+        if (!mounted.current || generation!==accessGeneration.current) return;
         setRoom(next);
         setError(null);
 
         // The thread and the rail are members-only; a settled room is still
         // worth rendering for its public result when they are refused.
         const [thread, rail] = await Promise.all([
-          fetchMessages(roomId, undefined, PAGE).catch((caught: unknown) => {
+          fetchOfficialPage(roomId, 'message').catch((caught: unknown) => {
             if (isMembershipRefusal(caught)) return 'locked' as const;
             throw caught;
           }),
-          fetchEvidence(roomId).catch(() => [] as ArenaEvidence[]),
+          (next.roomMode==='DUEL' ? fetchOfficialPage(roomId,'evidence') : fetchEvidence(roomId)),
         ]);
-        if (!mounted.current) return;
+        if (!mounted.current || generation!==accessGeneration.current) return;
 
         if (thread === 'locked') {
           clearPrivateThread();
         } else {
           setThreadLocked(false);
-          setHasOlder(thread.length >= PAGE);
+          messageHasOlder.current=thread.length>=PAGE;
+          setHasOlder(messageHasOlder.current);
+          if (!messageCursor.current) messageCursor.current=thread[0]?.preciseCreatedAt ? thread[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
           setMessages((current) =>
             mode === 'initial' ? thread : mergeMessages(current, thread),
           );
         }
-        setEvidence(rail);
+        if(thread!=='locked') setEvidence(old=> mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+        if(thread!=='locked' && next.roomMode==='DUEL') {
+          if (!evidenceCursor.current) evidenceCursor.current=rail[0]?.preciseCreatedAt ? rail[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
+          if(mode==='initial' || !olderEvidence.current) {
+            olderEvidence.current=rail.at(-1)?.preciseCreatedAt ? rail.at(-1) as OfficialCursor : null;
+            evidenceHasOlder.current=rail.length>=PAGE;
+          }
+          setHasOlder(messageHasOlder.current || evidenceHasOlder.current);
+        }
 
         // Mindshift opens after the verdict (or once the viewer has recorded a
         // final stance); before that the RPC refuses and there is nothing to show.
@@ -282,7 +337,7 @@ export function useLiveArenaRoom(
           setStats(null);
         }
       } catch (caught) {
-        if (!mounted.current) return;
+        if (!mounted.current || generation!==accessGeneration.current) return;
         if (isMembershipRefusal(caught)) {
           clearPrivateThread();
           setRoom(null);
@@ -297,7 +352,8 @@ export function useLiveArenaRoom(
     [roomId],
   );
 
-  const refresh = React.useCallback(() => load('refresh'), [load]);
+  const refresh = React.useCallback(async () => { await refreshThread(); await load('refresh'); }, [load,refreshThread]);
+  useFocusEffect(React.useCallback(()=>{ void refreshThread(); return undefined; },[refreshThread]));
 
   React.useEffect(() => {
     setRoom(null);
@@ -307,6 +363,7 @@ export function useLiveArenaRoom(
     setThreadLocked(false);
     setHasOlder(true);
     visibilityCursor.current = 0;
+    messageCursor.current=null; evidenceCursor.current=null; olderEvidence.current=null;
     void load('initial');
   }, [load]);
 
@@ -325,7 +382,7 @@ export function useLiveArenaRoom(
     };
     const unsubscribe = subscribeRoomMessages(roomId, (event) => {
       scheduleHydrate(event.id);
-    });
+    }, connected => { if(connected && mounted.current) { void refreshThread(); void refreshRoomState(); } });
     let reconciling = false;
     const reconcileAll = async (): Promise<void> => {
       if (reconciling) return;
@@ -366,16 +423,30 @@ export function useLiveArenaRoom(
   }, [load, reconcileVisibility, refreshThread]);
 
   const loadOlder = React.useCallback(async (): Promise<void> => {
-    if (loadingOlder || !hasOlder || threadLocked || messages.length === 0) return;
+    if (loadingOlder || !hasOlder || threadLocked) return;
     setLoadingOlder(true);
+    const generation=accessGeneration.current;
     try {
-      const oldest = messages[messages.length - 1].createdAt;
-      const page = await fetchMessages(roomId, oldest, PAGE);
-      if (!mounted.current) return;
-      setHasOlder(page.length >= PAGE);
-      setMessages((current) => mergeMessages(current, page));
-    } catch {
-      if (mounted.current) setHasOlder(false);
+      const oldest = messages.filter(m=>!m.pending).at(-1);
+      if(messageHasOlder.current && oldest?.preciseCreatedAt) {
+        const page = await fetchOfficialPage(roomId,'message',oldest as OfficialCursor);
+        if (!mounted.current || generation!==accessGeneration.current) return;
+        messageHasOlder.current=page.length>=PAGE;
+        setMessages(current=>mergeMessages(current,page));
+      }
+      if(evidenceHasOlder.current && olderEvidence.current) {
+        const page=await fetchOfficialPage(roomId,'evidence',olderEvidence.current);
+        if(!mounted.current || generation!==accessGeneration.current) return;
+        evidenceHasOlder.current=page.length>=PAGE;
+        if(page.length) olderEvidence.current=page.at(-1) as OfficialCursor;
+        setEvidence(old=>[...new Map([...old,...page].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+      }
+      setHasOlder(messageHasOlder.current || evidenceHasOlder.current);
+    } catch(caught) {
+      if (mounted.current) {
+        if(isMembershipRefusal(caught)) clearPrivateThread();
+        else setError('Earlier transcript could not load. Try again.');
+      }
     } finally {
       if (mounted.current) setLoadingOlder(false);
     }
@@ -383,7 +454,14 @@ export function useLiveArenaRoom(
 
   const send = React.useCallback(
     async (input: Omit<PostArenaMessageInput, 'roomId'>): Promise<boolean> => {
-      if (sending) return false;
+      if (sendBusy.current) return false;
+      sendBusy.current=true;
+      const account=await currentUserId();
+      if(!account || !mounted.current) {sendBusy.current=false;return false;}
+      let requestKey: string | undefined;
+      try { if(roomRef.current?.roomMode==='DUEL') requestKey=await acquireOfficialRequest(account,roomId,'message',input); }
+      catch(caught) { sendBusy.current=false; if(mounted.current) notify(caught); return false; }
+      if(!mounted.current) {sendBusy.current=false;return false;}
       const temporaryId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const isReshare = Boolean(input.reshareSourceMessageId);
       const placeholder: ArenaMessage = {
@@ -413,10 +491,11 @@ export function useLiveArenaRoom(
               input.reshareSourceMessageId,
               input.parentMessageId ?? null,
               input.body,
-              authorRef.current,
+              authorRef.current, requestKey, account,
             )
-          : await postMessage({ ...input, roomId }, authorRef.current);
-        if (!mounted.current) return true;
+          : await postMessage({ ...input, roomId, requestKey, expectedAccountId:account }, authorRef.current);
+        if (requestKey) await confirmOfficialRequest(account,roomId,'message',requestKey).catch(()=>{});
+        if (!mounted.current) return false;
         setMessages((current) => [
           ...mergeMessages(
             current.filter((message) => message.id !== temporaryId),
@@ -431,6 +510,7 @@ export function useLiveArenaRoom(
         }
         return false;
       } finally {
+        sendBusy.current=false;
         if (mounted.current) setSending(false);
       }
     },
@@ -467,14 +547,20 @@ export function useLiveArenaRoom(
 
   const addEvidence = React.useCallback(
     async (input: Omit<SubmitArenaEvidenceInput, 'roomId'>): Promise<boolean> => {
+      if(evidenceBusy.current) return false;
+      evidenceBusy.current=true;
       try {
-        const created = await submitEvidence({ ...input, roomId });
-        if (mounted.current) setEvidence((current) => [created, ...current]);
+        const account=await currentUserId();
+        if(!account || !mounted.current) return false;
+        const requestKey=roomRef.current?.roomMode==='DUEL' ? await acquireOfficialRequest(account,roomId,'evidence',input) : undefined;
+        if(!mounted.current) return false;
+        const created=await submitEvidence({...input,roomId,requestKey,expectedAccountId:account});
+        if(requestKey) await confirmOfficialRequest(account,roomId,'evidence',requestKey).catch(()=>{});
+        if(!mounted.current) return false;
+        setEvidence(old=>[...new Map([...old,created].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
         return true;
-      } catch (caught) {
-        notify(caught);
-        return false;
-      }
+      } catch(caught) { if(mounted.current) notify(caught); return false; }
+      finally {evidenceBusy.current=false;}
     },
     [notify, roomId],
   );

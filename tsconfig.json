@@ -6,6 +6,7 @@
     "noImplicitOverride": true,
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true
   },
   "include": [

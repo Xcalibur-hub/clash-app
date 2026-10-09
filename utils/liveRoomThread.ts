@@ -1,3 +1,4 @@
+import { compareOfficial } from './officialRecovery.ts';
 /**
  * Live-room thread helpers: reply fan-out, ranking, deleted-parent soft-fail.
  * Ordering of roots remains server createdAt + id (newest-first).
@@ -8,6 +9,7 @@ export interface ThreadMessageLike {
   parentMessageId: string | null;
   kind: string;
   createdAt: number;
+  preciseCreatedAt?: string;
   pending?: boolean;
   reactions: readonly { count: number }[];
   /** Server reply count when available; otherwise derived from loaded children. */
@@ -87,7 +89,7 @@ export function mergeMessagesById<T extends ThreadMessageLike & { pending?: bool
     );
   }
   return [...byId.values()].sort((a, b) =>
-    b.createdAt === a.createdAt ? b.id.localeCompare(a.id) : b.createdAt - a.createdAt,
+    compareOfficial(b,a),
   );
 }
 
