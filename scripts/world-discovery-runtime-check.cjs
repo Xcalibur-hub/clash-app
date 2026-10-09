@@ -5,18 +5,19 @@ const assert=require('node:assert/strict'),React=require('react');
 for(const ext of ['.ts','.tsx'])Module._extensions[ext]=(m,f)=>m._compile(babel.transformSync(fs.readFileSync(f,'utf8'),{
   filename:f,babelrc:false,configFile:false,presets:['@babel/preset-typescript',['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs'],
 }).code,f);
-let cells=[],index=0,effects=[],notices=[],writes=0;
+let cells=[],index=0,effects=[],notices=[],writes=0,focused=true,accountId='account-a';
 const hooks={...React,
-  useState(v){const i=index++;if(!(i in cells))cells[i]=v;return[cells[i],n=>{writes++;cells[i]=typeof n==='function'?n(cells[i]):n;}];},
+  useState(v){const i=index++,instance=cells;if(!(i in instance))instance[i]=v;return[instance[i],n=>{writes++;instance[i]=typeof n==='function'?n(instance[i]):n;}];},
   useRef(v){const i=index++;if(!(i in cells))cells[i]={current:v};return cells[i];},
   useMemo(fn){index++;return fn();},
   useCallback(fn,deps){const i=index++,old=cells[i];if(!old||deps.some((d,j)=>d!==old.deps[j]))cells[i]={deps,fn};return cells[i].fn;},
   useEffect(fn,deps){const i=index++,old=cells[i];if(!old||!deps||deps.some((d,j)=>d!==old.deps?.[j]))effects.push(()=>{old?.cleanup?.();cells[i]={deps,cleanup:fn()};});},
+  useFocusEffect(fn){const i=index++,old=cells[i];if(!old||old.fn!==fn)effects.push(()=>{old?.cleanup?.();cells[i]={focus:true,fn,cleanup:focused?fn():undefined};});},
 };
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return{promise,resolve,reject};}
 let requests=[];
-const request=kind=>{const d=deferred();requests.push({kind,...d});return d.promise;};
-const service={fetchActiveMissions:()=>request('missions'),fetchRecentWorldDrops:()=>request('recent'),fetchNearbyWorldDrops:()=>request('area'),fetchMissionDrops:()=>request('mission-drops')};
+const request=(kind,args)=>{const d=deferred();requests.push({kind,args,...d});return d.promise;};
+const service={fetchActiveMissions:()=>request('missions'),fetchRecentWorldDrops:()=>request('recent'),fetchNearbyWorldDrops:(...args)=>request('area',args),fetchMissionDrops:()=>request('mission-drops')};
 const location={getForegroundPermission:()=>request('permission'),requestForegroundPermission:()=>request('prompt'),getOneShotLocation:()=>request('gps')};
 const dispatch=e=>notices.push(e);
 const original=Module._load;
@@ -28,7 +29,9 @@ Module._load=function(r,parent){
  if(r==='react-native')return{View:'View',Text:'Text',Pressable:'Button',ActivityIndicator:'Spinner',Platform:{OS:'android'},StyleSheet:{create:x=>x}};
  if(r==='react-native-maps')return{__esModule:true,default:'Map',Circle:'Circle'};
  if(r==='expo-router')return{useRouter:()=>({push(){},replace(){},back(){},canGoBack:()=>true})};
- if(r==='@react-navigation/native')return{useFocusEffect:fn=>hooks.useEffect(fn,[fn])};
+ if(r==='@react-navigation/native')return{useFocusEffect:fn=>hooks.useFocusEffect(fn)};
+ if(own&&r==='./AuthProvider')return{useAuth:()=>({user:accountId?{id:accountId}:null})};
+ if(own&&r==='./ClashStore')return{ClashProvider:'ClashProvider'};
  if(r==='react-native-safe-area-context')return{useSafeAreaInsets:()=>({top:0,bottom:0})};
  if(own&&r.endsWith('/worldService'))return service;
  if(own&&r.endsWith('/locationService'))return location;
@@ -39,15 +42,18 @@ Module._load=function(r,parent){
  if(own&&r.endsWith('/store'))return{useClash:()=>({dispatch}),showNotice:text=>({text})};
  if(own&&r.endsWith('/theme'))return{space:{},radius:{},typeScale:new Proxy({},{get:()=>({})}),useTheme:()=>({scheme:'dark'}),useThemeColors:()=>({})};
  if(own&&r.endsWith('/haptics'))return{tap(){}};
- if(own&&r.endsWith('/worldCluster'))return{clusterWorldDrops:drops=>drops.map(drop=>({kind:'drop',id:drop.id,drop})),regionMovedSignificantly:()=>true};
+ if(own&&r.endsWith('/worldCluster'))return{clusterWorldDrops:drops=>drops.map(drop=>({kind:'drop',id:drop.id,drop})),regionMovedSignificantly:(a,b)=>a.latitude!==b.latitude||a.longitude!==b.longitude};
  if(own&&r.includes('/components/'))return new Proxy({},{get:(_,key)=>String(key)});
  return original.apply(this,arguments);
 };
 const Screen=require('../app/world/index.tsx').default;
+const AccountScope=require('../store/AccountScope.tsx').AccountScope;
 const nodes=t=>!t||typeof t!=='object'?[]:[t,...React.Children.toArray(t.props?.children).flatMap(nodes)];
 function render(){index=0;const t=Screen();const run=effects;effects=[];run.forEach(f=>f());return t;}
 function cleanup(){cells.forEach(c=>c?.cleanup?.());}
-function reset(){cleanup();cells=[];effects=[];requests=[];notices=[];writes=0;}
+function blur(){focused=false;cells.filter(c=>c?.focus).forEach(c=>{c.cleanup?.();c.cleanup=undefined;});}
+function focus(){render();focused=true;cells.filter(c=>c?.focus).forEach(c=>{c.cleanup=c.fn();});}
+function reset(){cleanup();cells=[];effects=[];requests=[];notices=[];writes=0;focused=true;}
 function find(t,label){const n=nodes(t).find(n=>n.props?.accessibilityLabel===label);assert.ok(n,'missing '+label);return n;}
 function byType(t,type){return nodes(t).find(n=>n.type===type);}
 function press(label){find(render(),label).props.onPress();}
@@ -71,5 +77,17 @@ function pass(name){passed++;console.log('PASS '+name);}
  reset();render();const startup=pending('missions');press('Missions');const current=pending('missions');current.resolve([mission]);await flush();pending('mission-drops').resolve([]);await flush();startup.resolve([mission]);await flush();assert.ok(byType(render(),'WorldMissionBeacon'),'initial mission metadata must survive a filter switch');pass('filter changes during startup preserve mission metadata');
  reset();render();const pendingStartup=pending('missions');press('Use my location to recenter map');pending('permission').resolve('denied');await flush();pending('prompt').resolve('denied');await flush();pendingStartup.resolve([mission]);await flush();assert.equal(byType(render(),'Spinner'),undefined,'denied recenter must release superseded startup loading');pass('denied Locate during startup cannot leave a permanent loading overlay');
  reset();render();const departingMetadata=pending('missions');cleanup();const priorWrites=writes;departingMetadata.resolve([mission]);await flush();assert.equal(writes,priorWrites);assert.equal(requests.some(r=>r.kind==='recent'),false);pass('unmounted startup cannot commit mission metadata or start a feed request');
+ reset();await boot();press('Map area');pending('area').resolve([{id:'before-blur'}]);await flush();const viewport={latitude:13,longitude:72,latitudeDelta:0.2,longitudeDelta:0.3};byType(render(),'Map').props.onRegionChangeComplete(viewport);render();blur();focus();assert.equal(selected('Map area'),true);assert.deepEqual(ids(),[]);pending('missions').resolve([mission]);const refreshed=pending('area');assert.deepEqual(refreshed.args[0],{latitude:13,longitude:72});refreshed.resolve([{id:'after-focus'}]);await flush();assert.deepEqual(ids(),['after-focus']);assert.equal(requests.some(r=>['permission','prompt','gps'].includes(r.kind)),false);pass('retained refocus preserves Map area and viewport, clears old content and refreshes without GPS');
+ press('Missions');pending('missions').resolve([mission]);await flush();pending('mission-drops').resolve([{id:'mission-before'}]);await flush();render();blur();focus();assert.equal(selected('Missions'),true);pending('missions').resolve([mission]);pending('missions').resolve([mission]);await flush();pending('mission-drops').resolve([{id:'mission-refreshed'}]);await flush();assert.deepEqual(ids(),['mission-refreshed']);assert.ok(byType(render(),'WorldMissionBeacon'));pass('retained Missions refocus refreshes selected mode and mission card');
+ press('Map area');const oldArea=pending('area');render();blur();focus();pending('missions').resolve([mission]);pending('area').resolve([{id:'fresh-focus'}]);await flush();oldArea.resolve([{id:'late-blurred'}]);await flush();assert.deepEqual(ids(),['fresh-focus']);pass('pre-blur request cannot overwrite fresh refocus results');
+ press('Map area');const blurredFailure=pending('area');render();blur();const blurredWrites=writes;blurredFailure.reject(Error('blurred failure'));await flush();assert.equal(writes,blurredWrites);assert.ok(!notices.some(n=>n.text==='blurred failure'));pass('blur rejects late errors and loading writes before return');
+ focus();const oldMetadata=pending('missions'),oldFocus=pending('area');press('Recent');pending('recent').resolve([{id:'recent-current'}]);await flush();oldFocus.resolve([{id:'old-focus-area'}]);oldMetadata.resolve([mission]);await flush();assert.equal(selected('Recent'),true);assert.deepEqual(ids(),['recent-current']);pass('filter change during refocus supersedes refresh without dropping mission metadata');
+ press('Use my location to recenter map');pending('permission').resolve('granted');await flush();pending('gps').resolve({latitude:14,longitude:73});await flush();pending('area').resolve([]);await flush();assert.ok(byType(render(),'Circle'));const locationCalls=requests.filter(r=>['permission','prompt','gps'].includes(r.kind)).length;render();blur();focus();assert.equal(byType(render(),'Circle'),undefined);assert.equal(requests.filter(r=>['permission','prompt','gps'].includes(r.kind)).length,locationCalls);pending('missions').resolve([mission]);pending('area').resolve([]);await flush();pass('refocus clears prior one-shot indicator without permission or GPS calls');
+ press('Use my location to recenter map');const blurredPermission=pending('permission');render();blur();focus();pending('missions').resolve([mission]);pending('area').resolve([]);await flush();const prompts=requests.filter(r=>r.kind==='prompt').length;blurredPermission.resolve('denied');await flush();assert.equal(requests.filter(r=>r.kind==='prompt').length,prompts);pass('late pre-blur permission result cannot open an OS prompt on return');
+ reset();await boot();press('Map area');const accountA=pending('area');const keyA=AccountScope({children:null}).key;const oldCells=cells;accountId='account-b';assert.notEqual(AccountScope({children:null}).key,keyA);cleanup();cells=[];effects=[];render();pending('missions').resolve([mission]);await flush();pending('recent').resolve([{id:'account-b-drop'}]);await flush();accountA.resolve([{id:'account-a-drop'}]);await flush();assert.deepEqual(ids(),['account-b-drop']);assert.equal(selected('Recent'),true);assert.notEqual(oldCells,cells);accountId=null;assert.equal(AccountScope({children:null}).key,'signed-out');cleanup();cells=[];effects=[];render();pending('missions').resolve([mission]);await flush();pending('recent').resolve([]);await flush();assert.deepEqual(ids(),[]);pass('actual AccountScope identity keys trigger simulated remount isolation and signed-out reset');
+ reset();render();const blurredStartup=pending('missions');blur();focus();pending('missions').resolve([mission]);pending('recent').resolve([{id:'returned-startup'}]);await flush();blurredStartup.resolve([{id:'obsolete-mission'}]);await flush();assert.deepEqual(ids(),['returned-startup']);assert.equal(byType(render(),'WorldMissionBeacon').props.mission.id,mission.id);assert.equal(byType(render(),'Spinner'),undefined);pass('blur during initial bootstrap rejects late mission metadata on refocus');
+ press('Use my location to recenter map');pending('permission').resolve('granted');await flush();const blurredGps=pending('gps');render();blur();focus();pending('missions').resolve([mission]);pending('recent').resolve([{id:'no-stale-gps'}]);await flush();blurredGps.resolve({latitude:1,longitude:2});await flush();assert.deepEqual(ids(),['no-stale-gps']);assert.equal(byType(render(),'Circle'),undefined);assert.equal(selected('Recent'),true);pass('GPS completing after blur cannot recenter or replace refocused content');
+ reset();await boot();press('Map area');pending('area').resolve([]);await flush();byType(render(),'Map').props.onRegionChangeComplete({latitude:12,longitude:71,latitudeDelta:0.2,longitudeDelta:0.2});render();blur();focus();pending('missions').resolve([mission]);pending('area').resolve([]);await flush();assert.equal(nodes(render()).some(n=>n.props?.accessibilityLabel==='Search this area'),false,'focus has just searched the current viewport');pass('refocus updates query origin and clears a redundant Search this area action');
+ blur();focus();const beforePan=pending('area');pending('missions').resolve([mission]);byType(render(),'Map').props.onRegionChangeComplete({latitude:13,longitude:71,latitudeDelta:0.2,longitudeDelta:0.2});render();beforePan.resolve([]);await flush();assert.ok(find(render(),'Search this area'));pass('panning during focus refresh retains Search this area for the newer viewport');
  cleanup();console.log(`${passed}/${passed} World runtime checks passed; controlled hook bridge, not device tests.`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

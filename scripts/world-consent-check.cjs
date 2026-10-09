@@ -18,7 +18,8 @@ const between = (start, end) => {
   return source.slice(a, b);
 };
 
-const bootstrap = between('  const bootstrap = React.useCallback(', '  React.useEffect(() => {\n    void bootstrap();');
+const bootstrap = between('  const bootstrap = React.useCallback(', '  // Expo Router can retain this screen');
+const focus = between('  // Expo Router can retain this screen', '  const onFilterChange = async');
 const recenter = between('  const recenter = async', '  const zoomToCluster =');
 
 assert.match(source, /useState<WorldFilter>\('recent'\)/, 'default to permission-free Recent');
@@ -28,5 +29,6 @@ assert.match(recenter, /requestForegroundPermission\(\)/, 'recenter may request 
 assert.match(recenter, /getOneShotLocation\(\)/, 'recenter reads only after explicit user action');
 assert.match(source, /accessibilityLabel="Use my location to recenter map"/, 'location action is explicitly labeled');
 assert.doesNotMatch(source, /watchPositionAsync|requestBackgroundPermissionsAsync/, 'World screen must not track in background');
+assert.doesNotMatch(focus, /getOneShotLocation|requestForegroundPermission|getForegroundPermission/, 'return must not read or request location');
 
-process.stdout.write('World consent source contract: 7 checks passed (device behavior not tested).\n');
+process.stdout.write('World consent source contract: 8 checks passed (device behavior not tested).\n');

@@ -39,4 +39,4 @@ assert.match(effect, /firstFocus\.current/, 'first focus bootstraps only once');
 assert.match(effect, /setViewerDot\(null\)/, 'return clears the one-shot viewer position');
 assert.match(effect, /loadDropsFor\(mode, centre\)/, 'return refreshes the selected mode');
 
-process.stdout.write('World request-order source contract: 21 checks passed (runtime races not simulated).\\n');
+process.stdout.write('World request-order source contract: 21 checks passed (runtime races not simulated).\n');

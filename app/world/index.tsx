@@ -214,7 +214,12 @@ export default function WorldScreen(): React.JSX.Element {
           });
         void loadDropsFor(mode, centre)
           .then((result) => {
-            if (request === discoveryRequest.current) setDrops(result);
+            if (request === discoveryRequest.current) {
+              setDrops(result);
+              setQueryOrigin(centre);
+              // A pan during the refresh still needs its own area search.
+              setShowSearchArea(regionMovedSignificantly(centre, latestDiscovery.current.centre));
+            }
           })
           .catch((error) => {
             if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
