@@ -93,6 +93,8 @@ export default function WorldScreen(): React.JSX.Element {
   const mapRef = React.useRef<MapView | null>(null);
   // A later filter, map-area search, or recenter invalidates earlier requests.
   const discoveryRequest = React.useRef(0);
+  // Mission chrome survives discovery-mode changes, but never an unmount.
+  const missionRequest = React.useRef(0);
   const light = scheme === 'light';
 
   const [missions, setMissions] = React.useState<WorldMission[]>([]);
@@ -154,11 +156,13 @@ export default function WorldScreen(): React.JSX.Element {
 
   const bootstrap = React.useCallback(async (): Promise<void> => {
     const request = ++discoveryRequest.current;
+    const metadataRequest = ++missionRequest.current;
     setLoading(true);
     try {
       const activeMissions = await loadMissions();
-      if (request !== discoveryRequest.current) return;
+      if (metadataRequest !== missionRequest.current) return;
       setMissions(activeMissions);
+      if (request !== discoveryRequest.current) return;
       // Browsing is permission-free. Only the recenter button requests GPS.
       // In particular, an already-granted OS permission is not consent to
       // automatically transmit the viewer's location when this screen opens.
@@ -177,6 +181,7 @@ export default function WorldScreen(): React.JSX.Element {
     return () => {
       // Discard responses after leaving World, including pending GPS prompts.
       discoveryRequest.current += 1;
+      missionRequest.current += 1;
     };
   }, [bootstrap]);
 
@@ -223,6 +228,9 @@ export default function WorldScreen(): React.JSX.Element {
   const recenter = async (): Promise<void> => {
     hapticTap();
     const request = ++discoveryRequest.current;
+    // This action supersedes startup/filter loading even if permission is denied.
+    setLoading(false);
+    setSearching(false);
     let permission: Awaited<ReturnType<typeof getForegroundPermission>>;
     try {
       permission = await getForegroundPermission();
