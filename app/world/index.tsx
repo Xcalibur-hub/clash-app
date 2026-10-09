@@ -199,6 +199,10 @@ export default function WorldScreen(): React.JSX.Element {
         const { mode, centre } = latestDiscovery.current;
         setSelectedId(null);
         setDrops([]);
+        // One-shot location is not a live position: never reuse its dot
+        // after leaving and returning to World.
+        setViewerDot(null);
+        setLocationDenied(true);
         setLoading(false);
         setSearching(true);
         void loadMissions()
