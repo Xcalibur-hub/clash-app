@@ -242,6 +242,8 @@ export default function WorldScreen(): React.JSX.Element {
     const request = ++discoveryRequest.current;
     setFilter(next);
     setSelectedId(null);
+    // Do not display the previous mode's markers while the new query is pending.
+    setDrops([]);
     setLoading(false);
     setSearching(true);
     try {
@@ -261,6 +263,8 @@ export default function WorldScreen(): React.JSX.Element {
     hapticTap();
     const request = ++discoveryRequest.current;
     setFilter('nearby');
+    setSelectedId(null);
+    setDrops([]);
     setLoading(false);
     setSearching(true);
     try {
@@ -309,6 +313,8 @@ export default function WorldScreen(): React.JSX.Element {
       setRegion(next);
       mapRef.current?.animateToRegion(next, 550);
       setFilter('nearby');
+      setSelectedId(null);
+      setDrops([]);
       setLoading(false);
       setSearching(true);
       const result = await loadDropsFor('nearby', point);
@@ -542,7 +548,7 @@ export default function WorldScreen(): React.JSX.Element {
           </Pressable>
         ) : null}
 
-        {!loading && drops.length === 0 ? (
+        {!loading && !searching && drops.length === 0 ? (
           <View
             style={[
               styles.empty,
@@ -554,25 +560,42 @@ export default function WorldScreen(): React.JSX.Element {
             ]}
           >
             <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
-              Nothing here yet
+              {filter === 'nearby' ? 'No Drops in this area' : filter === 'mission' ? 'No Mission Drops yet' : 'No recent Drops yet'}
             </Text>
             <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textSecondary }]}>
-              Be the first to leave something worth finding.
+              {filter === 'nearby'
+                ? 'Try another part of the map or browse recent Drops.'
+                : filter === 'mission'
+                  ? 'This Mission is waiting for its first Drop.'
+                  : 'Explore the map or join a Mission to get things started.'}
             </Text>
-            {primaryMission ? (
+            <View style={styles.emptyActions}>
               <Pressable
-                onPress={participate}
+                onPress={() => void onFilterChange(filter === 'recent' ? 'nearby' : 'recent')}
                 style={[styles.emptyCta, { backgroundColor: light ? '#111113' : '#F5F5F7' }]}
                 accessibilityRole="button"
+                accessibilityLabel={filter === 'recent' ? 'Explore map area' : 'Browse recent Drops'}
               >
                 <Text
                   allowFontScaling={false}
                   style={[styles.emptyCtaText, { color: light ? '#F5F5F7' : '#111113' }]}
                 >
-                  Join this week's Mission
+                  {filter === 'recent' ? 'Explore map area' : 'Browse recent'}
                 </Text>
               </Pressable>
-            ) : null}
+              {primaryMission ? (
+                <Pressable
+                  onPress={participate}
+                  style={[styles.emptySecondary, { borderColor: t.border }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Join this week's Mission"
+                >
+                  <Text allowFontScaling={false} style={[styles.emptyCtaText, { color: t.textPrimary }]}>
+                    Join Mission
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         ) : null}
       </View>
@@ -736,11 +759,17 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { ...typeScale.label, fontWeight: '600' },
   emptyBody: { ...typeScale.meta, textAlign: 'center' },
+  emptyActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.xs, marginTop: 4 },
   emptyCta: {
-    marginTop: 4,
     paddingHorizontal: space.md,
     paddingVertical: 9,
     borderRadius: radius.pill,
+  },
+  emptySecondary: {
+    paddingHorizontal: space.md,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   emptyCtaText: { ...typeScale.meta, fontWeight: '600' },
   bottomChrome: {
