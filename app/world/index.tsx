@@ -91,6 +91,10 @@ export default function WorldScreen(): React.JSX.Element {
   const t = useThemeColors();
   const now = useClock(30_000);
   const mapRef = React.useRef<MapView | null>(null);
+  // A later filter, map-area search, or recenter invalidates earlier requests.
+  const discoveryRequest = React.useRef(0);
+  // Mission chrome survives discovery-mode changes, but never an unmount.
+  const missionRequest = React.useRef(0);
   const light = scheme === 'light';
 
   const [missions, setMissions] = React.useState<WorldMission[]>([]);
@@ -128,100 +132,120 @@ export default function WorldScreen(): React.JSX.Element {
     [drops, region],
   );
 
-  const loadMissions = React.useCallback(async (): Promise<void> => {
-    setMissions(await fetchActiveMissions());
+  const loadMissions = React.useCallback(async (): Promise<WorldMission[]> => {
+    return fetchActiveMissions();
   }, []);
 
   const loadDropsFor = React.useCallback(
-    async (mode: WorldFilter, centre: { latitude: number; longitude: number }): Promise<void> => {
+    async (mode: WorldFilter, centre: { latitude: number; longitude: number }): Promise<WorldDrop[]> => {
       if (mode === 'recent') {
-        setDrops(await fetchRecentWorldDrops(40));
-        return;
+        return fetchRecentWorldDrops(40);
       }
       if (mode === 'mission') {
         const active = (await fetchActiveMissions())[0];
-        if (!active) {
-          setDrops([]);
-          return;
-        }
-        setDrops(await fetchMissionDrops(active.id, 40));
-        return;
+        return active ? fetchMissionDrops(active.id, 40) : [];
       }
-      setDrops(
-        await fetchNearbyWorldDrops(
-          { latitude: centre.latitude, longitude: centre.longitude },
-          25,
-          40,
-        ),
+      return fetchNearbyWorldDrops(
+        { latitude: centre.latitude, longitude: centre.longitude },
+        25,
+        40,
       );
     },
     [],
   );
 
   const bootstrap = React.useCallback(async (): Promise<void> => {
+    const request = ++discoveryRequest.current;
+    const metadataRequest = ++missionRequest.current;
     setLoading(true);
     try {
-      await loadMissions();
+      const activeMissions = await loadMissions();
+      if (metadataRequest !== missionRequest.current) return;
+      setMissions(activeMissions);
+      if (request !== discoveryRequest.current) return;
       // Browsing is permission-free. Only the recenter button requests GPS.
       // In particular, an already-granted OS permission is not consent to
       // automatically transmit the viewer's location when this screen opens.
-      await loadDropsFor('recent', FALLBACK_REGION);
+      const recentDrops = await loadDropsFor('recent', FALLBACK_REGION);
+      if (request !== discoveryRequest.current) return;
+      setDrops(recentDrops);
     } catch (error) {
-      dispatch(showNotice(errorText(error)));
+      if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
     } finally {
-      setLoading(false);
+      if (request === discoveryRequest.current) setLoading(false);
     }
   }, [dispatch, loadMissions, loadDropsFor]);
 
   React.useEffect(() => {
     void bootstrap();
+    return () => {
+      // Discard responses after leaving World, including pending GPS prompts.
+      discoveryRequest.current += 1;
+      missionRequest.current += 1;
+    };
   }, [bootstrap]);
 
   const onFilterChange = async (next: WorldFilter): Promise<void> => {
     hapticTap();
+    const request = ++discoveryRequest.current;
     setFilter(next);
     setSelectedId(null);
+    setLoading(false);
     setSearching(true);
     try {
-      await loadDropsFor(next, { latitude: region.latitude, longitude: region.longitude });
+      const result = await loadDropsFor(next, { latitude: region.latitude, longitude: region.longitude });
+      if (request !== discoveryRequest.current) return;
+      setDrops(result);
       setQueryOrigin(region);
       setShowSearchArea(false);
     } catch (error) {
-      dispatch(showNotice(errorText(error)));
+      if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
     } finally {
-      setSearching(false);
+      if (request === discoveryRequest.current) setSearching(false);
     }
   };
 
   const searchThisArea = async (): Promise<void> => {
     hapticTap();
+    const request = ++discoveryRequest.current;
     setFilter('nearby');
+    setLoading(false);
     setSearching(true);
     try {
-      await loadDropsFor('nearby', { latitude: region.latitude, longitude: region.longitude });
+      const result = await loadDropsFor('nearby', { latitude: region.latitude, longitude: region.longitude });
+      if (request !== discoveryRequest.current) return;
+      setDrops(result);
       setQueryOrigin(region);
       setShowSearchArea(false);
       setSelectedId(null);
     } catch (error) {
-      dispatch(showNotice(errorText(error)));
+      if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
     } finally {
-      setSearching(false);
+      if (request === discoveryRequest.current) setSearching(false);
     }
   };
 
   const recenter = async (): Promise<void> => {
     hapticTap();
-    let permission = await getForegroundPermission();
-    if (permission !== 'granted') {
-      permission = await requestForegroundPermission();
-    }
-    if (permission !== 'granted') {
-      setLocationDenied(true);
-      dispatch(showNotice('Location permission is needed to recenter.'));
-      return;
-    }
+    const request = ++discoveryRequest.current;
+    // This action supersedes startup/filter loading even if permission is denied.
+    setLoading(false);
+    setSearching(false);
+    let permission: Awaited<ReturnType<typeof getForegroundPermission>>;
     try {
+      permission = await getForegroundPermission();
+      if (request !== discoveryRequest.current) return;
+      if (permission !== 'granted') {
+        permission = await requestForegroundPermission();
+        if (request !== discoveryRequest.current) return;
+      }
+      if (permission !== 'granted') {
+        setLocationDenied(true);
+        dispatch(showNotice('Location permission is needed to recenter.'));
+        return;
+      }
       const point = await getOneShotLocation();
+      if (request !== discoveryRequest.current) return;
       const next: Region = {
         latitude: point.latitude,
         longitude: point.longitude,
@@ -233,14 +257,17 @@ export default function WorldScreen(): React.JSX.Element {
       setRegion(next);
       mapRef.current?.animateToRegion(next, 550);
       setFilter('nearby');
+      setLoading(false);
       setSearching(true);
-      await loadDropsFor('nearby', point);
+      const result = await loadDropsFor('nearby', point);
+      if (request !== discoveryRequest.current) return;
+      setDrops(result);
       setQueryOrigin(next);
       setShowSearchArea(false);
     } catch (error) {
-      dispatch(showNotice(errorText(error)));
+      if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
     } finally {
-      setSearching(false);
+      if (request === discoveryRequest.current) setSearching(false);
     }
   };
 
