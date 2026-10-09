@@ -299,12 +299,16 @@ export function useLiveArenaRoom(
             if (isMembershipRefusal(caught)) return 'locked' as const;
             throw caught;
           }),
-          (next.roomMode==='DUEL' ? fetchOfficialPage(roomId,'evidence') : fetchEvidence(roomId)),
+          (next.roomMode==='DUEL' ? fetchOfficialPage(roomId,'evidence') : fetchEvidence(roomId)).catch((caught: unknown) => {
+            if (isMembershipRefusal(caught)) return 'locked' as const;
+            throw caught;
+          }),
         ]);
         if (!mounted.current || generation!==accessGeneration.current) return;
 
-        if (thread === 'locked') {
+        if (thread === 'locked' || rail === 'locked') {
           clearPrivateThread();
+          return;
         } else {
           setThreadLocked(false);
           messageHasOlder.current=thread.length>=PAGE;
@@ -314,8 +318,8 @@ export function useLiveArenaRoom(
             mode === 'initial' ? thread : mergeMessages(current, thread),
           );
         }
-        if(thread!=='locked') setEvidence(old=> mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
-        if(thread!=='locked' && next.roomMode==='DUEL') {
+        setEvidence(old=> mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+        if(next.roomMode==='DUEL') {
           if (!evidenceCursor.current) evidenceCursor.current=rail[0]?.preciseCreatedAt ? rail[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
           if(mode==='initial' || !olderEvidence.current) {
             olderEvidence.current=rail.at(-1)?.preciseCreatedAt ? rail.at(-1) as OfficialCursor : null;

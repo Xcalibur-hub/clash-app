@@ -175,11 +175,13 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         <View style={[styles.locked, styles.layer]}>
           <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>Watch this Clash</Text>
           <Text style={[styles.emptyBody, { color: t.textSecondary }]}>
-            {duel.status === 'open' && room.phase !== 'closed'
-              ? 'Enter as a spectator to follow the Clash. Watching does not make you a fighter.'
+            {presentation.canWatch
+              ? duel.status === 'settled'
+                ? 'Enter to review the historical Stage and official transcript. This Clash is read-only.'
+                : 'Enter as a spectator to follow the Clash. Watching does not make you a fighter.'
               : 'This Clash is available to members.'}
           </Text>
-          {duel.status === 'open' && room.phase !== 'closed' ? (
+          {presentation.canWatch ? (
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel="Watch this Clash as a spectator"

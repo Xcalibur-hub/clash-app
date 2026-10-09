@@ -18,16 +18,17 @@ export function duelPresentation(duel: ArenaDuel, phase: ArenaPhase) {
         ? 'JUDGING OPEN'
         : 'WATCHING';
   const stage = duel.status === 'cancelled' ? 'Cancelled' : duel.status === 'settled' ? 'Complete'
-    : phase === 'scheduled' ? 'Waiting' : phase === 'closed' ? 'Awaiting verdict'
+    : phase === 'scheduled' ? 'Waiting' : phase === 'closed' ? 'Settlement pending'
     : phase === 'judging' ? 'Judging' : phase === 'final_arguments' ? 'Final arguments' : 'Live';
   const hint = stage === 'Cancelled' ? 'This Clash ended without a verdict.'
     : stage === 'Complete' ? 'The official verdict is available.'
     : stage === 'Waiting' ? 'Waiting for the Clash to begin.'
-    : stage === 'Awaiting verdict' ? 'Voting has closed. The verdict is being settled.'
+    : stage === 'Settlement pending' ? 'Voting has closed. The server has not completed settlement. Refresh to check for a verdict or cancellation.'
     : stage === 'Judging' ? 'Who made the stronger case?'
     : stage === 'Final arguments' ? 'The fighters are making their final arguments.'
     : 'Clash in progress.';
   return { side, role, stage, hint,
+    canWatch: duel.status === 'settled' || (duel.status === 'open' && phase !== 'closed'),
     canPublish: Boolean(side && duel.status === 'open' && (phase === 'open' || phase === 'final_arguments')),
     canJudge: duel.status === 'open' && phase === 'judging' && duel.mayJudge && !duel.hasJudged && !side,
   };

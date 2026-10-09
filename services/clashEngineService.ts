@@ -7,20 +7,11 @@
 import { currentViewerProfileId } from './apiService';
 import { requestError, requireSupabase, SupabaseError } from './supabaseClient';
 import type { ClashRow, ClashSide, ClashStatus, Json, VerdictWinner } from '../supabase/types';
+import { parseClashSettlement, type ClashSettlementResult, type ServerVerdict } from '../utils/clashSettlement';
+export type { ClashSettlementResult, ServerVerdict } from '../utils/clashSettlement';
 
 export type ClashMode = 'STANDARD' | 'BLIND';
 
-export interface ServerVerdict {
-  clashId: string;
-  /** 'A', 'B', or 'DRAW' — a tie is never awarded to a side. */
-  winnerSide: VerdictWinner;
-  sideAScore: number;
-  sideBScore: number;
-  jurySize: number;
-  agreement: number;
-  margin: number;
-  verdictLabel: string;
-}
 
 export interface ReputationEvent {
   id: string;
@@ -83,11 +74,13 @@ function toVerdict(payload: Json | null): ServerVerdict {
   throw new SupabaseError('settle_clash returned an unexpected payload', 'bad_payload');
 }
 
-/** Settle a closed clash (idempotent); returns the single verdict. */
-export async function settleClash(clashId: string): Promise<ServerVerdict> {
+/** A server-owned terminal result: cancellation is a successful outcome. */
+export async function settleClash(clashId: string): Promise<ClashSettlementResult> {
   const { data, error } = await requireSupabase().rpc('settle_clash', { p_clash_id: clashId });
   if (error) throw requestError(error);
-  return toVerdict(data);
+  const result = parseClashSettlement(data, clashId);
+  if (!result) throw new SupabaseError('settle_clash returned an unexpected payload', 'bad_payload');
+  return result;
 }
 
 /** The settled verdict, or null while the clash is still open. */

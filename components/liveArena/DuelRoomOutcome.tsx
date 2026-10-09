@@ -48,13 +48,13 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn }: {
     );
   }
 
-  const headline = duel.hasJudged || recorded
+  const headline = phase === 'closed'
+    ? 'Settlement pending'
+    : duel.hasJudged || recorded
     ? 'Your ballot is recorded'
     : phase === 'judging'
       ? 'Who made the stronger case?'
-      : phase === 'closed'
-        ? 'Awaiting the verdict'
-        : 'Judging opens after final arguments';
+      : 'Judging opens after final arguments';
 
   return (
     <View style={[styles.wrap, { borderTopColor: t.border }]}>
@@ -79,13 +79,13 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn }: {
       </Animated.Text>
 
       <Text style={[styles.support, { color: t.textSecondary }]}>
-        {duel.hasJudged || recorded
+        {phase === 'closed'
+          ? presentation.hint
+          : duel.hasJudged || recorded
           ? 'Your judgement was submitted. Results appear after voting closes.'
           : presentation.side
             ? 'Fighters cannot judge their own Clash.'
-            : phase === 'closed'
-              ? 'Voting has closed. The official verdict is being settled.'
-              : 'Official judgements decide the verdict. Reactions do not count as ballots.'}
+            : 'Official judgements decide the verdict. Reactions do not count as ballots.'}
       </Text>
 
       {judgingOpen ? (

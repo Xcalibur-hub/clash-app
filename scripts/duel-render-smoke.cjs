@@ -97,6 +97,9 @@ const scenarios = {
   error: { messages: [], error: 'permission denied for table arena_room_messages' },
   loading: { messages: [], loading: true },
   locked: { threadLocked: true },
+  'historical-locked': { threadLocked: true, room: { ...room, phase: 'closed', status: 'SETTLED', duel: { ...duel, status: 'settled', verdict: { winnerSide: 'A', verdictLabel: 'SPLIT DECISION', jurySize: 1 } } } },
+  'cancelled-locked': { threadLocked: true, room: { ...room, phase: 'closed', status: 'CANCELLED', duel: { ...duel, status: 'cancelled' } } },
+  'settlement-pending': { room: { ...room, phase: 'closed', status: 'JUDGING', duel: { ...duel, hasJudged: true } } },
   moderated: { messages: [base.messages[1]], evidence: [{ id: 'hidden', author: base.messages[0].author, messageId: 'a1', title: 'SECRET HIDDEN CITATION', createdAt: now, roomId: 'r', topicId: 't', kind: 'link' }] },
 };
 const out = process.argv[2];
@@ -108,7 +111,7 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   assert.doesNotMatch(html, /SECRET HIDDEN CITATION|permission denied for table|999/);
   // Stadium: no permanent Arguments|Crowd|Evidence tab bar.
   assert.doesNotMatch(html, /Clash content/);
-  if (name !== 'error' && name !== 'loading' && name !== 'locked') {
+  if (name !== 'error' && name !== 'loading' && !name.includes('locked')) {
     assert.match(html, /Kevin/);
     assert.match(html, /Rohan/);
   }
@@ -136,6 +139,9 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   if (name === 'error') assert.match(html, /Couldn&#x27;t load the Clash/);
   if (name === 'loading') assert.match(html, /Loading Clash transcript/);
   if (name === 'locked') { assert.match(html, /Watch this Clash as a spectator/); assert.doesNotMatch(html, /Automation is already/); }
+  if (name === 'historical-locked') { assert.match(html,/Watch this Clash as a spectator|read-only/); assert.match(html,/historical Stage/); assert.doesNotMatch(html,/Automation is already|Fighter composer/); }
+  if (name === 'cancelled-locked') { assert.doesNotMatch(html,/Watch this Clash as a spectator|Send public Crowd message|Fighter composer/); }
+  if (name === 'settlement-pending') { assert.match(html,/Settlement pending/); assert.match(html,/not completed settlement/); assert.doesNotMatch(html,/Judge Kevin, Fighter A|Fighter composer/); }
   if (name === 'moderated') assert.doesNotMatch(html, /Automation is already/);
   if (out) fs.writeFileSync(path.join(out, `${name}.html`), `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${renderToStaticMarkup(getStyleElement())}<style>html,body{margin:0;background:#09090b;height:100%}*{font-family:Arial,sans-serif!important}</style></head><body>${html}</body></html>`);
   process.stdout.write(`PASS ${name}\n`);
@@ -223,4 +229,4 @@ for(const [name,crowd] of Object.entries({
   if(name==='crowd-closed') { assert.match(html,/read-only/); assert.doesNotMatch(html,/Send public Crowd message/); }
   process.stdout.write(`PASS ${name}\n`);
 }
-process.stdout.write('19/19 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');
+process.stdout.write('22/22 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');

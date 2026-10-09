@@ -20,6 +20,16 @@ import type { ArenaDuel } from './arenaDuelPayload';
 import type { ArenaMessage, ArenaEvidence } from '../services/liveArenaService';
 const duel = (): ArenaDuel => ({ clashId: 'cl', status: 'open', fighterA: { id: 'author', name: 'Kevin', handle: 'kevin' },
   fighterB: { id: 'challenger', name: 'Rohan', handle: 'rohan' }, viewerRelationship: 'spectator', mayJudge: false, hasJudged: false, verdict: null });
+test('historical entry offers Watch only for settled or currently open canonical rooms',()=>{
+  assert.equal(duelPresentation({...duel(),status:'settled'},'closed').canWatch,true);
+  assert.equal(duelPresentation({...duel(),status:'cancelled'},'closed').canWatch,false);
+  assert.equal(duelPresentation(duel(),'closed').canWatch,false);
+  assert.equal(duelPresentation(duel(),'scheduled').canWatch,true); // Existing staff-visible scheduled entry still relies on server authorization.
+  for(const phase of ['open','final_arguments','judging'] as const) assert.equal(duelPresentation(duel(),phase).canWatch,true);
+  const historical=duelPresentation({...duel(),status:'settled',viewerRelationship:'fighter_a'},'open');
+  assert.equal(historical.canPublish,false);assert.equal(historical.canJudge,false);
+  assert.match(duelPresentation(duel(),'closed').hint,/not completed settlement/);
+});
 function message(id: string, author: string | null, time: number, parent: string | null = null): ArenaMessage {
   return { id, roomId: 'r', kind: 'text', body: `Argument ${id}`, createdAt: time, parentMessageId: parent,
     author: author ? { id: author, name: author, handle: author, avatarTint: '#aaa', rank: 'Rookie' } : null,
@@ -102,7 +112,7 @@ test('server-supported progression has no invented opening/counter round', () =>
   assert.equal(duelPresentation(duel(), 'open').stage, 'Live');
   assert.equal(duelPresentation(duel(), 'final_arguments').stage, 'Final arguments');
   assert.equal(duelPresentation(duel(), 'judging').stage, 'Judging');
-  assert.equal(duelPresentation(duel(), 'closed').stage, 'Awaiting verdict');
+  assert.equal(duelPresentation(duel(), 'closed').stage, 'Settlement pending');
 });
 test('canonical cancellation and settlement override stale Room phase', () => {
   const cancelled = { ...duel(), status: 'cancelled' as const, mayJudge: true };
