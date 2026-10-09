@@ -235,8 +235,8 @@ select is(
 -- ── Media that is not ready is never surfaced ─────────────────────────────
 update public.media_objects set status = 'uploading' where id = 'wd-maya-pub';
 select is(
-  public.world_drop_view((select id from public.world_drops where caption = 'The Missing Frame' and creator_id = 'wd-maya'))->'media',
-  'null'::jsonb, 'media that is not ready is never surfaced'
+  public.world_drop_view((select id from public.world_drops where caption = 'The Missing Frame' and creator_id = 'wd-maya')),
+  null::jsonb, 'drop with media that is not ready is never surfaced'
 );
 
 select * from finish();
