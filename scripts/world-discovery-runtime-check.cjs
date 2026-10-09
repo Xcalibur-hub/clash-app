@@ -1,6 +1,6 @@
 // Actual World screen with a controlled hook/native bridge and deferred services.
 // Test records exist only in this process; this is not physical-device evidence.
-const fs=require('fs'),Module=require('module'),babel=require('@babel/core');
+const fs=require('fs'),Module=require('module'),babel=require('@babel/core'),path=require('node:path');
 const assert=require('node:assert/strict'),React=require('react');
 for(const ext of ['.ts','.tsx'])Module._extensions[ext]=(m,f)=>m._compile(babel.transformSync(fs.readFileSync(f,'utf8'),{
   filename:f,babelrc:false,configFile:false,presets:['@babel/preset-typescript',['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs'],
@@ -21,7 +21,9 @@ const location={getForegroundPermission:()=>request('permission'),requestForegro
 const dispatch=e=>notices.push(e);
 const original=Module._load;
 Module._load=function(r,parent){
- const own=parent?.filename.includes('Clash')&&!parent.filename.includes('node_modules');
+ const file=parent?.filename;
+ const root=path.resolve(__dirname,'..')+path.sep;
+ const own=typeof file==='string'&&file.startsWith(root)&&!file.includes(path.sep+'node_modules'+path.sep);
  if(own&&r==='react')return hooks;
  if(r==='react-native')return{View:'View',Text:'Text',Pressable:'Button',ActivityIndicator:'Spinner',Platform:{OS:'android'},StyleSheet:{create:x=>x}};
  if(r==='react-native-maps')return{__esModule:true,default:'Map',Circle:'Circle'};
