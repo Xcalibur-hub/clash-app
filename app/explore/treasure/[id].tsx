@@ -1,3 +1,5 @@
+import {withExploreAccount} from '../../../components/explore/ExploreAccountBoundary';
+import {useOperationScope} from '../../../hooks/useOperationScope';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -30,15 +32,17 @@ import { layout, radius, space, typeScale, useThemeColors } from '../../../theme
 import { timeLeftLabel } from '../../../utils/format';
 import { notify as hapticNotify, press as hapticPress, tap as hapticTap } from '../../../utils/haptics';
 
-export default function TreasureDetailScreen(): React.JSX.Element {
+function TreasureDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const huntId = typeof id === 'string' ? id : '';
+  const isCurrent = useOperationScope(huntId);
   const t = useThemeColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const now = useClock(15_000);
   const requireAuth = useRequireAuth();
 
+  const operationBusy=React.useRef(false);
   const [detail, setDetail] = React.useState<TreasureDetail | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
@@ -50,15 +54,17 @@ export default function TreasureDetailScreen(): React.JSX.Element {
 
   const reload = React.useCallback(async () => {
     const d = await fetchTreasureDetail(huntId);
+    if(!isCurrent())return;
     setDetail(d);
     if (d.completed && !d.claimed) setShowGift(true);
-  }, [huntId]);
+  }, [huntId,isCurrent]);
 
   React.useEffect(() => {
     analytics.track('treasure_opened', { realm: 'explore', source: 'explore' });
     let alive = true;
     (async () => {
       setLoading(true);
+      setDetail(null);setAnswer('');setFeedback(null);setShowGift(false);setError(null);
       try {
         const d = await fetchTreasureDetail(huntId);
         if (!alive) return;
@@ -76,30 +82,35 @@ export default function TreasureDetailScreen(): React.JSX.Element {
   }, [huntId]);
 
   const onJoin = async () => {
-    if (!requireAuth()) return;
+    if (!requireAuth() || operationBusy.current || !isCurrent()) return;
+    operationBusy.current=true;
     setBusy(true);
     setError(null);
     try {
       await joinTreasureHunt(huntId);
+      if(!isCurrent())return;
       analytics.track('treasure_joined', { realm: 'explore', source: 'explore' });
       hapticPress();
       await reload();
     } catch (e) {
+      if(!isCurrent())return;
       setError(e instanceof Error ? e.message : 'Join failed');
     } finally {
-      setBusy(false);
+      if(isCurrent()){operationBusy.current=false;setBusy(false);}
     }
   };
 
   const onSubmitAnswer = async (value?: string) => {
-    if (!requireAuth() || !detail?.currentClue) return;
+    if (!requireAuth() || !detail?.currentClue || operationBusy.current || !isCurrent()) return;
     const text = (value ?? answer).trim();
     if (!text) return;
+    operationBusy.current=true;
     setBusy(true);
     setFeedback(null);
     try {
       analytics.track('treasure_clue_attempted', { realm: 'explore', source: 'explore' });
       const result = await submitTreasureAnswer(huntId, detail.currentClue.id, text);
+      if(!isCurrent())return;
       if (!result.correct) {
         setFeedback('Not quite — try another angle.');
         hapticNotify('warning');
@@ -115,14 +126,15 @@ export default function TreasureDetailScreen(): React.JSX.Element {
         await reload();
       }
     } catch (e) {
+      if(!isCurrent())return;
       setError(e instanceof Error ? e.message : 'Answer failed');
     } finally {
-      setBusy(false);
+      if(isCurrent()){operationBusy.current=false;setBusy(false);}
     }
   };
 
   const onContentFind = async () => {
-    if (!requireAuth() || !detail?.currentClue) return;
+    if (!requireAuth() || !detail?.currentClue || operationBusy.current || !isCurrent()) return;
     // CONTENT_FIND: user navigates Clash; here they confirm a guessed public target id.
     // For V1 UX we accept a pasted public content id — never private answers.
     const contentId = answer.trim();
@@ -130,10 +142,12 @@ export default function TreasureDetailScreen(): React.JSX.Element {
       setFeedback('Find the public post, then paste its id.');
       return;
     }
+    operationBusy.current=true;
     setBusy(true);
     try {
       analytics.track('treasure_clue_attempted', { realm: 'explore', source: 'explore' });
       const result = await completeContentClue(huntId, detail.currentClue.id, contentId);
+      if(!isCurrent())return;
       if (!result.correct) {
         setFeedback('That content is not the hidden mark.');
         hapticNotify('warning');
@@ -147,24 +161,28 @@ export default function TreasureDetailScreen(): React.JSX.Element {
         await reload();
       }
     } catch (e) {
+      if(!isCurrent())return;
       setError(e instanceof Error ? e.message : 'Could not verify');
     } finally {
-      setBusy(false);
+      if(isCurrent()){operationBusy.current=false;setBusy(false);}
     }
   };
 
   const onClaim = async () => {
-    if (!requireAuth()) return;
+    if (!requireAuth() || operationBusy.current || !isCurrent()) return;
+    operationBusy.current=true;
     setClaiming(true);
     try {
       await claimTreasureReward(huntId);
+      if(!isCurrent())return;
       analytics.track('treasure_reward_claimed', { realm: 'explore', source: 'explore' });
       hapticNotify('success');
       await reload();
     } catch (e) {
+      if(!isCurrent())return;
       setError(e instanceof Error ? e.message : 'Claim failed');
     } finally {
-      setClaiming(false);
+      if(isCurrent()){operationBusy.current=false;setClaiming(false);}
     }
   };
 
@@ -432,3 +450,5 @@ const styles = StyleSheet.create({
   },
   discoverLinks: { flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' },
 });
+
+export default withExploreAccount(TreasureDetailScreen);

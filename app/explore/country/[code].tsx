@@ -1,3 +1,4 @@
+import {withExploreAccount} from '../../../components/explore/ExploreAccountBoundary';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -32,7 +33,7 @@ import { tap as hapticTap } from '../../../utils/haptics';
  * Country Explore — media-rich discovery for one public country code.
  * Source: profiles.public_country_code only.
  */
-export default function ExploreCountryScreen(): React.JSX.Element {
+function ExploreCountryScreen(): React.JSX.Element {
   const { code: raw } = useLocalSearchParams<{ code: string | string[] }>();
   const code = (Array.isArray(raw) ? raw[0] : raw)?.toUpperCase() ?? '';
   const router = useRouter();
@@ -47,6 +48,9 @@ export default function ExploreCountryScreen(): React.JSX.Element {
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setPage(null);
+    setError(null);
+    if(!/^[A-Z]{2}$/.test(code)){setError('Invalid country.');setLoading(false);return;}
     void fetchExploreCountry(code)
       .then((next) => {
         if (cancelled) return;
@@ -162,7 +166,7 @@ export default function ExploreCountryScreen(): React.JSX.Element {
           </Text>
           <Text allowFontScaling={false} style={[styles.activity, { color: t.textSecondary }]}>
             {page?.activityCount != null
-              ? `${page.activityCount.toLocaleString()} exploring`
+              ? `${page.activityCount.toLocaleString()} public profiles`
               : 'Quiet right now'}
           </Text>
         </Animated.View>
@@ -487,3 +491,5 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
   },
 });
+
+export default withExploreAccount(ExploreCountryScreen);

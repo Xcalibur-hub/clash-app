@@ -1,3 +1,5 @@
+import {withExploreAccount} from '../../components/explore/ExploreAccountBoundary';
+import {useOperationScope} from '../../hooks/useOperationScope';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -46,6 +48,7 @@ import {
   fetchTeleportCandidate,
   rememberTeleportId,
   readTeleportHistory,
+  clearTeleportHistory,
   searchExplore,
   type ExploreForYouItem,
   type ExploreLiveFeed,
@@ -72,8 +75,9 @@ import { tap as hapticTap } from '../../utils/haptics';
  * EXPLORE IA: For You | World | Live | Play | Meet
  * Floating mode rail + compact rolling filters. Feed stays virtualized.
  */
-export default function ExploreScreen(): React.JSX.Element {
+function ExploreScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const isCurrent = useOperationScope('ExploreScreen');
   const t = useThemeColors();
   const router = useRouter();
   const reduced = useReducedMotion();
@@ -92,6 +96,13 @@ export default function ExploreScreen(): React.JSX.Element {
   const [live, setLive] = React.useState<ExploreLiveFeed | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [loadingMore, setLoadingMore] = React.useState(false);
+  const paging = React.useRef(false);
+  const feedGeneration = React.useRef(0);
+  const teleportBusy = React.useRef(false);
+  const teleportTimer = React.useRef<ReturnType<typeof setTimeout>|null>(null);
+  const [error,setError] = React.useState<string|null>(null);
+  const [retry,setRetry] = React.useState(0);
+  React.useEffect(()=>{clearTeleportHistory();return()=>{if(teleportTimer.current)clearTimeout(teleportTimer.current);};},[]);
 
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [recent, setRecent] = React.useState<string[]>([]);
@@ -110,7 +121,11 @@ export default function ExploreScreen(): React.JSX.Element {
 
   React.useEffect(() => {
     let cancelled = false;
+    feedGeneration.current++;
+    paging.current=false;
+    setLoadingMore(false);
     setLoading(true);
+    setError(null);
     void Promise.all([fetchExploreWorldSummary(), fetchExploreForYou(24, 0), fetchExploreLive(20)])
       .then(([world, page, liveFeed]) => {
         if (cancelled) return;
@@ -120,14 +135,14 @@ export default function ExploreScreen(): React.JSX.Element {
         setForYouCursor(page.nextCursor);
         setLive(liveFeed);
       })
-      .catch(() => undefined)
+      .catch(() => {if(!cancelled)setError('Explore unavailable.');})
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retry]);
 
   React.useEffect(() => {
     if (!searching) {
@@ -135,6 +150,8 @@ export default function ExploreScreen(): React.JSX.Element {
       return;
     }
     let cancelled = false;
+    setSearchResults(null);
+    setError(null);
     void searchExplore(debounced)
       .then((results) => {
         if (!cancelled) {
@@ -146,11 +163,11 @@ export default function ExploreScreen(): React.JSX.Element {
           });
         }
       })
-      .catch(() => undefined);
+      .catch(() => {if(!cancelled)setError('Search unavailable. Try again.');});
     return () => {
       cancelled = true;
     };
-  }, [debounced, searching]);
+  }, [debounced, searching, retry]);
 
   const goCountryPage = React.useCallback(
     (code: string) => {
@@ -166,7 +183,8 @@ export default function ExploreScreen(): React.JSX.Element {
   }, []);
 
   const teleport = React.useCallback(async () => {
-    if (teleporting) return;
+    if (teleportBusy.current || !isCurrent()) return;
+    teleportBusy.current=true;
     setMode('world');
     setTeleporting(true);
     setTeleportReveal(null);
@@ -174,8 +192,11 @@ export default function ExploreScreen(): React.JSX.Element {
     analytics.track('explore_teleport', { realm: 'arena', source: 'explore' });
     try {
       const candidate = await fetchTeleportCandidate(readTeleportHistory());
+      if(!isCurrent())return;
       if (!candidate) {
+        teleportBusy.current=false;
         setTeleporting(false);
+        setError('No accessible teleport destinations.');
         return;
       }
       rememberTeleportId(candidate.id);
@@ -185,28 +206,36 @@ export default function ExploreScreen(): React.JSX.Element {
       setSpinLng(lng);
       setSpinToken((n) => n + 1);
       if (candidate.countryCode) setSelectedCountry(candidate.countryCode);
-      setTimeout(() => {
+      teleportTimer.current=setTimeout(() => {
+        if(!isCurrent())return;
+        teleportBusy.current=false;
         setTeleportReveal(candidate);
         setTeleporting(false);
       }, reduced ? 120 : 560);
     } catch {
+      if(!isCurrent())return;
+      teleportBusy.current=false;
+      setError('Teleport unavailable. Try again.');
       setTeleporting(false);
     }
-  }, [reduced, teleporting]);
+  }, [reduced, isCurrent]);
 
   const loadMoreForYou = React.useCallback(async () => {
-    if (loadingMore || forYouCursor == null) return;
+    if (loading || paging.current || forYouCursor == null || !isCurrent()) return;
+    paging.current=true;
+    const generation=feedGeneration.current;
     setLoadingMore(true);
     try {
       const page = await fetchExploreForYou(24, forYouCursor);
+      if(!isCurrent() || generation!==feedGeneration.current)return;
       setForYou((prev) => diversifyByCreator(dedupeExploreItems([...prev, ...page.items])));
       setForYouCursor(page.nextCursor);
     } catch {
-      /* ignore */
+      if(isCurrent() && generation===feedGeneration.current)setError('Could not load more. Scroll to retry.');
     } finally {
-      setLoadingMore(false);
+      if(isCurrent() && generation===feedGeneration.current){paging.current=false;setLoadingMore(false);}
     }
-  }, [forYouCursor, loadingMore]);
+  }, [forYouCursor, isCurrent, loading]);
 
   const filteredForYou = React.useMemo(() => {
     if (forYouFilter === 'all') return forYou;
@@ -292,9 +321,10 @@ export default function ExploreScreen(): React.JSX.Element {
         }}
       >
         {compactHeader}
+        {error ? <Pressable accessibilityRole="button" accessibilityLabel="Retry Explore" onPress={()=>setRetry(n=>n+1)}><Text style={{color:t.textSecondary}}>{error} Tap to retry.</Text></Pressable> : null}
       </View>
 
-      {searching && searchResults ? (
+      {searching && !searchResults ? (<ActivityIndicator accessibilityLabel="Loading search" color={t.textPrimary} />) : searching && searchResults ? (
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: layout.screenX,
@@ -444,8 +474,8 @@ export default function ExploreScreen(): React.JSX.Element {
                         ?.activityCount != null
                         ? `${summary.countries
                             .find((c) => c.countryCode === selectedCountry)!
-                            .activityCount!.toLocaleString()} exploring`
-                        : 'Trending now'}
+                            .activityCount!.toLocaleString()} public profiles`
+                        : 'Activity not shown'}
                     </Text>
                     <Pressable
                       onPress={() => goCountryPage(selectedCountry)}
@@ -903,3 +933,5 @@ const styles = StyleSheet.create({
     gap: 6,
   },
 });
+
+export default withExploreAccount(ExploreScreen);

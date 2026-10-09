@@ -1,3 +1,5 @@
+import {withExploreAccount} from '../../../components/explore/ExploreAccountBoundary';
+import {useOperationScope} from '../../../hooks/useOperationScope';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -39,7 +41,7 @@ import { press as hapticPress, tap as hapticTap } from '../../../utils/haptics';
 
 type SortMode = 'trending' | 'new';
 
-export default function ChallengeDetailScreen(): React.JSX.Element {
+function ChallengeDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const challengeId = typeof id === 'string' ? id : '';
   const t = useThemeColors();
@@ -49,10 +51,15 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const { pickImage, pickVideo } = useMediaPicker();
 
+  const joinBusy = React.useRef(false);
+  const submitBusy = React.useRef(false);
+  const pageBusy = React.useRef(false);
+  const reactionBusy = React.useRef(new Set<string>());
   const [detail, setDetail] = React.useState<ChallengeDetail | null>(null);
   const [entries, setEntries] = React.useState<ChallengeEntry[]>([]);
   const [cursor, setCursor] = React.useState<number | null>(0);
   const [sort, setSort] = React.useState<SortMode>('trending');
+  const isCurrent = useOperationScope(challengeId+':'+sort);
   const [loading, setLoading] = React.useState(true);
   const [joining, setJoining] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
@@ -63,17 +70,22 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
   const loadDetail = React.useCallback(async () => {
     if (!challengeId) return;
     const d = await fetchChallengeDetail(challengeId);
-    setDetail(d);
-  }, [challengeId]);
+    if(isCurrent())setDetail(d);
+  }, [challengeId,isCurrent]);
 
   const loadEntries = React.useCallback(
     async (reset: boolean) => {
-      if (!challengeId) return;
+      if (!challengeId || pageBusy.current || (!reset && cursor==null) || !isCurrent()) return;
+      pageBusy.current=true;
+      try {
       const page = await listChallengeEntries(challengeId, sort, 24, reset ? 0 : (cursor ?? 0));
-      setEntries((prev) => (reset ? page.items : [...prev, ...page.items]));
+      if(!isCurrent())return;
+      setEntries((prev) => Array.from(new Map((reset?page.items:[...prev,...page.items]).map(e=>[e.id,e])).values()));
       setCursor(page.nextCursor);
+      } catch(e){if(isCurrent())setError(e instanceof Error?e.message:'Could not load entries');}
+      finally{if(isCurrent())pageBusy.current=false;}
     },
-    [challengeId, cursor, sort],
+    [challengeId, cursor, sort,isCurrent],
   );
 
   React.useEffect(() => {
@@ -81,9 +93,15 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
     let alive = true;
     (async () => {
       setLoading(true);
+      setDetail(null);
+      setEntries([]);
+      setCursor(0);pageBusy.current=false;
+      joinBusy.current=false;submitBusy.current=false;reactionBusy.current.clear();
+      setJoining(false);setSubmitting(false);
       setError(null);
       try {
         await loadDetail();
+        if(!alive || !isCurrent())return;
         const page = await listChallengeEntries(challengeId, sort, 24, 0);
         if (!alive) return;
         setEntries(page.items);
@@ -97,43 +115,51 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
     return () => {
       alive = false;
     };
-  }, [challengeId, sort]);
+  }, [challengeId, sort,isCurrent]);
 
   const onJoin = async () => {
-    if (!requireAuth()) return;
+    if (!requireAuth() || joinBusy.current || !isCurrent()) return;
+    joinBusy.current=true;
     setJoining(true);
     try {
       await joinChallenge(challengeId);
+      if(!isCurrent())return;
       analytics.track('challenge_joined', { realm: 'explore', source: 'explore' });
       hapticPress();
       await loadDetail();
-      setComposeOpen(true);
+      if(isCurrent())setComposeOpen(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Join failed');
+      if(isCurrent())setError(e instanceof Error ? e.message : 'Join failed');
     } finally {
-      setJoining(false);
+      if(isCurrent()){joinBusy.current=false;setJoining(false);}
     }
   };
 
   const uploadAndSubmit = async (kind: 'image' | 'video') => {
-    if (!requireAuth()) return;
-    const picked = kind === 'image' ? await pickImage() : await pickVideo();
-    if (!picked) return;
+    if (!requireAuth() || submitBusy.current || !isCurrent()) return;
+    submitBusy.current=true;
     setSubmitting(true);
     setError(null);
-    const mime = picked.mimeType ?? (kind === 'video' ? 'video/mp4' : 'image/jpeg');
-    let planId: string | null = null;
+    let planId:string|null=null;
     try {
+      const picked=kind==='image'?await pickImage():await pickVideo();
+      if(!picked || !isCurrent())return;
+      const mime=picked.mimeType??(kind==='video'?'video/mp4':'image/jpeg');
       const plan = await createUpload(picked.kind, mime, 'public');
+      if(!isCurrent())return;
       planId = plan.id;
       const bytes = await readPickedBytes(picked.uri);
+      if(!isCurrent())return;
       await uploadFile(plan, bytes, mime);
+      if(!isCurrent())return;
       await completeUpload(plan.id, bytes.byteLength, {
         width: picked.width,
         height: picked.height,
         ...(picked.durationMs ? { durationMs: picked.durationMs } : {}),
       });
+      if(!isCurrent())return;
       await submitChallengeEntry(challengeId, plan.id, caption.trim() || null);
+      if(!isCurrent())return;
       analytics.track('challenge_submitted', {
         realm: 'explore',
         source: 'explore',
@@ -143,10 +169,13 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
       setComposeOpen(false);
       setCaption('');
       await loadDetail();
+      if(!isCurrent())return;
       const page = await listChallengeEntries(challengeId, sort, 24, 0);
+      if(!isCurrent())return;
       setEntries(page.items);
       setCursor(page.nextCursor);
     } catch (e) {
+      if(!isCurrent())return;
       if (planId) {
         try {
           await failUpload(planId);
@@ -156,12 +185,13 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
       }
       setError(e instanceof Error ? e.message : 'Submit failed');
     } finally {
-      setSubmitting(false);
+      if(isCurrent()){submitBusy.current=false;setSubmitting(false);}
     }
   };
 
   const onReact = async (entry: ChallengeEntry) => {
-    if (!requireAuth()) return;
+    if (!requireAuth() || reactionBusy.current.has(entry.id) || !isCurrent()) return;
+    reactionBusy.current.add(entry.id);
     const prev = entry.reacted;
     setEntries((list) =>
       list.map((e) =>
@@ -176,6 +206,7 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
     );
     try {
       const result = await toggleChallengeEntryReaction(entry.id);
+      if(!isCurrent())return;
       analytics.track('challenge_entry_reacted', { realm: 'explore', source: 'explore' });
       setEntries((list) =>
         list.map((e) =>
@@ -185,6 +216,7 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
         ),
       );
     } catch {
+      if(!isCurrent())return;
       setEntries((list) =>
         list.map((e) =>
           e.id === entry.id
@@ -196,7 +228,7 @@ export default function ChallengeDetailScreen(): React.JSX.Element {
             : e,
         ),
       );
-    }
+    } finally {if(isCurrent())reactionBusy.current.delete(entry.id);}
   };
 
   if (loading) {
@@ -533,3 +565,5 @@ const styles = StyleSheet.create({
   entryCopy: { padding: space.sm, gap: 4 },
   entryAuthor: { fontWeight: '700', fontSize: 13 },
 });
+
+export default withExploreAccount(ChallengeDetailScreen);

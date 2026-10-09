@@ -1,3 +1,4 @@
+import {withExploreAccount} from '../../../components/explore/ExploreAccountBoundary';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -50,7 +51,7 @@ function Tile({
   );
 }
 
-export default function MyPlayScreen(): React.JSX.Element {
+function MyPlayScreen(): React.JSX.Element {
   const t = useThemeColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -232,3 +233,5 @@ const styles = StyleSheet.create({
   tileCopy: { padding: space.sm, gap: 4 },
   tileTitle: { fontWeight: '700', fontSize: 14 },
 });
+
+export default withExploreAccount(MyPlayScreen);

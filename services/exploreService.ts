@@ -343,6 +343,7 @@ export async function fetchExploreWorldSummary(): Promise<ExploreWorldSummary> {
 }
 
 export async function fetchExploreCountry(countryCode: string): Promise<ExploreCountryPage> {
+  if(!/^[A-Z]{2}$/.test(countryCode.toUpperCase()))throw new SupabaseError('Invalid country.','invalid_country');
   const { data, error } = await client().rpc('get_explore_country', {
     p_country_code: countryCode.toUpperCase(),
   });
