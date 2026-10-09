@@ -34,4 +34,4 @@ assert.match(effect, /discoveryRequest\.current \+= 1/, 'unmount invalidates pen
 assert.match(recenter, /requestForegroundPermission\(\)/, 'recenter remains an explicit location action');
 assert.doesNotMatch(bootstrap, /getOneShotLocation|requestForegroundPermission|getForegroundPermission/, 'bootstrap remains permission free');
 
-process.stdout.write('World request-order source contract: 12 checks passed (runtime races not simulated).\n');
+process.stdout.write('World request-order source contract: 17 checks passed (runtime races not simulated).\n');
