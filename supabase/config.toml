@@ -409,3 +409,8 @@ verify_jwt = true
 [functions.arena-editorial]
 enabled = true
 verify_jwt = false
+
+# Optional authenticated GIF proxy. TENOR_API_KEY stays server-side.
+[functions.arena-gifs]
+enabled = true
+verify_jwt = true

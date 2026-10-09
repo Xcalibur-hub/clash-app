@@ -11,6 +11,7 @@ import {
 import { createComment, showNotice, useClash } from '../../store';
 import { useMediaPicker, type PickedMedia } from '../../hooks/useMediaPicker';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { useOperationScope } from '../../hooks/useOperationScope';
 import { analytics } from '../../services/analytics';
 import { postComment, type NewCommentGif, type NewCommentMedia } from '../../services/apiService';
 import {
@@ -22,7 +23,8 @@ import {
   uploadFile,
 } from '../../services/mediaService';
 import type { TenorGif } from '../../services/tenorService';
-import { errorText } from '../../services/supabaseClient';
+import { currentUserId,errorText } from '../../services/supabaseClient';
+import { useAuth } from '../../store/AuthProvider';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
@@ -82,7 +84,14 @@ export function RebuttalInput({
   const [focused, setFocused] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
+  const [sendError,setSendError]=React.useState<string|null>(null);
   const inputRef = React.useRef<TextInput>(null);
+  const {user}=useAuth();
+  const scope=`${user?.id??'guest'}:${takeId}:${parentId??''}`;
+  const isCurrent=useOperationScope(scope),busy=React.useRef(false);
+  const uploaded=React.useRef<{scope:string;picked:PickedMedia;ready:NewCommentMedia}|null>(null);
+  React.useEffect(()=>{setDraft('');clearAttachments();setGifOpen(false);setPending(false);setUploading(false);setSendError(null);busy.current=false;uploaded.current=null;
+  },[scope]);
 
   const hasAttachment = Boolean(media) || Boolean(gif);
   const expanded = focused || Boolean(draft.trim()) || hasAttachment || pending;
@@ -104,13 +113,14 @@ export function RebuttalInput({
     });
     try {
       const picked = kind === 'image' ? await pickImage() : await pickVideo();
+      if(!isCurrent())return;
       if (picked) {
         setGif(null);
         setMedia(picked);
         setFocused(true);
       }
     } catch (error) {
-      dispatch(showNotice(errorText(error)));
+      if(isCurrent())dispatch(showNotice(errorText(error)));
     }
   };
 
@@ -144,16 +154,21 @@ export function RebuttalInput({
 
   async function submit(): Promise<void> {
     const text = draft.trim();
-    if ((!text && !media && !gif) || pending) return;
+    if ((!text && !media && !gif) || busy.current) return;
     if (!requireAuth()) return;
+    busy.current=true;
+    setSendError(null);
     hapticPress();
     setPending(true);
     try {
+      if(!user?.id||await currentUserId()!==user.id||!isCurrent())throw new Error('Account changed. Reopen the reply.');
       let attached: NewCommentMedia | undefined;
       let attachedGif: NewCommentGif | undefined;
       if (media) {
         setUploading(true);
-        attached = await uploadMedia(media);
+        attached = uploaded.current?.scope===scope&&uploaded.current.picked===media?uploaded.current.ready:await uploadMedia(media);
+        if(!isCurrent())return;
+        uploaded.current={scope,picked:media,ready:attached};
       } else if (gif) {
         attachedGif = {
           provider: 'tenor',
@@ -161,6 +176,7 @@ export function RebuttalInput({
           url: gif.previewUrl,
         };
       }
+      if(!isCurrent()||await currentUserId()!==user.id)return;
       const comment = await postComment(
         takeId,
         text.slice(0, MAX),
@@ -168,6 +184,7 @@ export function RebuttalInput({
         attached,
         attachedGif,
       );
+      if(!isCurrent()||await currentUserId()!==user.id)return;
       if (attached) {
         analytics.track('media_reply_created', {
           source: parentId ? 'comment' : 'take',
@@ -186,13 +203,13 @@ export function RebuttalInput({
       dispatch(createComment(comment));
       setDraft('');
       clearAttachments();
+      uploaded.current=null;
       setFocused(false);
       onDone?.();
     } catch (error) {
-      dispatch(showNotice(errorText(error)));
+      if(isCurrent()){setSendError('Your reply was not confirmed. Your draft is kept; check your connection before sending again.');dispatch(showNotice(errorText(error)));}
     } finally {
-      setUploading(false);
-      setPending(false);
+      if(isCurrent()){busy.current=false;setUploading(false);setPending(false);}
     }
   }
 
@@ -263,6 +280,7 @@ export function RebuttalInput({
             }}
             accessibilityRole="button"
             accessibilityLabel="Cancel reply"
+            disabled={pending}
             hitSlop={8}
           >
             <Text allowFontScaling={false} style={[styles.cancel, { color: t.textSecondary }]}>
@@ -294,13 +312,14 @@ export function RebuttalInput({
             placeholder="Write a reply…"
             placeholderTextColor={t.textMuted}
             multiline={expanded}
+            editable={!pending}
             style={[styles.input, { color: t.textPrimary, minHeight: expanded ? 44 : 36 }]}
             accessibilityLabel={parentId ? 'Reply to rebuttal' : 'Add to the conversation'}
           />
 
           {media ? (
             <View style={styles.preview}>
-              <TakeMediaPreview media={media} onRemove={clearAttachments} />
+              <TakeMediaPreview media={media} onRemove={()=>{if(!pending)clearAttachments();}} />
             </View>
           ) : null}
           {gif ? (
@@ -311,6 +330,7 @@ export function RebuttalInput({
                 style={styles.gifRemove}
                 accessibilityRole="button"
                 accessibilityLabel="Remove GIF"
+                disabled={pending}
               >
                 <CloseIcon size={14} color="#FAFAF8" strokeWidth={2.4} />
               </Pressable>
@@ -383,6 +403,7 @@ export function RebuttalInput({
           )}
         </View>
       </View>
+      {sendError?<Text accessibilityRole="alert" style={{color:t.textSecondary,padding:space.sm}}>{sendError}</Text>:null}
 
       <GifPickerSheet
         visible={gifOpen}

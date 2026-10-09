@@ -1,14 +1,12 @@
 /**
- * Tenor GIF search (client-safe API key).
+ * Authenticated Tenor proxy; provider credentials stay in the Edge runtime.
  * Docs: https://developers.google.com/tenor/guides/quickstart
  *
  * Never logs search query text. Validates CDN hosts before returning results
  * so the composer cannot attach arbitrary remote URLs.
  */
 
-const TENOR_BASE = 'https://tenor.googleapis.com/v2';
-const CLIENT_KEY = 'clash_arena';
-const MEDIA_FILTER = 'tinygif,nanogif,gif';
+import {currentUserId,requireSupabase} from './supabaseClient';
 
 export interface TenorGif {
   id: string;
@@ -29,25 +27,15 @@ export type GifSearchState =
   | { status: 'empty' }
   | { status: 'error'; message: string };
 
-function apiKey(): string {
-  return (process.env.EXPO_PUBLIC_TENOR_API_KEY ?? '').trim();
-}
+
 
 export function isGifSearchConfigured(): boolean {
-  return apiKey().length > 0;
+  return process.env.EXPO_PUBLIC_ARENA_GIFS_ENABLED === 'true';
 }
 
 /** Server + client agree: https Tenor CDN hosts only. */
-export function isAllowedTenorUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:') return false;
-    const host = parsed.hostname.toLowerCase();
-    return host === 'tenor.com' || host.endsWith('.tenor.com');
-  } catch {
-    return false;
-  }
-}
+export {isAllowedTenorUrl} from '../utils/tenorUrl';
+import {isAllowedTenorUrl} from '../utils/tenorUrl';
 
 interface TenorMediaFormat {
   url?: string;
@@ -92,29 +80,16 @@ async function tenorGet(
   path: string,
   params: Record<string, string>,
 ): Promise<{ results: TenorGif[]; next: string | null }> {
-  const key = apiKey();
-  if (!key) {
-    throw new Error('GIF search is not configured. Set EXPO_PUBLIC_TENOR_API_KEY.');
-  }
-  const query = new URLSearchParams({
-    key,
-    client_key: CLIENT_KEY,
-    media_filter: MEDIA_FILTER,
-    contentfilter: 'medium',
-    limit: '24',
-    ...params,
+  if(!isGifSearchConfigured())throw new Error('GIF search is not enabled.');
+  const account=await currentUserId();if(!account)throw new Error('Sign in to search GIFs.');
+  const {data:payload,error}=await requireSupabase().functions.invoke('arena-gifs',{
+    body:{path,query:params.q??'',pos:params.pos??''},timeout:12000,
   });
-  const response = await fetch(`${TENOR_BASE}/${path}?${query.toString()}`);
-  if (!response.ok) {
-    throw new Error(response.status === 429 ? 'GIF provider rate limited. Try again.' : 'GIF provider unavailable.');
-  }
-  const payload = (await response.json()) as {
-    results?: TenorResult[];
-    next?: string;
-  };
+  if(await currentUserId()!==account)throw new Error('Account changed. Reopen GIF search.');
+  if(error||!payload||!Array.isArray(payload.results))throw new Error('GIF search is unavailable. Check your connection and retry.');
   const results = (payload.results ?? [])
     .map(toGif)
-    .filter((g): g is TenorGif => g !== null);
+    .filter((g: TenorGif | null): g is TenorGif => g !== null);
   const next = typeof payload.next === 'string' && payload.next.length > 0 ? payload.next : null;
   return { results, next };
 }

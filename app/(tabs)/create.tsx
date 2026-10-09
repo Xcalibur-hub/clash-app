@@ -248,11 +248,13 @@ export default function CreateTakeScreen(): React.JSX.Element {
           />
 
           {kind==='question'?<View style={{gap:space.sm,marginTop:space.md}}>
-            <Text style={{color:theme.textSecondary}}>Two distinct choices · Casual voting</Text>
-            {([{side:'A',value:sideA,set:setSideA},{side:'B',value:sideB,set:setSideB}]).map(option=><TextInput key={option.side}
+            <Text style={{color:theme.textSecondary}}>Two clear choices · Separate from Clash judging</Text>
+            {([{side:'A',value:sideA,set:setSideA},{side:'B',value:sideB,set:setSideB}]).map(option=><View key={option.side} style={{gap:space.xs}}><Text style={{color:theme.textMuted}}>OPTION {option.side} · {option.value.length}/60</Text><TextInput
               accessibilityLabel={`Side ${option.side} label`} placeholder={`Side ${option.side}`} placeholderTextColor={theme.textMuted}
               value={option.value} onChangeText={option.set} maxLength={60} editable={!posting}
-              style={{color:theme.textPrimary,borderColor:theme.border,borderWidth:1,borderRadius:12,padding:space.md,minHeight:52}} />)}
+              accessibilityHint="Use a short, distinct and fairly worded choice"
+              style={{color:theme.textPrimary,borderColor:theme.border,borderWidth:1,borderRadius:12,padding:space.md,minHeight:52}} /></View>)}
+            {sideA.trim()&&sideB.trim()&&!validQuestionChoices(sideA,sideB)?<Text accessibilityRole="alert" style={{color:theme.textSecondary}}>Give each option a different, meaningful label.</Text>:null}
           </View>:null}
 
           {media ? <TakeMediaPreview media={media} onRemove={removeMedia} /> : null}

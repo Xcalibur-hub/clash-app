@@ -26,6 +26,7 @@ import { BackIcon, MoreIcon } from '../../components/shared/icons';
 import { HOOD_LABEL } from '../../data/hoods';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useTakeReaction } from '../../hooks/useTakeReaction';
+import { useOperationScope } from '../../hooks/useOperationScope';
 import { toggleUpvote, fetchTakeById, fetchProfilesByIds } from '../../services/apiService';
 import { ClashModeSheet } from '../../components/clash/ClashModeSheet';
 import { startClash, type ClashMode } from '../../services/clashEngineService';
@@ -80,7 +81,10 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const { takeId, challenge } = useLocalSearchParams<{ takeId: string | string[]; challenge?: string }>();
   const id = Array.isArray(takeId) ? takeId[0] : takeId;
   const { state, dispatch } = useClash();
-  const { signedIn, loading: authLoading } = useAuth();
+  const { user,signedIn, loading: authLoading } = useAuth();
+  const accountScope=`${user?.id??'guest'}:${id}`,isCurrent=useOperationScope(accountScope);
+  const upvoteBusy=React.useRef(new Set<string>());
+  React.useEffect(()=>{upvoteBusy.current=new Set();setReplyTo(null);setMenu(null);setFollowingAuthor(false);},[accountScope]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const requireAuth = useRequireAuth();
@@ -97,8 +101,8 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const clashCommentRef = React.useRef<ChallengerComment | null>(null);
   const clashStartingRef = React.useRef(false);
 
-  const [remoteContext, setRemoteContext] = React.useState<{ take: Take; author: User } | null>(null);
-  const take = state.takes.find((item) => item.id === id) ?? (remoteContext?.take.id === id ? remoteContext.take : undefined);
+  const [remoteContext, setRemoteContext] = React.useState<{ take: Take; author: User;scope:string } | null>(null);
+  const take = state.takes.find((item) => item.id === id) ?? (remoteContext?.scope===accountScope&&remoteContext.take.id === id ? remoteContext.take : undefined);
   const author = take ? selectAuthor(state, take.authorId) ?? (remoteContext?.author.id === take.authorId ? remoteContext.author : undefined) : undefined;
   React.useEffect(() => {
     if (!id || (take && author)) return;
@@ -106,10 +110,10 @@ export default function TakeDetailScreen(): React.JSX.Element {
     void fetchTakeById(id).then(async found => {
       if (!found) return;
       const [profile] = await fetchProfilesByIds([found.authorId]);
-      if (active && profile) setRemoteContext({ take: found, author: profile });
-    }).catch(e => { if (active) dispatch(showNotice(errorText(e))); });
+      if (active && isCurrent() && profile) setRemoteContext({ take: found, author: profile,scope:accountScope });
+    }).catch(e => { if (active && isCurrent()) dispatch(showNotice(errorText(e))); });
     return () => { active = false; };
-  }, [id, take, author, dispatch]);
+  }, [id, take, author, dispatch,accountScope,isCurrent]);
 
   React.useEffect(() => {
     clashCommentRef.current = clashComment;
@@ -148,20 +152,24 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
   const upvote = React.useCallback(
     async (comment: ChallengerComment): Promise<void> => {
+      if(upvoteBusy.current.has(comment.id))return;
       const baseline = commentsRef.current.find((item) => item.id === comment.id);
       const wasUpvoted = state.upvotedCommentIds.includes(comment.id);
       if (!requireAuth()) return;
+      upvoteBusy.current.add(comment.id);
       hapticTap();
       dispatch(toggleCommentUpvote(comment.id));
       try {
         const result = await toggleUpvote(comment.id);
+        if(!isCurrent())return;
         dispatch(syncCommentUpvote(result.commentId, result.upvoted, result.upvotesCount));
       } catch (error) {
+        if(!isCurrent())return;
         dispatch(syncCommentUpvote(comment.id, wasUpvoted, baseline?.upvotes ?? 0));
         dispatch(showNotice(errorText(error)));
-      }
+      } finally {if(isCurrent())upvoteBusy.current.delete(comment.id);}
     },
-    [dispatch, requireAuth, state.upvotedCommentIds],
+    [dispatch, requireAuth, state.upvotedCommentIds,isCurrent],
   );
 
   const reply = React.useCallback(

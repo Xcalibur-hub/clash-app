@@ -22,7 +22,7 @@ export function getGifProviderStatus(): GifProviderStatus {
     tenor: 'Tenor',
   };
   const hints: Record<GifProviderId, string> = {
-    tenor: 'Set EXPO_PUBLIC_TENOR_API_KEY for this build to enable GIF search.',
+    tenor: 'GIF search is currently unavailable. You can still attach a photo or video.',
   };
   return {
     providerId: provider.id,

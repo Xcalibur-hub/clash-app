@@ -24,6 +24,7 @@ Module._load=function(request,parent){
   if(request==='./QuestionVotePanel')return{QuestionVotePanel:RN.View};
  }
  if(file.endsWith('/QuestionVotePanel.tsx')){
+  if(request==='react-native-reanimated')return{__esModule:true,default:{Text:RN.Text},useReducedMotion:()=>true};
   if(request==='react')return hooks;
   if(request==='react-native')return{...RN,AppState:{addEventListener(_event,fn){appCallback=fn;return{remove(){}};}}};
   if(request==='expo-router')return{useFocusEffect(fn){focusEffect=fn;}};
@@ -72,6 +73,7 @@ function textOf(tree){if(typeof tree==='string'||typeof tree==='number')return S
  panelError=new ServiceError('Hidden','42501');timer();await flush();tree=render();assert.match(textOf(tree),/Voting unavailable/);assert.doesNotMatch(textOf(tree),/participants/);panelError=null;pass('revoked access clears aggregate and selection');
  server={...server,status:'open'};timer();await flush();tree=render();let resolve;deferredVote=new Promise(r=>resolve=r);side(tree,'A').props.onPress();await flush();uid='b';tree=render();assert.doesNotMatch(textOf(tree),/Your choice|participants/);activate();await flush();resolve({...server,mySide:'A',revision:1,total:1,countA:1});await flush();tree=render();assert.equal(side(tree,'A').props.accessibilityState.selected,false);assert.doesNotMatch(textOf(tree),/Your choice/);pass('account switch mid-vote ignores former account result');
  const html=renderToStaticMarkup(tree);assert.match(html,/Casual A\/B question/);assert.equal((html.match(/role="button"/g)||[]).length,3);pass('actual card renders accessible choices and refresh control');
+ server={...server,countA:1,countB:7,total:8,mySide:'A',revision:1};timer();await flush();tree=render();assert.match(textOf(tree),/13%/);assert.match(textOf(tree),/87%/);pass('two rounded option percentages sum to 100 without changing server counts');
  index=0;const editorial=QuestionVotePanel({takeId:'q',choices:{...choices,aiGenerated:true,context:'Neutral attributed context',sources:[{url:'https://news.example.org/story',title:'Real source headline',publisher:'Verified source'}]}});
  assert.match(textOf(editorial),/AI.*EDITORIAL/);assert.match(textOf(editorial),/Neutral attributed context/);assert.equal(nodes(editorial).filter(n=>n.props?.accessibilityRole==='link').length,1);pass('editorial card clearly labels AI context and accessible source link');
  cleanup?.();cleanup=null;cells=[];uid='a';

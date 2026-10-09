@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { analytics } from '../../services/analytics';
+import { useAuth } from '../../store/AuthProvider';
 import { getGifProvider, getGifProviderStatus } from '../../services/gif';
 import type { TenorGif } from '../../services/tenorService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
@@ -51,26 +52,37 @@ export function GifPickerSheet({
   const [error, setError] = React.useState<string | null>(null);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const openedRef = React.useRef(false);
+  const {user}=useAuth();
+  const scope=React.useRef(''),request=React.useRef(0),paging=React.useRef(false);
+  const identity=`${user?.id??'guest'}:${visible}:${query}`;
+  if(scope.current!==identity){scope.current=identity;request.current++;paging.current=false;}
+  React.useEffect(()=>()=>{request.current++;scope.current='disposed';},[]);
 
   const gap = 8;
   const pad = space.md;
   const col = Math.max(140, Math.floor((width - pad * 2 - gap) / 2));
 
   const load = React.useCallback(async (q: string, pos?: string, append = false) => {
+    if(append&&paging.current)return;
+    const identity=scope.current,token=++request.current;
+    paging.current=true;
     if (!getGifProviderStatus().configured) {
       setState('unconfigured');
       setResults([]);
+      paging.current=false;
       return;
     }
     if (!append) {
       setState('loading');
       setError(null);
+      setResults([]);
     } else {
       setLoadingMore(true);
     }
     try {
       const provider = getGifProvider();
       const page = q.trim() ? await provider.search(q, pos) : await provider.trending(pos);
+      if(identity!==scope.current||token!==request.current)return;
       const mapped: TenorGif[] = page.results.map((g) => ({
         id: g.id,
         provider: 'tenor',
@@ -80,17 +92,19 @@ export function GifPickerSheet({
         height: g.height,
         description: g.description,
       }));
-      setResults((prev) => (append ? [...prev, ...mapped] : mapped));
-      setNext(page.next);
+      setResults((prev) => [...new Map((append?[...prev,...mapped]:mapped).map(item=>[item.id,item])).values()]);
+      setNext(page.next===pos?null:page.next);
+      setError(null);
       setState(page.results.length === 0 && !append ? 'empty' : 'ready');
     } catch (err) {
+      if(identity!==scope.current||token!==request.current)return;
       setError(err instanceof Error ? err.message : 'GIF provider unavailable.');
       if (!append) {
         setResults([]);
         setState('error');
       }
     } finally {
-      setLoadingMore(false);
+      if(token===request.current){paging.current=false;setLoadingMore(false);}
     }
   }, []);
 
@@ -113,7 +127,7 @@ export function GifPickerSheet({
   React.useEffect(() => {
     if (!visible) return;
     void load(debounced);
-  }, [visible, debounced, load]);
+  }, [visible, debounced, load,user?.id]);
 
   const select = (gif: TenorGif): void => {
     hapticTap();
@@ -246,9 +260,10 @@ export function GifPickerSheet({
                 loadingMore ? (
                   <ActivityIndicator style={{ marginVertical: space.md }} color={t.textMuted} />
                 ) : (
-                  <Text allowFontScaling={false} style={[styles.credit, { color: t.textMuted }]}>
-                    Via Tenor
-                  </Text>
+                  <View>
+                    {error?<Pressable accessibilityRole="button" onPress={()=>void load(debounced,next??undefined,true)} style={styles.retry}><Text style={{color:t.textSecondary}}>Couldn’t load more GIFs. Tap to retry.</Text></Pressable>:null}
+                    <Text allowFontScaling={false} style={[styles.credit, { color: t.textMuted }]}>Powered by Tenor</Text>
+                  </View>
                 )
               }
             />

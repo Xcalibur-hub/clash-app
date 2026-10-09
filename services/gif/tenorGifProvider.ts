@@ -1,7 +1,4 @@
-/**
- * Tenor-backed GifProvider. Client key stays in EXPO_PUBLIC_TENOR_API_KEY.
- * For a secret key, proxy via Edge Function later — same interface.
- */
+/** Tenor-backed GIF provider via the authenticated server-secret proxy. */
 import {
   fetchFeaturedGifs,
   isGifSearchConfigured,

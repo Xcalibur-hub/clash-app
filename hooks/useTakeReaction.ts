@@ -5,6 +5,8 @@ import { toggleTakeReaction } from '../services/apiService';
 import { errorText } from '../services/supabaseClient';
 import { tap as hapticTap } from '../utils/haptics';
 import { useRequireAuth } from './useRequireAuth';
+import { useAuth } from '../store/AuthProvider';
+import { useOperationScope } from './useOperationScope';
 
 /**
  * Reusable optimistic Take-reaction handler: auth gate → optimistic flip → RPC →
@@ -14,6 +16,8 @@ export function useTakeReaction(): (take: Take) => Promise<void> {
   const { state, dispatch } = useClash();
   const requireAuth = useRequireAuth();
   const inFlight = React.useRef<Set<string>>(new Set());
+  const {user}=useAuth(),isCurrent=useOperationScope(user?.id??'guest');
+  React.useEffect(()=>{inFlight.current=new Set();},[user?.id]);
 
   return React.useCallback(
     async (take: Take): Promise<void> => {
@@ -26,14 +30,16 @@ export function useTakeReaction(): (take: Take) => Promise<void> {
       dispatch(reactToTake(take.id));
       try {
         const result = await toggleTakeReaction(take.id);
+        if(!isCurrent())return;
         dispatch(syncTakeReaction(result.takeId, result.reacted, result.reactionsCount));
       } catch (error) {
+        if(!isCurrent())return;
         dispatch(syncTakeReaction(take.id, wasReacted, baseline));
         dispatch(showNotice(errorText(error)));
       } finally {
-        inFlight.current.delete(take.id);
+        if(isCurrent())inFlight.current.delete(take.id);
       }
     },
-    [dispatch, requireAuth, state],
+    [dispatch, requireAuth, state,isCurrent],
   );
 }

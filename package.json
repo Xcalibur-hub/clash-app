@@ -13,8 +13,8 @@
     "test:settlement:history": "node scripts/settlement-history-check.cjs",
     "test:crowd:service": "node scripts/crowd-service-check.cjs",
     "test:duel:render": "node scripts/duel-render-smoke.cjs",
-    "test:unit": "node --experimental-strip-types --test utils/clashSettlement.test.ts utils/officialRecovery.test.ts utils/arenaCrowd.test.ts utils/arenaFeedSurface.test.ts utils/immersiveClash.test.ts utils/arenaNav.test.ts utils/arenaStadium.test.ts utils/arenaAtmosphere.test.ts utils/arenaEntranceState.test.ts utils/challengeSwipe.test.ts utils/arenaCrewIdentity.test.ts utils/clashStart.test.ts utils/videoPlayerLifecycle.test.ts utils/takePulse.test.ts utils/tenorUrl.test.ts utils/liveArenaUrl.test.ts utils/liveRoomEvents.test.ts utils/liveRoomThread.test.ts utils/roomTyping.test.ts utils/roomPulseScore.test.ts utils/battleMoment.test.ts utils/arenaTrendScore.test.ts utils/arenaTrendRank.test.ts utils/arenaTrendRace.test.ts utils/arenaTrendChartRender.test.ts utils/arenaAccents.test.ts utils/exploreGlobeMath.test.ts utils/exploreCountries.test.ts utils/exploreTeleport.test.ts utils/exploreVaultVisibility.test.ts utils/exploreMosaic.test.ts utils/exploreForYouRank.test.ts utils/exploreGeo.test.ts utils/exploreNav.test.ts utils/exploreWorldCanvas.test.ts utils/meetModes.test.ts utils/meetVideoSession.test.ts utils/videoPoster.test.ts utils/mediaStill.test.ts utils/playRails.test.ts utils/vaultModules.test.ts utils/vaultExperiences.test.ts utils/vaultAccess.test.ts utils/vaultHomeRank.test.ts utils/vaultHomeCompose.test.ts utils/vaultPresentation.test.ts utils/vaultMoney.test.ts utils/vaultCommunityAccess.test.ts utils/vaultCommunityFeed.test.ts utils/vaultCommunityPseudonym.test.ts utils/vaultWorldPersonality.test.ts utils/vaultWorldRows.test.ts utils/vaultHomeRows.test.ts utils/creatorWorldDrops.test.ts utils/creatorLiveState.test.ts utils/creatorAiState.test.ts utils/digitalCreatorState.test.ts utils/arenaGameState.test.ts utils/clashNativeStickers.test.ts utils/arenaSides.test.ts utils/arenaCrews.test.ts utils/arenaDuelPayload.test.ts utils/arenaChallengePayload.test.ts utils/duelPresentation.test.ts utils/arenaClashDiscovery.test.ts utils/arenaInterests.test.ts utils/arenaQuestions.test.ts utils/arenaEditorial.test.ts utils/arenaEditorialEndpoint.test.ts",
-    "typecheck:editorial": "tsc --noEmit --strict --skipLibCheck --allowImportingTsExtensions --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM,DOM.Iterable supabase/functions/arena-editorial/index.ts",
+    "test:unit": "node --experimental-strip-types --test utils/clashSettlement.test.ts utils/officialRecovery.test.ts utils/arenaCrowd.test.ts utils/arenaFeedSurface.test.ts utils/immersiveClash.test.ts utils/arenaNav.test.ts utils/arenaStadium.test.ts utils/arenaAtmosphere.test.ts utils/arenaEntranceState.test.ts utils/challengeSwipe.test.ts utils/arenaCrewIdentity.test.ts utils/clashStart.test.ts utils/videoPlayerLifecycle.test.ts utils/takePulse.test.ts utils/tenorUrl.test.ts utils/liveArenaUrl.test.ts utils/liveRoomEvents.test.ts utils/liveRoomThread.test.ts utils/roomTyping.test.ts utils/roomPulseScore.test.ts utils/battleMoment.test.ts utils/arenaTrendScore.test.ts utils/arenaTrendRank.test.ts utils/arenaTrendRace.test.ts utils/arenaTrendChartRender.test.ts utils/arenaAccents.test.ts utils/exploreGlobeMath.test.ts utils/exploreCountries.test.ts utils/exploreTeleport.test.ts utils/exploreVaultVisibility.test.ts utils/exploreMosaic.test.ts utils/exploreForYouRank.test.ts utils/exploreGeo.test.ts utils/exploreNav.test.ts utils/exploreWorldCanvas.test.ts utils/meetModes.test.ts utils/meetVideoSession.test.ts utils/videoPoster.test.ts utils/mediaStill.test.ts utils/playRails.test.ts utils/vaultModules.test.ts utils/vaultExperiences.test.ts utils/vaultAccess.test.ts utils/vaultHomeRank.test.ts utils/vaultHomeCompose.test.ts utils/vaultPresentation.test.ts utils/vaultMoney.test.ts utils/vaultCommunityAccess.test.ts utils/vaultCommunityFeed.test.ts utils/vaultCommunityPseudonym.test.ts utils/vaultWorldPersonality.test.ts utils/vaultWorldRows.test.ts utils/vaultHomeRows.test.ts utils/creatorWorldDrops.test.ts utils/creatorLiveState.test.ts utils/creatorAiState.test.ts utils/digitalCreatorState.test.ts utils/arenaGameState.test.ts utils/clashNativeStickers.test.ts utils/arenaSides.test.ts utils/arenaCrews.test.ts utils/arenaDuelPayload.test.ts utils/arenaChallengePayload.test.ts utils/duelPresentation.test.ts utils/arenaClashDiscovery.test.ts utils/arenaInterests.test.ts utils/arenaQuestions.test.ts utils/arenaEditorial.test.ts utils/arenaEditorialEndpoint.test.ts utils/arenaGifProxy.test.ts",
+    "typecheck:editorial": "tsc --noEmit --strict --skipLibCheck --allowImportingTsExtensions --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM,DOM.Iterable supabase/functions/arena-editorial/index.ts supabase/functions/arena-gifs/index.ts",
     "test:editorial": "node --experimental-strip-types --test utils/arenaEditorial.test.ts utils/arenaEditorialEndpoint.test.ts",
     "test:questions": "node scripts/question-client-check.cjs",
     "test:interests": "node scripts/interest-client-check.cjs",
@@ -31,7 +31,8 @@
     "adb:reverse-supabase": "node scripts/adb-reverse-supabase.mjs",
     "dev:local": "node scripts/dev-local.mjs",
     "dev:hosted": "node scripts/dev-hosted.mjs",
-    "dev:backfill-video-posters": "node scripts/backfill-video-posters.mjs"
+    "dev:backfill-video-posters": "node scripts/backfill-video-posters.mjs",
+    "test:arena-engagement": "node scripts/arena-engagement-check.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/comic-neue": "^0.4.1",
@@ -88,7 +89,9 @@
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["react-native-webrtc"]
+        "exclude": [
+          "react-native-webrtc"
+        ]
       }
     }
   }

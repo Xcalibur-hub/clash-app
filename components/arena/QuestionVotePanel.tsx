@@ -7,10 +7,12 @@ import { fetchQuestion,voteQuestion } from '../../services/arenaQuestionService'
 import { questionPercent,type QuestionChoices,type QuestionState } from '../../utils/arenaQuestions';
 import { space,typeScale,useThemeColors } from '../../theme';
 import { PressableScale } from '../shared/PressableScale';
+import Animated,{FadeIn,useReducedMotion} from 'react-native-reanimated';
 
 /** Aggregate-only casual voting. Never writes judgements, stances or Room state. */
 export function QuestionVotePanel({takeId,choices}:{takeId:string;choices:QuestionChoices}):React.JSX.Element {
  const t=useThemeColors(),{user}=useAuth(),requireAuth=useRequireAuth();
+ const reducedMotion=useReducedMotion();
  const account=user?.id??null,scope=`${account??'guest'}:${takeId}`;
  const [state,setState]=React.useState<QuestionState|null>(null),[loading,setLoading]=React.useState(true),[sending,setSending]=React.useState(false);
  const [error,setError]=React.useState<string|null>(null),[pending,setPending]=React.useState<{side:'A'|'B';revision:number}|null>(null);
@@ -54,12 +56,16 @@ export function QuestionVotePanel({takeId,choices}:{takeId:string;choices:Questi
    onPress={()=>{void Linking.openURL(source.url).catch(()=>setError('The source link could not open.'));}}><Text style={[styles.caption,{color:t.textSecondary}]}>Source · {source.publisher}</Text></Pressable>):null}
   {(['A','B'] as const).map(side=>{
    const label=side==='A'?(visible?.sideA??choices.sideA):(visible?.sideB??choices.sideB),selected=visible?.mySide===side;
-   const count=side==='A'?visible?.countA:visible?.countB,percent=visible?questionPercent(count??0,visible.total):null;
+   const count=side==='A'?visible?.countA:visible?.countB;
+   const percent=visible&&visible.total>0?(side==='A'?questionPercent(visible.countA,visible.total):`${100-Math.round(100*visible.countA/visible.total)}%`):null;
    return <PressableScale key={side} accessibilityRole="button" accessibilityLabel={`Side ${side}: ${label}`}
     accessibilityState={{selected,disabled:(!visible&&Boolean(account))||sending||closed}}
+    accessibilityHint={closed?'Voting has closed':selected?'Your confirmed choice. You can change sides while voting is open.':'Choose this side. Results appear after voting.'}
     disabled={(!visible&&Boolean(account))||sending||closed} onPress={()=>void choose(side)}
     style={[styles.choice,{borderColor:selected?t.textPrimary:t.border,backgroundColor:selected?t.surfaceMuted:'transparent'}]}>
-    <Text style={[styles.label,{color:t.textPrimary}]}>{side} · {label}{selected?' · Your choice':''}</Text>
+    <Text style={[styles.caption,{color:t.textMuted}]}>OPTION {side}</Text>
+    <Text style={[styles.label,{color:t.textPrimary}]}>{label}</Text>
+    {selected?<Animated.Text entering={reducedMotion?undefined:FadeIn.duration(120)} style={[styles.caption,{color:t.textPrimary}]}>✓ Your choice</Animated.Text>:null}
     {results?<Text style={[styles.caption,{color:t.textSecondary}]}>{count} votes{percent?` · ${percent}`:''}</Text>:null}
    </PressableScale>;
   })}

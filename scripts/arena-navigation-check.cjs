@@ -56,6 +56,7 @@ const client = {
   }
 };
 Module._load = function (request, parent) {
+  if (request === 'react-native-reanimated') return {__esModule:true,default:{Text:RN.Text},useReducedMotion:()=>true};
   if (request === 'react') return react;
   if (request === 'react-native') return RN;
   if (request.endsWith('/PressableScale')) return { PressableScale: RN.Pressable };
