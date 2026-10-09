@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppState,Pressable,StyleSheet,Text,View } from 'react-native';
+import { AppState,Linking,Pressable,StyleSheet,Text,View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../store/AuthProvider';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
@@ -48,7 +48,10 @@ export function QuestionVotePanel({takeId,choices}:{takeId:string;choices:Questi
  };
  const closed=visible?.status==='closed',results=Boolean(visible&&(visible.mySide||closed));
  return <View style={[styles.wrap,{borderColor:t.border}]} accessibilityLabel="Casual A/B question">
-  <Text style={[styles.caption,{color:t.textMuted}]}>{choices.origin==='editorial'?'EDITORIAL A/B':'CASUAL A/B'} · Separate from Clash judging</Text>
+  <Text style={[styles.caption,{color:t.textMuted}]}>{choices.aiGenerated?'AI · EDITORIAL A/B':choices.origin==='editorial'?'EDITORIAL A/B':'CASUAL A/B'} · Separate from Clash judging</Text>
+  {choices.aiGenerated&&choices.context?<Text style={[styles.caption,{color:t.textSecondary}]}>{choices.context}</Text>:null}
+  {choices.aiGenerated?choices.sources?.map(source=><Pressable key={source.url} accessibilityRole="link" accessibilityLabel={`Source: ${source.title}`} style={styles.retry}
+   onPress={()=>{void Linking.openURL(source.url).catch(()=>setError('The source link could not open.'));}}><Text style={[styles.caption,{color:t.textSecondary}]}>Source · {source.publisher}</Text></Pressable>):null}
   {(['A','B'] as const).map(side=>{
    const label=side==='A'?(visible?.sideA??choices.sideA):(visible?.sideB??choices.sideB),selected=visible?.mySide===side;
    const count=side==='A'?visible?.countA:visible?.countB,percent=visible?questionPercent(count??0,visible.total):null;

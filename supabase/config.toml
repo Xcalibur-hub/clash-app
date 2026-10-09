@@ -403,3 +403,9 @@ verify_jwt = true
 [functions.digital-creator]
 enabled = true
 verify_jwt = true
+
+# Server-only worker: mandatory 32+ character x-editorial-secret check in handler.
+# No cron enabled. Database defaults remain paused/REVIEW_ONLY with no sources.
+[functions.arena-editorial]
+enabled = true
+verify_jwt = false

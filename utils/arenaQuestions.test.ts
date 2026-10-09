@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe,it } from 'node:test';
-import { validQuestionChoices,questionChoices,parseQuestionState,questionPercent } from './arenaQuestions.ts';
+import { validQuestionChoices,questionChoices,parseQuestionState,questionPercent,safeQuestionSource } from './arenaQuestions.ts';
 const state={takeId:'q',sideA:'Yes',sideB:'No',status:'open',expiresAt:'2026-10-10T00:00:00.123456Z',countA:0,countB:0,total:0,mySide:null,revision:0};
 describe('casual question contracts',()=>{
  it('requires distinct bounded meaningful labels',()=>{
@@ -21,6 +21,13 @@ describe('casual question contracts',()=>{
  it('accepts selected sides, genuine ties and closed history',()=>{
   const tie={...state,mySide:'B',revision:2,countA:1,countB:1,total:2,status:'closed'};
   assert.equal(parseQuestionState(tie,'q').mySide,'B');
+ });
+ it('requires safe attributed AI metadata and preserves human compatibility',()=>{
+  const row={question_a:'Yes',question_b:'No',question_origin:'editorial',question_ai_generated:true,question_context:'Neutral context',question_sources:[{url:'https://news.example.org/source',title:'Source title',publisher:'Source publisher'}]};
+  assert.equal(questionChoices(row)?.aiGenerated,true);assert.equal(questionChoices(row)?.sources?.length,1);
+  assert.throws(()=>questionChoices({...row,question_sources:[{...row.question_sources[0],url:'javascript:alert(1)'}]}));
+  assert.throws(()=>questionChoices({...row,question_sources:[]}));assert.throws(()=>questionChoices({...row,question_origin:'human'}));
+  assert.equal(safeQuestionSource('https://user:password@example.org/a'),false);assert.equal(safeQuestionSource('data:text/plain,hello'),false);
  });
  it('rejects malformed and cross-question state',()=>{
   for(const patch of [{takeId:'other'},{countA:-1},{total:1},{mySide:'DRAW'},{mySide:'A',revision:0},{revision:1},{expiresAt:'invalid'},{status:'live'},{countA:0.5,countB:0.5,total:1}])assert.throws(()=>parseQuestionState({...state,...patch},'q'));
