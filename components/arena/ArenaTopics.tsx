@@ -7,6 +7,7 @@ import { fetchLiveTopics, type LiveArenaTopic } from '../../services/liveArenaSe
 import type { ArenaInterest } from '../../utils/arenaInterests';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { useAuth } from '../../store/AuthProvider';
+import { ArenaQuestions } from './ArenaQuestions';
 export function ArenaTopics({
   refreshToken = 0,
   onOpenTopic,
@@ -26,6 +27,7 @@ export function ArenaTopics({
   const [loading, setLoading] = React.useState(true),
     [catalogueError, setCatalogueError] = React.useState(false),
     [topicsError, setTopicsError] = React.useState(false);
+  const [questionTopic,setQuestionTopic]=React.useState<string|undefined>();
   useFocusEffect(React.useCallback(() => {
     let active = true;
     setLoading(true);
@@ -72,7 +74,10 @@ export function ArenaTopics({
    {interest.hoods.map(hood => <Pressable key={hood} accessibilityRole="button" accessibilityLabel={'Explore ' + interest.name + ' in ' + hood} onPress={() => router.push('/hood/' + hood)} style={styles.link}><Text style={{
           color: t.textPrimary
         }}>Explore {interest.hoods.length > 1 ? hood : interest.name}</Text></Pressable>)}
+   <Pressable accessibilityRole="button" onPress={()=>setQuestionTopic(interest.id)} style={styles.link}><Text style={{color:t.textPrimary}}>Questions about {interest.name}</Text></Pressable>
   </View>)}
+  {questionTopic?<Pressable accessibilityRole="button" onPress={()=>setQuestionTopic(undefined)} style={styles.link}><Text style={{color:t.textSecondary}}>All questions</Text></Pressable>:null}
+  <ArenaQuestions topicId={questionTopic} refreshToken={refreshToken}/>
   <Text style={[styles.heading, {
       color: t.textPrimary
     }]}>Active discussions</Text>

@@ -58,6 +58,7 @@ const client = {
 Module._load = function (request, parent) {
   if (request === 'react') return react;
   if (request === 'react-native') return RN;
+  if (request.endsWith('/PressableScale')) return { PressableScale: RN.Pressable };
   if (request === 'expo-router') return {
     useRouter: () => ({
       push: p => routes.push(p)
@@ -166,7 +167,7 @@ async function main() {
   let buttons = nodes(tree).filter(n => n.props.accessibilityRole === 'button');
   buttons[0].props.onPress();
   assert.deepEqual(routes, ['/hood/movies']);
-  buttons[1].props.onPress();
+  buttons.find(button=>button.props.accessibilityLabel==='Open discussion Real discussion').props.onPress();
   assert.equal(opened, 'room-canonical');
   console.log('PASS catalogue mapping and existing Room navigation');
   reset([[], [{

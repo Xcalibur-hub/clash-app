@@ -17,6 +17,7 @@ import { RebuttalInput } from '../../components/arena/RebuttalInput';
 import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
 import { TakeActionRow } from '../../components/arena/TakeActionRow';
 import { TakeChallenges } from '../../components/arena/TakeChallenges';
+import { QuestionVotePanel } from '../../components/arena/QuestionVotePanel';
 import { TakeDetailHero } from '../../components/arena/TakeDetailHero';
 import { Avatar } from '../../components/shared/Avatar';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -370,7 +371,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </View>
           )}
 
-          <MindshiftPanel takeId={take.id} />
+          {take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : <MindshiftPanel takeId={take.id} />}
 
           <TakeChallenges take={take} openComposer={challenge === '1'} />
           <TakeActionRow

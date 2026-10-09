@@ -41,6 +41,7 @@ import { PressableScale } from '../shared/PressableScale';
 import { TakeActionRow } from './TakeActionRow';
 import { ChallengeTakeButton } from './TakeChallenges';
 import { TakeStoryBeat } from './TakeStoryBeat';
+import { QuestionVotePanel } from './QuestionVotePanel';
 
 export interface TakeFeedItemProps {
   take: Take;
@@ -132,6 +133,7 @@ function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
   return (
     <Animated.View entering={entering} style={styles.wrap}>
       {body}
+      {take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : null}
       {!isViewer && <ChallengeTakeButton takeId={take.id} />}
     </Animated.View>
   );

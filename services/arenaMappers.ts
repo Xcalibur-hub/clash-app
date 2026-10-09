@@ -2,6 +2,7 @@ import type { ChallengerComment, Take, TakeMedia, User } from '../store/types';
 import type { Json, TableRow } from '../supabase/types';
 import { gradient, type GradientColors } from '../theme';
 import { SupabaseError } from './supabaseClient';
+import { questionChoices } from '../utils/arenaQuestions';
 
 /**
  * Row ⇄ domain translation for the Arena.
@@ -32,6 +33,7 @@ function toMedia(row: TableRow<'takes'>): TakeMedia | undefined {
 /** Postgres timestamps are ISO strings; the store counts milliseconds. */
 export function toTake(row: TableRow<'takes'>): Take {
   return {
+    question: questionChoices(row),
     id: row.id,
     authorId: row.author_id,
     text: row.text,

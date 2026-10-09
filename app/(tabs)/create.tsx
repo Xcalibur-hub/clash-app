@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TakeComposerFields } from '../../components/arena/TakeComposerFields';
@@ -15,6 +15,10 @@ import { useMediaPicker, type PickedMedia } from '../../hooks/useMediaPicker';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { analytics } from '../../services/analytics';
 import { postTake, type NewTakeMedia } from '../../services/apiService';
+import { createQuestion } from '../../services/arenaQuestionService';
+import { currentUserId } from '../../services/supabaseClient';
+import { validQuestionChoices } from '../../utils/arenaQuestions';
+import { SegmentedTabs } from '../../components/shared/SegmentedTabs';
 import {
   completeUpload,
   createUpload,
@@ -81,6 +85,9 @@ export default function CreateTakeScreen(): React.JSX.Element {
   const theme = useThemeColors();
 
   const [text, setText] = React.useState('');
+  const [kind,setKind]=React.useState<'take'|'question'>('take');
+  const [sideA,setSideA]=React.useState(''),[sideB,setSideB]=React.useState('');
+  const working=React.useRef(false),uploaded=React.useRef<{picked:PickedMedia;ready:NewTakeMedia}|null>(null);
   const [hood, setHood] = React.useState<DbHood>(toDbHood(viewer.hood));
   const [media, setMedia] = React.useState<PickedMedia | null>(null);
   const [posting, setPosting] = React.useState(false);
@@ -89,8 +96,8 @@ export default function CreateTakeScreen(): React.JSX.Element {
 
   const charsLeft = MAX_CHARS - text.length;
   const overLimit = charsLeft < 0;
-  const hasDraft = text.trim().length > 0 || media !== null;
-  const canDrop = text.trim().length > 0 && !overLimit && !posting;
+  const hasDraft = text.trim().length > 0 || media !== null || (kind==='question' && Boolean(sideA||sideB));
+  const canDrop = text.trim().length > 0 && !overLimit && !posting && (kind==='take'||validQuestionChoices(sideA,sideB));
 
   const doDismiss = (): void => {
     hapticTap();
@@ -165,18 +172,24 @@ export default function CreateTakeScreen(): React.JSX.Element {
   };
 
   async function drop(): Promise<void> {
-    if (!canDrop) return;
+    if (!canDrop || working.current) return;
     if (!requireAuth()) return;
+    working.current=true;
+    const account=await currentUserId();
+    if(!account){working.current=false;return;}
     hapticPress();
     setPosting(true);
     try {
       let newMedia: NewTakeMedia | undefined;
       if (media) {
         setUploading(true);
-        newMedia = await uploadMedia(media);
+        newMedia = uploaded.current?.picked===media ? uploaded.current.ready : await uploadMedia(media);
+        uploaded.current={picked:media,ready:newMedia};
       }
       // create_take derives the author and stamps expiry/counters server-side.
-      const take = await postTake(text.trim(), hood, newMedia);
+      if(await currentUserId()!==account)throw new Error('Account changed. Reopen the composer.');
+      const take = kind==='question' ? await createQuestion(text.trim(),hood,sideA.trim(),sideB.trim(),account,newMedia) : await postTake(text.trim(), hood, newMedia);
+      if(await currentUserId()!==account)return;
       analytics.track('take_created', {
         realm: 'arena',
         hood_id: hood,
@@ -191,6 +204,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
     } finally {
       setUploading(false);
       setPosting(false);
+      working.current=false;
     }
   }
 
@@ -210,13 +224,14 @@ export default function CreateTakeScreen(): React.JSX.Element {
         >
           <SectionHeading
             eyebrow="YOUR VOICE"
-            title="What's your take?"
+            title={kind==='question'?'Ask the Arena':"What's your take?"}
             marked
             accessory={
               <IconButton icon={CloseIcon} onPress={dismiss} label="Close take creation" />
             }
           />
 
+          <SegmentedTabs value={kind} items={[{key:'take',label:'Take'},{key:'question',label:'A/B question'}]} onChange={next=>{if(!posting)setKind(next);}} label="Post type" />
           <TakeComposerFields
             text={text}
             onChangeText={(next) => setText(next.slice(0, MAX_CHARS))}
@@ -232,6 +247,14 @@ export default function CreateTakeScreen(): React.JSX.Element {
             hoods={HOOD_IDS}
           />
 
+          {kind==='question'?<View style={{gap:space.sm,marginTop:space.md}}>
+            <Text style={{color:theme.textSecondary}}>Two distinct choices · Casual voting</Text>
+            {([{side:'A',value:sideA,set:setSideA},{side:'B',value:sideB,set:setSideB}]).map(option=><TextInput key={option.side}
+              accessibilityLabel={`Side ${option.side} label`} placeholder={`Side ${option.side}`} placeholderTextColor={theme.textMuted}
+              value={option.value} onChangeText={option.set} maxLength={60} editable={!posting}
+              style={{color:theme.textPrimary,borderColor:theme.border,borderWidth:1,borderRadius:12,padding:space.md,minHeight:52}} />)}
+          </View>:null}
+
           {media ? <TakeMediaPreview media={media} onRemove={removeMedia} /> : null}
 
           <View style={{ height: space.xxl }} />
@@ -239,7 +262,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>
           <GlowButton
-            label={uploading ? 'Uploading…' : posting ? 'Dropping…' : 'Drop It'}
+            label={uploading ? 'Uploading…' : posting ? 'Publishing…' : kind==='question'?'Publish question':'Drop It'}
             onPress={() => {
               void drop();
             }}
@@ -247,11 +270,11 @@ export default function CreateTakeScreen(): React.JSX.Element {
             pill
             disabled={!canDrop}
             style={styles.cta}
-            accessibilityLabel="Drop your take into the Arena"
-            accessibilityHint="Publishes your take and awards 30 XP"
+            accessibilityLabel={kind==='question'?'Publish your A/B question':'Drop your take into the Arena'}
+            accessibilityHint={kind==='question'?'Publishes a question with two choices':'Publishes your take'}
           />
           <Text allowFontScaling={false} style={[styles.disclaimer, { color: theme.textMuted }]}>
-            {canDrop ? 'Your take self-destructs after 24 hours.' : 'Write something first.'}
+            {kind==='question' ? (canDrop?'Voting closes after 24 hours.':'Add a question and two distinct choices.') : canDrop ? 'Your take self-destructs after 24 hours.' : 'Write something first.'}
           </Text>
         </View>
       </KeyboardAvoidingView>
