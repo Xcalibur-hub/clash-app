@@ -95,6 +95,11 @@ export default function WorldScreen(): React.JSX.Element {
   const discoveryRequest = React.useRef(0);
   // Mission chrome survives discovery-mode changes, but never an unmount.
   const missionRequest = React.useRef(0);
+  const firstFocus = React.useRef(true);
+  const latestDiscovery = React.useRef<{ mode: WorldFilter; centre: Region }>({
+    mode: 'recent',
+    centre: FALLBACK_REGION,
+  });
   const light = scheme === 'light';
 
   const [missions, setMissions] = React.useState<WorldMission[]>([]);
@@ -110,6 +115,10 @@ export default function WorldScreen(): React.JSX.Element {
   const [locationDenied, setLocationDenied] = React.useState(true);
   const [privacyOpen, setPrivacyOpen] = React.useState(false);
   const [viewerDot, setViewerDot] = React.useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Read the latest selection on focus without retriggering the focus effect
+  // whenever the viewer pans or switches discovery filters.
+  latestDiscovery.current = { mode: filter, centre: region };
 
   const primaryMission = missions[0] ?? null;
   const selected = React.useMemo(
@@ -176,14 +185,57 @@ export default function WorldScreen(): React.JSX.Element {
     }
   }, [dispatch, loadMissions, loadDropsFor]);
 
-  React.useEffect(() => {
-    void bootstrap();
-    return () => {
-      // Discard responses after leaving World, including pending GPS prompts.
-      discoveryRequest.current += 1;
-      missionRequest.current += 1;
-    };
-  }, [bootstrap]);
+  // Expo Router can retain this screen while another route is in front of it.
+  // Refresh on return; don't keep showing old results after blocks, expiry,
+  // or account-level policy changes while World was out of focus.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        void bootstrap();
+      } else {
+        const request = ++discoveryRequest.current;
+        const metadataRequest = ++missionRequest.current;
+        const { mode, centre } = latestDiscovery.current;
+        setSelectedId(null);
+        setDrops([]);
+        // One-shot location is not a live position: never reuse its dot
+        // after leaving and returning to World.
+        setViewerDot(null);
+        setLocationDenied(true);
+        setLoading(false);
+        setSearching(true);
+        void loadMissions()
+          .then((active) => {
+            if (metadataRequest === missionRequest.current) setMissions(active);
+          })
+          .catch((error) => {
+            if (metadataRequest === missionRequest.current) dispatch(showNotice(errorText(error)));
+          });
+        void loadDropsFor(mode, centre)
+          .then((result) => {
+            if (request === discoveryRequest.current) {
+              setDrops(result);
+              setQueryOrigin(centre);
+              // A pan during the refresh still needs its own area search.
+              setShowSearchArea(regionMovedSignificantly(centre, latestDiscovery.current.centre));
+            }
+          })
+          .catch((error) => {
+            if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
+          })
+          .finally(() => {
+            if (request === discoveryRequest.current) setSearching(false);
+          });
+      }
+      return () => {
+        // Invalidate requests on blur as well as unmount. Do not cancel or
+        // implicitly start a new GPS permission request.
+        discoveryRequest.current += 1;
+        missionRequest.current += 1;
+      };
+    }, [bootstrap, dispatch, loadDropsFor, loadMissions]),
+  );
 
   const onFilterChange = async (next: WorldFilter): Promise<void> => {
     hapticTap();

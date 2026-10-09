@@ -17,11 +17,11 @@ function section(start, end) {
 }
 
 const load = section('  const loadDropsFor = React.useCallback(', '  const bootstrap = React.useCallback(');
-const bootstrap = section('  const bootstrap = React.useCallback(', '  React.useEffect(() => {\n    void bootstrap();');
+const bootstrap = section('  const bootstrap = React.useCallback(', '  // Expo Router can retain this screen');
 const filters = section('  const onFilterChange = async', '  const searchThisArea = async');
 const area = section('  const searchThisArea = async', '  const recenter = async');
 const recenter = section('  const recenter = async', '  const zoomToCluster =');
-const effect = section('  React.useEffect(() => {\n    void bootstrap();', '  const onFilterChange = async');
+const effect = section('  // Expo Router can retain this screen', '  const onFilterChange = async');
 
 assert.match(source, /discoveryRequest = React\.useRef\(0\)/, 'one request generation per World screen');
 assert.doesNotMatch(load, /setDrops\(/, 'fetch helper cannot mutate the feed directly');
@@ -30,8 +30,13 @@ for (const [label, block] of [['bootstrap', bootstrap], ['filter', filters], ['a
   assert.match(block, /request !== discoveryRequest\.current/, label + ' checks request freshness');
   assert.match(block, /setDrops\(/, label + ' commits only its current result');
 }
-assert.match(effect, /discoveryRequest\.current \+= 1/, 'unmount invalidates pending requests');
+assert.match(effect, /discoveryRequest\.current \+= 1/, 'blur invalidates pending requests');
 assert.match(recenter, /requestForegroundPermission\(\)/, 'recenter remains an explicit location action');
 assert.doesNotMatch(bootstrap, /getOneShotLocation|requestForegroundPermission|getForegroundPermission/, 'bootstrap remains permission free');
 
-process.stdout.write('World request-order source contract: 17 checks passed (runtime races not simulated).\n');
+assert.match(effect, /useFocusEffect\(/, 'World reload is tied to navigation focus');
+assert.match(effect, /firstFocus\.current/, 'first focus bootstraps only once');
+assert.match(effect, /setViewerDot\(null\)/, 'return clears the one-shot viewer position');
+assert.match(effect, /loadDropsFor\(mode, centre\)/, 'return refreshes the selected mode');
+
+process.stdout.write('World request-order source contract: 21 checks passed (runtime races not simulated).\n');
