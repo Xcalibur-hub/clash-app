@@ -34,4 +34,9 @@ assert.match(effect, /discoveryRequest\.current \+= 1/, 'blur invalidates pendin
 assert.match(recenter, /requestForegroundPermission\(\)/, 'recenter remains an explicit location action');
 assert.doesNotMatch(bootstrap, /getOneShotLocation|requestForegroundPermission|getForegroundPermission/, 'bootstrap remains permission free');
 
-process.stdout.write('World request-order source contract: 17 checks passed (runtime races not simulated).\n');
+assert.match(effect, /useFocusEffect\(/, 'World reload is tied to navigation focus');
+assert.match(effect, /firstFocus\.current/, 'first focus bootstraps only once');
+assert.match(effect, /setViewerDot\(null\)/, 'return clears the one-shot viewer position');
+assert.match(effect, /loadDropsFor\(mode, centre\)/, 'return refreshes the selected mode');
+
+process.stdout.write('World request-order source contract: 21 checks passed (runtime races not simulated).\\n');
