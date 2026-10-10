@@ -6,18 +6,18 @@ This is a **standalone Expo development app** with package identity `com.clash.m
 
 Uses Expo SDK 54 + React Native 0.81.5 + React 19.1.0, matching the root application, and MapLibre v11 (`@maplibre/maplibre-react-native`).
 
-## Step 4–5 scope — markers, clusters, preview, performance
+## Step 4–6 scope — markers, clusters, preview, performance, stability
 
 Synthetic Goa Drops drive:
 
-- Circular media markers (image/video + optional mission dot + selected ring)
 - Grid + hierarchical clustering (probe-local; no new native deps)
 - Dataset sizes 50 / 250 / 1_000 / 5_000 with viewport filtering
-- React `Marker` views for ≤250; GeoJSON circle/symbol layers for ≥1000
-- Cluster tap → ease camera; compact Drop preview
-- On-screen timing metrics (`performance.now`)
+- **Default:** MapLibre GeoJSON circle/symbol layers for all sizes (direct hit-testing)
+- Optional RN Marker chrome (visual only — blocks hits on A50 when enabled)
+- Cluster tap → ease camera; compact Drop preview; empty-map dismiss
+- On-screen timing + `Last hit` label; `npm run device:profile` for gfxinfo/meminfo
 
-See `docs/PERFORMANCE_AND_TILES.md` for A50 notes and tile-provider evaluation.
+See `docs/PERFORMANCE_AND_TILES.md` and `docs/STABILITY_AND_INTERACTIONS.md`.
 
 Uses https://demotiles.maplibre.org/style.json **only for the development probe**. No production SLA. No Mapillary, location permission, GPS, tracking, Supabase, or live World data.
 
@@ -40,6 +40,7 @@ Uses https://demotiles.maplibre.org/style.json **only for the development probe*
 npm test
 npm run typecheck
 npm run bench:cluster
+npm run device:profile -- --label run1
 npm start          # Metro :8082
-npm run android    # native rebuild for com.clash.mapprobe only
+npm run android    # native rebuild for com.clash.mapprobe only (needs auth)
 ```

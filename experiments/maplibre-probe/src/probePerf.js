@@ -18,9 +18,21 @@ import { filterDropsInViewport } from './probeViewport.js';
  * @returns {RenderStrategy}
  */
 export function chooseRenderStrategy(datasetSize) {
-  // Keep React Native Marker views only for modest sets; larger volumes use
-  // MapLibre GeoJSON circle/symbol layers (native) after viewport filtering.
-  return datasetSize >= 1000 ? 'geojson-layers' : 'markers';
+  // Step 6 finding (A50 / MapLibre RN 11): RN Marker views intercept map
+  // touches and block GeoJSONSource hit-testing. Default to native GeoJSON
+  // layers for all sizes so direct Drop/cluster taps remain reliable.
+  // Marker chrome remains available via forceMarkers for visual comparison only.
+  void datasetSize;
+  return 'geojson-layers';
+}
+
+/**
+ * Optional Marker chrome — visual only; do not use for hit-testing.
+ * @param {number} datasetSize
+ * @param {boolean} [forceMarkers=false]
+ */
+export function shouldMountMarkerChrome(datasetSize, forceMarkers = false) {
+  return Boolean(forceMarkers) && datasetSize > 0 && datasetSize < 1000;
 }
 
 /**
