@@ -6,14 +6,18 @@ This is a **standalone Expo development app** with package identity `com.clash.m
 
 Uses Expo SDK 54 + React Native 0.81.5 + React 19.1.0, matching the root application, and MapLibre v11 (`@maplibre/maplibre-react-native`).
 
-## Step 4 scope — markers, clusters, preview
+## Step 4–5 scope — markers, clusters, preview, performance
 
 Synthetic Goa Drops drive:
 
 - Circular media markers (image/video + optional mission dot + selected ring)
-- Grid clustering adapted from CLASH World clustering (probe-local copy)
-- Cluster tap → ease camera to approximate center at a higher zoom
-- Compact bottom Drop preview (no playback, no World navigation)
+- Grid + hierarchical clustering (probe-local; no new native deps)
+- Dataset sizes 50 / 250 / 1_000 / 5_000 with viewport filtering
+- React `Marker` views for ≤250; GeoJSON circle/symbol layers for ≥1000
+- Cluster tap → ease camera; compact Drop preview
+- On-screen timing metrics (`performance.now`)
+
+See `docs/PERFORMANCE_AND_TILES.md` for A50 notes and tile-provider evaluation.
 
 Uses https://demotiles.maplibre.org/style.json **only for the development probe**. No production SLA. No Mapillary, location permission, GPS, tracking, Supabase, or live World data.
 
@@ -35,6 +39,7 @@ Uses https://demotiles.maplibre.org/style.json **only for the development probe*
 ```bash
 npm test
 npm run typecheck
+npm run bench:cluster
 npm start          # Metro :8082
 npm run android    # native rebuild for com.clash.mapprobe only
 ```
