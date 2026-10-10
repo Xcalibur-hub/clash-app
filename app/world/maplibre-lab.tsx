@@ -49,7 +49,7 @@ export default function WorldMapLibreDevelopmentRoute(): React.JSX.Element {
           setCameraText(`${center[1].toFixed(4)}, ${center[0].toFixed(4)} · zoom ${Number.isFinite(zoom) ? zoom.toFixed(2) : 'n/a'}`);
         }}
       >
-        <Camera initialViewState={{ center: toMapLibreCoordinate(FALLBACK), zoom: 11 }} />
+        <Camera initialViewState={{ center: [...toMapLibreCoordinate(FALLBACK)], zoom: 11 }} />
       </Map>
       <View pointerEvents="box-none" style={styles.panel}>
         <Text onPress={() => router.back()} accessibilityRole="button" style={styles.back}>‹ Back</Text>
