@@ -2,7 +2,7 @@ import React from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Camera, Map } from '@maplibre/maplibre-react-native';
-import { toMapLibreCoordinate, type WorldCameraRegion } from '../../utils/worldMapAdapter';
+import type { WorldCameraRegion } from '../../utils/worldMapAdapter';
 
 const FALLBACK: WorldCameraRegion = {
   latitude: 15.4909,
@@ -49,7 +49,7 @@ export default function WorldMapLibreDevelopmentRoute(): React.JSX.Element {
           setCameraText(`${center[1].toFixed(4)}, ${center[0].toFixed(4)} · zoom ${Number.isFinite(zoom) ? zoom.toFixed(2) : 'n/a'}`);
         }}
       >
-        <Camera initialViewState={{ center: [...toMapLibreCoordinate(FALLBACK)], zoom: 11 }} />
+        <Camera initialViewState={{ center: [FALLBACK.longitude, FALLBACK.latitude], zoom: 11 }} />
       </Map>
       <View pointerEvents="box-none" style={styles.panel}>
         <Text onPress={() => router.back()} accessibilityRole="button" style={styles.back}>‹ Back</Text>
