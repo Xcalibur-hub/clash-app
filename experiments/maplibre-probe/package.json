@@ -1,0 +1,17 @@
+{
+  "name": "clash-maplibre-probe",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start --dev-client --port 8082",
+    "android": "expo run:android --port 8082",
+    "ios": "expo run:ios --port 8082"
+  },
+  "dependencies": {
+    "expo": "~54.0.37",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "@maplibre/maplibre-react-native": "^11.0.0"
+  }
+}
