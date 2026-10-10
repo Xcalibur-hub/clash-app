@@ -237,6 +237,14 @@ export default function WorldScreen(): React.JSX.Element {
     }, [bootstrap, dispatch, loadDropsFor, loadMissions]),
   );
 
+  // A query's centre is where the request began, not necessarily where the
+  // viewer is looking when its response arrives. Keep the latest camera
+  // position in a ref so even a pan before React re-renders is respected.
+  const recordQueryOrigin = (centre: Region): void => {
+    setQueryOrigin(centre);
+    setShowSearchArea(regionMovedSignificantly(centre, latestDiscovery.current.centre));
+  };
+
   const onFilterChange = async (next: WorldFilter): Promise<void> => {
     hapticTap();
     const request = ++discoveryRequest.current;
@@ -246,12 +254,12 @@ export default function WorldScreen(): React.JSX.Element {
     setDrops([]);
     setLoading(false);
     setSearching(true);
+    const requestRegion = region;
     try {
-      const result = await loadDropsFor(next, { latitude: region.latitude, longitude: region.longitude });
+      const result = await loadDropsFor(next, { latitude: requestRegion.latitude, longitude: requestRegion.longitude });
       if (request !== discoveryRequest.current) return;
       setDrops(result);
-      setQueryOrigin(region);
-      setShowSearchArea(false);
+      recordQueryOrigin(requestRegion);
     } catch (error) {
       if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
     } finally {
@@ -267,12 +275,12 @@ export default function WorldScreen(): React.JSX.Element {
     setDrops([]);
     setLoading(false);
     setSearching(true);
+    const requestRegion = region;
     try {
-      const result = await loadDropsFor('nearby', { latitude: region.latitude, longitude: region.longitude });
+      const result = await loadDropsFor('nearby', { latitude: requestRegion.latitude, longitude: requestRegion.longitude });
       if (request !== discoveryRequest.current) return;
       setDrops(result);
-      setQueryOrigin(region);
-      setShowSearchArea(false);
+      recordQueryOrigin(requestRegion);
       setSelectedId(null);
     } catch (error) {
       if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
@@ -320,8 +328,7 @@ export default function WorldScreen(): React.JSX.Element {
       const result = await loadDropsFor('nearby', point);
       if (request !== discoveryRequest.current) return;
       setDrops(result);
-      setQueryOrigin(next);
-      setShowSearchArea(false);
+      recordQueryOrigin(next);
     } catch (error) {
       if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
     } finally {
@@ -389,6 +396,7 @@ export default function WorldScreen(): React.JSX.Element {
         toolbarEnabled={false}
         moveOnMarkerPress={false}
         onRegionChangeComplete={(next) => {
+          latestDiscovery.current.centre = next;
           setRegion(next);
           setShowSearchArea(regionMovedSignificantly(queryOrigin, next));
         }}
