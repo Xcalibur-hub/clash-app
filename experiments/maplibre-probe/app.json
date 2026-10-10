@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "CLASH Map Probe",
+    "slug": "clash-maplibre-probe",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.clash.mapprobe"
+    },
+    "ios": {
+      "bundleIdentifier": "com.clash.mapprobe"
+    },
+    "plugins": [
+      "@maplibre/maplibre-react-native"
+    ]
+  }
+}
