@@ -1,13 +1,14 @@
 {
   "name": "clash-maplibre-probe",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "main": "index.js",
   "scripts": {
     "start": "expo start --dev-client --port 8082",
     "android": "expo run:android --port 8082",
     "ios": "expo run:ios --port 8082",
-    "test": "node --test src/probeCoordinates.test.js src/probeCluster.test.js src/probeSelection.test.js",
+    "test": "node --test src/probeCoordinates.test.js src/probeCluster.test.js src/probeSelection.test.js src/probeDatasets.test.js src/probeViewport.test.js src/probePerf.test.js",
+    "bench:cluster": "node scripts/bench-cluster.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

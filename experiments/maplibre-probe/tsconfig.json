@@ -12,7 +12,11 @@
     "src/probeCoordinates.js",
     "src/probeCluster.js",
     "src/probeDrops.js",
-    "src/probeSelection.js"
+    "src/probeSelection.js",
+    "src/probeDatasets.js",
+    "src/probeViewport.js",
+    "src/probeHierarchicalCluster.js",
+    "src/probePerf.js"
   ],
   "exclude": ["node_modules", "android", "ios", "src/**/*.test.js", "App.js", "index.js"]
 }
