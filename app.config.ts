@@ -70,6 +70,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'expo-video',
       'expo-localization',
       'expo-camera',
+      // Experimental native World map; only enabled for development app variants.
+      ...(isDevelopment ? ['@maplibre/maplibre-react-native'] : []),
       [
         '@config-plugins/react-native-webrtc',
         {
