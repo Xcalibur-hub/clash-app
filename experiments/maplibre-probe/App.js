@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { Camera, GeoJSONSource, Layer, Map, Marker } from '@maplibre/maplibre-react-native';
 
 import { ClusterMarkerView } from './src/ClusterMarkerView';
@@ -9,15 +9,25 @@ import { clusterExpansionZoom } from './src/probeCluster';
 import { regionFromZoom, toMapLibreLngLat } from './src/probeCoordinates';
 import { DATASET_SIZES } from './src/probeDatasets';
 import {
+  formatHitLabel,
+  isSelectionBlocked,
+  resolvePressFeatures,
+  selectionStillValid,
+  shouldDismissPreviewOnEmptyTap,
+} from './src/probeInteraction';
+import {
   formatMs,
   itemsToGeoJson,
   prepareMapPipeline,
+  shouldMountMarkerChrome,
 } from './src/probePerf';
 import { closePreview, isDropSelected, selectProbeDrop } from './src/probeSelection';
 
 // Public demo tiles are for development/prototype testing only; never ship this URL.
 const DEMO_STYLE = 'https://demotiles.maplibre.org/style.json';
 const GOA_CENTER = [73.83, 15.49];
+/** Expanded native source hitbox (default is ~44×44). */
+const SOURCE_HITBOX = { top: 28, right: 28, bottom: 28, left: 28 };
 
 export default function App() {
   const cameraRef = React.useRef(null);
@@ -29,6 +39,7 @@ export default function App() {
   const [center, setCenter] = React.useState({ latitude: 15.49, longitude: 73.83 });
   const [datasetSize, setDatasetSize] = React.useState(50);
   const [clusterMode, setClusterMode] = React.useState(/** @type {'grid' | 'hierarchical'} */ ('hierarchical'));
+  const [markerChrome, setMarkerChrome] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState(/** @type {string | null} */ (null));
   const [preview, setPreview] = React.useState(/** @type {{ open: boolean; drop: any }} */ ({
     open: false,
@@ -36,9 +47,20 @@ export default function App() {
   }));
   const [selectLatencyMs, setSelectLatencyMs] = React.useState(/** @type {number | null} */ (null));
   const [lastPipelineMs, setLastPipelineMs] = React.useState(/** @type {number | null} */ (null));
+  const [lastHitLabel, setLastHitLabel] = React.useState('none');
+  const [jsFpsSample, setJsFpsSample] = React.useState(/** @type {number | null} */ (null));
+  const [appStateLabel, setAppStateLabel] = React.useState(AppState.currentState);
+  const [stressCycles, setStressCycles] = React.useState(0);
 
   const ignoreRegionUntil = React.useRef(0);
+  const selectionBlockedUntil = React.useRef(0);
   const datasetRef = React.useRef(/** @type {readonly any[]} */ ([]));
+  const previewRef = React.useRef(preview);
+  const selectedIdRef = React.useRef(selectedId);
+  const fpsSampling = React.useRef(false);
+
+  previewRef.current = preview;
+  selectedIdRef.current = selectedId;
 
   const region = React.useMemo(
     () => regionFromZoom(center.latitude, center.longitude, zoom),
@@ -62,10 +84,45 @@ export default function App() {
     setLastPipelineMs(pipeline.wallMs);
   }, [pipeline]);
 
+  React.useEffect(() => {
+    if (!selectionStillValid(selectedId, pipeline.items)) {
+      setSelectedId(null);
+      setPreview({ open: false, drop: null });
+    }
+  }, [pipeline.items, selectedId]);
+
+  React.useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      setAppStateLabel(next);
+    });
+    return () => sub.remove();
+  }, []);
+
   const geojson = React.useMemo(
     () => itemsToGeoJson(pipeline.items),
     [pipeline.items],
   );
+
+  const sampleJsFps = React.useCallback(() => {
+    if (fpsSampling.current) return;
+    fpsSampling.current = true;
+    let frames = 0;
+    const start = performance.now();
+    const tick = () => {
+      frames += 1;
+      if (performance.now() - start < 1000) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      setJsFpsSample(frames);
+      fpsSampling.current = false;
+    };
+    requestAnimationFrame(tick);
+  }, []);
+
+  const onRegionWillChange = React.useCallback(() => {
+    sampleJsFps();
+  }, [sampleJsFps]);
 
   const onRegionDidChange = React.useCallback((event) => {
     const nextCenter = event.nativeEvent?.center;
@@ -84,17 +141,21 @@ export default function App() {
   }, []);
 
   const onSelectDrop = React.useCallback((drop) => {
+    if (isSelectionBlocked(Date.now(), selectionBlockedUntil.current)) return;
     const t0 = performance.now();
-    const next = selectProbeDrop(selectedId, drop);
+    const next = selectProbeDrop(selectedIdRef.current, drop);
     setSelectedId(next.selectedId);
     setPreview(next.preview);
     setSelectLatencyMs(performance.now() - t0);
-  }, [selectedId]);
+  }, []);
 
   const onSelectCluster = React.useCallback(
     (item) => {
+      if (isSelectionBlocked(Date.now(), selectionBlockedUntil.current)) return;
       const targetZoom = clusterExpansionZoom(zoom);
-      ignoreRegionUntil.current = Date.now() + 450;
+      const settleUntil = Date.now() + 500;
+      ignoreRegionUntil.current = settleUntil;
+      selectionBlockedUntil.current = settleUntil;
       cameraRef.current?.easeTo({
         center: toMapLibreLngLat({ latitude: item.latitude, longitude: item.longitude }),
         zoom: targetZoom,
@@ -103,6 +164,9 @@ export default function App() {
       });
       setZoom(targetZoom);
       setCenter({ latitude: item.latitude, longitude: item.longitude });
+      setViewport(
+        `Lat ${item.latitude.toFixed(4)} · Lng ${item.longitude.toFixed(4)} · Zoom ${targetZoom.toFixed(2)}`,
+      );
       setSelectedId(null);
       setPreview({ open: false, drop: null });
     },
@@ -114,35 +178,107 @@ export default function App() {
     setSelectedId(null);
   }, []);
 
-  const onGeoJsonPress = React.useCallback(
-    (event) => {
-      const features = event?.nativeEvent?.features ?? event?.features;
-      const feature = Array.isArray(features) ? features[0] : null;
-      if (!feature?.properties) return;
-      const { kind, id, count } = feature.properties;
-      if (kind === 'cluster') {
-        const [longitude, latitude] = feature.geometry?.coordinates ?? [];
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-        onSelectCluster({
-          kind: 'cluster',
-          id: String(id),
-          latitude,
-          longitude,
-          count: Number(count) || 0,
-          drops: [],
-        });
+  const applyHit = React.useCallback(
+    (hit, source) => {
+      if (isSelectionBlocked(Date.now(), selectionBlockedUntil.current)) return;
+      setLastHitLabel(formatHitLabel(hit, source));
+      if (hit.kind === 'cluster') {
+        onSelectCluster(hit);
         return;
       }
-      if (kind === 'drop' && id) {
-        const drop = datasetRef.current.find((entry) => entry.id === id);
-        if (drop) onSelectDrop(drop);
+      if (hit.kind === 'drop') {
+        onSelectDrop(hit.drop);
+        return;
+      }
+      if (shouldDismissPreviewOnEmptyTap(previewRef.current, hit)) {
+        onClosePreview();
       }
     },
-    [onSelectCluster, onSelectDrop],
+    [onClosePreview, onSelectCluster, onSelectDrop],
   );
+
+  const onGeoJsonPress = React.useCallback(
+    (event) => {
+      event?.stopPropagation?.();
+      const features = event?.nativeEvent?.features ?? event?.features ?? [];
+      applyHit(resolvePressFeatures(features, datasetRef.current), 'geojson');
+    },
+    [applyHit],
+  );
+
+  const onMapPress = React.useCallback(
+    (event) => {
+      const features = event?.nativeEvent?.features ?? event?.features ?? [];
+      // Source presses stopPropagation; empty-map presses land here with no features.
+      if (Array.isArray(features) && features.length > 0) {
+        applyHit(resolvePressFeatures(features, datasetRef.current), 'map');
+        return;
+      }
+      applyHit({ kind: 'empty' }, 'map');
+    },
+    [applyHit],
+  );
+
+  const resetCamera = React.useCallback(() => {
+    const settleUntil = Date.now() + 450;
+    ignoreRegionUntil.current = settleUntil;
+    selectionBlockedUntil.current = settleUntil;
+    cameraRef.current?.easeTo({
+      center: GOA_CENTER,
+      zoom: 11,
+      duration: 280,
+      easing: 'ease',
+    });
+    setZoom(11);
+    setCenter({ latitude: 15.49, longitude: 73.83 });
+    setViewport('Lat 15.4900 · Lng 73.8300 · Zoom 11.00');
+    setLastHitLabel('reset:camera');
+  }, []);
+
+  /** Jump camera to a visible Drop without selecting — enables direct map-tap verification. */
+  const aimFirstDrop = React.useCallback(() => {
+    const dropItem = pipeline.renderItems.find((item) => item.kind === 'drop');
+    const target = dropItem
+      ? { latitude: dropItem.latitude, longitude: dropItem.longitude, zoom: Math.max(zoom, 14) }
+      : pipeline.items.find((item) => item.kind === 'cluster')
+        ? {
+            latitude: pipeline.items.find((item) => item.kind === 'cluster').latitude,
+            longitude: pipeline.items.find((item) => item.kind === 'cluster').longitude,
+            zoom: clusterExpansionZoom(zoom),
+          }
+        : null;
+    if (!target) return;
+    const settleUntil = Date.now() + 450;
+    ignoreRegionUntil.current = settleUntil;
+    selectionBlockedUntil.current = settleUntil;
+    cameraRef.current?.easeTo({
+      center: toMapLibreLngLat(target),
+      zoom: target.zoom,
+      duration: 320,
+      easing: 'ease',
+    });
+    setZoom(target.zoom);
+    setCenter({ latitude: target.latitude, longitude: target.longitude });
+    setLastHitLabel('aim:camera-only');
+  }, [pipeline.items, pipeline.renderItems, zoom]);
+
+  const runDatasetStress = React.useCallback(() => {
+    const sequence = [50, 5000, 50, 1000, 250, 5000];
+    let i = 0;
+    const tick = () => {
+      setDatasetSize(sequence[i % sequence.length]);
+      setSelectedId(null);
+      setPreview({ open: false, drop: null });
+      setStressCycles((n) => n + 1);
+      i += 1;
+      if (i < sequence.length) setTimeout(tick, 350);
+    };
+    tick();
+  }, []);
 
   const metrics = pipeline.metrics;
   const sampleDrop = pipeline.dataset[0];
+  const showMarkerChrome = shouldMountMarkerChrome(datasetSize, markerChrome);
 
   return (
     <View style={styles.container}>
@@ -155,90 +291,107 @@ export default function App() {
         compass
         onDidFinishLoadingMap={() => setReady(true)}
         onDidFailLoadingMap={() => setMapError(true)}
+        onRegionWillChange={onRegionWillChange}
         onRegionDidChange={onRegionDidChange}
+        onPress={onMapPress}
       >
         <Camera ref={cameraRef} initialViewState={{ center: GOA_CENTER, zoom: 11 }} />
 
-        {pipeline.strategy === 'geojson-layers' ? (
-          <GeoJSONSource id="probe-drops" data={geojson} onPress={onGeoJsonPress}>
-            <Layer
-              id="probe-clusters"
-              type="circle"
-              filter={['==', ['get', 'kind'], 'cluster']}
-              paint={{
-                'circle-color': '#1E3A5F',
-                'circle-radius': 18,
-                'circle-stroke-width': 2,
-                'circle-stroke-color': '#8EC5FF',
-              }}
-            />
-            <Layer
-              id="probe-cluster-count"
-              type="symbol"
-              filter={['==', ['get', 'kind'], 'cluster']}
-              layout={{
-                'text-field': ['to-string', ['get', 'count']],
-                'text-size': 12,
-                'text-allow-overlap': true,
-              }}
-              paint={{ 'text-color': '#F4F8FF' }}
-            />
-            <Layer
-              id="probe-drop-circles"
-              type="circle"
-              filter={['==', ['get', 'kind'], 'drop']}
-              paint={{
-                'circle-color': [
-                  'case',
-                  ['==', ['get', 'id'], selectedId ?? ''],
-                  '#F5C451',
-                  '#2A2A32',
-                ],
-                'circle-radius': 10,
-                'circle-stroke-width': 2,
-                'circle-stroke-color': '#E8E8EE',
-              }}
-            />
-          </GeoJSONSource>
-        ) : (
-          pipeline.renderItems.map((item) => {
-            if (item.kind === 'cluster') {
+        {/*
+          Always mount GeoJSON for direct feature/cluster hit-testing.
+          Marker strategy keeps RN Marker chrome on top; hit circles stay
+          near-transparent so taps resolve through Source.onPress.
+        */}
+        <GeoJSONSource
+          id="probe-drops"
+          data={geojson}
+          onPress={onGeoJsonPress}
+          hitbox={SOURCE_HITBOX}
+        >
+          <Layer
+            id="probe-clusters"
+            type="circle"
+            filter={['==', ['get', 'kind'], 'cluster']}
+            paint={{
+              'circle-color': '#1E3A5F',
+              'circle-radius': 20,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#8EC5FF',
+              // Keep clusters fully paintable for hit-testing even under Marker chrome.
+              'circle-opacity': showMarkerChrome ? 0.35 : 1,
+              'circle-stroke-opacity': showMarkerChrome ? 0.5 : 1,
+            }}
+          />
+          <Layer
+            id="probe-cluster-count"
+            type="symbol"
+            filter={['==', ['get', 'kind'], 'cluster']}
+            layout={{
+              'text-field': ['to-string', ['get', 'count']],
+              'text-size': 12,
+              'text-allow-overlap': true,
+              visibility: showMarkerChrome ? 'none' : 'visible',
+            }}
+            paint={{ 'text-color': '#F4F8FF' }}
+          />
+          <Layer
+            id="probe-drop-circles"
+            type="circle"
+            filter={['==', ['get', 'kind'], 'drop']}
+            paint={{
+              'circle-color': [
+                'case',
+                ['==', ['get', 'id'], selectedId ?? ''],
+                '#F5C451',
+                '#2A2A32',
+              ],
+              'circle-radius': 16,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#E8E8EE',
+              'circle-opacity': showMarkerChrome ? 0.25 : 1,
+              'circle-stroke-opacity': showMarkerChrome ? 0.35 : 1,
+            }}
+          />
+        </GeoJSONSource>
+
+        {showMarkerChrome
+          ? pipeline.renderItems.map((item) => {
+              // Optional visual chrome only — known to intercept touches on A50.
+              if (item.kind === 'cluster') {
+                return (
+                  <Marker
+                    key={item.id}
+                    id={item.id}
+                    lngLat={toMapLibreLngLat(item)}
+                    anchor="center"
+                  >
+                    <View pointerEvents="none">
+                      <ClusterMarkerView count={item.count} />
+                    </View>
+                  </Marker>
+                );
+              }
+              const selected = isDropSelected(selectedId, item.drop.id);
               return (
                 <Marker
                   key={item.id}
                   id={item.id}
                   lngLat={toMapLibreLngLat(item)}
                   anchor="center"
-                  onPress={() => onSelectCluster(item)}
                 >
-                  <ClusterMarkerView count={item.count} onPress={() => onSelectCluster(item)} />
+                  <View pointerEvents="none">
+                    <DropMarkerView drop={item.drop} selected={selected} />
+                  </View>
                 </Marker>
               );
-            }
-            const selected = isDropSelected(selectedId, item.drop.id);
-            return (
-              <Marker
-                key={item.id}
-                id={item.id}
-                lngLat={toMapLibreLngLat(item)}
-                anchor="center"
-                onPress={() => onSelectDrop(item.drop)}
-              >
-                <DropMarkerView
-                  drop={item.drop}
-                  selected={selected}
-                  onPress={() => onSelectDrop(item.drop)}
-                />
-              </Marker>
-            );
-          })
-        )}
+            })
+          : null}
       </Map>
 
       <View style={styles.panel} pointerEvents="box-none">
         <ScrollView style={styles.panelScroll} nestedScrollEnabled>
-          <Text style={styles.eyebrow}>CLASH · MAP PERF PROBE</Text>
-          <Text style={styles.heading}>Performance · Tiles eval</Text>
+          <Text style={styles.eyebrow}>CLASH · MAP STABILITY PROBE</Text>
+          <Text style={styles.heading}>Stability · Interactions</Text>
           <Text style={styles.subline}>
             {mapError
               ? 'Map load failed — inspect Metro/native logs'
@@ -256,8 +409,12 @@ export default function App() {
             {formatMs(metrics.clusterMs)} · Pipe {formatMs(lastPipelineMs ?? metrics.totalMs)}
           </Text>
           <Text style={styles.subline}>
-            Select {selectLatencyMs == null ? 'n/a' : formatMs(selectLatencyMs)} · Camera events{' '}
-            {interactionCount} · FPS/mem not measured
+            Select {selectLatencyMs == null ? 'n/a' : formatMs(selectLatencyMs)} · Camera{' '}
+            {interactionCount} · JS rAF FPS {jsFpsSample == null ? 'n/a' : `${jsFpsSample}`} · App{' '}
+            {appStateLabel}
+          </Text>
+          <Text style={styles.subline} accessibilityLabel={`Last hit ${lastHitLabel}`}>
+            Last hit · {lastHitLabel} · Stress cycles {stressCycles}
           </Text>
 
           <Text style={styles.section}>Dataset</Text>
@@ -269,6 +426,7 @@ export default function App() {
                   setDatasetSize(size);
                   setSelectedId(null);
                   setPreview({ open: false, drop: null });
+                  setLastHitLabel(`dataset:${size}`);
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={`Load ${size} drops`}
@@ -294,10 +452,57 @@ export default function App() {
             ))}
           </View>
 
+          <Text style={styles.section}>Marker chrome (visual only · blocks hits)</Text>
           <View style={styles.row}>
+            <Pressable
+              onPress={() => setMarkerChrome(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Disable marker chrome"
+              style={[styles.chip, !markerChrome && styles.chipActive]}
+            >
+              <Text style={styles.chipText}>GeoJSON hits</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMarkerChrome(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Enable marker chrome visual only"
+              style={[styles.chip, markerChrome && styles.chipActive]}
+            >
+              <Text style={styles.chipText}>RN Markers</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.row}>
+            <Pressable
+              onPress={resetCamera}
+              accessibilityRole="button"
+              accessibilityLabel="Reset camera to Goa zoom 11"
+              style={styles.sampleBtn}
+            >
+              <Text style={styles.sampleText}>Reset camera</Text>
+            </Pressable>
+            <Pressable
+              onPress={aimFirstDrop}
+              accessibilityRole="button"
+              accessibilityLabel="Aim camera at first drop without selecting"
+              style={styles.sampleBtn}
+            >
+              <Text style={styles.sampleText}>Aim (no select)</Text>
+            </Pressable>
+            <Pressable
+              onPress={runDatasetStress}
+              accessibilityRole="button"
+              accessibilityLabel="Run dataset stress switch"
+              style={styles.sampleBtn}
+            >
+              <Text style={styles.sampleText}>Stress switch</Text>
+            </Pressable>
             {sampleDrop ? (
               <Pressable
-                onPress={() => onSelectDrop(sampleDrop)}
+                onPress={() => {
+                  setLastHitLabel(`control:sample:${sampleDrop.id}`);
+                  onSelectDrop(sampleDrop);
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="Select sample drop"
                 style={styles.sampleBtn}
@@ -318,7 +523,8 @@ export default function App() {
           </View>
 
           <Text style={styles.footnote}>
-            Demo tiles only · No GPS · No Supabase · No production keys · Not production-ready
+            Demo tiles only · Direct map taps required for Step 6 · No GPS · No Supabase · Not
+            production-ready
           </Text>
         </ScrollView>
       </View>

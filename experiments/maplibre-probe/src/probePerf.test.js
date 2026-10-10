@@ -7,15 +7,19 @@ import {
   chooseRenderStrategy,
   itemsToGeoJson,
   prepareMapPipeline,
+  shouldMountMarkerChrome,
 } from './probePerf.js';
 import { selectProbeDrop } from './probeSelection.js';
 
 describe('probe performance pipeline', () => {
-  it('chooses marker views for small sets and geojson for large sets', () => {
-    assert.equal(chooseRenderStrategy(50), 'markers');
-    assert.equal(chooseRenderStrategy(250), 'markers');
+  it('defaults to geojson layers for reliable direct hit-testing', () => {
+    assert.equal(chooseRenderStrategy(50), 'geojson-layers');
+    assert.equal(chooseRenderStrategy(250), 'geojson-layers');
     assert.equal(chooseRenderStrategy(1000), 'geojson-layers');
     assert.equal(chooseRenderStrategy(5000), 'geojson-layers');
+    assert.equal(shouldMountMarkerChrome(50, false), false);
+    assert.equal(shouldMountMarkerChrome(50, true), true);
+    assert.equal(shouldMountMarkerChrome(1000, true), false);
   });
 
   it('prepares high-volume datasets with viewport filtering', () => {

@@ -1,8 +1,8 @@
 ﻿node_modules/
 .expo/
-android/
-ios/
-*.png
-p*.xml
-probe_*.xml
-probe_*.png
+dist/
+web-build/
+*.log
+_*.xml
+_*.png
+.DS_Store
