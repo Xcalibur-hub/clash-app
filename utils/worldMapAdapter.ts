@@ -4,7 +4,7 @@
  * This is deliberately a pure TypeScript boundary. It does not import
  * react-native-maps or MapLibre and does not change the live World screen.
  */
-import { regionMovedSignificantly, type MapRegionLike } from './worldCluster';
+import { regionMovedSignificantly, type MapRegionLike } from './worldCluster.ts';
 
 export type WorldCameraRegion = MapRegionLike;
 export type WorldCoordinate = Readonly<{ latitude: number; longitude: number }>;
