@@ -1,17 +1,23 @@
 {
   "name": "clash-maplibre-probe",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "index.js",
   "scripts": {
     "start": "expo start --dev-client --port 8082",
     "android": "expo run:android --port 8082",
-    "ios": "expo run:ios --port 8082"
+    "ios": "expo run:ios --port 8082",
+    "test": "node --test src/probeCoordinates.test.js src/probeCluster.test.js src/probeSelection.test.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@maplibre/maplibre-react-native": "^11.0.0",
     "expo": "~54.0.37",
     "react": "19.1.0",
-    "react-native": "0.81.5",
-    "@maplibre/maplibre-react-native": "^11.0.0"
+    "react-native": "0.81.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "typescript": "^5.9.2"
   }
 }
