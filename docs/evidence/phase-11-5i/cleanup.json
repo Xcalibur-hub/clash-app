@@ -1,0 +1,83 @@
+{
+  "time_utc": "2026-10-11T15:38:14.065638+00:00",
+  "steps": [
+    {
+      "command": [
+        "docker",
+        "rm",
+        "7cc49e0a251e34d1614d2a374438a899501a5e980338fd470b5143beaae45d2b"
+      ],
+      "exit_code": 0,
+      "stdout": "7cc49e0a251e34d1614d2a374438a899501a5e980338fd470b5143beaae45d2b",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "rm",
+        "fa1de22b4f7ad86527819af2a9186786e341f3b36755e516a98fe41306688480"
+      ],
+      "exit_code": 0,
+      "stdout": "fa1de22b4f7ad86527819af2a9186786e341f3b36755e516a98fe41306688480",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "rm",
+        "4514859e8f40eaa1f88530ed944e87dc69c284322e424870c58f49f6a8a8945f"
+      ],
+      "exit_code": 0,
+      "stdout": "4514859e8f40eaa1f88530ed944e87dc69c284322e424870c58f49f6a8a8945f",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "rm",
+        "edd0277b3a0b042bc384eba721beef306463f9efe95e9adb03896d9347e5f4fa"
+      ],
+      "exit_code": 0,
+      "stdout": "edd0277b3a0b042bc384eba721beef306463f9efe95e9adb03896d9347e5f4fa",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "volume",
+        "rm",
+        "supabase_config_clash_p11v5i_20261011"
+      ],
+      "exit_code": 0,
+      "stdout": "supabase_config_clash_p11v5i_20261011",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "volume",
+        "rm",
+        "supabase_db_clash_p11v5i_20261011"
+      ],
+      "exit_code": 0,
+      "stdout": "supabase_db_clash_p11v5i_20261011",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "network",
+        "rm",
+        "supabase_network_clash_p11v5i_20261011"
+      ],
+      "exit_code": 0,
+      "stdout": "supabase_network_clash_p11v5i_20261011",
+      "stderr": ""
+    }
+  ],
+  "owned_containers_removed": 4,
+  "owned_volumes_removed": 2,
+  "owned_networks_removed": 1,
+  "all_existing_resource_identity_state_ports_unchanged": true,
+  "remaining_owned_resources": 0
+}

@@ -1,0 +1,16 @@
+{
+  "Id": "a9a68bbd72edcb45b42409af1ab4f21f3c972d782d00f7dc3760b19151411d17",
+  "Name": "supabase_network_clash_p11v5i_20261011",
+  "Driver": "bridge",
+  "EnableIPv6": false,
+  "Options": {
+    "com.docker.network.bridge.host_binding_ipv4": "127.0.0.1",
+    "com.docker.network.enable_ipv4": "true",
+    "com.docker.network.enable_ipv6": "false"
+  },
+  "Labels": {
+    "com.docker.compose.project": "clash_p11v5i_20261011",
+    "com.supabase.cli.project": "clash_p11v5i_20261011"
+  },
+  "Containers": {}
+}
