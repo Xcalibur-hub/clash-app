@@ -347,22 +347,44 @@ export async function fetchClashViewForTake(takeId: string): Promise<ClashView |
   return toClashView(data);
 }
 
-/** A profile's public reward ledger. */
+/** Private own reward history. Foreign profiles and stale sessions return no data.
+ * RLS is authoritative; these guards also discard responses after account changes.
+ */
 export async function fetchReputationEvents(profileId: string): Promise<ReputationEvent[]> {
-  const { data, error } = await requireSupabase()
-    .from('reputation_events')
-    .select('*')
-    .eq('profile_id', profileId)
-    .order('created_at', { ascending: false })
-    .limit(100);
-  if (error) throw requestError(error);
-  return data.map((row) => ({
-    id: row.id,
-    profileId: row.profile_id,
-    clashId: row.clash_id,
-    kind: row.kind,
-    reputationDelta: row.reputation_delta,
-    coinsDelta: row.coins_delta,
-    createdAt: Date.parse(row.created_at),
-  }));
+  const client = requireSupabase();
+  let invalidated = false;
+  let accountId: string | null | undefined;
+  const { data: subscription } = client.auth.onAuthStateChange((event, session) => {
+    // A sign-out/sign-in cycle invalidates even a return to the same account.
+    // Token refresh and initial session delivery do not change the request owner.
+    if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' ||
+      (accountId !== undefined && (session?.user.id ?? null) !== accountId)) invalidated = true;
+  });
+  try {
+    const { data: initial } = await client.auth.getSession();
+    accountId = initial.session?.user.id ?? null;
+    if (invalidated || !accountId) return [];
+    const me = await currentViewerProfileId();
+    if (invalidated || me !== profileId) return [];
+    const { data, error } = await client
+      .from('reputation_events')
+      .select('id, profile_id, clash_id, kind, reputation_delta, coins_delta, created_at')
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    const { data: latest } = await client.auth.getSession();
+    if (invalidated || latest.session?.user.id !== accountId) return [];
+    if (error) throw requestError(error);
+    return (data ?? []).filter((row) => row.profile_id === profileId).map((row) => ({
+      id: row.id,
+      profileId: row.profile_id,
+      clashId: row.clash_id,
+      kind: row.kind,
+      reputationDelta: row.reputation_delta,
+      coinsDelta: row.coins_delta,
+      createdAt: Date.parse(row.created_at),
+    }));
+  } finally {
+    subscription.subscription.unsubscribe();
+  }
 }
