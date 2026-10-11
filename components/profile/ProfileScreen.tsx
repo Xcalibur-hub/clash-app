@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useOperationScope } from '../../hooks/useOperationScope';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Take, User } from '../../store';
 import { showNotice, useClash } from '../../store';
@@ -49,7 +50,9 @@ export interface ProfileScreenProps {
 /** Full profile body — continuous identity page, not a stack of cards. */
 export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenProps): React.JSX.Element {
   const { dispatch, state } = useClash();
-  const { signedIn } = useAuth();
+  const { signedIn, user } = useAuth();
+  const isCurrent = useOperationScope(JSON.stringify([user?.id ?? null, profileId]));
+  const historyRequest = React.useRef(0);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useThemeColors();
@@ -68,8 +71,11 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   const [tab, setTab] = React.useState<ProfileTab>('takes');
   const [takes, setTakes] = React.useState<Take[] | null>(null);
   const [replies, setReplies] = React.useState<ProfileReply[] | null>(null);
-  const [clashes, setClashes] = React.useState<ProfileClash[] | null>(null);
-  const [opponents, setOpponents] = React.useState<Map<string, User>>(new Map());
+  const [history, setHistory] = React.useState<{
+    scope: () => boolean; rows: ProfileClash[]; opponents: Map<string, User>;
+  } | null>(null);
+  const clashes = history?.scope === isCurrent && isCurrent() ? history.rows : null;
+  const opponents = history?.scope === isCurrent && isCurrent() ? history.opponents : new Map<string, User>();
 
   const [editOpen, setEditOpen] = React.useState(false);
   const [signOutOpen, setSignOutOpen] = React.useState(false);
@@ -84,6 +90,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
         fetchViewerSafetyState(viewerId),
         fetchVault(profileId),
       ]);
+      if (!isCurrent()) return;
       if (!nextProfile) {
         setNotFound(true);
         return;
@@ -99,10 +106,11 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
         is_guest: viewerId === null,
       });
     } catch (error) {
+      if (!isCurrent()) return;
       setLoadError(true);
       dispatch(showNotice(errorText(error)));
     }
-  }, [profileId, viewerId, dispatch]);
+  }, [profileId, viewerId, dispatch, isCurrent]);
 
   const loadTakes = React.useCallback(async (): Promise<void> => {
     if (takes !== null) return;
@@ -123,25 +131,37 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   }, [profileId, replies, dispatch]);
 
   const loadClashes = React.useCallback(async (): Promise<void> => {
-    if (clashes !== null) return;
+    if (!isCurrent()) return;
+    const request = ++historyRequest.current;
+    const active = (): boolean => isCurrent() && request === historyRequest.current;
+    // Revalidate on every focus/refresh, never retain a previously visible result
+    // while fetching current source permissions.
+    setHistory(null);
     try {
       const rows = await fetchProfileClashes(profileId);
-      setClashes(rows);
+      if (!active()) return;
       const ids = [...new Set(rows.map((row) => row.opponentId).filter((id): id is string => id !== null))];
-      if (ids.length > 0) {
-        const users = await fetchProfilesByIds(ids);
-        setOpponents(new Map(users.map((user) => [user.id, user])));
-      }
+      const users = ids.length ? await fetchProfilesByIds(ids) : [];
+      if (!active()) return;
+      setHistory({ scope: isCurrent, rows, opponents: new Map(users.map((user) => [user.id, user])) });
     } catch (error) {
-      dispatch(showNotice(errorText(error)));
+      if (active()) {
+        setHistory(null);
+        dispatch(showNotice(errorText(error)));
+      }
     }
-  }, [profileId, clashes, dispatch]);
+  }, [profileId, isCurrent, dispatch]);
+
+  useFocusEffect(React.useCallback(() => {
+    if (tab === 'clashes') void loadClashes();
+    return () => { historyRequest.current += 1; };
+  }, [tab, loadClashes]));
 
   React.useEffect(() => {
     setProfile(null);
     setTakes(null);
     setReplies(null);
-    setClashes(null);
+    setHistory(null);
     setFollow(null);
     setBlocked(false);
     setNotFound(false);
@@ -152,14 +172,13 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   React.useEffect(() => {
     if (tab === 'takes') void loadTakes();
     else if (tab === 'replies') void loadReplies();
-    else void loadClashes();
-  }, [tab, loadTakes, loadReplies, loadClashes]);
+  }, [tab, loadTakes, loadReplies]);
 
   const refresh = async (): Promise<void> => {
     setRefreshing(true);
     setTakes(null);
     setReplies(null);
-    setClashes(null);
+    setHistory(null);
     await load();
     if (tab === 'takes') await loadTakes();
     else if (tab === 'replies') await loadReplies();

@@ -78,6 +78,7 @@ export async function fetchProfileReplies(profileId: string): Promise<ProfileRep
 /** Clashes the profile took part in (as Take author or challenger), newest first. */
 export async function fetchProfileClashes(profileId: string): Promise<ProfileClash[]> {
   const { data, error } = await requireSupabase().rpc('profile_clash_list', { p_profile_id: profileId });
+  if (error?.code === '42501') return [];
   if (error) throw requestError(error);
   if (!Array.isArray(data)) return [];
   return data.flatMap((entry) => {

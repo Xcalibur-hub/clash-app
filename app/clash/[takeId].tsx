@@ -23,6 +23,7 @@ import { Notice } from '../../components/shared/Notice';
 import { ArenaIcon, BackIcon, ShareIcon } from '../../components/shared/icons';
 import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { useOperationScope } from '../../hooks/useOperationScope';
 import { analytics } from '../../services/analytics';
 import { currentViewerProfileId } from '../../services/apiService';
 import {
@@ -87,13 +88,16 @@ export default function ClashScreen(): React.JSX.Element {
   const { takeId } = useLocalSearchParams<{ takeId: string | string[] }>();
   const id = Array.isArray(takeId) ? takeId[0] : takeId;
   const { state, dispatch } = useClash();
-  const { signedIn } = useAuth();
+  const { signedIn, user } = useAuth();
+  const isCurrent = useOperationScope(JSON.stringify([user?.id ?? null, id]));
+  const loadGeneration = React.useRef(0);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const requireAuth = useRequireAuth();
   const t = useThemeColors();
 
-  const [view, setView] = React.useState<ClashView | null | undefined>(undefined);
+  const [viewState, setViewState] = React.useState<{ scope: () => boolean; value: ClashView | null } | null>(null);
+  const view = viewState?.scope === isCurrent && isCurrent() ? viewState.value : undefined;
   const [reputation, setReputation] = React.useState(0);
   const [coins, setCoins] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
@@ -143,10 +147,16 @@ export default function ClashScreen(): React.JSX.Element {
   }, [state, id, view]);
 
   const load = React.useCallback(async (): Promise<void> => {
+    if (!isCurrent()) return;
+    const generation = ++loadGeneration.current;
+    const active = (): boolean => isCurrent() && loadGeneration.current === generation;
     setError(null);
     try {
       const next = await fetchClashViewForTake(id);
-      setView(next);
+      if (!active()) return;
+      setViewState({ scope: isCurrent, value: next });
+      setReputation(0);
+      setCoins(0);
       if (!next) return;
       if (next.battleMode === 'DUEL' && next.roomId) return;
       if (!openedRef.current) {
@@ -164,24 +174,32 @@ export default function ClashScreen(): React.JSX.Element {
         });
       }
       const me = await currentViewerProfileId();
+      if (!active()) return;
       if (me) {
         const events = await fetchReputationEvents(me);
+        if (!active()) return;
         const mine = events.filter((event) => event.clashId === next.clashId);
         setReputation(mine.reduce((sum, event) => sum + event.reputationDelta, 0));
         setCoins(mine.reduce((sum, event) => sum + event.coinsDelta, 0));
       }
     } catch (e) {
-      setError(errorText(e));
+      if (active()) {
+        setViewState(null);
+        setReputation(0);
+        setCoins(0);
+        setError(errorText(e));
+      }
     }
-  }, [id]);
+  }, [id, isCurrent]);
 
   useFocusEffect(
     React.useCallback(() => {
+      setViewState(null);
       void load();
       const timer = setInterval(() => {
         void load();
       }, POLL_MS);
-      return () => clearInterval(timer);
+      return () => { loadGeneration.current += 1; clearInterval(timer); };
     }, [load]),
   );
 
