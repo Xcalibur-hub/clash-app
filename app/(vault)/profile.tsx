@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ProfileHero } from '../../components/profile/ProfileHero';
 import { SegmentedTabs, type SegmentedTab } from '../../components/shared/SegmentedTabs';
 import { ReputationBar } from '../../components/profile/ReputationBar';
@@ -32,6 +32,11 @@ import {
 import { layout, space, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
 import { withClashStats } from '../../utils/profileClashStats';
+import {
+  filterSettledWins,
+  isCurrentRequest,
+  ownedStateIsStale,
+} from '../../utils/profileStatsLifecycle';
 
 type VaultProfileTab = 'takes' | 'wins';
 
@@ -51,63 +56,111 @@ export default function VaultProfileScreen(): React.JSX.Element {
   const router = useRouter();
   const t = useThemeColors();
   const viewer = state.viewer;
+  const viewerRef = React.useRef(viewer);
+  viewerRef.current = viewer;
   const takes = React.useMemo(() => selectViewerTakes(state), [state]);
 
   const [wins, setWins] = React.useState<ProfileClash[] | null>(null);
+  const [winsForId, setWinsForId] = React.useState<string | null>(null);
   const [opponents, setOpponents] = React.useState<Map<string, User>>(new Map());
   const [winsError, setWinsError] = React.useState(false);
-  const [arenaRep, setArenaRep] = React.useState<ArenaReputation | null>(null);
+  /** undefined = not loaded for this account; null = failed/unavailable. */
+  const [arenaRep, setArenaRep] = React.useState<ArenaReputation | null | undefined>(undefined);
+  const [repForId, setRepForId] = React.useState<string | null>(null);
+  const requestRef = React.useRef(0);
 
+  // Drop previous-account Wins / facets immediately on switch or sign-out.
   React.useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (viewer.id === 'guest') return;
-      try {
-        if (viewer.wins === null || viewer.clashes === null) {
-          const stats = await fetchProfileClashStats(viewer.id);
-          if (!cancelled) dispatch(setViewer(withClashStats(viewer, stats)));
-        }
-      } catch {
-        // Keep null counts — do not invent zeros.
-      }
-      try {
-        const rep = await fetchMyArenaReputation();
-        if (!cancelled) setArenaRep(rep);
-      } catch {
-        if (!cancelled) setArenaRep(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [viewer, dispatch]);
+    requestRef.current += 1;
+    setWins(viewer.id === 'guest' ? [] : null);
+    setWinsForId(viewer.id === 'guest' ? 'guest' : null);
+    setWinsError(false);
+    setOpponents(new Map());
+    setArenaRep(undefined);
+    setRepForId(null);
+  }, [viewer.id]);
 
-  React.useEffect(() => {
-    if (tab !== 'wins' || wins !== null || winsError) return;
-    let cancelled = false;
-    void (async () => {
+  const loadWins = React.useCallback(
+    async (requestId: number, profileId: string): Promise<void> => {
       try {
-        const rows = await fetchProfileClashes(viewer.id);
-        if (cancelled) return;
-        const won = rows.filter((row) => row.outcome === 'won');
-        setWins(won);
+        const rows = await fetchProfileClashes(profileId);
+        if (!isCurrentRequest(true, requestId, requestRef.current)) return;
+        if (viewerRef.current.id !== profileId) return;
+        setWins(filterSettledWins(rows));
+        setWinsForId(profileId);
+        setWinsError(false);
         const ids = [
-          ...new Set(won.map((row) => row.opponentId).filter((id): id is string => id !== null)),
+          ...new Set(
+            filterSettledWins(rows)
+              .map((row) => row.opponentId)
+              .filter((id): id is string => id !== null),
+          ),
         ];
-        if (ids.length > 0) {
-          const users = await fetchProfilesByIds(ids);
-          if (!cancelled) setOpponents(new Map(users.map((user) => [user.id, user])));
+        if (ids.length === 0) {
+          setOpponents(new Map());
+          return;
         }
+        const users = await fetchProfilesByIds(ids);
+        if (!isCurrentRequest(true, requestId, requestRef.current)) return;
+        if (viewerRef.current.id !== profileId) return;
+        setOpponents(new Map(users.map((user) => [user.id, user])));
       } catch (error) {
-        if (cancelled) return;
+        if (!isCurrentRequest(true, requestId, requestRef.current)) return;
+        if (viewerRef.current.id !== profileId) return;
         setWinsError(true);
+        setWins(null);
+        setWinsForId(null);
         dispatch(showNotice(errorText(error)));
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [tab, wins, winsError, viewer.id, dispatch]);
+    },
+    [dispatch],
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (viewer.id === 'guest') return undefined;
+      let active = true;
+      const requestId = ++requestRef.current;
+      const profileId = viewer.id;
+
+      void (async () => {
+        try {
+          const stats = await fetchProfileClashStats(profileId);
+          if (!active || !isCurrentRequest(true, requestId, requestRef.current)) return;
+          if (viewerRef.current.id !== profileId) return;
+          dispatch(setViewer(withClashStats(viewerRef.current, stats)));
+        } catch {
+          // Keep null counts — do not invent zeros.
+        }
+
+        try {
+          const rep = await fetchMyArenaReputation();
+          if (!active || !isCurrentRequest(true, requestId, requestRef.current)) return;
+          if (viewerRef.current.id !== profileId) return;
+          setArenaRep(rep);
+          setRepForId(profileId);
+        } catch {
+          if (!active || !isCurrentRequest(true, requestId, requestRef.current)) return;
+          if (viewerRef.current.id !== profileId) return;
+          setArenaRep(null);
+          setRepForId(profileId);
+        }
+
+        if (tab === 'wins') {
+          await loadWins(requestId, profileId);
+        }
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [viewer.id, tab, dispatch, loadWins]),
+  );
+
+  const winsStale = ownedStateIsStale(winsForId, viewer.id);
+  const visibleWins = winsStale ? null : wins;
+  const repStale = ownedStateIsStale(repForId, viewer.id);
+  const visibleRep = repStale ? undefined : arenaRep;
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
@@ -127,8 +180,8 @@ export default function VaultProfileScreen(): React.JSX.Element {
           reputation={viewer.reputation}
           rank={viewer.rank}
           streak={viewer.streak}
-          facets={arenaRep?.facets}
-          standing={arenaRep?.standing}
+          facets={visibleRep?.facets}
+          standing={visibleRep?.standing}
         />
 
         <SegmentedTabs
@@ -150,11 +203,11 @@ export default function VaultProfileScreen(): React.JSX.Element {
                 onPress={() => router.push(`/clash/${take.id}`)}
               />
             ))
-          : wins === null && !winsError
+          : visibleWins === null && !winsError
             ? (
                 <ActivityIndicator color={t.textPrimary} />
               )
-            : (wins ?? []).map((clash) => (
+            : (visibleWins ?? []).map((clash) => (
                 <ProfileClashRow
                   key={clash.clash.id}
                   clash={clash}
@@ -180,10 +233,13 @@ export default function VaultProfileScreen(): React.JSX.Element {
             onAction={() => {
               setWinsError(false);
               setWins(null);
+              setWinsForId(null);
+              const requestId = ++requestRef.current;
+              void loadWins(requestId, viewer.id);
             }}
           />
         ) : null}
-        {tab === 'wins' && wins !== null && wins.length === 0 ? (
+        {tab === 'wins' && visibleWins !== null && visibleWins.length === 0 ? (
           <EmptyState
             icon={TrophyIcon}
             title="No Clash wins yet"

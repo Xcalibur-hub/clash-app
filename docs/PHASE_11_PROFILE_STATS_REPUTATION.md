@@ -47,6 +47,24 @@ No opponent identities or take text are returned (aggregate only).
 3. **`profile_clash_list` is capped at 30**; stats count all matching settled rows (no client aggregation of the list).
 4. **Public facet / standing cards** for other profiles would need a new authorized read contract — not built here.
 
+## Client lifecycle (hardening)
+
+- Own Arena reputation is fetched **after** the essential profile shell and never fails the screen.
+- Facets / Wins are keyed to the owning profile id; previous-account data is cleared on auth switch (AuthHydrator drops to guest immediately) and ignored if a stale response arrives.
+- Self Profile + Vault Profile soft-refresh settled stats / Wins on screen focus (no polling).
+- Failed Wins loads surface Retry; failed stats leave `wins`/`clashes` as `null`.
+
+## Migration / test sequencing
+
+| Artifact | This PR (#14) | PR #13 (comment/reply notifications) |
+| --- | --- | --- |
+| Migration | `20261010120000_profile_clash_stats.sql` | `20261011120000_comment_reply_notifications.sql` |
+| pgTAP | `085_profile_clash_stats.sql` | `084_comment_reply_notifications.sql` |
+
+Migration timestamps already order cleanly (#14 before #13). The pgTAP file was renamed from `084_` → `085_` so both draft PRs can land without colliding on `084_*`. The migration filename was **not** rewritten (safe: avoids silent renames of an identifier that may already exist in a local migration history if applied).
+
+**Local history note:** if `profile_clash_stats` was applied via ad-hoc SQL (not `supabase migration up`), record `20261010120000` in `supabase_migrations.schema_migrations` before relying on `migration up`, or re-apply through the normal migration path on a fresh local DB. Do not `db reset` in shared environments.
+
 ## Validation
 
 See the PR description for exact `typecheck`, `test:unit`, `expo-doctor`, and pgTAP results.

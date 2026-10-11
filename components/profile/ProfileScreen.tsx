@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Take, User } from '../../store';
 import { showNotice, useClash } from '../../store';
@@ -24,6 +24,7 @@ import {
   type ProfileReply,
 } from '../../services/profileService';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { isCurrentRequest } from '../../utils/profileStatsLifecycle';
 import { dockBottomPadding } from '../navigation/dockConfig';
 import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { EmptyState } from '../shared/EmptyState';
@@ -78,20 +79,40 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   const [editOpen, setEditOpen] = React.useState(false);
   const [signOutOpen, setSignOutOpen] = React.useState(false);
   const [actionsOpen, setActionsOpen] = React.useState(false);
-  /** Own facets only; undefined = not requested, null = unavailable. */
+  /** Own facets only; undefined = not requested / cleared, null = unavailable. */
   const [arenaRep, setArenaRep] = React.useState<ArenaReputation | null | undefined>(undefined);
+  const loadRequest = React.useRef(0);
+  const tabRequest = React.useRef(0);
+  const softRequest = React.useRef(0);
+
+  const loadOwnReputation = React.useCallback(
+    async (requestId: number): Promise<void> => {
+      try {
+        const next = await fetchMyArenaReputation();
+        if (!isCurrentRequest(true, requestId, loadRequest.current)) return;
+        setArenaRep(next);
+      } catch {
+        if (!isCurrentRequest(true, requestId, loadRequest.current)) return;
+        setArenaRep(null);
+      }
+    },
+    [],
+  );
 
   const load = React.useCallback(async (): Promise<void> => {
+    const requestId = ++loadRequest.current;
+    const isSelf = viewerId !== null && viewerId === profileId;
+    // Never carry facets across profile / account boundaries.
+    setArenaRep(undefined);
     try {
       setLoadError(false);
-      const isSelf = viewerId !== null && viewerId === profileId;
-      const [nextProfile, nextFollow, safety, nextVault, nextArenaRep] = await Promise.all([
+      const [nextProfile, nextFollow, safety, nextVault] = await Promise.all([
         fetchProfileById(profileId),
         fetchFollowState(profileId),
         fetchViewerSafetyState(viewerId),
         fetchVault(profileId),
-        isSelf ? fetchMyArenaReputation() : Promise.resolve(undefined),
       ]);
+      if (!isCurrentRequest(true, requestId, loadRequest.current)) return;
       if (!nextProfile) {
         setNotFound(true);
         return;
@@ -101,56 +122,77 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
       setFollow(nextFollow);
       setHasVault(nextVault !== null);
       setBlocked(safety.blockedProfileIds.includes(profileId));
-      setArenaRep(isSelf ? (nextArenaRep ?? null) : undefined);
       analytics.trackOnce(`profile_viewed:${profileId}`, 'profile_viewed', {
         realm: 'profile',
         is_self: isSelf,
         is_guest: viewerId === null,
       });
+      // Optional own-only facets — failures must not fail the profile shell.
+      if (isSelf) void loadOwnReputation(requestId);
     } catch (error) {
+      if (!isCurrentRequest(true, requestId, loadRequest.current)) return;
       setLoadError(true);
       dispatch(showNotice(errorText(error)));
     }
-  }, [profileId, viewerId, dispatch]);
+  }, [profileId, viewerId, dispatch, loadOwnReputation]);
 
   const loadTakes = React.useCallback(async (): Promise<void> => {
     if (takes !== null) return;
+    const requestId = ++tabRequest.current;
     try {
-      setTakes(await fetchProfileTakes(profileId));
+      const next = await fetchProfileTakes(profileId);
+      if (!isCurrentRequest(true, requestId, tabRequest.current)) return;
+      setTakes(next);
     } catch (error) {
+      if (!isCurrentRequest(true, requestId, tabRequest.current)) return;
       dispatch(showNotice(errorText(error)));
     }
   }, [profileId, takes, dispatch]);
 
   const loadReplies = React.useCallback(async (): Promise<void> => {
     if (replies !== null) return;
+    const requestId = ++tabRequest.current;
     try {
-      setReplies(await fetchProfileReplies(profileId));
+      const next = await fetchProfileReplies(profileId);
+      if (!isCurrentRequest(true, requestId, tabRequest.current)) return;
+      setReplies(next);
     } catch (error) {
+      if (!isCurrentRequest(true, requestId, tabRequest.current)) return;
       dispatch(showNotice(errorText(error)));
     }
   }, [profileId, replies, dispatch]);
 
-  const loadClashes = React.useCallback(async (): Promise<void> => {
-    if (clashes !== null) return;
+  const applyClashes = React.useCallback(async (requestId: number): Promise<void> => {
     try {
       const rows = await fetchProfileClashes(profileId);
+      if (!isCurrentRequest(true, requestId, tabRequest.current)) return;
       setClashes(rows);
       const ids = [...new Set(rows.map((row) => row.opponentId).filter((id): id is string => id !== null))];
       if (ids.length > 0) {
         const users = await fetchProfilesByIds(ids);
+        if (!isCurrentRequest(true, requestId, tabRequest.current)) return;
         setOpponents(new Map(users.map((user) => [user.id, user])));
+      } else {
+        setOpponents(new Map());
       }
     } catch (error) {
+      if (!isCurrentRequest(true, requestId, tabRequest.current)) return;
       dispatch(showNotice(errorText(error)));
     }
-  }, [profileId, clashes, dispatch]);
+  }, [profileId, dispatch]);
+
+  const loadClashes = React.useCallback(async (): Promise<void> => {
+    if (clashes !== null) return;
+    const requestId = ++tabRequest.current;
+    await applyClashes(requestId);
+  }, [clashes, applyClashes]);
 
   React.useEffect(() => {
     setProfile(null);
     setTakes(null);
     setReplies(null);
     setClashes(null);
+    setOpponents(new Map());
     setFollow(null);
     setBlocked(false);
     setNotFound(false);
@@ -164,6 +206,40 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     else if (tab === 'replies') void loadReplies();
     else void loadClashes();
   }, [tab, loadTakes, loadReplies, loadClashes]);
+
+  // Soft-refresh settled stats / clash history when returning to an owned profile
+  // (e.g. after a Clash settles). Uses a separate generation so it cannot cancel
+  // the essential profile shell load. No polling.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!self) return undefined;
+      let active = true;
+      const requestId = ++softRequest.current;
+      const clashRequest = ++tabRequest.current;
+      void (async () => {
+        try {
+          const nextProfile = await fetchProfileById(profileId);
+          if (!active || !isCurrentRequest(true, requestId, softRequest.current)) return;
+          if (nextProfile) setProfile(nextProfile);
+        } catch {
+          // Keep the last good profile shell; pull-to-refresh still surfaces errors.
+        }
+        await applyClashes(clashRequest);
+        if (!active || !isCurrentRequest(true, requestId, softRequest.current)) return;
+        try {
+          const next = await fetchMyArenaReputation();
+          if (!active || !isCurrentRequest(true, requestId, softRequest.current)) return;
+          setArenaRep(next);
+        } catch {
+          if (!active || !isCurrentRequest(true, requestId, softRequest.current)) return;
+          setArenaRep(null);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [self, profileId, applyClashes]),
+  );
 
   const refresh = async (): Promise<void> => {
     setRefreshing(true);
