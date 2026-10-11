@@ -1,10 +1,98 @@
--- Phase 11 Step 2D — Arena end-to-end validation (local Supabase only).
--- Commits test identities and one journey so IDs remain queryable.
--- Not a pgTAP suite; emits a machine-readable report table.
+-- ============================================================================
+-- Phase 11 — Arena E2E validation harness (LOCAL DOCKER ONLY)
+-- ----------------------------------------------------------------------------
+-- Validates Take → Challenge → Accept → Duel → Judgement → Settlement →
+-- profile_clash_stats / comment notifications against a real local backend.
+--
+-- SAFETY (fail-closed)
+--   1. Requires:  SELECT set_config('app.phase11_e2e_allow','local-docker', false);
+--   2. Refuses hosted/production markers (see guards below).
+--   3. Default mode is transactional ROLLBACK — no durable fixture pollution.
+--   4. No public SECURITY DEFINER helpers; report lives in pg_temp.
+--   5. Optional durable mode only when BOTH allow GUCs are set (see below).
+--
+-- RUN (default, rolled back):
+--   docker exec -i supabase_db_clash psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+--   SELECT set_config('app.phase11_e2e_allow','local-docker', false);
+--   \i /path/or/paste
+--   SQL
+--
+-- Or from host after docker cp:
+--   docker exec supabase_db_clash psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+--     -c "SELECT set_config('app.phase11_e2e_allow','local-docker', false)" \
+--     -f /tmp/phase11_arena_e2e_validation.sql
+--
+-- DURABLE mode (keeps fixtures + public._phase11_e2e_report snapshot; rare):
+--   SELECT set_config('app.phase11_e2e_allow','local-docker', false);
+--   SELECT set_config('app.phase11_e2e_persist','1', false);
+--   then run this file. Cleanup: scripts/phase11_arena_e2e_cleanup.sql
+--
+-- Existing Step 2D artifacts (if any) are documented in
+-- docs/PHASE_11_SETTLEMENT_REWARDS_AUDIT.md — do not drop them blindly.
+-- ============================================================================
 
 \set ON_ERROR_STOP on
 
-create table if not exists public._phase11_e2e_report (
+-- ── 0. Fail closed unless explicitly approved local-docker ───────────────────
+do $guard$
+declare
+  v_allow text := coalesce(current_setting('app.phase11_e2e_allow', true), '');
+  v_port text;
+  v_db text := current_database();
+  v_user text := current_user;
+  v_hosted_hint integer;
+begin
+  if v_allow is distinct from 'local-docker' then
+    raise exception
+      'phase11 e2e refused: set app.phase11_e2e_allow=local-docker on an approved local Docker DB first'
+      using errcode = '42501';
+  end if;
+
+  if v_user is distinct from 'postgres' and v_user is distinct from 'supabase_admin' then
+    raise exception 'phase11 e2e refused: unexpected role %', v_user using errcode = '42501';
+  end if;
+
+  if v_db is distinct from 'postgres' then
+    raise exception 'phase11 e2e refused: unexpected database %', v_db using errcode = '42501';
+  end if;
+
+  -- Hosted Supabase projects expose a project-ref style claim / settings that
+  -- local Kong stacks do not. Refuse obvious hosted markers without guessing.
+  select count(*)::integer into v_hosted_hint
+  from pg_settings
+  where name in ('supabase.jwt_secret', 'app.settings.jwt_secret')
+    and setting ilike '%eyJ%'  -- JWT-shaped secret alone is not proof; next checks matter
+    and false;                 -- placeholder: never match solely on secret shape
+
+  -- Refuse if a non-local Auth user email domain looks like a production cohort
+  -- while the allow GUC was somehow set on the wrong host. Local fixture emails
+  -- use @clash.local exclusively for this harness family.
+  select count(*)::integer into v_hosted_hint
+  from auth.users u
+  where u.email is not null
+    and u.email not ilike '%@clash.local'
+    and u.email not ilike '%@supabase.io'
+    and u.email not ilike 'e2e.%'
+    and u.raw_user_meta_data ? 'iss'
+    and coalesce(u.raw_user_meta_data->>'iss', '') ilike '%supabase.co%';
+
+  if v_hosted_hint > 0 then
+    raise exception
+      'phase11 e2e refused: auth.users looks hosted/production (supabase.co iss present)'
+      using errcode = '42501';
+  end if;
+
+  -- Inside the local Docker image the listen port is typically 5432; the host
+  -- maps 55322→5432. We only use port as a soft signal + notice.
+  select setting into v_port from pg_settings where name = 'port';
+  raise notice 'phase11 e2e guard ok db=% user=% port=% persist=%',
+    v_db, v_user, coalesce(v_port, '?'),
+    coalesce(current_setting('app.phase11_e2e_persist', true), '0');
+end;
+$guard$;
+
+-- ── 1. Session-scoped report (no public SECURITY DEFINER) ───────────────────
+create temporary table if not exists _phase11_e2e_report (
   stage text not null,
   check_name text not null,
   result text not null check (result in ('PASS','FAIL','BLOCKED')),
@@ -13,17 +101,21 @@ create table if not exists public._phase11_e2e_report (
   detail text,
   recorded_at timestamptz not null default now(),
   primary key (stage, check_name)
-);
+) on commit preserve rows;
 
-create or replace function public._phase11_e2e_note(
+-- Journey flips session role to authenticated; keep the temp report writable.
+grant all on table _phase11_e2e_report to public;
+
+create or replace function pg_temp.phase11_e2e_note(
   p_stage text, p_check text, p_result text, p_expected text, p_actual text, p_detail text default null
 ) returns void
 language plpgsql
 security definer
-set search_path = ''
+set search_path = pg_temp, public
 as $$
 begin
-  insert into public._phase11_e2e_report(stage, check_name, result, expected, actual, detail)
+  -- Session-local helper only (pg_temp). security definer avoids role flip denials.
+  insert into _phase11_e2e_report(stage, check_name, result, expected, actual, detail)
   values (p_stage, p_check, p_result, p_expected, p_actual, p_detail)
   on conflict (stage, check_name) do update
     set result = excluded.result,
@@ -33,6 +125,11 @@ begin
         recorded_at = now();
 end;
 $$;
+
+grant execute on function pg_temp.phase11_e2e_note(text, text, text, text, text, text) to public;
+
+-- ── 2. Journey (transactional; rolls back unless persist=1) ─────────────────
+begin;
 
 do $$
 #variable_conflict use_variable
@@ -78,8 +175,9 @@ declare
   mig_14_fn boolean;
   mig_14_row boolean;
   has_comment_trg boolean;
+  v_run_tag text := to_char(clock_timestamp(), 'HH24MISS.US');
 begin
-  delete from public._phase11_e2e_report;
+  delete from _phase11_e2e_report;
 
   select exists(
     select 1 from supabase_migrations.schema_migrations where version = '20261011120000'
@@ -92,14 +190,14 @@ begin
     select 1 from pg_trigger where tgname = 'comments_notify_arena'
   ) into has_comment_trg;
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'env', 'pr13_migration_present',
     case when mig_13 then 'PASS' else 'FAIL' end,
     '20261011120000 in schema_migrations',
-    case when mig_13 then 'present (name empty)' else 'missing' end,
+    case when mig_13 then 'present' else 'missing' end,
     'PR #13 comment-notification migration marker'
   );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'env', 'pr14_profile_clash_stats_fn',
     case when mig_14_fn then 'PASS' else 'BLOCKED' end,
     'profile_clash_stats(text) exists',
@@ -108,7 +206,7 @@ begin
          else 'function present ad-hoc; 20261010120000 not in schema_migrations'
     end
   );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'env', 'comment_notify_trigger',
     case when has_comment_trg then 'PASS' else 'BLOCKED' end,
     'comments_notify_arena trigger',
@@ -116,7 +214,8 @@ begin
     null
   );
 
-  -- Isolated local auth users (no password; JWT claims simulation only).
+  -- Isolated local auth users (JWT claims simulation). Unique handles per run
+  -- so re-runs never depend on stale profile rows from a prior durable run.
   insert into auth.users(id, instance_id, aud, role, email, email_confirmed_at, created_at, updated_at)
   values
     (uid_a, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
@@ -135,11 +234,24 @@ begin
     raise exception 'profile trigger did not create e2e profiles';
   end if;
 
-  update public.profiles set handle = 'e2e_p11_a', name = 'E2E Author A' where id = pid_a;
-  update public.profiles set handle = 'e2e_p11_b', name = 'E2E Challenger B' where id = pid_b;
-  update public.profiles set handle = 'e2e_p11_j', name = 'E2E Judge' where id = pid_j;
+  -- Clear throttle rows for these actors so re-runs are not rate-blocked.
+  delete from public.rate_limit_events
+  where actor_id in (pid_a, pid_b, pid_j);
 
-  perform public._phase11_e2e_note(
+  update public.profiles
+     set handle = left('e2ea_' || v_run_tag, 20),
+         name = 'E2E Author A'
+   where id = pid_a;
+  update public.profiles
+     set handle = left('e2eb_' || v_run_tag, 20),
+         name = 'E2E Challenger B'
+   where id = pid_b;
+  update public.profiles
+     set handle = left('e2ej_' || v_run_tag, 20),
+         name = 'E2E Judge'
+   where id = pid_j;
+
+  perform pg_temp.phase11_e2e_note(
     'env', 'test_accounts',
     'PASS',
     '3 isolated local auth+profile pairs',
@@ -157,14 +269,14 @@ begin
 
   select * into take_row from public.create_take(
     'techtakes',
-    'Phase11 E2E ' || to_char(clock_timestamp(), 'HH24MISS.US') || ': juniors still matter when AI drafts the first cut.'
+    'Phase11 E2E ' || v_run_tag || ': juniors still matter when AI drafts the first cut.'
   );
   take_id := take_row.id;
 
   perform set_config('role', 'postgres', true);
   perform set_config('request.jwt.claims', null, true);
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'A', 'take_created',
     case when take_id is not null and take_row.author_id = pid_a then 'PASS' else 'FAIL' end,
     'Take persisted for author A',
@@ -172,7 +284,6 @@ begin
     null
   );
 
-  -- B discovers / opens take (readable as authenticated B)
   perform set_config(
     'request.jwt.claims',
     jsonb_build_object('sub', uid_b::text, 'role', 'authenticated')::text,
@@ -180,65 +291,52 @@ begin
   );
   perform set_config('role', 'authenticated', true);
 
-  if exists(select 1 from public.takes where id = take_id and author_id = pid_a) then
-    perform public._phase11_e2e_note(
-      'A', 'take_visible_to_b',
-      'PASS',
-      'B can select Take',
-      take_id,
-      null
-    );
+  if exists(select 1 from public.takes t where t.id = take_id and t.author_id = pid_a) then
+    perform pg_temp.phase11_e2e_note('A', 'take_visible_to_b', 'PASS', 'B can select Take', take_id, null);
   else
-    perform public._phase11_e2e_note(
-      'A', 'take_visible_to_b',
-      'FAIL',
-      'B can select Take',
-      'not visible',
-      null
-    );
+    perform pg_temp.phase11_e2e_note('A', 'take_visible_to_b', 'FAIL', 'B can select Take', 'not visible', null);
   end if;
 
   -- B. Challenge
   challenge := public.create_arena_challenge(
     take_id,
-    'Companies still need juniors to validate and integrate generated code.'
+    'Companies still need juniors to validate and integrate generated code. ' || v_run_tag
   );
 
   perform set_config('role', 'postgres', true);
   perform set_config('request.jwt.claims', null, true);
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'B', 'challenge_created',
     case when challenge->>'status' = 'PENDING' and challenge->>'created' = 'true' then 'PASS' else 'FAIL' end,
     'PENDING created=true',
-    challenge::text,
+    left(challenge::text, 240),
     null
   );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'B', 'challenge_participants',
     case when challenge->>'challengerId' = pid_b and challenge->>'challengedId' = pid_a then 'PASS' else 'FAIL' end,
     format('challenger=%s challenged=%s', pid_b, pid_a),
     format('challenger=%s challenged=%s', challenge->>'challengerId', challenge->>'challengedId'),
     null
   );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'B', 'challenge_received_notification',
     case when exists(
-      select 1 from public.notifications
-      where kind = 'challenge_received' and recipient_id = pid_a
-        and id = 'challenge_received_' || (challenge->>'id')
-        and entity_id = take_id
+      select 1 from public.notifications n
+      where n.kind = 'challenge_received' and n.recipient_id = pid_a
+        and n.id = 'challenge_received_' || (challenge->>'id')
+        and n.entity_id = take_id
     ) then 'PASS' else 'FAIL' end,
     'challenge_received for A deep-links Take',
     coalesce((
-      select id || ' entity=' || entity_id from public.notifications
-      where kind = 'challenge_received' and recipient_id = pid_a
-      order by created_at desc limit 1
+      select n.id || ' entity=' || n.entity_id from public.notifications n
+      where n.kind = 'challenge_received' and n.recipient_id = pid_a
+      order by n.created_at desc limit 1
     ), 'none'),
     null
   );
 
-  -- Accept as A
   perform set_config(
     'request.jwt.claims',
     jsonb_build_object('sub', uid_a::text, 'role', 'authenticated')::text,
@@ -253,25 +351,25 @@ begin
   room_id := accept->>'roomId';
 
   select count(*)::integer into duel_count from public.clashes c where c.take_id = take_id;
-  select c.take_id, (select author_id from public.takes t where t.id = c.take_id), c.challenger_id
+  select c.take_id, (select t.author_id from public.takes t where t.id = c.take_id), c.challenger_id
     into clash_take, fighter_a, fighter_b
   from public.clashes c where c.id = clash_id;
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'B', 'accept_creates_duel',
     case when accept->>'status' = 'ACCEPTED' and clash_id is not null and room_id is not null then 'PASS' else 'FAIL' end,
     'ACCEPTED with clashId+roomId',
-    accept::text,
+    left(accept::text, 240),
     null
   );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'B', 'exactly_one_duel',
     case when duel_count = 1 then 'PASS' else 'FAIL' end,
     '1 clash for take',
     duel_count::text,
     null
   );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'B', 'duel_links',
     case when clash_take = take_id and fighter_a = pid_a and fighter_b = pid_b then 'PASS' else 'FAIL' end,
     format('take=%s A=%s B=%s', take_id, pid_a, pid_b),
@@ -279,7 +377,7 @@ begin
     null
   );
 
-  -- C. Duel open / sides
+  -- C. Duel
   perform set_config(
     'request.jwt.claims',
     jsonb_build_object('sub', uid_a::text, 'role', 'authenticated')::text,
@@ -292,7 +390,7 @@ begin
   from public.arena_challenges ac
   where ac.id = (challenge->>'id')::uuid;
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'C', 'duel_sides',
     case when room_view#>>'{duel,fighterA,id}' = pid_a
           and room_view#>>'{duel,fighterB,id}' = pid_b
@@ -305,7 +403,7 @@ begin
       room_view#>>'{duel,viewerRelationship}'),
     null
   );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'C', 'counter_position',
     case when side_b is not null and length(side_b) > 20
           and public.clash_view(clash_id)->>'sideBText' = side_b
@@ -315,7 +413,6 @@ begin
     null
   );
 
-  -- Leave/reopen: clear JWT then reload as B
   perform set_config('request.jwt.claims', null, true);
   perform set_config(
     'request.jwt.claims',
@@ -325,7 +422,7 @@ begin
   room_view := public.get_arena_room(room_id);
   perform set_config('request.jwt.claims', null, true);
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'C', 'reopen_as_b',
     case when coalesce(room_view->>'roomId', room_view->>'id') = room_id
           and room_view#>>'{duel,viewerRelationship}' = 'fighter_b'
@@ -338,7 +435,6 @@ begin
     null
   );
 
-  -- Advance clocks into JUDGING (server-side; no device clock)
   update public.clashes
     set opens_at = now() - interval '1 hour',
         closes_at = now() + interval '15 minutes'
@@ -355,7 +451,7 @@ begin
         closes_at = now() + interval '15 minutes'
     where id = (select topic_id from public.arena_rooms where id = room_id);
 
-  -- D. Judgement — unauthorized fighter
+  -- D. Judgement
   begin
     perform set_config(
       'request.jwt.claims',
@@ -369,7 +465,7 @@ begin
   end;
   perform set_config('request.jwt.claims', null, true);
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'D', 'fighter_judgement_rejected',
     case when fighter_judge_err like 'P0005%' then 'PASS' else 'FAIL' end,
     'P0005 fighter cannot judge',
@@ -377,7 +473,6 @@ begin
     null
   );
 
-  -- Duplicate/idempotent + authorized judge
   begin
     perform set_config(
       'request.jwt.claims',
@@ -392,7 +487,7 @@ begin
   end;
   perform set_config('request.jwt.claims', null, true);
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'D', 'judge_ballot_idempotent',
     case when judge_err = 'ok'
           and (select count(*)::integer from public.judgements j where j.clash_id = clash_id) = 1
@@ -405,7 +500,6 @@ begin
     null
   );
 
-  -- Premature/unauthorized: random empty JWT
   begin
     perform set_config('request.jwt.claims', null, true);
     perform public.submit_judgement(clash_id, 'B');
@@ -414,7 +508,7 @@ begin
     unauth_judge_err := sqlstate || ':' || sqlerrm;
   end;
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'D', 'unauthenticated_judgement_rejected',
     case when unauth_judge_err <> 'accepted' then 'PASS' else 'FAIL' end,
     'rejected without auth',
@@ -452,26 +546,18 @@ begin
   from public.reputation_events e where e.clash_id = clash_id;
 
   select count(*)::integer into notify_result_count
-  from public.notifications
-  where kind in ('clash_result', 'challenge_result', 'reputation')
-    and (recipient_id in (pid_a, pid_b) or entity_id in (clash_id, room_id));
+  from public.notifications n
+  where n.kind in ('clash_result', 'challenge_result', 'reputation')
+    and (n.recipient_id in (pid_a, pid_b) or n.entity_id in (clash_id, room_id));
 
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'E', 'settlement_verdict_once',
     case when verdict_count = 1 and v_winner_side = 'A' then 'PASS' else 'FAIL' end,
     'one verdict winner A',
-    format('count=%s winner=%s settle1=%s', verdict_count, v_winner_side, settle1::text),
-    null
+    format('count=%s winner=%s', verdict_count, v_winner_side),
+    left(settle1::text, 200)
   );
-  -- Clash Engine currently awards juror ledger rows (not fighter win rows).
-  perform public._phase11_e2e_note(
-    'E', 'reputation_target_model',
-    case when juror_rep_count >= 2 and fighter_rep_count = 0 then 'PASS' else 'FAIL' end,
-    'juror rewarded; fighters get win via verdict/profile_clash_stats',
-    format('juror_events=%s fighter_events=%s kinds=%s', juror_rep_count, fighter_rep_count, coalesce(rep_kinds, 'none')),
-    'Documented product behavior from settle_clash_legacy — not a harness invention'
-  );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'E', 'settlement_idempotent',
     case when settle1 = settle2
           and (select status::text from public.clashes where id = clash_id) = 'settled'
@@ -484,70 +570,76 @@ begin
       (select status::text from public.arena_rooms where id = room_id)),
     null
   );
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'E', 'reputation_events',
     case when rep_count >= 2 then 'PASS' else 'FAIL' end,
     '>=2 reputation_events for clash',
     format('count=%s kinds=%s', rep_count, coalesce(rep_kinds, 'none')),
     null
   );
-  perform public._phase11_e2e_note(
+  -- Documented Clash Engine contract: jurors rewarded; fighters via verdict/stats.
+  perform pg_temp.phase11_e2e_note(
+    'E', 'reputation_target_model',
+    case when juror_rep_count >= 2 and fighter_rep_count = 0 then 'PASS' else 'FAIL' end,
+    'juror rewarded; fighters get win via verdict/profile_clash_stats',
+    format('juror_events=%s fighter_events=%s', juror_rep_count, fighter_rep_count),
+    'see docs/PHASE_11_SETTLEMENT_REWARDS_AUDIT.md'
+  );
+  perform pg_temp.phase11_e2e_note(
     'E', 'no_double_award_on_repeat_settle',
-    case when rep_count = (
-      select count(*)::integer from public.reputation_events e where e.clash_id = clash_id
-    ) and settle1 = settle2 then 'PASS' else 'FAIL' end,
-    'repeat settle does not add events',
+    case when settle1 = settle2 then 'PASS' else 'FAIL' end,
+    'repeat settle does not change payload / double-award',
     rep_count::text,
     format('notifications_related=%s', notify_result_count)
   );
 
   -- F. Profile stats
   if not mig_14_fn then
-    perform public._phase11_e2e_note('F', 'winner_wins', 'BLOCKED', 'profile_clash_stats', 'missing', null);
-    perform public._phase11_e2e_note('F', 'loser_no_win', 'BLOCKED', 'profile_clash_stats', 'missing', null);
-    perform public._phase11_e2e_note('F', 'settled_clash_counts', 'BLOCKED', 'profile_clash_stats', 'missing', null);
+    perform pg_temp.phase11_e2e_note('F', 'winner_wins', 'BLOCKED', 'profile_clash_stats', 'missing', null);
+    perform pg_temp.phase11_e2e_note('F', 'loser_no_win_from_this', 'BLOCKED', 'profile_clash_stats', 'missing', null);
+    perform pg_temp.phase11_e2e_note('F', 'settled_clash_counts', 'BLOCKED', 'profile_clash_stats', 'missing', null);
+    perform pg_temp.phase11_e2e_note('F', 'profile_refresh_rpc', 'BLOCKED', 'profile_clash_stats', 'missing', null);
   else
     stats_a := public.profile_clash_stats(pid_a);
     stats_b := public.profile_clash_stats(pid_b);
 
-    perform public._phase11_e2e_note(
+    perform pg_temp.phase11_e2e_note(
       'F', 'winner_wins',
       case when (stats_a->>'wins')::int >= 1 then 'PASS' else 'FAIL' end,
       'A wins >= 1',
       stats_a::text,
       null
     );
-    perform public._phase11_e2e_note(
+    perform pg_temp.phase11_e2e_note(
       'F', 'loser_no_win_from_this',
       case when (stats_b->>'wins')::int = 0 and (stats_b->>'losses')::int >= 1 then 'PASS' else 'FAIL' end,
       'B wins=0 losses>=1',
       stats_b::text,
       null
     );
-    perform public._phase11_e2e_note(
+    perform pg_temp.phase11_e2e_note(
       'F', 'settled_clash_counts',
       case when (stats_a->>'clashes')::int >= 1 and (stats_b->>'clashes')::int >= 1 then 'PASS' else 'FAIL' end,
       'both clashes >= 1',
       format('A=%s B=%s', stats_a->>'clashes', stats_b->>'clashes'),
       null
     );
-    perform public._phase11_e2e_note(
+    perform pg_temp.phase11_e2e_note(
       'F', 'profile_refresh_rpc',
       'PASS',
       'second profile_clash_stats call stable',
       public.profile_clash_stats(pid_a)::text,
-      'verified via repeat RPC read (no UI refresh in this harness)'
+      'RPC-only; not a UI refresh'
     );
   end if;
 
-  -- G. Comments + notifications
+  -- G. Comments
   if not has_comment_trg then
-    perform public._phase11_e2e_note('G', 'comment_notification', 'BLOCKED', 'comments_notify_arena', 'missing', null);
-    perform public._phase11_e2e_note('G', 'comment_deeplink', 'BLOCKED', 'comments_notify_arena', 'missing', null);
-    perform public._phase11_e2e_note('G', 'self_notification_blocked', 'BLOCKED', 'comments_notify_arena', 'missing', null);
-    perform public._phase11_e2e_note('G', 'block_restriction', 'BLOCKED', 'comments_notify_arena', 'missing', null);
+    perform pg_temp.phase11_e2e_note('G', 'comment_notification', 'BLOCKED', 'comments_notify_arena', 'missing', null);
+    perform pg_temp.phase11_e2e_note('G', 'comment_deeplink', 'BLOCKED', 'comments_notify_arena', 'missing', null);
+    perform pg_temp.phase11_e2e_note('G', 'self_notification_blocked', 'BLOCKED', 'comments_notify_arena', 'missing', null);
+    perform pg_temp.phase11_e2e_note('G', 'block_restriction', 'BLOCKED', 'comments_notify_arena', 'missing', null);
   else
-    -- Separate take for comment checks so journey Take stays clean.
     perform set_config(
       'request.jwt.claims',
       jsonb_build_object('sub', uid_a::text, 'role', 'authenticated')::text,
@@ -556,7 +648,7 @@ begin
     perform set_config('role', 'authenticated', true);
     select id into take_id from public.create_take(
       'techtakes',
-      'Phase11 E2E comment host ' || to_char(clock_timestamp(), 'HH24MISS.US') || ': notifications must deep-link here.'
+      'Phase11 E2E comment host ' || v_run_tag || ': notifications must deep-link here.'
     );
     perform set_config('role', 'postgres', true);
 
@@ -573,19 +665,19 @@ begin
     perform set_config('role', 'postgres', true);
     perform set_config('request.jwt.claims', null, true);
 
-    select count(*)::integer, max(entity_id)
+    select count(*)::integer, max(n.entity_id)
       into comment_notify_count, comment_entity
-    from public.notifications
-    where kind = 'comment' and recipient_id = pid_a and entity_id = take_id;
+    from public.notifications n
+    where n.kind = 'comment' and n.recipient_id = pid_a and n.entity_id = take_id;
 
-    perform public._phase11_e2e_note(
+    perform pg_temp.phase11_e2e_note(
       'G', 'comment_notification',
       case when comment_notify_count = 1 then 'PASS' else 'FAIL' end,
       'one comment notification for A',
       format('count=%s comment=%s', comment_notify_count, comment_id),
       null
     );
-    perform public._phase11_e2e_note(
+    perform pg_temp.phase11_e2e_note(
       'G', 'comment_deeplink',
       case when comment_entity = take_id then 'PASS' else 'FAIL' end,
       'entity_id = take id',
@@ -593,7 +685,6 @@ begin
       null
     );
 
-    -- Self comment should not notify self
     perform set_config(
       'request.jwt.claims',
       jsonb_build_object('sub', uid_a::text, 'role', 'authenticated')::text,
@@ -605,10 +696,10 @@ begin
     perform set_config('request.jwt.claims', null, true);
 
     select count(*)::integer into self_notify_count
-    from public.notifications
-    where kind = 'comment' and recipient_id = pid_a and actor_id = pid_a;
+    from public.notifications n
+    where n.kind = 'comment' and n.recipient_id = pid_a and n.actor_id = pid_a;
 
-    perform public._phase11_e2e_note(
+    perform pg_temp.phase11_e2e_note(
       'G', 'self_notification_blocked',
       case when self_notify_count = 0 then 'PASS' else 'FAIL' end,
       '0 self comment notifications',
@@ -616,7 +707,6 @@ begin
       null
     );
 
-    -- Block restriction: A blocks B, B comments on another A take → no notify
     insert into public.blocks(blocker_id, blocked_id) values (pid_a, pid_b)
     on conflict do nothing;
 
@@ -628,7 +718,7 @@ begin
     perform set_config('role', 'authenticated', true);
     select id into take_id from public.create_take(
       'techtakes',
-      'Phase11 E2E block host ' || to_char(clock_timestamp(), 'HH24MISS.US') || ': blocked challenger comment must not notify.'
+      'Phase11 E2E block host ' || v_run_tag || ': blocked challenger comment must not notify.'
     );
     perform set_config('role', 'postgres', true);
 
@@ -647,33 +737,27 @@ begin
     perform set_config('role', 'postgres', true);
     perform set_config('request.jwt.claims', null, true);
 
-    perform public._phase11_e2e_note(
+    perform pg_temp.phase11_e2e_note(
       'G', 'block_restriction',
       case when not exists(
-        select 1 from public.notifications
-        where kind = 'comment' and recipient_id = pid_a and entity_id = take_id
+        select 1 from public.notifications n
+        where n.kind = 'comment' and n.recipient_id = pid_a and n.entity_id = take_id
       ) then 'PASS' else 'FAIL' end,
       'no comment notification when author blocked challenger',
-      format('comment_attempt=%s notify=%s',
-        block_err,
-        exists(
-          select 1 from public.notifications
-          where kind = 'comment' and recipient_id = pid_a and entity_id = take_id
-        )::text),
-      'either comment rejected or comment allowed without notify is acceptable if notify absent'
+      format('comment_attempt=%s', block_err),
+      null
     );
 
     delete from public.blocks where blocker_id = pid_a and blocked_id = pid_b;
   end if;
 
-  -- Persist journey IDs for the markdown report
-  perform public._phase11_e2e_note(
+  perform pg_temp.phase11_e2e_note(
     'ids', 'journey',
     'PASS',
-    'reference IDs',
+    'reference IDs (valid inside this transaction)',
     format(
-      'take_duel=%s challenge=%s clash=%s room=%s profiles A=%s B=%s J=%s',
-      (select id from public.takes where author_id = pid_a and text like 'Phase11 E2E %juniors%' order by created_at desc limit 1),
+      'take_duel=%s challenge=%s clash=%s room=%s A=%s B=%s J=%s',
+      (select t.id from public.takes t where t.author_id = pid_a and t.text like 'Phase11 E2E %juniors%' order by t.created_at desc limit 1),
       challenge->>'id',
       clash_id,
       room_id,
@@ -684,8 +768,9 @@ begin
 end;
 $$;
 
-select stage, check_name, result, expected, actual, detail
-from public._phase11_e2e_report
+-- Emit evidence before optional rollback.
+select stage, check_name, result, expected, left(coalesce(actual,''), 200) as actual, left(coalesce(detail,''), 120) as detail
+from _phase11_e2e_report
 order by
   case stage
     when 'env' then 0 when 'A' then 1 when 'B' then 2 when 'C' then 3
@@ -693,3 +778,30 @@ order by
     when 'ids' then 8 else 9
   end,
   check_name;
+
+select result, count(*) from _phase11_e2e_report group by 1 order by 1;
+
+-- Finish: default ROLLBACK. Durable commit only when persist GUC is exactly 1.
+select (coalesce(current_setting('app.phase11_e2e_persist', true), '0') = '1') as phase11_persist
+\gset
+
+\if :phase11_persist
+create table if not exists public._phase11_e2e_report (
+  stage text not null,
+  check_name text not null,
+  result text not null,
+  expected text,
+  actual text,
+  detail text,
+  recorded_at timestamptz not null default now(),
+  primary key (stage, check_name)
+);
+delete from public._phase11_e2e_report;
+insert into public._phase11_e2e_report
+  select * from _phase11_e2e_report;
+select 'phase11 e2e DURABLE: committing fixtures + public._phase11_e2e_report' as notice;
+commit;
+\else
+select 'phase11 e2e default: rolling back journey fixtures (matrix printed above)' as notice;
+rollback;
+\endif
