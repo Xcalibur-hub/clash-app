@@ -1,10 +1,10 @@
-﻿# Phase 11 Step 4C — Critical authorization hardening
+# Phase 11 Step 4C — Critical authorization hardening
 
 ## Scope and status
 
 Based on freshly fetched main `eccd5214e0c6e3ce68f86b9656d972441b53a34a`, in isolated worktree `C:/p11auth`, branch `fix/phase-11-critical-authorization`.
 
-H1/H2 corrections are proposed for review. **Post-migration SQL validation is BLOCKED pending explicit authorization of a disposable test environment or a rolled-back grant-change transaction on the existing local database. The migration has NOT been applied anywhere.** Do not treat the passing baseline tests as proof of the proposed grants. No hosted deployment, reset, data deletion, merge, Android data/permission change, or production UI/native change occurred. Android Step 2F remains **DEFERRED**. Primary checkout Crew changes remain untouched.
+H1/H2 corrections are proposed for review. **The single owner-authorized rollback-only validation is BLOCKED: pgTAP is absent from the current local database. Temporary migration statements executed, but the first no_plan() call failed before any assertions. Session termination aborted the transaction and fresh read-only inspection verified exact baseline restoration. The migration has NOT been applied persistently anywhere.** Do not treat the passing baseline tests as proof of the proposed grants. No hosted deployment, reset, data deletion, merge, Android data/permission change, or production UI/native change occurred. Android Step 2F remains **DEFERRED**. Primary checkout Crew changes remain untouched.
 
 ## Exact changes
 
@@ -59,7 +59,7 @@ H2 consumers reviewed:
 
 Existing subscription checks require an active vault and active/trial subscription with an unexpired period. Creator access and intentional free/preview rules remain the existing contract. Paid non-preview lessons remain locked under the current engine; this patch introduces no purchase entitlement mechanism.
 
-## Test evidence (this checkpoint)
+## Initial implementation validation (preceding commit d2b9f39)
 
 | Check | Actual result |
 | --- | --- |
@@ -68,7 +68,7 @@ Existing subscription checks require an active vault and active/trial subscripti
 | npx expo-doctor | PASS, 18/18 checks, exit 0 |
 | Existing local pgTAP below | PASS, 7 files, 349 assertions, exit 0; unchanged database |
 | New 087 against unchanged grants | **FAIL as expected pre-fix**, exit 1: 39 assertions, 13 failures, 26 passes |
-| New 087 after migration | **NOT RUN — authorization pending** |
+| New 087 after migration | See authorized attempt below: **BLOCKED**, no assertions executed |
 | Arena engagement | Initial failure from hard-coded checkout path; after test-only portability fix PASS 8/8, exit 0 |
 | Casual question client/interaction | PASS 25/25 |
 | Official submission/recovery service | PASS 14/14 |
@@ -89,7 +89,7 @@ Dependency install used the existing lockfile (`npm ci --ignore-scripts`), no ne
 
 ## Deployment and outstanding validation prerequisites
 
-1. Obtain explicit approval for a named disposable test DB, or for a single rolled-back migration-validation transaction on the existing local DB. Local Docker status alone does not establish disposability. No change to existing grants was executed in this checkpoint.
+1. Obtain explicit approval for a named disposable test DB, or for a single rolled-back migration-validation transaction on the existing local DB. Local Docker status alone does not establish disposability. The one authorized attempt temporarily executed the migration statements; all changes were rolled back on session termination. Another validation transaction now requires fresh authorization.
 2. Inspect target ledger, owners, role inheritance, table/column ACLs and all preceding migrations. Current local ledger includes `20261011120000`, `20261009190000`, `20261009180000`, `20261009170000` and unmerged objects; it is ahead of main and cannot certify a clean replay. Do not reset it, replay blindly, mark versions applied or deploy this earlier-numbered migration with include-all without checking target history.
 3. On an authorized disposable target, apply this migration transactionally after its dependencies. On an explicitly authorized existing local target, use one transaction containing the migration statements followed by the 087 fixtures/assertions, then ROLLBACK; remove nested fixture BEGIN and final rollback only in the temporary validation wrapper. Never write a migration ledger row for this experiment. Inspect TAP failures, not only psql's exit status (pgTAP assertion failures need a TAP-aware runner).
 4. Run 087 plus the seven listed SQL files under the proposed grants, inspect effective privileges and verify fixtures/ACLs/ledger return to baseline after rollback. Also exercise direct local PostgREST field projections and helper RPC denial if an authorized HTTP test account is available.
@@ -102,3 +102,69 @@ Dependency install used the existing lockfile (`npm ci --ignore-scripts`), no ne
 - Existing or external consumers using `course_lessons.select('*')` or direct sensitive fields will receive 42501 after deployment and must use the existing card/media API. Repository consumers were checked; third-party consumers were not.
 - Owner and service-role table access remains privileged by design. Notification helper owner access is necessary for trusted functions. Search_path and grants do not prove every unrelated SECURITY DEFINER endpoint safe.
 - No production-readiness or zero-vulnerability claim. H1/H2 remain exposed in any environment where the proposed migration has not been applied and verified.
+
+## Authorized rollback-only local validation
+
+**Final status: BLOCKED.** On 2026-10-11 the owner authorized exactly one validation transaction against the retained local database. That attempt was consumed. No second attempt was made.
+
+### Target and transaction method
+
+- Existing container: `supabase_db_clash`, image `public.ecr.aws/supabase/postgres:17.6.1.155`, database `postgres`; local host mapping `localhost:55322 -> container:5432`.
+- Connection used `docker exec -i` and the local Unix socket inside that exact inspected container. No hosted connection or service-role credential was used. Container environment/credentials were not logged.
+- Migration tested: `20261011053717_critical_authorization_hardening.sql`, unchanged from reviewed commit `d2b9f39`. The committed 087 file was also unchanged.
+- Runner: `node scripts/phase11-authorization-rollback-check.cjs`, in `C:/p11auth` on the existing branch. Node syntax check passed.
+- One non-interactive `psql` session with explicit BEGIN, transaction-local statement/lock timeouts, exact migration SQL, and planned fixture-scoped suites separated by savepoints. Original test BEGIN/ROLLBACK lines were stripped only in the generated ignored wrapper. No COMMIT or migration-ledger INSERT exists.
+- `ON_ERROR_STOP=1` makes SQL errors close the non-interactive connection, causing PostgreSQL to abort the open transaction. A finally block independently opens a fresh read-only session to verify restoration. An exclusive ignored attempt receipt prevents accidental replay of the validation transaction.
+
+### Actual failure and assertion counts
+
+The migration statements, including the inherited-privilege deployment guard, encountered no reported SQL error. The first 087 test setup statement failed:
+
+```text
+ERROR: function no_plan() does not exist
+LINE 1: select no_plan();
+HINT: No function matches the given name and argument types.
+```
+
+Docker/psql exited **3**; wrapper exited **1**. Read-only diagnosis found no installed `pgtap` extension and no `no_plan` or `finish` function in pg_proc. The default search_path already includes public and extensions; this is missing test infrastructure, not a confirmed defect in the production migration. The preceding Supabase CLI test results do not establish that pgTAP exists in this direct session now.
+
+| Check under proposed grants | Actual result |
+| --- | --- |
+| 087 security assertions | **0 executed, 0 passed, 0 assertion failures**; setup SQL error |
+| H1 direct forgery / trusted notification / idempotency assertions | **NOT VERIFIED** in this attempt |
+| H2 column / entitlement / catalogue assertions | **NOT VERIFIED** in this attempt |
+| Additional PUBLIC ACL / RLS / wildcard assertions | NOT RUN |
+| 002_clash_engine.sql | NOT RUN; aborted before suite |
+| 008_clash_draw.sql | NOT RUN; aborted before suite |
+| 039_vault_commerce.sql | NOT RUN; aborted before suite |
+| 041_vault_communities.sql | NOT RUN; aborted before suite |
+| 010_clash_scheduler.sql | Deliberately excluded: database-wide maintenance can touch retained records |
+| 012_vault_access.sql | Deliberately excluded: global expiry/maintenance sweeps can touch retained records |
+| 075_maintenance_failure_recovery.sql | Deliberately excluded: global maintenance and diagnostics-wide updates/pruning can touch pre-existing artifacts |
+
+All attempted temporary grant work used the same single transaction. No assertions completed; there is no post-fix pgTAP pass claim. The earlier 349 baseline assertions remain baseline evidence only.
+
+### Rollback verification
+
+The explicit final ROLLBACK marker was **not reached** because ON_ERROR_STOP closed the session. Automatic transaction abort on disconnect was independently verified through exact baseline comparison, rather than assumed from process exit.
+
+Fresh read-only snapshot comparison returned `equal: true`, `changedSections: []`:
+
+- All **156 tables** in public, auth, storage and supabase_migrations: counts and ordered row-content fingerprints identical.
+- Migration ledger versions and full-row fingerprints identical; no migration version recorded.
+- Relation owners, table ACLs, RLS enable/force flags and column ACLs identical.
+- Function inventory, owners, EXECUTE ACLs, SECURITY DEFINER/config attributes and body fingerprints identical.
+- Policy definitions and role memberships identical.
+- Effective clash_notify EXECUTE and lesson table/body/media SELECT for anon, authenticated and service_role identical to baseline.
+- No fixture users, forged notifications, persistent test tables/functions or other fixture data persisted. 087 stopped before fixture inserts; complete table fingerprints also exclude changes to unrelated application records.
+- Existing local diagnostic artifacts, including `_phase11_e2e_report`, were not cleaned or reconciled; they are covered by the unchanged public-table snapshot.
+
+Baseline client exposures are therefore restored: PUBLIC/anon/authenticated/service_role still have the original helper EXECUTE, and anon/authenticated retain the original sensitive lesson reads. This is the required rollback outcome, not a production security fix deployment.
+
+### Wrapper correction and next prerequisite
+
+After this failed attempt, only the wrapper and documentation were changed. The wrapper now checks pgTAP/no_plan availability **read-only before starting a validation transaction**, and preserves partial stdout if psql fails. It was syntax-checked only; **it was not executed again**. Production migration logic and 087 remain unchanged.
+
+A fresh explicit authorization is required before another validation transaction. That scope should address pgTAP setup inside the same rollback-only transaction if the extension is available and its installation can be safely rolled back, or name an already prepared authorized test target. Do not install it persistently, rerun the transaction, reset Supabase or deploy under this consumed authorization.
+
+No new unit/typecheck/Expo/Android runs were made for this SQL-only attempt. Android Step 2F remains DEFERRED. H3/M1 and hosted/PostgREST/media verification remain outstanding. Release remains blocked on a successful post-fix authorization regression run; the migration remains undeployed.
