@@ -32,7 +32,11 @@ export function ProfileIdentity({
 }: ProfileIdentityProps): React.JSX.Element {
   const stats: readonly Stat[] = [
     { key: 'takes', value: compact(takesCount), label: 'Takes' },
-    { key: 'wins', value: compact(viewer.wins), label: 'Wins' },
+    {
+      key: 'wins',
+      value: viewer.wins === null ? '—' : compact(viewer.wins),
+      label: 'Wins',
+    },
     { key: 'rep', value: compact(viewer.reputation), label: 'Reputation' },
   ];
 
