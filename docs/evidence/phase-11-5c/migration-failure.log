@@ -1,0 +1,139 @@
+Connecting to local database...
+Applying migration 20260926120000_initial_arena_schema.sql...
+NOTICE (00000): trigger "comment_upvotes_count" for relation "public.comment_upvotes" does not exist, skipping
+NOTICE (00000): trigger "profiles_touch" for relation "public.profiles" does not exist, skipping
+NOTICE (00000): policy "profiles are readable by everyone" for relation "public.profiles" does not exist, skipping
+NOTICE (00000): policy "a profile is created by its owner" for relation "public.profiles" does not exist, skipping
+NOTICE (00000): policy "a profile is edited by its owner" for relation "public.profiles" does not exist, skipping
+NOTICE (00000): policy "takes are readable by everyone" for relation "public.takes" does not exist, skipping
+NOTICE (00000): policy "takes are dropped by their author" for relation "public.takes" does not exist, skipping
+NOTICE (00000): policy "takes are edited by their author or a hood moderator" for relation "public.takes" does not exist, skipping
+NOTICE (00000): policy "takes are removed by a hood moderator" for relation "public.takes" does not exist, skipping
+NOTICE (00000): policy "rebuttals are readable unless removed" for relation "public.comments" does not exist, skipping
+NOTICE (00000): policy "rebuttals are posted on a live take" for relation "public.comments" does not exist, skipping
+NOTICE (00000): policy "rebuttals are edited by their author or a hood moderator" for relation "public.comments" does not exist, skipping
+NOTICE (00000): policy "rebuttals are deleted by their author or a hood moderator" for relation "public.comments" does not exist, skipping
+NOTICE (00000): policy "a vote is visible to its owner" for relation "public.comment_upvotes" does not exist, skipping
+NOTICE (00000): policy "a vote is cast by its owner" for relation "public.comment_upvotes" does not exist, skipping
+NOTICE (00000): policy "a vote is withdrawn by its owner" for relation "public.comment_upvotes" does not exist, skipping
+Applying migration 20260926130000_auth_profile_trigger.sql...
+NOTICE (00000): trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+Applying migration 20260926140000_social_foundation.sql...
+NOTICE (00000): trigger "follows_notify" for relation "public.follows" does not exist, skipping
+NOTICE (00000): policy "follows are readable by everyone" for relation "public.follows" does not exist, skipping
+NOTICE (00000): policy "a block is visible to its parties" for relation "public.blocks" does not exist, skipping
+NOTICE (00000): policy "a mute is private to its owner" for relation "public.mutes" does not exist, skipping
+NOTICE (00000): policy "a report is visible to its reporter or staff" for relation "public.reports" does not exist, skipping
+NOTICE (00000): policy "moderation actions are visible to staff" for relation "public.moderation_actions" does not exist, skipping
+NOTICE (00000): policy "a notification is visible to its recipient" for relation "public.notifications" does not exist, skipping
+NOTICE (00000): policy "a notification is read by its recipient" for relation "public.notifications" does not exist, skipping
+Applying migration 20260926150000_media_storage.sql...
+NOTICE (00000): policy "public media objects are readable" for relation "public.media_objects" does not exist, skipping
+NOTICE (00000): policy "own media objects are readable" for relation "public.media_objects" does not exist, skipping
+NOTICE (00000): policy "media objects are publicly readable" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "own media objects are readable" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "media upload into own namespace" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "own media objects are updatable" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "own media objects are deletable" for relation "storage.objects" does not exist, skipping
+Applying migration 20260926160000_clash_engine.sql...
+NOTICE (00000): policy "clashes are readable by everyone" for relation "public.clashes" does not exist, skipping
+NOTICE (00000): policy "a ballot is visible to its juror" for relation "public.judgements" does not exist, skipping
+NOTICE (00000): policy "verdicts are readable by everyone" for relation "public.verdicts" does not exist, skipping
+NOTICE (00000): policy "reputation events are readable by everyone" for relation "public.reputation_events" does not exist, skipping
+Applying migration 20260926170000_production_hardening.sql...
+NOTICE (00000): trigger "trg_take_create_limits" for relation "public.takes" does not exist, skipping
+NOTICE (00000): trigger "trg_comment_create_limits" for relation "public.comments" does not exist, skipping
+NOTICE (00000): trigger "trg_media_upload_rate_limit" for relation "public.media_objects" does not exist, skipping
+NOTICE (00000): trigger "trg_clash_start_rate_limit" for relation "public.clashes" does not exist, skipping
+NOTICE (00000): trigger "trg_judgement_rate_limit" for relation "public.judgements" does not exist, skipping
+NOTICE (00000): trigger "trg_follow_rate_limit" for relation "public.follows" does not exist, skipping
+NOTICE (00000): trigger "trg_block_rate_limit" for relation "public.blocks" does not exist, skipping
+NOTICE (00000): trigger "trg_mute_rate_limit" for relation "public.mutes" does not exist, skipping
+NOTICE (00000): trigger "trg_report_rate_limit" for relation "public.reports" does not exist, skipping
+Applying migration 20260926180000_take_reactions.sql...
+NOTICE (00000): trigger "trg_sync_take_reactions" for relation "public.take_reactions" does not exist, skipping
+NOTICE (00000): trigger "trg_take_reaction_rate_limit" for relation "public.take_reactions" does not exist, skipping
+NOTICE (00000): policy "a reaction is visible to its owner" for relation "public.take_reactions" does not exist, skipping
+Applying migration 20260926190000_hoods_and_threads.sql...
+NOTICE (00000): trigger "trg_comment_relationships" for relation "public.comments" does not exist, skipping
+NOTICE (00000): trigger "trg_hood_join_rate_limit" for relation "public.hood_memberships" does not exist, skipping
+NOTICE (00000): policy "hood membership is readable by everyone" for relation "public.hood_memberships" does not exist, skipping
+Applying migration 20260926200000_take_creation_rpc.sql...
+Applying migration 20260927000000_feed_visibility.sql...
+Applying migration 20260927010000_clash_draw.sql...
+Applying migration 20260927020000_take_insert_lockdown.sql...
+Applying migration 20260927030000_clash_scheduler.sql...
+Applying migration 20260928000000_vault_foundation.sql...
+NOTICE (00000): trigger "vault_drops_media_rules" for relation "public.vault_drops" does not exist, skipping
+NOTICE (00000): policy "an active vault is public, its creator sees all" for relation "public.creator_vaults" does not exist, skipping
+NOTICE (00000): policy "a vault drop is visible by access rules" for relation "public.vault_drops" does not exist, skipping
+NOTICE (00000): policy "a collection is visible with its vault" for relation "public.vault_collections" does not exist, skipping
+NOTICE (00000): policy "a collection item is visible with its drop" for relation "public.vault_collection_items" does not exist, skipping
+NOTICE (00000): policy "a subscription is visible to its subscriber or staff" for relation "public.vault_subscriptions" does not exist, skipping
+Applying migration 20260928010000_vault_rpcs.sql...
+Applying migration 20260928020000_vault_entitlement.sql...
+Applying migration 20260928030000_vault_notifications.sql...
+NOTICE (00000): trigger "vault_drops_notify_subscribers" for relation "public.vault_drops" does not exist, skipping
+NOTICE (00000): trigger "vault_subscriptions_notify_creator" for relation "public.vault_subscriptions" does not exist, skipping
+Applying migration 20260928040000_vault_maintenance.sql...
+Applying migration 20260928050000_vault_storefront.sql...
+Applying migration 20260928100000_mindshift.sql...
+NOTICE (00000): policy "a stance is visible to its owner" for relation "public.take_stances" does not exist, skipping
+Applying migration 20260928110000_blind_clash.sql...
+Applying migration 20260928120000_hood_prediction.sql...
+NOTICE (00000): policy "hood games are readable" for relation "public.hood_games" does not exist, skipping
+NOTICE (00000): policy "hood game options are readable" for relation "public.hood_game_options" does not exist, skipping
+NOTICE (00000): policy "a prediction entry is visible to its owner" for relation "public.hood_game_entries" does not exist, skipping
+Applying migration 20260928130000_world_missions.sql...
+NOTICE (00000): policy "world missions readable when not draft" for relation "public.world_missions" does not exist, skipping
+NOTICE (00000): policy "published world drops are readable" for relation "public.world_drops" does not exist, skipping
+Applying migration 20260928140000_world_drop_view.sql...
+Applying migration 20260930100000_sponsor_attribution.sql...
+NOTICE (00000): policy "advertiser owner can read advertiser" for relation "public.advertisers" does not exist, skipping
+NOTICE (00000): policy "advertiser owner or assigned creator can read campaign" for relation "public.sponsor_campaigns" does not exist, skipping
+NOTICE (00000): policy "campaign creator assignment visible to parties" for relation "public.campaign_creators" does not exist, skipping
+NOTICE (00000): policy "referral links visible to parties" for relation "public.referral_links" does not exist, skipping
+NOTICE (00000): policy "coupon codes visible to parties" for relation "public.coupon_codes" does not exist, skipping
+NOTICE (00000): policy "creator reads own commission ledger" for relation "public.creator_commission_ledger" does not exist, skipping
+Applying migration 20260930110000_sponsor_attribution_hardening.sql...
+NOTICE (42710): extension "pgcrypto" already exists, skipping
+NOTICE (00000): trigger "sponsor_coupon_canonicalize_trg" for relation "public.coupon_codes" does not exist, skipping
+Applying migration 20260930120000_sponsor_studio_rpcs.sql...
+Applying migration 20260930130000_creator_earnings.sql...
+Applying migration 20260930140000_comment_media.sql...
+NOTICE (00000): constraint "comments_has_content" of relation "comments" does not exist, skipping
+NOTICE (00000): constraint "comments_media_complete" of relation "comments" does not exist, skipping
+NOTICE (00000): trigger "trg_comment_media" for relation "public.comments" does not exist, skipping
+Applying migration 20261002140000_comment_gifs_enum.sql...
+Applying migration 20261002140100_comment_gifs.sql...
+NOTICE (00000): constraint "comments_gif_provider_check" of relation "comments" does not exist, skipping
+Applying migration 20261002150000_live_arena_enums.sql...
+Applying migration 20261002150100_live_arena_schema.sql...
+NOTICE (00000): policy "live arena topics are readable" for relation "public.arena_daily_topics" does not exist, skipping
+NOTICE (00000): policy "arena topics are publicly readable" for relation "public.arena_daily_topics" does not exist, skipping
+NOTICE (00000): policy "arena topics are readable when live or by staff" for relation "public.arena_daily_topics" does not exist, skipping
+NOTICE (00000): policy "arena rooms follow their topic" for relation "public.arena_rooms" does not exist, skipping
+NOTICE (00000): policy "arena rooms follow their topic or staff" for relation "public.arena_rooms" does not exist, skipping
+NOTICE (00000): policy "an arena membership is visible to its owner" for relation "public.arena_room_participants" does not exist, skipping
+NOTICE (00000): policy "arena messages are visible to room members" for relation "public.arena_room_messages" does not exist, skipping
+NOTICE (00000): policy "arena evidence is visible to room members" for relation "public.arena_room_evidence" does not exist, skipping
+NOTICE (00000): policy "arena reactions are visible to room members" for relation "public.arena_room_message_reactions" does not exist, skipping
+NOTICE (00000): policy "arena evidence marks are visible to room members" for relation "public.arena_room_evidence_marks" does not exist, skipping
+NOTICE (00000): policy "an arena side vote is visible to its owner" for relation "public.arena_room_side_votes" does not exist, skipping
+NOTICE (00000): policy "an arena argument vote is visible to its owner" for relation "public.arena_room_argument_votes" does not exist, skipping
+NOTICE (00000): policy "settled arena results are readable" for relation "public.arena_room_results" does not exist, skipping
+NOTICE (00000): policy "arena results are readable to members and staff" for relation "public.arena_room_results" does not exist, skipping
+Applying migration 20261002160000_live_arena_spectator.sql...
+NOTICE (00000): constraint "arena_room_participants_stance_role" of relation "arena_room_participants" does not exist, skipping
+Applying migration 20261002170000_arena_spectator_upgrade.sql...
+Applying migration 20261002180000_arena_feel_alive.sql...
+Applying migration 20261003120000_list_arena_topic_rooms.sql...
+Applying migration 20261003140000_watch_arena_room.sql...
+Applying migration 20261003150000_list_arena_room_presence.sql...
+Applying migration 20261003160000_room_pulse_and_scale.sql...
+Applying migration 20261003180000_explore_global.sql...
+ERROR: syntax error at or near "﻿" (SQLSTATE 42601)
+At statement: 0
+﻿-- Phase 14.0 â€” Explore global discovery.
+^
+Try rerunning the command with --debug to troubleshoot the error.
