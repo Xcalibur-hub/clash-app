@@ -168,3 +168,89 @@ After this failed attempt, only the wrapper and documentation were changed. The 
 A fresh explicit authorization is required before another validation transaction. That scope should address pgTAP setup inside the same rollback-only transaction if the extension is available and its installation can be safely rolled back, or name an already prepared authorized test target. Do not install it persistently, rerun the transaction, reset Supabase or deploy under this consumed authorization.
 
 No new unit/typecheck/Expo/Android runs were made for this SQL-only attempt. Android Step 2F remains DEFERRED. H3/M1 and hosted/PostgREST/media verification remain outstanding. Release remains blocked on a successful post-fix authorization regression run; the migration remains undeployed.
+
+## pgTAP infrastructure root-cause investigation
+
+### Read-only scope and findings
+
+Investigation on 2026-10-11, branch `fix/phase-11-critical-authorization`, worktree `C:/p11auth`. Only read-only SQL catalog queries, Docker inspection/file reads, CLI version inspection and official tagged-source reads were performed. **No CLI test command, rollback wrapper, extension initialization, H1/H2 migration, validation transaction, restart, reset or deployment was executed.** The previous single-attempt authorization remains consumed. Only this documentation is changed.
+
+Confirmed local state:
+
+| Inspection | Result |
+| --- | --- |
+| Container / image | `supabase_db_clash` / `public.ecr.aws/supabase/postgres:17.6.1.155` |
+| PostgreSQL server | 17.6, Linux x86_64 |
+| Database / direct user | `postgres` / `postgres`, Unix socket inside that container |
+| Host mapping / Docker identity | `localhost:55322 -> 5432`; network `supabase_network_clash`, aliases `db`, `db.supabase.internal` |
+| Current schemas searched | pg_catalog, public, extensions; configured search_path includes public and extensions |
+| pg_extension pgtap row | **Absent** |
+| pg_available_extensions | pgtap default version **1.3.3**, installed_version NULL |
+| pg_available_extension_versions | 1.3.1, 1.3.2, 1.3.3; all uninstalled, superuser=false, trusted=false, relocatable=true, dependency plpgsql |
+| pg_proc / pg_namespace | No no_plan, plan, finish, ok, throws_ok, is_empty or cmp_ok functions; no function name containing pgtap |
+| Package files | `/nix/var/nix/profiles/default/share/postgresql/extension/pgtap.control` and `pgtap--1.3.3.sql` exist |
+| Connected databases listed | _supabase, postgres, storage_vectors, template1; no observed separate test database |
+| Project config | project_id=clash, db.port=55322, db.shadow_port=55320, pooler disabled |
+| Ledger, read-only | Latest remains 20261011120000, followed by 20261009190000, 20261009180000, 20261009170000, 20261009140000; no reconciliation performed |
+
+Two CLI installations were identified. The cached npm package and Windows binary used by the preceding npx commands are **2.120.0**. The Scoop/PATH executable is **2.40.7**. Version commands only were executed; neither installation's test command was run. The cache and preceding command output identify the likely npx version; no retained packet trace or process-level connection log independently reconstructs each historical invocation.
+
+### CLI versus direct-session differences
+
+**Root cause: the CLI automatically installs pgTAP for its run and removes it when finished if it was absent beforehand. The standalone psql wrapper assumed those functions already existed.** Current extension absence is consistent with that cleanup; missing search_path entries are not the cause.
+
+Evidence from the exact [v2.120.0 test-db handler](https://github.com/supabase/cli/blob/v2.120.0/apps/cli/src/command-internal/test-db.handler.ts): constants at lines 36–37 define extension enable/disable SQL; lines 252–270 check prior installation, enable it, and register cleanup only for a newly installed extension. The [integration tests](https://github.com/supabase/cli/blob/v2.120.0/apps/cli/src/command-internal/test-db.integration.test.ts) explicitly cover removal after a test run and preservation of a pre-existing extension. These source tests were inspected, not executed here.
+
+The [local resolver](https://github.com/supabase/cli/blob/v2.120.0/apps/cli/src/command-internal/db-config.layer.ts#L610) selects database postgres and the configured db.port for Compose local execution. The handler routes the separate pg_prove client container to the existing database through Docker's db:5432 alias. Its [side-effect contract](https://github.com/supabase/cli/blob/v2.120.0/apps/cli/src/commands/test/db/SIDE_EFFECTS.md) describes extension creation/removal and client-container execution. The handler and connection implementation do not issue a test-specific search_path adjustment.
+
+| Path | Database server | Initialization / runner |
+| --- | --- | --- |
+| CLI setup connection, configured Compose local | Same local postgres DB via host port 55322 | Enables pgTAP in extensions, outside fixture transactions |
+| CLI pg_prove client | Same DB via db:5432 on supabase_network_clash | One-shot client container, not a second PostgreSQL server |
+| Direct failed wrapper | Same DB via container Unix socket | No pgTAP initialization; first no_plan fails |
+| Shadow port 55320 | Configured for db diff | Not selected by the inspected test-db path |
+
+There is no evidence that the earlier command used a different database, temporary test database, shadow database or another PostgreSQL container. That conclusion follows from the inspected implementation, project config and current Docker routing; historical network traffic was not captured. The pg_prove container is a test client, not a disposable copy of application data.
+
+**Correction to earlier safety characterization:** CLI fixtures roll back, but the CLI command itself is not database-read-only. Its extension setup and cleanup are separate SQL operations, not enclosed by those fixture transactions. It must not be invoked under the current read-only scope or used to observe the next transaction's uncommitted H1/H2 grants. Earlier baseline passes remain valid baseline test results, not proof of persistent pgTAP installation or post-fix correctness.
+
+### Safe options and recommendation
+
+- **A — already prepared isolated database:** strongest separation from retained records, if an explicitly authorized target with equivalent schema/roles is supplied. None was identified in this investigation. Do not create, reset or populate one under this scope; schema/role drift could invalidate authorization results.
+- **B — transaction-local pgTAP initialization: recommended for a future attempt on this exact target.** The available SQL package creates ordinary functions, types and views with grants. plpgsql is already installed; postgres has CREATE on the database and extensions schema. The control file does not require superuser. No new binaries, package download or persistent extension installation is needed. PostgreSQL transaction semantics support rolling back this SQL installation together with migration grants and fixtures; actual execution and restoration still require verification, not a pass assumption.
+- **C — native SQL assertions without pgTAP:** possible with caller-role SQL/error checks and an explicit assertion collector, all in one rollback-only session. It would require translating the existing test harness and proving equivalent coverage. That adds avoidable test changes; it is not preferred when the bundled pgTAP package is available.
+
+B prerequisites/risks: recheck the target and package, extension absence, namespace safety, privileges and fixture conflicts before starting. anon/authenticated currently lack CREATE in public/extensions; dashboard_user has CREATE in extensions, so avoid concurrent privileged schema edits. Review package initialization and event triggers again if versions change. Existing cron/GraphQL/net grant triggers branch on their own extension names; PostgREST DDL triggers use transactional NOTIFY. [PostgreSQL NOTIFY documentation](https://www.postgresql.org/docs/17/sql-notify.html) confirms aborted transactions do not deliver those notifications. No extension installation or rollback behavior was experimentally tested in this investigation.
+
+The next wrapper must snapshot **extensions as well as the existing application schemas**, including pg_extension, extension-member dependencies, functions, types/views, ACLs and policies. Extend the single-session wrapper's preflight to allow explicitly approved transaction-local setup; the current wrapper intentionally rejects absent pgTAP. Use a new authorization-specific attempt receipt, preserving the previous evidence. Keep no COMMIT path, ON_ERROR_STOP/disconnect rollback, bounded timeouts, TAP-aware assertion/plan checks, and a fresh read-only post-rollback comparison. Uncommitted pgTAP and temporary grants are visible only in that session. Skip global maintenance/expiry suites unless their fixture isolation is separately established. Concurrent background writes can make data fingerprints differ and must be reported, not repaired. Internal XID/OID allocation and operational logs are not reversible application records; no promise is made to restore such server bookkeeping.
+
+### Proposed future commands — NOT EXECUTED
+
+After explicit fresh authorization and wrapper review, use one assembled script with this structure:
+
+```sql
+\set ON_ERROR_STOP on
+BEGIN;
+SET LOCAL statement_timeout = '45s';
+SET LOCAL lock_timeout = '5s';
+CREATE EXTENSION pgtap WITH SCHEMA extensions VERSION '1.3.3';
+SET LOCAL search_path = public, extensions;
+-- Exact reviewed H1/H2 migration SQL, with no ledger write.
+-- 087 and compatible fixture-scoped suites in this SAME session.
+-- Strip only outer test BEGIN/ROLLBACK and isolate suites with savepoints.
+-- Parse every TAP assertion and plan; do not equate SQL exit 0 with PASS.
+ROLLBACK;
+```
+
+The future non-interactive transport would be:
+
+```powershell
+Get-Content -Raw -LiteralPath '<reviewed authorization-specific wrapper.sql>' |
+  docker exec -i supabase_db_clash psql -X -q -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres
+```
+
+Use the programmatic runner for robust TAP parsing and finally-based read-only restoration checks. The shell example is only the session transport, not a complete verifier. Do not invoke supabase test db for this purpose, do not initialize pgTAP in a separate connection, and do not manually DROP it afterward; rollback must remove its catalog objects along with the temporary grants.
+
+**Exact fresh authorization needed:** permission for ONE additional explicit transaction in the existing local `supabase_db_clash` / postgres database to create bundled pgTAP 1.3.3 in extensions inside that transaction, set transaction-local search_path/timeouts, execute the unchanged reviewed H1/H2 migration and 087 plus approved fixture-scoped regressions in that same session, then ROLLBACK; permission for read-only before/after catalog/data fingerprints and wrapper/documentation updates. No persistent extension/grant/schema/data/ledger change, second attempt, hosted operation, reset, global maintenance sweep or merge is included.
+
+Remaining blockers: that fresh authorization, the reviewed wrapper adjustment and successful same-session H1/H2 tests with verified extension/grant/data restoration. H1/H2 are **not claimed to pass**. Android Step 2F remains DEFERRED; H3/M1 remain outside scope.
