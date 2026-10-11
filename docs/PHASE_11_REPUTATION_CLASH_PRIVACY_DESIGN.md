@@ -131,7 +131,7 @@ Use a separately authorized isolated test environment or explicitly approved rol
 10. Test owner change/FORCE RLS assumptions, helper search paths/EXECUTE grants, policy recursion, service writer paths and arbitrary-viewer oracle attempts. Check every role that can inherit API grants.
 11. Client tests cover own-history account switch, late async responses, unavailable notification destinations, null verdicts and profile history. Run existing reward, Crowd, Stage and settlement suites in the later implementation checkpoint.
 
-Use descriptive uniquely numbered pgTAP filenames only after checking all pending branches. Step 4A's proposed `084_safety_settings.sql` collides with PR #13's `084_comment_reply_notifications.sql`; `086_safety_settings.sql` was recommended if available. Step 4C proposes `087_critical_authorization.sql`. Reserve later privacy test numbers only after a fresh union inventory; no test files are created here.
+Use descriptive uniquely numbered pgTAP filenames after checking all pending branches. Safety Settings and PR #13 originally collided at sequence 084; the Step 5B integration candidate assigns `086_safety_settings.sql`, retaining `084_comment_reply_notifications.sql`. Step 4C uses `087_critical_authorization.sql`, H3 uses 088 and M1 uses 089. These are prepared files, not newly executed SQL validation.
 
 ## Pending PR integration risks
 

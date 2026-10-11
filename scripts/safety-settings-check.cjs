@@ -9,7 +9,8 @@ let cells = [], index = 0, focus, cleanup, foreground, alert, reloads = 0, route
 const hooks = { ...React,
   useState(value) { const i = index++; if (!(i in cells)) cells[i] = value; return [cells[i], value => { cells[i] = typeof value === 'function' ? value(cells[i]) : value; }]; },
   useRef(value) { const i = index++; if (!(i in cells)) cells[i] = { current: value }; return cells[i]; },
-  useCallback(fn) { return fn; },
+  useCallback(fn, deps) { const i = index++, old = cells[i]; if (!old || deps.some((d,j) => d !== old.deps[j])) cells[i] = { fn, deps }; return cells[i].fn; },
+  useEffect() {},
 };
 const flush = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
@@ -77,21 +78,25 @@ Module._load = function(request, parent) {
   }
   return original.apply(this, arguments);
 };
+let profileFocus = [];
 let profileRead = async () => ({ id: 'target', name: 'Target', handle: 'target' });
 const safetyLoader = Module._load;
 Module._load = function(request, parent) {
   const file = parent.filename.replaceAll('\\', '/');
+  if (file.endsWith('/hooks/useOperationScope.ts') && request === 'react') return hooks;
   if (file.endsWith('/ProfileScreen.tsx')) {
     if (request === 'react') return { ...hooks, useEffect() {} };
     if (request === 'react-native') return { View: 'View', Text: 'Text', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'Spinner', RefreshControl: 'RefreshControl', StyleSheet: { create: styles => styles } };
-    if (request === 'expo-router') return { useFocusEffect(fn) { focus = fn; }, useRouter: () => ({ push() {}, replace() {} }) };
+    if (request === 'expo-router') return { useFocusEffect(fn) { profileFocus.push(fn); focus = () => { const stops = profileFocus.map(setup => setup()); return () => stops.forEach(stop => stop?.()); }; }, useRouter: () => ({ push() {}, replace() {} }) };
     if (request === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
-    if (request.endsWith('/AuthProvider')) return { useAuth: () => ({ signedIn: !!uid }) };
+    if (request.endsWith('/AuthProvider')) return { useAuth: () => ({ signedIn: !!uid, user: uid ? { id: uid } : null }) };
     if (request.endsWith('/store')) return { useClash: () => ({ state: { viewer: { id: 'profile-' + uid } }, dispatch() {} }), showNotice: value => value };
     if (request.endsWith('/profileService')) return { fetchProfileById: () => profileRead(), fetchProfileClashes: async () => [], fetchProfileReplies: async () => [], fetchProfileTakes: async () => [] };
     if (request.endsWith('/socialService')) return { fetchFollowState: async () => ({ following: false, followerCount: 0, followingCount: 0 }) };
     if (request.endsWith('/safetyService')) return { fetchViewerSafetyState: async () => ({ blockedProfileIds: records.blocks.filter(row => row.blocker_id === 'profile-' + uid).map(row => row.blocked_id) }) };
     if (request.endsWith('/vaultService')) return { fetchVault: async () => null };
+    if (request.endsWith('/arenaGameService')) return { fetchMyArenaReputation: async () => null };
+    if (request.endsWith('/utils/profileStatsLifecycle') || request.endsWith('/hooks/useOperationScope')) return original.apply(this, arguments);
     if (request.endsWith('/apiService')) return { fetchProfilesByIds: async () => [] };
     if (request.endsWith('/supabaseClient')) return { errorText: error => error.message };
     if (request.endsWith('/analytics')) return { analytics: { trackOnce() {} } };
@@ -184,7 +189,7 @@ const button = (tree, label) => nodes(tree).find(node => node.props?.accessibili
   pass('screen keys relationship subtree by authenticated account for immediate isolation');
   reset(); switchAccount('a'); await api.blockProfile('target');
   const { ProfileScreen } = require('../components/profile/ProfileScreen.tsx');
-  const renderProfile = () => { index = 0; return ProfileScreen({ profileId: 'target' }); };
+  const renderProfile = () => { index = 0; profileFocus = []; return ProfileScreen({ profileId: 'target' }); };
   tree = renderProfile(); activate(); await flush(); tree = renderProfile();
   assert.ok(nodes(tree).some(row => row.props?.title === 'You blocked this user'));
   const oldProfile = deferred(); profileRead = () => oldProfile.promise;

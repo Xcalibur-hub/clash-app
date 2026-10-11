@@ -29,6 +29,8 @@ create function pg_temp.t() returns text language sql as $$select id from m1_top
 -- Invoker helper: assertions execute as the current real API role, never owner.
 create function pg_temp.hidden(c text,t text,reason text) returns setof text language plpgsql as $$begin
  return next ok(not public.clash_readable(c),reason||': caller predicate denies');
+ return next is((public.profile_clash_stats('m1-a')->>'clashes')::int,
+   (select count(*)::int from public.clashes x join public.verdicts v on v.clash_id=x.id join public.takes t on t.id=x.take_id where t.author_id='m1-a' and x.status='settled' and public.clash_readable(x.id)),reason||': aggregate cannot leak hidden settled outcome');
  return next is((select count(*)::int from public.clashes where id=c),0,reason||': direct known-ID Clash denied');
  return next is((select count(*)::int from public.verdicts where clash_id=c),0,reason||': direct verdict denied');
  return next is((select count(*)::int from public.clashes x join public.verdicts v on v.clash_id=x.id where x.id=c),0,reason||': direct join denied');
@@ -154,8 +156,25 @@ set local role authenticated;
 select ok(public.clash_readable(pg_temp.c()),'readable settled canonical history before membership');
 select lives_ok('select public.watch_arena_room(pg_temp.r())','new spectator can enter readable settled Room');
 select is((select winner_side::text from public.verdicts where clash_id=pg_temp.c()),'DRAW','canonical settled direct result preserved');
+select is((public.profile_clash_stats('m1-a')->>'draws')::int,2,'readable legacy plus canonical DRAW aggregates preserved');
 select is(public.get_arena_crowd(pg_temp.r())->>'canSend','false','settled Crowd remains read only');
 reset role;
+-- Integration regression: visible source, hidden canonical Room, settled outcome.
+-- Only rolled-back fixtures change; this detects the missing PR 14 Room gate.
+create temporary table m1_saved_topic_status as select status from public.arena_daily_topics where id=pg_temp.t();
+update public.arena_daily_topics set status='scheduled' where id=pg_temp.t();
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000f893","role":"authenticated"}',true);
+set local role authenticated;
+select ok(public.arena_take_readable('m1-canonical-take'),'source itself remains readable for aggregate regression');
+select ok(not public.arena_room_readable(pg_temp.r()),'nonmember cannot read the scheduled fixture Room');
+select is((public.profile_clash_stats('m1-a')->>'draws')::int,1,'stats exclude hidden canonical verdict but preserve readable legacy DRAW');
+reset role;
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000f891","role":"authenticated"}',true);
+set local role authenticated;
+select is((public.profile_clash_stats('m1-a')->>'draws')::int,2,'existing fighter retains both readable settled DRAW aggregates');
+reset role;
+update public.arena_daily_topics set status=(select status from m1_saved_topic_status) where id=pg_temp.t();
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000f894","role":"authenticated"}',true);
 update public.takes set status='removed' where id='m1-canonical-take';
 set local role authenticated;
 select * from pg_temp.hidden(pg_temp.c(),'m1-canonical-take','removed settled canonical existing spectator');

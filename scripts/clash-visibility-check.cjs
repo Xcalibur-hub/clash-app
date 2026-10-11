@@ -43,7 +43,7 @@ Module._load = function(request, parent) {
   if (controlled) {
     if (request === 'react') return hooks;
     if (request === 'react-native') return native;
-    if (request === 'expo-router') return { useLocalSearchParams: () => ({ takeId: routeId }), useRouter: () => ({ push: path => navigation.push(path), replace: path => navigation.push(path), canGoBack: () => false, back: noop }), useFocusEffect: fn => { focus = fn; }, Redirect: 'Redirect' };
+    if (request === 'expo-router') return { useLocalSearchParams: () => ({ takeId: routeId }), useRouter: () => ({ push: path => navigation.push(path), replace: path => navigation.push(path), canGoBack: () => false, back: noop }), useFocusEffect: fn => { focusCallbacks.push(fn); }, Redirect: 'Redirect' };
     if (request === 'expo-linear-gradient') return { LinearGradient: 'Gradient' };
     if (request === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
     if (request.endsWith('/store/AuthProvider')) return { useAuth: auth };
@@ -55,6 +55,7 @@ Module._load = function(request, parent) {
     if (request.endsWith('/services/socialService')) return { fetchFollowState: async () => ({ following: false, followerCount: 0, followingCount: 0 }) };
     if (request.endsWith('/services/safetyService')) return { fetchViewerSafetyState: async () => ({ blockedProfileIds: [] }) };
     if (request.endsWith('/services/vaultService')) return { fetchVault: async () => null };
+    if (request.endsWith('/services/arenaGameService')) return { fetchMyArenaReputation: async () => null };
     if (request.endsWith('/services/notificationService')) return { fetchNotifications: () => notificationResult, markNotificationRead: async () => {}, markAllNotificationsRead: async () => {} };
     if (request.endsWith('/services/supabaseClient')) return { errorText: e => e.message, SupabaseError: ServiceError };
     if (request.endsWith('/services/analytics')) return { analytics: { track: noop, trackOnce: noop } };
@@ -97,8 +98,8 @@ test('profile history does not infer a verdict from settled status alone', async
   assert.equal((await profileService.fetchProfileClashes('profile'))[0].verdict, null);
 });
 
-let Component, props;
-function render() { index = 0; const tree = Component(props); const pending = effects; effects = []; pending.forEach(fn => fn()); return tree; }
+let Component, props, focusCallbacks = [];
+function render() { index = 0; focusCallbacks = []; const tree = Component(props); const callbacks = focusCallbacks; focus = () => { const cleanups = callbacks.map(fn => fn()); return () => cleanups.forEach(fn => fn?.()); }; const pending = effects; effects = []; pending.forEach(fn => fn()); return tree; }
 function find(node, type) {
   if (!node || typeof node !== 'object') return null;
   if (node.type === type || node.type?.name === type) return node;
@@ -131,7 +132,7 @@ test('account change masks cached Clash and rejects prior-account response', asy
   const old = defer(); screenView = old.promise; enter(); await flush(); account = 'b'; assert.equal(find(render(), 'ClashMatchup'), null); old.resolve(view); await flush(); assert.equal(find(render(), 'ClashMatchup'), null); cleanup();
 });
 const history = [{ clash: { id: 'cl', takeId: 'take' }, opponentId: null, verdict: null }];
-async function openHistory() { historyResult = Promise.resolve(history); start('profile'); await flush(); find(render(), 'SegmentedTabs').props.onChange('clashes'); render(); const cleanup = enter(); await flush(); return cleanup; }
+async function openHistory() { historyResult = Promise.resolve(history); start('profile'); enter(); await flush(); find(render(), 'SegmentedTabs').props.onChange('clashes'); render(); const cleanup = enter(); await flush(); return cleanup; }
 test('profile refocus revalidates previously cached history and removes denied rows', async () => {
   let cleanup = await openHistory(); assert.equal(find(render(), 'ClashesList').props.clashes.length, 1);
   cleanup(); const denied = defer(); historyResult = denied.promise; cleanup = enter(); assert.equal(find(render(), 'ClashesList')?.props.clashes ?? null, null);

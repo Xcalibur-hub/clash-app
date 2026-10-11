@@ -137,8 +137,8 @@ test('screen preserves legitimate own reward display', async () => {
   const cleanup = startScreen(); await flush(); assert.equal(rewards().reputationDelta, 120); assert.equal(rewards().coinsDelta, 40); cleanup();
 });
 test('screen immediately masks history on switch and on return to old identity', async () => {
-  const cleanup = startScreen(); await flush(); account = 'b'; assert.equal(rewards().reputationDelta, 0);
-  account = 'a'; assert.equal(rewards().reputationDelta, 0); cleanup();
+  const cleanup = startScreen(); await flush(); account = 'b'; assert.equal(find(render(), 'VerdictReveal'), null); assert.equal(rewards()?.reputationDelta ?? 0, 0);
+  account = 'a'; assert.equal(find(render(), 'VerdictReveal'), null); assert.equal(rewards()?.reputationDelta ?? 0, 0); cleanup();
 });
 for (const scenario of ['logout', 'switch', 'blur', 'take-change']) test(`screen rejects late reward response after ${scenario}`, async () => {
   const cleanup = startScreen(); await flush(); const pending = defer(); screenEvents = pending.promise;
@@ -148,5 +148,5 @@ for (const scenario of ['logout', 'switch', 'blur', 'take-change']) test(`screen
   if (scenario === 'blur') stop();
   if (scenario === 'take-change') { takeId = 'other'; render(); }
   pending.resolve([{ clashId: 'cl', reputationDelta: 999, coinsDelta: 999 }]); await flush();
-  assert.equal(rewards().reputationDelta, 0); cleanup(); stop();
+  assert.equal(rewards()?.reputationDelta ?? 0, 0); cleanup(); stop();
 });

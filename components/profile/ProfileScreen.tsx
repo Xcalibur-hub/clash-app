@@ -86,7 +86,11 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   const [signOutOpen, setSignOutOpen] = React.useState(false);
   const [actionsOpen, setActionsOpen] = React.useState(false);
   /** Own facets only; undefined = not requested / cleared, null = unavailable. */
-  const [arenaRep, setArenaRep] = React.useState<ArenaReputation | null | undefined>(undefined);
+  const [arenaRepState, setArenaRepState] = React.useState<{ scope: () => boolean; value: ArenaReputation | null } | null>(null);
+  const arenaRep = self && arenaRepState?.scope === isCurrent && isCurrent() ? arenaRepState.value : undefined;
+  const setArenaRep = React.useCallback((value: ArenaReputation | null | undefined): void => {
+    setArenaRepState(value === undefined ? null : { scope: isCurrent, value });
+  }, [isCurrent]);
   const loadRequest = React.useRef(0);
   const tabRequest = React.useRef(0);
   const softRequest = React.useRef(0);
@@ -102,7 +106,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
         setArenaRep(null);
       }
     },
-    [isCurrent],
+    [isCurrent, setArenaRep],
   );
 
   const load = React.useCallback(async (): Promise<void> => {
@@ -233,7 +237,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
       return () => {
         active = false;
       };
-    }, [self, profileId, isCurrent]),
+    }, [self, profileId, isCurrent, setArenaRep]),
   );
 
   useFocusEffect(React.useCallback(() => {

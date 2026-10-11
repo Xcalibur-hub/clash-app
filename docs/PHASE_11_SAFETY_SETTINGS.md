@@ -1,3 +1,5 @@
+> Integration note (Step 5B): the prepared safety suite is now `086_safety_settings.sql`. Results below are historical Step 4A evidence; current non-database results are in PHASE_11_INTEGRATION_CANDIDATE.md. No database tests ran during integration.
+
 ﻿# Phase 11 Step 4A — Safety Settings
 
 ## Pre-implementation audit (2026-10-11)
@@ -54,7 +56,7 @@ The existing Arena engagement harness assumed every checkout path contained /Cla
 | npx expo-doctor | PASS, 18/18 | Existing dependencies; no native rebuild |
 | git diff --check | PASS | Focused branch changes |
 
-Exact database command: npx supabase test db --local supabase/tests/000_social_foundation.sql supabase/tests/060_profile_read_security.sql supabase/tests/061_relationship_and_crew_security.sql supabase/tests/084_safety_settings.sql.
+Exact database command: npx supabase test db --local supabase/tests/000_social_foundation.sql supabase/tests/060_profile_read_security.sql supabase/tests/061_relationship_and_crew_security.sql supabase/tests/086_safety_settings.sql.
 
 The new pgTAP file covers authenticated lifecycle/idempotency, anonymous EXECUTE denial, server-derived actor contracts, pinned function search_path, no direct relationship DML, unrelated-account list probing, inability to remove another owner's relationships and denial of private auth linkage. Existing files additionally cover follow dissolution, reports, profile grants and relationship-oracle restrictions. These are live database assertions, not mocked SQL or hosted tests. No schema was applied. Local ledger was inspected read-only (latest installed versions observed: 20261011120000, 20261009190000, 20261009180000); this task did not reconcile or change it.
 
@@ -80,7 +82,7 @@ Release dependencies: review and merge this draft separately; run Step 2F physic
 - services/safetyService.ts
 - scripts/safety-settings-check.cjs
 - scripts/arena-engagement-check.cjs
-- supabase/tests/084_safety_settings.sql
+- supabase/tests/086_safety_settings.sql
 - package.json (test:safety script only)
 - docs/PHASE_11_SAFETY_SETTINGS.md
 

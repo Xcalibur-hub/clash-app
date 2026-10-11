@@ -68,7 +68,7 @@ Raw profile_reputation_facets is own-only and denies unrelated rows. However rep
 
 ### L2 — Test numbering collision in pending integrations (Low, integration defect)
 
-The complete main test directory has 83 files and no duplicate numeric prefixes. Main contains neither 084_safety_settings.sql nor 084_comment_reply_notifications.sql. The user-identified pending Step 4A/PR #13 collision therefore is not present on main yet; it is a cross-PR integration collision. 086_safety_settings.sql is available on this main snapshot and is the recommended Step 4A filename, subject to checking all branches when the owner authorizes that change. Do not rename PR #13 or Step 4A in this documentation-only step. A numeric prefix is an ordering convention rather than PostgreSQL migration identity, but collisions obscure test ownership and integrations.
+The audited main test directory had 83 files and no duplicate numeric prefixes. The pending Safety Settings and comment/reply notification suites both originally proposed sequence 084. Phase 11 Step 5B now assigns Safety Settings to `086_safety_settings.sql` and retains PR #13's `084_comment_reply_notifications.sql` in the candidate only. The original audit changed no branch or database. A numeric prefix is an ordering convention rather than PostgreSQL migration identity, but collisions obscure test ownership and integrations.
 
 ### L3 — Local-only schema drift requires ownership review (Low, environment limitation; not a main finding)
 
