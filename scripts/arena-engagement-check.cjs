@@ -5,7 +5,8 @@ let cells=[],index=0,effects=[],uid='a',events=[],postCalls=0,uploadCalls=0,post
 const hooks={...React,useState(v){const i=index++;if(!(i in cells))cells[i]=v;return[cells[i],n=>{cells[i]=typeof n==='function'?n(cells[i]):n;}];},useRef(v){const i=index++;if(!(i in cells))cells[i]={current:v};return cells[i];},useCallback(f,deps){const i=index++,old=cells[i];if(!old||deps.some((d,j)=>d!==old.deps[j]))cells[i]={deps,callback:f};return cells[i].callback;},useEffect(f,deps){const i=index++,old=cells[i];if(!old||!deps||deps.some((d,j)=>d!==old.deps?.[j])){effects.push(()=>{old?.cleanup?.();cells[i]={deps,setup:f,cleanup:f()};});}}};
 const RN={View:'View',Text:'Text',TextInput:'Input',Pressable:'Button',Image:'Image',ActivityIndicator:'Spinner',Modal:'Modal',FlatList:'List',StyleSheet:{create:x=>x,absoluteFill:{}},useWindowDimensions:()=>({width:360,height:800})};
 const state={viewer:{id:'profile-a',name:'A',tint:'#888'},takes:[],upvotedCommentIds:[],reactedTakeIds:[]};
-const original=Module._load;Module._load=function(r,parent){const file=parent?.filename.replaceAll('\\','/')??'';const own=!file.includes('node_modules')&&file.includes('/Clash/');
+const repoRoot=require('node:path').resolve(__dirname,'..').replaceAll('\\','/')+'/';
+const original=Module._load;Module._load=function(r,parent){const file=parent?.filename.replaceAll('\\','/')??'';const own=!file.includes('node_modules')&&file.startsWith(repoRoot);
  if(own&&r==='react')return hooks;if(r==='react-native')return RN;
  if(r==='react-native-safe-area-context')return{useSafeAreaInsets:()=>({top:0,bottom:0})};
  if(own&&r.endsWith('/AuthProvider'))return{useAuth:()=>({user:uid?{id:uid}:null})};

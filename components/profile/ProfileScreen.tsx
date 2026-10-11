@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Take, User } from '../../store';
 import { showNotice, useClash } from '../../store';
@@ -57,6 +57,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   const viewerId = signedIn ? state.viewer.id : null;
   const self = viewerId !== null && viewerId === profileId;
 
+  const profileLoadSequence = React.useRef(0);
   const [profile, setProfile] = React.useState<User | null>(null);
   const [follow, setFollow] = React.useState<FollowState | null>(null);
   const [blocked, setBlocked] = React.useState(false);
@@ -76,6 +77,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   const [actionsOpen, setActionsOpen] = React.useState(false);
 
   const load = React.useCallback(async (): Promise<void> => {
+    const sequence = ++profileLoadSequence.current;
     try {
       setLoadError(false);
       const [nextProfile, nextFollow, safety, nextVault] = await Promise.all([
@@ -84,6 +86,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
         fetchViewerSafetyState(viewerId),
         fetchVault(profileId),
       ]);
+      if (sequence !== profileLoadSequence.current) return;
       if (!nextProfile) {
         setNotFound(true);
         return;
@@ -99,6 +102,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
         is_guest: viewerId === null,
       });
     } catch (error) {
+      if (sequence !== profileLoadSequence.current) return;
       setLoadError(true);
       dispatch(showNotice(errorText(error)));
     }
@@ -137,7 +141,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     }
   }, [profileId, clashes, dispatch]);
 
-  React.useEffect(() => {
+  useFocusEffect(React.useCallback(() => {
     setProfile(null);
     setTakes(null);
     setReplies(null);
@@ -147,7 +151,8 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     setNotFound(false);
     setLoadError(false);
     void load();
-  }, [load]);
+    return () => { profileLoadSequence.current += 1; };
+  }, [load]));
 
   React.useEffect(() => {
     if (tab === 'takes') void loadTakes();
