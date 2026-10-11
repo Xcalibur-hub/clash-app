@@ -1,0 +1,15 @@
+# REVIEW PROPOSAL ONLY: requires a separately reviewed managed-stack base.
+# !override requires Docker Compose >= 2.24.4; never use an ordinary list merge.
+services:
+  db:
+    ports: !override
+      - target: 5432
+        published: "57722"
+        host_ip: 127.0.0.1
+        protocol: tcp
+  kong:
+    ports: !override
+      - target: 8000
+        published: "57721"
+        host_ip: 127.0.0.1
+        protocol: tcp
