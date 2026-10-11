@@ -13,12 +13,16 @@ interface Stat {
 
 /** The four numbers the reference puts on a profile (screen 13). */
 function statList(viewer: User): Stat[] {
-  const winRate = viewer.clashes > 0 ? Math.round((viewer.wins / viewer.clashes) * 100) : 0;
+  const clashes = viewer.clashes;
+  const wins = viewer.wins;
+  const loaded = clashes !== null && wins !== null;
+  const winRate =
+    loaded && clashes > 0 ? Math.round((wins / clashes) * 100) : null;
   return [
     { label: 'REPUTATION', value: formatReputation(viewer.reputation), tone: accent.gold },
-    { label: 'CLASHES', value: String(viewer.clashes), tone: ink.primary },
-    { label: 'WINS', value: String(viewer.wins), tone: accent.mint },
-    { label: 'WIN RATE', value: `${winRate}%`, tone: accent.b },
+    { label: 'CLASHES', value: loaded ? String(clashes) : '—', tone: ink.primary },
+    { label: 'WINS', value: loaded ? String(wins) : '—', tone: accent.mint },
+    { label: 'WIN RATE', value: winRate === null ? '—' : `${winRate}%`, tone: accent.b },
   ];
 }
 

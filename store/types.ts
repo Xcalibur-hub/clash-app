@@ -58,8 +58,13 @@ export interface User {
   rank: RankName;
   reputation: number;
   coins: number;
-  clashes: number;
-  wins: number;
+  /**
+   * Settled Clash count with a verdict. `null` means not loaded yet or the
+   * stats query failed — never treat as a verified zero.
+   */
+  clashes: number | null;
+  /** Settled wins for this profile. `null` until hydrated (see `clashes`). */
+  wins: number | null;
   streak: number;
   badges: readonly Badge[];
 }
