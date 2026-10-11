@@ -32,7 +32,8 @@
     "dev:local": "node scripts/dev-local.mjs",
     "dev:hosted": "node scripts/dev-hosted.mjs",
     "dev:backfill-video-posters": "node scripts/backfill-video-posters.mjs",
-    "test:arena-engagement": "node scripts/arena-engagement-check.cjs"
+    "test:arena-engagement": "node scripts/arena-engagement-check.cjs",
+    "test:arena:engagement": "node scripts/arena-engagement-check.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/comic-neue": "^0.4.1",
