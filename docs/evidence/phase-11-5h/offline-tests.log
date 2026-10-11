@@ -1,0 +1,145 @@
+TAP version 13
+# Subtest: all frozen source hashes verified; four extension statements; none after 44
+ok 1 - all frozen source hashes verified; four extension statements; none after 44
+  ---
+  duration_ms: 709.2152
+  ...
+# Subtest: proposal changes exactly the reviewed statement after BOM removal
+ok 2 - proposal changes exactly the reviewed statement after BOM removal
+  ---
+  duration_ms: 4.0303
+  ...
+# Subtest: unreviewed source bytes fail closed
+ok 3 - unreviewed source bytes fail closed
+  ---
+  duration_ms: 5.2338
+  ...
+# Subtest: 106 outputs deterministic with exactly three BOM removals and one correction
+ok 4 - 106 outputs deterministic with exactly three BOM removals and one correction
+  ---
+  duration_ms: 1970.7185
+  ...
+# Subtest: altered ordinary source bytes refused before output creation
+ok 5 - altered ordinary source bytes refused before output creation
+  ---
+  duration_ms: 549.3742
+  ...
+# Subtest: unexpected extension statement refused
+ok 6 - unexpected extension statement refused
+  ---
+  duration_ms: 629.9922
+  ...
+# Subtest: source reorder and missing migration refused
+ok 7 - source reorder and missing migration refused
+  ---
+  duration_ms: 747.9303
+  ...
+# Subtest: unsafe paths and existing directories refused
+ok 8 - unsafe paths and existing directories refused
+  ---
+  duration_ms: 4465.0995
+  ...
+# Subtest: full artifact verifies and detects corruption, extras and manifest tampering
+ok 9 - full artifact verifies and detects corruption, extras and manifest tampering
+  ---
+  duration_ms: 3371.6248
+  ...
+# Subtest: clean UTF-8, CRLF and literal bytes stay identical
+ok 10 - clean UTF-8, CRLF and literal bytes stay identical
+  ---
+  duration_ms: 4.5624
+  ...
+# Subtest: one file-start BOM before comment removes exactly three bytes
+ok 11 - one file-start BOM before comment removes exactly three bytes
+  ---
+  duration_ms: 1.03
+  ...
+# Subtest: rejects invalid UTF-8
+ok 12 - rejects invalid UTF-8
+  ---
+  duration_ms: 2.788
+  ...
+# Subtest: rejects UTF-16 LE
+ok 13 - rejects UTF-16 LE
+  ---
+  duration_ms: 0.7908
+  ...
+# Subtest: rejects UTF-16 BE
+ok 14 - rejects UTF-16 BE
+  ---
+  duration_ms: 0.502
+  ...
+# Subtest: rejects UTF-32 LE
+ok 15 - rejects UTF-32 LE
+  ---
+  duration_ms: 0.7688
+  ...
+# Subtest: rejects UTF-32 BE
+ok 16 - rejects UTF-32 BE
+  ---
+  duration_ms: 1.1278
+  ...
+# Subtest: rejects NUL
+ok 17 - rejects NUL
+  ---
+  duration_ms: 0.6133
+  ...
+# Subtest: rejects duplicate BOM
+ok 18 - rejects duplicate BOM
+  ---
+  duration_ms: 1.4688
+  ...
+# Subtest: rejects embedded BOM
+ok 19 - rejects embedded BOM
+  ---
+  duration_ms: 1.3436
+  ...
+# Subtest: rejects BOM after whitespace
+ok 20 - rejects BOM after whitespace
+  ---
+  duration_ms: 1.2183
+  ...
+# Subtest: rejects leading NBSP
+ok 21 - rejects leading NBSP
+  ---
+  duration_ms: 2.4535
+  ...
+# Subtest: rejects leading zero-width space
+ok 22 - rejects leading zero-width space
+  ---
+  duration_ms: 0.5857
+  ...
+# Subtest: rejects control byte
+ok 23 - rejects control byte
+  ---
+  duration_ms: 0.6332
+  ...
+# Subtest: rejects BOM before executable token
+ok 24 - rejects BOM before executable token
+  ---
+  duration_ms: 0.4732
+  ...
+# Subtest: mojibake heuristic warns but does not rewrite valid Unicode
+ok 25 - mojibake heuristic warns but does not rewrite valid Unicode
+  ---
+  duration_ms: 0.6584
+  ...
+# Subtest: artifact writes verified bytes and refuses existing destination without overwriting
+ok 26 - artifact writes verified bytes and refuses existing destination without overwriting
+  ---
+  duration_ms: 18.2141
+  ...
+# Subtest: unsafe artifact input creates no destination
+ok 27 - unsafe artifact input creates no destination
+  ---
+  duration_ms: 2.545
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12501.353

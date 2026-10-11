@@ -1,0 +1,50 @@
+{
+  "recommendation": "BLOCKED",
+  "reason": "Pinned CLI 2.40.7 uses fixed internal database/S3 credentials without supported startup overrides; all-fresh-credential requirement cannot be satisfied by the reviewed setup",
+  "offline_tests": {
+    "passed": 27,
+    "failed": 0,
+    "skipped": 0
+  },
+  "hashes_verified": 245,
+  "artifact_files_verified": 106,
+  "infrastructure_created": false,
+  "sql_executed": false,
+  "migration_attempts": 0,
+  "migrations_applied": 0,
+  "migrations_blocked": 106,
+  "sql_suites_run": 0,
+  "sql_suites_blocked": 89,
+  "tap_assertions_run": 0,
+  "concurrency_suites_run": 0,
+  "concurrency_suites_blocked": 9,
+  "created_containers": 0,
+  "created_volumes": 0,
+  "created_networks": 0,
+  "existing_resource_identity_state_ports_unchanged": true,
+  "new_private_config_removed": true,
+  "source_evidence": [
+    {
+      "url": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/pkg/config/config.go",
+      "sha256": "97de9a73543f3dcbccde3e4770007081f2b1f3bce02755f4ad08b62a3aa4eb2a"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/pkg/config/db.go",
+      "sha256": "17f6cbeb298737317f06ad437831d71cd0bf83ca6f9b02bc881030d6095c9476"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/pkg/config/storage.go",
+      "sha256": "3acf94802e4cd3dfc93c5bee172e06c3c5929101c301e65669307f489898452e"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/cmd/start.go",
+      "sha256": "7e1f1b1e8600a111883a7f7090ac5f14001502abb898e5ef23f23dcf4787dfc9"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/internal/db/start/start.go",
+      "sha256": "f1b5aa0599058e048a84f717aa81762904c31c2bc9306bbf29a96a2a274db7ba"
+    }
+  ],
+  "orchestration_note": "Initial prepare.py had a Python argument-wrapper TypeError before input verification; corrected before verification and before any infrastructure. No database/migration retry occurred.",
+  "time_utc": "2026-10-11T15:08:09.811542+00:00"
+}

@@ -1,0 +1,43 @@
+{
+  "candidate_commit": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "implementation_commit": "9c71d72a15095047821789386ca9d395961bab4f",
+  "tooling_commit": "8c0b4e9c7d49a330e7e549f91c48070b0d1dfd15",
+  "verified_source_hashes": 245,
+  "verified_artifact_files": 106,
+  "offline_tests_passed": 27,
+  "manifest_git_blob_sha256": "a9b30736c87a7fac05c9764404dfd58a876f64db6a3e072e9a348cac8b162b4e",
+  "project": "clash_p11v3_20261011",
+  "ports_checked_free": [
+    57520,
+    57521,
+    57522,
+    57523,
+    57524,
+    57525,
+    57526,
+    57527,
+    57528,
+    57529,
+    57530,
+    57531,
+    57532,
+    57533,
+    57534,
+    57535,
+    57536,
+    57537,
+    57538,
+    57539
+  ],
+  "scratch": "C:\\p11db3\\.expo\\attempt3\\stack",
+  "cli": "2.40.7",
+  "expected_images": {
+    "db": "public.ecr.aws/supabase/postgres:17.6.1.002",
+    "auth": "public.ecr.aws/supabase/gotrue:v2.179.0",
+    "storage": "public.ecr.aws/supabase/storage-api:v1.26.5",
+    "realtime": "public.ecr.aws/supabase/realtime:v2.47.0",
+    "rest": "public.ecr.aws/supabase/postgrest:v13.0.6",
+    "gateway": "public.ecr.aws/supabase/kong:2.8.1"
+  },
+  "time_utc": "2026-10-11T15:06:02.664261+00:00"
+}
