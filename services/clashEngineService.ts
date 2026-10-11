@@ -87,9 +87,10 @@ export async function settleClash(clashId: string): Promise<ClashSettlementResul
 export async function fetchVerdict(clashId: string): Promise<ServerVerdict | null> {
   const { data, error } = await requireSupabase()
     .from('verdicts')
-    .select('*')
+    .select('clash_id, winner_side, side_a_score, side_b_score, jury_size, agreement, margin, verdict_label')
     .eq('clash_id', clashId)
     .maybeSingle();
+  if (error?.code === '42501') return null;
   if (error) throw requestError(error);
   if (!data) return null;
   return {
@@ -281,12 +282,15 @@ function toClashView(payload: Json | null): ClashView {
   };
 }
 
-function toClashDetail(row: ClashRow): ClashDetail {
+const CLASH_READ_FIELDS = 'id, take_id, status, mode, opens_at, closes_at, created_at, settled_at' as const;
+type ReadableClashRow = Pick<ClashRow, 'id' | 'take_id' | 'status' | 'mode' | 'opens_at' | 'closes_at' | 'created_at' | 'settled_at'>;
+
+function toClashDetail(row: ReadableClashRow): ClashDetail {
   return {
     id: row.id,
     takeId: row.take_id,
-    challengerId: row.challenger_id ?? '',
-    challengerCommentId: row.challenger_comment_id ?? null,
+    challengerId: '',
+    challengerCommentId: null,
     status: row.status,
     mode: (row as ClashRow & { mode?: ClashMode }).mode ?? 'STANDARD',
     opensAt: Date.parse(row.opens_at),
@@ -301,22 +305,24 @@ export async function fetchClashForTake(takeId: string): Promise<ClashDetail | n
   const client = requireSupabase();
   const open = await client
     .from('clashes')
-    .select('*')
+    .select(CLASH_READ_FIELDS)
     .eq('take_id', takeId)
     .eq('status', 'open')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (open.error?.code === '42501') return null;
   if (open.error) throw requestError(open.error);
   if (open.data) return toClashDetail(open.data);
 
   const latest = await client
     .from('clashes')
-    .select('*')
+    .select(CLASH_READ_FIELDS)
     .eq('take_id', takeId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (latest.error?.code === '42501') return null;
   if (latest.error) throw requestError(latest.error);
   return latest.data ? toClashDetail(latest.data) : null;
 }
@@ -325,16 +331,18 @@ export async function fetchClashForTake(takeId: string): Promise<ClashDetail | n
 export async function fetchClashById(clashId: string): Promise<ClashDetail | null> {
   const { data, error } = await requireSupabase()
     .from('clashes')
-    .select('id, take_id, status, mode, opens_at, closes_at, created_at, settled_at')
+    .select(CLASH_READ_FIELDS)
     .eq('id', clashId)
     .maybeSingle();
+  if (error?.code === '42501') return null;
   if (error) throw requestError(error);
-  return data ? toClashDetail({ ...data, challenger_id: '', challenger_comment_id: null } as ClashRow) : null;
+  return data ? toClashDetail(data) : null;
 }
 
 /** Authoritative Clash screen read. Identities are present only when revealed. */
 export async function fetchClashView(clashId: string): Promise<ClashView | null> {
   const { data, error } = await requireSupabase().rpc('clash_view', { p_clash_id: clashId });
+  if (error?.code === '42501') return null;
   if (error) throw requestError(error);
   return data === null ? null : toClashView(data);
 }
@@ -342,6 +350,7 @@ export async function fetchClashView(clashId: string): Promise<ClashView | null>
 /** Authoritative Clash screen read for an existing Take. */
 export async function fetchClashViewForTake(takeId: string): Promise<ClashView | null> {
   const { data, error } = await requireSupabase().rpc('clash_view_for_take', { p_take_id: takeId });
+  if (error?.code === '42501') return null;
   if (error) throw requestError(error);
   if (data === null) return null;
   return toClashView(data);

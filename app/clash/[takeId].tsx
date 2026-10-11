@@ -95,9 +95,10 @@ export default function ClashScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const t = useThemeColors();
 
-  const [view, setView] = React.useState<ClashView | null | undefined>(undefined);
+  const [viewState, setViewState] = React.useState<{ scope: () => boolean; value: ClashView | null } | null>(null);
   const isCurrent = useOperationScope(JSON.stringify([accountId, id]));
   const loadGeneration = React.useRef(0);
+  const view = viewState?.scope === isCurrent && isCurrent() ? viewState.value : undefined;
   const [rewards, setRewards] = React.useState<{
     accountId: string | null; takeId: string; scope: () => boolean; reputation: number; coins: number;
   } | null>(null);
@@ -159,7 +160,7 @@ export default function ClashScreen(): React.JSX.Element {
     try {
       const next = await fetchClashViewForTake(id);
       if (!active()) return;
-      setView(next);
+      setViewState({ scope: isCurrent, value: next });
       setRewards(null);
       if (!next) return;
       if (next.battleMode === 'DUEL' && next.roomId) return;
@@ -189,12 +190,13 @@ export default function ClashScreen(): React.JSX.Element {
         });
       }
     } catch (e) {
-      if (active()) setError(errorText(e));
+      if (active()) { setViewState(null); setRewards(null); setError(errorText(e)); }
     }
   }, [id, accountId, isCurrent]);
 
   useFocusEffect(
     React.useCallback(() => {
+      setViewState(null);
       void load();
       const timer = setInterval(() => {
         void load();
