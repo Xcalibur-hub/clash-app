@@ -12,6 +12,10 @@ import { fetchFollowState, followUser, unfollowUser, type FollowState } from '..
 import { fetchViewerSafetyState } from '../../services/safetyService';
 import { fetchVault } from '../../services/vaultService';
 import {
+  fetchMyArenaReputation,
+  type ArenaReputation,
+} from '../../services/arenaGameService';
+import {
   fetchProfileById,
   fetchProfileClashes,
   fetchProfileReplies,
@@ -74,15 +78,19 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   const [editOpen, setEditOpen] = React.useState(false);
   const [signOutOpen, setSignOutOpen] = React.useState(false);
   const [actionsOpen, setActionsOpen] = React.useState(false);
+  /** Own facets only; undefined = not requested, null = unavailable. */
+  const [arenaRep, setArenaRep] = React.useState<ArenaReputation | null | undefined>(undefined);
 
   const load = React.useCallback(async (): Promise<void> => {
     try {
       setLoadError(false);
-      const [nextProfile, nextFollow, safety, nextVault] = await Promise.all([
+      const isSelf = viewerId !== null && viewerId === profileId;
+      const [nextProfile, nextFollow, safety, nextVault, nextArenaRep] = await Promise.all([
         fetchProfileById(profileId),
         fetchFollowState(profileId),
         fetchViewerSafetyState(viewerId),
         fetchVault(profileId),
+        isSelf ? fetchMyArenaReputation() : Promise.resolve(undefined),
       ]);
       if (!nextProfile) {
         setNotFound(true);
@@ -93,9 +101,10 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
       setFollow(nextFollow);
       setHasVault(nextVault !== null);
       setBlocked(safety.blockedProfileIds.includes(profileId));
+      setArenaRep(isSelf ? (nextArenaRep ?? null) : undefined);
       analytics.trackOnce(`profile_viewed:${profileId}`, 'profile_viewed', {
         realm: 'profile',
-        is_self: viewerId !== null && viewerId === profileId,
+        is_self: isSelf,
         is_guest: viewerId === null,
       });
     } catch (error) {
@@ -146,6 +155,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     setBlocked(false);
     setNotFound(false);
     setLoadError(false);
+    setArenaRep(undefined);
     void load();
   }, [load]);
 
@@ -253,6 +263,8 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
           following={follow.following}
           followerCount={follow.followerCount}
           followingCount={follow.followingCount}
+          arenaFacets={arenaRep?.facets}
+          arenaStanding={arenaRep?.standing}
           onEdit={() => setEditOpen(true)}
           onToggleFollow={() => void toggleFollow()}
           onMore={() => {

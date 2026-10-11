@@ -1,24 +1,37 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ProfileHero } from '../../components/profile/ProfileHero';
 import { SegmentedTabs, type SegmentedTab } from '../../components/shared/SegmentedTabs';
 import { ReputationBar } from '../../components/profile/ReputationBar';
 import { TakeMiniCard } from '../../components/profile/TakeMiniCard';
-import { WinCard } from '../../components/profile/WinCard';
+import { ProfileClashRow } from '../../components/profile/ProfileLists';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
 import { ArenaIcon, TrophyIcon } from '../../components/shared/icons';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import {
-  selectAuthor,
+  fetchMyArenaReputation,
+  type ArenaReputation,
+} from '../../services/arenaGameService';
+import { fetchProfilesByIds } from '../../services/apiService';
+import {
+  fetchProfileClashStats,
+  fetchProfileClashes,
+  type ProfileClash,
+} from '../../services/profileService';
+import { errorText } from '../../services/supabaseClient';
+import {
   selectViewerTakes,
+  setViewer,
+  showNotice,
   useClash,
-  type WinEntry,
+  type User,
 } from '../../store';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, space, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
+import { withClashStats } from '../../utils/profileClashStats';
 
 type VaultProfileTab = 'takes' | 'wins';
 
@@ -29,23 +42,72 @@ const VAULT_TABS: readonly SegmentedTab<VaultProfileTab>[] = [
 
 /**
  * Vault PROFILE — same viewer identity, continuous editorial page.
- * Wins stay empty until server Clash history is wired (no mocks).
+ * Wins are settled Clash outcomes (`outcome === 'won'`) from profile_clash_list.
  */
 export default function VaultProfileScreen(): React.JSX.Element {
-  const { state } = useClash();
+  const { state, dispatch } = useClash();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = React.useState<VaultProfileTab>('takes');
   const router = useRouter();
   const t = useThemeColors();
   const viewer = state.viewer;
   const takes = React.useMemo(() => selectViewerTakes(state), [state]);
-  const wins: readonly WinEntry[] = [];
 
-  const winnerHandle = (entry: WinEntry): string => {
-    const authorId =
-      entry.result.winningSide === 'A' ? entry.take.authorId : entry.clash.challengerId;
-    return selectAuthor(state, authorId)?.handle ?? 'unknown';
-  };
+  const [wins, setWins] = React.useState<ProfileClash[] | null>(null);
+  const [opponents, setOpponents] = React.useState<Map<string, User>>(new Map());
+  const [winsError, setWinsError] = React.useState(false);
+  const [arenaRep, setArenaRep] = React.useState<ArenaReputation | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (viewer.id === 'guest') return;
+      try {
+        if (viewer.wins === null || viewer.clashes === null) {
+          const stats = await fetchProfileClashStats(viewer.id);
+          if (!cancelled) dispatch(setViewer(withClashStats(viewer, stats)));
+        }
+      } catch {
+        // Keep null counts — do not invent zeros.
+      }
+      try {
+        const rep = await fetchMyArenaReputation();
+        if (!cancelled) setArenaRep(rep);
+      } catch {
+        if (!cancelled) setArenaRep(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewer, dispatch]);
+
+  React.useEffect(() => {
+    if (tab !== 'wins' || wins !== null || winsError) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await fetchProfileClashes(viewer.id);
+        if (cancelled) return;
+        const won = rows.filter((row) => row.outcome === 'won');
+        setWins(won);
+        const ids = [
+          ...new Set(won.map((row) => row.opponentId).filter((id): id is string => id !== null)),
+        ];
+        if (ids.length > 0) {
+          const users = await fetchProfilesByIds(ids);
+          if (!cancelled) setOpponents(new Map(users.map((user) => [user.id, user])));
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setWinsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, wins, winsError, viewer.id, dispatch]);
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
@@ -61,7 +123,13 @@ export default function VaultProfileScreen(): React.JSX.Element {
       >
         <ProfileHero viewer={viewer} />
 
-        <ReputationBar reputation={viewer.reputation} rank={viewer.rank} streak={viewer.streak} />
+        <ReputationBar
+          reputation={viewer.reputation}
+          rank={viewer.rank}
+          streak={viewer.streak}
+          facets={arenaRep?.facets}
+          standing={arenaRep?.standing}
+        />
 
         <SegmentedTabs
           value={tab}
@@ -82,14 +150,18 @@ export default function VaultProfileScreen(): React.JSX.Element {
                 onPress={() => router.push(`/clash/${take.id}`)}
               />
             ))
-          : wins.map((entry) => (
-              <WinCard
-                key={entry.result.clashId}
-                entry={entry}
-                winnerHandle={winnerHandle(entry)}
-                onPress={() => router.push(`/clash/${entry.take.id}`)}
-              />
-            ))}
+          : wins === null && !winsError
+            ? (
+                <ActivityIndicator color={t.textPrimary} />
+              )
+            : (wins ?? []).map((clash) => (
+                <ProfileClashRow
+                  key={clash.clash.id}
+                  clash={clash}
+                  opponent={clash.opponentId ? opponents.get(clash.opponentId) : undefined}
+                  onOpen={() => router.push(`/clash/${clash.clash.takeId}`)}
+                />
+              ))}
         {tab === 'takes' && takes.length === 0 ? (
           <EmptyState
             icon={ArenaIcon}
@@ -99,7 +171,19 @@ export default function VaultProfileScreen(): React.JSX.Element {
             onAction={() => router.replace('/(tabs)')}
           />
         ) : null}
-        {tab === 'wins' && wins.length === 0 ? (
+        {tab === 'wins' && winsError ? (
+          <EmptyState
+            icon={TrophyIcon}
+            title="Couldn't load wins"
+            body="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={() => {
+              setWinsError(false);
+              setWins(null);
+            }}
+          />
+        ) : null}
+        {tab === 'wins' && wins !== null && wins.length === 0 ? (
           <EmptyState
             icon={TrophyIcon}
             title="No Clash wins yet"

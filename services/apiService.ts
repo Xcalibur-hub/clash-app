@@ -10,6 +10,8 @@ import {
   type TakeReactionResult,
   type UpvoteResult,
 } from './arenaMappers';
+import { fetchProfileClashStats } from './profileService';
+import { withClashStats } from '../utils/profileClashStats';
 import { currentUserId, requestError, requireSupabase, SupabaseError } from './supabaseClient';
 import { requireUserId } from './authService';
 
@@ -138,7 +140,13 @@ export async function fetchViewerProfile(): Promise<User | null> {
   if (!uid) return null;
   const { data, error } = await requireSupabase().rpc('get_my_profile');
   if (error) throw requestError(error);
-  return data?.[0] ? toUser(data[0]) : null;
+  if (!data?.[0]) return null;
+  const user = toUser(data[0]);
+  try {
+    return withClashStats(user, await fetchProfileClashStats(user.id));
+  } catch {
+    return user;
+  }
 }
 
 /**
