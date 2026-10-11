@@ -1,0 +1,9 @@
+172.24.0.1 2026-10-11 11:54:56.694 UTC [352] postgres@postgres ERROR:  permission denied for function pg_read_file
+172.24.0.1 2026-10-11 11:54:56.694 UTC [352] postgres@postgres CONTEXT:  PL/pgSQL function inline_code_block line 1 at EXECUTE
+	SQL statement "    do $_$    begin      execute replace(replace(replace(replace(            pg_read_file('/etc/postgresql-custom/extension-custom-scripts/before-create.sql')          , '@extname@', '''pgcrypto''')          , '@extschema@', '''extensions''')          , '@extversion@', 'null')          , '@extcascade@', 'false');    exception      when undefined_file then        null;    end; $_$"
+172.24.0.1 2026-10-11 11:54:56.694 UTC [352] postgres@postgres STATEMENT:  -- ============================================================================
+	-- Phase 14.1 â€” Challenges + Treasure Hunts + Hidden Gifts
+	-- Server-authoritative gameplay. Answers/rewards never client-trusted.
+	-- ============================================================================
+
+	create extension if not exists pgcrypto with schema extensions
