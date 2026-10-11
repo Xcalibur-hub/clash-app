@@ -187,7 +187,7 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     await applyClashes(requestId);
   }, [clashes, applyClashes]);
 
-  React.useEffect(() => {
+  useFocusEffect(React.useCallback(() => {
     setProfile(null);
     setTakes(null);
     setReplies(null);
@@ -199,7 +199,8 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
     setLoadError(false);
     setArenaRep(undefined);
     void load();
-  }, [load]);
+    return () => { loadRequest.current += 1; tabRequest.current += 1; softRequest.current += 1; };
+  }, [load]));
 
   React.useEffect(() => {
     if (tab === 'takes') void loadTakes();

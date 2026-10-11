@@ -8,6 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
+    "test:safety": "node scripts/safety-settings-check.cjs",
     "test:duel": "node --experimental-strip-types --test utils/arenaDuelPayload.test.ts utils/duelPresentation.test.ts",
     "test:official:service": "node scripts/official-service-check.cjs",
     "test:settlement:history": "node scripts/settlement-history-check.cjs",
