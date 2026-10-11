@@ -20,12 +20,14 @@ export interface ProfileHeaderProps {
   onEdit?: () => void;
   onToggleFollow?: () => void;
   onMore?: () => void;
+  /** Own-only Arena facets; omit for others or when the fetch failed. */
+  arenaFacets?: Readonly<Record<string, number>>;
+  arenaStanding?: string;
 }
 
 /**
  * Editorial identity header — avatar, name, bio, follow, then reputation.
- * Stats use only real social counts (followers / following).
- * Clash record lives in the Clashes tab (User.clashes/wins are not hydrated).
+ * Social row uses follower counts plus settled Clash aggregates when hydrated.
  */
 export function ProfileHeader({
   profile,
@@ -36,6 +38,8 @@ export function ProfileHeader({
   onEdit,
   onToggleFollow,
   onMore,
+  arenaFacets,
+  arenaStanding,
 }: ProfileHeaderProps): React.JSX.Element {
   const t = useThemeColors();
 
@@ -98,7 +102,13 @@ export function ProfileHeader({
         </View>
       </View>
 
-      <ReputationBar reputation={profile.reputation} rank={profile.rank} streak={profile.streak} />
+      <ReputationBar
+        reputation={profile.reputation}
+        rank={profile.rank}
+        streak={profile.streak}
+        facets={isSelf ? arenaFacets : undefined}
+        standing={isSelf ? arenaStanding : undefined}
+      />
 
       <View style={[styles.social, { borderTopColor: t.border }]}>
         <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
@@ -122,6 +132,24 @@ export function ProfileHeader({
                 {formatReputation(profile.reputation)}
               </Text>
               {'  rep'}
+            </Text>
+          </>
+        ) : null}
+        {profile.clashes !== null && profile.wins !== null ? (
+          <>
+            <Text allowFontScaling={false} style={[styles.socialDot, { color: t.textMuted }]}>
+              ·
+            </Text>
+            <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
+              <Text style={[styles.socialValue, { color: t.textPrimary }]}>{compact(profile.wins)}</Text>
+              {'  wins'}
+            </Text>
+            <Text allowFontScaling={false} style={[styles.socialDot, { color: t.textMuted }]}>
+              ·
+            </Text>
+            <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
+              <Text style={[styles.socialValue, { color: t.textPrimary }]}>{compact(profile.clashes)}</Text>
+              {'  clashes'}
             </Text>
           </>
         ) : null}
