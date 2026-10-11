@@ -1,0 +1,10 @@
+{
+  "source": "Actual docker ps -a --filter label=com.supabase.cli.project=clash_p11v5i_20261011 output captured during startup",
+  "observed_database_binding": "0.0.0.0:57622->5432/tcp, [::]:57622->5432/tcp",
+  "network_requested_host_binding_ipv4": "127.0.0.1",
+  "network_id": "a9a68bbd72edcb45b42409af1ab4f21f3c972d782d00f7dc3760b19151411d17",
+  "docker_server_version": "28.3.3",
+  "action": "Killed only attempt-specific CLI startup processes and stopped owned containers, then captured metadata and cleaned up",
+  "external_reachability_tested": false,
+  "actual_cause_of_network_option_not_taking_effect": "Not established; no retry or network reconfiguration authorized"
+}

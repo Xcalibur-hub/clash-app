@@ -1,0 +1,83 @@
+[
+  {
+    "id": "7cc49e0a251e34d1614d2a374438a899501a5e980338fd470b5143beaae45d2b",
+    "name": "/supabase_realtime_clash_p11v5i_20261011",
+    "image": "public.ecr.aws/supabase/realtime:v2.47.0",
+    "image_id": "sha256:6b26b3679de63aec6b4849c02140d8f55b65ce2eecadcd5e5b712f596d0249a2",
+    "state": "created",
+    "health": null,
+    "network_mode": "supabase_network_clash_p11v5i_20261011",
+    "network_endpoints": [
+      "supabase_network_clash_p11v5i_20261011"
+    ],
+    "port_bindings": {},
+    "mounts": []
+  },
+  {
+    "id": "fa1de22b4f7ad86527819af2a9186786e341f3b36755e516a98fe41306688480",
+    "name": "/supabase_auth_clash_p11v5i_20261011",
+    "image": "public.ecr.aws/supabase/gotrue:v2.179.0",
+    "image_id": "sha256:658cf69f57d48e10cbe508a79874e6067348b82a4d216a0bb446c067d7a246f9",
+    "state": "exited",
+    "health": "unhealthy",
+    "network_mode": "supabase_network_clash_p11v5i_20261011",
+    "network_endpoints": [
+      "supabase_network_clash_p11v5i_20261011"
+    ],
+    "port_bindings": {},
+    "mounts": []
+  },
+  {
+    "id": "4514859e8f40eaa1f88530ed944e87dc69c284322e424870c58f49f6a8a8945f",
+    "name": "/supabase_kong_clash_p11v5i_20261011",
+    "image": "public.ecr.aws/supabase/kong:2.8.1",
+    "image_id": "sha256:1b53405d8680a09d6f44494b7990bf7da2ea43f84a258c59717d4539abf09f6d",
+    "state": "exited",
+    "health": "unhealthy",
+    "network_mode": "supabase_network_clash_p11v5i_20261011",
+    "network_endpoints": [
+      "supabase_network_clash_p11v5i_20261011"
+    ],
+    "port_bindings": {
+      "8000/tcp": [
+        {
+          "HostIp": "",
+          "HostPort": "57621"
+        }
+      ]
+    },
+    "mounts": []
+  },
+  {
+    "id": "edd0277b3a0b042bc384eba721beef306463f9efe95e9adb03896d9347e5f4fa",
+    "name": "/supabase_db_clash_p11v5i_20261011",
+    "image": "public.ecr.aws/supabase/postgres:17.6.1.002",
+    "image_id": "sha256:3f5e3b691d5887161e1b977302b66122eb6cfdf2a6358bdad493454efb75f8a6",
+    "state": "exited",
+    "health": "unhealthy",
+    "network_mode": "supabase_network_clash_p11v5i_20261011",
+    "network_endpoints": [
+      "supabase_network_clash_p11v5i_20261011"
+    ],
+    "port_bindings": {
+      "5432/tcp": [
+        {
+          "HostIp": "",
+          "HostPort": "57622"
+        }
+      ]
+    },
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "supabase_db_clash_p11v5i_20261011",
+        "destination": "/var/lib/postgresql/data"
+      },
+      {
+        "type": "volume",
+        "name": "supabase_config_clash_p11v5i_20261011",
+        "destination": "/etc/postgresql-custom"
+      }
+    ]
+  }
+]
