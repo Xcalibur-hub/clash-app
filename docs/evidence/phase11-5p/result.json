@@ -1,0 +1,31 @@
+{
+  "recommendation": "BLOCKED",
+  "candidate": "22d958c1d7e36a47258039851771d8d234202fbe",
+  "project": "clash_p11bind_5p_20261012",
+  "failure_stage": "first read-only Docker inventory, before Compose discovery/render or resource creation",
+  "docker_exit_code": 1,
+  "offline": {
+    "passed": 73,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "frozen_hashes_verified": 245,
+  "artifacts_verified": 106,
+  "vendor_hashes_verified": 4,
+  "service_image_runtime_verification": "BLOCKED",
+  "resource_baseline_comparison": "BLOCKED: daemon unavailable; no resource mutation issued",
+  "containers_created_by_task": 0,
+  "volumes_created_by_task": 0,
+  "networks_created_by_task": 0,
+  "database_connections": 0,
+  "migrations_executed": 0,
+  "migrations_blocked": 106,
+  "sql_suites_executed": 0,
+  "sql_suites_blocked": 89,
+  "postgresql_tap_assertions": 0,
+  "concurrency_suites_executed": 0,
+  "concurrency_suites_blocked": 9,
+  "primary_status_unchanged": true,
+  "cleanup": "Not required: no creation/startup/resource mutation command issued"
+}

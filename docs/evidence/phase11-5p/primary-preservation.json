@@ -1,0 +1,5 @@
+{
+  "status_unchanged": true,
+  "modified_and_untracked_status": " M scripts/dev-local.mjs\n M scripts/local-supabase-env.mjs\n M services/arenaCrewService.ts\n M utils/arenaCrewPayload.ts\n M utils/arenaCrewSpecialties.ts\n M utils/arenaCrews.test.ts\n?? Microsoft/\n?? app/arena/crews/\n?? components/crews/\n?? shot.png\n?? supabase/ANDROID_LOCAL_DEVELOPMENT.md\n?? supabase/migrations/20261006140000_arena_crews_discovery.sql\n?? supabase/tests/052_arena_crews_discovery.sql\n",
+  "byte_hash_comparison": "Not collected before preflight failure; no byte-preservation assertion made"
+}

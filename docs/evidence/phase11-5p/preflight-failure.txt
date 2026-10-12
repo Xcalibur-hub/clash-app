@@ -1,0 +1,8 @@
+First failing command (read-only):
+docker ps -a --format "{{.ID}} {{.Names}} {{.Image}} {{.State}}"
+Docker process exit: 1 (captured by checked() assertion).
+
+error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.51/containers/json?all=1": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+
+Node control preflight aborted with AssertionError [ERR_ASSERTION], actual 1, expected 0, in inventory().
+No Docker query retry, Desktop startup, context switch or alternate connection was performed.
