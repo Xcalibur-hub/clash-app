@@ -1,0 +1,4 @@
+
+Connecting to remote database...
+failed to connect to [REDACTED]: failed to connect to `host=127.0.0.1 user=[REDACTED] database=[REDACTED]`: tls error (server refused TLS connection)
+Try rerunning the command with --debug to troubleshoot the error.

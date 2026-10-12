@@ -1,0 +1,6 @@
+*.go text eol=lf
+*.cjs text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+vendor-evidence/* -text
+vendor-evidence/provenance.json text eol=lf
