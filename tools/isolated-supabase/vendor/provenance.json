@@ -1,0 +1,22 @@
+[
+  {
+    "file": "schema.sql",
+    "sha256": "3a9f39fb79d67d4fb2f5e54638dca1d06894a3e1a57419bc188e4ee09c72556f",
+    "source": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/internal/db/start/templates/schema.sql"
+  },
+  {
+    "file": "webhook.sql",
+    "sha256": "aa956b7b1f205284a524882fe0d580c72d86374aea9c9c2e93ac398df5e07d0b",
+    "source": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/internal/db/start/templates/webhook.sql"
+  },
+  {
+    "file": "_supabase.sql",
+    "sha256": "ced0d2dd073c86f402e409ff540ecda07455997e6a0a1e8a738c154c6b962a20",
+    "source": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/internal/db/start/templates/_supabase.sql"
+  },
+  {
+    "file": "kong.yml",
+    "sha256": "47c866e83ce8c6276a10e4a509cb151140f7cdd56107970e0cbd25d031f7651e",
+    "source": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/internal/start/templates/kong.yml"
+  }
+]

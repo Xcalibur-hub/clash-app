@@ -1,0 +1,13 @@
+Observed excerpt from the pre-correction actual authorized CLI regression:
+
+not ok 1 - actual authorized bootstrap CLI verifies real artifacts and reaches exactly one mocked psql command
+Bootstrap client failed; see sanitized log if available. No retry authorized.
+Warning: Accessing non-existent property 'loadConfig' of module exports inside circular dependency
+Warning: Accessing non-existent property 'password' of module exports inside circular dependency
+Warning: Accessing non-existent property 'redactor' of module exports inside circular dependency
+Warning: Accessing non-existent property 'runner' of module exports inside circular dependency
+Warning: Accessing non-existent property 'psqlArgs' of module exports inside circular dependency
+Warning: Accessing non-existent property 'migrationArgs' of module exports inside circular dependency
+Actual child exit: 1; expected: 0. Test command exit: 1.
+
+This was a wholly offline reproduction. No Docker executable or PostgreSQL process ran.
