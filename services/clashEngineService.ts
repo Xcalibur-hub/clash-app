@@ -87,9 +87,10 @@ export async function settleClash(clashId: string): Promise<ClashSettlementResul
 export async function fetchVerdict(clashId: string): Promise<ServerVerdict | null> {
   const { data, error } = await requireSupabase()
     .from('verdicts')
-    .select('*')
+    .select('clash_id, winner_side, side_a_score, side_b_score, jury_size, agreement, margin, verdict_label')
     .eq('clash_id', clashId)
     .maybeSingle();
+  if (error?.code === '42501') return null;
   if (error) throw requestError(error);
   if (!data) return null;
   return {
@@ -281,12 +282,15 @@ function toClashView(payload: Json | null): ClashView {
   };
 }
 
-function toClashDetail(row: ClashRow): ClashDetail {
+const CLASH_READ_FIELDS = 'id, take_id, status, mode, opens_at, closes_at, created_at, settled_at' as const;
+type ReadableClashRow = Pick<ClashRow, 'id' | 'take_id' | 'status' | 'mode' | 'opens_at' | 'closes_at' | 'created_at' | 'settled_at'>;
+
+function toClashDetail(row: ReadableClashRow): ClashDetail {
   return {
     id: row.id,
     takeId: row.take_id,
-    challengerId: row.challenger_id ?? '',
-    challengerCommentId: row.challenger_comment_id ?? null,
+    challengerId: '',
+    challengerCommentId: null,
     status: row.status,
     mode: (row as ClashRow & { mode?: ClashMode }).mode ?? 'STANDARD',
     opensAt: Date.parse(row.opens_at),
@@ -301,22 +305,24 @@ export async function fetchClashForTake(takeId: string): Promise<ClashDetail | n
   const client = requireSupabase();
   const open = await client
     .from('clashes')
-    .select('*')
+    .select(CLASH_READ_FIELDS)
     .eq('take_id', takeId)
     .eq('status', 'open')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (open.error?.code === '42501') return null;
   if (open.error) throw requestError(open.error);
   if (open.data) return toClashDetail(open.data);
 
   const latest = await client
     .from('clashes')
-    .select('*')
+    .select(CLASH_READ_FIELDS)
     .eq('take_id', takeId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (latest.error?.code === '42501') return null;
   if (latest.error) throw requestError(latest.error);
   return latest.data ? toClashDetail(latest.data) : null;
 }
@@ -325,16 +331,18 @@ export async function fetchClashForTake(takeId: string): Promise<ClashDetail | n
 export async function fetchClashById(clashId: string): Promise<ClashDetail | null> {
   const { data, error } = await requireSupabase()
     .from('clashes')
-    .select('id, take_id, status, mode, opens_at, closes_at, created_at, settled_at')
+    .select(CLASH_READ_FIELDS)
     .eq('id', clashId)
     .maybeSingle();
+  if (error?.code === '42501') return null;
   if (error) throw requestError(error);
-  return data ? toClashDetail({ ...data, challenger_id: '', challenger_comment_id: null } as ClashRow) : null;
+  return data ? toClashDetail(data) : null;
 }
 
 /** Authoritative Clash screen read. Identities are present only when revealed. */
 export async function fetchClashView(clashId: string): Promise<ClashView | null> {
   const { data, error } = await requireSupabase().rpc('clash_view', { p_clash_id: clashId });
+  if (error?.code === '42501') return null;
   if (error) throw requestError(error);
   return data === null ? null : toClashView(data);
 }
@@ -342,27 +350,50 @@ export async function fetchClashView(clashId: string): Promise<ClashView | null>
 /** Authoritative Clash screen read for an existing Take. */
 export async function fetchClashViewForTake(takeId: string): Promise<ClashView | null> {
   const { data, error } = await requireSupabase().rpc('clash_view_for_take', { p_take_id: takeId });
+  if (error?.code === '42501') return null;
   if (error) throw requestError(error);
   if (data === null) return null;
   return toClashView(data);
 }
 
-/** A profile's public reward ledger. */
+/** Private own reward history. Foreign profiles and stale sessions return no data.
+ * RLS is authoritative; these guards also discard responses after account changes.
+ */
 export async function fetchReputationEvents(profileId: string): Promise<ReputationEvent[]> {
-  const { data, error } = await requireSupabase()
-    .from('reputation_events')
-    .select('*')
-    .eq('profile_id', profileId)
-    .order('created_at', { ascending: false })
-    .limit(100);
-  if (error) throw requestError(error);
-  return data.map((row) => ({
-    id: row.id,
-    profileId: row.profile_id,
-    clashId: row.clash_id,
-    kind: row.kind,
-    reputationDelta: row.reputation_delta,
-    coinsDelta: row.coins_delta,
-    createdAt: Date.parse(row.created_at),
-  }));
+  const client = requireSupabase();
+  let invalidated = false;
+  let accountId: string | null | undefined;
+  const { data: subscription } = client.auth.onAuthStateChange((event, session) => {
+    // A sign-out/sign-in cycle invalidates even a return to the same account.
+    // Token refresh and initial session delivery do not change the request owner.
+    if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' ||
+      (accountId !== undefined && (session?.user.id ?? null) !== accountId)) invalidated = true;
+  });
+  try {
+    const { data: initial } = await client.auth.getSession();
+    accountId = initial.session?.user.id ?? null;
+    if (invalidated || !accountId) return [];
+    const me = await currentViewerProfileId();
+    if (invalidated || me !== profileId) return [];
+    const { data, error } = await client
+      .from('reputation_events')
+      .select('id, profile_id, clash_id, kind, reputation_delta, coins_delta, created_at')
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    const { data: latest } = await client.auth.getSession();
+    if (invalidated || latest.session?.user.id !== accountId) return [];
+    if (error) throw requestError(error);
+    return (data ?? []).filter((row) => row.profile_id === profileId).map((row) => ({
+      id: row.id,
+      profileId: row.profile_id,
+      clashId: row.clash_id,
+      kind: row.kind,
+      reputationDelta: row.reputation_delta,
+      coinsDelta: row.coins_delta,
+      createdAt: Date.parse(row.created_at),
+    }));
+  } finally {
+    subscription.subscription.unsubscribe();
+  }
 }

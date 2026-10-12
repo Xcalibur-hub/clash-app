@@ -1,0 +1,23 @@
+{
+  "scope": "offline only; no database or Docker commands",
+  "node": {
+    "passed": 81,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "go": {
+    "top_level_passed": 28,
+    "passing_subtests": 23,
+    "passing_leaf_cases": 47,
+    "failed": 0
+  },
+  "go_vet_exit": 0,
+  "database_connections": 0,
+  "migrations_applied": 0,
+  "sql_suites_executed": 0,
+  "database_tap_assertions": 0,
+  "primary_status_unchanged": true,
+  "primary_tracked_dirty_hashes_unchanged": 6,
+  "evidence_normalization": "UTF-16 shell output decoded to UTF-8; trailing line whitespace removed from Node TAP only; assertions unchanged"
+}

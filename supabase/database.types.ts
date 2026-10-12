@@ -6993,6 +6993,10 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: Json
       }
+      profile_clash_stats: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
       publish_meet_signal: {
         Args: {
           p_kind: Database["public"]["Enums"]["meet_signal_kind"]
