@@ -117,3 +117,7 @@ One authorized direct IPv6 preflight from `C:/p116g` on exact Step 6F revision `
 ## Step 6H: pgbouncer managed schema allowlist (file-only)
 
 Isolated review established that supabase/postgres provisions schema `pgbouncer` for dedicated PgBouncer `auth_query`. The executor managed-schema allowlist now includes `pgbouncer`; unknown schemas remain fail-closed. No hosted reconnect. Staging still not migration-eligible until a separately authorized preflight passes. See [Step 6H report](PHASE_11_PGBOUNCER_COMPAT_REVIEW_6H.md).
+
+## Step 6I: direct eligibility preflight PASS (2026-10-12)
+
+One authorized direct IPv6 preflight from `C:/p116i` on exact Step 6H revision `e85ce3e` passed all mandatory gates, including empty application ledger (`0` entries) and `unexpected_schemas=0` with `pgbouncer` allowlisted. **Migration-eligible; migrations not deployed.** Application security remains unverified. `pgbouncer` owner/contents still unverified (no executor inventory). See [Step 6I report](PHASE_11_DIRECT_ELIGIBILITY_PREFLIGHT_6I.md).
