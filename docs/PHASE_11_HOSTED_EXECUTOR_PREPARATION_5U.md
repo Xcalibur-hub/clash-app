@@ -2,6 +2,8 @@
 
 12 October 2026. **FILE-ONLY. Ready for a separately authorized first read-only staging preflight; not cleared for migration, fixture execution or promotion.** No Docker command, SQL execution, database connection, project creation/linking, deployment, Expo or Android operation occurred. Database security remains unverified. Step 4C remains BLOCKED against existing local databases; Step 2F remains DEFERRED.
 
+Draft delivery: [PR #45](https://github.com/Xcalibur-hub/clash-app/pull/45), stacked on PR #44; implementation commit `4125d73836bc567dbc61abd34126bdf05d994e9c`. The final documentation commit is reported in the handoff response. No merge or deployment.
+
 ## Frozen baseline and artifact provenance
 
 New worktree `C:/p11exec`, branch `feat/phase-11-hosted-executor`, based on PR #44 head `068a188e751c4b2f7feaa4de787d0945b4e87d27`. Read [the staging plan](PHASE_11_HOSTED_STAGING_READINESS_5T.md) and [project handoff](CLASH_PROJECT_HANDOFF_5T.md). Prerequisites are #26 ? #31 ? #35 ? #37 ? #39 ? #42 ? #43 ? #44, with #28 encoding tooling and #34 binding review included. No prerequisite branch was edited or merged.

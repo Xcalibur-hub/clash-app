@@ -4,7 +4,7 @@
 
 ## Step 5U progress and next action
 
-[Hosted executor preparation](PHASE_11_HOSTED_EXECUTOR_PREPARATION_5U.md) and [creation checklist](HOSTED_STAGING_CREATION_CHECKLIST.md) now supersede the file-only preparation item below. New Step 5U draft is stacked on [PR #44](https://github.com/Xcalibur-hub/clash-app/pull/44); its PR link will be recorded after creation. The frozen implementation and artifact lineage are unchanged.
+[Hosted executor preparation](PHASE_11_HOSTED_EXECUTOR_PREPARATION_5U.md) and [creation checklist](HOSTED_STAGING_CREATION_CHECKLIST.md) now supersede the file-only preparation item below. [Step 5U draft PR #45](https://github.com/Xcalibur-hub/clash-app/pull/45) is stacked on [PR #44](https://github.com/Xcalibur-hub/clash-app/pull/44), open and unmerged. The frozen implementation and artifact lineage are unchanged.
 
 Verified now: 245 frozen hashes, 106 compatibility artifacts, all 89 source suites bundled, ten dblink adapters; 81 prerequisite Node tests and 28 top-level Go tests (23 subtests, 47 leaf cases) pass, plus Go vet. These are mocked/offline results, **zero database connections/migrations/SQL assertions**. Actual CLI 2.40.7 pgx v4 parser regressions confirm TLS settings are dropped during remote URL reconstruction. A separate pinned pgx v5 executor uses explicit verified TLS; no Compose redirection or insecure fallback.
 
