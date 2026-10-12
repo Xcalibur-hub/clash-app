@@ -97,3 +97,49 @@ func TestManagedSchemaAllowlistSharedByCountAndNameQueries(t *testing.T) {
 		t.Fatal("name inventory must not join object catalogs")
 	}
 }
+
+func TestManagedSchemaAllowlistIncludesDocumentedPgbouncer(t *testing.T) {
+	if !strings.Contains(managedSchemaAllowlist, "'pgbouncer'") {
+		t.Fatal("documented supabase/postgres pgbouncer schema missing from allowlist")
+	}
+}
+
+func TestPreflightAcceptsSolePgbouncerManagedSchema(t *testing.T) {
+	// Mimic Step 6G inventory shape after allowlisting: zero unexpected schemas.
+	m := &alteredSession{mock: &mock{}}
+	m.override = func(q string) (Result, bool) {
+		switch q {
+		case objectsSQL:
+			return Result{Rows: []map[string]any{{"relations": 0, "routines": 0, "types": 0, "unexpected_schemas": 0}}}, true
+		case unexpectedSchemaNamesSQL:
+			return Result{Rows: []map[string]any{}}, true
+		default:
+			return Result{}, false
+		}
+	}
+	if _, e := preflight(context.Background(), m); e != nil {
+		t.Fatal(e)
+	}
+}
+
+func TestPreflightStillRejectsUnknownSchema(t *testing.T) {
+	m := &alteredSession{mock: &mock{}}
+	m.override = func(q string) (Result, bool) {
+		switch q {
+		case objectsSQL:
+			return Result{Rows: []map[string]any{{"relations": 0, "routines": 0, "types": 0, "unexpected_schemas": 1}}}, true
+		case unexpectedSchemaNamesSQL:
+			return Result{Rows: []map[string]any{{"name": "app_private"}}}, true
+		default:
+			return Result{}, false
+		}
+	}
+	report, e := preflight(context.Background(), m)
+	if e == nil || e.Error() != "unexpected application objects; review required" {
+		t.Fatal("unknown schema must remain fail-closed", e)
+	}
+	rows, _ := report["unexpected_schema_names"].([]map[string]any)
+	if len(rows) != 1 || fmt.Sprint(rows[0]["name"]) != "app_private" {
+		t.Fatalf("unknown schema name not retained: %#v", report["unexpected_schema_names"])
+	}
+}

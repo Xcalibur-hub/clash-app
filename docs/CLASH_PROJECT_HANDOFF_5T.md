@@ -113,3 +113,7 @@ Isolated worktree `C:/p116f` investigated the Step 6E blockers without live SQL.
 ## Step 6G: direct compatibility preflight blocked on schema `pgbouncer` (2026-10-12)
 
 One authorized direct IPv6 preflight from `C:/p116g` on exact Step 6F revision `5ce5641` confirmed TLS/identity (backend SSL true) and accepted `pgcrypto` owned by `postgres`. Execution stopped at unexpected application objects: allowlisted name inventory reported **`pgbouncer`**. No allowlist mutation, retry, or migration. Staging remains not migration-eligible. See [Step 6G report](PHASE_11_DIRECT_COMPAT_PREFLIGHT_6G.md).
+
+## Step 6H: pgbouncer managed schema allowlist (file-only)
+
+Isolated review established that supabase/postgres provisions schema `pgbouncer` for dedicated PgBouncer `auth_query`. The executor managed-schema allowlist now includes `pgbouncer`; unknown schemas remain fail-closed. No hosted reconnect. Staging still not migration-eligible until a separately authorized preflight passes. See [Step 6H report](PHASE_11_PGBOUNCER_COMPAT_REVIEW_6H.md).

@@ -77,7 +77,11 @@ const managedSQL = `select pg_catalog.to_regclass('auth.users') is not null and 
 // Known managed/system schemas that are never treated as application schemas.
 // Keep in sync with unexpectedSchemaNamesSQL. Do not invent allowlist entries
 // from unverified hosted observations; expand only with documented managed names.
-const managedSchemaAllowlist = `'information_schema','public','auth','storage','realtime','_realtime','extensions','graphql','graphql_public','vault','net','pgsodium','pgsodium_masks','cron','supabase_functions','supabase_migrations','_analytics'`
+// pgbouncer is provisioned by supabase/postgres for dedicated PgBouncer auth_query
+// (ansible/files/pgbouncer_config/pgbouncer_auth_schema.sql; schema-17 dump).
+// Name-based allowlisting matches other managed schemas; live owner/contents are
+// not asserted here — see docs/PHASE_11_PGBOUNCER_COMPAT_REVIEW_6H.md.
+const managedSchemaAllowlist = `'information_schema','public','auth','storage','realtime','_realtime','extensions','graphql','graphql_public','vault','net','pgsodium','pgsodium_masks','cron','supabase_functions','supabase_migrations','_analytics','pgbouncer'`
 
 // Exclude extension-managed public objects by pg_depend, not by guessing names.
 // Fresh projects must have no non-extension public relations/routines/user types.
