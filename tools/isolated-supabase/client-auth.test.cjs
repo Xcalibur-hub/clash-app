@@ -1,10 +1,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {spawnSync}=require('node:child_process');
 const {password,redactor,runner,psqlArgs,migrationArgs,loadConfig}=require('./client-auth.cjs');
+const platformEnv={PATH:'path',SYSTEMROOT:'C:\\Windows',USERPROFILE:'C:\\Users\\fixture',PROGRAMFILES:'C:\\Program Files',PROGRAMDATA:'C:\\ProgramData'};
 const fixture=()=>({services:{db:{environment:{POSTGRES_PASSWORD:'test-password-unique'}},auth:{environment:{GOTRUE_DB_DATABASE_URL:'postgresql://user:url-secret@db/db',JWT_SECRET:'jwt-secret-unique'}}}});
 test('password is read from disposable configuration, not inherited credentials',()=>{
  const config=fixture();let captured;
- runner(config,'fixture',(command,args,options)=>{captured={command,args,options};return {status:0,stdout:'ok'};},{PATH:'path',PGPASSWORD:'inherited',DATABASE_URL:'other',SUPABASE_DB_PASSWORD:'other',SUPABASE_ACCESS_TOKEN:'other'})('docker',psqlArgs('supabase_admin'),true);
+ runner(config,'fixture',(command,args,options)=>{captured={command,args,options};return {status:0,stdout:'ok'};},{...platformEnv,PGPASSWORD:'inherited',DATABASE_URL:'other',SUPABASE_DB_PASSWORD:'other',SUPABASE_ACCESS_TOKEN:'other'})('docker',psqlArgs('supabase_admin'),true);
  assert.equal(captured.options.env.PGPASSWORD,password(config));assert.equal(captured.options.env.PATH,'path');
  for(const key of ['DATABASE_URL','SUPABASE_DB_PASSWORD','SUPABASE_ACCESS_TOKEN'])assert.equal(captured.options.env[key],undefined);
  assert.ok(!JSON.stringify(captured.args).includes(password(config)));assert.equal(captured.options.shell,false);
@@ -14,10 +15,10 @@ test('missing, blank, non-string or line-breaking passwords reject before subpro
   assert.throws(()=>runner(c,'fixture',()=>{calls++;}));assert.equal(calls,0);}
 });
 test('credentials are forwarded only to authenticated child processes without parent mutation',()=>{
- const inherited={PATH:'path'};const captured=[];
+ const inherited={...platformEnv};const captured=[];
  const run=runner(fixture(),'fixture',(command,args,options)=>{captured.push(options.env);return {status:0};},inherited);
  run('docker',['inspect']);run('docker',psqlArgs('postgres'),true);run('docker',['inspect']);
- assert.equal(captured[0].PGPASSWORD,undefined);assert.equal(captured[1].PGPASSWORD,password(fixture()));assert.equal(captured[2].PGPASSWORD,undefined);assert.deepEqual(inherited,{PATH:'path'});
+ assert.equal(captured[0].PGPASSWORD,undefined);assert.equal(captured[1].PGPASSWORD,password(fixture()));assert.equal(captured[2].PGPASSWORD,undefined);assert.deepEqual(inherited,platformEnv);
 });
 test('all psql roles use noninteractive auth, name-only forwarding and error stop',()=>{
  for(const role of ['postgres','supabase_admin']) for(const transcript of [false,true]) {
@@ -51,7 +52,7 @@ test('malformed private config errors do not print its contents',()=>{
 });
 test('lifecycle delegates bootstrap to authenticated helper and contains no bare psql',()=>{
  const s=fs.readFileSync(path.join(__dirname,'lifecycle.ps1'),'utf8');
- assert.ok(s.includes("'client-auth.cjs') bootstrap $taskRoot --authorized-new-disposable-attempt"));assert.ok(!s.includes("'psql'"));
+ assert.ok(s.includes("'client-auth.cjs'),'bootstrap',$taskRoot,'--authorized-new-disposable-attempt'"));assert.ok(!s.includes("'psql'"));
  const e=fs.readFileSync(path.join(__dirname,'execute.cjs'),'utf8');assert.ok(e.includes("psqlArgs('postgres',[],true)"));assert.ok(e.includes("run('supabase',migrationArgs(root),true)"));
  assert.ok(e.includes("safe(r.stdout+'\\n'+r.stderr)"));assert.ok(e.includes('safe(r.stderr)'));
 });
@@ -68,6 +69,7 @@ test('PowerShell logging sanitizes actual mocked command output and preserves ge
   fs.writeFileSync(path.join(root,'stderr.cjs'),"const c=require('./compose.json');process.stderr.write(c.services.db.environment.POSTGRES_PASSWORD);process.exitCode=2;");
   fs.writeFileSync(script,`$ErrorActionPreference='Stop'
 $taskRoot=$PSScriptRoot
+. (Join-Path (Split-Path $args[0]) 'client-environment.ps1')
 $ast=[System.Management.Automation.Language.Parser]::ParseFile($args[0],[ref]$null,[ref]$null)
 $fn=$ast.Find({param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'D'},$true)
 Invoke-Expression $fn.Extent.Text

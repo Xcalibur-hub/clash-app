@@ -17,7 +17,7 @@ function verifyPrepared(root) {
   S3_ACCESS_KEY:config.services.storage.environment.S3_PROTOCOL_ACCESS_KEY_ID,S3_SECRET_KEY:config.services.storage.environment.S3_PROTOCOL_ACCESS_KEY_SECRET};
  assert.ok(isDeepStrictEqual(config,compose(meta.project,secrets)),'Prepared Compose changed');
  const {jwt}=require('./prepare.cjs');assert.ok(secrets.ANON_KEY===jwt(env.JWT_SECRET,'anon'),'Anonymous key mismatch');assert.ok(secrets.SERVICE_KEY===jwt(env.JWT_SECRET,'service_role'),'Service key mismatch');
- for(const file of ['client-auth.cjs','db-entrypoint.sh','extensions.sql','inspect-security.sql','images.json',...require('./vendor/provenance.json').map(e=>'vendor/'+e.file)])
+ for(const file of ['client-auth.cjs','client-environment.cjs','client-environment.ps1','client-environment.json','db-entrypoint.sh','extensions.sql','inspect-security.sql','images.json',...require('./vendor/provenance.json').map(e=>'vendor/'+e.file)])
   assert.deepEqual(fs.readFileSync(path.join(root,'bootstrap',file)),fs.readFileSync(path.join(__dirname,file)),'Bootstrap file changed: '+file);
  verifyArtifact(path.join(root,'migration-compatibility-reviewed'),artifact());
  const manifest=JSON.parse(fs.readFileSync(path.join(root,'source-manifest.json')));

@@ -49,7 +49,7 @@ test('inspection distinguishes file intent from unsafe actual host bindings',()=
  assert.equal(checkInspect(inspect,project,false).reachability_verified,false);inspect[0].HostConfig.PortBindings['5432/tcp'][0].HostIp='';assert.throws(()=>checkInspect(inspect,project,false));
 });
 test('future lifecycle refuses missing authorization; default executor cannot run on import',()=>{
- const s=fs.readFileSync(path.join(__dirname,'lifecycle.ps1'),'utf8');assert.ok(s.indexOf('if (-not $AuthorizedNewDisposableAttempt)')<s.indexOf('& docker'));
+ const s=fs.readFileSync(path.join(__dirname,'lifecycle.ps1'),'utf8');assert.ok(s.indexOf('if (-not $AuthorizedNewDisposableAttempt)')<s.indexOf("Invoke-IsolatedClient 'docker'"));
  assert.ok(s.indexOf("C @('create','--no-build')")<s.indexOf("C @('start','db')"));
  const execute=require('./execute.cjs');assert.equal(typeof execute.verifyPrepared,'function');
 });
