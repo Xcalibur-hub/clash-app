@@ -1,0 +1,32 @@
+{
+  "recommendation": "FAIL",
+  "candidate_security": "BLOCKED_UNVERIFIED",
+  "project": "clash_p11bind_5s_20261012",
+  "offline": {
+    "passed": 81,
+    "failed": 0,
+    "skipped": 0
+  },
+  "sources_verified": 245,
+  "artifacts_verified": 106,
+  "managed_initialization_jobs_passed": 3,
+  "bootstrap_exit": 0,
+  "migration_runner_exit": 1,
+  "migrations_applied": 0,
+  "migrations_blocked": 106,
+  "sql_suites_executed": 0,
+  "sql_suites_blocked": 89,
+  "tap": {
+    "assertions": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "concurrency_suites_executed": 0,
+  "concurrency_suites_blocked": 9,
+  "cleanup": "PASS",
+  "post_cleanup_project_containers": 0,
+  "post_cleanup_project_volumes": 0,
+  "post_cleanup_project_networks": 0,
+  "post_cleanup_dedicated_listeners": 0
+}
