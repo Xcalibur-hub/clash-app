@@ -1,0 +1,11 @@
+{
+  "database_security_passed": false,
+  "identity_gate": {
+    "database_match": true,
+    "current_role_match": true,
+    "session_role_match": true,
+    "backend_ssl_observed": false,
+    "postgres_17_match": true,
+    "failure_reason": "backend_ssl_required"
+  }
+}

@@ -1,0 +1,46 @@
+{
+    "reviewed_commit":  "df5d8d084bbe331d8de3479e045b1b409248414e",
+    "executable_sha256":  "3d71f3a1d8a565ae294649a8d6ae9f0607071a9cc68d60210af4dd408afa7d5a",
+    "offline_exits":  {
+                          "node":  0,
+                          "go":  0,
+                          "vet":  0,
+                          "modules":  0,
+                          "build":  0
+                      },
+    "node":  {
+                 "skip":  0,
+                 "pass":  81,
+                 "fail":  0
+             },
+    "go":  {
+               "subtests":  82,
+               "top_level":  52,
+               "skip":  0,
+               "leaf_cases":  123,
+               "fail":  0
+           },
+    "frozen":  {
+                   "source_hashes":  245,
+                   "vendor_templates":  4,
+                   "passed":  true
+               },
+    "artifacts":  {
+                      "artifact_dir":  "C:\\p11prez\\.expo\\migration-compatibility-hosted-5u-final",
+                      "artifact_manifest_sha256":  "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+                      "suite_manifest_sha256":  "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+                      "migrations":  106,
+                      "adapted_suites":  10,
+                      "total_suites":  89,
+                      "source_hashes":  245,
+                      "sql_executed":  false
+                  },
+    "ca_sha256":  "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "credential_source":  "existing per-user Windows Credential Manager entry",
+    "private_acl_verified":  true,
+    "child_environment":  "cleared then nonsecret Windows platform allowlist only",
+    "preflight_invocations":  1,
+    "migrations_executed":  0,
+    "sql_suites_executed":  0,
+    "database_security_passed":  false
+}
