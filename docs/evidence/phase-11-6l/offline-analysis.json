@@ -1,0 +1,17 @@
+{
+  "failed_artifact": "20261004120000_explore_play_system.sql",
+  "compatibility_transform": "assert-managed-pgcrypto",
+  "transform_requires_owner": "supabase_admin",
+  "hosted_pgcrypto_owner_from_6k_preflight": "postgres",
+  "hosted_pgcrypto_owner_from_6l_investigate": "postgres",
+  "artifact_assert_would_pass_live": false,
+  "unreachable_if_assert_fails": [
+    "explore_* enums",
+    "explore_challenge_* tables",
+    "explore_treasure_clues*",
+    "play RPCs",
+    "notification_kind ADD VALUE labels"
+  ],
+  "original_sqlstate_from_6k": "unavailable",
+  "frozen_source_sql_altered_in_6l": false
+}

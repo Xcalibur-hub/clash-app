@@ -1,0 +1,22 @@
+{
+  "source": "Step 6G pre-connect verification",
+  "approved": {
+    "project": "clash-staging",
+    "project_ref": "zrutlrhhvfcsmssjiijl",
+    "host": "db.zrutlrhhvfcsmssjiijl.supabase.co",
+    "port": 5432,
+    "database": "postgres",
+    "username": "postgres",
+    "connection_mode": "direct"
+  },
+  "dashboard_direct_form": "db.[PROJECT-REF].supabase.co:5432",
+  "matches_authorization": true,
+  "network_precheck": {
+    "global_ipv6": true,
+    "default_ipv6_route": true,
+    "aaaa": true,
+    "tcp_5432_ipv6": "CONNECTED"
+  },
+  "executor_revision": "5ce5641708b49fac2270ee008b4a298a0a62f199",
+  "step_6f_pgcrypto_owners": ["supabase_admin", "postgres"]
+}

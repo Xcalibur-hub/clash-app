@@ -1,0 +1,47 @@
+{
+  "fresh_preflight_success": true,
+  "identity_gate": {
+    "database_match": true,
+    "current_role_match": true,
+    "session_role_match": true,
+    "backend_ssl_observed": true,
+    "postgres_17_match": true,
+    "failure_reason": "none"
+  },
+  "application_objects": [
+    {
+      "relations": 0,
+      "routines": 0,
+      "types": 0,
+      "unexpected_schemas": 0
+    }
+  ],
+  "existing_data": [
+    {
+      "buckets": false,
+      "objects": false,
+      "users": false
+    }
+  ],
+  "application_ledger_entries": 0,
+  "unexpected_schema_names": null,
+  "managed": [
+    {
+      "cron_catalog": false,
+      "cron_preloaded": true,
+      "managed": true,
+      "publication": true,
+      "restricted_files": true,
+      "restricted_role": true
+    }
+  ],
+  "installed_extensions": [
+    {
+      "name": "pgcrypto",
+      "owner": "postgres",
+      "schema": "extensions",
+      "version": "1.3"
+    }
+  ],
+  "database_security_passed_field": false
+}

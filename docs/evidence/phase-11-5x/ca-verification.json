@@ -1,0 +1,10 @@
+{
+  "source": "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt",
+  "final_source": "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt",
+  "source_repository_commit": "d303c248d352308b0a233d2ba0d07cf1c31cb544",
+  "source_config": "apps/studio/hooks/custom-content/custom-content.json",
+  "local_file": "C:/Users/91962/Downloads/prod-ca-2021.crt",
+  "bytes": 1367,
+  "sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+  "exact_match": true
+}

@@ -1,0 +1,22 @@
+{
+  "step": "6K",
+  "quarantine": true,
+  "staging_requires_investigation": true,
+  "migrations_attempted": 44,
+  "migrations_completed": 43,
+  "migrations_remaining": 63,
+  "last_successful": "20261003200000_explore_for_you_ia.sql",
+  "failed_on": "20261004120000_explore_play_system.sql",
+  "failure_message_sanitized": "database operation failed; diagnostics withheld",
+  "ledger_verification": "incomplete; executor stopped before full 106; completed_items=43 implies 43 ledger rows for successful commits but live ledger was not re-queried after failure (no additional connection)",
+  "automatic_retry": false,
+  "automatic_resume": false,
+  "repair_performed": false,
+  "reset_performed": false,
+  "sql_suites_executed": false,
+  "fixtures_created": false,
+  "cron_observation": "clash_scheduler migration (#13) is among the 43 committed artifacts; clash-maintenance may be active. No post-failure cron inventory connection was made.",
+  "executor_revision": "f2a2b3f7fd5aee33bfd5b4c80e68dce95c90e354",
+  "migrate_path_lineage": "e85ce3e4f62490d98c94b9e032d4f68a97e1485f",
+  "binary_sha256": "128cac60fa1e6f982182e8de458eb528f75154fd09baf9d5aa5838e9276db5c1"
+}
