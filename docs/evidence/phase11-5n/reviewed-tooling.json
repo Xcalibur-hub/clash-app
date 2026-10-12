@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "path": "scripts/migration-compatibility-artifact.cjs",
+      "reference": "8c0b4e9c7d49a330e7e549f91c48070b0d1dfd15",
+      "sha256": "99906059fd86c3868d8c17dd75c65d7823ff85ec44734d174f910d0781731ef5",
+      "git_blob_identical": true
+    },
+    {
+      "path": "scripts/migration-compatibility-artifact.test.cjs",
+      "reference": "8c0b4e9c7d49a330e7e549f91c48070b0d1dfd15",
+      "sha256": "5b31be605206b07f9c8f941c356a01f8724b3384fa771a37f005a3f4e6ce4485",
+      "git_blob_identical": true
+    },
+    {
+      "path": "scripts/loopback-binding-check.cjs",
+      "reference": "d7cd45d918635345636915092016c5d21c96f31f",
+      "sha256": "030710331a4ae0c5c8b52142ffd716db1240cb584972ef2a8f5fe2fde3ebb3c1",
+      "git_blob_identical": true
+    }
+  ],
+  "powershell": "7.6.6",
+  "powershell_archive_sha256": "02fe458be20493fbdf43f61ea20610b811ee6c738ab1676c61b9cfcd1a33c860"
+}

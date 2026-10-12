@@ -1,0 +1,27 @@
+{
+  "recommendation": "BLOCKED",
+  "harness_execution": "FAIL",
+  "stage": "Compose config render, before resource creation",
+  "project": "clash_p11bind_5n_20261012",
+  "head": "8225b5763d4db5089f11e850f0a3d319557d798a",
+  "offline_tests": {
+    "passed": 68,
+    "failed": 0,
+    "skipped": 0
+  },
+  "frozen_source_hashes": 245,
+  "compatibility_artifacts": 106,
+  "created_containers": 0,
+  "created_volumes": 0,
+  "created_networks": 0,
+  "database_connections": 0,
+  "migrations_executed": 0,
+  "migrations_blocked": 106,
+  "sql_suites_executed": 0,
+  "sql_suites_blocked": 89,
+  "[REDACTED]ql_tap_assertions": 0,
+  "concurrency_suites_executed": 0,
+  "concurrency_suites_blocked": 9,
+  "cleanup": "No resources created; no removal required; exact baseline metadata inventory match",
+  "runtime_verified": false
+}

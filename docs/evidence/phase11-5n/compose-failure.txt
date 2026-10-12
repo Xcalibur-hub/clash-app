@@ -1,0 +1,8 @@
+compose exit=125
+unknown shorthand flag: 'p' in -p
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+compose exit=0
+MOCK_ARGV=compose|-p|clash_p11bind_5n_20261012|-f|C:\p11runn\.expo\clash_p11bind_5n_20261012\compose.json|config|--format|json
