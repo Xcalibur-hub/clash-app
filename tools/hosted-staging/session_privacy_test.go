@@ -142,7 +142,9 @@ func TestExpandedPreflightDenials(t *testing.T) {
 		{"existing_bucket", dataSQL, "buckets", true},
 		{"cron_job", cronSQL, "jobs", true},
 		{"missing_role", rolesSQL, "drop_name", "supabase_admin"},
-		{"wrong_pgcrypto", extensionsSQL, "owner", "postgres"},
+		{"foreign_pgcrypto_owner", extensionsSQL, "owner", "untrusted_owner"},
+		{"wrong_pgcrypto_schema", extensionsSQL, "schema", "public"},
+		{"wrong_pgcrypto_version", extensionsSQL, "version", "1.2"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -191,7 +193,7 @@ func TestExpandedPreflightReadOnlyAndEvidence(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	for _, required := range []string{"available_extensions", "role_inheritance", "application_objects", "existing_data", "application_ledger_entries", "cron"} {
+	for _, required := range []string{"available_extensions", "role_inheritance", "application_objects", "unexpected_schema_names", "existing_data", "application_ledger_entries", "cron"} {
 		if !strings.Contains(string(b), required) {
 			t.Fatal("missing inventory", required)
 		}

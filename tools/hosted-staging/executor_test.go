@@ -101,6 +101,8 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 		return Result{}, nil
 	case objectsSQL:
 		return Result{Rows: []map[string]any{{"relations": 0, "routines": 0, "types": 0, "unexpected_schemas": 0}}}, nil
+	case unexpectedSchemaNamesSQL:
+		return Result{Rows: []map[string]any{}}, nil
 	case dataSQL:
 		return Result{Rows: []map[string]any{{"users": false, "objects": false, "buckets": false}}}, nil
 	case cronSQL:

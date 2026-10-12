@@ -105,3 +105,7 @@ Step 5X remains BLOCKED: its original failing field cannot be reconstructed. Nex
 ## Step 6E: direct IPv6 preflight blocked on pgcrypto owner (2026-10-12)
 
 After network-only Steps 6B–6D confirmed IPv6 reachability to `db.zrutlrhhvfcsmssjiijl.supabase.co:5432` on the owner Windows hotspot, one authorized direct-mode preflight ran from worktree `C:/p116e` on exact Step 5Y revision `df5d8d0` with rebuilt hash `3d71f3a1…`. Client TLS and identity gates passed, including **`backend_ssl_observed=true`** (contrast Step 5Z pooler backend SSL false). Execution stopped at `managed pgcrypto prerequisite mismatch`: installed `pgcrypto` 1.3 in `extensions` is owned by `postgres`, while the gate requires `supabase_admin`. Partial inventory also shows `unexpected_schemas=1`. Zero migrations/suites ran. Staging remains **not migration-eligible**; application security unverified. See [Step 6E report](PHASE_11_DIRECT_IPV6_PREFLIGHT_6E.md).
+
+## Step 6F: hosted DB compatibility investigation (file-only)
+
+Isolated worktree `C:/p116f` investigated the Step 6E blockers without live SQL. The pgcrypto owner gate was an executor assumption (`supabase_admin` only), not a frozen-migration requirement; hosted staging presented owner `postgres`. The executor now accepts managed owners `supabase_admin` or `postgres` for `extensions.pgcrypto` 1.3 and records allowlisted unexpected schema **names** while remaining fail-closed on non-zero counts. Offline Go tests and frozen 245/106 hashes verified. No hosted reconnect. See [Step 6F report](PHASE_11_HOSTED_DB_COMPAT_6F.md).
