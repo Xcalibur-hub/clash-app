@@ -1,6 +1,7 @@
 // File-only on import. Runtime entry point requires separate disposable-attempt authorization.
 const fs=require('node:fs'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
+const {clientEnvironment}=require('./client-environment.cjs');
 function loadConfig(root) {
  try {return JSON.parse(fs.readFileSync(path.join(root,'compose.json'),'utf8'));}
  catch {throw new Error('Cannot read disposable Compose configuration');}
@@ -21,7 +22,7 @@ function redactor(config) {
 }
 function runner(config,root,spawn=spawnSync,inherited=process.env) {
  const value=password(config); // Reject before ANY child process, including Docker inspection.
- const env=Object.fromEntries(Object.entries(inherited).filter(([k])=>/^(?:PATH|PATHEXT|SYSTEMROOT|WINDIR|COMSPEC|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|DOCKER_CONTEXT)$/i.test(k)));
+ const env=clientEnvironment(inherited);
  return (command,args,authenticated=false)=>{
   const childEnv={...env,...(authenticated?{PGPASSWORD:value}:{})};
   try {

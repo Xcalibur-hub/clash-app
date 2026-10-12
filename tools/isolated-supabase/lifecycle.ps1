@@ -14,12 +14,14 @@ if ($project -notmatch '^clash_p11bind_[a-z0-9_]+$' -or (Split-Path -Leaf $taskR
 # Reject inherited credentials/link inputs; never modify existing environment files.
 $forbidden=Get-ChildItem Env: | Where-Object { $_.Name -match '^(SUPABASE_|PG|DATABASE_URL$|EXPO_PUBLIC_SUPABASE_|DOCKER_HOST$|DOCKER_TLS_VERIFY$|DOCKER_CERT_PATH$)' }
 if ($forbidden) { throw 'Use a clean shell without inherited backend credentials or project links.' }
+. (Join-Path $PSScriptRoot 'client-environment.ps1')
+$null=Get-IsolatedClientEnvironment
 function D([string[]]$Arguments) {
  # Capture native stderr before it can escape the sanitizer (including Windows PowerShell).
  $priorErrorAction=$ErrorActionPreference
  try {
   $ErrorActionPreference='Continue'
-  $result=& docker @Arguments 2>&1
+  $result=Invoke-IsolatedClient 'docker' $Arguments 2>&1
   $code=$LASTEXITCODE
  } catch { throw 'Docker client could not start' }
  finally { $ErrorActionPreference=$priorErrorAction }
@@ -56,13 +58,13 @@ function CheckBindings([bool]$Running) {
  if (($actual -join ',') -ne ($wanted -join ',')) { throw 'Unexpected project container set' }
  $file=Join-Path $taskRoot 'bindings-created.private.json'
  [IO.File]::WriteAllText($file,$inspection)
- & node (Join-Path $PSScriptRoot '../../scripts/loopback-binding-check.cjs') created $file $project
+ Invoke-IsolatedClient 'node' @((Join-Path $PSScriptRoot '../../scripts/loopback-binding-check.cjs'),'created',$file,$project)
  if ($LASTEXITCODE -ne 0) { throw 'Created bindings denied; no container may start' }
  if ($Running) {
   $runtime=@($parsed | Where-Object {$_.Config.Labels.'com.docker.compose.service' -notmatch '-init$'})
   $file=Join-Path $taskRoot 'bindings-running.private.json'
   [IO.File]::WriteAllText($file,(ConvertTo-Json -InputObject $runtime -Depth 100))
-  & node (Join-Path $PSScriptRoot '../../scripts/loopback-binding-check.cjs') running $file $project
+  Invoke-IsolatedClient 'node' @((Join-Path $PSScriptRoot '../../scripts/loopback-binding-check.cjs'),'running',$file,$project)
   if ($LASTEXITCODE -ne 0) { throw 'Running bindings denied' }
  }
 }
@@ -88,11 +90,11 @@ if ($Stage -eq 'create') {
  $listeners=@(Get-NetTCPConnection -State Listen | Where-Object {$_.LocalPort -in @(57721,57722)})
  if ($listeners.Count -ne 0) {throw 'Dedicated ports unavailable'}
  # Verify source/artifact bytes and configuration without any DB connection.
- & node -e "require(process.argv[1]).verifyPrepared(process.argv[2]);" (Join-Path $PSScriptRoot 'execute.cjs') $taskRoot
+ Invoke-IsolatedClient 'node' @('-e','require(process.argv[1]).verifyPrepared(process.argv[2]);',(Join-Path $PSScriptRoot 'execute.cjs'),$taskRoot)
  if ($LASTEXITCODE -ne 0) {throw 'Offline preparation invalid'}
  $rendered=C @('config','--format','json')
  $renderPath=Join-Path $taskRoot 'compose-rendered.private.json';[IO.File]::WriteAllText($renderPath,$rendered)
- & node (Join-Path $PSScriptRoot '../../scripts/loopback-binding-check.cjs') compose $renderPath $project
+ Invoke-IsolatedClient 'node' @((Join-Path $PSScriptRoot '../../scripts/loopback-binding-check.cjs'),'compose',$renderPath,$project)
  if ($LASTEXITCODE -ne 0) {throw 'Compose binding policy failed'}
  $baseline | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskRoot 'resource-baseline.json')
  @{engine=(D @('version','--format','{{.Server.Version}}'));compose=(D @('compose','version','--short'));endpoint=$endpoint} |
@@ -117,7 +119,7 @@ if ($Stage -eq 'create') {
 
  foreach ($job in @('realtime-init','storage-init','auth-init')) { C @('start',$job) | Out-Null; WaitService $job $true }
  # Only the newly isolated database. Exact CLI managed bootstrap precedes extensions.
- & node (Join-Path $PSScriptRoot 'client-auth.cjs') bootstrap $taskRoot --authorized-new-disposable-attempt
+ Invoke-IsolatedClient 'node' @((Join-Path $PSScriptRoot 'client-auth.cjs'),'bootstrap',$taskRoot,'--authorized-new-disposable-attempt')
  if ($LASTEXITCODE -ne 0) { throw 'Bootstrap client failed; stop affected sequence' }
  '{}' | Set-Content -LiteralPath (Join-Path $taskRoot 'bootstrap-complete.json')
 } elseif ($Stage -eq 'runtime') {
