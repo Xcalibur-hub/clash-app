@@ -15,13 +15,20 @@ if ($project -notmatch '^clash_p11bind_[a-z0-9_]+$' -or (Split-Path -Leaf $taskR
 $forbidden=Get-ChildItem Env: | Where-Object { $_.Name -match '^(SUPABASE_|PG|DATABASE_URL$|EXPO_PUBLIC_SUPABASE_|DOCKER_HOST$|DOCKER_TLS_VERIFY$|DOCKER_CERT_PATH$)' }
 if ($forbidden) { throw 'Use a clean shell without inherited backend credentials or project links.' }
 function D([string[]]$Arguments) {
- $result=& docker @Arguments 2>&1
- $code=$LASTEXITCODE
+ # Capture native stderr before it can escape the sanitizer (including Windows PowerShell).
+ $priorErrorAction=$ErrorActionPreference
+ try {
+  $ErrorActionPreference='Continue'
+  $result=& docker @Arguments 2>&1
+  $code=$LASTEXITCODE
+ } catch { throw 'Docker client could not start' }
+ finally { $ErrorActionPreference=$priorErrorAction }
  $safe=($result -join "`n")
  $private=Get-Content -Raw -LiteralPath (Join-Path $taskRoot 'compose.json') | ConvertFrom-Json
  foreach ($service in $private.services.PSObject.Properties) {
   foreach ($e in $service.Value.environment.PSObject.Properties) {
-   if ($e.Name -match 'SECRET|KEY' -and [string]$e.Value) { $safe=$safe.Replace([string]$e.Value,'[REDACTED]') }
+   try { $uri=[Uri]([string]$e.Value); if ($uri.UserInfo -match '^[^:]*:(.+)$') { $safe=$safe.Replace($Matches[1],'[REDACTED]').Replace([Uri]::UnescapeDataString($Matches[1]),'[REDACTED]') } } catch {}
+   if ($e.Name -match 'SECRET|KEY|PASSWORD' -and [string]$e.Value) { $safe=$safe.Replace([string]$e.Value,'[REDACTED]') }
   }
  }
  Add-Content -LiteralPath (Join-Path $taskRoot 'commands.sanitized.log') -Value ($Arguments[0]+' exit='+$code+"`n"+$safe)
@@ -110,7 +117,8 @@ if ($Stage -eq 'create') {
 
  foreach ($job in @('realtime-init','storage-init','auth-init')) { C @('start',$job) | Out-Null; WaitService $job $true }
  # Only the newly isolated database. Exact CLI managed bootstrap precedes extensions.
- C @('exec','-T','db','psql','-X','-v','ON_ERROR_STOP=1','-U','supabase_admin','-d','postgres','-f','/bootstrap/extensions.sql') | Out-Null
+ & node (Join-Path $PSScriptRoot 'client-auth.cjs') bootstrap $taskRoot --authorized-new-disposable-attempt
+ if ($LASTEXITCODE -ne 0) { throw 'Bootstrap client failed; stop affected sequence' }
  '{}' | Set-Content -LiteralPath (Join-Path $taskRoot 'bootstrap-complete.json')
 } elseif ($Stage -eq 'runtime') {
  if (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'evidence/migration-success.json'))) {throw 'All106 migrations must pass before runtime startup'}
