@@ -1,0 +1,61 @@
+{
+    "inspection_date":  "2026-10-12",
+    "baseline":  "6ce87015a6d23e5c1f5547dfe9faed3100fa97f4",
+    "official_repository":  "https://github.com/supabase/supavisor",
+    "main_commit":  "5df5caf10694bb68ddd3eca14ac005832de40427",
+    "release":  "v2.9.13",
+    "release_commit":  "5a51fbfadaa6d6286c1fee0a95d4c629e81a2750",
+    "hosted_deployed_version":  "unknown",
+    "files":  [
+                  {
+                      "file":  "docs__configuration__tenants.md",
+                      "sha256":  "9d7d5a51aa4e093de6e2be530cc871cbdb208807fc9bffc345c88749f2b64276"
+                  },
+                  {
+                      "file":  "lib__supavisor__client_handler.ex",
+                      "sha256":  "73ad6c633c7bd3f6edd1ca3f1bb1c41f693b65e99cd72d17fd7d8da3889cf35d"
+                  },
+                  {
+                      "file":  "lib__supavisor__client_handler__auth_methods.ex",
+                      "sha256":  "3e54a165b731e8a10432d37a9b873f327627a452c4394adf7047e1a8683cab3d"
+                  },
+                  {
+                      "file":  "lib__supavisor__client_handler__auth_methods__jit.ex",
+                      "sha256":  "313ccc3b6d77d80db846c3f8485e6a44cdf3bcf011ef4b6d6759be60e90e9d9c"
+                  },
+                  {
+                      "file":  "lib__supavisor__db_handler.ex",
+                      "sha256":  "e85445ebb014fa4586e80e74aeba6fb101aec83701fce0c55524e8724c338490"
+                  },
+                  {
+                      "file":  "lib__supavisor__handler_helpers.ex",
+                      "sha256":  "36c67a13c11403d84ffd32229d0455b52af9c6784ba0d8812a6d6f1fca639847"
+                  },
+                  {
+                      "file":  "lib__supavisor__helpers.ex",
+                      "sha256":  "3b8044273c5daa8981dee8bda6b85d7013fdbb5a0a1a2ecda9ea4d705946af10"
+                  },
+                  {
+                      "file":  "lib__supavisor__tenants__tenant.ex",
+                      "sha256":  "2ec57f0dffef8f1e72844e149cc5ff841a1d79d4466428c7fc090b83eadd75e6"
+                  },
+                  {
+                      "file":  "release__lib__supavisor__client_handler.ex",
+                      "sha256":  "22d99457e2e5ebaaa18ffbe15c2eb8d8fbe4ec29fcf5f2a012d2af35f88f1522"
+                  },
+                  {
+                      "file":  "release__lib__supavisor__db_handler.ex",
+                      "sha256":  "be32647752832e704478a4765bf881661a22acf00cf1bb94a25d21505763e4a3"
+                  },
+                  {
+                      "file":  "release__lib__supavisor__tenants__tenant.ex",
+                      "sha256":  "e61dc793d64bed2db0fddfda1e1dc2488db3652fb0661a17d801c6b9973375aa"
+                  }
+              ],
+    "frozen_hashes_verified":  245,
+    "artifact_migrations_verified":  106,
+    "vendor_templates_verified":  4,
+    "static_assertions_passed":  5,
+    "live_connections":  0,
+    "code_changes":  0
+}
