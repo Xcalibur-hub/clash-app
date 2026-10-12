@@ -1,0 +1,23 @@
+{
+  "containers": {
+    "before_count": 43,
+    "after_count": 43,
+    "exact_inventory_equal": true,
+    "before_sha256": "711dfb9eac1f964c126cdcaa1e3631a28be8b3a625cb75c23e9920dc5c409791",
+    "after_sha256": "711dfb9eac1f964c126cdcaa1e3631a28be8b3a625cb75c23e9920dc5c409791"
+  },
+  "volumes": {
+    "before_count": 22,
+    "after_count": 22,
+    "exact_inventory_equal": true,
+    "before_sha256": "deb12db6f2eaebc7a4b1e8552fa6c1dc3b3e5a7408818fe1b07d6cb0d40c6bb9",
+    "after_sha256": "deb12db6f2eaebc7a4b1e8552fa6c1dc3b3e5a7408818fe1b07d6cb0d40c6bb9"
+  },
+  "networks": {
+    "before_count": 9,
+    "after_count": 9,
+    "exact_inventory_equal": true,
+    "before_sha256": "78d35d216a7e1978a9f8696f8a69bfa762fcb29cb0b43f8af462d3df7ba51f2c",
+    "after_sha256": "78d35d216a7e1978a9f8696f8a69bfa762fcb29cb0b43f8af462d3df7ba51f2c"
+  }
+}

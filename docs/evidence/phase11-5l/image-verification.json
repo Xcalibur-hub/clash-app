@@ -1,0 +1,50 @@
+[
+  {
+    "service": "db",
+    "image": "public.ecr.aws/supabase/postgres:17.6.1.002@sha256:3f5e3b691d5887161e1b977302b66122eb6cfdf2a6358bdad493454efb75f8a6",
+    "registry_hashes_verified": true,
+    "cached": true,
+    "cached_descriptor_digest": "sha256:3f5e3b691d5887161e1b977302b66122eb6cfdf2a6358bdad493454efb75f8a6",
+    "cached_id": "sha256:3f5e3b691d5887161e1b977302b66122eb6cfdf2a6358bdad493454efb75f8a6"
+  },
+  {
+    "service": "auth",
+    "image": "public.ecr.aws/supabase/gotrue:v2.179.0@sha256:658cf69f57d48e10cbe508a79874e6067348b82a4d216a0bb446c067d7a246f9",
+    "registry_hashes_verified": true,
+    "cached": true,
+    "cached_descriptor_digest": "sha256:658cf69f57d48e10cbe508a79874e6067348b82a4d216a0bb446c067d7a246f9",
+    "cached_id": "sha256:658cf69f57d48e10cbe508a79874e6067348b82a4d216a0bb446c067d7a246f9"
+  },
+  {
+    "service": "storage",
+    "image": "public.ecr.aws/supabase/storage-api:v1.26.5@sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c",
+    "registry_hashes_verified": true,
+    "cached": true,
+    "cached_descriptor_digest": "sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c",
+    "cached_id": "sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c"
+  },
+  {
+    "service": "realtime",
+    "image": "public.ecr.aws/supabase/realtime:v2.47.0@sha256:6b26b3679de63aec6b4849c02140d8f55b65ce2eecadcd5e5b712f596d0249a2",
+    "registry_hashes_verified": true,
+    "cached": true,
+    "cached_descriptor_digest": "sha256:6b26b3679de63aec6b4849c02140d8f55b65ce2eecadcd5e5b712f596d0249a2",
+    "cached_id": "sha256:6b26b3679de63aec6b4849c02140d8f55b65ce2eecadcd5e5b712f596d0249a2"
+  },
+  {
+    "service": "rest",
+    "image": "public.ecr.aws/supabase/postgrest:v13.0.6@sha256:6797796b22aa5df4be1cdf4e52d9e8f6b202ecdfbfcd9d867648c44a8bac1a1e",
+    "registry_hashes_verified": true,
+    "cached": true,
+    "cached_descriptor_digest": "sha256:6797796b22aa5df4be1cdf4e52d9e8f6b202ecdfbfcd9d867648c44a8bac1a1e",
+    "cached_id": "sha256:6797796b22aa5df4be1cdf4e52d9e8f6b202ecdfbfcd9d867648c44a8bac1a1e"
+  },
+  {
+    "service": "kong",
+    "image": "public.ecr.aws/supabase/kong:2.8.1@sha256:1b53405d8680a09d6f44494b7990bf7da2ea43f84a258c59717d4539abf09f6d",
+    "registry_hashes_verified": true,
+    "cached": true,
+    "cached_descriptor_digest": "sha256:1b53405d8680a09d6f44494b7990bf7da2ea43f84a258c59717d4539abf09f6d",
+    "cached_id": "sha256:1b53405d8680a09d6f44494b7990bf7da2ea43f84a258c59717d4539abf09f6d"
+  }
+]
