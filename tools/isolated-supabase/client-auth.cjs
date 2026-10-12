@@ -50,8 +50,9 @@ function bootstrap(root,authorization) {
  fs.appendFileSync(path.join(root,'commands.sanitized.log'),'bootstrap psql exit='+result.status+'\n'+safe(result.stdout+'\n'+result.stderr)+'\n');
  if(result.status!==0) throw new Error('Bootstrap psql failed; stop affected sequence');
 }
+// Bootstrap loads execute.cjs, which imports these helpers. Publish them before CLI dispatch.
+module.exports={loadConfig,password,redactor,runner,psqlArgs,migrationArgs};
 if(require.main===module) {
  try {if(process.argv[2]!=='bootstrap') throw new Error('Unknown client operation');bootstrap(process.argv[3],process.argv[4]);}
  catch {console.error('Bootstrap client failed; see sanitized log if available. No retry authorized.');process.exitCode=1;}
 }
-module.exports={loadConfig,password,redactor,runner,psqlArgs,migrationArgs};
