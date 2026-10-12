@@ -1,0 +1,105 @@
+[
+  {
+    "id": "b5eb9acd57ef5c1c696c9d59269e37fff7f653c30786dc5edd5143024646d495",
+    "name": "/clash_p11bind_5q_20261012-db-1",
+    "service": "db",
+    "status": "running",
+    "exit_code": 0,
+    "health": "healthy",
+    "host_config": {
+      "5432/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "57722"
+        }
+      ]
+    },
+    "actual_ports": {
+      "5432/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "57722"
+        }
+      ]
+    }
+  },
+  {
+    "id": "349e88c64d755c6f8f46a957641b33fac0696d9d64470204ae1f4507372397e1",
+    "name": "/clash_p11bind_5q_20261012-kong-1",
+    "service": "kong",
+    "status": "created",
+    "exit_code": 0,
+    "host_config": {
+      "8000/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "57721"
+        }
+      ]
+    },
+    "actual_ports": {}
+  },
+  {
+    "id": "501f0c577a5d8fd3f2bde1db6ed1c9d57b70fc6fdba9f0f48fe7512814cc7379",
+    "name": "/clash_p11bind_5q_20261012-storage-1",
+    "service": "storage",
+    "status": "created",
+    "exit_code": 0,
+    "host_config": {},
+    "actual_ports": {}
+  },
+  {
+    "id": "52bd2b24a04f85528c7e524edf6ac9c1e7706a6df1bcfaf04149e0e4053ff6da",
+    "name": "/clash_p11bind_5q_20261012-auth-init-1",
+    "service": "auth-init",
+    "status": "exited",
+    "exit_code": 0,
+    "host_config": {},
+    "actual_ports": {}
+  },
+  {
+    "id": "6de96945fcf25d2f3e2120a0f3ea923b04faf4ef570d571e14d114b76f40d221",
+    "name": "/clash_p11bind_5q_20261012-realtime-1",
+    "service": "realtime",
+    "status": "created",
+    "exit_code": 0,
+    "host_config": {},
+    "actual_ports": {}
+  },
+  {
+    "id": "b06c437cd006050a81462e389617abc860d2a42962f0efe6f4d97470e01ea0b5",
+    "name": "/clash_p11bind_5q_20261012-rest-1",
+    "service": "rest",
+    "status": "created",
+    "exit_code": 0,
+    "host_config": {},
+    "actual_ports": {}
+  },
+  {
+    "id": "42759be994cc85c3aeeb0fd359c44bf60a67c59bb3262b777d120804f194b7d6",
+    "name": "/clash_p11bind_5q_20261012-storage-init-1",
+    "service": "storage-init",
+    "status": "exited",
+    "exit_code": 0,
+    "host_config": {},
+    "actual_ports": {}
+  },
+  {
+    "id": "e0bab89d9f372b1d5b18fac3821fb8b8454e41561fcd4389eeed9be11a1f4a2d",
+    "name": "/clash_p11bind_5q_20261012-realtime-init-1",
+    "service": "realtime-init",
+    "status": "exited",
+    "exit_code": 0,
+    "host_config": {},
+    "actual_ports": {}
+  },
+  {
+    "id": "a497271d09fc99f7a3b59ebafb8adb8ba9f6bdca1be6cd60792a9bd81cca4df9",
+    "name": "/clash_p11bind_5q_20261012-auth-1",
+    "service": "auth",
+    "status": "created",
+    "exit_code": 0,
+    "host_config": {},
+    "actual_ports": {}
+  }
+]

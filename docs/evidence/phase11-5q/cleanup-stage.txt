@@ -1,0 +1,2 @@
+{"status":"CREATION_BINDING_INSPECTION_PASS","reachability_verified":false}
+

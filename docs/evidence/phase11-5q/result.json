@@ -1,0 +1,41 @@
+{
+  "recommendation": "FAIL",
+  "candidate_database_validation": "BLOCKED / UNVERIFIED",
+  "baseline": "22d958c1d7e36a47258039851771d8d234202fbe",
+  "project": "clash_p11bind_5q_20261012",
+  "offline_tests": {
+    "passed": 73,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "frozen_hashes_verified": 245,
+  "compatibility_artifacts_verified": 106,
+  "cached_images_verified": 6,
+  "containers_created": 9,
+  "volumes_created": 3,
+  "networks_created": 1,
+  "managed_jobs": {
+    "realtime_init": 0,
+    "storage_init": 0,
+    "auth_init": 0
+  },
+  "extension_prerequisite_psql_invocations": 0,
+  "bootstrap_stage_exit": 1,
+  "migrations_executed": 0,
+  "migrations_blocked": 106,
+  "sql_suites_executed": 0,
+  "sql_suites_passed": 0,
+  "sql_suites_failed": 0,
+  "sql_suites_skipped": 0,
+  "sql_suites_blocked": 89,
+  "postgresql_tap_assertions": 0,
+  "concurrency_suites_executed": 0,
+  "concurrency_suites_blocked": 9,
+  "security_results": "UNVERIFIED",
+  "cleanup_exit": 0,
+  "post_cleanup_project_resources": 0,
+  "post_cleanup_port_listeners": 0,
+  "baseline_inventory_match": true,
+  "primary_status_and_six_modified_tracked_hashes_preserved": true
+}
