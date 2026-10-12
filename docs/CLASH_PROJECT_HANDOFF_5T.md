@@ -85,3 +85,11 @@ The old nine concurrency labels omit dblink suites 053/076 and include 048's tra
 Step 4C remains **BLOCKED against existing local databases**; its consumed authorization is not renewed. Android Step 2F remains **DEFERRED**. No Figma/native/UI redesign, payment work, new judging/gameplay, migration rewrite or database reset is included.
 
 Primary checkout: `C:/Users/91962/Desktop/Clash` retains its six modified tracked Crew/development files and existing untracked Crew directories/migration/test and other artifacts. No stash/discard/overwrite/commit of that work is permitted. Step 5U tooling/documentation is confined to the new `C:/p11exec` worktree. Primary status and all six modified tracked-file hashes match the preservation baseline.
+
+## Step 5X: first hosted preflight stopped (2026-10-12)
+
+Owner-created staging `clash-staging` / `zrutlrhhvfcsmssjiijl` is management-verified in the approved organization and owner-approved Tokyo region. Step 5W Windows Credential Manager enrollment and internal read-back succeeded without password disclosure; authoritative CA bytes and private NTFS ACLs were verified. Fresh isolated preparation verified 245 source hashes, 106 artifacts, 81 Node tests and 105 Go leaf cases (46 top-level tests).
+
+The single authorized session-pooler preflight exited 1 at `unexpected database identity or TLS`. Verified client-to-pooler TLS/authentication reached the first SQL identity gate, but the failing database/current-role/session-role/backend-SSL field was not recorded. Backend SSL through a pooler is a separate hop; its failure is a hypothesis, not a confirmed diagnosis. Extensions, privileges, managed prerequisites, empty-project checks and ledger remain blocked. Zero migrations, SQL suites or TAP assertions ran; application security remains unverified. No retry was performed.
+
+See [Step 5X report](PHASE_11_HOSTED_STAGING_PREFLIGHT_5X.md) and sanitized evidence. Immediate next action: separately reviewed file-only safe identity diagnostics and pooler security-contract analysis, then obtain new explicit authorization before another live read-only attempt. Migration deployment cannot proceed yet. Step 4C remains BLOCKED and Step 2F DEFERRED. No merges or deployment authorized.
