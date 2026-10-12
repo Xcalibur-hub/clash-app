@@ -1,4 +1,8 @@
 import 'react-native-url-polyfill/auto';
+import Constants from 'expo-constants';
+import * as Application from 'expo-application';
+import backendOrigins from '../config/backend-origins.json';
+import { resolveAppVariant, assertBackendAllowed, assertNativeVariant, backendStorageKey } from '../utils/backendPolicy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, type AppStateStatus } from 'react-native';
 import { createClient, type PostgrestError, type SupabaseClient } from '@supabase/supabase-js';
@@ -14,8 +18,8 @@ import { logger } from './logger';
  * rotated on a frozen JS thread. `detectSessionInUrl` stays off — there is no
  * browser URL to parse, deep-link auth is a Phase 4 concern.
  *
- * Local vs hosted sessions use different AsyncStorage keys so a phone that was
- * signed into hosted Supabase does not reuse that JWT against the local stack.
+ * Each backend origin has its own AsyncStorage session key. Existing generic
+ * session keys are never imported into another project; reauthentication is required.
  *
  * `EXPO_PUBLIC_*` values are inlined at build time and are safe to ship: the
  * publishable key only grants what Row Level Security allows.
@@ -66,11 +70,17 @@ export function errorText(error: unknown): string {
 
 function buildClient(): ClashSupabaseClient | null {
   if (!isSupabaseConfigured) return null;
+  const variant = resolveAppVariant(Constants.expoConfig?.extra?.appVariant);
+  assertNativeVariant(variant, Application.applicationId);
+  // Existing development clients keep local/hosted flexibility; staging never does.
+  if (!__DEV__ || variant === 'staging' || Application.applicationId === 'com.clash.v2') {
+    assertBackendAllowed(variant, url, backendOrigins);
+  }
   const client = createClient<Database>(url, anonKey, {
     auth: {
       storage: AsyncStorage,
-      // Isolate local vs hosted sessions on the same physical device.
-      storageKey: isLocalSupabase ? 'sb-clash-local-auth-token' : 'sb-clash-hosted-auth-token',
+      // Never reuse a session across backend origins.
+      storageKey: backendStorageKey(url),
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

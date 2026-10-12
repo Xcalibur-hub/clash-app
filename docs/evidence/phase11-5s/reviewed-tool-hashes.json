@@ -1,0 +1,6 @@
+{
+  "scripts/migration-compatibility-artifact.cjs": "9ac2b107a85172f7c4d4cec49ba5afa5e926c98ac7f359e6435acda8dcadcf5e",
+  "tools/isolated-supabase/images.json": "30bff1c57d2235942bb0f8932d0b89333341750d53578aa485ae88a497d92105",
+  "tools/isolated-supabase/vendor/provenance.json": "d526907d0ca87895dca6c09b56c90fd0c1e74ebe5e1606f9cc25b61639474e53",
+  "tools/isolated-supabase/client-auth.cjs": "8590ef44e5fc8729ac76138ca7b86f2c7f5e43e13c429b9bddc1a177bed4a68d"
+}

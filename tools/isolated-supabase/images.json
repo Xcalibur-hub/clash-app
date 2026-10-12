@@ -1,0 +1,44 @@
+{
+  "db": {
+    "tag": "public.ecr.aws/supabase/postgres:17.6.1.002",
+    "index_digest": "sha256:3f5e3b691d5887161e1b977302b66122eb6cfdf2a6358bdad493454efb75f8a6",
+    "linux_amd64_manifest": "sha256:a0621305c3d812a23189df8664fac4d4e5311508dc42855c920cef0de12d05d0",
+    "config_digest": "sha256:383980ef2945b440df2d534de2a04f8cf5bd2a4e787a75562acaaceeb2020d48",
+    "image": "public.ecr.aws/supabase/postgres:17.6.1.002@sha256:3f5e3b691d5887161e1b977302b66122eb6cfdf2a6358bdad493454efb75f8a6"
+  },
+  "auth": {
+    "tag": "public.ecr.aws/supabase/gotrue:v2.179.0",
+    "index_digest": "sha256:658cf69f57d48e10cbe508a79874e6067348b82a4d216a0bb446c067d7a246f9",
+    "linux_amd64_manifest": "sha256:67de638720afdef14a413d5141418e39855862d065dce219ee5411c7141a52e0",
+    "config_digest": "sha256:bd94c90fa9729f864cf9e68b4c374132e077a3328e7472048918bbb4a0797674",
+    "image": "public.ecr.aws/supabase/gotrue:v2.179.0@sha256:658cf69f57d48e10cbe508a79874e6067348b82a4d216a0bb446c067d7a246f9"
+  },
+  "storage": {
+    "tag": "public.ecr.aws/supabase/storage-api:v1.26.5",
+    "index_digest": "sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c",
+    "linux_amd64_manifest": "sha256:3db906bf7a38dd1671b57028a218b9c388276fda603558cab5192e6ec42753f2",
+    "config_digest": "sha256:8f99835f25f6b9d90918ec4cc973d0e90b5b31e6a06879c3d0c6d1056041dc8f",
+    "image": "public.ecr.aws/supabase/storage-api:v1.26.5@sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c"
+  },
+  "realtime": {
+    "tag": "public.ecr.aws/supabase/realtime:v2.47.0",
+    "index_digest": "sha256:6b26b3679de63aec6b4849c02140d8f55b65ce2eecadcd5e5b712f596d0249a2",
+    "linux_amd64_manifest": "sha256:5e1a4b2fc3e62737eb32357c61337f5255c5099a4c9fa9e0b6221a4b3dd40b27",
+    "config_digest": "sha256:cee6b7a192fde5444eeb1e0dc9c04a9820846f4059494816ed766486fd7f7504",
+    "image": "public.ecr.aws/supabase/realtime:v2.47.0@sha256:6b26b3679de63aec6b4849c02140d8f55b65ce2eecadcd5e5b712f596d0249a2"
+  },
+  "rest": {
+    "tag": "public.ecr.aws/supabase/postgrest:v13.0.6",
+    "index_digest": "sha256:6797796b22aa5df4be1cdf4e52d9e8f6b202ecdfbfcd9d867648c44a8bac1a1e",
+    "linux_amd64_manifest": "sha256:bdb2fcece2e6858b3d016b149088158ede06ffe2fa21f30d3b79fd4fed17bfcd",
+    "config_digest": "sha256:774b4a345671b0cebeb53c1e70b0fe88a2d64a60801caff42fcb4bacd7879254",
+    "image": "public.ecr.aws/supabase/postgrest:v13.0.6@sha256:6797796b22aa5df4be1cdf4e52d9e8f6b202ecdfbfcd9d867648c44a8bac1a1e"
+  },
+  "kong": {
+    "tag": "public.ecr.aws/supabase/kong:2.8.1",
+    "index_digest": "sha256:1b53405d8680a09d6f44494b7990bf7da2ea43f84a258c59717d4539abf09f6d",
+    "linux_amd64_manifest": "sha256:e21b0b793879ab96720ed4188f9441260273f4bf775bcbff8d435e019ffb759a",
+    "config_digest": "sha256:3cefb958bcd694597b65adc00053a762b1f9a6df3c6031af528d052d75a64e1a",
+    "image": "public.ecr.aws/supabase/kong:2.8.1@sha256:1b53405d8680a09d6f44494b7990bf7da2ea43f84a258c59717d4539abf09f6d"
+  }
+}
