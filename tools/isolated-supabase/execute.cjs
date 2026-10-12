@@ -1,6 +1,7 @@
 // FUTURE AUTHORIZED DISPOSABLE ATTEMPT ONLY. Never invoked by offline tests.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const {spawnSync}=require('node:child_process');
+const {isDeepStrictEqual}=require('node:util');
+const {loadConfig,password,redactor,runner,psqlArgs,migrationArgs}=require('./client-auth.cjs');
 const {hash,compose,frozen,CONCURRENCY_PREFIXES}=require('./prepare.cjs');
 const {verify:verifyArtifact,prepare:artifact}=require('../../scripts/migration-compatibility-artifact.cjs');
 const {checkCompose}=require('../../scripts/loopback-binding-check.cjs');
@@ -9,14 +10,14 @@ function verifyPrepared(root) {
  root=path.resolve(root); assert.equal(fs.realpathSync(root).toLowerCase(),root.toLowerCase());
  const meta=JSON.parse(fs.readFileSync(path.join(root,'prepared.json')));
  assert.match(meta.project,/^clash_p11bind_[a-z0-9_]+$/);assert.equal(path.basename(root),meta.project);
- const config=JSON.parse(fs.readFileSync(path.join(root,'compose.json')));checkCompose(config,meta.project);
+ const config=loadConfig(root);password(config);checkCompose(config,meta.project);
  const env=config.services.db.environment;
  const secrets={...env,...config.services.storage.environment,SERVICE_KEY:config.services.storage.environment.SERVICE_KEY,
   SECRET_KEY_BASE:config.services.realtime.environment.SECRET_KEY_BASE,DB_ENC_KEY:config.services.realtime.environment.DB_ENC_KEY,
   S3_ACCESS_KEY:config.services.storage.environment.S3_PROTOCOL_ACCESS_KEY_ID,S3_SECRET_KEY:config.services.storage.environment.S3_PROTOCOL_ACCESS_KEY_SECRET};
- assert.deepEqual(config,compose(meta.project,secrets),'Prepared Compose changed');
- const {jwt}=require('./prepare.cjs');assert.equal(secrets.ANON_KEY,jwt(env.JWT_SECRET,'anon'));assert.equal(secrets.SERVICE_KEY,jwt(env.JWT_SECRET,'service_role'));
- for(const file of ['db-entrypoint.sh','extensions.sql','inspect-security.sql','images.json',...require('./vendor/provenance.json').map(e=>'vendor/'+e.file)])
+ assert.ok(isDeepStrictEqual(config,compose(meta.project,secrets)),'Prepared Compose changed');
+ const {jwt}=require('./prepare.cjs');assert.ok(secrets.ANON_KEY===jwt(env.JWT_SECRET,'anon'),'Anonymous key mismatch');assert.ok(secrets.SERVICE_KEY===jwt(env.JWT_SECRET,'service_role'),'Service key mismatch');
+ for(const file of ['client-auth.cjs','db-entrypoint.sh','extensions.sql','inspect-security.sql','images.json',...require('./vendor/provenance.json').map(e=>'vendor/'+e.file)])
   assert.deepEqual(fs.readFileSync(path.join(root,'bootstrap',file)),fs.readFileSync(path.join(__dirname,file)),'Bootstrap file changed: '+file);
  verifyArtifact(path.join(root,'migration-compatibility-reviewed'),artifact());
  const manifest=JSON.parse(fs.readFileSync(path.join(root,'source-manifest.json')));
@@ -38,23 +39,21 @@ function main(mode,root,authorization) {
  assert.equal(authorization,'--authorized-new-disposable-attempt','Separate runtime authorization REQUIRED');
  assert.ok(['migrate','tests'].includes(mode));const ctx=verifyPrepared(root);root=ctx.root;
  assert.ok(fs.existsSync(path.join(root,'bootstrap-complete.json')),'Managed bootstrap and binding evidence required');
- const config=JSON.parse(fs.readFileSync(path.join(root,'compose.json'))),project=ctx.meta.project;
+ const config=loadConfig(root),project=ctx.meta.project,safe=redactor(config);
  const evidence=path.join(root,'evidence');fs.mkdirSync(evidence,{recursive:true});
  const claim=path.join(evidence,mode+'-attempt.json');fs.writeFileSync(claim,JSON.stringify({started_at:new Date().toISOString()}),{flag:'wx'});
- const childEnv=Object.fromEntries(Object.entries(process.env).filter(([k])=>/^(?:PATH|PATHEXT|SYSTEMROOT|WINDIR|COMSPEC|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|DOCKER_CONTEXT)$/i.test(k)));
- // Never inherit SUPABASE_*, PG*, DATABASE_URL, backend URLs or keys.
- const run=(command,args)=>spawnSync(command,args,{cwd:root,env:childEnv,encoding:'utf8',maxBuffer:64*1024*1024,timeout:15*60*1000,shell:false});
- const docker=args=>run('docker',['compose','-p',project,'-f',path.join(root,'compose.json'),...args]);
+ const run=runner(config,root);
+ const docker=args=>run('docker',['compose','-p',project,'-f',path.join(root,'compose.json'),...args],args.includes('psql'));
  const endpoint=run('docker',['context','inspect','--format','{{.Endpoints.docker.Host}}']);assert.equal(endpoint.status,0);assert.match(endpoint.stdout.trim(),/^(npipe:|unix:)/,'Local Docker daemon required');
  const inspected=run('docker',['inspect',...docker(['ps','-a','-q']).stdout.trim().split(/\r?\n/)]);
  assert.equal(inspected.status,0);require('../../scripts/loopback-binding-check.cjs').checkInspect(JSON.parse(inspected.stdout),project,false);
- const sqlArgs=['exec','-T','-e','PGOPTIONS=-c search_path=public,extensions','db','psql','-X','-q','-A','-t','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres'];
+ const sqlArgs=psqlArgs('postgres',[],true);
  if(mode==='migrate') {
   const version=run('supabase',['--version']);assert.equal(version.status,0);assert.equal(version.stdout.trim(),'2.40.7');
   const empty=docker([...sqlArgs,'-c',"select case when to_regclass('supabase_migrations.schema_migrations') is null then 'EMPTY' else 'EXISTS' end"]);
   assert.equal(empty.status,0);assert.equal(empty.stdout.trim(),'EMPTY','Existing migration ledger refused; no repair/retry');
-  const r=run('supabase',['migration','up','--db-url','postgresql://postgres:postgres@127.0.0.1:57722/postgres?sslmode=disable','--workdir',root]);
-  fs.writeFileSync(path.join(evidence,'migrations.log'),r.stdout+'\n'+r.stderr);
+  const r=run('supabase',migrationArgs(root),true);
+  fs.writeFileSync(path.join(evidence,'migrations.log'),safe(r.stdout+'\n'+r.stderr));
   assert.equal(r.status,0,'Migration failed: STOP, no retries');
   const ledger=docker([...sqlArgs,'-c','select version from supabase_migrations.schema_migrations order by version']);
   assert.equal(ledger.status,0);const expected=ctx.manifest.migration_order.map(e=>path.basename(e.path).split('_')[0]);
@@ -65,9 +64,9 @@ function main(mode,root,authorization) {
   const results=[];
   for(const e of ctx.manifest.sql_suites_prepared_not_executed) {
    const name=path.basename(e.path),r=docker([...sqlArgs,'-f','/tests/'+name]);
-   fs.writeFileSync(path.join(evidence,name+'.stdout'),r.stdout||'');fs.writeFileSync(path.join(evidence,name+'.stderr'),r.stderr||'');
+   fs.writeFileSync(path.join(evidence,name+'.stdout'),safe(r.stdout));fs.writeFileSync(path.join(evidence,name+'.stderr'),safe(r.stderr));
    try {results.push({suite:name,...validateSuite(name,r.stdout||'',r.stderr||'',r.status)});}
-   catch(error) {results.push({suite:name,status:'FAIL',error:error.message,observed_tap:observedTap(r.stdout||''),exit_code:r.status});
+   catch(error) {results.push({suite:name,status:'FAIL',error:safe(error.message),observed_tap:observedTap(r.stdout||''),exit_code:r.status});
     fs.writeFileSync(path.join(evidence,'failure-summary.json'),JSON.stringify({suites_attempted:results.length,suites_not_run:89-results.length,failed_suite:name,
      observed_tap:observedTap(r.stdout||''),note:'Observed counts are not a passing TAP validation; see per-suite results and raw logs.'},null,2));fs.writeFileSync(path.join(evidence,'tap-results.json'),JSON.stringify(results,null,2));throw error;}
    fs.writeFileSync(path.join(evidence,'tap-results.json'),JSON.stringify(results,null,2));
@@ -77,5 +76,5 @@ function main(mode,root,authorization) {
   fs.writeFileSync(path.join(evidence,'tap-totals.json'),JSON.stringify(totals,null,2));console.log(JSON.stringify(totals));
  }
 }
-if(require.main===module)try{main(...process.argv.slice(2));}catch(e){console.error(e.message);process.exitCode=1;}
+if(require.main===module)try{main(...process.argv.slice(2));}catch(e){let message='Executor failed; no retry authorized';try{message=redactor(loadConfig(process.argv[3]))(e.message);}catch{}console.error(message);process.exitCode=1;}
 module.exports={verifyPrepared,validateSuite};
