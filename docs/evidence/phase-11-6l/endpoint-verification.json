@@ -1,0 +1,19 @@
+{
+  "source": "Step 6L pre-connect verification",
+  "approved": {
+    "project": "clash-staging",
+    "project_ref": "zrutlrhhvfcsmssjiijl",
+    "host": "db.zrutlrhhvfcsmssjiijl.supabase.co",
+    "port": 5432,
+    "connection_mode": "direct",
+    "authorization": "investigate:zrutlrhhvfcsmssjiijl"
+  },
+  "ca_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+  "binary_sha256": "2ae1a66e50bcf5dbacbb9948fede995e14b5df8239e1c813be34ef305b444464",
+  "network_precheck": {
+    "aaaa": true,
+    "tcp_5432_ipv6": "CONNECTED"
+  },
+  "writes_authorized": false,
+  "migration_sql_executed": false
+}

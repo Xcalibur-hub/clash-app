@@ -1,10 +1,14 @@
 # CLASH project handoff — Phase 11 Step 5T
 
-12 October 2026. **Frozen integration candidate; clash-staging is QUARANTINED after partial migration; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
+12 October 2026. **Frozen integration candidate; clash-staging remains QUARANTINED after partial migration; root cause identified; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
+
+## Step 6L: quarantine investigation (READ-ONLY)
+
+[Step 6L investigation](PHASE_11_STAGING_QUARANTINE_INVESTIGATION_6L.md): ledger **43/43** hash-verified; migration 44 **absent** from ledger and catalogs (`confirmed_absent` rollback). Live `pgcrypto` owner is **`postgres`**; frozen compatibility artifact 44 asserts **`supabase_admin`** — **confirmed root cause**. `clash-maintenance` is **active** (25/25 runs in 1h). Original SQLSTATE unavailable. **Quarantine retained.** Next: authorize compatibility-assert fix + new artifact hashes, then a separate resume/rebuild write plan. No migrate/fixtures/inventory from this step. Step 4C BLOCKED; Step 2F DEFERRED. Primary Crew dirt untouched.
 
 ## Step 6K: controlled staging migration (PARTIAL — QUARANTINE)
 
-[Step 6K deployment report](PHASE_11_STAGING_MIGRATION_DEPLOYMENT_6K.md): fresh direct preflight PASS; authorized `migrate:zrutlrhhvfcsmssjiijl` stopped after **43/106** committed artifacts. Failure on `20261004120000_explore_play_system.sql` with sanitized `database operation failed; diagnostics withheld`. **No retry, resume, reset, or repair.** `clash_scheduler` is among the committed set — cron may be active. Next action: separately authorize **read-only investigation**, then a written recovery/completion plan. Do **not** run inventory/fixtures or release testing on this partial schema without new authorization. Step 4C remains BLOCKED; Step 2F DEFERRED. Primary Crew dirt stays untouched.
+[Step 6K deployment report](PHASE_11_STAGING_MIGRATION_DEPLOYMENT_6K.md): stopped at 43/106 on `explore_play_system`. Superseded diagnostically by 6L.
 
 ## Step 6J: migration deployment readiness (FILE-ONLY)
 

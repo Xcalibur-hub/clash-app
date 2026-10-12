@@ -133,9 +133,32 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 			r.Rows = append(r.Rows, map[string]any{"ok": true})
 		}
 		return r, nil
+	case investigatePgcryptoSQL:
+		return Result{Rows: []map[string]any{{"version": "1.3", "schema": "extensions", "owner": "postgres", "owner_is_supabase_admin": false, "owner_is_postgres": true}}}, nil
+	case investigatePgcryptoAssertSQL:
+		return Result{Rows: []map[string]any{{"artifact_assert_would_pass": false}}}, nil
+	case investigateMig44ObjectsSQL:
+		return Result{Rows: []map[string]any{{
+			"explore_challenge_participants": false, "explore_challenge_entries": false, "explore_challenge_entry_reactions": false,
+			"explore_challenge_results": false, "explore_treasure_clues": false, "explore_treasure_clue_progress": false,
+			"explore_treasure_reward_claims": false, "explore_entry_status": false, "explore_treasure_type": false,
+			"explore_clue_type": false, "explore_content_target": false, "explore_answer_digest": false,
+			"join_challenge": false, "settle_challenge": false, "explore_challenges_reward_type": false,
+			"explore_treasure_hunts_hunt_type": false, "notification_kind_challenge_result": false,
+		}}}, nil
+	case investigateCronSQL:
+		return Result{Rows: []map[string]any{{"jobid": "1", "jobname": "clash-maintenance", "schedule": "* * * * *", "command": "select public.run_maintenance(500)", "username": "postgres", "active": true}}}, nil
+	case investigateCronRunsSQL:
+		return Result{Rows: []map[string]any{{"runs_1h": 0, "succeeded_1h": 0, "failed_1h": 0}}}, nil
 	}
 	if q == managedSQL {
 		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true, "cron_preloaded": true, "cron_catalog": true}}}, nil
+	}
+	if q == `select to_regclass('cron.job') is not null as cron_catalog` {
+		return Result{Rows: []map[string]any{{"cron_catalog": true}}}, nil
+	}
+	if q == "select set_config('statement_timeout','15000',true)" {
+		return Result{Rows: []map[string]any{{"set_config": "15000"}}}, nil
 	}
 	if strings.HasPrefix(q, "select jsonb_build_array(") {
 		return Result{Rows: []map[string]any{{"args": m.args}}}, nil

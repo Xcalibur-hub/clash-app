@@ -24,11 +24,12 @@ After separate target-specific approval, compile this module to an operator-cont
 ```text
 hosted-staging --mode preflight --authorize preflight:<approved-ref> --config <private-nonsecret-config>
 hosted-staging --mode migrate --authorize migrate:<approved-ref> --config <private-nonsecret-config>
+hosted-staging --mode investigate --authorize investigate:<approved-ref> --config <private-nonsecret-config>
 hosted-staging --mode inventory --authorize inventory:<approved-ref> --config <private-nonsecret-config>
 hosted-staging --mode fixtures --authorize committed-fixtures:<approved-ref> --config <private-nonsecret-config>
 ```
 
-These are four different authorization scopes. Read-only preflight does not approve migration, fixture creation, scheduler changes or project creation. `fixtures` additionally requires `sterile_test_project: true`, an empty application, a matching complete 106-entry ledger, the 89-suite hash and no active cron jobs. Pausing/restoring cron is a separate, reviewed operation; the executor does not do it. No local hostname, arbitrary URL, transaction pooler, plaintext fallback or inherited PG/Supabase configuration is supported. Direct mode remains available; explicit session-pooler mode supports IPv4 with the exact Dashboard-approved shared host, fixed port 5432 and project-qualified username. Never derive that host from a region or silently change modes.
+These are different authorization scopes. `investigate` is read-only quarantine/ledger/cron catalog inspection only; it does not migrate, resume, or repair. Read-only preflight does not approve migration, fixture creation, scheduler changes or project creation. `fixtures` additionally requires `sterile_test_project: true`, an empty application, a matching complete 106-entry ledger, the 89-suite hash and no active cron jobs. Pausing/restoring cron is a separate, reviewed operation; the executor does not do it. No local hostname, arbitrary URL, transaction pooler, plaintext fallback or inherited PG/Supabase configuration is supported. Direct mode remains available; explicit session-pooler mode supports IPv4 with the exact Dashboard-approved shared host, fixed port 5432 and project-qualified username. Never derive that host from a region or silently change modes.
 
 Migration files run once in filename order, each with its genuine ledger insert in the same transaction. An error stops the run. A partial ledger is **not** resumed or repaired. SQL bodies, database error strings and passwords are never logged. Evidence records counts, hashes and generic failures. Evidence directories remain private: Windows operators must verify NTFS ACLs because Unix mode bits alone do not provide a Windows ACL guarantee.
 

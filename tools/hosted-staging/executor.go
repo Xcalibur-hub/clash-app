@@ -420,7 +420,7 @@ func Run(ctx context.Context, c Config, mode, authorization, password string, di
 	if !authorized(mode, authorization, c.ProjectRef) {
 		return 0, errors.New("explicit mode/project authorization required")
 	}
-	if mode != "preflight" && mode != "migrate" && mode != "inventory" && mode != "fixtures" {
+	if mode != "preflight" && mode != "migrate" && mode != "inventory" && mode != "fixtures" && mode != "investigate" {
 		return 0, errors.New("unknown or fixture-producing mode refused")
 	}
 	conf, e := connection(c, password)
@@ -454,6 +454,12 @@ func Run(ctx context.Context, c Config, mode, authorization, password string, di
 		return 0, e
 	case "migrate":
 		return migrate(ctx, s, c, a)
+	case "investigate":
+		report, e := investigate(ctx, s, c, a)
+		if evidenceErr := saveInvestigate(c.RunDir, report); evidenceErr != nil {
+			e = evidenceErr
+		}
+		return 0, e
 	case "fixtures":
 		return executeSuites(ctx, s, conf, dial, c, a)
 	default:
@@ -466,5 +472,5 @@ func authorized(mode, auth, ref string) bool {
 	if mode == "fixtures" {
 		prefix = "committed-fixtures"
 	}
-	return (mode == "preflight" || mode == "migrate" || mode == "inventory" || mode == "fixtures" || mode == "store-credential") && auth == prefix+":"+ref
+	return (mode == "preflight" || mode == "migrate" || mode == "inventory" || mode == "fixtures" || mode == "store-credential" || mode == "investigate") && auth == prefix+":"+ref
 }
