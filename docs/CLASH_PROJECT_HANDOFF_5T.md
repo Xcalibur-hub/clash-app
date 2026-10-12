@@ -2,6 +2,12 @@
 
 12 October 2026. **Frozen integration candidate; hosted deployment and integrated database security BLOCKED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
+## Step 5V actual status: BLOCKED before creation
+
+[Step 5V report and sanitized evidence](PHASE_11_HOSTED_STAGING_PREFLIGHT_5V.md) supersede the immediate next action described below. The unique authenticated organization was verified as Xcalibur-hub-2's Org (`dninpemahklihtxcjrnz`), Free, with a $0/month project quote. **No project was created and no database connection/preflight ran.** This Windows host has no global IPv6 address or IPv6 default route; the reviewed executor supports only the direct endpoint. Approved private credential storage/supply, Mumbai allocation and full requested preflight inventory coverage also remain unresolved.
+
+The 245 source hashes, 106 artifacts, 89 bundled suites, 81 Node tests, 28 top-level Go tests (23 subtests, 47 leaf cases), Go dependency verification, vet and build passed again in this isolated worktree. These are offline results only. Resolve prerequisites and obtain explicit continuation authorization before project creation; migrations/fixtures remain unauthorized. Step 4C stays BLOCKED and Step 2F DEFERRED. PR #45 and the frozen lineage remain unchanged.
+
 ## Step 5U progress and next action
 
 [Hosted executor preparation](PHASE_11_HOSTED_EXECUTOR_PREPARATION_5U.md) and [creation checklist](HOSTED_STAGING_CREATION_CHECKLIST.md) now supersede the file-only preparation item below. [Step 5U draft PR #45](https://github.com/Xcalibur-hub/clash-app/pull/45) is stacked on [PR #44](https://github.com/Xcalibur-hub/clash-app/pull/44), open and unmerged. The frozen implementation and artifact lineage are unchanged.
