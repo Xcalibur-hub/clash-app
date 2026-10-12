@@ -1,0 +1,17 @@
+{
+  "step": "6K",
+  "baseline_commit": "f2a2b3f7fd5aee33bfd5b4c80e68dce95c90e354",
+  "executor_diff_vs_6h_tools_hosted_staging": "empty",
+  "go_test": "ok",
+  "go_vet": "pass",
+  "frozen_source_files": 245,
+  "migration_artifacts_verified": 106,
+  "compatibility_manifest_sha256": "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+  "suite_manifest_sha256": "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+  "frozen_manifest_sha256_git_blob": "a9b30736c87a7fac05c9764404dfd58a876f64db6a3e072e9a348cac8b162b4e",
+  "seal_candidate": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "binary_sha256": "128cac60fa1e6f982182e8de458eb528f75154fd09baf9d5aa5838e9276db5c1",
+  "sql_suites_executed": false,
+  "fixtures_created": false,
+  "automatic_retry": false
+}

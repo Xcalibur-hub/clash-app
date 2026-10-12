@@ -1,14 +1,18 @@
 # CLASH project handoff — Phase 11 Step 5T
 
-12 October 2026. **Frozen integration candidate; hosted migration deploy not yet authorized; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
+12 October 2026. **Frozen integration candidate; clash-staging is QUARANTINED after partial migration; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
+
+## Step 6K: controlled staging migration (PARTIAL — QUARANTINE)
+
+[Step 6K deployment report](PHASE_11_STAGING_MIGRATION_DEPLOYMENT_6K.md): fresh direct preflight PASS; authorized `migrate:zrutlrhhvfcsmssjiijl` stopped after **43/106** committed artifacts. Failure on `20261004120000_explore_play_system.sql` with sanitized `database operation failed; diagnostics withheld`. **No retry, resume, reset, or repair.** `clash_scheduler` is among the committed set — cron may be active. Next action: separately authorize **read-only investigation**, then a written recovery/completion plan. Do **not** run inventory/fixtures or release testing on this partial schema without new authorization. Step 4C remains BLOCKED; Step 2F DEFERRED. Primary Crew dirt stays untouched.
 
 ## Step 6J: migration deployment readiness (FILE-ONLY)
 
-[Step 6J readiness audit](PHASE_11_MIGRATION_DEPLOYMENT_READINESS_6J.md) reviewed the hosted-staging migrate path, frozen 106 artifacts vs Step 6I environment, recovery/quarantine behavior, and the future `migrate:<ref>` authorization boundary. **Deployment readiness: READY.** No executor code change. No hosted connection, migration, or SQL suite ran. Transaction+ledger pairing is confirmed for transactional SQL; partial apply does not auto-resume. Next action: separately authorize one bounded direct IPv6 migrate of the frozen 106 to `zrutlrhhvfcsmssjiijl`, then separately authorize inventory/fixtures. Step 4C remains BLOCKED; Step 2F DEFERRED. Primary Crew dirt stays untouched.
+[Step 6J readiness audit](PHASE_11_MIGRATION_DEPLOYMENT_READINESS_6J.md): offline READY; no deploy. Superseded operationally by 6K partial apply.
 
 ## Step 6I eligibility (prior)
 
-[Step 6I](PHASE_11_DIRECT_ELIGIBILITY_PREFLIGHT_6I.md): direct IPv6 preflight PASS; empty ledger; migration-eligible. That eligibility is **not** migrate authorization.
+[Step 6I](PHASE_11_DIRECT_ELIGIBILITY_PREFLIGHT_6I.md): direct IPv6 preflight PASS; empty ledger; migration-eligible at that time. Historical only relative to 6K quarantine.
 
 ## Step 5W offline progress and next action
 
