@@ -1,0 +1,15 @@
+{"status":"CREATION_BINDING_INSPECTION_PASS","reachability_verified":false}
+
+Bootstrap client failed; see sanitized log if available. No retry authorized.
+(node:4560) Warning: Accessing non-existent property 'loadConfig' of module exports inside circular dependency
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4560) Warning: Accessing non-existent property 'password' of module exports inside circular dependency
+(node:4560) Warning: Accessing non-existent property 'redactor' of module exports inside circular dependency
+(node:4560) Warning: Accessing non-existent property 'runner' of module exports inside circular dependency
+(node:4560) Warning: Accessing non-existent property 'psqlArgs' of module exports inside circular dependency
+(node:4560) Warning: Accessing non-existent property 'migrationArgs' of module exports inside circular dependency
+Exception: C:\p11runq\tools\isolated-supabase\lifecycle.ps1:123
+Line |
+ 123 |  … DE -ne 0) { throw 'Bootstrap client failed; stop affected sequence' } …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Bootstrap client failed; stop affected sequence
