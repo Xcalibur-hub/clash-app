@@ -83,12 +83,34 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 		return Result{}, errors.New("MOCK_SECRET")
 	}
 	switch q {
+	case backendSQL:
+		return Result{Rows: []map[string]any{{"pid": 123}}}, nil
+	case availableExtensionsSQL:
+		out := Result{}
+		for _, name := range []string{"pgcrypto", "postgis", "pg_cron", "pgtap", "dblink"} {
+			out.Rows = append(out.Rows, map[string]any{"name": name, "version": "mock"})
+		}
+		return out, nil
+	case rolesSQL:
+		out := Result{}
+		for _, name := range []string{"postgres", "supabase_admin", "anon", "authenticated", "service_role", "authenticator", "supabase_auth_admin", "supabase_storage_admin"} {
+			out.Rows = append(out.Rows, map[string]any{"name": name})
+		}
+		return out, nil
+	case roleEdgesSQL:
+		return Result{}, nil
+	case objectsSQL:
+		return Result{Rows: []map[string]any{{"relations": 0, "routines": 0, "types": 0, "unexpected_schemas": 0}}}, nil
+	case dataSQL:
+		return Result{Rows: []map[string]any{{"users": false, "objects": false, "buckets": false}}}, nil
+	case cronSQL:
+		return Result{Rows: []map[string]any{{"jobs": false}}}, nil
 	case identitySQL:
 		db := "postgres"
 		if m.badIdentity {
 			db = "other"
 		}
-		return Result{Rows: []map[string]any{{"db": db, "usr": "postgres", "version": 170006, "ssl": true}}}, nil
+		return Result{Rows: []map[string]any{{"db": db, "usr": "postgres", "login": "postgres", "version": 170006, "ssl": true}}}, nil
 	case extensionsSQL:
 		return Result{Rows: []map[string]any{{"name": "pgcrypto", "version": "1.3", "schema": "extensions", "owner": "supabase_admin"}}}, nil
 	case ledgerExistsSQL:
@@ -110,8 +132,8 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 		}
 		return r, nil
 	}
-	if strings.HasPrefix(q, "select to_regclass('auth.users')") {
-		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true}}}, nil
+	if q == managedSQL {
+		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true, "cron_preloaded": true, "cron_catalog": true}}}, nil
 	}
 	if strings.HasPrefix(q, "select jsonb_build_array(") {
 		return Result{Rows: []map[string]any{{"args": m.args}}}, nil

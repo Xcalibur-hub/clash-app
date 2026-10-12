@@ -23,14 +23,18 @@ const seal = "a92a550527f810913b01f6e6411dc78996c71a06"
 const frozenManifest = "a9b30736c87a7fac05c9764404dfd58a876f64db6a3e072e9a348cac8b162b4e"
 
 type Config struct {
-	ProjectRef   string `json:"project_ref"`
-	CAFile       string `json:"ca_file"`
-	CAHash       string `json:"ca_sha256"`
-	ArtifactDir  string `json:"artifact_dir"`
-	ArtifactHash string `json:"artifact_manifest_sha256"`
-	RunDir       string `json:"run_dir"`
-	SuiteHash    string `json:"suite_manifest_sha256"`
-	Sterile      bool   `json:"sterile_test_project"`
+	recordPreflight  func(map[string]any) error
+	ConnectionMode   string `json:"connection_mode"`
+	PoolerHost       string `json:"pooler_host"`
+	CredentialSource string `json:"credential_source"`
+	ProjectRef       string `json:"project_ref"`
+	CAFile           string `json:"ca_file"`
+	CAHash           string `json:"ca_sha256"`
+	ArtifactDir      string `json:"artifact_dir"`
+	ArtifactHash     string `json:"artifact_manifest_sha256"`
+	RunDir           string `json:"run_dir"`
+	SuiteHash        string `json:"suite_manifest_sha256"`
+	Sterile          bool   `json:"sterile_test_project"`
 }
 type Result struct {
 	Rows []map[string]any
@@ -130,8 +134,25 @@ func connection(c Config, password string) (*pgx.ConnConfig, error) {
 		return nil, errors.New("driver configuration refused")
 	}
 	conf.Host = "db." + c.ProjectRef + ".supabase.co"
+	switch c.ConnectionMode {
+	case "", "direct":
+		if c.PoolerHost != "" {
+			return nil, errors.New("pooler host refused in direct mode")
+		}
+	case "session-pooler":
+		// Exact host comes from the approved project's Dashboard, never from region guessing.
+		if !regexp.MustCompile(`^aws-[0-9]+-[a-z]{2}-[a-z]+-[1-9][0-9]*\.pooler\.supabase\.com$`).MatchString(c.PoolerHost) {
+			return nil, errors.New("approved shared session-pooler hostname required")
+		}
+		conf.Host = c.PoolerHost
+	default:
+		return nil, errors.New("unsupported connection mode; transaction pooling refused")
+	}
 	conf.Port = 5432
 	conf.User = "postgres"
+	if c.ConnectionMode == "session-pooler" {
+		conf.User += "." + c.ProjectRef
+	}
 	conf.Database = "postgres"
 	conf.Password = password
 	conf.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots, ServerName: conf.Host}
@@ -202,8 +223,8 @@ func artifacts(c Config) (Artifact, error) {
 	return a, nil
 }
 
-const identitySQL = `select current_database() as db,current_user as usr,current_setting('server_version_num')::int as version,coalesce((select ssl from pg_stat_ssl where pid=pg_backend_pid()),false) as ssl`
-const extensionsSQL = `select e.extname as name,e.extversion as version,n.nspname as schema,pg_get_userbyid(e.extowner) as owner from pg_extension e join pg_namespace n on n.oid=e.extnamespace where e.extname in ('pgcrypto','postgis','pg_cron','pgtap') order by e.extname`
+const identitySQL = `select current_database() as db,current_user as usr,session_user as login,current_setting('server_version_num')::int as version,coalesce((select ssl from pg_stat_ssl where pid=pg_backend_pid()),false) as ssl`
+const extensionsSQL = `select e.extname as name,e.extversion as version,n.nspname as schema,pg_get_userbyid(e.extowner) as owner from pg_extension e join pg_namespace n on n.oid=e.extnamespace where e.extname in ('pgcrypto','postgis','pg_cron','pgtap','dblink') order by e.extname`
 const ledgerExistsSQL = `select to_regclass('supabase_migrations.schema_migrations') is not null as exists`
 const ledgerSQL = `select version,name,array_to_json(statements)::text as statements_json from supabase_migrations.schema_migrations order by version`
 const sterileSQL = `select (select count(*) from public.profiles) as profiles,(select count(*) from auth.users) as users,(select count(*) from public.takes) as takes,(select count(*) from public.rate_limit_events) as rates,(select count(*) from public.clashes) as clashes,(select count(*) from public.verdicts) as verdicts,(select count(*) from public.notifications) as notifications,(select count(*) from public.reputation_events) as rewards`
@@ -224,7 +245,7 @@ func identity(ctx context.Context, s Session) error {
 		return errors.New("missing identity")
 	}
 	v := r.Rows[0]
-	if v["db"] != "postgres" || v["usr"] != "postgres" || v["ssl"] != true {
+	if v["db"] != "postgres" || v["usr"] != "postgres" || v["login"] != "postgres" || v["ssl"] != true {
 		return errors.New("unexpected database identity or TLS")
 	}
 	n := fmt.Sprint(v["version"])
@@ -247,60 +268,12 @@ func ledger(ctx context.Context, s Session) ([]map[string]any, error) {
 	r, e = query(ctx, s, ledgerSQL)
 	return r.Rows, e
 }
-func preflight(ctx context.Context, s Session) (err error) {
-	if _, e := query(ctx, s, "begin read only"); e != nil {
-		return e
-	}
-	defer func() {
-		c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if _, e := s.Query(c, "rollback"); e != nil {
-			err = errors.New("read-only rollback unconfirmed; stop")
-		}
-	}()
-	if e := identity(ctx, s); e != nil {
-		return e
-	}
-	r, e := query(ctx, s, extensionsSQL)
-	if e != nil {
-		return e
-	}
-	valid := false
-	for _, v := range r.Rows {
-		if v["name"] == "pgcrypto" && v["version"] == "1.3" && v["schema"] == "extensions" && v["owner"] == "supabase_admin" {
-			valid = true
-		}
-	}
-	if !valid {
-		return errors.New("managed pgcrypto prerequisite mismatch")
-	}
-	r, e = query(ctx, s, `select to_regclass('auth.users') is not null and to_regclass('storage.objects') is not null and to_regclass('storage.buckets') is not null and to_regclass('realtime.messages') is not null as managed, to_regclass('public.profiles') is null as fresh, exists(select 1 from pg_publication where pubname='supabase_realtime') as publication, exists(select 1 from pg_roles where rolname='postgres' and not rolsuper) as restricted_role, not pg_has_role('postgres','pg_read_server_files','member') and not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='pg_catalog' and p.proname in ('pg_read_file','pg_read_binary_file') and has_function_privilege('postgres',p.oid,'execute')) as restricted_files`)
-	if e != nil {
-		return e
-	}
-	if len(r.Rows) != 1 {
-		return errors.New("managed prerequisite missing")
-	}
-	for _, k := range []string{"managed", "fresh", "publication", "restricted_role", "restricted_files"} {
-		if r.Rows[0][k] != true {
-			return errors.New("managed prerequisite refused: " + k)
-		}
-	}
-	l, e := ledger(ctx, s)
-	if e != nil {
-		return e
-	}
-	if len(l) > 0 {
-		return errors.New("nonempty application ledger refused")
-	}
-	return nil
-}
 
 const createLedgerSQL = `create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations(version text not null primary key, statements text[], name text)`
 const insertLedgerSQL = `insert into supabase_migrations.schema_migrations(version,name,statements) values($1,$2,$3)`
 
 func migrate(ctx context.Context, s Session, c Config, a Artifact) (int, error) {
-	if e := preflight(ctx, s); e != nil {
+	if _, e := preflight(ctx, s); e != nil {
 		return 0, e
 	}
 	if _, e := query(ctx, s, createLedgerSQL); e != nil {
@@ -397,9 +370,12 @@ func Run(ctx context.Context, c Config, mode, authorization, password string, di
 	if e != nil {
 		return 0, e
 	}
+	if c.ConnectionMode == "session-pooler" {
+		dial = sessionConnector(dial)
+	}
 	s, e := dial(ctx, conf)
 	if e != nil {
-		return 0, errors.New("TLS/authentication connection failed; no retry")
+		return 0, errors.New("TLS/authentication/session connection failed; no retry")
 	}
 	defer func() {
 		c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -410,7 +386,11 @@ func Run(ctx context.Context, c Config, mode, authorization, password string, di
 	}()
 	switch mode {
 	case "preflight":
-		return 0, preflight(ctx, s)
+		report, e := preflight(ctx, s)
+		if evidenceErr := savePreflight(c, report); evidenceErr != nil {
+			e = evidenceErr
+		}
+		return 0, e
 	case "migrate":
 		return migrate(ctx, s, c, a)
 	case "fixtures":
@@ -425,5 +405,5 @@ func authorized(mode, auth, ref string) bool {
 	if mode == "fixtures" {
 		prefix = "committed-fixtures"
 	}
-	return (mode == "preflight" || mode == "migrate" || mode == "inventory" || mode == "fixtures") && auth == prefix+":"+ref
+	return (mode == "preflight" || mode == "migrate" || mode == "inventory" || mode == "fixtures" || mode == "store-credential") && auth == prefix+":"+ref
 }

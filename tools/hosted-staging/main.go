@@ -14,9 +14,12 @@ import (
 )
 
 func command(args []string, getenv func(string) string, dial Connector) error {
+	return commandWithStore(args, getenv, dial, windowsStore())
+}
+func commandWithStore(args []string, getenv func(string) string, dial Connector, store secretStore) error {
 	f := flag.NewFlagSet("hosted-staging", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	mode := f.String("mode", "", "preflight, migrate, inventory or separately authorized fixtures")
+	mode := f.String("mode", "", "store-credential, preflight, migrate, inventory or separately authorized fixtures")
 	auth := f.String("authorize", "", "explicit mode:project reference")
 	file := f.String("config", "", "reviewed nonsecret configuration file")
 	if e := f.Parse(args); e != nil {
@@ -41,7 +44,16 @@ func command(args []string, getenv func(string) string, dial Connector) error {
 	if !authorized(*mode, *auth, c.ProjectRef) {
 		return errors.New("explicit mode/project authorization required")
 	}
-	pass := getenv("CLASH_STAGING_PASSWORD")
+	if *mode == "store-credential" {
+		if getenv("CLASH_STAGING_PASSWORD") != "" {
+			return errors.New("inherited password refused for credential storage")
+		}
+		return storeCredential(c, store)
+	}
+	pass, e := passwordFor(c, getenv, store)
+	if e != nil {
+		return e
+	}
 	if _, e = connection(c, pass); e != nil {
 		return e
 	}
@@ -57,6 +69,7 @@ func command(args []string, getenv func(string) string, dial Connector) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
+	c.recordPreflight = func(report map[string]any) error { return recordPreflight(c.RunDir, report) }
 	count, runError := Run(ctx, c, *mode, *auth, pass, dial)
 	outcome := map[string]any{"mode": *mode, "project_ref": c.ProjectRef, "candidate": seal, "completed_items": count, "success": runError == nil, "database_security_passed": false}
 	if runError != nil {

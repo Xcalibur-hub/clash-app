@@ -2,6 +2,12 @@
 
 12 October 2026. **Frozen integration candidate; hosted deployment and integrated database security BLOCKED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
+## Step 5W offline progress and next action
+
+[Step 5W implementation/report](PHASE_11_HOSTED_SESSION_POOLER_5W.md) adds explicit IPv4 shared session-pooler transport, Windows Credential Manager entry/retrieval and expanded catalog-only preflight evidence. Direct transport, frozen source/migration manifests, authorization scopes and migration transactions are preserved. [The creation checklist](HOSTED_STAGING_CREATION_CHECKLIST.md) now requires owner-controlled Dashboard creation because the connector password handoff is not verified.
+
+No project, credential entry, database connection, Docker operation or SQL execution occurred. The next action is review of this offline branch and separate authorization for owner-controlled creation, secret-store enrollment and a single read-only preflight. Actual endpoint identity, CA chain, Windows native-store behavior and managed extension/role compatibility remain runtime blockers. Earlier Step 5V network/credential findings are historical evidence below, not a claim that live staging has been unblocked. Step 4C stays BLOCKED; Step 2F DEFERRED.
+
 ## Step 5V actual status: BLOCKED before creation
 
 [Step 5V report and sanitized evidence](PHASE_11_HOSTED_STAGING_PREFLIGHT_5V.md) supersede the immediate next action described below. The unique authenticated organization was verified as Xcalibur-hub-2's Org (`dninpemahklihtxcjrnz`), Free, with a $0/month project quote. **No project was created and no database connection/preflight ran.** This Windows host has no global IPv6 address or IPv6 default route; the reviewed executor supports only the direct endpoint. Approved private credential storage/supply, Mumbai allocation and full requested preflight inventory coverage also remain unresolved.
