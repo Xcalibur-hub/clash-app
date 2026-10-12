@@ -1,0 +1,209 @@
+{"Time":"2026-10-12T16:08:06.6226895+05:30","Action":"start","Package":"clash/hosted-staging"}
+{"Time":"2026-10-12T16:08:08.0374635+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip"}
+{"Time":"2026-10-12T16:08:08.0374635+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip","Output":"=== RUN   TestPinnedCLITLSRoundTrip\n"}
+{"Time":"2026-10-12T16:08:08.1328038+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/disable"}
+{"Time":"2026-10-12T16:08:08.1333638+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/disable","Output":"=== RUN   TestPinnedCLITLSRoundTrip/disable\n"}
+{"Time":"2026-10-12T16:08:08.1399305+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/disable","Output":"--- PASS: TestPinnedCLITLSRoundTrip/disable (0.01s)\n"}
+{"Time":"2026-10-12T16:08:08.1399305+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/disable","Elapsed":0.01}
+{"Time":"2026-10-12T16:08:08.1399305+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/require"}
+{"Time":"2026-10-12T16:08:08.1399305+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/require","Output":"=== RUN   TestPinnedCLITLSRoundTrip/require\n"}
+{"Time":"2026-10-12T16:08:08.1534464+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/require","Output":"--- PASS: TestPinnedCLITLSRoundTrip/require (0.01s)\n"}
+{"Time":"2026-10-12T16:08:08.1534464+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/require","Elapsed":0.01}
+{"Time":"2026-10-12T16:08:08.1534464+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/verify-ca"}
+{"Time":"2026-10-12T16:08:08.1534464+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/verify-ca","Output":"=== RUN   TestPinnedCLITLSRoundTrip/verify-ca\n"}
+{"Time":"2026-10-12T16:08:08.1540248+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/verify-ca","Output":"--- PASS: TestPinnedCLITLSRoundTrip/verify-ca (0.00s)\n"}
+{"Time":"2026-10-12T16:08:08.1540248+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/verify-ca","Elapsed":0}
+{"Time":"2026-10-12T16:08:08.1540248+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/verify-full"}
+{"Time":"2026-10-12T16:08:08.1540248+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/verify-full","Output":"=== RUN   TestPinnedCLITLSRoundTrip/verify-full\n"}
+{"Time":"2026-10-12T16:08:08.154635+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/verify-full","Output":"--- PASS: TestPinnedCLITLSRoundTrip/verify-full (0.00s)\n"}
+{"Time":"2026-10-12T16:08:08.154635+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip/verify-full","Elapsed":0}
+{"Time":"2026-10-12T16:08:08.193584+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip","Output":"--- PASS: TestPinnedCLITLSRoundTrip (0.16s)\n"}
+{"Time":"2026-10-12T16:08:08.193584+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestPinnedCLITLSRoundTrip","Elapsed":0.16}
+{"Time":"2026-10-12T16:08:08.193584+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestVendoredCLIExactExtraction"}
+{"Time":"2026-10-12T16:08:08.19423+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestVendoredCLIExactExtraction","Output":"=== RUN   TestVendoredCLIExactExtraction\n"}
+{"Time":"2026-10-12T16:08:08.1953537+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestVendoredCLIExactExtraction","Output":"--- PASS: TestVendoredCLIExactExtraction (0.00s)\n"}
+{"Time":"2026-10-12T16:08:08.1953537+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestVendoredCLIExactExtraction","Elapsed":0}
+{"Time":"2026-10-12T16:08:08.1953537+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestVerifiedConnectionContract"}
+{"Time":"2026-10-12T16:08:08.1953537+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestVerifiedConnectionContract","Output":"=== RUN   TestVerifiedConnectionContract\n"}
+{"Time":"2026-10-12T16:08:08.3767036+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestVerifiedConnectionContract","Output":"--- PASS: TestVerifiedConnectionContract (0.18s)\n"}
+{"Time":"2026-10-12T16:08:08.3767036+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestVerifiedConnectionContract","Elapsed":0.18}
+{"Time":"2026-10-12T16:08:08.3767036+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial"}
+{"Time":"2026-10-12T16:08:08.3767036+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial","Output":"=== RUN   TestGuardsBeforeDial\n"}
+{"Time":"2026-10-12T16:08:08.3767036+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/unauthorized"}
+{"Time":"2026-10-12T16:08:08.3767036+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/unauthorized","Output":"=== RUN   TestGuardsBeforeDial/unauthorized\n"}
+{"Time":"2026-10-12T16:08:08.5305196+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/unauthorized","Output":"--- PASS: TestGuardsBeforeDial/unauthorized (0.15s)\n"}
+{"Time":"2026-10-12T16:08:08.5311927+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/unauthorized","Elapsed":0.15}
+{"Time":"2026-10-12T16:08:08.5311927+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/missing_password"}
+{"Time":"2026-10-12T16:08:08.5311927+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/missing_password","Output":"=== RUN   TestGuardsBeforeDial/missing_password\n"}
+{"Time":"2026-10-12T16:08:08.7164122+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/missing_password","Output":"--- PASS: TestGuardsBeforeDial/missing_password (0.19s)\n"}
+{"Time":"2026-10-12T16:08:08.7169584+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/missing_password","Elapsed":0.19}
+{"Time":"2026-10-12T16:08:08.7169584+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/wrong_target"}
+{"Time":"2026-10-12T16:08:08.7169584+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/wrong_target","Output":"=== RUN   TestGuardsBeforeDial/wrong_target\n"}
+{"Time":"2026-10-12T16:08:08.8792222+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/wrong_target","Output":"--- PASS: TestGuardsBeforeDial/wrong_target (0.16s)\n"}
+{"Time":"2026-10-12T16:08:08.8792222+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/wrong_target","Elapsed":0.16}
+{"Time":"2026-10-12T16:08:08.8792222+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/bad_ca"}
+{"Time":"2026-10-12T16:08:08.8792222+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/bad_ca","Output":"=== RUN   TestGuardsBeforeDial/bad_ca\n"}
+{"Time":"2026-10-12T16:08:09.0531714+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/bad_ca","Output":"--- PASS: TestGuardsBeforeDial/bad_ca (0.17s)\n"}
+{"Time":"2026-10-12T16:08:09.0531714+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/bad_ca","Elapsed":0.17}
+{"Time":"2026-10-12T16:08:09.0531714+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/changed_artifact"}
+{"Time":"2026-10-12T16:08:09.0531714+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/changed_artifact","Output":"=== RUN   TestGuardsBeforeDial/changed_artifact\n"}
+{"Time":"2026-10-12T16:08:09.2472203+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/changed_artifact","Output":"--- PASS: TestGuardsBeforeDial/changed_artifact (0.19s)\n"}
+{"Time":"2026-10-12T16:08:09.2472203+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/changed_artifact","Elapsed":0.19}
+{"Time":"2026-10-12T16:08:09.2472203+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/fixture_mode"}
+{"Time":"2026-10-12T16:08:09.2472203+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/fixture_mode","Output":"=== RUN   TestGuardsBeforeDial/fixture_mode\n"}
+{"Time":"2026-10-12T16:08:09.3934709+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/fixture_mode","Output":"--- PASS: TestGuardsBeforeDial/fixture_mode (0.15s)\n"}
+{"Time":"2026-10-12T16:08:09.3934709+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial/fixture_mode","Elapsed":0.15}
+{"Time":"2026-10-12T16:08:09.3934709+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial","Output":"--- PASS: TestGuardsBeforeDial (1.02s)\n"}
+{"Time":"2026-10-12T16:08:09.3934709+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestGuardsBeforeDial","Elapsed":1.02}
+{"Time":"2026-10-12T16:08:09.3934709+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTLSFailureRedacted"}
+{"Time":"2026-10-12T16:08:09.3934709+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTLSFailureRedacted","Output":"=== RUN   TestTLSFailureRedacted\n"}
+{"Time":"2026-10-12T16:08:09.7528407+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTLSFailureRedacted","Output":"--- PASS: TestTLSFailureRedacted (0.36s)\n"}
+{"Time":"2026-10-12T16:08:09.7528407+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTLSFailureRedacted","Elapsed":0.36}
+{"Time":"2026-10-12T16:08:09.7528407+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestWrongDatabaseStopsBeforeMigration"}
+{"Time":"2026-10-12T16:08:09.7528407+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestWrongDatabaseStopsBeforeMigration","Output":"=== RUN   TestWrongDatabaseStopsBeforeMigration\n"}
+{"Time":"2026-10-12T16:08:10.2644574+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestWrongDatabaseStopsBeforeMigration","Output":"--- PASS: TestWrongDatabaseStopsBeforeMigration (0.51s)\n"}
+{"Time":"2026-10-12T16:08:10.2644574+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestWrongDatabaseStopsBeforeMigration","Elapsed":0.51}
+{"Time":"2026-10-12T16:08:10.2644574+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestPartialMigrationFirstFailure"}
+{"Time":"2026-10-12T16:08:10.2644574+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPartialMigrationFirstFailure","Output":"=== RUN   TestPartialMigrationFirstFailure\n"}
+{"Time":"2026-10-12T16:08:10.7450037+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPartialMigrationFirstFailure","Output":"--- PASS: TestPartialMigrationFirstFailure (0.48s)\n"}
+{"Time":"2026-10-12T16:08:10.7450037+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestPartialMigrationFirstFailure","Elapsed":0.48}
+{"Time":"2026-10-12T16:08:10.7450037+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestCommitUncertaintyStops"}
+{"Time":"2026-10-12T16:08:10.7450037+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCommitUncertaintyStops","Output":"=== RUN   TestCommitUncertaintyStops\n"}
+{"Time":"2026-10-12T16:08:11.3561837+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCommitUncertaintyStops","Output":"--- PASS: TestCommitUncertaintyStops (0.61s)\n"}
+{"Time":"2026-10-12T16:08:11.357191+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestCommitUncertaintyStops","Elapsed":0.61}
+{"Time":"2026-10-12T16:08:11.357191+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestLedgerMismatchStops"}
+{"Time":"2026-10-12T16:08:11.357191+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestLedgerMismatchStops","Output":"=== RUN   TestLedgerMismatchStops\n"}
+{"Time":"2026-10-12T16:08:11.7783828+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestLedgerMismatchStops","Output":"--- PASS: TestLedgerMismatchStops (0.42s)\n"}
+{"Time":"2026-10-12T16:08:11.7787568+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestLedgerMismatchStops","Elapsed":0.42}
+{"Time":"2026-10-12T16:08:11.7787568+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestAll106MockTransactions"}
+{"Time":"2026-10-12T16:08:11.7787568+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestAll106MockTransactions","Output":"=== RUN   TestAll106MockTransactions\n"}
+{"Time":"2026-10-12T16:08:12.4205092+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestAll106MockTransactions","Output":"--- PASS: TestAll106MockTransactions (0.64s)\n"}
+{"Time":"2026-10-12T16:08:12.4205092+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestAll106MockTransactions","Elapsed":0.64}
+{"Time":"2026-10-12T16:08:12.4205092+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported"}
+{"Time":"2026-10-12T16:08:12.4205092+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported","Output":"=== RUN   TestCleanupFailureReported\n"}
+{"Time":"2026-10-12T16:08:12.4205092+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/readonly_rollback"}
+{"Time":"2026-10-12T16:08:12.4205092+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/readonly_rollback","Output":"=== RUN   TestCleanupFailureReported/readonly_rollback\n"}
+{"Time":"2026-10-12T16:08:12.9360847+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/readonly_rollback","Output":"--- PASS: TestCleanupFailureReported/readonly_rollback (0.52s)\n"}
+{"Time":"2026-10-12T16:08:12.9383244+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/readonly_rollback","Elapsed":0.52}
+{"Time":"2026-10-12T16:08:12.9383244+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/connection_close"}
+{"Time":"2026-10-12T16:08:12.9383244+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/connection_close","Output":"=== RUN   TestCleanupFailureReported/connection_close\n"}
+{"Time":"2026-10-12T16:08:13.8930766+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/connection_close","Output":"--- PASS: TestCleanupFailureReported/connection_close (0.96s)\n"}
+{"Time":"2026-10-12T16:08:13.8936734+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/connection_close","Elapsed":0.96}
+{"Time":"2026-10-12T16:08:13.8936734+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/failed_migration_rollback"}
+{"Time":"2026-10-12T16:08:13.8936734+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/failed_migration_rollback","Output":"=== RUN   TestCleanupFailureReported/failed_migration_rollback\n"}
+{"Time":"2026-10-12T16:08:14.8055593+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/failed_migration_rollback","Output":"--- PASS: TestCleanupFailureReported/failed_migration_rollback (0.91s)\n"}
+{"Time":"2026-10-12T16:08:14.8055593+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported/failed_migration_rollback","Elapsed":0.91}
+{"Time":"2026-10-12T16:08:14.8055593+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported","Output":"--- PASS: TestCleanupFailureReported (2.38s)\n"}
+{"Time":"2026-10-12T16:08:14.8055593+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestCleanupFailureReported","Elapsed":2.38}
+{"Time":"2026-10-12T16:08:14.8055593+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestActualEntrypointAndEvidenceRedaction"}
+{"Time":"2026-10-12T16:08:14.8055593+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestActualEntrypointAndEvidenceRedaction","Output":"=== RUN   TestActualEntrypointAndEvidenceRedaction\n"}
+{"Time":"2026-10-12T16:08:15.7937319+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestActualEntrypointAndEvidenceRedaction","Output":"--- PASS: TestActualEntrypointAndEvidenceRedaction (0.99s)\n"}
+{"Time":"2026-10-12T16:08:15.7937319+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestActualEntrypointAndEvidenceRedaction","Elapsed":0.99}
+{"Time":"2026-10-12T16:08:15.7937319+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestInventoryReadOnly"}
+{"Time":"2026-10-12T16:08:15.7937319+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestInventoryReadOnly","Output":"=== RUN   TestInventoryReadOnly\n"}
+{"Time":"2026-10-12T16:08:15.7942559+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestInventoryReadOnly","Output":"--- PASS: TestInventoryReadOnly (0.00s)\n"}
+{"Time":"2026-10-12T16:08:15.7947924+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestInventoryReadOnly","Elapsed":0}
+{"Time":"2026-10-12T16:08:15.7947924+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestPinnedCLIActualPGX4ParserLosesSourceTLS"}
+{"Time":"2026-10-12T16:08:15.7947924+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLIActualPGX4ParserLosesSourceTLS","Output":"=== RUN   TestPinnedCLIActualPGX4ParserLosesSourceTLS\n"}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestPinnedCLIActualPGX4ParserLosesSourceTLS","Output":"--- PASS: TestPinnedCLIActualPGX4ParserLosesSourceTLS (0.35s)\n"}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestPinnedCLIActualPGX4ParserLosesSourceTLS","Elapsed":0.35}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting"}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting","Output":"=== RUN   TestTAPAccounting\n"}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/success"}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/success","Output":"=== RUN   TestTAPAccounting/success\n"}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/success","Output":"--- PASS: TestTAPAccounting/success (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/success","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/skip"}
+{"Time":"2026-10-12T16:08:16.1444829+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/skip","Output":"=== RUN   TestTAPAccounting/skip\n"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/skip","Output":"--- PASS: TestTAPAccounting/skip (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/skip","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/empty_skip"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/empty_skip","Output":"=== RUN   TestTAPAccounting/empty_skip\n"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/empty_skip","Output":"--- PASS: TestTAPAccounting/empty_skip (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/empty_skip","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/failure"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/failure","Output":"=== RUN   TestTAPAccounting/failure\n"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/failure","Output":"--- PASS: TestTAPAccounting/failure (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/failure","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/no_plan"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/no_plan","Output":"=== RUN   TestTAPAccounting/no_plan\n"}
+{"Time":"2026-10-12T16:08:16.1450524+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/no_plan","Output":"--- PASS: TestTAPAccounting/no_plan (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/no_plan","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/plan_mismatch"}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/plan_mismatch","Output":"=== RUN   TestTAPAccounting/plan_mismatch\n"}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/plan_mismatch","Output":"--- PASS: TestTAPAccounting/plan_mismatch (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/plan_mismatch","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/bailout"}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/bailout","Output":"=== RUN   TestTAPAccounting/bailout\n"}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/bailout","Output":"--- PASS: TestTAPAccounting/bailout (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1456006+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/bailout","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/todo_pass"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/todo_pass","Output":"=== RUN   TestTAPAccounting/todo_pass\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/todo_pass","Output":"--- PASS: TestTAPAccounting/todo_pass (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/todo_pass","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/duplicate"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/duplicate","Output":"=== RUN   TestTAPAccounting/duplicate\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/duplicate","Output":"--- PASS: TestTAPAccounting/duplicate (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/duplicate","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTAPAccounting/empty"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/empty","Output":"=== RUN   TestTAPAccounting/empty\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting/empty","Output":"--- PASS: TestTAPAccounting/empty (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting/empty","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTAPAccounting","Output":"--- PASS: TestTAPAccounting (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTAPAccounting","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestFixtureModeCannotBeOrdinaryAuthorization"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFixtureModeCannotBeOrdinaryAuthorization","Output":"=== RUN   TestFixtureModeCannotBeOrdinaryAuthorization\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFixtureModeCannotBeOrdinaryAuthorization","Output":"--- PASS: TestFixtureModeCannotBeOrdinaryAuthorization (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestFixtureModeCannotBeOrdinaryAuthorization","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestFixtureWorkflowRefusesNonSterileAttestation"}
+{"Time":"2026-10-12T16:08:16.1462321+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFixtureWorkflowRefusesNonSterileAttestation","Output":"=== RUN   TestFixtureWorkflowRefusesNonSterileAttestation\n"}
+{"Time":"2026-10-12T16:08:16.346153+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFixtureWorkflowRefusesNonSterileAttestation","Output":"--- PASS: TestFixtureWorkflowRefusesNonSterileAttestation (0.20s)\n"}
+{"Time":"2026-10-12T16:08:16.346153+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestFixtureWorkflowRefusesNonSterileAttestation","Elapsed":0.2}
+{"Time":"2026-10-12T16:08:16.346153+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestSQLBoundaries"}
+{"Time":"2026-10-12T16:08:16.346153+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestSQLBoundaries","Output":"=== RUN   TestSQLBoundaries\n"}
+{"Time":"2026-10-12T16:08:16.346153+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestSQLBoundaries","Output":"--- PASS: TestSQLBoundaries (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.346153+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestSQLBoundaries","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.346153+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestTenFrozenAdaptations"}
+{"Time":"2026-10-12T16:08:16.346153+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTenFrozenAdaptations","Output":"=== RUN   TestTenFrozenAdaptations\n"}
+{"Time":"2026-10-12T16:08:16.4115892+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTenFrozenAdaptations","Output":"    suites_test.go:70: 89 exact frozen suites, 10 adaptations; 317 dblink calls mapped\n"}
+{"Time":"2026-10-12T16:08:16.4688523+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestTenFrozenAdaptations","Output":"--- PASS: TestTenFrozenAdaptations (0.12s)\n"}
+{"Time":"2026-10-12T16:08:16.4688523+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestTenFrozenAdaptations","Elapsed":0.12}
+{"Time":"2026-10-12T16:08:16.4688523+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestBridgeConnectUsesVerifiedClient"}
+{"Time":"2026-10-12T16:08:16.4688523+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestBridgeConnectUsesVerifiedClient","Output":"=== RUN   TestBridgeConnectUsesVerifiedClient\n"}
+{"Time":"2026-10-12T16:08:16.6344124+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestBridgeConnectUsesVerifiedClient","Output":"--- PASS: TestBridgeConnectUsesVerifiedClient (0.17s)\n"}
+{"Time":"2026-10-12T16:08:16.6344124+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestBridgeConnectUsesVerifiedClient","Elapsed":0.17}
+{"Time":"2026-10-12T16:08:16.6344124+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestDynamicArgumentsStayOnServer"}
+{"Time":"2026-10-12T16:08:16.6344124+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestDynamicArgumentsStayOnServer","Output":"=== RUN   TestDynamicArgumentsStayOnServer\n"}
+{"Time":"2026-10-12T16:08:16.6349575+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestDynamicArgumentsStayOnServer","Output":"--- PASS: TestDynamicArgumentsStayOnServer (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.6349575+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestDynamicArgumentsStayOnServer","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.6349575+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestAsyncBusyDrainOrdering"}
+{"Time":"2026-10-12T16:08:16.6349575+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestAsyncBusyDrainOrdering","Output":"=== RUN   TestAsyncBusyDrainOrdering\n"}
+{"Time":"2026-10-12T16:08:16.6349575+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestAsyncBusyDrainOrdering","Output":"--- PASS: TestAsyncBusyDrainOrdering (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.6349575+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestAsyncBusyDrainOrdering","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.6355345+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestRemoteErrorRedactionPreservesAssertions"}
+{"Time":"2026-10-12T16:08:16.6355345+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestRemoteErrorRedactionPreservesAssertions","Output":"=== RUN   TestRemoteErrorRedactionPreservesAssertions\n"}
+{"Time":"2026-10-12T16:08:16.6355345+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestRemoteErrorRedactionPreservesAssertions","Output":"--- PASS: TestRemoteErrorRedactionPreservesAssertions (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestRemoteErrorRedactionPreservesAssertions","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestFixtureAuthorizationIsSeparate"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFixtureAuthorizationIsSeparate","Output":"=== RUN   TestFixtureAuthorizationIsSeparate\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFixtureAuthorizationIsSeparate","Output":"--- PASS: TestFixtureAuthorizationIsSeparate (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestFixtureAuthorizationIsSeparate","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestFixtureCleanupFirstFailure"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFixtureCleanupFirstFailure","Output":"=== RUN   TestFixtureCleanupFirstFailure\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFixtureCleanupFirstFailure","Output":"--- PASS: TestFixtureCleanupFirstFailure (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestFixtureCleanupFirstFailure","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestMainRollbackFailureNotHidden"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestMainRollbackFailureNotHidden","Output":"=== RUN   TestMainRollbackFailureNotHidden\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestMainRollbackFailureNotHidden","Output":"--- PASS: TestMainRollbackFailureNotHidden (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestMainRollbackFailureNotHidden","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestFrozenNestedResultMapping"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFrozenNestedResultMapping","Output":"=== RUN   TestFrozenNestedResultMapping\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFrozenNestedResultMapping","Output":"--- PASS: TestFrozenNestedResultMapping (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestFrozenNestedResultMapping","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"run","Package":"clash/hosted-staging","Test":"TestFailedSourceCleanupNeverRetried"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFailedSourceCleanupNeverRetried","Output":"=== RUN   TestFailedSourceCleanupNeverRetried\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Test":"TestFailedSourceCleanupNeverRetried","Output":"--- PASS: TestFailedSourceCleanupNeverRetried (0.00s)\n"}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"pass","Package":"clash/hosted-staging","Test":"TestFailedSourceCleanupNeverRetried","Elapsed":0}
+{"Time":"2026-10-12T16:08:16.6361089+05:30","Action":"output","Package":"clash/hosted-staging","Output":"PASS\n"}
+{"Time":"2026-10-12T16:08:16.6446777+05:30","Action":"output","Package":"clash/hosted-staging","Output":"ok  \tclash/hosted-staging\t10.022s\n"}
+{"Time":"2026-10-12T16:08:22.0393005+05:30","Action":"pass","Package":"clash/hosted-staging","Elapsed":15.417}

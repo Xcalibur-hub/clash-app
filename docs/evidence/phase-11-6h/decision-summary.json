@@ -1,0 +1,6 @@
+﻿{
+    "allowlist_after_includes_pgbouncer":  true,
+    "allowlist_before_omitted":  true,
+    "step_6g_unexpected_name":  "pgbouncer",
+    "unknown_schemas_still_fail_closed":  true
+}

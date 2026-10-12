@@ -1,0 +1,21 @@
+﻿{
+    "decision":  "allowlist_pgbouncer",
+    "residual":  "live owner/contents not verified; name allowlist only",
+    "prepare":  {
+                    "suite_manifest_sha256":  "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+                    "frozen_source_files":  245,
+                    "migrations":  106,
+                    "artifact_manifest_sha256":  "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a"
+                },
+    "go_vet":  "PASS",
+    "go_test":  "PASS",
+    "migration_eligible":  false,
+    "scope":  "file-only",
+    "baseline":  "89c0fe84663f89aefff1df9b9fd6a424acf8bce7",
+    "live_connections":  0,
+    "provenance":  [
+                       "supabase/postgres ansible/files/pgbouncer_config/pgbouncer_auth_schema.sql",
+                       "supabase/postgres ansible/files/pgbouncer_config/pgbouncer.ini.j2 auth_query",
+                       "supabase/postgres schema-17 dump CREATE SCHEMA pgbouncer"
+                   ]
+}

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { ARENA_CREW_SPECIALTIES } from './arenaCrewSpecialties.ts';
 import {
   arenaCrewErrorKey,
+  arenaCrewUserMessage,
   parseArenaCrewList,
   parseArenaCrewPayload,
 } from './arenaCrewPayload.ts';
@@ -70,5 +71,34 @@ describe('arena crew error keys', () => {
       'permission_denied',
     );
     assert.equal(arenaCrewErrorKey('request already pending'), 'request_already_pending');
+    assert.equal(arenaCrewErrorKey('sign in to join a crew'), 'auth_required');
+    assert.equal(arenaCrewErrorKey('this crew is not open join'), 'not_open_join');
+    assert.equal(arenaCrewErrorKey('transfer ownership before leaving'), 'owner_must_transfer');
+  });
+
+  it('never surfaces raw unknown errors to the user', () => {
+    assert.equal(
+      arenaCrewUserMessage('relation \"arena_crews\" does not exist'),
+      'Something went wrong with that Crew action. Try again.',
+    );
+    assert.match(arenaCrewUserMessage('sign in to create a crew'), /Sign in/i);
+  });
+});
+
+describe('arena crew join access rules', () => {
+  it('blocks guests and one-crew conflicts in pure helpers', async () => {
+    const { crewJoinAction } = await import('./arenaCrewIdentity.ts');
+    assert.equal(
+      crewJoinAction('OPEN', { isMember: false, hasPendingRequest: false, activeCrewId: 'ac_other' }, 'ac_1'),
+      'blocked_other',
+    );
+    assert.equal(
+      crewJoinAction('INVITE_ONLY', { isMember: false, hasPendingRequest: false, activeCrewId: null }, 'ac_1'),
+      'invite_only',
+    );
+    assert.equal(
+      crewJoinAction('REQUEST', { isMember: false, hasPendingRequest: true, activeCrewId: null }, 'ac_1'),
+      'pending',
+    );
   });
 });

@@ -1,0 +1,16 @@
+﻿{
+    "facts":  [
+                  "6E observed pgcrypto owner postgres version 1.3 schema extensions",
+                  "prior gate required supabase_admin only",
+                  "migrations use create extension if not exists and extensions.* calls only"
+              ],
+    "assumptions":  [
+                        "EXECUTE grants remain sufficient for migrations when owner is postgres",
+                        "unexpected schema on 6E is likely a newer managed schema not yet allowlisted — unconfirmed without live name inventory"
+                    ],
+    "changes":  [
+                    "pgcryptoAcceptableOwner supabase_admin|postgres",
+                    "unexpectedSchemaNamesSQL names-only limit 32",
+                    "shared managedSchemaAllowlist"
+                ]
+}

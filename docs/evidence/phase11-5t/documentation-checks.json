@@ -1,0 +1,42 @@
+{
+  "relative_links_checked": 4,
+  "relative_links_valid": true,
+  "primary_status_matches_step5s_baseline": true,
+  "primary_modified_files": [
+    {
+      "file": "scripts/dev-local.mjs",
+      "sha256_matches": true
+    },
+    {
+      "file": "scripts/local-supabase-env.mjs",
+      "sha256_matches": true
+    },
+    {
+      "file": "services/arenaCrewService.ts",
+      "sha256_matches": true
+    },
+    {
+      "file": "utils/arenaCrewPayload.ts",
+      "sha256_matches": true
+    },
+    {
+      "file": "utils/arenaCrewSpecialties.ts",
+      "sha256_matches": true
+    },
+    {
+      "file": "utils/arenaCrews.test.ts",
+      "sha256_matches": true
+    }
+  ],
+  "application_or_migration_changes": false,
+  "docker_executed": false,
+  "sql_executed": false,
+  "supabase_cli_executed": false,
+  "expo_executed": false,
+  "hosted_credentials_generated": false,
+  "offline_tests": {
+    "passed": 27,
+    "failed": 0,
+    "skipped": 0
+  }
+}

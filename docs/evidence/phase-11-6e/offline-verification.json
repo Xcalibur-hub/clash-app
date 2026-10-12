@@ -1,0 +1,17 @@
+﻿{
+    "sql_suites_executed":  0,
+    "go_vet":  0,
+    "frozen_source_files":  245,
+    "suite_manifest_sha256":  "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+    "go_mod_verify":  "all modules verified",
+    "executable_match_5y":  true,
+    "go_test":  "ok clash/hosted-staging",
+    "source_revision":  "df5d8d084bbe331d8de3479e045b1b409248414e",
+    "connection_mode":  "direct",
+    "ca_sha256":  "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "pooler_used":  false,
+    "migrations_executed":  0,
+    "executable_sha256":  "3d71f3a1d8a565ae294649a8d6ae9f0607071a9cc68d60210af4dd408afa7d5a",
+    "artifact_manifest_sha256":  "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+    "migrations":  106
+}
