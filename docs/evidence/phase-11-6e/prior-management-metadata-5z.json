@@ -1,0 +1,5 @@
+{
+ "source":"authenticated Supabase management metadata; not SQL preflight output",
+ "project":{"id":"zrutlrhhvfcsmssjiijl","name":"clash-staging","organization_id":"dninpemahklihtxcjrnz","region":"ap-northeast-1","status":"ACTIVE_HEALTHY","database":{"version":"17.11.0.003","postgres_engine":"17"},"created_at":"2026-10-12T11:30:10.599833Z"},
+ "organization":{"id":"dninpemahklihtxcjrnz","name":"Xcalibur-hub-2's Org","plan":"free"}
+}
