@@ -109,3 +109,7 @@ After network-only Steps 6B–6D confirmed IPv6 reachability to `db.zrutlrhhvfcs
 ## Step 6F: hosted DB compatibility investigation (file-only)
 
 Isolated worktree `C:/p116f` investigated the Step 6E blockers without live SQL. The pgcrypto owner gate was an executor assumption (`supabase_admin` only), not a frozen-migration requirement; hosted staging presented owner `postgres`. The executor now accepts managed owners `supabase_admin` or `postgres` for `extensions.pgcrypto` 1.3 and records allowlisted unexpected schema **names** while remaining fail-closed on non-zero counts. Offline Go tests and frozen 245/106 hashes verified. No hosted reconnect. See [Step 6F report](PHASE_11_HOSTED_DB_COMPAT_6F.md).
+
+## Step 6G: direct compatibility preflight blocked on schema `pgbouncer` (2026-10-12)
+
+One authorized direct IPv6 preflight from `C:/p116g` on exact Step 6F revision `5ce5641` confirmed TLS/identity (backend SSL true) and accepted `pgcrypto` owned by `postgres`. Execution stopped at unexpected application objects: allowlisted name inventory reported **`pgbouncer`**. No allowlist mutation, retry, or migration. Staging remains not migration-eligible. See [Step 6G report](PHASE_11_DIRECT_COMPAT_PREFLIGHT_6G.md).
