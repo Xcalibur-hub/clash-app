@@ -2,6 +2,14 @@
 
 12 October 2026. **Frozen integration candidate; hosted deployment and integrated database security BLOCKED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
+## Step 5U progress and next action
+
+[Hosted executor preparation](PHASE_11_HOSTED_EXECUTOR_PREPARATION_5U.md) and [creation checklist](HOSTED_STAGING_CREATION_CHECKLIST.md) now supersede the file-only preparation item below. New Step 5U draft is stacked on [PR #44](https://github.com/Xcalibur-hub/clash-app/pull/44); its PR link will be recorded after creation. The frozen implementation and artifact lineage are unchanged.
+
+Verified now: 245 frozen hashes, 106 compatibility artifacts, all 89 source suites bundled, ten dblink adapters; 81 prerequisite Node tests and 28 top-level Go tests (23 subtests, 47 leaf cases) pass, plus Go vet. These are mocked/offline results, **zero database connections/migrations/SQL assertions**. Actual CLI 2.40.7 pgx v4 parser regressions confirm TLS settings are dropped during remote URL reconstruction. A separate pinned pgx v5 executor uses explicit verified TLS; no Compose redirection or insecure fallback.
+
+Read-only first-preflight preparation is ready, subject to new staging creation/identity/CA/operator authorization. Direct-host network reachability, hosted owners/extensions/default ACLs, ledger compatibility, all 89 runtime tests, committed fixture cleanup, Storage/Realtime/cron and application behavior remain unverified. The immediate next action is owner selection of organization/region/budget/operator and separate authorization for one new project and read-only preflight. Do not jump directly to migration or fixture execution. Step 4C remains BLOCKED; Step 2F remains DEFERRED.
+
 ## Architecture and ownership
 
 CLASH is an Expo / React Native application using Supabase Auth, PostgreSQL/RPCs/RLS, Storage, Realtime and server maintenance. PostgreSQL is authoritative; no second database or alternate competition engine is planned. Expo SDK 54 / React Native 0.81.5 are the recorded app baseline; use package-lock.json rather than upgrading packages during staging preparation.
@@ -36,7 +44,7 @@ Frozen implementation `9c71d72a15095047821789386ca9d395961bab4f`; docs/manifest 
 | #32 / #33 / #34 / #35 | Attempt/startup evidence, localhost-binding checker/proposal and Compose harness |
 | #36 / #37 / #38 / #39 | Runtime/client-auth failure evidence and fix; Windows plugin-discovery failure evidence and environment fix |
 | #40 / #41 / #42 / #43 | Step 5P / 5Q evidence, bootstrap import-order fix and Step 5S TLS failure report |
-| This Step 5T PR | Documentation and offline evidence only; stacked against #43, no merge/deployment authority |
+| #44 / Step 5T | Documentation and offline evidence only; stacked against #43, no merge/deployment authority |
 
 These are provenance relationships, not a claim that all current GitHub heads are merged or unchanged. Exact #13–#24 integrated heads are frozen in `PHASE_11_INTEGRATION_CANDIDATE.md` and its manifest. Before promotion, re-inventory head drift; never integrate draft heads automatically. The active evidence chain is #26 → #31 → #35 → #37 → #39 → #42 → #43; #34's binding checker is an included prerequisite. No source PR is modified by this documentation branch.
 
@@ -57,11 +65,11 @@ The old nine concurrency labels omit dblink suites 053/076 and include 048's tra
 ## Next checkpoints and ownership
 
 1. **Owner/security reviewer:** accept the plan, staging organization/region/budget and least-privilege access model. Do not give agents production credentials.
-2. **File-only engineering checkpoint:** prepare and review a hosted executor/TLS contract and ten suite adaptations with fixture ownership/cleanup and exact assertion mapping. Preserve source migrations/tests; any revised artifact needs a new provenance manifest. This is recommended work, not begun here.
+2. **Step 5U file-only engineering checkpoint:** executor/TLS contract and ten suite adaptations prepared with offline tests. Review the new draft and its runtime limitations; source migrations/tests are preserved. This completes preparation, not database validation.
 3. **Separately authorized target preflight:** create one named new hosted project; inspect managed schema/extension/role identities and supported capabilities; stop on mismatch. No fallback to existing local/hosted databases.
 4. **Separately authorized deployment/validation:** use the checklist, one controlled ordered migration run, focused security tests, complete mapped 89 suites, JWT/API/Storage/Realtime/cron checks, actual TAP accounting and scoped cleanup. Obtain acceptance before testers/builds.
 5. **Later app/device checkpoint:** approve disjoint backend origin and staging build/OTA configuration, controlled tester access and Android verification. No automatic merge/production promotion follows staging results.
 
 Step 4C remains **BLOCKED against existing local databases**; its consumed authorization is not renewed. Android Step 2F remains **DEFERRED**. No Figma/native/UI redesign, payment work, new judging/gameplay, migration rewrite or database reset is included.
 
-Primary checkout: `C:/Users/91962/Desktop/Clash` retains its six modified tracked Crew/development files and existing untracked Crew directories/migration/test and other artifacts. No stash/discard/overwrite/commit of that work is permitted. New documentation is confined to `C:/p11host`.
+Primary checkout: `C:/Users/91962/Desktop/Clash` retains its six modified tracked Crew/development files and existing untracked Crew directories/migration/test and other artifacts. No stash/discard/overwrite/commit of that work is permitted. Step 5U tooling/documentation is confined to the new `C:/p11exec` worktree. Primary status and all six modified tracked-file hashes match the preservation baseline.
