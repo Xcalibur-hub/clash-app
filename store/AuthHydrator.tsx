@@ -32,6 +32,10 @@ export function AuthHydrator(): null {
     if (uid === prevUid.current) return undefined;
     prevUid.current = uid;
 
+    // Drop the previous account immediately so profile Wins / clash counts /
+    // own facets cannot flash under the next session while hydration runs.
+    dispatch(setViewer(GUEST_VIEWER));
+
     let cancelled = false;
     void (async () => {
       let viewer = GUEST_VIEWER;
@@ -44,7 +48,7 @@ export function AuthHydrator(): null {
           viewer = GUEST_VIEWER;
         }
       }
-      if (cancelled) return;
+      if (cancelled || prevUid.current !== uid) return;
       dispatch(setViewer(viewer));
       // Re-hydrate so the feed reflects the new identity's safety (block/mute),
       // reaction, upvote and viewer state — signing in mid-session filters the

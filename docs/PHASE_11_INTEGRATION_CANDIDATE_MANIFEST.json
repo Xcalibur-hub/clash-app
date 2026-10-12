@@ -1,0 +1,1313 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-11",
+  "branch": "integration/phase-11-staging-candidate",
+  "base_commit": "eccd5214e0c6e3ce68f86b9656d972441b53a34a",
+  "candidate_commit": "9c71d72a15095047821789386ca9d395961bab4f",
+  "candidate_tree": "b1582e0cbd5c4f25e88e63e81e323703bac6180f",
+  "freeze_contract": "candidate_commit is the tested implementation snapshot. The subsequent seal commit adds only PHASE_11_INTEGRATION_CANDIDATE.md and this manifest; final delivery SHA is the draft PR head. SHA256 hashes use exact Git blob bytes, not Windows CRLF working-tree bytes.",
+  "pr_provenance": [
+    {
+      "pr": 13,
+      "head": "03429fe63628064a48486c16e346ff8330200bcb",
+      "classification": "implementation",
+      "integration_dependencies": []
+    },
+    {
+      "pr": 14,
+      "head": "ac7639ed070a2d59c65534f1c1dde66dd96b034e",
+      "classification": "implementation",
+      "integration_dependencies": []
+    },
+    {
+      "pr": 15,
+      "head": "b4f77eeb6314b8e0d542f2b50a086baa4d06cd76",
+      "classification": "non-database harness",
+      "integration_dependencies": []
+    },
+    {
+      "pr": 16,
+      "head": "ecac2183d7b53b0d6dc2b1ce50ed2c55b7b90088",
+      "classification": "historical documentation and superseded harness",
+      "integration_dependencies": []
+    },
+    {
+      "pr": 17,
+      "head": "401b4b424bf7c9240047d802d889c9d8adb78b61",
+      "classification": "documentation and superseding rollback-default SQL harness",
+      "integration_dependencies": [
+        16
+      ]
+    },
+    {
+      "pr": 18,
+      "head": "5aa256b2c784bd3d08bab3959ed7e460fd819bd1",
+      "classification": "implementation using committed Crew core",
+      "integration_dependencies": []
+    },
+    {
+      "pr": 19,
+      "head": "547fdc43f3df6c518c2af23590215badeed32d40",
+      "classification": "implementation and safety tests",
+      "integration_dependencies": [
+        14,
+        15
+      ]
+    },
+    {
+      "pr": 20,
+      "head": "245801378a7b94479df01bcf22f9c8db6a918526",
+      "classification": "documentation only",
+      "integration_dependencies": []
+    },
+    {
+      "pr": 21,
+      "head": "c6ab76677068120458c88dce54da10f26a66cda3",
+      "classification": "H1/H2 implementation and blocked validation evidence",
+      "integration_dependencies": [
+        15
+      ]
+    },
+    {
+      "pr": 22,
+      "head": "6b0ac7dbaa2b35640e2650964fc9608b1ed7a949",
+      "classification": "documentation only",
+      "integration_dependencies": [
+        20
+      ]
+    },
+    {
+      "pr": 23,
+      "head": "d715ded83368b8c6a413f4b9f82018a5ecc0fd31",
+      "classification": "H3 implementation",
+      "integration_dependencies": [
+        21,
+        22
+      ]
+    },
+    {
+      "pr": 24,
+      "head": "57ceb1b9c71a63845a88e4abc33a67a678dafb69",
+      "classification": "M1 implementation",
+      "integration_dependencies": [
+        21,
+        22,
+        23
+      ]
+    }
+  ],
+  "migration_order": [
+    {
+      "path": "supabase/migrations/20260926120000_initial_arena_schema.sql",
+      "sha256": "69baf3f487c1b5d032acbfe4f800d13a0b7bdc7679c049b11502c02a199515b9"
+    },
+    {
+      "path": "supabase/migrations/20260926130000_auth_profile_trigger.sql",
+      "sha256": "482469bd8112d7be201edd961f8ce4a046eb20e809018c5ae78e758a4e761387"
+    },
+    {
+      "path": "supabase/migrations/20260926140000_social_foundation.sql",
+      "sha256": "7b61537f4f93a0352fe5ac8897c319a2591002a97e3efe5a7d838d7622a68e0a"
+    },
+    {
+      "path": "supabase/migrations/20260926150000_media_storage.sql",
+      "sha256": "fccd34c805b7e2444dd65c579ccefad699f4698bc840699ee156d2139641db8a"
+    },
+    {
+      "path": "supabase/migrations/20260926160000_clash_engine.sql",
+      "sha256": "fb8eddbd85b188132aa8219eb7f62360ce704f05d98329ff988c10196d0982b8"
+    },
+    {
+      "path": "supabase/migrations/20260926170000_production_hardening.sql",
+      "sha256": "07916c3915cf14dfb29811fe2d05119c2f579ccb1e9500ece5e83f9e4d2d6ae5"
+    },
+    {
+      "path": "supabase/migrations/20260926180000_take_reactions.sql",
+      "sha256": "d6656d77d4c14e56b055b27be1c169d329fabb97e4d93c1f1d206bf4c921aa1d"
+    },
+    {
+      "path": "supabase/migrations/20260926190000_hoods_and_threads.sql",
+      "sha256": "55fdd7c4173546d6b6e8c71d63833a08a5b09851787dacf19a074c0322f56063"
+    },
+    {
+      "path": "supabase/migrations/20260926200000_take_creation_rpc.sql",
+      "sha256": "d83cd2110c97c943ff72f89292db3c6e44551328c8b62f060d74bbf1db08ad28"
+    },
+    {
+      "path": "supabase/migrations/20260927000000_feed_visibility.sql",
+      "sha256": "57285606475d5d1e7f87da4e2d399fe1c7b18ad8f157089c7150c6ed272f61a8"
+    },
+    {
+      "path": "supabase/migrations/20260927010000_clash_draw.sql",
+      "sha256": "177cc6028a00cbcb91b590f26c3f75ae32e57dd936867ff96866ef5654c0f800"
+    },
+    {
+      "path": "supabase/migrations/20260927020000_take_insert_lockdown.sql",
+      "sha256": "bdba99027d183953de0c363532ffa082c372b682a6d09d32bd64686ab8653612"
+    },
+    {
+      "path": "supabase/migrations/20260927030000_clash_scheduler.sql",
+      "sha256": "856b0d1c062688cc77c189e418a12dfc05817aa35cd82405a7e7cea4c6ce011c"
+    },
+    {
+      "path": "supabase/migrations/20260928000000_vault_foundation.sql",
+      "sha256": "f95097ddb63ac698d2ea8721939411a9e5770d2c8d2b03f984d17f8a761cc68d"
+    },
+    {
+      "path": "supabase/migrations/20260928010000_vault_rpcs.sql",
+      "sha256": "452c5ddcaedafc82cdec1b67d2b5cb73d5bcbcc40b08dd47a22f2efb400844cc"
+    },
+    {
+      "path": "supabase/migrations/20260928020000_vault_entitlement.sql",
+      "sha256": "6678a26db8ecf78233286e528eeb2f57142e0b551a238b057972ee139e4b2e72"
+    },
+    {
+      "path": "supabase/migrations/20260928030000_vault_notifications.sql",
+      "sha256": "e0f94585c269f9d88f0cb84d7faf25957ad81d8b3f960804ee48fe275bd512e7"
+    },
+    {
+      "path": "supabase/migrations/20260928040000_vault_maintenance.sql",
+      "sha256": "217e36c776731307b108f81f91c3c2452a547227a2e1ce2957ee7def3935d5be"
+    },
+    {
+      "path": "supabase/migrations/20260928050000_vault_storefront.sql",
+      "sha256": "54c10c52ae5afa2c2da189b4704b60cc29724dae8e6a5cdc9d18573cdc04ca67"
+    },
+    {
+      "path": "supabase/migrations/20260928100000_mindshift.sql",
+      "sha256": "ecfd3be9bf1ffd9c5c85b2031ecfe300240787bf082c702fe597588e0d4118fa"
+    },
+    {
+      "path": "supabase/migrations/20260928110000_blind_clash.sql",
+      "sha256": "8aa5c38d1e2f8a2c2d52fd56fe52b9a86cf00ef9d223eddccc9aa6a7b59d5465"
+    },
+    {
+      "path": "supabase/migrations/20260928120000_hood_prediction.sql",
+      "sha256": "a2dd80168897f4141bdc4f8a2b2701ac748625249862896342ccc85afcc6cb52"
+    },
+    {
+      "path": "supabase/migrations/20260928130000_world_missions.sql",
+      "sha256": "3a62430bcbd6b5ce5068996483b9ed5eb4a37b367fe99bf4cb0485f768ce5541"
+    },
+    {
+      "path": "supabase/migrations/20260928140000_world_drop_view.sql",
+      "sha256": "891e35ec00a715568d4a85620d8fe96534aa30a3bb9145eaeeee4ad9c84be840"
+    },
+    {
+      "path": "supabase/migrations/20260930100000_sponsor_attribution.sql",
+      "sha256": "2bfa0a561395d97e14d8923d39f93b3f6b59b94ea7a69cfc139191ae558e157a"
+    },
+    {
+      "path": "supabase/migrations/20260930110000_sponsor_attribution_hardening.sql",
+      "sha256": "b1e86d80dcb2da5f57fd4390e48fad2b001763af03401088e87de35043251781"
+    },
+    {
+      "path": "supabase/migrations/20260930120000_sponsor_studio_rpcs.sql",
+      "sha256": "5eb508da4001d40fda47b911db8b8d32710df6c8cd99e14deb523cf2cd6fc753"
+    },
+    {
+      "path": "supabase/migrations/20260930130000_creator_earnings.sql",
+      "sha256": "3dc1f71d1d248f72e9fa3d1ed503a39ea3c8576a8795e932f639578265875e5d"
+    },
+    {
+      "path": "supabase/migrations/20260930140000_comment_media.sql",
+      "sha256": "ca17d8c23352b523254e992a783422621a4e854b5a4a5a0ede0e2abaf072c620"
+    },
+    {
+      "path": "supabase/migrations/20261002140000_comment_gifs_enum.sql",
+      "sha256": "90e4d9ce7a82a1d6016a17a47f73e2d7a880dfd73048aed70e34b871bc2b31e0"
+    },
+    {
+      "path": "supabase/migrations/20261002140100_comment_gifs.sql",
+      "sha256": "7664381221383e3ca400cb550505a79e7bbf69e928f35143bbc8069a81674ea7"
+    },
+    {
+      "path": "supabase/migrations/20261002150000_live_arena_enums.sql",
+      "sha256": "96bbf31606a419e86823337b3907ca9d2675b164f023ece8c4063ed9dc7c7d17"
+    },
+    {
+      "path": "supabase/migrations/20261002150100_live_arena_schema.sql",
+      "sha256": "753e1981de711328db44619a47d9a96996d0cc4bb4aa80a9679d95d4a08cbd59"
+    },
+    {
+      "path": "supabase/migrations/20261002160000_live_arena_spectator.sql",
+      "sha256": "59997c548eda8eb3e4643f01ed20a41276439a72047f3abb3198361039aa8949"
+    },
+    {
+      "path": "supabase/migrations/20261002170000_arena_spectator_upgrade.sql",
+      "sha256": "dd333ff557aeda0564e1b9f70cc742bec5557e5f37d3a79c590894d76b98cb9c"
+    },
+    {
+      "path": "supabase/migrations/20261002180000_arena_feel_alive.sql",
+      "sha256": "332b02dac48b1f492b803e0326b57b860117b8cceea7d6888a7cf3ea71b9fd90"
+    },
+    {
+      "path": "supabase/migrations/20261003120000_list_arena_topic_rooms.sql",
+      "sha256": "7201a87c69cd7738fd6c9a8fe4c38a8146a19fdc711e77f784708a852c596b83"
+    },
+    {
+      "path": "supabase/migrations/20261003140000_watch_arena_room.sql",
+      "sha256": "eeab8c4567f8b8ac7fd588a7e1254b9f3b43f091b90828daabe38814ce08a874"
+    },
+    {
+      "path": "supabase/migrations/20261003150000_list_arena_room_presence.sql",
+      "sha256": "f0c3298c1eb197e290ad45bd786b357ed28f9f40d7a76e64464c6c74f8b5fe74"
+    },
+    {
+      "path": "supabase/migrations/20261003160000_room_pulse_and_scale.sql",
+      "sha256": "db791c428c240b97f1afabe7d13be4add415e926012bd3b9a2375037b8bc31fe"
+    },
+    {
+      "path": "supabase/migrations/20261003180000_explore_global.sql",
+      "sha256": "a5599544c44e28415cc9d5434b0cf66f70d555257b443a5380f871fc559c9c9b"
+    },
+    {
+      "path": "supabase/migrations/20261003190000_explore_vault_preview.sql",
+      "sha256": "fd419f1521894b38d051966633216841cce3ab08a2139f77bcbd21a6ca3275d1"
+    },
+    {
+      "path": "supabase/migrations/20261003200000_explore_for_you_ia.sql",
+      "sha256": "0895d572da8d1113edb6a02ae0ffef204441940b621b5216a6b9139bdddb84f3"
+    },
+    {
+      "path": "supabase/migrations/20261004120000_explore_play_system.sql",
+      "sha256": "b047b47ea03dbb90bb4324b40a20196e30dd449d89557b42a49b4e1d8045d844"
+    },
+    {
+      "path": "supabase/migrations/20261004120100_explore_treasure_gameplay.sql",
+      "sha256": "ae947f2e3d5c246ac137ea3b9fff7ad600a4927fc9aba214e5419f25d62c4ab4"
+    },
+    {
+      "path": "supabase/migrations/20261004140000_meet_text_matching.sql",
+      "sha256": "8c1f0d69a59180032487c6a3a68e0184497a55fe41675d5d8f62655732fc4745"
+    },
+    {
+      "path": "supabase/migrations/20261004150000_meet_video.sql",
+      "sha256": "c458734080fb3ef4f0c7a6d196f5ff70fd08e641d549d9e63397ae6fe038422d"
+    },
+    {
+      "path": "supabase/migrations/20261004160000_vault_storefront_preview.sql",
+      "sha256": "72dba3e6ea3b7673ced4f2c79074ee11c87dca81c796daf48c2a4e0c31aaccec"
+    },
+    {
+      "path": "supabase/migrations/20261004170000_vault_commerce.sql",
+      "sha256": "6591fcaec38bf9a42f055ad2f8ffaf39e2e744e84dc4ba835ba4b368c4681bb4"
+    },
+    {
+      "path": "supabase/migrations/20261004170100_vault_commerce_rpcs.sql",
+      "sha256": "8c7d2b4adec6f5ee1c43a5ecf3ad1773b5a72e8cad5adf6faef54b1c05479b3f"
+    },
+    {
+      "path": "supabase/migrations/20261004181000_vault_discover_worlds.sql",
+      "sha256": "015d10906e274284825b1c6f01d1ff209c0ed979ccd3eb3a2c1630c7d0c80770"
+    },
+    {
+      "path": "supabase/migrations/20261004190000_vault_communities.sql",
+      "sha256": "8355b98c8a73ea5e2e4e43e2edba78a6f363af299ef4cb40c698867631ff1077"
+    },
+    {
+      "path": "supabase/migrations/20261004190100_vault_community_rpcs.sql",
+      "sha256": "38b2ce28e9a31a0ac3b9f36182e951fea891013d67fb28180382fac22df00ffc"
+    },
+    {
+      "path": "supabase/migrations/20261004200000_creator_world_drops.sql",
+      "sha256": "b54be73ca3abbf8ce034f7ab7976ece7203246e122453abef5cf45a81cbedf74"
+    },
+    {
+      "path": "supabase/migrations/20261004200100_creator_world_drop_rpcs.sql",
+      "sha256": "6405205d2b25615fdd7122839b74bfc54872fb0e640c5d871fe95a303fbd3a91"
+    },
+    {
+      "path": "supabase/migrations/20261005100000_creator_live.sql",
+      "sha256": "9b834948bacf24f976d3753da610b6bce7b29df437c0701ab6a9e005afc096a6"
+    },
+    {
+      "path": "supabase/migrations/20261005100100_creator_live_rpcs.sql",
+      "sha256": "c3798a7ee90e0de682b5a5603715cfa01ac8577a971f378951175b9ec1ce4e45"
+    },
+    {
+      "path": "supabase/migrations/20261005110000_creator_ai.sql",
+      "sha256": "7ca3df37a6fb361a4f0b072a373a6cb23886e8d44418bf779b530ed5c6b3411e"
+    },
+    {
+      "path": "supabase/migrations/20261005110100_creator_ai_rpcs.sql",
+      "sha256": "09bde638abc001f8314a792b38a752847daf3acae890f694f856f1446289f8d2"
+    },
+    {
+      "path": "supabase/migrations/20261005120000_digital_creator.sql",
+      "sha256": "db85f04cbfb3072400e4d568f07f80316a73ba2bc4f26fe0b3227bdef63a0aa4"
+    },
+    {
+      "path": "supabase/migrations/20261005120100_digital_creator_rpcs.sql",
+      "sha256": "6ee9892d63cb3ea078f70ab26991e8936faef63c591557aa8866fcb7b2a7136f"
+    },
+    {
+      "path": "supabase/migrations/20261005130000_arena_game_enums.sql",
+      "sha256": "22d155be7ad72efda75648ac33477d04783d07a7a1e9f08e284ef0053a575a2e"
+    },
+    {
+      "path": "supabase/migrations/20261005130100_arena_reputation_facets.sql",
+      "sha256": "59d4689ca8ddbdcdf997124de887cfb46d7367cc3f6afee0bf89b47f3299353e"
+    },
+    {
+      "path": "supabase/migrations/20261005130200_arena_call_backup.sql",
+      "sha256": "b8fc1c487a4ef6c413c4e6709930e7b97a4f9638238f2a1b41e8b8ba1b4b7229"
+    },
+    {
+      "path": "supabase/migrations/20261005130300_arena_reactions_and_entertainment.sql",
+      "sha256": "e5681a322b54b0a7913c095311d928df54f04db68663f2f086a8554fb52a2584"
+    },
+    {
+      "path": "supabase/migrations/20261005140000_arena_trending_and_scale.sql",
+      "sha256": "30f01cdc26707c20d9abb3621766032c422ccafc0c19ee45f643e72452bafc28"
+    },
+    {
+      "path": "supabase/migrations/20261005150000_arena_trending_rank_race.sql",
+      "sha256": "89ce2cab0bf83b1794d0167ba6bc9ddae3623485e1ba607c59cfe13b3ad74ffc"
+    },
+    {
+      "path": "supabase/migrations/20261005160000_arena_trending_visibility.sql",
+      "sha256": "85badb6005d73f73527780acbf40e800cfa9a95d1c79ab3bcca5ee8ede796c1f"
+    },
+    {
+      "path": "supabase/migrations/20261005210000_arena_expressive_media.sql",
+      "sha256": "9d9766014a24a3772d0a53e025ddc0005fe955701dfe4c9e6c69f925b62cab36"
+    },
+    {
+      "path": "supabase/migrations/20261006120000_arena_crews_enums.sql",
+      "sha256": "6d1f29632aa63daea354105371d82876c654152327a66f1f5ea354225fcf3b18"
+    },
+    {
+      "path": "supabase/migrations/20261006120100_arena_crews_foundation.sql",
+      "sha256": "745e270e1a13e606d45212e721bab1f7569e21712e788ce4b5b7702d7e8478b9"
+    },
+    {
+      "path": "supabase/migrations/20261006130000_arena_crews_hardening.sql",
+      "sha256": "cb09101410992c900fe26ba64dfac2b1e2230952274c8a430a665492258c2487"
+    },
+    {
+      "path": "supabase/migrations/20261006150000_arena_correctness_foundation.sql",
+      "sha256": "a8ac4a2441dac029bc43d29398ca1412f60465775cae2f9cd39747d6339e37e9"
+    },
+    {
+      "path": "supabase/migrations/20261007120000_arena_duel_foundation.sql",
+      "sha256": "e5e966c2976b74846e744aef2eb3140e0fdb54103db09cd2601e4ea607982a8e"
+    },
+    {
+      "path": "supabase/migrations/20261007130000_arena_challenge_notifications.sql",
+      "sha256": "be4b09ff6d259a66bac8bd87ae15d535c2cb0b4cacef47e9f67ee4d4eb427a42"
+    },
+    {
+      "path": "supabase/migrations/20261007130100_arena_challenge_lifecycle.sql",
+      "sha256": "85eb74d096bb85751d52844548e66dc3db039b1b5d41b8c46689faa626854494"
+    },
+    {
+      "path": "supabase/migrations/20261008100000_arena_crowd_report_target.sql",
+      "sha256": "fc332a2eaa850da801956d64ddd4a80538bdb6163d6cee5c5ca1395202e7faa7"
+    },
+    {
+      "path": "supabase/migrations/20261008100100_arena_crowd_chat.sql",
+      "sha256": "fb7adce47e244626210da17da4b5b4c2156374d3ff3f4d3d46dea5b2285df95c"
+    },
+    {
+      "path": "supabase/migrations/20261008110000_profile_read_security.sql",
+      "sha256": "ba2396fd40d4d57dc4d98830119a9bfd575a25bfd8c84ee6761b4292b3418a6e"
+    },
+    {
+      "path": "supabase/migrations/20261008110100_relationship_and_crew_security.sql",
+      "sha256": "4b2f7dcf71ef3d1e9c8b5a57dfd3d96482bb8859072c2eb612beb457afd31f80"
+    },
+    {
+      "path": "supabase/migrations/20261008110200_arena_content_visibility.sql",
+      "sha256": "dd7656ce40d664945b20e3555d56aecaf451db72d96b645e1f91b4e9500bf33b"
+    },
+    {
+      "path": "supabase/migrations/20261008110300_private_room_typing.sql",
+      "sha256": "11dddca1246c80f9888b0bd7db4d924aac224cb5c79573e9e64fc32d8d1ae5ef"
+    },
+    {
+      "path": "supabase/migrations/20261008110400_legacy_visibility_helpers.sql",
+      "sha256": "9020208ac082aaaaaac1755018d3bd8c7374f384df6b200038124e2c1441ca55"
+    },
+    {
+      "path": "supabase/migrations/20261008110500_private_viewer_helpers.sql",
+      "sha256": "5ef557fcab4500c7dfcd182a590efee2f9403ddb6a2f4557fae25a7ee5cd3617"
+    },
+    {
+      "path": "supabase/migrations/20261008110600_canonical_topic_visibility.sql",
+      "sha256": "42bf5d96292b6b0b909e5f37449f8e5bdc3ed5335241fcb2810f400b709da09c"
+    },
+    {
+      "path": "supabase/migrations/20261008121000_arena_discovery_states.sql",
+      "sha256": "60e249c9a05dc6ffc4679e98809aa2a76d706f4f9b305e9d7daa3b7e3818d7c0"
+    },
+    {
+      "path": "supabase/migrations/20261008133000_arena_interest_catalogue.sql",
+      "sha256": "683bc7f330f1c4a8d55fbc00a18a866404621933cf31e8f36d52d11bcef5ccc2"
+    },
+    {
+      "path": "supabase/migrations/20261008134000_arena_interest_preferences.sql",
+      "sha256": "c5b1ac6525e69d262fed1db22913f4b02433cac3df0641457bf1be3536e06064"
+    },
+    {
+      "path": "supabase/migrations/20261008135000_arena_personalized_feed.sql",
+      "sha256": "7c451dd24f756c6c644fe131a6dc35990d788440bd9a405eb080a554a9239fd6"
+    },
+    {
+      "path": "supabase/migrations/20261008135500_arena_interest_conflict_http.sql",
+      "sha256": "6dea555a9b1ef16da9813e1d805a3532a3c02aa5a4390722a5ed291fbff7d33e"
+    },
+    {
+      "path": "supabase/migrations/20261008140000_arena_interest_feed_index.sql",
+      "sha256": "0521cdec6a25c0d6dcf9370c1441ad49753c9a8a22e767c136ea0dacf3fc0c5b"
+    },
+    {
+      "path": "supabase/migrations/20261008151000_arena_challenge_inbox.sql",
+      "sha256": "08e0c0a693811a0ba5edbea35338ebb190f68a3a1f3daab828098eb6fde9d29e"
+    },
+    {
+      "path": "supabase/migrations/20261009100000_canonical_authorization.sql",
+      "sha256": "07b88b4b2538d57e5aa50b662665e954837ce37cb1cb74a9d8fde99ac235ca38"
+    },
+    {
+      "path": "supabase/migrations/20261009110000_official_retry_and_recovery.sql",
+      "sha256": "7182e24acb7879630fb918fd412936c0fb2e54c5a68d5a9c61121a6837bf7958"
+    },
+    {
+      "path": "supabase/migrations/20261009120000_historical_settlement_recovery.sql",
+      "sha256": "fe1775b15b77db9360a49b933a0d0c8f93b1f505c61ba41b79af958999482fca"
+    },
+    {
+      "path": "supabase/migrations/20261009130000_arena_casual_questions.sql",
+      "sha256": "b4d16bf184a4b6faea94a145c30c0d19c5240d24088fc75a7e2d8b923a6b4e23"
+    },
+    {
+      "path": "supabase/migrations/20261009140000_arena_editorial_pipeline.sql",
+      "sha256": "5e771ee857d5a94ca7e061b2a4ff35e5e156dda3d59bfdb5d3c8ea9ac803b85f"
+    },
+    {
+      "path": "supabase/migrations/20261009170000_arena_gif_proxy_budget.sql",
+      "sha256": "6097e54b2062368e4861be1af89333479101f7c99bda51b94099d119336ee8e6"
+    },
+    {
+      "path": "supabase/migrations/20261009180000_explore_security_contract.sql",
+      "sha256": "926e24cebeb5914584a300a3e192093c71faa70d382679b84576e63d8fc8e9b1"
+    },
+    {
+      "path": "supabase/migrations/20261009190000_world_read_security.sql",
+      "sha256": "a9137e7caf671114027da8cca951160895c30583605182d21b6b638483f1a628"
+    },
+    {
+      "path": "supabase/migrations/20261010120000_profile_clash_stats.sql",
+      "sha256": "706d66051f1523d520e19f84b795ba89acf5c6bd4fbb7144fb3291befd802b0f"
+    },
+    {
+      "path": "supabase/migrations/20261011053717_critical_authorization_hardening.sql",
+      "sha256": "0207239f0d23d27aa6e71b0d3236c14a2cf7fe57af7839d61a958c122bb3d5cb"
+    },
+    {
+      "path": "supabase/migrations/20261011074540_h3_reputation_history_privacy.sql",
+      "sha256": "2f51f9efcdf02579af17be8b0593c39c653a080de20bac7d4c4de9437daf6b07"
+    },
+    {
+      "path": "supabase/migrations/20261011081531_m1_clash_verdict_visibility.sql",
+      "sha256": "64e21e6aea131f41a87e751297e960c51c993ab447f782b08db35ba6e02c199c"
+    },
+    {
+      "path": "supabase/migrations/20261011095952_profile_stats_clash_visibility.sql",
+      "sha256": "a8b7c6df5907df4d921dd2db85e05247fb1af22ccb84acf6b713c0365e2e4cff"
+    },
+    {
+      "path": "supabase/migrations/20261011120000_comment_reply_notifications.sql",
+      "sha256": "45cccafb5edeca1ecdc76ad3b235dafc8cf60752b4dcb8029d2dd3c55e643081"
+    }
+  ],
+  "sql_suites_prepared_not_executed": [
+    {
+      "path": "supabase/tests/000_social_foundation.sql",
+      "sha256": "b8f2804322027dbb3af7979cd3073ad2c22cd60264112e4ba0533a03ebd5ed9c"
+    },
+    {
+      "path": "supabase/tests/001_media_storage.sql",
+      "sha256": "9c91b163ccdb36c88f423d1c5e422da7c988507ffd11590ef7564c79749dd1e9"
+    },
+    {
+      "path": "supabase/tests/002_clash_engine.sql",
+      "sha256": "1e8f9ad85999c63bb112ca439634b5d29f7d6b3936d002daeb311e7106d8feae"
+    },
+    {
+      "path": "supabase/tests/003_hardening.sql",
+      "sha256": "a95cde50f2c696272137b982275878cfc72386a19b9db93941d691918712ab86"
+    },
+    {
+      "path": "supabase/tests/004_take_reactions.sql",
+      "sha256": "e4036eb07a6df0acdeb0976130ca07024a1aee92f0dde2eb203da737a9791a36"
+    },
+    {
+      "path": "supabase/tests/005_hoods_and_threads.sql",
+      "sha256": "4fa058f99be6670c3a6bd84f6132a9b5ae6d9ea5bda0a57212ee1c1a73810eb1"
+    },
+    {
+      "path": "supabase/tests/006_take_creation.sql",
+      "sha256": "05773e8d3ea7f3e2dc3ca911ea57ea334104e4f4f48a26084b8c67296ab89502"
+    },
+    {
+      "path": "supabase/tests/007_feed_visibility.sql",
+      "sha256": "8c768b8aa81d6f60804e7ef977353a43d5602542fe91fd820a104bf35ab3e9fc"
+    },
+    {
+      "path": "supabase/tests/008_clash_draw.sql",
+      "sha256": "c41fcdbdb8e287260b3293dbf329a1c14276d52fb5c867e35474c69dd05dd72d"
+    },
+    {
+      "path": "supabase/tests/009_take_insert_lockdown.sql",
+      "sha256": "7812258512a73c7635f8418423890f7b41072fb9cfa22eafdb2b06ec43849c61"
+    },
+    {
+      "path": "supabase/tests/010_clash_scheduler.sql",
+      "sha256": "0f5ccaa8e5cdaf4513bedc763d7d022c2920034ea4340c3eea2f8400d45c92e8"
+    },
+    {
+      "path": "supabase/tests/011_vault_creator.sql",
+      "sha256": "1f03f840ed0012a8113220c197236282e14381122b72d239a86026677bc2ab8e"
+    },
+    {
+      "path": "supabase/tests/012_vault_access.sql",
+      "sha256": "fe338d738ff0fc2895a135e622cadf9bc849c0e84af0df58c700cabe7273b2d4"
+    },
+    {
+      "path": "supabase/tests/013_vault_storefront.sql",
+      "sha256": "a41fd15e14b8c6ab5566c24132de0001ae836f403a620ab6ed403811619043e8"
+    },
+    {
+      "path": "supabase/tests/014_mindshift.sql",
+      "sha256": "f4686283aa44210c3c862a69681f78d36d130d9829c5ca8c6d14dd5d8f9e6a68"
+    },
+    {
+      "path": "supabase/tests/015_blind_clash.sql",
+      "sha256": "8b86e761434fd1c273b20cd29b98ceffc2fe91449c81d0d5ef899dc98447add8"
+    },
+    {
+      "path": "supabase/tests/016_hood_prediction.sql",
+      "sha256": "d57ff03b654ed3364a193039c7dd1680aef0f89c15278d1a31d70db211e41071"
+    },
+    {
+      "path": "supabase/tests/017_world_missions.sql",
+      "sha256": "f74afea6867847ffc526788d0c1055877e5d51d623974561cad8fd20e6718562"
+    },
+    {
+      "path": "supabase/tests/018_world_drop_view.sql",
+      "sha256": "bc573e772106b517d7f57decae3a244f222116949202cbdf1e5cce6fe9643a6a"
+    },
+    {
+      "path": "supabase/tests/019_sponsor_attribution.sql",
+      "sha256": "dbac7f9778cec3daaf6150e1dee3b2f0be7f72c0e2216b162c0ed74acfb8103d"
+    },
+    {
+      "path": "supabase/tests/020_sponsor_attribution_hardening.sql",
+      "sha256": "80750c21a792abad0c5cc2574bb7009ce39df69e229edcb82967c41b18a92c9b"
+    },
+    {
+      "path": "supabase/tests/021_sponsor_studio.sql",
+      "sha256": "16a2cf9720cad7a6f39115b09b727991e1274d72314a551fccc6186b2d524a58"
+    },
+    {
+      "path": "supabase/tests/022_creator_earnings.sql",
+      "sha256": "6ba7790885863acea38c820c483193099d3ef2910ea02645802c3d221acdf999"
+    },
+    {
+      "path": "supabase/tests/023_comment_media.sql",
+      "sha256": "3402d2d15b5c75c0825bc964d10eb435f3d59f3957316e102021ded9de13b953"
+    },
+    {
+      "path": "supabase/tests/024_comment_gifs.sql",
+      "sha256": "0bda65347ae4aee819b3f642eeed2a21261029549cdd605125d757dc29080836"
+    },
+    {
+      "path": "supabase/tests/025_live_arena.sql",
+      "sha256": "ca75cb0d6d9a2d232ecb7f899b68a2e0d15ca3494a591fa020985c56499785ac"
+    },
+    {
+      "path": "supabase/tests/026_live_arena_spectator.sql",
+      "sha256": "53f7f4a50f5ce7113ea2762eb6b9cc07ad11a4a612442b061b13fa6c9aebbc99"
+    },
+    {
+      "path": "supabase/tests/027_arena_spectator_upgrade.sql",
+      "sha256": "c0ffb91e5c32049f00c2fb6e8f15fd3d7c2ac51db6661f9121e48644e13072af"
+    },
+    {
+      "path": "supabase/tests/028_arena_feel_alive.sql",
+      "sha256": "155dfd6d93c1e4194c6c01cefe5c71b3a163ac83fac64caf0e7ffce425e03f06"
+    },
+    {
+      "path": "supabase/tests/029_list_arena_topic_rooms.sql",
+      "sha256": "beb7526de9318e6e80693d42dcca047e3c88d9ba7ecd64b5261af9ca56879972"
+    },
+    {
+      "path": "supabase/tests/030_watch_arena_room.sql",
+      "sha256": "59db12d036b9852db9dd0a7c8b148e45e9b14752a61f4650a62039dbc83979d2"
+    },
+    {
+      "path": "supabase/tests/031_room_pulse_and_scale.sql",
+      "sha256": "e454078cc639a5fe1f44828e2f7998336808217c51b237b251e16d4d5bbf3f76"
+    },
+    {
+      "path": "supabase/tests/032_explore_global.sql",
+      "sha256": "baec4abd423703a6c8d68189dc0ef6de914c01fa6fe047632ff1fa341f1b1fd9"
+    },
+    {
+      "path": "supabase/tests/033_explore_vault_preview.sql",
+      "sha256": "46cab701f9dada814ba93bdc48d18a6437d8fe169a105803d6f927cbc2cf34be"
+    },
+    {
+      "path": "supabase/tests/034_explore_for_you.sql",
+      "sha256": "b8662dfd4a087e8b7acd2ee30ee018ff3615e19df1e63a003ab90ee67142e19f"
+    },
+    {
+      "path": "supabase/tests/035_explore_play.sql",
+      "sha256": "99bf1bf9fa51b317b924b0905179e029b0d7f531adc422a505bc53b1089e9e9d"
+    },
+    {
+      "path": "supabase/tests/036_meet_text_matching.sql",
+      "sha256": "eec0d449c4d831799d5c6b75b113729610197d3fcfae894585b7e27aee7e2907"
+    },
+    {
+      "path": "supabase/tests/037_meet_video.sql",
+      "sha256": "4cb390c45cecb65ce1c33eddb266949a9bed0667a5a20362ef883e5f1671ab31"
+    },
+    {
+      "path": "supabase/tests/038_vault_storefront_preview.sql",
+      "sha256": "5223c9feb37f92cadf6769309d9b2e37515dbf607b74cfde4b793b2d22f52026"
+    },
+    {
+      "path": "supabase/tests/039_vault_commerce.sql",
+      "sha256": "33e8b2c642327999c34acc5324b706087d8a7380c0d6105b1db3327ba8067ee7"
+    },
+    {
+      "path": "supabase/tests/040_vault_discover_worlds.sql",
+      "sha256": "0ca4144a81a265c9832b8642a4b0d9623ebd19f79eb033a330a5bdfbe03154eb"
+    },
+    {
+      "path": "supabase/tests/041_vault_communities.sql",
+      "sha256": "93bf11f6e2f84fee01d0524ef3403bc949ad2f66865ab2dcc802af40062e7249"
+    },
+    {
+      "path": "supabase/tests/042_creator_world_drops.sql",
+      "sha256": "4c2e7e13eebbfed496879ea8e33346aea3ca0ec373a7212b0de008e4a4bb3048"
+    },
+    {
+      "path": "supabase/tests/043_creator_live.sql",
+      "sha256": "86cb62152e0794a2a0ea17758fcf20cf06e236c057f96d18a117f2a2221244b3"
+    },
+    {
+      "path": "supabase/tests/044_creator_ai.sql",
+      "sha256": "c732874e89e0dbc4fbcef3eeaa23873a7acccb712c70e9f57fdaffd6ad4a08aa"
+    },
+    {
+      "path": "supabase/tests/045_digital_creator.sql",
+      "sha256": "beccfe138c985deecc36497b8490e9385f340cb2c8e5211e53c018e63ee2c1f9"
+    },
+    {
+      "path": "supabase/tests/046_arena_game_layer.sql",
+      "sha256": "96094a0f5d6b14e51bfa413dee036825aeca22cddc6afb20c56d3eb916e1abc8"
+    },
+    {
+      "path": "supabase/tests/047_arena_trending_and_scale.sql",
+      "sha256": "a1049f05ed771a0ab8e01eb0ef596b5417c62525d3cb364ff59616b8b69946e0"
+    },
+    {
+      "path": "supabase/tests/048_arena_trending_rank_race.sql",
+      "sha256": "01144eb0547a16814fab6fe65a30f29f98fb234988bafe3ff13fbe771f071acc"
+    },
+    {
+      "path": "supabase/tests/049_arena_expressive_media.sql",
+      "sha256": "7bb7f1f3925061271d4667863304e363196559406bf9e3beddcfc993b2c02160"
+    },
+    {
+      "path": "supabase/tests/050_arena_crews_foundation.sql",
+      "sha256": "099e703ac4b43f378145aa078d6dff6ee60b7647caf2e5c33472af6535ef22d2"
+    },
+    {
+      "path": "supabase/tests/051_arena_crews_behavior.sql",
+      "sha256": "a664c7740873ec76ec96a3fc04f309364295b6db7bfd6d26782e40a2e83a02c4"
+    },
+    {
+      "path": "supabase/tests/053_arena_correctness_foundation.sql",
+      "sha256": "ab2c0b76cbc70aca06a541195f2d4158dc6ffdb6a304a0434bd3b0a5d70bc664"
+    },
+    {
+      "path": "supabase/tests/054_arena_duel_foundation.sql",
+      "sha256": "c31bc01b83d4ffba213b4288c49ac160a134600977b92b8ab46eb763c37fe9fc"
+    },
+    {
+      "path": "supabase/tests/055_arena_duel_concurrency.sql",
+      "sha256": "b3a81bc067e811f2a4f3d952dbecab5198075c53e2727734ac610e09b4b2724e"
+    },
+    {
+      "path": "supabase/tests/056_arena_challenge_lifecycle.sql",
+      "sha256": "bb61986e7e676f6c9063dca7b73625406d54c87e33d3c4e91c62f07c31e56694"
+    },
+    {
+      "path": "supabase/tests/057_arena_challenge_concurrency.sql",
+      "sha256": "94b4de4fe05a4866a0a1d0d6456a629078f130f4174af465aaaff09c7b6f93d7"
+    },
+    {
+      "path": "supabase/tests/058_arena_crowd_chat.sql",
+      "sha256": "c55f2e60b71a9b294ab567f15c7722500e4d87ffe8f8a5cd0cc6cb0526274d64"
+    },
+    {
+      "path": "supabase/tests/059_arena_crowd_concurrency.sql",
+      "sha256": "c56e5a72a323192f334aa82890fb8bd18466f31afe7f6d6fa6d5d8c9dfe8f91e"
+    },
+    {
+      "path": "supabase/tests/060_profile_read_security.sql",
+      "sha256": "88a4257daa41588d8a05f7878e59749ae321c28b0036ecb8632f11d8c8fc8c8f"
+    },
+    {
+      "path": "supabase/tests/061_relationship_and_crew_security.sql",
+      "sha256": "852d5773f771ca086b7b8782a604ba5e2cac639d5f94c5aa6b2327a176e2db58"
+    },
+    {
+      "path": "supabase/tests/062_arena_content_visibility.sql",
+      "sha256": "278bcfd02a5517b9116204ec2213f4be0bddc1eb4da345a02c5d951c0bd9b2bc"
+    },
+    {
+      "path": "supabase/tests/063_private_room_typing.sql",
+      "sha256": "ccbb6cdf4ca34b518a1a32f63a815e256aa8a0e9a77f4fa56ed8bde0013876b5"
+    },
+    {
+      "path": "supabase/tests/064_arena_discovery_states.sql",
+      "sha256": "30540160692371bbba32bb7eba5d2a805029b43612a94f0f177b2bcd4c0504eb"
+    },
+    {
+      "path": "supabase/tests/065_arena_interest_catalogue.sql",
+      "sha256": "5402b8bca6d2b1fa1f8a0224ad47f3c6e16ef20843cd8b1cacf6ef4172d096da"
+    },
+    {
+      "path": "supabase/tests/066_arena_interest_preferences.sql",
+      "sha256": "c11f0ef499447238184a7b3a4e61217995414df08bdc3e4af0a497c3f30b5e71"
+    },
+    {
+      "path": "supabase/tests/067_arena_interest_concurrency.sql",
+      "sha256": "bd0828d6a3092eb2d5b18c5d2ddac8b7de10db0c9902a71dabaab2da0458d70b"
+    },
+    {
+      "path": "supabase/tests/068_arena_interest_ranking.sql",
+      "sha256": "c47bdbe140edf5695485721450006773eea8ddbf39ff125b63c8a67f6d2fb44c"
+    },
+    {
+      "path": "supabase/tests/069_arena_challenge_inbox.sql",
+      "sha256": "d8e9c9b178fe75676e34774e99b7f2b330df2f4ab7054835d4b5c24d58899573"
+    },
+    {
+      "path": "supabase/tests/070_canonical_authorization.sql",
+      "sha256": "b117764705f85c6a90ac45483bf773a70ee9604a42b180bcc343e00e5724dfda"
+    },
+    {
+      "path": "supabase/tests/071_canonical_authorization_concurrency.sql",
+      "sha256": "2d11a715fef5e239f40ab16cac20721c0250400822a2f1a65d301b1d3ae06192"
+    },
+    {
+      "path": "supabase/tests/072_official_retry_and_recovery.sql",
+      "sha256": "1c605c51de0cd4bbe858f1a086f66df72559ac0a68c5fd12bdd359521bd4e188"
+    },
+    {
+      "path": "supabase/tests/073_official_submission_concurrency.sql",
+      "sha256": "e7a1b0a93fb3d47e70aa2cb8ec60b4044234591afa7204e11b5479db2507a545"
+    },
+    {
+      "path": "supabase/tests/074_historical_canonical_entry.sql",
+      "sha256": "ebfc31ef6b3887fd9472d7f54b820a7539ed2e4779f3884d76c8bce12126682c"
+    },
+    {
+      "path": "supabase/tests/075_maintenance_failure_recovery.sql",
+      "sha256": "22d7d683d91336af79c242d8708dcfcdde5fab4bda8f1a0ac3252adae7611f9b"
+    },
+    {
+      "path": "supabase/tests/076_maintenance_batch_contention.sql",
+      "sha256": "5d1dabe9695c82dcfe1cf66cbe76cf9526448ba2f6a99008782b951b00bd87aa"
+    },
+    {
+      "path": "supabase/tests/077_arena_casual_questions.sql",
+      "sha256": "f62ff817650de79d83b788775eb45ac0ae25843aa4f11ea8c72e7fd536778f25"
+    },
+    {
+      "path": "supabase/tests/078_arena_question_concurrency.sql",
+      "sha256": "6a3798d3547d5738877e210dfe115eee8d7266f1ab95abb3dd82598748ff69d9"
+    },
+    {
+      "path": "supabase/tests/079_arena_editorial_pipeline.sql",
+      "sha256": "610ea9a75188b96a62fc935bf95528a596978453dab82f4b5f84369812f84959"
+    },
+    {
+      "path": "supabase/tests/080_arena_editorial_concurrency.sql",
+      "sha256": "de2e29d2ad02fb74ff1659b0e168c49bffdd5e3034c6c36f022a4ede45680e4d"
+    },
+    {
+      "path": "supabase/tests/081_arena_gif_proxy_budget.sql",
+      "sha256": "04c14c8af5d214e10916270d5fdddd5fe72822de1df47f82e9d267149c55f287"
+    },
+    {
+      "path": "supabase/tests/082_explore_security_contract.sql",
+      "sha256": "e5e0666cb17bed33d43111d39e4f41e75b2666d80b13c987e7b122dfe968c8da"
+    },
+    {
+      "path": "supabase/tests/083_world_read_security.sql",
+      "sha256": "2682cad1b7872329524c550f54a83881531a113fb7339235cb860f5885f2452c"
+    },
+    {
+      "path": "supabase/tests/084_comment_reply_notifications.sql",
+      "sha256": "6f0d683780857da06081ed0af26c5c6157efe9a4d976c02231cb74d02be1560b"
+    },
+    {
+      "path": "supabase/tests/085_profile_clash_stats.sql",
+      "sha256": "06044a4ab7cc6670a39153f7a4fe7677b6cde5a3f5bf379523de58992a322cfd"
+    },
+    {
+      "path": "supabase/tests/086_safety_settings.sql",
+      "sha256": "fc96274191566f753ec88badf57674badca96828f9e7919050c928da3b26c354"
+    },
+    {
+      "path": "supabase/tests/087_critical_authorization.sql",
+      "sha256": "abb1023fcec4681ef4b5dddc6e282b7f7d1ab77da5e8dcb0526eaa37e6d5fead"
+    },
+    {
+      "path": "supabase/tests/088_h3_reputation_privacy.sql",
+      "sha256": "2ae62096b3fcda83ee6857b0094c918841daba718dab78173befdab14b678101"
+    },
+    {
+      "path": "supabase/tests/089_m1_clash_visibility.sql",
+      "sha256": "3b48e2b64670bcd9442aa66508f3686fafc40116d4484c7ea86b229201c5d3e7"
+    }
+  ],
+  "integrated_client_config_and_harness_artifacts": [
+    {
+      "path": "app.config.ts",
+      "sha256": "26652ee305c8686218f44800a4b55ed8250b2576b61d72efa2eaf833ff9802b3"
+    },
+    {
+      "path": "app/(tabs)/notifications.tsx",
+      "sha256": "7c9ddd61faca28f5fd341a7d4248531acdd916f77bcac13f34de88043299da10"
+    },
+    {
+      "path": "app/(vault)/profile.tsx",
+      "sha256": "76fda30818aae6b13219e7a982e580f615ab745adfab67517ec1fb8ab8a15ed1"
+    },
+    {
+      "path": "app/arena/_layout.tsx",
+      "sha256": "90d1a4011d9daa793c9f034577991b60eaff058a11b60c55734028e7ae50fbdb"
+    },
+    {
+      "path": "app/arena/crews/[slug].tsx",
+      "sha256": "60ac36a0fd3f668b5006a02992767d10844ba00fa2586326240d4bca0c9230c6"
+    },
+    {
+      "path": "app/arena/crews/create.tsx",
+      "sha256": "ac1b3f0ede282a5af6bc27ae10e2390a883f52ed9320dc3a4584d4c27149cb51"
+    },
+    {
+      "path": "app/arena/crews/index.tsx",
+      "sha256": "f22ced80e6b132a4bd56062d54dad43a3d5193119082505358bceb4d1c834ed3"
+    },
+    {
+      "path": "app/clash/[takeId].tsx",
+      "sha256": "725e0b626d1dc3a3c0f7ea0dc198b486b8349b13a785440bf83f880a984abea0"
+    },
+    {
+      "path": "app/settings/index.tsx",
+      "sha256": "fc948a730d04e5765f7c183c545c6fc2aa47494c79fac1b00aea0d1acd2e4ed0"
+    },
+    {
+      "path": "app/settings/safety.tsx",
+      "sha256": "3437d3e04da8715111a1b567dbf07ded76d0697a44e30ee63ec0d81e57e092bd"
+    },
+    {
+      "path": "components/arena/ArenaCommunity.tsx",
+      "sha256": "351f3f99fb6d74bb4f7a7960e520f0c179eef0b9c7fdcaeb42e4a691cb4a2e68"
+    },
+    {
+      "path": "components/crews/CrewListCard.tsx",
+      "sha256": "c9d9b6ab8377ff0543b824fc854f3c3dbd9b2c306677f1977059642f45ac0dbd"
+    },
+    {
+      "path": "components/crews/CrewMembershipBar.tsx",
+      "sha256": "886fb201e9ab0ec50b927c1091cffd1f9e13c1a6fd25d13949fc6c2d061a9a6d"
+    },
+    {
+      "path": "components/navigation/AppSidebar.tsx",
+      "sha256": "4d669ca8ba4cfab1ce201d3a7f16ff00add98b0f4f0db71ada89d5e49ada29d1"
+    },
+    {
+      "path": "components/profile/ProfileHeader.tsx",
+      "sha256": "66e8fbde2e0909d3c2a96058eed01133afc11ac629e878aec1870d3c34896fc3"
+    },
+    {
+      "path": "components/profile/ProfileIdentity.tsx",
+      "sha256": "76944a0050ed5009456400b5451a789d20268ff3c3425a1d9281be042ea46fa0"
+    },
+    {
+      "path": "components/profile/ProfileScreen.tsx",
+      "sha256": "5a8a180afb85bdb75f94d4951db38ae464a04a996f9bcbc7d75b8b950eb3b3dd"
+    },
+    {
+      "path": "components/profile/ReputationBar.tsx",
+      "sha256": "26149258e315572bb1305105ae74e190cfe5a22371b727502baf050ade374d69"
+    },
+    {
+      "path": "components/profile/StatGrid.tsx",
+      "sha256": "b4af5bdb254f4fbd5c9d5e091ff24f3038dc7fe8ea772fe4dae3852e707512f1"
+    },
+    {
+      "path": "components/settings/SafetySettingsScreen.tsx",
+      "sha256": "80c7eb2dfe8c04e26230f40e704590a6bde2e6348873034f294a4295ceecf6f8"
+    },
+    {
+      "path": "config/backend-origins.json",
+      "sha256": "634fa4a3c77a0bc49e044500c67edb9d962f2953b71cb58597f86c3a98c47594"
+    },
+    {
+      "path": "eas.json",
+      "sha256": "be1b31af06397e8dcd12af29d27a9f88b77486db74399730eaab7ed2d7ac9e38"
+    },
+    {
+      "path": "package.json",
+      "sha256": "58455fe47f57fd91ac8fffba23b4eef5301402ce712745d9f9725f085dcc96ab"
+    },
+    {
+      "path": "scripts/arena-engagement-check.cjs",
+      "sha256": "874c0d60493c0ecb42991c8e82993438862c8556fbc36344358c406a077a8891"
+    },
+    {
+      "path": "scripts/clash-visibility-check.cjs",
+      "sha256": "fd4a93ff70f83a3f56fc3b6690a5ae6d921e63d6fa3599ab927f6f09a9ab7d13"
+    },
+    {
+      "path": "scripts/explore-security-check.cjs",
+      "sha256": "c51d0d00b2a48cc6c6a4eda59064446f9c27e5ae1da6e8ea8993c388026c2829"
+    },
+    {
+      "path": "scripts/integration-static-check.cjs",
+      "sha256": "ed765554258861f611567ebab4d0932aaa9d39f2748b7ed5d9c2e0dfd13afcf7"
+    },
+    {
+      "path": "scripts/phase11-authorization-rollback-check.cjs",
+      "sha256": "511563c3e83cf02e87977f95e4eba8436333223e1fa34bd894511e98e3f2f50f"
+    },
+    {
+      "path": "scripts/phase11_arena_e2e_cleanup.sql",
+      "sha256": "58af329441bc77bc096b02752a2295fa35c10d9d66553a4c86ec5ba5a5693e88"
+    },
+    {
+      "path": "scripts/phase11_arena_e2e_validation.sql",
+      "sha256": "9ed16ef5ee5688020a5994742196f3654b5ddb1c1e65732d70874b7b40922815"
+    },
+    {
+      "path": "scripts/reputation-privacy-check.cjs",
+      "sha256": "365b41f0a872f1d1c3c9c2ca5195c8587e7084be9075f01644a9624ec8ca6411"
+    },
+    {
+      "path": "scripts/safety-settings-check.cjs",
+      "sha256": "44b4f15f88fbbfb4c9e7d481393c22f9ec40b14db38f71b16bd6123ad0683f89"
+    },
+    {
+      "path": "scripts/staging-isolation-check.cjs",
+      "sha256": "59eee412d904c9f6025e434816cf7df96b36734a0ef7476984e022ca6fa59412"
+    },
+    {
+      "path": "services/apiService.ts",
+      "sha256": "cef813c90b227a109c5fe9c081ea792c2423806c8ad6fc867c9fecd84d5a6a3e"
+    },
+    {
+      "path": "services/arenaMappers.ts",
+      "sha256": "5891c829284255f68a64ef14aaf86962175b92ca57fe97734171345e864e67ed"
+    },
+    {
+      "path": "services/clashEngineService.ts",
+      "sha256": "be002efd00a9d14135b2753a621c4115d1e2edea4ebd2acf4cf3888ef3e32cea"
+    },
+    {
+      "path": "services/profileService.ts",
+      "sha256": "61fc2779d71bbac5ce72142af0639d0babd92b15225c6b67b381aca2546f6055"
+    },
+    {
+      "path": "services/safetyService.ts",
+      "sha256": "2b6c910f7e90cd134a5985cde22fd5db30522e1ec2e6d3f0b735a8facb9935f3"
+    },
+    {
+      "path": "services/supabaseClient.ts",
+      "sha256": "9be927f432d0d965e3e93722af9ef60d5cfa624bf3a90d386964e099e87a3cdf"
+    },
+    {
+      "path": "store/AuthHydrator.tsx",
+      "sha256": "ca53f36129514f84caa879f2ffc66ca04a4076764eb003bbfdaa29b3865f53d2"
+    },
+    {
+      "path": "store/types.ts",
+      "sha256": "d079908f67efedb6e1a141ba3801a4e49c638561ea58a885b4ab7e619b960ed6"
+    },
+    {
+      "path": "supabase/database.types.ts",
+      "sha256": "91b567b2223e22fc41bbcebc0e6fb5e0bf9732d2ecb3f4b4c7db895f0e5bec33"
+    },
+    {
+      "path": "utils/arenaCrewPayload.ts",
+      "sha256": "9a95fb0b030e8e1ccdfa494b0832548dced2575df1dcb77d956f73b09cee87e8"
+    },
+    {
+      "path": "utils/arenaCrews.test.ts",
+      "sha256": "c3af5675e0f0f4338fb6285110d0d02ce48a4055a41f16c4b6d1e52d19c3f0f5"
+    },
+    {
+      "path": "utils/backendPolicy.d.ts",
+      "sha256": "6facdcd57b16417293150384856ae13fae8adf3f01c575cc8459c117ffa22f2f"
+    },
+    {
+      "path": "utils/backendPolicy.js",
+      "sha256": "aa82f20b014cebd76fd0a7074f53a87baf03d34bc6f292058fa32803a312d9f1"
+    },
+    {
+      "path": "utils/profileClashStats.test.ts",
+      "sha256": "3fd8e0fd1dd8f688536748f14aa347ec632de805b2eb8681f6cfe234b1fcc7f2"
+    },
+    {
+      "path": "utils/profileClashStats.ts",
+      "sha256": "28a4b0c460f80118ef67706983ed898fe3e08d1e6052ed598cbe9f94b2900395"
+    },
+    {
+      "path": "utils/profileStatsLifecycle.test.ts",
+      "sha256": "5a2f74d078f01889a54120e2acb8068343676218d4ffa89d94a1364cf598a5aa"
+    },
+    {
+      "path": "utils/profileStatsLifecycle.ts",
+      "sha256": "d8ec6b5e50f53aa554b20dd57c7f0f3cb78bb05a9b63ba9544e3a801031ede88"
+    }
+  ],
+  "additive_migration_dependencies": {
+    "20261011095952_profile_stats_clash_visibility.sql": [
+      "20261010120000_profile_clash_stats.sql",
+      "20261011081531_m1_clash_verdict_visibility.sql"
+    ]
+  },
+  "validation": {
+    "typecheck": {
+      "exit": 0
+    },
+    "unit": {
+      "exit": 0,
+      "tests": 539,
+      "pass": 539,
+      "fail": 0,
+      "suites": 124,
+      "skipped": 0
+    },
+    "expo_doctor": {
+      "exit": 0,
+      "pass": 18,
+      "total": 18
+    },
+    "staging_isolation_included_in_unit": {
+      "tests": 16,
+      "pass": 16
+    },
+    "focused_non_database": [
+      {
+        "script": "arena-engagement-check",
+        "exit": 0,
+        "passing_labels": 12,
+        "tail": [
+          "PASS signed-out Clashes show empty guidance and Challenge Inbox entry",
+          "PASS signed-in Clashes leave loading and show empty section copy",
+          "12/12 Arena engagement checks passed; hook bridge, not native verification."
+        ]
+      },
+      {
+        "script": "safety-settings-check",
+        "exit": 0,
+        "passing_labels": 24,
+        "tail": [
+          "ok 23 - screen keys relationship subtree by authenticated account for immediate isolation",
+          "ok 24 - profile refocus refreshes block state after Settings and rejects stale pre-unblock result",
+          "24/24 safety service/UI checks passed; controlled dependencies, not live database or Android."
+        ]
+      },
+      {
+        "script": "official-service-check",
+        "exit": 0,
+        "passing_labels": 14,
+        "tail": [
+          "PASS connection recovery notifies official hook",
+          "PASS disposed subscription cannot reconnect or deliver late rows",
+          "14/14 official service/store checks passed; network/storage doubles, not device verification."
+        ]
+      },
+      {
+        "script": "crowd-service-check",
+        "exit": 0,
+        "passing_labels": 7,
+        "tail": [
+          "PASS Realtime emits IDs only",
+          "PASS reconnect state reported",
+          "PASS disposed subscription cannot update rows or connection state"
+        ]
+      },
+      {
+        "script": "duel-render-smoke",
+        "exit": 0,
+        "passing_labels": 22,
+        "tail": [
+          "PASS crowd-closed",
+          "22/22 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.",
+          "props.pointerEvents is deprecated. Use style.pointerEvents"
+        ]
+      },
+      {
+        "script": "settlement-history-check",
+        "exit": 0,
+        "passing_labels": 11,
+        "tail": [
+          "PASS nonmember evidence denial preserves readable historical Room and locked entry",
+          "PASS server-authorized membership refresh unlocks historical transcript",
+          "11/11 settlement/history checks passed; controlled dependencies, not native verification."
+        ]
+      },
+      {
+        "script": "typing-service-check",
+        "exit": 0,
+        "passing_labels": 1,
+        "tail": [
+          "PASS private typing subscription, server-only identity, ignored forged metadata, caller-derived writes and disposed-response isolation"
+        ]
+      },
+      {
+        "script": "account-isolation-check",
+        "exit": 0,
+        "passing_labels": 2,
+        "tail": [
+          "PASS sign-in, account switch and sign-out replace the shared store/screen scope",
+          "PASS stale auth restoration and callbacks from disposed providers cannot overwrite identity"
+        ]
+      },
+      {
+        "script": "arena-navigation-check",
+        "exit": 0,
+        "passing_labels": 11,
+        "tail": [
+          "PASS empty Crew discovery remains honest",
+          "PASS late Crew response cannot repopulate disposed account view",
+          "11/11 Arena navigation component/service checks passed (hook bridge, not device verification)."
+        ]
+      },
+      {
+        "script": "challenge-inbox-check",
+        "exit": 0,
+        "passing_labels": 18,
+        "tail": [
+          "PASS switching sections clears rows and rejects old-direction response immediately",
+          "PASS late action response rejected after account switch",
+          "18/18 challenge inbox client/component checks passed; hook bridge is not physical verification."
+        ]
+      },
+      {
+        "script": "interest-client-check",
+        "exit": 0,
+        "passing_labels": 12,
+        "tail": [
+          "PASS save-in-flight disables every card",
+          "PASS For You preserves server order and other scopes keep original batch",
+          "12/12 interest client/render checks passed; native animation is bridged, not device verification."
+        ]
+      },
+      {
+        "script": "question-client-check",
+        "exit": 0,
+        "passing_labels": 25,
+        "tail": [
+          "PASS account changes and disposal discard late question pages",
+          "PASS question discovery empty state reflects server data",
+          "25/25 question service/interaction checks passed; controlled dependencies, not physical verification."
+        ]
+      },
+      {
+        "script": "explore-security-check",
+        "exit": 0,
+        "passing_labels": 8,
+        "tail": [
+          "PASS reward claim blocks duplicate taps and ignores errors after account unmount",
+          "PASS country service rejects malformed codes before RPC and preserves suppressed counts",
+          "8/8 Explore client checks passed; controlled hook bridge, not device verification."
+        ]
+      },
+      {
+        "script": "world-consent-check",
+        "exit": 0,
+        "passing_labels": 0,
+        "tail": [
+          "World consent source contract: 8 checks passed (device behavior not tested)."
+        ]
+      },
+      {
+        "script": "world-request-order-check",
+        "exit": 0,
+        "passing_labels": 0,
+        "tail": [
+          "World request-order source contract: 21 checks passed (runtime races not simulated)."
+        ]
+      },
+      {
+        "script": "world-empty-discovery-check",
+        "exit": 0,
+        "passing_labels": 0,
+        "tail": [
+          "World empty discovery source contract: 13 checks passed (native behavior not tested)."
+        ]
+      },
+      {
+        "script": "world-pan-request-check",
+        "exit": 0,
+        "passing_labels": 0,
+        "tail": [
+          "World pan-during-fetch source contract: 8 checks passed (runtime races tested separately)."
+        ]
+      },
+      {
+        "script": "world-discovery-runtime-check",
+        "exit": 0,
+        "passing_labels": 35,
+        "tail": [
+          "PASS pan while Search this area request is pending preserves the action for the newer viewport",
+          "PASS pan during explicit Locate nearby fetch preserves Search this area without additional GPS",
+          "35/35 World runtime checks passed; controlled hook bridge, not device tests."
+        ]
+      },
+      {
+        "script": "integration-static-check",
+        "exit": 0,
+        "passing_labels": 9,
+        "tail": [
+          "PASS superseding E2E harness is rollback-default and opt-in",
+          "PASS all SQL dollar-quoted blocks lexically balanced",
+          "9/9 repository-only integration checks passed; 106 migrations, 89 SQL suites. SQL NOT EXECUTED."
+        ]
+      }
+    ],
+    "database": "NOT EXECUTED; no queries, SQL compilation, migrations, pgTAP, or transactions",
+    "android": "NOT EXECUTED; Step 2F DEFERRED"
+  },
+  "known_blockers": [
+    "Step 4C BLOCKED; no renewed database-validation authorization",
+    "H1/H2/H3/M1 and new aggregate gate require isolated PostgreSQL authorization and full pgTAP validation",
+    "staging and production approved-origin lists intentionally empty; hosted builds/connections fail closed until separately reviewed",
+    "target ownership, FORCE RLS, inherited/default ACLs, managed Storage, extensions and cron unverified",
+    "no hosted project/environment/credentials configured; external services and costs unresolved",
+    "Node 22.11.0 used; Expo Doctor dependency declares Node >=22.13.0 in Node 22 series",
+    "source branches and primary dirty Crew discovery not reconciled into running database"
+  ],
+  "required_validation_order": [
+    "explicit authorization for a fresh disposable target, identities, extension setup, scheduler isolation and attempt count",
+    "compile/apply exact 106 hashed migrations in filename order only on approved isolated target; no seeds or ledger imports",
+    "effective owner/role/default/table/column/function grants and managed-schema checks; fail closed",
+    "H1/H2 then H3 then M1 and profile aggregate Room gate, notification/settlement idempotency",
+    "full 89 pgTAP suites plus concurrency runners with reviewed isolated fixture scope and complete TAP accounting",
+    "separately authorized staging configuration, Edge/Realtime/Storage integration, then Android and load testing"
+  ]
+}
