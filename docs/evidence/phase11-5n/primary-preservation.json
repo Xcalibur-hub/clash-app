@@ -1,0 +1,25 @@
+{
+  "status_unchanged": true,
+  "tracked_byte_checks": [
+    {
+      "file": "scripts/dev-local.mjs",
+      "sha256_matches": true
+    },
+    {
+      "file": "scripts/local-supabase-env.mjs",
+      "sha256_matches": true
+    },
+    {
+      "file": "services/arenaCrewService.ts",
+      "sha256_matches": true
+    },
+    {
+      "file": "utils/arenaCrewPayload.ts",
+      "sha256_matches": true
+    },
+    {
+      "file": "utils/arenaCrews.test.ts",
+      "sha256_matches": true
+    }
+  ]
+}
