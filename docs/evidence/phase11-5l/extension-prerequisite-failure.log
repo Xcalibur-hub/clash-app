@@ -1,0 +1,3 @@
+compose exit=2
+Password for user supabase_admin:
+psql: error: connection to server on socket "/run/postgresql/.s.PGSQL.5432" failed: fe_sendauth: no password supplied

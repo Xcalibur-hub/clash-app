@@ -1,0 +1,189 @@
+{
+  "project": "clash_p11bind_5l_20261012",
+  "containers": [
+    {
+      "id": "bb5ed9340b156742cf20debab1b105f53d09ae430b1c4b3b8d057fd0b60c2a33",
+      "name": "/clash_p11bind_5l_20261012-db-1",
+      "service": "db",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/postgres:17.6.1.002@sha256:3f5e3b691d5887161e1b977302b66122eb6cfdf2a6358bdad493454efb75f8a6",
+      "state": "running",
+      "exit_code": 0,
+      "started_at": "2026-10-12T03:30:03.319389795Z",
+      "finished_at": "0001-01-01T00:00:00Z",
+      "requested_ports": {
+        "5432/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "57722"
+          }
+        ]
+      },
+      "actual_ports": {
+        "5432/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "57722"
+          }
+        ]
+      }
+    },
+    {
+      "id": "f8483a9c9e67064b997a72f2d52028e00e73b7cfe1e48f22512444057537c052",
+      "name": "/clash_p11bind_5l_20261012-storage-1",
+      "service": "storage",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/storage-api:v1.26.5@sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c",
+      "state": "created",
+      "exit_code": 0,
+      "started_at": "0001-01-01T00:00:00Z",
+      "finished_at": "0001-01-01T00:00:00Z",
+      "requested_ports": {},
+      "actual_ports": {}
+    },
+    {
+      "id": "783748de10c3ce47351d4afd6e58bcabcbb718333a78ad2dc40705deba505257",
+      "name": "/clash_p11bind_5l_20261012-storage-init-1",
+      "service": "storage-init",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/storage-api:v1.26.5@sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c",
+      "state": "exited",
+      "exit_code": 0,
+      "started_at": "2026-10-12T03:30:37.052736208Z",
+      "finished_at": "2026-10-12T03:30:40.423575958Z",
+      "requested_ports": {},
+      "actual_ports": {}
+    },
+    {
+      "id": "c2e9673ea20b9298792543b0e2035562d321381949512ffa71d275f054ff4c20",
+      "name": "/clash_p11bind_5l_20261012-auth-init-1",
+      "service": "auth-init",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/gotrue:v2.179.0@sha256:658cf69f57d48e10cbe508a79874e6067348b82a4d216a0bb446c067d7a246f9",
+      "state": "exited",
+      "exit_code": 0,
+      "started_at": "2026-10-12T03:30:42.347158048Z",
+      "finished_at": "2026-10-12T03:30:43.488052489Z",
+      "requested_ports": {},
+      "actual_ports": {}
+    },
+    {
+      "id": "37a79e3d578be35eb1519ef8b550eaa9de978f3bd302fb2ff214245dcc8bb8e1",
+      "name": "/clash_p11bind_5l_20261012-auth-1",
+      "service": "auth",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/gotrue:v2.179.0@sha256:658cf69f57d48e10cbe508a79874e6067348b82a4d216a0bb446c067d7a246f9",
+      "state": "created",
+      "exit_code": 0,
+      "started_at": "0001-01-01T00:00:00Z",
+      "finished_at": "0001-01-01T00:00:00Z",
+      "requested_ports": {},
+      "actual_ports": {}
+    },
+    {
+      "id": "7e385c562b4dcee1c03463d5508a110e16ecf8a675ea7baee239296ad10c2c54",
+      "name": "/clash_p11bind_5l_20261012-kong-1",
+      "service": "kong",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/kong:2.8.1@sha256:1b53405d8680a09d6f44494b7990bf7da2ea43f84a258c59717d4539abf09f6d",
+      "state": "created",
+      "exit_code": 0,
+      "started_at": "0001-01-01T00:00:00Z",
+      "finished_at": "0001-01-01T00:00:00Z",
+      "requested_ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "57721"
+          }
+        ]
+      },
+      "actual_ports": {}
+    },
+    {
+      "id": "860e40f10d4315c2c3b6f727f35ad108381232aaf17873db3b27e9525a801624",
+      "name": "/clash_p11bind_5l_20261012-realtime-1",
+      "service": "realtime",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/realtime:v2.47.0@sha256:6b26b3679de63aec6b4849c02140d8f55b65ce2eecadcd5e5b712f596d0249a2",
+      "state": "created",
+      "exit_code": 0,
+      "started_at": "0001-01-01T00:00:00Z",
+      "finished_at": "0001-01-01T00:00:00Z",
+      "requested_ports": {},
+      "actual_ports": {}
+    },
+    {
+      "id": "3c021c2af5b4ce6a16c582d8776c1076bd1b521846c054b3093c2ae71ae288c0",
+      "name": "/clash_p11bind_5l_20261012-realtime-init-1",
+      "service": "realtime-init",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/realtime:v2.47.0@sha256:6b26b3679de63aec6b4849c02140d8f55b65ce2eecadcd5e5b712f596d0249a2",
+      "state": "exited",
+      "exit_code": 0,
+      "started_at": "2026-10-12T03:30:21.432921638Z",
+      "finished_at": "2026-10-12T03:30:35.384525054Z",
+      "requested_ports": {},
+      "actual_ports": {}
+    },
+    {
+      "id": "272f2d7e1abcadf533b7b4b1e5f30d09e2f8cdd282c966248308d5371a8bd027",
+      "name": "/clash_p11bind_5l_20261012-rest-1",
+      "service": "rest",
+      "project": "clash_p11bind_5l_20261012",
+      "image": "public.ecr.aws/supabase/postgrest:v13.0.6@sha256:6797796b22aa5df4be1cdf4e52d9e8f6b202ecdfbfcd9d867648c44a8bac1a1e",
+      "state": "created",
+      "exit_code": 0,
+      "started_at": "0001-01-01T00:00:00Z",
+      "finished_at": "0001-01-01T00:00:00Z",
+      "requested_ports": {},
+      "actual_ports": {}
+    }
+  ],
+  "volumes": [
+    {
+      "Name": "clash_p11bind_5l_20261012_db-data",
+      "Driver": "local",
+      "Labels": {
+        "com.docker.compose.config-hash": "12a7e1f5eafaa61fc1e7e91ce4cc756133a4e71ede2bdd872c12b72dbf63d8bb",
+        "com.docker.compose.project": "clash_p11bind_5l_20261012",
+        "com.docker.compose.version": "2.39.2",
+        "com.docker.compose.volume": "db-data"
+      },
+      "CreatedAt": "2026-10-12T03:29:01Z"
+    },
+    {
+      "Name": "clash_p11bind_5l_20261012_db-config",
+      "Driver": "local",
+      "Labels": {
+        "com.docker.compose.config-hash": "d6d2910f6acf2b349cca11afeb8f8c61ce73eeda385872b921f0fb3d69a3765b",
+        "com.docker.compose.project": "clash_p11bind_5l_20261012",
+        "com.docker.compose.version": "2.39.2",
+        "com.docker.compose.volume": "db-config"
+      },
+      "CreatedAt": "2026-10-12T03:29:01Z"
+    },
+    {
+      "Name": "clash_p11bind_5l_20261012_storage-data",
+      "Driver": "local",
+      "Labels": {
+        "com.docker.compose.config-hash": "fdab5bdde973c58c306f471ee65283ad46a2eac8e0b8d72c9289f611d0fda8a5",
+        "com.docker.compose.project": "clash_p11bind_5l_20261012",
+        "com.docker.compose.version": "2.39.2",
+        "com.docker.compose.volume": "storage-data"
+      },
+      "CreatedAt": "2026-10-12T03:29:01Z"
+    }
+  ],
+  "network": {
+    "Name": "clash_p11bind_5l_20261012_network",
+    "Id": "1c2846eb1ab11a5121f7e35b2e088cfc5a4e0e153c2eb87839653584c8e926fd",
+    "Driver": "bridge",
+    "Labels": {
+      "com.docker.compose.config-hash": "6757fd2547354d9ce1a1b219a72b5f8ca188adfc1383acd59698e5ca9af444c5",
+      "com.docker.compose.network": "isolated",
+      "com.docker.compose.project": "clash_p11bind_5l_20261012",
+      "com.docker.compose.version": "2.39.2"
+    }
+  }
+}

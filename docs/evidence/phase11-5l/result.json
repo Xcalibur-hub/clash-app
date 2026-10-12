@@ -1,0 +1,78 @@
+{
+  "recommendation": "FAIL",
+  "integrated_database_candidate": "BLOCKED_UNVERIFIED",
+  "project": "clash_p11bind_5l_20261012",
+  "harness_commit": "d153c11efb5be3b663a2beeb4efd1802526cded2",
+  "candidate_seal": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "candidate_implementation": "9c71d72a15095047821789386ca9d395961bab4f",
+  "verified_frozen_sources": 245,
+  "verified_artifacts": 106,
+  "artifact_matches_step5k": true,
+  "bom_removals": 3,
+  "pgcrypto_assertion_transformations": 1,
+  "offline_node_tests": {
+    "passed": 57,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "stages": {
+    "create_exit": 0,
+    "bootstrap_stage_exit": 1,
+    "extension_psql_exit": 2,
+    "cleanup_exit": 0
+  },
+  "managed_init_exit_codes": {
+    "realtime": 0,
+    "storage": 0,
+    "auth": 0
+  },
+  "postgres_windows_listener_observed": {
+    "local_address": "127.0.0.1",
+    "local_port": 57722,
+    "owning_process": 43360,
+    "source": "Get-NetTCPConnection observation during bootstrap"
+  },
+  "hostconfig_bindings_verified": {
+    "db": "127.0.0.1:57722->5432/tcp",
+    "kong": "127.0.0.1:57721->8000/tcp",
+    "other_services_published_ports": 0
+  },
+  "gateway_runtime_started": false,
+  "post_cleanup_attempt_resource_counts": {
+    "containers": 0,
+    "volumes": 0,
+    "networks": 0
+  },
+  "post_cleanup_dedicated_listeners": [],
+  "application_migrations": {
+    "executed": 0,
+    "passed": 0,
+    "failed": 0,
+    "blocked": 106
+  },
+  "sql_suites": {
+    "executed": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "blocked": 89
+  },
+  "sql_tap_assertions": {
+    "executed": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "concurrency_suites": {
+    "executed": 0,
+    "blocked": 9
+  },
+  "h1_h2_h3_m1": "NOT_TESTED",
+  "effective_security_inventory": "NOT_EXECUTED",
+  "failed_statement": "psql authentication; no prerequisite SQL statements executed",
+  "failure": "fe_sendauth: no password supplied",
+  "bootstrap_retries": 0,
+  "migration_retries": 0,
+  "startup_attempts": 1
+}

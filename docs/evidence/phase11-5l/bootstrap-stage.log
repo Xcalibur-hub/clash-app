@@ -1,0 +1,10 @@
+{"status":"CREATION_BINDING_INSPECTION_PASS","reachability_verified":false}
+Exception: C:\p11runl\tools\isolated-supabase\lifecycle.ps1:28
+
+Line |
+
+  28 |  … de -ne 0) { throw ('Docker command failed; stop affected sequence: '+ …
+
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+     | Docker command failed; stop affected sequence: compose

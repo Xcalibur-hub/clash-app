@@ -1,0 +1,22 @@
+[
+  {
+    "path": "scripts/migration-compatibility-artifact.cjs",
+    "reference": "8c0b4e9c7d49a330e7e549f91c48070b0d1dfd15",
+    "sha256": "99906059fd86c3868d8c17dd75c65d7823ff85ec44734d174f910d0781731ef5"
+  },
+  {
+    "path": "scripts/migration-encoding-check.cjs",
+    "reference": "8c0b4e9c7d49a330e7e549f91c48070b0d1dfd15",
+    "sha256": "0631a2903777eadd0d96bb6eb420128845e523ff236d408a6d2ce00ee068bc8a"
+  },
+  {
+    "path": "scripts/extension-hook-preflight.cjs",
+    "reference": "8c0b4e9c7d49a330e7e549f91c48070b0d1dfd15",
+    "sha256": "bdcd88d8fbc1b29ef611c724b52fe5220ef2b7ab81d5b6e047cf0c0c3d0c2695"
+  },
+  {
+    "path": "scripts/loopback-binding-check.cjs",
+    "reference": "d7cd45d918635345636915092016c5d21c96f31f",
+    "sha256": "030710331a4ae0c5c8b52142ffd716db1240cb584972ef2a8f5fe2fde3ebb3c1"
+  }
+]
