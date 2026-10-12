@@ -92,13 +92,15 @@ func preflight(ctx context.Context, s Session) (report map[string]any, err error
 			err = errors.New("read-only rollback unconfirmed; stop")
 		}
 	}()
-	if e := identity(ctx, s); e != nil {
-		return report, e
+	diagnostics, identityError := inspectIdentity(ctx, s)
+	report["identity_gate"] = diagnostics
+	if identityError != nil {
+		return report, identityError
 	}
 	// Only catalog fields, relevant role memberships and existence/counts are recorded.
 	// No user records, function bodies, role settings, SQL text or connection secrets.
 	for _, item := range []struct{ name, q string }{
-		{"identity", identitySQL}, {"installed_extensions", extensionsSQL}, {"available_extensions", availableExtensionsSQL}, {"roles", rolesSQL}, {"role_inheritance", roleEdgesSQL}, {"managed", managedSQL}, {"application_objects", objectsSQL}, {"existing_data", dataSQL},
+		{"installed_extensions", extensionsSQL}, {"available_extensions", availableExtensionsSQL}, {"roles", rolesSQL}, {"role_inheritance", roleEdgesSQL}, {"managed", managedSQL}, {"application_objects", objectsSQL}, {"existing_data", dataSQL},
 	} {
 		result, e := query(ctx, s, item.q)
 		if e != nil {

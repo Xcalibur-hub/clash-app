@@ -223,7 +223,7 @@ func artifacts(c Config) (Artifact, error) {
 	return a, nil
 }
 
-const identitySQL = `select current_database() as db,current_user as usr,session_user as login,current_setting('server_version_num')::int as version,coalesce((select ssl from pg_stat_ssl where pid=pg_backend_pid()),false) as ssl`
+const identitySQL = `select current_database() as db,current_user as usr,session_user as login,current_setting('server_version_num')::int as version,(select ssl from pg_stat_ssl where pid=pg_backend_pid()) as ssl`
 const extensionsSQL = `select e.extname as name,e.extversion as version,n.nspname as schema,pg_get_userbyid(e.extowner) as owner from pg_extension e join pg_namespace n on n.oid=e.extnamespace where e.extname in ('pgcrypto','postgis','pg_cron','pgtap','dblink') order by e.extname`
 const ledgerExistsSQL = `select to_regclass('supabase_migrations.schema_migrations') is not null as exists`
 const ledgerSQL = `select version,name,array_to_json(statements)::text as statements_json from supabase_migrations.schema_migrations order by version`
@@ -236,23 +236,84 @@ func query(ctx context.Context, s Session, q string, args ...any) (Result, error
 	}
 	return r, nil
 }
-func identity(ctx context.Context, s Session) error {
+
+// Only comparisons and fixed codes leave this gate, never raw identity values.
+type identityDiagnostics struct {
+	DatabaseMatch    bool   `json:"database_match"`
+	CurrentRoleMatch bool   `json:"current_role_match"`
+	SessionRoleMatch bool   `json:"session_role_match"`
+	BackendSSL       any    `json:"backend_ssl_observed"`
+	VersionMatch     bool   `json:"postgres_17_match"`
+	FailureReason    string `json:"failure_reason"`
+}
+
+func inspectIdentity(ctx context.Context, s Session) (identityDiagnostics, error) {
+	d := identityDiagnostics{BackendSSL: "unknown"}
+	refuse := func(code string) (identityDiagnostics, error) {
+		d.FailureReason = code
+		return d, errors.New(code)
+	}
 	r, e := query(ctx, s, identitySQL)
 	if e != nil {
-		return e
+		return refuse("identity_query_failed")
+	}
+	if len(r.Rows) == 0 {
+		return refuse("identity_row_missing")
 	}
 	if len(r.Rows) != 1 {
-		return errors.New("missing identity")
+		return refuse("identity_row_count_invalid")
 	}
 	v := r.Rows[0]
-	if v["db"] != "postgres" || v["usr"] != "postgres" || v["login"] != "postgres" || v["ssl"] != true {
-		return errors.New("unexpected database identity or TLS")
+	db, dbOK := v["db"].(string)
+	usr, usrOK := v["usr"].(string)
+	login, loginOK := v["login"].(string)
+	d.DatabaseMatch = dbOK && db == "postgres"
+	d.CurrentRoleMatch = usrOK && usr == "postgres"
+	d.SessionRoleMatch = loginOK && login == "postgres"
+	ssl, sslOK := v["ssl"].(bool)
+	if sslOK {
+		d.BackendSSL = ssl
 	}
-	n := fmt.Sprint(v["version"])
-	if len(n) != 6 || !strings.HasPrefix(n, "17") {
-		return errors.New("PostgreSQL 17 required")
+	var version int64
+	versionOK := true
+	switch n := v["version"].(type) {
+	case int:
+		version = int64(n)
+	case int32:
+		version = int64(n)
+	case int64:
+		version = n
+	default:
+		versionOK = false
 	}
-	return nil
+	d.VersionMatch = versionOK && version >= 170000 && version < 180000
+	if !dbOK || !usrOK || !loginOK || !versionOK || (v["ssl"] != nil && !sslOK) {
+		return refuse("identity_values_malformed")
+	}
+	if !d.DatabaseMatch {
+		return refuse("database_mismatch")
+	}
+	if !d.CurrentRoleMatch {
+		return refuse("current_role_mismatch")
+	}
+	if !d.SessionRoleMatch {
+		return refuse("session_role_mismatch")
+	}
+	if !sslOK {
+		return refuse("backend_ssl_unknown")
+	}
+	if !ssl {
+		return refuse("backend_ssl_required")
+	}
+	if !d.VersionMatch {
+		return refuse("postgres_17_required")
+	}
+	d.FailureReason = "none"
+	return d, nil
+}
+func identity(ctx context.Context, s Session) error {
+	_, e := inspectIdentity(ctx, s)
+	return e
 }
 func ledger(ctx context.Context, s Session) ([]map[string]any, error) {
 	r, e := query(ctx, s, ledgerExistsSQL)
