@@ -1,0 +1,4 @@
+
+Migration failed: STOP, no retries
+
+1 !== 0
