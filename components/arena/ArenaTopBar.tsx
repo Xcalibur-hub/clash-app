@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { selectViewer, useClash } from '../../store';
 import { space, typeScale, useThemeColors } from '../../theme';
@@ -20,7 +20,7 @@ export interface ArenaTopBarProps {
  */
 export function ArenaTopBar({
   paddingTop,
-  contextLine = 'ARENA',
+  contextLine = 'Where the internet takes sides.',
 }: ArenaTopBarProps): React.JSX.Element {
   const { state } = useClash();
   const viewer = selectViewer(state);
@@ -39,6 +39,7 @@ export function ArenaTopBar({
         >
           CLASH
         </Animated.Text>
+        <View style={[styles.brandDot, { backgroundColor: t.scheme === 'dark' ? '#DDB1E8' : '#EB634E' }]} />
         {contextLine ? (
           <Animated.Text
             entering={reduced ? undefined : FadeIn.delay(80).duration(320)}
@@ -90,17 +91,20 @@ const styles = StyleSheet.create({
   brandBlock: { flex: 1, minWidth: 0, gap: 2, paddingRight: space.sm },
   brand: {
     ...typeScale.title,
-    fontSize: 34,
-    lineHeight: 38,
-    letterSpacing: -0.8,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontSize: 38,
+    lineHeight: 43,
+    letterSpacing: -1.5,
     fontWeight: '800',
   },
   context: {
     ...typeScale.caption,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.6,
+    letterSpacing: -0.1,
   },
+  brandDot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, left: 151, top: 4 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: 4 },
   iconBtn: {
     width: 36,
