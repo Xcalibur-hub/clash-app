@@ -1,0 +1,103 @@
+{
+  "step": "phase-11-13",
+  "mode": "verify-read-only",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "started_at": "2026-10-13T07:57:23.046Z",
+  "secrets_read": false,
+  "token_present": true,
+  "expected": [
+    "vault-media-access",
+    "course-lesson-media-access",
+    "creator-ai",
+    "digital-creator"
+  ],
+  "inventory": [
+    {
+      "name": "vault-media-access",
+      "verify_jwt": true,
+      "version": 1,
+      "updated_at": 1791878185671
+    },
+    {
+      "name": "course-lesson-media-access",
+      "verify_jwt": true,
+      "version": 1,
+      "updated_at": 1791878194335
+    },
+    {
+      "name": "creator-ai",
+      "verify_jwt": true,
+      "version": 1,
+      "updated_at": 1791878203174
+    },
+    {
+      "name": "digital-creator",
+      "verify_jwt": true,
+      "version": 1,
+      "updated_at": 1791878212083
+    }
+  ],
+  "inventory_check": {
+    "ok": true,
+    "reason": "inventory matches manifest",
+    "rows": [
+      {
+        "name": "vault-media-access",
+        "deployed": true,
+        "version": 1,
+        "verify_jwt": true,
+        "pass": true
+      },
+      {
+        "name": "course-lesson-media-access",
+        "deployed": true,
+        "version": 1,
+        "verify_jwt": true,
+        "pass": true
+      },
+      {
+        "name": "creator-ai",
+        "deployed": true,
+        "version": 1,
+        "verify_jwt": true,
+        "pass": true
+      },
+      {
+        "name": "digital-creator",
+        "deployed": true,
+        "version": 1,
+        "verify_jwt": true,
+        "pass": true
+      }
+    ],
+    "notAllowlisted": [],
+    "missing": []
+  },
+  "smoke": [
+    {
+      "name": "vault-media-access",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "name": "course-lesson-media-access",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "name": "creator-ai",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "name": "digital-creator",
+      "status": 401,
+      "expected": 401
+    }
+  ],
+  "smoke_check": {
+    "ok": true,
+    "reason": "all 4 function(s) rejected an unauthenticated call with 401"
+  },
+  "result": "VERIFIED"
+}

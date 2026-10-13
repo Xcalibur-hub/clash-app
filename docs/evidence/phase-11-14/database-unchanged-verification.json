@@ -1,0 +1,129 @@
+{
+  "auth_user_count": 0,
+  "available_extension_names": [
+    "dblink",
+    "pg_cron",
+    "pgcrypto",
+    "pgtap",
+    "postgis"
+  ],
+  "candidate": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "clash_maintenance_active": false,
+  "clash_maintenance_jobs": [
+    {
+      "active": false,
+      "command": "select public.run_maintenance(500)",
+      "jobid": "1",
+      "jobname": "clash-maintenance",
+      "schedule": "* * * * *",
+      "username": "postgres"
+    }
+  ],
+  "clash_maintenance_quiescence": {
+    "active_backends": 0,
+    "history_rows": 0,
+    "live_job_pids": 0,
+    "stale_unfinished": 0,
+    "unexpected_status": 0,
+    "unfinished": 0
+  },
+  "cron_quiescent": true,
+  "database_security_passed": false,
+  "expected_migrations": 106,
+  "expected_objects": [
+    {
+      "arena_interest_preferences": true,
+      "course_lessons": true,
+      "explore_challenge_results": true,
+      "h1_notify_guarded": true,
+      "h2_lesson_content_guarded": true,
+      "h3_reputation_owner_gate": true,
+      "postgis_geometry_type": true,
+      "reputation_rls_enabled": true,
+      "v105_profile_clash_stats": true,
+      "v106_arena_comment_notify": true,
+      "v106_comments_notify_trigger": true,
+      "v106_notify_arena_comment": true
+    }
+  ],
+  "identity_gate": {
+    "database_match": true,
+    "current_role_match": true,
+    "session_role_match": true,
+    "backend_ssl_observed": true,
+    "postgres_17_match": true,
+    "failure_reason": "none"
+  },
+  "installed_extension_names": [
+    "pg_cron",
+    "pgcrypto",
+    "postgis"
+  ],
+  "installed_extensions": [
+    {
+      "name": "pg_cron",
+      "owner": "supabase_admin",
+      "schema": "pg_catalog",
+      "version": "1.6.4"
+    },
+    {
+      "name": "pgcrypto",
+      "owner": "postgres",
+      "schema": "extensions",
+      "version": "1.3"
+    },
+    {
+      "name": "postgis",
+      "owner": "supabase_admin",
+      "schema": "extensions",
+      "version": "3.3.7"
+    }
+  ],
+  "ledger_count": 106,
+  "ledger_verified": true,
+  "managed": [
+    {
+      "cron_catalog": true,
+      "cron_preloaded": true,
+      "managed": true,
+      "publication": true,
+      "restricted_files": true,
+      "restricted_role": true
+    }
+  ],
+  "mode": "verify-complete",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "required_extension_states": {
+    "dblink": "available_not_installed",
+    "pg_cron": "installed",
+    "pgcrypto": "installed",
+    "pgtap": "available_not_installed",
+    "postgis": "installed"
+  },
+  "storage_bucket_classification": {
+    "private-media": "expected",
+    "public-media": "expected"
+  },
+  "storage_bucket_count": 2,
+  "storage_buckets": [
+    {
+      "ID": "private-media",
+      "Name": "private-media",
+      "Public": false,
+      "SizeLimit": 104857600,
+      "MIME": "{image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm}",
+      "CreatedAt": "2026-10-12 16:47:03.187275+00"
+    },
+    {
+      "ID": "public-media",
+      "Name": "public-media",
+      "Public": true,
+      "SizeLimit": 104857600,
+      "MIME": "{image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm}",
+      "CreatedAt": "2026-10-12 16:47:03.187275+00"
+    }
+  ],
+  "storage_object_count": 0,
+  "unexpected_schema_names": null,
+  "verified_complete": true
+}

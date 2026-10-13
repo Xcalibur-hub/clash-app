@@ -1,0 +1,51 @@
+{
+  "step": "phase-11-14",
+  "operation": "one-time automated staging Edge Function deployment",
+  "pinned_commit": "644cde87db0210c318af81d8a8023f0d53adf243",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "credential": "Windows Credential Manager: CLASH/staging/zrutlrhhvfcsmssjiijl/management (metadata only; value never read into evidence)",
+  "scope_deployed": ["vault-media-access", "course-lesson-media-access", "creator-ai", "digital-creator"],
+  "not_deployed": ["arena-editorial", "arena-gifs"],
+  "pre_execution_gates": [
+    { "check": "credential retrieval", "ok": true, "detail": "CREDENTIAL_OK kind=sbp_pat; value never printed, logged or written" },
+    { "check": "helper/manifest scope cross-check", "ok": true, "detail": "SCOPE_OK functions=[four] cli=2.40.7 ref=zrutlrhhvfcsmssjiijl" },
+    { "check": "project identity", "ok": true, "detail": "project identity confirmed" },
+    { "check": "function allowlist", "ok": true, "detail": "4 approved function(s)" },
+    { "check": "commit pin", "ok": true, "detail": "commit pinned at 644cde87db0210c318af81d8a8023f0d53adf243" },
+    { "check": "repository inputs", "ok": true, "detail": "six functions present; config.toml verify_jwt matches the manifest" },
+    { "check": "pinned CLI version (actual)", "ok": true, "detail": "CLI 2.40.7" },
+    { "check": "secret prerequisites", "ok": true, "detail": "no required secret for the selected set; secrets API not called" },
+    { "check": "pre-mutation inventory read-back", "ok": true, "detail": "0 function(s) already deployed" }
+  ],
+  "post_execution_checks": [
+    { "check": "strict inventory (requireAll)", "ok": true, "detail": "inventory matches manifest" },
+    { "check": "partial deployment", "ok": true, "detail": "all requested functions present" },
+    { "check": "negative-auth smoke", "ok": true, "detail": "all 4 function(s) rejected an unauthenticated call with 401" },
+    { "check": "independent read-only verification", "ok": true, "detail": "VERIFIED: 4 present, verify_jwt=true each, 4x 401, unexpected=[] missing=[]" },
+    { "check": "database untouched", "ok": true, "detail": "verify-complete: ledger 106, cron inactive + quiescent, 2 buckets, 0 users, 0 objects, no schema drift" }
+  ],
+  "deployed_versions": {
+    "vault-media-access": 1,
+    "course-lesson-media-access": 1,
+    "creator-ai": 1,
+    "digital-creator": 1
+  },
+  "verify_jwt": {
+    "vault-media-access": true,
+    "course-lesson-media-access": true,
+    "creator-ai": true,
+    "digital-creator": true
+  },
+  "negative_auth_results": {
+    "vault-media-access": 401,
+    "course-lesson-media-access": 401,
+    "creator-ai": 401,
+    "digital-creator": 401
+  },
+  "result": "DEPLOYED AND VERIFIED",
+  "secrets_read": false,
+  "secret_values_present": false,
+  "hosted_changes_outside_scope": "none (no database write, no Auth change, no secret change, no cron change, no quarantine lift)",
+  "staging_state": "QUARANTINED",
+  "cron_state": "inactive"
+}

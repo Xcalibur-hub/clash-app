@@ -1,0 +1,180 @@
+{
+  "step": "phase-11-13",
+  "mode": "execute",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "started_at": "2026-10-13T07:56:07.349Z",
+  "checks": [
+    {
+      "check": "project_identity",
+      "ok": true,
+      "detail": "project identity confirmed"
+    },
+    {
+      "check": "function_allowlist",
+      "ok": true,
+      "detail": "4 approved function(s)"
+    },
+    {
+      "check": "commit_pin",
+      "ok": true,
+      "detail": "commit pinned at 644cde87db0210c318af81d8a8023f0d53adf243"
+    },
+    {
+      "check": "repository_inputs",
+      "ok": true,
+      "detail": "six functions present; config.toml verify_jwt matches the manifest"
+    },
+    {
+      "check": "pinned_cli",
+      "ok": true,
+      "detail": "CLI 2.40.7"
+    },
+    {
+      "check": "secret_prereqs",
+      "ok": true,
+      "detail": "no required secret for the selected set; secrets API not called"
+    },
+    {
+      "check": "target_read_back",
+      "ok": true,
+      "detail": "0 function(s) already deployed"
+    },
+    {
+      "check": "inventory_strict",
+      "ok": true,
+      "detail": "inventory matches manifest"
+    },
+    {
+      "check": "partial_deployment",
+      "ok": true,
+      "detail": "all requested functions present"
+    },
+    {
+      "check": "negative_auth_smoke",
+      "ok": true,
+      "detail": "all 4 function(s) rejected an unauthenticated call with 401"
+    }
+  ],
+  "requested": [
+    "vault-media-access",
+    "course-lesson-media-access",
+    "creator-ai",
+    "digital-creator"
+  ],
+  "token_present": true,
+  "approved_set": [
+    "vault-media-access",
+    "course-lesson-media-access",
+    "creator-ai",
+    "digital-creator"
+  ],
+  "source": {
+    "commit": "644cde87db0210c318af81d8a8023f0d53adf243",
+    "branch": "HEAD"
+  },
+  "required_secrets_for_set": [],
+  "inventory_before": [],
+  "deployed": [
+    {
+      "name": "vault-media-access",
+      "ms": 11413
+    },
+    {
+      "name": "course-lesson-media-access",
+      "ms": 8785
+    },
+    {
+      "name": "creator-ai",
+      "ms": 8800
+    },
+    {
+      "name": "digital-creator",
+      "ms": 8895
+    }
+  ],
+  "inventory": [
+    {
+      "name": "vault-media-access",
+      "verify_jwt": true,
+      "version": 1,
+      "updated_at": 1791878185671
+    },
+    {
+      "name": "course-lesson-media-access",
+      "verify_jwt": true,
+      "version": 1,
+      "updated_at": 1791878194335
+    },
+    {
+      "name": "creator-ai",
+      "verify_jwt": true,
+      "version": 1,
+      "updated_at": 1791878203174
+    },
+    {
+      "name": "digital-creator",
+      "verify_jwt": true,
+      "version": 1,
+      "updated_at": 1791878212083
+    }
+  ],
+  "smoke": [
+    {
+      "name": "vault-media-access",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "name": "course-lesson-media-access",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "name": "creator-ai",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "name": "digital-creator",
+      "status": 401,
+      "expected": 401
+    }
+  ],
+  "result": "DEPLOYED AND VERIFIED",
+  "functions": [
+    {
+      "name": "vault-media-access",
+      "verify_jwt": true,
+      "required": [],
+      "optional": []
+    },
+    {
+      "name": "course-lesson-media-access",
+      "verify_jwt": true,
+      "required": [],
+      "optional": []
+    },
+    {
+      "name": "creator-ai",
+      "verify_jwt": true,
+      "required": [],
+      "optional": [
+        "CREATOR_AI_API_KEY",
+        "CREATOR_AI_BASE_URL",
+        "CREATOR_AI_MODEL"
+      ]
+    },
+    {
+      "name": "digital-creator",
+      "verify_jwt": true,
+      "required": [],
+      "optional": [
+        "DIGITAL_CREATOR_API_KEY",
+        "DIGITAL_CREATOR_BASE_URL"
+      ]
+    }
+  ],
+  "secrets_read": false,
+  "secret_values_present": false,
+  "generated_at": "2026-10-13T07:57:00.128Z"
+}
