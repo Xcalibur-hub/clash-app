@@ -12,6 +12,7 @@ import {
 } from './staging-functions.lib.mjs';
 import { APPROVED_DEPLOYMENT_SET, FUNCTIONS, PINNED_CLI_VERSION, PROJECT_REF } from './staging-functions.manifest.mjs';
 import { run, validateRepositoryInputs } from './staging-functions-deploy.mjs';
+import { normalizeApiInventory } from './staging-functions.api.mjs';
 
 const SHA = 'a'.repeat(40);
 const deployed = (name, verify_jwt) => ({ name, verify_jwt, version: 1 });
@@ -123,5 +124,22 @@ test('an execute run without --commit or --confirm-project stops before any CLI 
   const stopped = await run(['--only', 'vault-media-access', '--execute', '--evidence-dir', '.expo/staging-deploy/test-noauth']);
   assert.equal(stopped.result, 'STOPPED');
   assert.ok(stopped.reason.length > 0);
+});
+
+test('Management API inventory normalizer handles empty, shaped and malformed payloads', () => {
+  assert.deepEqual(normalizeApiInventory([]), []);
+  const [row] = normalizeApiInventory([{ slug: 'creator-ai', version: 3, verify_jwt: true, updated_at: 'x' }]);
+  assert.deepEqual(row, { name: 'creator-ai', verify_jwt: true, version: 3, updated_at: 'x' });
+  // A missing verify_jwt must become null so the strict check fails closed.
+  assert.equal(normalizeApiInventory([{ slug: 'x' }])[0].verify_jwt, null);
+  assert.throws(() => normalizeApiInventory({ message: 'not an array' }));
+});
+
+test('an empty deployed inventory fails closed when the expected set is required', () => {
+  assert.equal(checkInventory({ manifest: FUNCTIONS, actual: [], requireAll: true }).ok, false);
+  assert.equal(checkInventory({ manifest: FUNCTIONS, actual: [] }).ok, true); // no unexpected, no mismatch — membership is a separate gate
+  assert.equal(checkPartialDeployment({ requested: APPROVED_DEPLOYMENT_SET, actual: [] }).ok, false);
+  const partialSet = APPROVED_DEPLOYMENT_SET.slice(0, 2).map((n) => ({ name: n, verify_jwt: true, version: 1 }));
+  assert.equal(checkInventory({ manifest: FUNCTIONS.filter((f) => APPROVED_DEPLOYMENT_SET.includes(f.name)), actual: partialSet, requireAll: true }).ok, false);
 });
 

@@ -31,6 +31,7 @@ import {
   checkCliVersion, checkCommitPin, checkInventory, checkPartialDeployment, checkProjectRef,
   checkSecretPrereqs, checkSmoke, evidenceIsSanitized, redact, requiredSecretsForSet, selectFunctions,
 } from './staging-functions.lib.mjs';
+import { fetchFunctionsInventory, fetchSecretNames } from './staging-functions.api.mjs';
 
 export const TOKEN_ENV = 'SUPABASE_ACCESS_TOKEN';
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -88,22 +89,15 @@ export function validateRepositoryInputs(manifest) {
   if (JWT_EXEMPT.length !== 1 || JWT_EXEMPT[0] !== 'arena-editorial') throw new Error('refusing: JWT exemption set changed');
 }
 
-export function fetchDeployed() {
-  const r = cli(['functions', 'list', '--project-ref', PROJECT_REF, '-o', 'json']);
-  if (!r.ok) throw new Error(`refusing: could not read the deployed inventory`);
-  return (JSON.parse(r.out) ?? []).map((x) => ({
-    name: String(x.name ?? x.slug ?? ''),
-    verify_jwt: typeof x.verify_jwt === 'boolean' ? x.verify_jwt : (typeof x.verifyJwt === 'boolean' ? x.verifyJwt : x.verify_jwt ?? null),
-    version: x.version ?? null,
-    updated_at: x.updated_at ?? null,
-  }));
+export async function fetchDeployed(token) {
+  // Inventory MUST come from the Management API: the pinned CLI's `functions
+  // list` has no machine-readable output and never reports verify_jwt.
+  return fetchFunctionsInventory(token);
 }
 
-export function readSecretNames() {
-  const r = cli(['secrets', 'list', '--project-ref', PROJECT_REF, '-o', 'json']);
-  if (!r.ok) throw new Error('refusing: could not list secret names');
-  // NAMES ONLY. Values are never requested, read, printed or uploaded.
-  return (JSON.parse(r.out) ?? []).map((x) => String(x.name ?? x.Name ?? ''));
+export async function readSecretNames(token) {
+  // NAMES ONLY. Secret values are never requested, read, printed or uploaded.
+  return fetchSecretNames(token);
 }
 
 export function writeEvidence(dir, payload) {
@@ -145,6 +139,8 @@ export async function run(argv = process.argv.slice(2)) {
     evidenceDir = args.evidence;
     evidence.mode = args.execute ? 'execute' : 'dry-run';
     evidence.requested = args.only;
+    const token = process.env[TOKEN_ENV] ?? '';
+    evidence.token_present = token.length > 0;
 
     // 1. project identity — before anything else.
     const proj = checkProjectRef(PROJECT_REF, args.confirmProject);
@@ -183,10 +179,17 @@ export async function run(argv = process.argv.slice(2)) {
     const required = requiredSecretsForSet(sel.selected, FUNCTIONS);
     evidence.required_secrets_for_set = required;
     if (args.execute) {
-      const present = readSecretNames();
-      const sec = checkSecretPrereqs({ required, present });
-      note('secret_prereqs', sec);
-      if (!sec.ok) return stop(sec.reason);
+      if (!token) return stop(`missing credential: set ${TOKEN_ENV} in this shell only (never a file, argv or log)`);
+      if (required.length === 0) {
+        // Step 13 rule: check required secrets only for the selected set. With an
+        // empty requirement the secrets API is not called at all.
+        note('secret_prereqs', { ok: true, reason: 'no required secret for the selected set; secrets API not called' });
+      } else {
+        const present = await readSecretNames(token);
+        const sec = checkSecretPrereqs({ required, present });
+        note('secret_prereqs', sec);
+        if (!sec.ok) return stop(sec.reason);
+      }
     } else {
       note('secret_prereqs', { ok: true, reason: `plan: ${required.length} required secret(s) for the selected set` });
     }
@@ -197,8 +200,8 @@ export async function run(argv = process.argv.slice(2)) {
       return evidence;
     }
 
-    // Pre-mutation read-back of the target project.
-    const before = fetchDeployed();
+    // Pre-mutation read-back of the target project (Management API).
+    const before = await fetchDeployed(token);
     evidence.inventory_before = before;
     note('target_read_back', { ok: true, reason: `${before.length} function(s) already deployed` });
 
@@ -211,9 +214,10 @@ export async function run(argv = process.argv.slice(2)) {
       evidence.deployed = deployed;
     }
 
-    const after = fetchDeployed();
+    const after = await fetchDeployed(token);
     evidence.inventory = after;
-    const inv = checkInventory({ manifest: FUNCTIONS, actual: after });
+    const selectedManifest = FUNCTIONS.filter((f) => sel.selected.includes(f.name));
+    const inv = checkInventory({ manifest: selectedManifest, actual: after, requireAll: true });
     note('inventory_strict', inv);
     if (!inv.ok) return stop(inv.reason);
     const partial = checkPartialDeployment({ requested: sel.selected, actual: after });

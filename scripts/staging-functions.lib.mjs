@@ -83,8 +83,9 @@ export function checkSecretPrereqs({ required, present }) {
   return { ok: true, reason: `required secrets present: ${required.length}`, missing: [] };
 }
 
-/** Fail-closed inventory verification, including unexpected-name allowlisting. */
-export function checkInventory({ manifest, actual, allowlist = [] }) {
+/** Fail-closed inventory verification: rejects unexpected names, JWT mismatches,
+ *  and — with `requireAll` — any expected function that is missing. */
+export function checkInventory({ manifest, actual, allowlist = [], requireAll = false }) {
   const rows = [];
   for (const f of manifest) {
     const row = actual.find((r) => r.name === f.name);
@@ -93,13 +94,17 @@ export function checkInventory({ manifest, actual, allowlist = [] }) {
   }
   const unexpected = actual.filter((r) => !manifest.some((f) => f.name === r.name)).map((r) => r.name);
   const notAllowlisted = unexpected.filter((n) => !allowlist.includes(n));
-  const mismatched = rows.filter((r) => r.deployed && !checkJwtEquals(r.verify_jwt, manifest.find((f) => f.name === r.name).verifyJwt, r.name).ok).map((r) => r.name);
+  const mismatched = rows.filter((r) => r.deployed && !r.pass).map((r) => r.name);
+  const missing = rows.filter((r) => !r.deployed).map((r) => r.name);
+  const ok = notAllowlisted.length === 0 && mismatched.length === 0 && (!requireAll || missing.length === 0);
   const reason = notAllowlisted.length
     ? `unexpected deployed function(s): ${notAllowlisted.join(', ')}`
     : mismatched.length
       ? `verify_jwt mismatch: ${mismatched.join(', ')}`
-      : 'inventory matches manifest';
-  return { ok: notAllowlisted.length === 0 && mismatched.length === 0, reason, rows, unexpected, notAllowlisted };
+      : requireAll && missing.length
+        ? `expected function(s) missing: ${missing.join(', ')}`
+        : 'inventory matches manifest';
+  return { ok, reason, rows, unexpected, notAllowlisted, missing };
 }
 
 export function checkPartialDeployment({ requested, actual }) {

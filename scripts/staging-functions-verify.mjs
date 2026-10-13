@@ -16,9 +16,10 @@ import { checkInventory, checkSmoke, evidenceIsSanitized, redact } from './stagi
 import { ROOT, TOKEN_ENV, fetchDeployed, smokeTests, writeEvidence } from './staging-functions-deploy.mjs';
 
 export function parseVerifyArgs(argv) {
-  const out = { smokeOnly: false, evidence: path.join(ROOT, '.expo', 'staging-verify', String(Date.now())) };
+  const out = { smokeOnly: false, expect: [], evidence: path.join(ROOT, '.expo', 'staging-verify', String(Date.now())) };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--smoke-only') out.smokeOnly = true;
+    else if (argv[i] === '--expect') out.expect = String(argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
     else if (argv[i] === '--evidence-dir') out.evidence = path.resolve(String(argv[++i] ?? ''));
     else throw new Error(`unknown argument: ${argv[i]}`);
   }
@@ -30,15 +31,22 @@ export async function run(argv = process.argv.slice(2), deps = { fetchDeployed, 
   const evidence = { step: 'phase-11-13', mode: 'verify-read-only', project_ref: PROJECT_REF, started_at: new Date().toISOString(), secrets_read: false };
   try {
     if (PROJECT_REF !== 'zrutlrhhvfcsmssjiijl') throw new Error('refusing: unexpected project reference');
-    evidence.token_present = (process.env[TOKEN_ENV] ?? '').length > 0;
+    const token = process.env[TOKEN_ENV] ?? '';
+    evidence.token_present = token.length > 0;
+    const byName = new Map(FUNCTIONS.map((f) => [f.name, f]));
+    const expectedNames = args.expect.length ? args.expect : FUNCTIONS.map((f) => f.name);
+    const unknown = expectedNames.filter((n) => !byName.has(n));
+    if (unknown.length) throw new Error(`refusing: not a reviewed function: ${unknown.join(', ')}`);
+    const expectedManifest = expectedNames.map((n) => byName.get(n));
+    evidence.expected = expectedNames;
     if (!args.smokeOnly) {
       if (!evidence.token_present) throw new Error(`refusing: set ${TOKEN_ENV} in this shell only (never in a file, argv or log)`);
-      const inventory = deps.fetchDeployed();
+      const inventory = await deps.fetchDeployed(token);
       evidence.inventory = inventory;
-      const inv = checkInventory({ manifest: FUNCTIONS, actual: inventory, allowlist: REVIEWED_DEPLOYED_ALLOWLIST });
-      evidence.inventory_check = { ok: inv.ok, reason: inv.reason, rows: inv.rows, notAllowlisted: inv.notAllowlisted };
+      const inv = checkInventory({ manifest: expectedManifest, actual: inventory, allowlist: REVIEWED_DEPLOYED_ALLOWLIST, requireAll: true });
+      evidence.inventory_check = { ok: inv.ok, reason: inv.reason, rows: inv.rows, notAllowlisted: inv.notAllowlisted, missing: inv.missing };
     }
-    const smoke = await deps.smokeTests(FUNCTIONS.map((f) => f.name));
+    const smoke = await deps.smokeTests(expectedNames);
     evidence.smoke = smoke;
     const sm = checkSmoke(smoke);
     evidence.smoke_check = { ok: sm.ok, reason: sm.reason };
