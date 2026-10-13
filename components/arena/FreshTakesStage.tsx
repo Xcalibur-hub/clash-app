@@ -270,34 +270,36 @@ export function FreshTakesStage({
         </View>
       </GestureDetector>
 
-      <ArenaStackProgress index={index} total={items.length} />
-
-      {items.length > 1 && reduced ? (
-        <View style={styles.tapNav}>
+      <View style={styles.browseBar}>
+        <Text style={[styles.browseLabel, { color: t.textSecondary }]}>
+          {String(index + 1).padStart(2, '0')} <Text style={{ color: t.textMuted }}>/ {String(items.length).padStart(2, '0')}</Text>
+        </Text>
+        <View style={styles.browseControls}>
           <Pressable
-            disabled={index <= 0}
-            onPress={() => goTo(index - 1)}
             accessibilityRole="button"
             accessibilityLabel="Previous fresh take"
-            style={[styles.tapHit, { opacity: index <= 0 ? 0.35 : 1 }]}
+            accessibilityState={{ disabled: index === 0 }}
+            disabled={index === 0}
+            onPress={() => goTo(index - 1)}
+            style={[styles.browseArrow, { backgroundColor: t.surfaceElevated, opacity: index === 0 ? 0.4 : 1 }]}
           >
-            <Text allowFontScaling={false} style={[styles.tapLabel, { color: t.textSecondary }]}>
-              Previous
-            </Text>
+            <Text style={[styles.browseArrowText, { color: t.textPrimary }]}>←</Text>
           </Pressable>
           <Pressable
-            disabled={index >= items.length - 1}
-            onPress={() => goTo(index + 1)}
             accessibilityRole="button"
             accessibilityLabel="Next fresh take"
-            style={[styles.tapHit, { opacity: index >= items.length - 1 ? 0.35 : 1 }]}
+            accessibilityState={{ disabled: index === items.length - 1 }}
+            disabled={index === items.length - 1}
+            onPress={() => goTo(index + 1)}
+            style={[styles.browseArrow, { backgroundColor: t.surfaceElevated, opacity: index === items.length - 1 ? 0.4 : 1 }]}
           >
-            <Text allowFontScaling={false} style={[styles.tapLabel, { color: t.textSecondary }]}>
-              Next
-            </Text>
+            <Text style={[styles.browseArrowText, { color: t.textPrimary }]}>→</Text>
           </Pressable>
         </View>
-      ) : null}
+      </View>
+      <ArenaStackProgress index={index} total={items.length} />
+
+
     </View>
   );
 }
@@ -587,6 +589,11 @@ const styles = StyleSheet.create({
     ...typeScale.caption,
     fontSize: 11,
   },
+  browseBar: { paddingHorizontal: layout.screenX, paddingTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  browseLabel: { fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  browseControls: { flexDirection: 'row', gap: 9 },
+  browseArrow: { width: 43, height: 43, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  browseArrowText: { fontSize: 22, fontWeight: '700' },
   tapNav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
