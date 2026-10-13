@@ -478,6 +478,8 @@ export default function ArenaScreen(): React.JSX.Element {
     state.arenaStatus,
     theme.textPrimary,
     theme.textMuted,
+    theme.textSecondary,
+    theme.scheme,
     toggleReaction,
   ]);
 
