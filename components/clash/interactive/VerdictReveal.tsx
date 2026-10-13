@@ -2,7 +2,7 @@
  * Server-authoritative verdict reveal — dramatic but restrained.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -36,7 +36,13 @@ export function VerdictReveal({
   const reduced = useReducedMotion();
   const phase = useSharedValue(reduced ? 1 : 0);
   const isDraw = verdict.winnerSide === 'DRAW';
-  const tone = isDraw ? t.textPrimary : sideTone(verdict.winnerSide === 'A' ? 'A' : 'B').tone;
+  const dark = t.scheme === 'dark';
+  const tone = dark ? '#FFF4E9' : '#261D2A';
+  const winnerFill = isDraw
+    ? (dark ? '#3F394A' : '#F8DE8D')
+    : verdict.winnerSide === 'A'
+      ? (dark ? '#49365D' : '#E8D8FF')
+      : (dark ? '#61414A' : '#FFD0B8');
   const pct = verdict.jurySize > 0 ? Math.round(verdict.agreement * 100) : 0;
   const judgeWord = verdict.jurySize === 1 ? 'judgment' : 'judgments';
   const total = Math.max(1, verdict.sideAScore + verdict.sideBScore);
@@ -78,23 +84,23 @@ export function VerdictReveal({
       <Animated.View
         style={[
           styles.card,
-          { borderColor: t.border, backgroundColor: t.surfaceElevated },
+          { borderColor: 'transparent', backgroundColor: winnerFill },
           content,
         ]}
       >
         <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-          Verdict
+          THE PEOPLE HAVE SPOKEN
         </Text>
         {!isDraw ? (
           <Text allowFontScaling={false} style={[styles.sideWin, { color: tone }]}>
-            Side {verdict.winnerSide}
+            SIDE {verdict.winnerSide}
           </Text>
         ) : null}
         <Text allowFontScaling={false} style={[styles.headline, { color: tone }]}>
-          {isDraw ? 'Draw' : 'Wins'}
+          {isDraw ? 'IT’S A DRAW' : 'TAKES THE WIN.'}
         </Text>
         {!isDraw ? (
-          <Text allowFontScaling={false} style={[styles.label, { color: t.textSecondary }]}>
+          <Text allowFontScaling={false} style={[styles.label, { color: dark ? '#E7D6E3' : '#635262' }]}>
             {verdict.verdictLabel}
           </Text>
         ) : null}
@@ -106,7 +112,7 @@ export function VerdictReveal({
             style={[styles.pct, { color: tone }]}
             accessibilityLabel={`${pct} percent`}
           />
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textSecondary }]}>
+          <Text allowFontScaling={false} style={[styles.meta, { color: dark ? '#E7D6E3' : '#635262' }]}>
             {verdict.jurySize.toLocaleString('en-IN')} {judgeWord}
           </Text>
         </View>
@@ -135,13 +141,13 @@ export function VerdictReveal({
         </View>
 
         {personal ? (
-          <Text allowFontScaling={false} style={[styles.personal, { color: t.textPrimary }]}>
+          <Text allowFontScaling={false} style={[styles.personal, { color: tone }]}>
             {personal}
           </Text>
         ) : null}
 
         {reputationDelta > 0 || coinsDelta > 0 ? (
-          <Text allowFontScaling={false} style={[styles.reward, { color: t.textSecondary }]}>
+          <Text allowFontScaling={false} style={[styles.reward, { color: dark ? '#E7D6E3' : '#635262' }]}>
             {reputationDelta > 0 ? `+${reputationDelta} reputation` : ''}
             {reputationDelta > 0 && coinsDelta > 0 ? ' · ' : ''}
             {coinsDelta > 0 ? `+${coinsDelta} coins` : ''}
@@ -160,21 +166,21 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: space.sm,
-    padding: space.lg,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    padding: 24,
+    borderRadius: 28,
+    borderWidth: 0,
   },
   eyebrow: {
     ...typeScale.caption,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    fontWeight: '700',
+    fontWeight: '900',
   },
   sideWin: { ...typeScale.title, fontWeight: '600', letterSpacing: -0.3 },
-  headline: { ...typeScale.display, fontSize: 44, lineHeight: 48, fontWeight: '700', letterSpacing: -1.2 },
+  headline: { ...typeScale.display, fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }), fontSize: 39, lineHeight: 44, fontWeight: '900', letterSpacing: -1.4 },
   label: { ...typeScale.meta },
   scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm, marginTop: space.xs },
-  pct: { ...typeScale.display, fontSize: 40, fontWeight: '700', letterSpacing: -1 },
+  pct: { ...typeScale.display, fontSize: 44, fontWeight: '900', letterSpacing: -1.2 },
   meta: { ...typeScale.meta, flexShrink: 1 },
   barTrack: {
     flexDirection: 'row',
