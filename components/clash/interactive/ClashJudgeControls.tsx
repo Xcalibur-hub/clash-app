@@ -85,7 +85,7 @@ function JudgeButton({
       ]}
     >
       <Text allowFontScaling={false} style={[styles.btnLabel, { color: tone }]}>
-        {pending ? 'LOCKING…' : side === 'A' ? 'I AGREE ↗' : 'I DISAGREE ↗'}
+        {pending ? 'LOCKING…' : `VOTE SIDE ${side} ↗`}
       </Text>
       <Text allowFontScaling={false} style={[styles.btnHandle, { color: t.textMuted }]} numberOfLines={1}>
         {handle ? `@${handle}` : `VOTE SIDE ${side}`}
