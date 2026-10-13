@@ -89,16 +89,14 @@ export function adbReverseSupabase() {
   if (lines.length === 0) {
     fail('No Android device connected (adb devices). Plug in USB and enable debugging.');
   }
-  const rev = spawnSync(
-    'adb',
-    ['reverse', `tcp:${API_PORT}`, `tcp:${API_PORT}`],
-    { encoding: 'utf8', shell: true },
-  );
-  if (rev.stdout) process.stdout.write(rev.stdout);
-  if (rev.stderr) process.stderr.write(rev.stderr);
-  if (rev.status !== 0) {
-    fail(`adb reverse failed for port ${API_PORT}`);
+  for (const port of [API_PORT, 8081]) {
+    const rev = spawnSync('adb', ['reverse', `tcp:${port}`, `tcp:${port}`], {
+      encoding: 'utf8', shell: true,
+    });
+    if (rev.stdout) process.stdout.write(rev.stdout);
+    if (rev.stderr) process.stderr.write(rev.stderr);
+    if (rev.status !== 0) fail(`adb reverse failed for port ${port}`);
+    console.log(`adb reverse tcp:${port} tcp:${port} OK`);
   }
-  console.log(`adb reverse tcp:${API_PORT} tcp:${API_PORT} OK`);
-  console.log('Only the Kong API gateway port is forwarded (auth/rest/realtime/storage).');
+  console.log('Forwarded Supabase API and Metro; database/admin ports stay local.');
 }
