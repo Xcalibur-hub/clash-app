@@ -398,14 +398,26 @@ export default function TakeDetailScreen(): React.JSX.Element {
           />
 
           <View style={styles.threadHead}>
-            <View style={styles.threadTitleWrap}>
-              <Text allowFontScaling={false} style={[styles.threadTitle, { color: theme.textPrimary }]}>
-                Conversation
+            <View style={styles.threadEyebrowRow}>
+              <View style={[styles.threadAccent, { backgroundColor: theme.scheme === 'dark' ? '#C9A5EC' : '#9E73BB' }]} />
+              <Text style={[styles.threadEyebrow, { color: theme.textSecondary }]}>
+                THE DISCUSSION
               </Text>
-              <View style={[styles.threadRule, { backgroundColor: theme.borderStrong }]} />
+              <Text style={[styles.threadCount, { color: theme.textMuted }]}>
+                {comments.length} {comments.length === 1 ? 'REPLY' : 'REPLIES'}
+              </Text>
             </View>
-            <View style={styles.sortWrap}>
-              <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" compact />
+            <Text allowFontScaling style={[styles.threadTitle, { color: theme.textPrimary }]}>
+              Join the conversation<Text style={{ color: theme.scheme === 'dark' ? '#D6B9FA' : '#9968B5' }}> ↗</Text>
+            </Text>
+            <Text style={[styles.threadDescription, { color: theme.textSecondary }]}>
+              Follow the lines to see who replied to whom. Collapse branches to focus on the arguments.
+            </Text>
+            <View style={styles.threadFilters}>
+              <Text style={[styles.threadSortLabel, { color: theme.textMuted }]}>SORT BY</Text>
+              <View style={styles.sortWrap}>
+                <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" compact />
+              </View>
             </View>
           </View>
 
@@ -533,25 +545,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  threadHead: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: space.md,
-    paddingTop: space.sm,
-  },
-  threadTitleWrap: { flex: 1, gap: 8 },
+  threadHead: { gap: 9, paddingTop: space.xl, paddingBottom: space.sm },
+  threadEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  threadAccent: { width: 10, height: 10, borderRadius: 3, transform: [{ rotate: '18deg' }] },
+  threadEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
+  threadCount: { marginLeft: 'auto', fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
   threadTitle: {
-    ...typeScale.section,
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.35,
+    ...typeScale.section, fontSize: 26, lineHeight: 32, fontWeight: '900', letterSpacing: -0.8,
   },
-  threadRule: {
-    height: StyleSheet.hairlineWidth,
-    width: '100%',
-  },
-  sortWrap: { maxWidth: 148, paddingBottom: 2 },
+  threadDescription: { fontSize: 12, lineHeight: 19, fontWeight: '500' },
+  threadFilters: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 7 },
+  threadSortLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  sortWrap: { width: 148 },
   empty: {
     ...typeScale.meta,
     fontSize: 14,
