@@ -1,0 +1,56 @@
+{
+  "step": "phase-11-13",
+  "mode": "dry-run",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "started_at": "2026-10-13T06:53:24.826Z",
+  "checks": [
+    {
+      "check": "project_identity",
+      "ok": true,
+      "detail": "project identity confirmed"
+    },
+    {
+      "check": "function_allowlist",
+      "ok": true,
+      "detail": "4 approved function(s)"
+    },
+    {
+      "check": "commit_pin",
+      "ok": true,
+      "detail": "commit pinned at ea8d128d21799a9f689c5cb137a87d32cf2264de"
+    },
+    {
+      "check": "repository_inputs",
+      "ok": true,
+      "detail": "six functions present; config.toml verify_jwt matches the manifest"
+    },
+    {
+      "check": "pinned_cli",
+      "ok": true,
+      "detail": "pinned spec supabase@2.40.7 (asserted only on --execute)"
+    },
+    {
+      "check": "secret_prereqs",
+      "ok": true,
+      "detail": "plan: 0 required secret(s) for the selected set"
+    }
+  ],
+  "requested": [
+    "vault-media-access",
+    "course-lesson-media-access",
+    "creator-ai",
+    "digital-creator"
+  ],
+  "approved_set": [
+    "vault-media-access",
+    "course-lesson-media-access",
+    "creator-ai",
+    "digital-creator"
+  ],
+  "source": {
+    "commit": "ea8d128d21799a9f689c5cb137a87d32cf2264de",
+    "branch": "feat/phase-11-backend-security-7"
+  },
+  "required_secrets_for_set": [],
+  "result": "PLAN ONLY - re-run with --execute, --commit and --confirm-project after authorization"
+}
