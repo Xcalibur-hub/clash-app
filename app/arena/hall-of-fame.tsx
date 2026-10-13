@@ -1,7 +1,7 @@
 /** Arena V2 archive preview — real settled Clashes only; never invents winners. */
 import React from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchClashDiscovery } from '../../services/arenaClashDiscoveryService';
 import { fetchClashViewForTake } from '../../services/clashEngineService';
@@ -11,6 +11,7 @@ import { useThemeColors } from '../../theme';
 import { tap } from '../../utils/haptics';
 
 type ArchiveEntry = { entry: ClashDiscoveryEntry; winner: 'A' | 'B' | 'DRAW' };
+type WinnerFilter = 'ALL' | 'A' | 'B' | 'DRAW';
 export default function HallOfFame(): React.JSX.Element {
   const t = useThemeColors();
   const router = useRouter();
@@ -18,12 +19,11 @@ export default function HallOfFame(): React.JSX.Element {
   const [rows, setRows] = React.useState<ArchiveEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
-  useFocusEffect(React.useCallback(() => {
-    let active = true;
-    setLoading(true);
+  const [filter, setFilter] = React.useState<WinnerFilter>('ALL');
+  const [refreshing, setRefreshing] = React.useState(false);
+  const load = React.useCallback(async (isActive: () => boolean) => {
     setError(false);
-    void (async () => {
-      try {
+    try {
         const entries = (await fetchClashDiscovery()).filter(
           (entry) => entry.kind === 'CLASH' && entry.status === 'settled',
         ).slice(0, 12);
@@ -34,16 +34,25 @@ export default function HallOfFame(): React.JSX.Element {
             return { entry, winner: view.verdict.winnerSide };
           } catch { return null; }
         }));
-        if (active) setRows(settled.filter((row): row is ArchiveEntry => row !== null));
-      } catch { if (active) setError(true); }
-      finally { if (active) setLoading(false); }
-    })();
+        if (isActive()) setRows(settled.filter((row): row is ArchiveEntry => row !== null));
+    } catch { if (isActive()) setError(true); }
+    finally { if (isActive()) { setLoading(false); setRefreshing(false); } }
+  }, []);
+  useFocusEffect(React.useCallback(() => {
+    let active = true;
+    setLoading(true);
+    void load(() => active);
     return () => { active = false; };
-  }, []));
+  }, [load]));
+  const visibleRows = rows.filter((row) => filter === 'ALL' || row.winner === filter);
   const dark = t.scheme === 'dark';
   const ink = dark ? '#FFF7EE' : '#28202C';
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.background }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
+        setRefreshing(true);
+        void load(() => true);
+      }} tintColor={t.textPrimary} />}
       contentContainerStyle={[styles.page, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 28 }]}>
       <Pressable accessibilityRole="button" accessibilityLabel="Back to Arena"
         onPress={() => { tap(); router.back(); }} style={styles.back}>
@@ -61,6 +70,19 @@ export default function HallOfFame(): React.JSX.Element {
         A preview of your discoverable settled Clashes. A public, permanent Hall of Fame
         and official ranking criteria are not available yet.
       </Text>
+      <View style={styles.filters} accessibilityLabel="Filter archive by result">
+        {(['ALL', 'A', 'B', 'DRAW'] as WinnerFilter[]).map((choice) => (
+          <Pressable key={choice} accessibilityRole="button"
+            accessibilityLabel={choice === 'ALL' ? 'All results' : choice === 'DRAW' ? 'Draws' : `Side ${choice} wins`}
+            accessibilityState={{ selected: filter === choice }}
+            onPress={() => { tap(); setFilter(choice); }}
+            style={[styles.chip, { backgroundColor: filter === choice ? t.textPrimary : t.surfaceElevated }]}>
+            <Text style={{ color: filter === choice ? t.background : t.textSecondary, fontWeight: '800', fontSize: 12 }}>
+              {choice === 'ALL' ? 'All' : choice === 'DRAW' ? 'Draws' : `Side ${choice}`}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       {loading ? <Text style={{ color: t.textMuted }}>Loading real results…</Text> : null}
       {error ? <Text accessibilityRole="alert" style={{ color: t.textPrimary }}>
         Couldn't load results. Return to Arena and try again.
@@ -68,7 +90,10 @@ export default function HallOfFame(): React.JSX.Element {
       {!loading && !error && rows.length === 0 ? (
         <Text style={{ color: t.textMuted }}>No settled results to display yet.</Text>
       ) : null}
-      {rows.map(({ entry, winner }, index) => {
+      {!loading && !error && rows.length > 0 && visibleRows.length === 0 ? (
+        <Text style={{ color: t.textMuted }}>No results match this filter.</Text>
+      ) : null}
+      {visibleRows.map(({ entry, winner }, index) => {
         const fill = winner === 'A'
           ? (dark ? '#46365D' : '#EAD9FF')
           : winner === 'B' ? (dark ? '#63434B' : '#FFD6C0')
@@ -97,6 +122,8 @@ const styles = StyleSheet.create({
   heading: { fontSize: 46, lineHeight: 49, fontWeight: '900', letterSpacing: -2 },
   subtitle: { fontSize: 14, fontWeight: '600' },
   section: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5, marginTop: 10 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  chip: { borderRadius: 18, paddingHorizontal: 13, paddingVertical: 10 },
   card: { padding: 22, borderRadius: 24, gap: 14, minHeight: 160 },
   cardTitle: { fontSize: 24, lineHeight: 30, fontWeight: '800', letterSpacing: -0.7 },
   cardFoot: { fontSize: 12, fontWeight: '900', letterSpacing: 1 },
