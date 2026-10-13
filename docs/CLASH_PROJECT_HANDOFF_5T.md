@@ -2,9 +2,13 @@
 
 12 October 2026. **Frozen integration candidate; clash-staging remains QUARANTINED after partial migration; root cause identified; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
+## Step 6Q: fresh recovery verification (BLOCKED)
+
+[Step 6Q report](PHASE_11_STAGING_RECOVERY_VERIFY_6Q.md): read-only `investigate:zrutlrhhvfcsmssjiijl` — ledger 43 + mig-44 absent + identity/TLS PASS; **FAIL** `storage.buckets` non-empty. Cron/deps not re-probed after fail-closed stop. Quarantine retained. **No resume procedure issued.**
+
 ## Step 6P: authorized live cron pause (SUCCESS — quarantine retained)
 
-[Step 6P report](PHASE_11_STAGING_CRON_PAUSE_6P.md): `pause-cron:zrutlrhhvfcsmssjiijl` set `clash-maintenance` (`jobid=1`) **active=false** via `cron.alter_job`; quiescence `history_and_activity_clear`. Staging remains **QUARANTINED**. Resume still needs separate authorization. Do not auto-start 6Q.
+[Step 6P report](PHASE_11_STAGING_CRON_PAUSE_6P.md): `pause-cron:zrutlrhhvfcsmssjiijl` set `clash-maintenance` (`jobid=1`) **active=false** via `cron.alter_job`; quiescence `history_and_activity_clear`. Staging remains **QUARANTINED**. Superseded for recovery readiness by 6Q block on buckets.
 
 ## Step 6O.1: cron pause hardening (FILE-ONLY)
 

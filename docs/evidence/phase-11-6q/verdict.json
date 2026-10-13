@@ -1,0 +1,20 @@
+{
+  "step": "6Q",
+  "verdict": "BLOCKED",
+  "reason": "storage.buckets non-empty (buckets=true); users=false; objects=false",
+  "checks": {
+    "identity_tls_pg17": "PASS",
+    "ledger_prefix_43_hashes": "PASS",
+    "migration_44_absent": "PASS",
+    "prefix_dependencies": "NOT_REACHED",
+    "manifest_5c39f97c": "PASS_OFFLINE_PIN",
+    "artifact_44_380b693f": "PASS_OFFLINE_PIN",
+    "cron_inactive_jobid_1": "NOT_REACHED",
+    "cron_quiescent": "NOT_REACHED",
+    "no_unexpected_auth_storage_buckets": "FAIL"
+  },
+  "pgcrypto_assert_would_pass": true,
+  "staging_quarantine": "RETAINED",
+  "resume_procedure_issued": false,
+  "writes_performed": false
+}

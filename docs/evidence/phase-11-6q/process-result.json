@@ -1,0 +1,13 @@
+{
+  "operation": "investigate",
+  "authorization": "investigate:zrutlrhhvfcsmssjiijl",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "source_revision": "9ba4baf313430321f12d3b436e0aa6ca121c06c7",
+  "executable_sha256": "40edcdd9ac125528266a7e7d7994a9567a8a295229fa62a77fcc6f4d4d7262ef",
+  "connection_mode": "direct",
+  "invoked": true,
+  "exit_code": 1,
+  "elapsed_ms": 7329,
+  "stdout": "",
+  "stderr": "unexpected auth or storage data; quarantine retained"
+}

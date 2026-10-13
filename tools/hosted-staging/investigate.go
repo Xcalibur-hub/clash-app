@@ -186,12 +186,50 @@ func investigate(ctx context.Context, s Session, c Config, a Artifact) (report m
 		report["migration_44_rollback"] = "uncertain"
 	}
 
+	schemas, e := query(ctx, s, unexpectedSchemaNamesSQL)
+	if e != nil {
+		return report, e
+	}
+	report["unexpected_schema_names"] = schemas.Rows
+	if len(schemas.Rows) != 0 {
+		report["stop_condition"] = "unexpected_schemas"
+		return report, errors.New("unexpected schemas; quarantine retained")
+	}
+
+	data, e := query(ctx, s, dataSQL)
+	if e != nil {
+		return report, e
+	}
+	report["existing_data"] = data.Rows
+	if len(data.Rows) != 1 || data.Rows[0]["users"] != false || data.Rows[0]["objects"] != false || data.Rows[0]["buckets"] != false {
+		report["stop_condition"] = "unexpected_auth_or_storage"
+		return report, errors.New("unexpected auth or storage data; quarantine retained")
+	}
+
+	deps, e := query(ctx, s, resumePrefixDepsSQL)
+	if e != nil {
+		return report, e
+	}
+	report["prefix_dependencies"] = deps.Rows
+	prefixDepsOK := len(deps.Rows) == 1 && allTrueRow(deps.Rows[0])
+	report["prefix_dependencies_present"] = prefixDepsOK
+	if !prefixDepsOK {
+		report["stop_condition"] = "prefix_dependencies_missing"
+		return report, errors.New("required prefix-43 dependencies missing; quarantine retained")
+	}
+
 	cronCat, e := query(ctx, s, `select to_regclass('cron.job') is not null as cron_catalog`)
 	if e != nil {
 		return report, e
 	}
 	report["cron_catalog"] = cronCat.Rows
-	if len(cronCat.Rows) == 1 && cronCat.Rows[0]["cron_catalog"] == true {
+	if len(cronCat.Rows) != 1 || cronCat.Rows[0]["cron_catalog"] != true {
+		report["stop_condition"] = "cron_catalog_missing"
+		return report, errors.New("cron catalog missing; quarantine retained")
+	}
+	cronInactiveOK := false
+	cronJobID := ""
+	{
 		jobs, e := query(ctx, s, investigateCronSQL)
 		if e != nil {
 			return report, e
@@ -202,6 +240,62 @@ func investigate(ctx context.Context, s Session, c Config, a Artifact) (report m
 			return report, e
 		}
 		report["clash_maintenance_runs_1h"] = runs.Rows
+		if len(jobs.Rows) != 1 {
+			report["stop_condition"] = "cron_job_count_mismatch"
+			return report, errors.New("clash-maintenance job count unexpected; quarantine retained")
+		}
+		j := jobs.Rows[0]
+		cronJobID = fmt.Sprint(j["jobid"])
+		scheduleOK := fmt.Sprint(j["schedule"]) == pauseCronExpectedSchedule
+		commandOK := fmt.Sprint(j["command"]) == pauseCronExpectedCommand
+		userOK := fmt.Sprint(j["username"]) == pauseCronExpectedUsername
+		nameOK := fmt.Sprint(j["jobname"]) == pauseCronJobName
+		active := j["active"] == true
+		report["clash_maintenance_identity_ok"] = scheduleOK && commandOK && userOK && nameOK && cronJobID == "1"
+		report["clash_maintenance_active"] = active
+		if !scheduleOK || !commandOK || !userOK || !nameOK || cronJobID != "1" {
+			report["stop_condition"] = "cron_job_identity_mismatch"
+			return report, errors.New("clash-maintenance identity drift; quarantine retained")
+		}
+		if active {
+			report["stop_condition"] = "cron_still_active"
+			return report, errors.New("clash-maintenance still active; quarantine retained")
+		}
+		cronInactiveOK = true
+		hist, e := probeCronHistory(ctx, s, cronJobID)
+		if e != nil {
+			report["stop_condition"] = "cron_quiescence_incomplete"
+			return report, e
+		}
+		activeBackends, livePIDs, e := probeCronActivity(ctx, s, cronJobID)
+		if e != nil {
+			report["stop_condition"] = "cron_quiescence_incomplete"
+			return report, e
+		}
+		hist.ActiveBackends = activeBackends
+		hist.LiveJobPIDs = livePIDs
+		report["cron_quiescence_probe"] = hist
+		clear, terminal := evaluateQuiescence(hist)
+		if terminal != nil {
+			report["stop_condition"] = "cron_quiescence_ambiguous"
+			return report, terminal
+		}
+		if !clear {
+			report["stop_condition"] = "cron_execution_in_progress"
+			return report, errors.New("maintenance execution still in progress; quarantine retained")
+		}
+		report["cron_quiescence"] = "history_and_activity_clear"
+	}
+	report["cron_inactive_ready"] = cronInactiveOK
+	_ = cronJobID
+
+	report["compatibility_manifest_sha256"] = c.ArtifactHash
+	report["compatibility_manifest_expected"] = resumeRequiredManifest
+	report["compatibility_manifest_match"] = c.ArtifactHash == resumeRequiredManifest
+	if len(a.Files) > resumeStartIndex {
+		report["artifact_44_sha256"] = a.Files[resumeStartIndex].Hash
+		report["artifact_44_expected"] = resumeArtifact44Hash
+		report["artifact_44_match"] = a.Files[resumeStartIndex].Hash == resumeArtifact44Hash
 	}
 
 	if id.FailureReason != "none" && id.FailureReason != "" {
@@ -217,10 +311,33 @@ func investigate(ctx context.Context, s Session, c Config, a Artifact) (report m
 		return report, errors.New("unexpected application modifications; quarantine retained")
 	}
 	report["stop_condition"] = "none"
+	assertPass := false
+	if len(assertRow.Rows) == 1 && assertRow.Rows[0]["artifact_assert_would_pass"] == true {
+		assertPass = true
+	}
+	manifestOK := c.ArtifactHash == resumeRequiredManifest
+	artifact44OK := len(a.Files) > resumeStartIndex && a.Files[resumeStartIndex].Hash == resumeArtifact44Hash
+	quiescentOK := report["cron_quiescence"] == "history_and_activity_clear"
+	gates := map[string]any{
+		"identity":                   true,
+		"ledger_prefix_43":           true,
+		"migration_44_absent":        true,
+		"prefix_dependencies":        true,
+		"compatibility_manifest":     manifestOK,
+		"artifact_44":                artifact44OK,
+		"cron_inactive_jobid_1":      cronInactiveOK,
+		"cron_quiescent":             quiescentOK,
+		"no_unexpected_schemas":      true,
+		"no_auth_storage_data":       true,
+		"pgcrypto_assert_would_pass": assertPass,
+	}
+	report["recovery_gates"] = gates
+	ready := manifestOK && artifact44OK && cronInactiveOK && quiescentOK && assertPass
+	report["recovery_verification_ready"] = ready
 	report["failure_classification"] = map[string]any{
-		"most_likely": "artifact_pgcrypto_owner_assert_requires_supabase_admin_but_hosted_owner_is_postgres",
-		"evidence":    "offline artifact assert + live pgcrypto owner + artifact_assert_would_pass",
-		"sqlstate":    "unavailable_from_original_migrate",
+		"historical_6k_cause":                  "artifact_pgcrypto_owner_assert_required_supabase_admin_hosted_was_postgres",
+		"corrected_artifact_assert_would_pass": assertPass,
+		"sqlstate":                             "unavailable_from_original_migrate",
 	}
 	return report, nil
 }
