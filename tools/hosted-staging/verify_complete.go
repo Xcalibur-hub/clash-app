@@ -28,38 +28,6 @@ const verifyCompleteObjectsSQL = `select
   not has_function_privilege('anon','public.clash_notify(text,text,public.notification_kind,text)','execute') as h1_notify_guarded,
   (select relrowsecurity from pg_class where oid='public.reputation_events'::regclass) as reputation_rls_enabled`
 
-// verifyCompleteBucketInventory accepts exactly the media_storage bootstrap
-// buckets with the expected visibility, without imposing the recovery
-// contract's zero-row auth/storage requirement (counts are reported instead).
-func verifyCompleteBucketInventory(buckets []recoveryBucket) (map[string]string, error) {
-	classification := map[string]string{}
-	seen := map[string]bool{}
-	for _, b := range buckets {
-		expected, known := recoveryExpectedBuckets[b.ID]
-		if b.ID == "" || b.ID == "<nil>" || b.Name != b.ID {
-			classification[b.ID] = "malformed"
-			return classification, errors.New("storage bucket identity malformed; drift detected")
-		}
-		if !known {
-			classification[b.ID] = "unexpected"
-			return classification, errors.New("unexpected storage bucket; drift detected")
-		}
-		if b.Public != expected {
-			classification[b.ID] = "unexpected_public_flag"
-			return classification, errors.New("storage bucket visibility mismatch; drift detected")
-		}
-		classification[b.ID] = "expected"
-		seen[b.ID] = true
-	}
-	for id := range recoveryExpectedBuckets {
-		if !seen[id] {
-			classification[id] = "missing"
-			return classification, errors.New("expected storage bucket missing; drift detected")
-		}
-	}
-	return classification, nil
-}
-
 func verifyComplete(ctx context.Context, s Session, c Config, a Artifact) (report map[string]any, err error) {
 	report = map[string]any{
 		"mode": "verify-complete", "project_ref": c.ProjectRef, "candidate": seal,
