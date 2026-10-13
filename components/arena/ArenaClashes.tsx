@@ -72,6 +72,19 @@ export function ArenaClashes({
       <Text style={[styles.sub, { color: t.textSecondary }]}>
         Follow upcoming duels and revisit completed Clashes.
       </Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Open Hall of Fame archive"
+        style={[styles.hallEntry, { backgroundColor: t.scheme === 'dark' ? '#49375D' : '#E9D8FF' }]}
+        onPress={() => { hapticPress(); router.push('/arena/hall-of-fame'); }}>
+        <Text style={[styles.hallEyebrow, { color: t.scheme === 'dark' ? '#EADDF5' : '#625073' }]}>
+          THE ARENA ARCHIVE  ↗
+        </Text>
+        <Text style={[styles.hallTitle, { color: t.scheme === 'dark' ? '#FFF7EE' : '#28202C' }]}>
+          Hall of Fame ✳
+        </Text>
+        <Text style={[styles.hallSub, { color: t.scheme === 'dark' ? '#EADDF5' : '#625073' }]}>
+          Revisit real settled Clashes
+        </Text>
+      </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Open Challenge Inbox"
         style={[styles.row,{borderColor:t.border}]} onPress={()=>{hapticPress();router.push('/arena/challenges');}}>
         <Text style={[styles.enter,{color:t.textPrimary}]}>CHALLENGE INBOX</Text>
@@ -194,6 +207,10 @@ function ClashRow({
 }
 
 const styles = StyleSheet.create({
+  hallEntry: { borderRadius: 24, padding: 20, gap: 8, marginVertical: 8 },
+  hallEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.1 },
+  hallTitle: { fontSize: 27, lineHeight: 32, fontWeight: '900', letterSpacing: -0.8 },
+  hallSub: { fontSize: 13, fontWeight: '600' },
   wrap: {
     paddingHorizontal: layout.screenX,
     paddingTop: space.md,
