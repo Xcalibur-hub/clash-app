@@ -8,8 +8,9 @@ import { test } from 'node:test';
 import { AUTHENTICATED_PLAN, STAGING_HOST } from './staging-function-e2e.mjs';
 import { ids } from './staging-fixtures.mjs';
 import {
-  CHECK_ORDER, authenticatedGate, runAuthenticatedSuite, scanForMarkers, signIn,
+  CHECK_ORDER, SUITE_CLAIMS, authenticatedGate, runAuthenticatedSuite, scanForMarkers, signIn,
 } from './staging-function-e2e-authenticated.mjs';
+import { redactForEvidence } from './staging-host.mjs';
 
 const PREFIX = 'p11f_abcd1234';
 const M = ids(PREFIX);
@@ -171,4 +172,57 @@ test('scanForMarkers flags secrets and stack frames but not ordinary errors', ()
   for (const bad of ['sbp_abcdefghijklmnop', 'service_role', 'at Object.handler', 'Deno.env.get']) {
     assert.equal(scanForMarkers(`{"x":"${bad}"}`).ok, false, bad);
   }
+});
+
+// ── Step 16A.1 finding 8: no credential or signed URL can reach evidence or the console ────
+test('the redactor removes signed URLs, tokens, JWTs, keys and fixture emails', () => {
+  const signed = `${BASE}/storage/v1/object/sign/private-media/${M.storagePath}?token=abc123def456`;
+  const cases = [
+    [signed, 'abc123def456'],
+    [`Bearer ${'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0.sig'}`, 'eyJhbGciOiJIUzI1NiJ9'],
+    ['sbp_abcdefghijklmnopqrst', 'sbp_abcdefghijklmnopqrst'],
+    [M.accountA.email, M.accountA.email],
+    [M.accountA.uid, M.accountA.uid],
+  ];
+  for (const [input, secret] of cases) {
+    const out = redactForEvidence(input);
+    assert.equal(out.includes(secret), false, `redaction left: ${secret}`);
+    assert.match(out, /redacted/);
+  }
+  assert.equal(redactForEvidence('{"error":"forbidden"}'), '{"error":"forbidden"}', 'ordinary bodies pass through');
+});
+
+test('a suite run cannot leak a signed URL, a token or an account email into its output', async () => {
+  const signed = `${BASE}/storage/v1/object/sign/private-media/${M.storagePath}?token=leaky-token-value`;
+  // Sabotage makes the DENIAL body carry the sensitive strings, and the detail quotes that body.
+  const { fetchImpl } = mockApi({
+    sabotage: ({ path, token }) => (path.endsWith('vault-media-access') && token === TOK.b
+      ? [403, { error: 'forbidden', debug_url: signed, debug_email: M.accountA.email, debug_key: 'sbp_abcdefghijklmnop' }]
+      : null),
+  });
+  const lines = [];
+  const run = await runAuthenticatedSuite({ fetchImpl, env: fullEnv(), manifest, log: (l) => lines.push(l) });
+  assert.equal(run.stopped, false);
+  const serialized = JSON.stringify(run);
+  for (const secret of ['leaky-token-value', 'sbp_abcdefghijklmnop', M.accountA.email, '/storage/v1/object/sign/']) {
+    assert.equal(serialized.includes(secret), false, `the result leaked ${secret}`);
+    assert.equal(lines.join('\n').includes(secret), false, `the console log leaked ${secret}`);
+  }
+  assert.match(lines.join('\n'), /redacted-(signed-url|email|pat)/);
+  assert.equal(run.results.some((r) => r.redacted === true), true, 'the redaction is recorded, not silent');
+  // And the client-visible response bodies are still clean, so the check itself still fails closed.
+  assert.equal(run.results.find((r) => r.id === 'vault.unauthorized_media').ok, false);
+  assert.equal(run.results.find((r) => r.id === 'response_sanitization').ok, false);
+});
+
+test('the suite states its claim as signing-only, not byte retrieval', () => {
+  assert.match(SUITE_CLAIMS.media, /signed-URL contract only/);
+  assert.match(SUITE_CLAIMS.media, /NOT byte retrieval/);
+  assert.match(SUITE_CLAIMS.cleanup, /writes nothing/);
+  // The media checks assert the URL contract only: no byte-fetching endpoint is ever called.
+  return runAuthenticatedSuite({ fetchImpl: mockApi().fetchImpl, env: fullEnv(), manifest }).then((run) => {
+    const paths = run.results.map((r) => r.detail).join(' ');
+    assert.equal(/bytes?=|object\/public|download/.test(paths), false);
+    assert.equal(run.results.find((r) => r.id === 'vault.entitled_media').ok, true);
+  });
 });

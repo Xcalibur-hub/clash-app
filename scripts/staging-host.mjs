@@ -22,3 +22,27 @@ export function buildFunctionUrl(name, host = STAGING_HOST) {
   assertStagingTarget(`https://${host}`);
   return `https://${host}${FUNCTIONS_V1}${name}`;
 }
+
+/**
+ * Evidence redaction (Step 16A.1). Every string this toolkit writes to a console or an evidence
+ * file passes through here, so a signed URL, a JWT, a personal access token, a bearer token or a
+ * fixture email can never be preserved by accident. `secrets` adds any caller-known secret values.
+ */
+export const EVIDENCE_REDACTION_PATTERNS = [
+  [/https?:\/\/[^\s"']*\/storage\/v1\/object\/sign\/[^\s"']*/g, '[redacted-signed-url]'],
+  [/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+/g, '[redacted-jwt]'],
+  [/sbp_[A-Za-z0-9]{10,}/g, '[redacted-pat]'],
+  [/eyJ[A-Za-z0-9_-]{30,}/g, '[redacted-key]'],
+  [/([?&]token=)[^&\s"']+/g, '$1[redacted]'],
+  [/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[redacted-email]'],
+  [/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '[redacted-uuid]'],
+];
+
+export function redactForEvidence(text, secrets = []) {
+  let out = String(text ?? '');
+  for (const secret of secrets) {
+    if (secret && String(secret).length >= 6) out = out.split(String(secret)).join('[redacted]');
+  }
+  for (const [pattern, replacement] of EVIDENCE_REDACTION_PATTERNS) out = out.replace(pattern, replacement);
+  return out;
+}

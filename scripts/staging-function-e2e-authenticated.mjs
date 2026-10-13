@@ -11,7 +11,7 @@
  * HTTP and credential sources are injected (`fetchImpl`, `env`) so the whole suite runs
  * offline against mocks, in both the success and the failure direction.
  */
-import { STAGING_HOST, buildFunctionUrl } from './staging-host.mjs';
+import { STAGING_HOST, buildFunctionUrl, redactForEvidence } from './staging-host.mjs';
 
 const REF = STAGING_HOST.split('.')[0];
 export const EXECUTE_AUTHORIZATION = `fixture-execute:${REF}`;
@@ -252,6 +252,15 @@ export const CHECKS = {
 export const CHECK_ORDER = Object.keys(CHECKS);
 
 /**
+ * What this suite proves, stated so the evidence cannot overclaim (Step 16A.1, finding 5).
+ * No object bytes are uploaded by the fixtures, so byte retrieval is explicitly out of scope.
+ */
+export const SUITE_CLAIMS = {
+  media: 'signed-URL contract only (bucket, kind, expiresIn=120, entitlement gate); NOT byte retrieval',
+  cleanup: 'every probe is a read or a rejected call; the suite itself writes nothing',
+};
+
+/**
  * Runs all eleven checks. `fetchImpl` and `env` are injected so the suite is fully
  * exercisable offline; this function performs no writes of any kind.
  */
@@ -286,8 +295,9 @@ export async function runAuthenticatedSuite({ fetchImpl, env = process.env, mani
     } catch (e) {
       outcome = { ok: false, detail: `threw: ${String(e?.message ?? e).slice(0, 160)}` };
     }
-    log(`${outcome.ok ? 'PASS' : 'FAIL'} ${id} — ${outcome.detail}`);
-    results.push({ id, ok: outcome.ok, detail: outcome.detail, responses: ctx.caught.length });
+    const detail = redactForEvidence(outcome.detail);
+    log(`${outcome.ok ? 'PASS' : 'FAIL'} ${id} — ${detail}`);
+    results.push({ id, ok: outcome.ok, detail, redacted: detail !== outcome.detail, responses: ctx.caught.length });
   }
   const failed = results.filter((r) => !r.ok).length;
   return { stopped: false, results, failed, passed: results.length - failed, total: results.length };

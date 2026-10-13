@@ -11,7 +11,7 @@
  * The harness refuses any host that is not exactly the staging Edge Function host.
  */
 import { createHmac } from 'node:crypto';
-import { FUNCTIONS_V1, STAGING_HOST, assertStagingTarget, buildFunctionUrl } from './staging-host.mjs';
+import { FUNCTIONS_V1, STAGING_HOST, assertStagingTarget, buildFunctionUrl, redactForEvidence } from './staging-host.mjs';
 
 // Re-exported so existing callers and tests keep their single import site.
 export { FUNCTIONS_V1, STAGING_HOST, assertStagingTarget, buildFunctionUrl };
@@ -208,13 +208,14 @@ if (invokedDirectly()) {
       evidence.note = 'every probe is rejected before any function code runs; no fixture, user, upload or database write';
     }
     fs.mkdirSync(args.evidence, { recursive: true });
-    fs.writeFileSync(path.join(args.evidence, 'e2e-evidence.json'), JSON.stringify(evidence, null, 2) + '\n', { mode: 0o600 });
-    console.log(JSON.stringify(evidence, null, 2));
+    const safe = redactForEvidence(JSON.stringify(evidence, null, 2));
+    fs.writeFileSync(path.join(args.evidence, 'e2e-evidence.json'), safe + '\n', { mode: 0o600 });
+    console.log(safe);
     process.exit(['PASS', 'PLAN ONLY'].includes(evidence.result) ? 0 : 1);
   } catch (e) {
     evidence.result = 'STOPPED';
-    evidence.reason = String(e?.message ?? e);
-    console.log(JSON.stringify(evidence, null, 2));
+    evidence.reason = redactForEvidence(String(e?.message ?? e));
+    console.log(redactForEvidence(JSON.stringify(evidence, null, 2)));
     process.exit(2);
   }
 }
