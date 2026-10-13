@@ -2,9 +2,13 @@
 
 12 October 2026. **Frozen integration candidate; clash-staging remains QUARANTINED after partial migration; root cause identified; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
-## Step 6Q: fresh recovery verification (BLOCKED)
+## Comprehensive audit (recovery READY for authorized resume)
 
-[Step 6Q report](PHASE_11_STAGING_RECOVERY_VERIFY_6Q.md): read-only `investigate:zrutlrhhvfcsmssjiijl` — ledger 43 + mig-44 absent + identity/TLS PASS; **FAIL** `storage.buckets` non-empty. Cron/deps not re-probed after fail-closed stop. Quarantine retained. **No resume procedure issued.**
+[Comprehensive audit](PHASE_11_COMPREHENSIVE_BACKEND_AUDIT.md): bucket “failure” was a **false P0** — after migration 43, exactly `public-media`+`private-media` are expected. Recovery storage gate + collect-all investigate fixed offline. Fresh hosted investigate: **all recovery gates PASS**. Local 1→106 and 43→106 sims PASS (stubbed platform). Staging remains **QUARANTINED**. Next: separately authorize **`resume:zrutlrhhvfcsmssjiijl`** only.
+
+## Step 6Q: fresh recovery verification (superseded)
+
+[Step 6Q report](PHASE_11_STAGING_RECOVERY_VERIFY_6Q.md): initially BLOCKED on buckets; explained and corrected in comprehensive audit.
 
 ## Step 6P: authorized live cron pause (SUCCESS — quarantine retained)
 

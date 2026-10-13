@@ -186,24 +186,43 @@ func investigate(ctx context.Context, s Session, c Config, a Artifact) (report m
 		report["migration_44_rollback"] = "uncertain"
 	}
 
+	// Collect-all read-only probes: record every independent gate, then fail closed once.
+	var stopReasons []string
+	note := func(cond, msg string) {
+		stopReasons = append(stopReasons, cond+": "+msg)
+	}
+
 	schemas, e := query(ctx, s, unexpectedSchemaNamesSQL)
 	if e != nil {
 		return report, e
 	}
 	report["unexpected_schema_names"] = schemas.Rows
-	if len(schemas.Rows) != 0 {
-		report["stop_condition"] = "unexpected_schemas"
-		return report, errors.New("unexpected schemas; quarantine retained")
+	schemasOK := len(schemas.Rows) == 0
+	if !schemasOK {
+		note("unexpected_schemas", "unexpected schemas; quarantine retained")
 	}
 
+	// Legacy empty-DB boolean retained for comparison with migrate preflight.
 	data, e := query(ctx, s, dataSQL)
 	if e != nil {
 		return report, e
 	}
-	report["existing_data"] = data.Rows
-	if len(data.Rows) != 1 || data.Rows[0]["users"] != false || data.Rows[0]["objects"] != false || data.Rows[0]["buckets"] != false {
-		report["stop_condition"] = "unexpected_auth_or_storage"
-		return report, errors.New("unexpected auth or storage data; quarantine retained")
+	report["existing_data_empty_db_gate"] = data.Rows
+
+	buckets, userCount, objectCount, bucketCount, e := probeRecoveryStorage(ctx, s)
+	if e != nil {
+		note("storage_probe", e.Error())
+	} else {
+		report["storage_buckets"] = buckets
+		report["auth_user_count"] = userCount
+		report["storage_object_count"] = objectCount
+		report["storage_bucket_count"] = bucketCount
+		class, ve := validateRecoveryStorageState(buckets, userCount, objectCount)
+		report["storage_bucket_classification"] = class
+		report["recovery_storage_ok"] = ve == nil
+		if ve != nil {
+			note("recovery_storage", ve.Error())
+		}
 	}
 
 	deps, e := query(ctx, s, resumePrefixDepsSQL)
@@ -214,22 +233,20 @@ func investigate(ctx context.Context, s Session, c Config, a Artifact) (report m
 	prefixDepsOK := len(deps.Rows) == 1 && allTrueRow(deps.Rows[0])
 	report["prefix_dependencies_present"] = prefixDepsOK
 	if !prefixDepsOK {
-		report["stop_condition"] = "prefix_dependencies_missing"
-		return report, errors.New("required prefix-43 dependencies missing; quarantine retained")
+		note("prefix_dependencies_missing", "required prefix-43 dependencies missing; quarantine retained")
 	}
 
+	cronInactiveOK := false
+	quiescentOK := false
+	cronIdentityOK := false
 	cronCat, e := query(ctx, s, `select to_regclass('cron.job') is not null as cron_catalog`)
 	if e != nil {
 		return report, e
 	}
 	report["cron_catalog"] = cronCat.Rows
 	if len(cronCat.Rows) != 1 || cronCat.Rows[0]["cron_catalog"] != true {
-		report["stop_condition"] = "cron_catalog_missing"
-		return report, errors.New("cron catalog missing; quarantine retained")
-	}
-	cronInactiveOK := false
-	cronJobID := ""
-	{
+		note("cron_catalog_missing", "cron catalog missing; quarantine retained")
+	} else {
 		jobs, e := query(ctx, s, investigateCronSQL)
 		if e != nil {
 			return report, e
@@ -241,53 +258,51 @@ func investigate(ctx context.Context, s Session, c Config, a Artifact) (report m
 		}
 		report["clash_maintenance_runs_1h"] = runs.Rows
 		if len(jobs.Rows) != 1 {
-			report["stop_condition"] = "cron_job_count_mismatch"
-			return report, errors.New("clash-maintenance job count unexpected; quarantine retained")
+			note("cron_job_count_mismatch", "clash-maintenance job count unexpected; quarantine retained")
+		} else {
+			j := jobs.Rows[0]
+			cronJobID := fmt.Sprint(j["jobid"])
+			scheduleOK := fmt.Sprint(j["schedule"]) == pauseCronExpectedSchedule
+			commandOK := fmt.Sprint(j["command"]) == pauseCronExpectedCommand
+			userOK := fmt.Sprint(j["username"]) == pauseCronExpectedUsername
+			nameOK := fmt.Sprint(j["jobname"]) == pauseCronJobName
+			active := j["active"] == true
+			cronIdentityOK = scheduleOK && commandOK && userOK && nameOK && cronJobID == "1"
+			report["clash_maintenance_identity_ok"] = cronIdentityOK
+			report["clash_maintenance_active"] = active
+			if !cronIdentityOK {
+				note("cron_job_identity_mismatch", "clash-maintenance identity drift; quarantine retained")
+			}
+			if active {
+				note("cron_still_active", "clash-maintenance still active; quarantine retained")
+			} else if cronIdentityOK {
+				cronInactiveOK = true
+				hist, e := probeCronHistory(ctx, s, cronJobID)
+				if e != nil {
+					note("cron_quiescence_incomplete", e.Error())
+				} else {
+					activeBackends, livePIDs, e := probeCronActivity(ctx, s, cronJobID)
+					if e != nil {
+						note("cron_quiescence_incomplete", e.Error())
+					} else {
+						hist.ActiveBackends = activeBackends
+						hist.LiveJobPIDs = livePIDs
+						report["cron_quiescence_probe"] = hist
+						clear, terminal := evaluateQuiescence(hist)
+						if terminal != nil {
+							note("cron_quiescence_ambiguous", terminal.Error())
+						} else if !clear {
+							note("cron_execution_in_progress", "maintenance execution still in progress; quarantine retained")
+						} else {
+							quiescentOK = true
+							report["cron_quiescence"] = "history_and_activity_clear"
+						}
+					}
+				}
+			}
 		}
-		j := jobs.Rows[0]
-		cronJobID = fmt.Sprint(j["jobid"])
-		scheduleOK := fmt.Sprint(j["schedule"]) == pauseCronExpectedSchedule
-		commandOK := fmt.Sprint(j["command"]) == pauseCronExpectedCommand
-		userOK := fmt.Sprint(j["username"]) == pauseCronExpectedUsername
-		nameOK := fmt.Sprint(j["jobname"]) == pauseCronJobName
-		active := j["active"] == true
-		report["clash_maintenance_identity_ok"] = scheduleOK && commandOK && userOK && nameOK && cronJobID == "1"
-		report["clash_maintenance_active"] = active
-		if !scheduleOK || !commandOK || !userOK || !nameOK || cronJobID != "1" {
-			report["stop_condition"] = "cron_job_identity_mismatch"
-			return report, errors.New("clash-maintenance identity drift; quarantine retained")
-		}
-		if active {
-			report["stop_condition"] = "cron_still_active"
-			return report, errors.New("clash-maintenance still active; quarantine retained")
-		}
-		cronInactiveOK = true
-		hist, e := probeCronHistory(ctx, s, cronJobID)
-		if e != nil {
-			report["stop_condition"] = "cron_quiescence_incomplete"
-			return report, e
-		}
-		activeBackends, livePIDs, e := probeCronActivity(ctx, s, cronJobID)
-		if e != nil {
-			report["stop_condition"] = "cron_quiescence_incomplete"
-			return report, e
-		}
-		hist.ActiveBackends = activeBackends
-		hist.LiveJobPIDs = livePIDs
-		report["cron_quiescence_probe"] = hist
-		clear, terminal := evaluateQuiescence(hist)
-		if terminal != nil {
-			report["stop_condition"] = "cron_quiescence_ambiguous"
-			return report, terminal
-		}
-		if !clear {
-			report["stop_condition"] = "cron_execution_in_progress"
-			return report, errors.New("maintenance execution still in progress; quarantine retained")
-		}
-		report["cron_quiescence"] = "history_and_activity_clear"
 	}
 	report["cron_inactive_ready"] = cronInactiveOK
-	_ = cronJobID
 
 	report["compatibility_manifest_sha256"] = c.ArtifactHash
 	report["compatibility_manifest_expected"] = resumeRequiredManifest
@@ -302,43 +317,47 @@ func investigate(ctx context.Context, s Session, c Config, a Artifact) (report m
 		return report, errors.New("target identity differs; stop")
 	}
 	if !prefixOK || unexpected || hasFailed {
-		report["stop_condition"] = "ledger_prefix_mismatch_or_unexpected"
-		// Still return report for evidence; caller treats as investigation complete with quarantine retained.
-		return report, errors.New("ledger data differs from expected committed prefix; quarantine retained")
+		note("ledger_prefix_mismatch_or_unexpected", "ledger data differs from expected committed prefix; quarantine retained")
 	}
 	if anyMig44 {
-		report["stop_condition"] = "unexpected_migration_44_objects"
-		return report, errors.New("unexpected application modifications; quarantine retained")
+		note("unexpected_migration_44_objects", "unexpected application modifications; quarantine retained")
 	}
-	report["stop_condition"] = "none"
+
 	assertPass := false
 	if len(assertRow.Rows) == 1 && assertRow.Rows[0]["artifact_assert_would_pass"] == true {
 		assertPass = true
 	}
 	manifestOK := c.ArtifactHash == resumeRequiredManifest
 	artifact44OK := len(a.Files) > resumeStartIndex && a.Files[resumeStartIndex].Hash == resumeArtifact44Hash
-	quiescentOK := report["cron_quiescence"] == "history_and_activity_clear"
+	storageOK, _ := report["recovery_storage_ok"].(bool)
 	gates := map[string]any{
 		"identity":                   true,
-		"ledger_prefix_43":           true,
-		"migration_44_absent":        true,
-		"prefix_dependencies":        true,
+		"ledger_prefix_43":           prefixOK && !hasFailed && !unexpected && len(l) == investigatePrefixCount,
+		"migration_44_absent":        !anyMig44 && !hasFailed,
+		"prefix_dependencies":        prefixDepsOK,
 		"compatibility_manifest":     manifestOK,
 		"artifact_44":                artifact44OK,
 		"cron_inactive_jobid_1":      cronInactiveOK,
 		"cron_quiescent":             quiescentOK,
-		"no_unexpected_schemas":      true,
-		"no_auth_storage_data":       true,
+		"no_unexpected_schemas":      schemasOK,
+		"recovery_storage_expected":  storageOK,
 		"pgcrypto_assert_would_pass": assertPass,
 	}
 	report["recovery_gates"] = gates
-	ready := manifestOK && artifact44OK && cronInactiveOK && quiescentOK && assertPass
+	ready := prefixOK && !hasFailed && !unexpected && !anyMig44 && prefixDepsOK && schemasOK && storageOK &&
+		manifestOK && artifact44OK && cronInactiveOK && quiescentOK && assertPass
 	report["recovery_verification_ready"] = ready
 	report["failure_classification"] = map[string]any{
 		"historical_6k_cause":                  "artifact_pgcrypto_owner_assert_required_supabase_admin_hosted_was_postgres",
 		"corrected_artifact_assert_would_pass": assertPass,
 		"sqlstate":                             "unavailable_from_original_migrate",
 	}
+	if len(stopReasons) > 0 {
+		report["stop_condition"] = stopReasons[0]
+		report["all_stop_conditions"] = stopReasons
+		return report, errors.New(stopReasons[0])
+	}
+	report["stop_condition"] = "none"
 	return report, nil
 }
 

@@ -5,11 +5,11 @@
 **Worktree:** `C:/p116q`, branch `feat/phase-11-recovery-verify-6q`.  
 **Authorization:** `investigate:zrutlrhhvfcsmssjiijl`.
 
-## Verdict: BLOCKED
+## Verdict: BLOCKED (historical) → superseded
 
-Fresh investigate **stopped fail-closed** on storage drift: `storage.buckets` has at least one row (`buckets=true`), while `auth.users` and `storage.objects` remain empty. Prior 6I/6K preflights recorded `buckets=false`.  
+This step’s first investigate **stopped** on `buckets=true`. That gate was later shown to be a **false P0**: migration `media_storage` (within the first 43) creates exactly `public-media` and `private-media`. See [comprehensive audit](PHASE_11_COMPREHENSIVE_BACKEND_AUDIT.md) for the corrected recovery storage contract and a fresh investigate with **all gates PASS**.
 
-Staging remains **QUARANTINED**. **Resume is not authorized.** No one-time resume procedure is issued from this step.
+Staging remains **QUARANTINED**. Resume still requires **separate** authorization (`resume:zrutlrhhvfcsmssjiijl`).
 
 | # | Check | Result |
 |---|---|---|

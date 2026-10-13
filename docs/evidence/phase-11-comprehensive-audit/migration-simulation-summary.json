@@ -1,0 +1,19 @@
+{
+  "postgres_image": "postgis/postgis:17-3.5",
+  "full_1_to_106": "SUCCESS",
+  "resume_43_to_106": "SUCCESS",
+  "artifact_44_applied": true,
+  "expected_buckets_after_43": ["private-media", "public-media"],
+  "platform_stubs_required": [
+    "auth.uid/role/jwt",
+    "storage.buckets/objects",
+    "realtime.messages with extension column",
+    "realtime.send/topic",
+    "supabase_realtime publication",
+    "postgis in extensions",
+    "pgcrypto in extensions"
+  ],
+  "not_identical_to_hosted_supabase": true,
+  "pg_cron_local": false,
+  "hosted_cron_verified_separately": true
+}

@@ -228,6 +228,13 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 			live = 0
 		}
 		return Result{Rows: []map[string]any{{"active_backends": active, "live_job_pids": live}}}, nil
+	case recoveryBucketInventorySQL:
+		return Result{Rows: []map[string]any{
+			{"id": "private-media", "name": "private-media", "public": false, "file_size_limit": int64(104857600), "allowed_mime_types": "{image/jpeg}", "created_at": "2026-01-01"},
+			{"id": "public-media", "name": "public-media", "public": true, "file_size_limit": int64(104857600), "allowed_mime_types": "{image/jpeg}", "created_at": "2026-01-01"},
+		}}, nil
+	case recoveryAuthStorageCountsSQL:
+		return Result{Rows: []map[string]any{{"user_count": 0, "object_count": 0, "bucket_count": 2}}}, nil
 	}
 	if q == managedSQL {
 		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true, "cron_preloaded": true, "cron_catalog": true}}}, nil

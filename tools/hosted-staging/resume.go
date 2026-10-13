@@ -157,13 +157,20 @@ func resumePreflight(ctx context.Context, s Session, c Config, a Artifact) (repo
 	if len(schemas.Rows) != 0 {
 		return report, errors.New("unexpected schemas; quarantine retained")
 	}
-	data, e := query(ctx, s, dataSQL)
+	// Empty-DB migrate still requires zero buckets. Resume after prefix-43 expects
+	// exactly the media_storage bootstrap buckets with zero users/objects.
+	buckets, userCount, objectCount, bucketCount, e := probeRecoveryStorage(ctx, s)
 	if e != nil {
 		return report, e
 	}
-	report["existing_data"] = data.Rows
-	if len(data.Rows) != 1 || data.Rows[0]["users"] != false || data.Rows[0]["objects"] != false || data.Rows[0]["buckets"] != false {
-		return report, errors.New("unexpected auth or storage data; quarantine retained")
+	report["storage_buckets"] = buckets
+	report["auth_user_count"] = userCount
+	report["storage_object_count"] = objectCount
+	report["storage_bucket_count"] = bucketCount
+	class, e := validateRecoveryStorageState(buckets, userCount, objectCount)
+	report["storage_bucket_classification"] = class
+	if e != nil {
+		return report, e
 	}
 	deps, e := query(ctx, s, resumePrefixDepsSQL)
 	if e != nil {
