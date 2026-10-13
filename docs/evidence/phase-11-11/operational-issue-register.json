@@ -1,0 +1,15 @@
+{
+  "step": "phase-11-11",
+  "register": [
+    { "id": "OPS-1", "sev": "P1", "area": "Auth", "status": "BLOCKED — evidence required (no credential)", "change": "confirmed no approved Management API credential exists; exact Dashboard checklist produced", "evidence": "management-api-availability.json, dashboard-evidence-checklist.md", "next": "operator completes the Auth sections of the checklist" },
+    { "id": "OPS-2", "sev": "P1", "area": "Edge Functions", "status": "BLOCKED — evidence required (no credential)", "change": "repository inventory pinned to 6 functions with intended verify_jwt policy and in-code auth; deployment diff impossible without the function list", "evidence": "repository-function-inventory.json, dashboard-evidence-checklist.md §3", "next": "operator completes the Edge Functions section" },
+    { "id": "OPS-3", "sev": "P1", "area": "Cron", "status": "CLOSED (procedure) — execution unauthorized", "change": "unchanged from Step 10; four-layer runbook stands", "evidence": "PHASE_11_STAGING_OPERATIONAL_CLOSURE_STEP_10.md Part C" },
+    { "id": "OPS-4", "sev": "P2", "area": "Maintenance concurrency", "status": "CLOSED", "change": "unchanged from Step 10 (overlap rejected; exactly-once; 3x deterministic)", "evidence": "phase-11-10/local-maintenance-concurrency.tap.log" },
+    { "id": "OPS-5", "sev": "P2", "area": "Local harness", "status": "CLOSED", "change": "unchanged", "evidence": "scripts/local-pgtap-staging.mjs" },
+    { "id": "OPS-6", "sev": "P2", "area": "Observability", "status": "SPEC DEFINED, NOT CONFIGURED", "change": "unchanged from Step 10", "evidence": "PHASE_11_STAGING_OPERATIONAL_CLOSURE_STEP_10.md Part E.1" },
+    { "id": "OPS-7", "sev": "P2", "area": "Rollback / incident", "status": "PARTIALLY CLOSED", "change": "unchanged; restore must target a database named `postgres` (pg_cron pin)", "evidence": "phase-11-10/local-restore-rehearsal.log" },
+    { "id": "OPS-8", "sev": "P3", "area": "Contracts", "status": "BY DESIGN (asserted)", "change": "unchanged", "evidence": "phase-11-9/local-functional-smoke.json" },
+    { "id": "OPS-9", "sev": "P3", "area": "Realtime publication", "status": "PARTIAL — DB-side verified", "change": "hosted publication existence re-verified read-only; table set known from local parity; delivery unconfirmed", "evidence": "hosted-db-inventory.json (managed.publication=true)" },
+    { "id": "OPS-10", "sev": "P3", "area": "Staging isolation", "status": "BLOCKED — evidence required (no credential)", "change": "repository isolation policy re-confirmed; organization/plan separation needs Dashboard metadata", "evidence": "dashboard-evidence-checklist.md §6" }
+  ]
+}

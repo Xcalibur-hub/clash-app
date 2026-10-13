@@ -1,0 +1,14 @@
+{
+  "step": "phase-11-11",
+  "source": "repository only (supabase/config.toml + supabase/functions) — this is NOT hosted deployment configuration",
+  "expected_function_count": 6,
+  "expected_functions": [
+    { "name": "vault-media-access", "verify_jwt": true, "files": ["index.ts"], "auth": "requires an Authorization header and verifies it via asCaller.auth.getUser(); returns 401 otherwise; signs the storage object server-side so the service key never leaves the runtime" },
+    { "name": "course-lesson-media-access", "verify_jwt": true, "files": ["index.ts"], "auth": "same JWT -> entitlement -> service-sign pattern with an explicit 401 path" },
+    { "name": "creator-ai", "verify_jwt": true, "files": ["index.ts", "instructions.ts", "provider.ts"], "auth": "authenticated; provider credentials live only in the function environment" },
+    { "name": "digital-creator", "verify_jwt": true, "files": ["index.ts", "provider.ts"], "auth": "authenticated; renders only an already-authorized Creator AI reply" },
+    { "name": "arena-editorial", "verify_jwt": false, "files": ["adapters.ts", "core.ts", "index.ts", "provider.ts", "worker.ts"], "auth": "server-only worker; mandatory x-editorial-secret header compared in code, 401 on mismatch" },
+    { "name": "arena-gifs", "verify_jwt": true, "files": ["handler.ts", "index.ts"], "auth": "authenticated GIF proxy; TENOR_API_KEY stays server-side" }
+  ],
+  "hosted_status": "UNVERIFIED — deployment list, versions and per-function JWT enforcement cannot be read without Management API access"
+}
