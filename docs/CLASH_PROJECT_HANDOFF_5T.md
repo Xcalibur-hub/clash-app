@@ -2,9 +2,13 @@
 
 12 October 2026. **Frozen integration candidate; clash-staging remains QUARANTINED after partial migration; root cause identified; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
+## Step 6N: safe resume executor (FILE-ONLY)
+
+[Step 6N resume readiness](PHASE_11_STAGING_RESUME_READINESS_6N.md): dedicated **`resume:zrutlrhhvfcsmssjiijl`** mode with recovery preflight (exact 43-hash prefix, mig-44 absent, advisory lock, stop-on-first-failure). Empty-DB `migrate` preflight **unchanged**. Offline tests PASS. **Executor READY; operational recovery BLOCKED** until separately authorized **cron pause**, then authorized resume with manifest **`5c39f97c…`**. Quarantine retained. No hosted access in 6N.
+
 ## Step 6M: pgcrypto artifact correction (FILE-ONLY)
 
-[Step 6M recovery prep](PHASE_11_PGCRYPTO_ARTIFACT_RECOVERY_6M.md): `assert-managed-pgcrypto` now accepts owners **`postgres`** and **`supabase_admin`** only. Artifacts **1–43 unchanged**; artifact 44 + compatibility manifest updated (`5c39f97c…`). **Quarantine retained.** Recommended recovery: **Option A** resume from prefix 43 after new **`resume`** executor mode is implemented and separately authorized. No hosted access in 6M.
+[Step 6M recovery prep](PHASE_11_PGCRYPTO_ARTIFACT_RECOVERY_6M.md): artifact assert allows `postgres`|`supabase_admin`; manifest `5c39f97c…`. Superseded for resume implementation by 6N.
 
 ## Step 6L: quarantine investigation (READ-ONLY)
 

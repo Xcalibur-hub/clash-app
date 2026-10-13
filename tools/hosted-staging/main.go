@@ -19,7 +19,7 @@ func command(args []string, getenv func(string) string, dial Connector) error {
 func commandWithStore(args []string, getenv func(string) string, dial Connector, store secretStore) error {
 	f := flag.NewFlagSet("hosted-staging", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	mode := f.String("mode", "", "store-credential, preflight, migrate, investigate, inventory or separately authorized fixtures")
+	mode := f.String("mode", "", "store-credential, preflight, migrate, investigate, resume, inventory or separately authorized fixtures")
 	auth := f.String("authorize", "", "explicit mode:project reference")
 	file := f.String("config", "", "reviewed nonsecret configuration file")
 	if e := f.Parse(args); e != nil {

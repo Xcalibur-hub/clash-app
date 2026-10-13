@@ -64,6 +64,8 @@ type mock struct {
 	queries                                         []string
 	fail                                            string
 	rollbackFail, closeFail, badIdentity, badLedger bool
+	cronActive, missingPrefixDeps, lockHeld         bool
+	mig44Objects                                    bool
 	ledger                                          []map[string]any
 	args                                            []any
 }
@@ -138,18 +140,36 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 	case investigatePgcryptoAssertSQL:
 		return Result{Rows: []map[string]any{{"artifact_assert_would_pass": false}}}, nil
 	case investigateMig44ObjectsSQL:
+		present := m.mig44Objects
 		return Result{Rows: []map[string]any{{
-			"explore_challenge_participants": false, "explore_challenge_entries": false, "explore_challenge_entry_reactions": false,
-			"explore_challenge_results": false, "explore_treasure_clues": false, "explore_treasure_clue_progress": false,
-			"explore_treasure_reward_claims": false, "explore_entry_status": false, "explore_treasure_type": false,
-			"explore_clue_type": false, "explore_content_target": false, "explore_answer_digest": false,
-			"join_challenge": false, "settle_challenge": false, "explore_challenges_reward_type": false,
-			"explore_treasure_hunts_hunt_type": false, "notification_kind_challenge_result": false,
+			"explore_challenge_participants": present, "explore_challenge_entries": present, "explore_challenge_entry_reactions": present,
+			"explore_challenge_results": present, "explore_treasure_clues": present, "explore_treasure_clue_progress": present,
+			"explore_treasure_reward_claims": present, "explore_entry_status": present, "explore_treasure_type": present,
+			"explore_clue_type": present, "explore_content_target": present, "explore_answer_digest": present,
+			"join_challenge": present, "settle_challenge": present, "explore_challenges_reward_type": present,
+			"explore_treasure_hunts_hunt_type": present, "notification_kind_challenge_result": present,
 		}}}, nil
 	case investigateCronSQL:
-		return Result{Rows: []map[string]any{{"jobid": "1", "jobname": "clash-maintenance", "schedule": "* * * * *", "command": "select public.run_maintenance(500)", "username": "postgres", "active": true}}}, nil
+		if m.cronActive {
+			return Result{Rows: []map[string]any{{"jobid": "1", "jobname": "clash-maintenance", "schedule": "* * * * *", "command": "select public.run_maintenance(500)", "username": "postgres", "active": true}}}, nil
+		}
+		return Result{Rows: []map[string]any{{"jobid": "1", "jobname": "clash-maintenance", "schedule": "* * * * *", "command": "select public.run_maintenance(500)", "username": "postgres", "active": false}}}, nil
 	case investigateCronRunsSQL:
 		return Result{Rows: []map[string]any{{"runs_1h": 0, "succeeded_1h": 0, "failed_1h": 0}}}, nil
+	case resumePrefixDepsSQL:
+		if m.missingPrefixDeps {
+			return Result{Rows: []map[string]any{{"explore_challenges": false, "explore_treasure_hunts": true, "explore_treasure_progress": true, "profiles": true, "media_objects": true}}}, nil
+		}
+		return Result{Rows: []map[string]any{{"explore_challenges": true, "explore_treasure_hunts": true, "explore_treasure_progress": true, "profiles": true, "media_objects": true}}}, nil
+	case resumeLockSQL:
+		if m.lockHeld {
+			return Result{Rows: []map[string]any{{"acquired": false}}}, nil
+		}
+		m.lockHeld = true
+		return Result{Rows: []map[string]any{{"acquired": true}}}, nil
+	case resumeUnlockSQL:
+		m.lockHeld = false
+		return Result{Rows: []map[string]any{{"released": true}}}, nil
 	}
 	if q == managedSQL {
 		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true, "cron_preloaded": true, "cron_catalog": true}}}, nil
