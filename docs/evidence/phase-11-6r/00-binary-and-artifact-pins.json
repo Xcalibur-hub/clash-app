@@ -1,0 +1,17 @@
+{
+    "revision":  "c422f7e219818c2fed6e036c280bfbf882f60299",
+    "executor_binary_sha256":  "e5ca38b802262906c7e8f12f94cf048e709e41247973535f1de2e15fe0f8a881",
+    "executor_tree":  "tools/hosted-staging",
+    "compatibility_manifest_sha256":  "5c39f97c62559b1f5ed175be409480fb3515fded61a16f0b1b33cc3e22768110",
+    "suite_manifest_sha256":  "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+    "artifact_44_path":  "supabase/migrations/20261004120000_explore_play_system.sql",
+    "artifact_44_sha256":  "380b693fd09edcefbe30028c8ed5de72ae9716776198f1d45c6ed8a1ef17f261",
+    "ca_sha256":  "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "connection_mode":  "direct",
+    "credential_source":  "windows-credential-manager",
+    "project_ref":  "zrutlrhhvfcsmssjiijl",
+    "go_version":  "go1.25.3",
+    "target":  "windows/amd64",
+    "artifact_regeneration_identical_to_prior_approved":  true,
+    "prepare_sql_executed":  false
+}

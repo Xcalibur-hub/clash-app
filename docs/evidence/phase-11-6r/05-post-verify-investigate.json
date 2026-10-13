@@ -1,0 +1,913 @@
+{
+  "all_stop_conditions": [
+    "ledger_prefix_mismatch_or_unexpected: ledger data differs from expected committed prefix; quarantine retained",
+    "unexpected_migration_44_objects: unexpected application modifications; quarantine retained"
+  ],
+  "artifact_44_expected": "380b693fd09edcefbe30028c8ed5de72ae9716776198f1d45c6ed8a1ef17f261",
+  "artifact_44_match": true,
+  "artifact_44_sha256": "380b693fd09edcefbe30028c8ed5de72ae9716776198f1d45c6ed8a1ef17f261",
+  "artifact_pgcrypto_assert": [
+    {
+      "artifact_assert_would_pass": true
+    }
+  ],
+  "auth_user_count": 0,
+  "candidate": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "clash_maintenance_active": false,
+  "clash_maintenance_identity_ok": true,
+  "clash_maintenance_jobs": [
+    {
+      "active": false,
+      "command": "select public.run_maintenance(500)",
+      "jobid": "1",
+      "jobname": "clash-maintenance",
+      "schedule": "* * * * *",
+      "username": "postgres"
+    }
+  ],
+  "clash_maintenance_runs_1h": [
+    {
+      "failed_1h": 0,
+      "runs_1h": 0,
+      "succeeded_1h": 0
+    }
+  ],
+  "compatibility_manifest_expected": "5c39f97c62559b1f5ed175be409480fb3515fded61a16f0b1b33cc3e22768110",
+  "compatibility_manifest_match": true,
+  "compatibility_manifest_sha256": "5c39f97c62559b1f5ed175be409480fb3515fded61a16f0b1b33cc3e22768110",
+  "cron_catalog": [
+    {
+      "cron_catalog": true
+    }
+  ],
+  "cron_inactive_ready": true,
+  "cron_quiescence": "history_and_activity_clear",
+  "cron_quiescence_probe": {
+    "Unfinished": 0,
+    "StaleUnfinished": 0,
+    "UnexpectedStatus": 0,
+    "HistoryRows": 0,
+    "ActiveBackends": 0,
+    "LiveJobPIDs": 0
+  },
+  "database_security_passed": false,
+  "existing_data_empty_db_gate": [
+    {
+      "buckets": true,
+      "objects": false,
+      "users": false
+    }
+  ],
+  "expected_committed_prefix": 43,
+  "failed_migration_name": "explore_play_system",
+  "failed_migration_version": "20261004120000",
+  "failure_classification": {
+    "corrected_artifact_assert_would_pass": true,
+    "historical_6k_cause": "artifact_pgcrypto_owner_assert_required_supabase_admin_hosted_was_postgres",
+    "sqlstate": "unavailable_from_original_migrate"
+  },
+  "first_43_integrity": false,
+  "identity_gate": {
+    "database_match": true,
+    "current_role_match": true,
+    "session_role_match": true,
+    "backend_ssl_observed": true,
+    "postgres_17_match": true,
+    "failure_reason": "none"
+  },
+  "ledger_count": 106,
+  "ledger_entries": [
+    {
+      "expected_file": "20260926120000_initial_arena_schema.sql",
+      "hash_match": true,
+      "index": 1,
+      "name": "initial_arena_schema",
+      "version": "20260926120000"
+    },
+    {
+      "expected_file": "20260926130000_auth_profile_trigger.sql",
+      "hash_match": true,
+      "index": 2,
+      "name": "auth_profile_trigger",
+      "version": "20260926130000"
+    },
+    {
+      "expected_file": "20260926140000_social_foundation.sql",
+      "hash_match": true,
+      "index": 3,
+      "name": "social_foundation",
+      "version": "20260926140000"
+    },
+    {
+      "expected_file": "20260926150000_media_storage.sql",
+      "hash_match": true,
+      "index": 4,
+      "name": "media_storage",
+      "version": "20260926150000"
+    },
+    {
+      "expected_file": "20260926160000_clash_engine.sql",
+      "hash_match": true,
+      "index": 5,
+      "name": "clash_engine",
+      "version": "20260926160000"
+    },
+    {
+      "expected_file": "20260926170000_production_hardening.sql",
+      "hash_match": true,
+      "index": 6,
+      "name": "production_hardening",
+      "version": "20260926170000"
+    },
+    {
+      "expected_file": "20260926180000_take_reactions.sql",
+      "hash_match": true,
+      "index": 7,
+      "name": "take_reactions",
+      "version": "20260926180000"
+    },
+    {
+      "expected_file": "20260926190000_hoods_and_threads.sql",
+      "hash_match": true,
+      "index": 8,
+      "name": "hoods_and_threads",
+      "version": "20260926190000"
+    },
+    {
+      "expected_file": "20260926200000_take_creation_rpc.sql",
+      "hash_match": true,
+      "index": 9,
+      "name": "take_creation_rpc",
+      "version": "20260926200000"
+    },
+    {
+      "expected_file": "20260927000000_feed_visibility.sql",
+      "hash_match": true,
+      "index": 10,
+      "name": "feed_visibility",
+      "version": "20260927000000"
+    },
+    {
+      "expected_file": "20260927010000_clash_draw.sql",
+      "hash_match": true,
+      "index": 11,
+      "name": "clash_draw",
+      "version": "20260927010000"
+    },
+    {
+      "expected_file": "20260927020000_take_insert_lockdown.sql",
+      "hash_match": true,
+      "index": 12,
+      "name": "take_insert_lockdown",
+      "version": "20260927020000"
+    },
+    {
+      "expected_file": "20260927030000_clash_scheduler.sql",
+      "hash_match": true,
+      "index": 13,
+      "name": "clash_scheduler",
+      "version": "20260927030000"
+    },
+    {
+      "expected_file": "20260928000000_vault_foundation.sql",
+      "hash_match": true,
+      "index": 14,
+      "name": "vault_foundation",
+      "version": "20260928000000"
+    },
+    {
+      "expected_file": "20260928010000_vault_rpcs.sql",
+      "hash_match": true,
+      "index": 15,
+      "name": "vault_rpcs",
+      "version": "20260928010000"
+    },
+    {
+      "expected_file": "20260928020000_vault_entitlement.sql",
+      "hash_match": true,
+      "index": 16,
+      "name": "vault_entitlement",
+      "version": "20260928020000"
+    },
+    {
+      "expected_file": "20260928030000_vault_notifications.sql",
+      "hash_match": true,
+      "index": 17,
+      "name": "vault_notifications",
+      "version": "20260928030000"
+    },
+    {
+      "expected_file": "20260928040000_vault_maintenance.sql",
+      "hash_match": true,
+      "index": 18,
+      "name": "vault_maintenance",
+      "version": "20260928040000"
+    },
+    {
+      "expected_file": "20260928050000_vault_storefront.sql",
+      "hash_match": true,
+      "index": 19,
+      "name": "vault_storefront",
+      "version": "20260928050000"
+    },
+    {
+      "expected_file": "20260928100000_mindshift.sql",
+      "hash_match": true,
+      "index": 20,
+      "name": "mindshift",
+      "version": "20260928100000"
+    },
+    {
+      "expected_file": "20260928110000_blind_clash.sql",
+      "hash_match": true,
+      "index": 21,
+      "name": "blind_clash",
+      "version": "20260928110000"
+    },
+    {
+      "expected_file": "20260928120000_hood_prediction.sql",
+      "hash_match": true,
+      "index": 22,
+      "name": "hood_prediction",
+      "version": "20260928120000"
+    },
+    {
+      "expected_file": "20260928130000_world_missions.sql",
+      "hash_match": true,
+      "index": 23,
+      "name": "world_missions",
+      "version": "20260928130000"
+    },
+    {
+      "expected_file": "20260928140000_world_drop_view.sql",
+      "hash_match": true,
+      "index": 24,
+      "name": "world_drop_view",
+      "version": "20260928140000"
+    },
+    {
+      "expected_file": "20260930100000_sponsor_attribution.sql",
+      "hash_match": true,
+      "index": 25,
+      "name": "sponsor_attribution",
+      "version": "20260930100000"
+    },
+    {
+      "expected_file": "20260930110000_sponsor_attribution_hardening.sql",
+      "hash_match": true,
+      "index": 26,
+      "name": "sponsor_attribution_hardening",
+      "version": "20260930110000"
+    },
+    {
+      "expected_file": "20260930120000_sponsor_studio_rpcs.sql",
+      "hash_match": true,
+      "index": 27,
+      "name": "sponsor_studio_rpcs",
+      "version": "20260930120000"
+    },
+    {
+      "expected_file": "20260930130000_creator_earnings.sql",
+      "hash_match": true,
+      "index": 28,
+      "name": "creator_earnings",
+      "version": "20260930130000"
+    },
+    {
+      "expected_file": "20260930140000_comment_media.sql",
+      "hash_match": true,
+      "index": 29,
+      "name": "comment_media",
+      "version": "20260930140000"
+    },
+    {
+      "expected_file": "20261002140000_comment_gifs_enum.sql",
+      "hash_match": true,
+      "index": 30,
+      "name": "comment_gifs_enum",
+      "version": "20261002140000"
+    },
+    {
+      "expected_file": "20261002140100_comment_gifs.sql",
+      "hash_match": true,
+      "index": 31,
+      "name": "comment_gifs",
+      "version": "20261002140100"
+    },
+    {
+      "expected_file": "20261002150000_live_arena_enums.sql",
+      "hash_match": true,
+      "index": 32,
+      "name": "live_arena_enums",
+      "version": "20261002150000"
+    },
+    {
+      "expected_file": "20261002150100_live_arena_schema.sql",
+      "hash_match": true,
+      "index": 33,
+      "name": "live_arena_schema",
+      "version": "20261002150100"
+    },
+    {
+      "expected_file": "20261002160000_live_arena_spectator.sql",
+      "hash_match": true,
+      "index": 34,
+      "name": "live_arena_spectator",
+      "version": "20261002160000"
+    },
+    {
+      "expected_file": "20261002170000_arena_spectator_upgrade.sql",
+      "hash_match": true,
+      "index": 35,
+      "name": "arena_spectator_upgrade",
+      "version": "20261002170000"
+    },
+    {
+      "expected_file": "20261002180000_arena_feel_alive.sql",
+      "hash_match": true,
+      "index": 36,
+      "name": "arena_feel_alive",
+      "version": "20261002180000"
+    },
+    {
+      "expected_file": "20261003120000_list_arena_topic_rooms.sql",
+      "hash_match": true,
+      "index": 37,
+      "name": "list_arena_topic_rooms",
+      "version": "20261003120000"
+    },
+    {
+      "expected_file": "20261003140000_watch_arena_room.sql",
+      "hash_match": true,
+      "index": 38,
+      "name": "watch_arena_room",
+      "version": "20261003140000"
+    },
+    {
+      "expected_file": "20261003150000_list_arena_room_presence.sql",
+      "hash_match": true,
+      "index": 39,
+      "name": "list_arena_room_presence",
+      "version": "20261003150000"
+    },
+    {
+      "expected_file": "20261003160000_room_pulse_and_scale.sql",
+      "hash_match": true,
+      "index": 40,
+      "name": "room_pulse_and_scale",
+      "version": "20261003160000"
+    },
+    {
+      "expected_file": "20261003180000_explore_global.sql",
+      "hash_match": true,
+      "index": 41,
+      "name": "explore_global",
+      "version": "20261003180000"
+    },
+    {
+      "expected_file": "20261003190000_explore_vault_preview.sql",
+      "hash_match": true,
+      "index": 42,
+      "name": "explore_vault_preview",
+      "version": "20261003190000"
+    },
+    {
+      "expected_file": "20261003200000_explore_for_you_ia.sql",
+      "hash_match": true,
+      "index": 43,
+      "name": "explore_for_you_ia",
+      "version": "20261003200000"
+    },
+    {
+      "expected_file": "20261004120000_explore_play_system.sql",
+      "hash_match": true,
+      "index": 44,
+      "name": "explore_play_system",
+      "version": "20261004120000"
+    },
+    {
+      "expected_file": "20261004120100_explore_treasure_gameplay.sql",
+      "hash_match": true,
+      "index": 45,
+      "name": "explore_treasure_gameplay",
+      "version": "20261004120100"
+    },
+    {
+      "expected_file": "20261004140000_meet_text_matching.sql",
+      "hash_match": true,
+      "index": 46,
+      "name": "meet_text_matching",
+      "version": "20261004140000"
+    },
+    {
+      "expected_file": "20261004150000_meet_video.sql",
+      "hash_match": true,
+      "index": 47,
+      "name": "meet_video",
+      "version": "20261004150000"
+    },
+    {
+      "expected_file": "20261004160000_vault_storefront_preview.sql",
+      "hash_match": true,
+      "index": 48,
+      "name": "vault_storefront_preview",
+      "version": "20261004160000"
+    },
+    {
+      "expected_file": "20261004170000_vault_commerce.sql",
+      "hash_match": true,
+      "index": 49,
+      "name": "vault_commerce",
+      "version": "20261004170000"
+    },
+    {
+      "expected_file": "20261004170100_vault_commerce_rpcs.sql",
+      "hash_match": true,
+      "index": 50,
+      "name": "vault_commerce_rpcs",
+      "version": "20261004170100"
+    },
+    {
+      "expected_file": "20261004181000_vault_discover_worlds.sql",
+      "hash_match": true,
+      "index": 51,
+      "name": "vault_discover_worlds",
+      "version": "20261004181000"
+    },
+    {
+      "expected_file": "20261004190000_vault_communities.sql",
+      "hash_match": true,
+      "index": 52,
+      "name": "vault_communities",
+      "version": "20261004190000"
+    },
+    {
+      "expected_file": "20261004190100_vault_community_rpcs.sql",
+      "hash_match": true,
+      "index": 53,
+      "name": "vault_community_rpcs",
+      "version": "20261004190100"
+    },
+    {
+      "expected_file": "20261004200000_creator_world_drops.sql",
+      "hash_match": true,
+      "index": 54,
+      "name": "creator_world_drops",
+      "version": "20261004200000"
+    },
+    {
+      "expected_file": "20261004200100_creator_world_drop_rpcs.sql",
+      "hash_match": true,
+      "index": 55,
+      "name": "creator_world_drop_rpcs",
+      "version": "20261004200100"
+    },
+    {
+      "expected_file": "20261005100000_creator_live.sql",
+      "hash_match": true,
+      "index": 56,
+      "name": "creator_live",
+      "version": "20261005100000"
+    },
+    {
+      "expected_file": "20261005100100_creator_live_rpcs.sql",
+      "hash_match": true,
+      "index": 57,
+      "name": "creator_live_rpcs",
+      "version": "20261005100100"
+    },
+    {
+      "expected_file": "20261005110000_creator_ai.sql",
+      "hash_match": true,
+      "index": 58,
+      "name": "creator_ai",
+      "version": "20261005110000"
+    },
+    {
+      "expected_file": "20261005110100_creator_ai_rpcs.sql",
+      "hash_match": true,
+      "index": 59,
+      "name": "creator_ai_rpcs",
+      "version": "20261005110100"
+    },
+    {
+      "expected_file": "20261005120000_digital_creator.sql",
+      "hash_match": true,
+      "index": 60,
+      "name": "digital_creator",
+      "version": "20261005120000"
+    },
+    {
+      "expected_file": "20261005120100_digital_creator_rpcs.sql",
+      "hash_match": true,
+      "index": 61,
+      "name": "digital_creator_rpcs",
+      "version": "20261005120100"
+    },
+    {
+      "expected_file": "20261005130000_arena_game_enums.sql",
+      "hash_match": true,
+      "index": 62,
+      "name": "arena_game_enums",
+      "version": "20261005130000"
+    },
+    {
+      "expected_file": "20261005130100_arena_reputation_facets.sql",
+      "hash_match": true,
+      "index": 63,
+      "name": "arena_reputation_facets",
+      "version": "20261005130100"
+    },
+    {
+      "expected_file": "20261005130200_arena_call_backup.sql",
+      "hash_match": true,
+      "index": 64,
+      "name": "arena_call_backup",
+      "version": "20261005130200"
+    },
+    {
+      "expected_file": "20261005130300_arena_reactions_and_entertainment.sql",
+      "hash_match": true,
+      "index": 65,
+      "name": "arena_reactions_and_entertainment",
+      "version": "20261005130300"
+    },
+    {
+      "expected_file": "20261005140000_arena_trending_and_scale.sql",
+      "hash_match": true,
+      "index": 66,
+      "name": "arena_trending_and_scale",
+      "version": "20261005140000"
+    },
+    {
+      "expected_file": "20261005150000_arena_trending_rank_race.sql",
+      "hash_match": true,
+      "index": 67,
+      "name": "arena_trending_rank_race",
+      "version": "20261005150000"
+    },
+    {
+      "expected_file": "20261005160000_arena_trending_visibility.sql",
+      "hash_match": true,
+      "index": 68,
+      "name": "arena_trending_visibility",
+      "version": "20261005160000"
+    },
+    {
+      "expected_file": "20261005210000_arena_expressive_media.sql",
+      "hash_match": true,
+      "index": 69,
+      "name": "arena_expressive_media",
+      "version": "20261005210000"
+    },
+    {
+      "expected_file": "20261006120000_arena_crews_enums.sql",
+      "hash_match": true,
+      "index": 70,
+      "name": "arena_crews_enums",
+      "version": "20261006120000"
+    },
+    {
+      "expected_file": "20261006120100_arena_crews_foundation.sql",
+      "hash_match": true,
+      "index": 71,
+      "name": "arena_crews_foundation",
+      "version": "20261006120100"
+    },
+    {
+      "expected_file": "20261006130000_arena_crews_hardening.sql",
+      "hash_match": true,
+      "index": 72,
+      "name": "arena_crews_hardening",
+      "version": "20261006130000"
+    },
+    {
+      "expected_file": "20261006150000_arena_correctness_foundation.sql",
+      "hash_match": true,
+      "index": 73,
+      "name": "arena_correctness_foundation",
+      "version": "20261006150000"
+    },
+    {
+      "expected_file": "20261007120000_arena_duel_foundation.sql",
+      "hash_match": true,
+      "index": 74,
+      "name": "arena_duel_foundation",
+      "version": "20261007120000"
+    },
+    {
+      "expected_file": "20261007130000_arena_challenge_notifications.sql",
+      "hash_match": true,
+      "index": 75,
+      "name": "arena_challenge_notifications",
+      "version": "20261007130000"
+    },
+    {
+      "expected_file": "20261007130100_arena_challenge_lifecycle.sql",
+      "hash_match": true,
+      "index": 76,
+      "name": "arena_challenge_lifecycle",
+      "version": "20261007130100"
+    },
+    {
+      "expected_file": "20261008100000_arena_crowd_report_target.sql",
+      "hash_match": true,
+      "index": 77,
+      "name": "arena_crowd_report_target",
+      "version": "20261008100000"
+    },
+    {
+      "expected_file": "20261008100100_arena_crowd_chat.sql",
+      "hash_match": true,
+      "index": 78,
+      "name": "arena_crowd_chat",
+      "version": "20261008100100"
+    },
+    {
+      "expected_file": "20261008110000_profile_read_security.sql",
+      "hash_match": true,
+      "index": 79,
+      "name": "profile_read_security",
+      "version": "20261008110000"
+    },
+    {
+      "expected_file": "20261008110100_relationship_and_crew_security.sql",
+      "hash_match": true,
+      "index": 80,
+      "name": "relationship_and_crew_security",
+      "version": "20261008110100"
+    },
+    {
+      "expected_file": "20261008110200_arena_content_visibility.sql",
+      "hash_match": true,
+      "index": 81,
+      "name": "arena_content_visibility",
+      "version": "20261008110200"
+    },
+    {
+      "expected_file": "20261008110300_private_room_typing.sql",
+      "hash_match": true,
+      "index": 82,
+      "name": "private_room_typing",
+      "version": "20261008110300"
+    },
+    {
+      "expected_file": "20261008110400_legacy_visibility_helpers.sql",
+      "hash_match": true,
+      "index": 83,
+      "name": "legacy_visibility_helpers",
+      "version": "20261008110400"
+    },
+    {
+      "expected_file": "20261008110500_private_viewer_helpers.sql",
+      "hash_match": true,
+      "index": 84,
+      "name": "private_viewer_helpers",
+      "version": "20261008110500"
+    },
+    {
+      "expected_file": "20261008110600_canonical_topic_visibility.sql",
+      "hash_match": true,
+      "index": 85,
+      "name": "canonical_topic_visibility",
+      "version": "20261008110600"
+    },
+    {
+      "expected_file": "20261008121000_arena_discovery_states.sql",
+      "hash_match": true,
+      "index": 86,
+      "name": "arena_discovery_states",
+      "version": "20261008121000"
+    },
+    {
+      "expected_file": "20261008133000_arena_interest_catalogue.sql",
+      "hash_match": true,
+      "index": 87,
+      "name": "arena_interest_catalogue",
+      "version": "20261008133000"
+    },
+    {
+      "expected_file": "20261008134000_arena_interest_preferences.sql",
+      "hash_match": true,
+      "index": 88,
+      "name": "arena_interest_preferences",
+      "version": "20261008134000"
+    },
+    {
+      "expected_file": "20261008135000_arena_personalized_feed.sql",
+      "hash_match": true,
+      "index": 89,
+      "name": "arena_personalized_feed",
+      "version": "20261008135000"
+    },
+    {
+      "expected_file": "20261008135500_arena_interest_conflict_http.sql",
+      "hash_match": true,
+      "index": 90,
+      "name": "arena_interest_conflict_http",
+      "version": "20261008135500"
+    },
+    {
+      "expected_file": "20261008140000_arena_interest_feed_index.sql",
+      "hash_match": true,
+      "index": 91,
+      "name": "arena_interest_feed_index",
+      "version": "20261008140000"
+    },
+    {
+      "expected_file": "20261008151000_arena_challenge_inbox.sql",
+      "hash_match": true,
+      "index": 92,
+      "name": "arena_challenge_inbox",
+      "version": "20261008151000"
+    },
+    {
+      "expected_file": "20261009100000_canonical_authorization.sql",
+      "hash_match": true,
+      "index": 93,
+      "name": "canonical_authorization",
+      "version": "20261009100000"
+    },
+    {
+      "expected_file": "20261009110000_official_retry_and_recovery.sql",
+      "hash_match": true,
+      "index": 94,
+      "name": "official_retry_and_recovery",
+      "version": "20261009110000"
+    },
+    {
+      "expected_file": "20261009120000_historical_settlement_recovery.sql",
+      "hash_match": true,
+      "index": 95,
+      "name": "historical_settlement_recovery",
+      "version": "20261009120000"
+    },
+    {
+      "expected_file": "20261009130000_arena_casual_questions.sql",
+      "hash_match": true,
+      "index": 96,
+      "name": "arena_casual_questions",
+      "version": "20261009130000"
+    },
+    {
+      "expected_file": "20261009140000_arena_editorial_pipeline.sql",
+      "hash_match": true,
+      "index": 97,
+      "name": "arena_editorial_pipeline",
+      "version": "20261009140000"
+    },
+    {
+      "expected_file": "20261009170000_arena_gif_proxy_budget.sql",
+      "hash_match": true,
+      "index": 98,
+      "name": "arena_gif_proxy_budget",
+      "version": "20261009170000"
+    },
+    {
+      "expected_file": "20261009180000_explore_security_contract.sql",
+      "hash_match": true,
+      "index": 99,
+      "name": "explore_security_contract",
+      "version": "20261009180000"
+    },
+    {
+      "expected_file": "20261009190000_world_read_security.sql",
+      "hash_match": true,
+      "index": 100,
+      "name": "world_read_security",
+      "version": "20261009190000"
+    },
+    {
+      "expected_file": "20261010120000_profile_clash_stats.sql",
+      "hash_match": true,
+      "index": 101,
+      "name": "profile_clash_stats",
+      "version": "20261010120000"
+    },
+    {
+      "expected_file": "20261011053717_critical_authorization_hardening.sql",
+      "hash_match": true,
+      "index": 102,
+      "name": "critical_authorization_hardening",
+      "version": "20261011053717"
+    },
+    {
+      "expected_file": "20261011074540_h3_reputation_history_privacy.sql",
+      "hash_match": true,
+      "index": 103,
+      "name": "h3_reputation_history_privacy",
+      "version": "20261011074540"
+    },
+    {
+      "expected_file": "20261011081531_m1_clash_verdict_visibility.sql",
+      "hash_match": true,
+      "index": 104,
+      "name": "m1_clash_verdict_visibility",
+      "version": "20261011081531"
+    },
+    {
+      "expected_file": "20261011095952_profile_stats_clash_visibility.sql",
+      "hash_match": true,
+      "index": 105,
+      "name": "profile_stats_clash_visibility",
+      "version": "20261011095952"
+    },
+    {
+      "expected_file": "20261011120000_comment_reply_notifications.sql",
+      "hash_match": true,
+      "index": 106,
+      "name": "comment_reply_notifications",
+      "version": "20261011120000"
+    }
+  ],
+  "migration_44_ledger_entry": true,
+  "migration_44_objects": [
+    {
+      "explore_answer_digest": true,
+      "explore_challenge_entries": true,
+      "explore_challenge_entry_reactions": true,
+      "explore_challenge_participants": true,
+      "explore_challenge_results": true,
+      "explore_challenges_reward_type": true,
+      "explore_clue_type": true,
+      "explore_content_target": true,
+      "explore_entry_status": true,
+      "explore_treasure_clue_progress": true,
+      "explore_treasure_clues": true,
+      "explore_treasure_hunts_hunt_type": true,
+      "explore_treasure_reward_claims": true,
+      "explore_treasure_type": true,
+      "join_challenge": true,
+      "notification_kind_challenge_result": true,
+      "settle_challenge": true
+    }
+  ],
+  "migration_44_objects_present": true,
+  "migration_44_rollback": "objects_present_uncertain_or_partial",
+  "mode": "investigate",
+  "original_sqlstate": "unavailable",
+  "original_sqlstate_reason": "executor redacts database errors as database operation failed; diagnostics withheld",
+  "pgcrypto": [
+    {
+      "owner": "postgres",
+      "owner_is_postgres": true,
+      "owner_is_supabase_admin": false,
+      "schema": "extensions",
+      "version": "1.3"
+    }
+  ],
+  "prefix_dependencies": [
+    {
+      "explore_challenges": true,
+      "explore_treasure_hunts": true,
+      "explore_treasure_progress": true,
+      "media_objects": true,
+      "profiles": true
+    }
+  ],
+  "prefix_dependencies_present": true,
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "quarantine_retained": true,
+  "recovery_gates": {
+    "artifact_44": true,
+    "compatibility_manifest": true,
+    "cron_inactive_jobid_1": true,
+    "cron_quiescent": true,
+    "identity": true,
+    "ledger_prefix_43": false,
+    "migration_44_absent": false,
+    "no_unexpected_schemas": true,
+    "pgcrypto_assert_would_pass": true,
+    "prefix_dependencies": true,
+    "recovery_storage_expected": true
+  },
+  "recovery_storage_ok": true,
+  "recovery_verification_ready": false,
+  "stop_condition": "ledger_prefix_mismatch_or_unexpected: ledger data differs from expected committed prefix; quarantine retained",
+  "storage_bucket_classification": {
+    "private-media": "expected",
+    "public-media": "expected"
+  },
+  "storage_bucket_count": 2,
+  "storage_buckets": [
+    {
+      "ID": "private-media",
+      "Name": "private-media",
+      "Public": false,
+      "SizeLimit": 104857600,
+      "MIME": "{image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm}",
+      "CreatedAt": "2026-10-12 16:47:03.187275+00"
+    },
+    {
+      "ID": "public-media",
+      "Name": "public-media",
+      "Public": true,
+      "SizeLimit": 104857600,
+      "MIME": "{image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm}",
+      "CreatedAt": "2026-10-12 16:47:03.187275+00"
+    }
+  ],
+  "storage_object_count": 0,
+  "unexpected_ledger_entries": true,
+  "unexpected_schema_names": null
+}
