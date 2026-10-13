@@ -28,9 +28,10 @@ const service = {
   clearTeleportHistory() {history = [];}, readTeleportHistory: () => history,
   rememberTeleportId: id => history.push(id), fetchTeleportCandidate: async () => null,
 };
+const repoRoot = require('node:path').resolve(__dirname, '..').replaceAll('\\', '/') + '/';
 const original = Module._load;
 Module._load = function(request, parent) {
-  const own = parent?.filename.includes('Clash') && !parent.filename.includes('node_modules');
+  const own = parent?.filename.replaceAll('\\', '/').startsWith(repoRoot) && !parent.filename.includes('node_modules');
   if (own && request === 'react') return hooks;
   if (request === 'react-native') return native;
   if (request === 'expo-router') return {usePathname: () => path, useRouter: () => ({push() {}}),useLocalSearchParams:()=>({id:'hunt'})};

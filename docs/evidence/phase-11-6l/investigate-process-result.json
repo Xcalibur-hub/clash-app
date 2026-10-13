@@ -1,0 +1,13 @@
+{
+    "InvokedAt":  "2026-10-12T17:13:51.4291658Z",
+    "Stdout":  "Authorized operation completed; inspect scoped evidence. No database security pass implied.",
+    "ExecutableSha256":  "2ae1a66e50bcf5dbacbb9948fede995e14b5df8239e1c813be34ef305b444464",
+    "Authorization":  "investigate:zrutlrhhvfcsmssjiijl",
+    "ElapsedMs":  29513,
+    "ProjectRef":  "zrutlrhhvfcsmssjiijl",
+    "SourceRevision":  "56b441cc6db011ea501c767c33d34635a21d5cab",
+    "ExitCode":  0,
+    "ConnectionMode":  "direct",
+    "Stderr":  "",
+    "Operation":  "investigate"
+}

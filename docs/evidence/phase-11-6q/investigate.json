@@ -1,0 +1,44 @@
+﻿{
+    "mode":  "investigate",
+    "project_ref":  "zrutlrhhvfcsmssjiijl",
+    "candidate":  "a92a550527f810913b01f6e6411dc78996c71a06",
+    "identity_gate":  {
+                          "database_match":  true,
+                          "current_role_match":  true,
+                          "session_role_match":  true,
+                          "backend_ssl_observed":  true,
+                          "postgres_17_match":  true,
+                          "failure_reason":  "none"
+                      },
+    "ledger_count":  43,
+    "first_43_integrity":  true,
+    "hash_mismatches":  0,
+    "migration_44_ledger_entry":  false,
+    "migration_44_objects_present":  false,
+    "migration_44_rollback":  "confirmed_absent",
+    "artifact_pgcrypto_assert":  [
+                                     {
+                                         "artifact_assert_would_pass":  true
+                                     }
+                                 ],
+    "pgcrypto":  [
+                     {
+                         "owner":  "postgres",
+                         "owner_is_postgres":  true,
+                         "owner_is_supabase_admin":  false,
+                         "schema":  "extensions",
+                         "version":  "1.3"
+                     }
+                 ],
+    "existing_data":  [
+                          {
+                              "buckets":  true,
+                              "objects":  false,
+                              "users":  false
+                          }
+                      ],
+    "stop_condition":  "unexpected_auth_or_storage",
+    "quarantine_retained":  true,
+    "database_security_passed":  false,
+    "notes":  "Full private investigate.json retained under .expo/6q-private; ledger entry list omitted from public evidence"
+}

@@ -1,0 +1,20 @@
+{
+  "step": "6O",
+  "mode": "file-only",
+  "hosted_connection": false,
+  "pause_executed": false,
+  "offline_ready": true,
+  "live_pause_authorized": false,
+  "authorization": "pause-cron:zrutlrhhvfcsmssjiijl",
+  "mechanism": "cron.alter_job(job_id, active:=false)",
+  "job_name": "clash-maintenance",
+  "expected_schedule": "* * * * *",
+  "expected_command": "select public.run_maintenance(500)",
+  "expected_username": "postgres",
+  "advisory_lock_key": 872314060,
+  "quiescence_timeout_seconds": 30,
+  "go_test": "ok",
+  "go_vet": "pass",
+  "pause_cron_top_level_pass": 14,
+  "staging_quarantine_unchanged": true
+}

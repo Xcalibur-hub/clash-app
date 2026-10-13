@@ -1,0 +1,7 @@
+﻿{
+    "index":  1,
+    "version":  "20260926120000",
+    "name":  "initial_arena_schema",
+    "ok":  false,
+    "error":  "BEGIN\r\nDO\r\nDO\r\nDO\r\nDO\r\nDO\r\nCREATE TABLE\r\nCREATE TABLE\r\nCREATE TABLE\r\nCREATE TABLE\r\nCREATE INDEX\r\nCREATE INDEX\r\nCREATE INDEX\r\nCREATE INDEX\r\nCREATE INDEX\r\ndocker : psql:/tmp/m.sql:182: ERROR:  function auth.uid() does not exist\r\nAt C:\\Users\\91962\\AppData\\Local\\Temp\\ps-script-ea8c3c52-3d98-479b-9801-6f1d62b9611c.ps1:116 char:10\r\n+   $out = docker exec clash-audit-pg psql -U postgres -v ON_ERROR_STOP ...\r\n+          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo    "
+}

@@ -1,0 +1,12 @@
+﻿{
+    "InvokedAt":  "2026-10-12T15:31:53.2331402Z",
+    "Stdout":  "",
+    "ExecutableSha256":  "baf063e20aebdf1180bd68652166460ecb65ca24d5d7b303f1a7c47f148a52fe",
+    "ConnectionMode":  "direct",
+    "Stderr":  "unexpected application objects; review required",
+    "ElapsedMs":  11514,
+    "ProjectRef":  "zrutlrhhvfcsmssjiijl",
+    "SourceRevision":  "5ce5641708b49fac2270ee008b4a298a0a62f199",
+    "ExitCode":  1,
+    "Operation":  "preflight"
+}

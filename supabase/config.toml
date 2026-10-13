@@ -385,6 +385,11 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 enabled = true
 verify_jwt = true
 
+# Private course-lesson media gate (same JWT → entitlement → service sign pattern).
+[functions.course-lesson-media-access]
+enabled = true
+verify_jwt = true
+
 # ── Creator AI ──────────────────────────────────────────────────────────────
 # The only place an AI provider is called. Provider credentials live in this
 # function's environment (`CREATOR_AI_API_KEY`, optional `CREATOR_AI_BASE_URL`

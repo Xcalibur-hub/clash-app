@@ -1,0 +1,25 @@
+{
+  "audited_functions": ["artifacts", "migrate", "Run", "authorized", "connection"],
+  "per_migration_sequence": [
+    "re-hash artifact bytes",
+    "begin",
+    "execute migration SQL (simple protocol)",
+    "insert supabase_migrations.schema_migrations",
+    "commit",
+    "verify full ledger order/name/statement digest"
+  ],
+  "create_ledger_sql_outside_loop": true,
+  "create_ledger_sql_idempotent": true,
+  "direct_mode_pid_binding": false,
+  "session_pooler_pid_binding": true,
+  "authorization_prefix_migrate": "migrate:<project_ref>",
+  "preflight_rerun_inside_migrate": true,
+  "commit_failure_message": "commit outcome unknown; stop and inspect, no retry",
+  "rollback_unconfirmed_message": "migration failed; rollback unconfirmed",
+  "extension_creates_in_artifacts": [
+    "20260927030000_clash_scheduler.sql:create extension if not exists pg_cron (caught)",
+    "20260928130000_world_missions.sql:create extension if not exists postgis with schema extensions",
+    "20260930110000_sponsor_attribution_hardening.sql:create extension if not exists pgcrypto with schema extensions"
+  ],
+  "cron_schedule_side_effect": "20260927030000_clash_scheduler.sql may register clash-maintenance when pg_cron available"
+}

@@ -1,0 +1,68 @@
+﻿{
+    "mode":  "investigate",
+    "project_ref":  "zrutlrhhvfcsmssjiijl",
+    "stop_condition":  "none",
+    "recovery_verification_ready":  true,
+    "recovery_gates":  {
+                           "artifact_44":  true,
+                           "compatibility_manifest":  true,
+                           "cron_inactive_jobid_1":  true,
+                           "cron_quiescent":  true,
+                           "identity":  true,
+                           "ledger_prefix_43":  true,
+                           "migration_44_absent":  true,
+                           "no_unexpected_schemas":  true,
+                           "pgcrypto_assert_would_pass":  true,
+                           "prefix_dependencies":  true,
+                           "recovery_storage_expected":  true
+                       },
+    "identity_gate":  {
+                          "database_match":  true,
+                          "current_role_match":  true,
+                          "session_role_match":  true,
+                          "backend_ssl_observed":  true,
+                          "postgres_17_match":  true,
+                          "failure_reason":  "none"
+                      },
+    "ledger_count":  43,
+    "first_43_integrity":  true,
+    "migration_44_ledger_entry":  false,
+    "migration_44_objects_present":  false,
+    "migration_44_rollback":  "confirmed_absent",
+    "prefix_dependencies_present":  true,
+    "storage_bucket_classification":  {
+                                          "private-media":  "expected",
+                                          "public-media":  "expected"
+                                      },
+    "storage_bucket_count":  2,
+    "auth_user_count":  0,
+    "storage_object_count":  0,
+    "clash_maintenance_jobs":  [
+                                   {
+                                       "active":  false,
+                                       "command":  "select public.run_maintenance(500)",
+                                       "jobid":  "1",
+                                       "jobname":  "clash-maintenance",
+                                       "schedule":  "* * * * *",
+                                       "username":  "postgres"
+                                   }
+                               ],
+    "clash_maintenance_active":  false,
+    "cron_quiescence":  "history_and_activity_clear",
+    "artifact_pgcrypto_assert":  [
+                                     {
+                                         "artifact_assert_would_pass":  true
+                                     }
+                                 ],
+    "compatibility_manifest_match":  true,
+    "artifact_44_match":  true,
+    "unexpected_schema_names":  null,
+    "existing_data_empty_db_gate":  [
+                                        {
+                                            "buckets":  true,
+                                            "objects":  false,
+                                            "users":  false
+                                        }
+                                    ],
+    "note":  "empty_db_gate buckets=true is EXPECTED after mig4; recovery_storage_expected validates exact public-media+private-media"
+}

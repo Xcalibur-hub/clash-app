@@ -1,0 +1,44 @@
+{
+  "mode": "pause-cron",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "candidate": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "job_name": "clash-maintenance",
+  "jobid": "1",
+  "expected_schedule": "* * * * *",
+  "expected_command": "select public.run_maintenance(500)",
+  "expected_username": "postgres",
+  "mechanism": "cron.alter_job(job_id, active:=false)",
+  "jobs_before": [
+    {
+      "JobID": "1",
+      "JobName": "clash-maintenance",
+      "Schedule": "* * * * *",
+      "Command": "select public.run_maintenance(500)",
+      "Username": "postgres",
+      "Active": true
+    }
+  ],
+  "jobs_after": [
+    {
+      "JobID": "1",
+      "JobName": "clash-maintenance",
+      "Schedule": "* * * * *",
+      "Command": "select public.run_maintenance(500)",
+      "Username": "postgres",
+      "Active": false
+    }
+  ],
+  "wrote_active_false": true,
+  "quiescence": "history_and_activity_clear",
+  "quiescence_requires": ["job_run_details", "pg_stat_activity"],
+  "identity_gate": {
+    "database_match": true,
+    "current_role_match": true,
+    "session_role_match": true,
+    "backend_ssl_observed": true,
+    "postgres_17_match": true,
+    "failure_reason": "none"
+  },
+  "success": true,
+  "database_security_passed": false
+}
