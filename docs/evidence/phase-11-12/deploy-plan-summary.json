@@ -1,0 +1,23 @@
+{
+  "step": "phase-11-12",
+  "mode": "dry-run",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "approved": ["vault-media-access", "course-lesson-media-access"],
+  "source": {
+    "commit": "657bd9ba7c6f9fbf60104c126fea885d65d57f00",
+    "branch": "feat/phase-11-backend-security-7"
+  },
+  "token_present": false,
+  "result": "PLAN ONLY - re-run with --execute after authorization",
+  "functions_expected": 6,
+  "jwt_exempt": ["arena-editorial"],
+  "manifest_required_secrets": ["ARENA_EDITORIAL_RUN_SECRET"],
+  "guards_observed": [
+    "dirty working tree is refused (verified: refused with 3 untracked paths before commit)",
+    "clean working tree with --only produces PLAN ONLY and deploys nothing",
+    "config.toml verify_jwt is cross-checked against the manifest for all six functions",
+    "the JWT-exempt set must be exactly ['arena-editorial']",
+    "no --no-verify-jwt flag is ever passed"
+  ],
+  "note": "dry-run only; no deployment, no secret read, no hosted change performed"
+}

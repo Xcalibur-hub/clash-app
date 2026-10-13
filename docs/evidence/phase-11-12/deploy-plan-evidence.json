@@ -1,0 +1,99 @@
+{
+  "step": "phase-11-12",
+  "mode": "dry-run",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "started_at": "2026-10-13T06:41:05.878Z",
+  "approved": [
+    "vault-media-access",
+    "course-lesson-media-access"
+  ],
+  "source": {
+    "commit": "657bd9ba7c6f9fbf60104c126fea885d65d57f00",
+    "branch": "feat/phase-11-backend-security-7"
+  },
+  "functions": [
+    {
+      "name": "vault-media-access",
+      "verify_jwt": true,
+      "required": [],
+      "optional": [],
+      "platform_injected": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
+    },
+    {
+      "name": "course-lesson-media-access",
+      "verify_jwt": true,
+      "required": [],
+      "optional": [],
+      "platform_injected": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
+    },
+    {
+      "name": "creator-ai",
+      "verify_jwt": true,
+      "required": [],
+      "optional": [
+        "CREATOR_AI_API_KEY",
+        "CREATOR_AI_BASE_URL",
+        "CREATOR_AI_MODEL"
+      ],
+      "platform_injected": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
+    },
+    {
+      "name": "digital-creator",
+      "verify_jwt": true,
+      "required": [],
+      "optional": [
+        "DIGITAL_CREATOR_API_KEY",
+        "DIGITAL_CREATOR_BASE_URL"
+      ],
+      "platform_injected": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
+    },
+    {
+      "name": "arena-editorial",
+      "verify_jwt": false,
+      "required": [
+        "ARENA_EDITORIAL_RUN_SECRET"
+      ],
+      "optional": [
+        "ARENA_AI_API_KEY",
+        "ARENA_AI_MODEL",
+        "ARENA_AI_BASE_URL"
+      ],
+      "platform_injected": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
+    },
+    {
+      "name": "arena-gifs",
+      "verify_jwt": true,
+      "required": [],
+      "optional": [
+        "TENOR_API_KEY"
+      ],
+      "platform_injected": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
+    }
+  ],
+  "token_present": false,
+  "result": "PLAN ONLY — re-run with --execute after authorization"
+}
