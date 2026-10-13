@@ -54,13 +54,33 @@ export function parseArgs(argv) {
   return out;
 }
 
+/** Windows cannot execFile `npx` — the shim is `npx.cmd` and needs no shell. */
+export function resolveCliBinary(platform = process.platform) {
+  return platform === 'win32' ? 'npx.cmd' : 'npx';
+}
+
+/**
+ * Node refuses to spawn .cmd/.bat without a shell, so the pinned CLI runs through
+ * one. Every argument is therefore validated first: function names, the project
+ * ref and the version pin are all constant-shaped, and no secret is ever an
+ * argument (the token travels in the child environment only).
+ */
+const SHELL_UNSAFE = /[&|<>^"'`$(){};*?[\]!#%~\s]/;
+export function assertArgsSafe(args) {
+  const bad = args.filter((a) => typeof a !== 'string' || a.length === 0 || SHELL_UNSAFE.test(a));
+  if (bad.length) throw new Error('refusing: unsafe CLI argument');
+  return true;
+}
+
 /** Runs the PINNED CLI. Output is captured and redacted by the caller. */
 export function cli(args) {
+  const argv = ['--yes', CLI_SPEC, ...args];
   try {
-    return { ok: true, out: execFileSync('npx', ['--yes', CLI_SPEC, ...args], { cwd: ROOT, encoding: 'utf8', env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }) };
+    assertArgsSafe(argv);
+    return { ok: true, out: execFileSync(resolveCliBinary(), argv, { cwd: ROOT, encoding: 'utf8', env: process.env, stdio: ['ignore', 'pipe', 'pipe'], shell: true }) };
   } catch (e) {
-    // Both streams can contain the CLI's own diagnostics; they are redacted here
-    // so a token can never be persisted to a log or to evidence.
+    // Both streams can contain the CLI's own diagnostics; redacted here so a
+    // token can never reach a log or the evidence file.
     const out = `${e?.stdout ?? ''}${e?.stderr ?? ''}`.trim() || String(e?.message ?? e);
     return { ok: false, out: redact(out) };
   }
@@ -168,7 +188,7 @@ export async function run(argv = process.argv.slice(2)) {
     //    plan run stays fully offline).
     if (args.execute) {
       const version = cli(['--version']);
-      const cliCheck = version.ok ? checkCliVersion(version.out, PINNED_CLI_VERSION) : { ok: false, reason: 'CLI not runnable' };
+      const cliCheck = version.ok ? checkCliVersion(version.out, PINNED_CLI_VERSION) : { ok: false, reason: `CLI not runnable: ${redact(version.out).slice(0, 140)}` };
       note('pinned_cli', cliCheck);
       if (!cliCheck.ok) return stop(cliCheck.reason);
     } else {

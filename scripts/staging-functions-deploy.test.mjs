@@ -11,7 +11,7 @@ import {
   requiredSecretsForSet, selectFunctions,
 } from './staging-functions.lib.mjs';
 import { APPROVED_DEPLOYMENT_SET, FUNCTIONS, PINNED_CLI_VERSION, PROJECT_REF } from './staging-functions.manifest.mjs';
-import { run, validateRepositoryInputs } from './staging-functions-deploy.mjs';
+import { assertArgsSafe, cli, resolveCliBinary, run, validateRepositoryInputs } from './staging-functions-deploy.mjs';
 import { normalizeApiInventory } from './staging-functions.api.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -133,6 +133,25 @@ test('Management API inventory normalizer handles empty, shaped and malformed pa
   // A missing verify_jwt must become null so the strict check fails closed.
   assert.equal(normalizeApiInventory([{ slug: 'x' }])[0].verify_jwt, null);
   assert.throws(() => normalizeApiInventory({ message: 'not an array' }));
+});
+
+test('the CLI binary is resolved per platform (Windows needs npx.cmd)', () => {
+  assert.equal(resolveCliBinary('win32'), 'npx.cmd');
+  assert.equal(resolveCliBinary('linux'), 'npx');
+  assert.equal(resolveCliBinary('darwin'), 'npx');
+});
+
+test('the pinned CLI executes and reports the pinned version', () => {
+  const r = cli(['--version']);
+  assert.equal(r.ok, true, `cli failed: ${r.out}`);
+  assert.equal(checkCliVersion(r.out, PINNED_CLI_VERSION).ok, true, r.out);
+});
+
+test('CLI arguments are refused when shell-unsafe', () => {
+  assert.equal(assertArgsSafe(['functions', 'deploy', 'vault-media-access', '--project-ref', PROJECT_REF]), true);
+  for (const evil of ['a b', 'a&b', 'a|b', 'a;b', 'a`b', 'a$(b)', 'a>b', '', 'a"b']) {
+    assert.throws(() => assertArgsSafe([evil]), /unsafe CLI argument/, `must refuse ${JSON.stringify(evil)}`);
+  }
 });
 
 test('an empty deployed inventory fails closed when the expected set is required', () => {
