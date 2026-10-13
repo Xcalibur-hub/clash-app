@@ -68,6 +68,8 @@ type mock struct {
 	lockHeld                                         map[int64]bool
 	mig44Objects                                     bool
 	completeObjects                                  bool
+	installedExts                                    []map[string]any
+	managedRow                                       map[string]any
 	pauseInactive, duplicateCron, missingCronJob     bool
 	wrongCronCommand, alterUnavailable               bool
 	pauseRunning, pauseRunningClearAfter, pausePolls int
@@ -125,6 +127,9 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 		}
 		return Result{Rows: []map[string]any{{"db": db, "usr": "postgres", "login": "postgres", "version": 170006, "ssl": true}}}, nil
 	case extensionsSQL:
+		if m.installedExts != nil {
+			return Result{Rows: m.installedExts}, nil
+		}
 		return Result{Rows: []map[string]any{{"name": "pgcrypto", "version": "1.3", "schema": "extensions", "owner": "supabase_admin"}}}, nil
 	case ledgerExistsSQL:
 		return Result{Rows: []map[string]any{{"exists": len(m.ledger) > 0}}}, nil
@@ -264,13 +269,18 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 	case verifyCompleteObjectsSQL:
 		present := m.completeObjects
 		return Result{Rows: []map[string]any{{
-			"v106_comment_reply_notifications": present, "profile_clash_stats": present,
-			"arena_interest_preferences": present, "explore_challenge_results": present,
-			"h3_reputation_owner_gate": present, "h2_lesson_body_guarded": present,
-			"h1_notify_guarded": present, "reputation_rls_enabled": present,
+			"course_lessons": present, "v105_profile_clash_stats": present,
+			"v106_arena_comment_notify": present, "v106_notify_arena_comment": present,
+			"v106_comments_notify_trigger": present, "arena_interest_preferences": present,
+			"explore_challenge_results": present, "postgis_geometry_type": present,
+			"reputation_rls_enabled": present, "h3_reputation_owner_gate": present,
+			"h2_lesson_content_guarded": present, "h1_notify_guarded": present,
 		}}}, nil
 	}
 	if q == managedSQL {
+		if m.managedRow != nil {
+			return Result{Rows: []map[string]any{m.managedRow}}, nil
+		}
 		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true, "cron_preloaded": true, "cron_catalog": true}}}, nil
 	}
 	if q == `select to_regclass('cron.job') is not null as cron_catalog` {

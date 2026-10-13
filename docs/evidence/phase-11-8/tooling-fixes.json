@@ -1,0 +1,32 @@
+{
+  "step": "phase-11-8",
+  "fixes": [
+    {
+      "id": "D1",
+      "issue": "Three committed migrations carry a UTF-8 BOM (ef bb bf); `supabase db reset` fails with SQLSTATE 42601 on a fresh clone, so the pgTAP suite cannot run.",
+      "fix": "scripts/local-pgtap-staging.mjs stages a disposable project whose supabase/migrations are the REVIEWED BOM-stripped compatibility artifacts (same bytes migrated to hosted).",
+      "frozen_bytes_changed": false,
+      "verified": "106 migrations applied; manifest 5c39f97c; local-pgtap-final.tap.log"
+    },
+    {
+      "id": "D2",
+      "issue": "001_media_storage.sql #23 expects an exception on direct SQL delete of a storage object, which requires the storage-api protect_delete trigger. The CLI-pinned storage-api v1.26.5 has no such migration; v1.69.11/v1.77.5/v1.79.36 ship migrations/tenant/0055-prevent-direct-deletes.sql.",
+      "fix": "Local, disposable-only image alias: docker tag storage-api:v1.69.11 storage-api:v1.26.5 (original image id sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c).",
+      "scope": "local test environment only; no repository or hosted change",
+      "restore": "docker tag sha256:e6b603040889a574b641b46f7876dfae1d0aa5c3c2e07eb0551f812c0f5ccb6c public.ecr.aws/supabase/storage-api:v1.26.5",
+      "verified": "001_media_storage.sql PASS 24/24"
+    },
+    {
+      "id": "D3",
+      "issue": "066_arena_interest_preferences.sql #20 requires an account that existed when 20261008134000 backfilled preferences; a fresh database has zero users at that moment.",
+      "fix": "Harness-only seed (supabase/seeds/00_harness_prereqs.sql) inserts one returning account plus its completed preference row after migrations. Not a migration; never applied to hosted.",
+      "verified": "066_arena_interest_preferences.sql PASS 20/20"
+    },
+    {
+      "id": "D4",
+      "issue": "Ten dblink concurrency suites cannot run: dblink is not a trusted extension and the local postgres role is deliberately non-superuser, so both `create extension dblink` and dblink TCP authentication fail.",
+      "fix": "Disposable-only environment step: `alter role postgres superuser` (via supabase_admin). No test or migration bytes changed. No test asserts a non-superuser postgres.",
+      "verified": "10/10 committed-concurrency suites PASS (3444 total assertions)"
+    }
+  ]
+}

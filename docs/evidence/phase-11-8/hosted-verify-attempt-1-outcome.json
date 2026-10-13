@@ -1,0 +1,9 @@
+{
+  "candidate": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "completed_items": 0,
+  "database_security_passed": false,
+  "failure": "expected migrated objects missing or unguarded; drift detected",
+  "mode": "verify-complete",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "success": false
+}

@@ -1,0 +1,35 @@
+{
+  "step": "phase-11-8",
+  "basis": "mechanical classification of all 89 suites in supabase/tests (dblink use, DML/DDL presence)",
+  "categories": {
+    "read_only_catalog": {
+      "count": 5,
+      "files": ["029_list_arena_topic_rooms.sql", "030_watch_arena_room.sql", "034_explore_for_you.sql", "049_arena_expressive_media.sql", "050_arena_crews_foundation.sql"],
+      "execution_class": "read-only SQL; safe to run against hosted without writes",
+      "note": "assert catalog/privilege state only (no fixtures, no DML)"
+    },
+    "disposable_transactional": {
+      "count": 74,
+      "execution_class": "requires a disposable database",
+      "note": "write fixtures (auth.users, profiles, arena rows) inside begin/rollback; nothing commits"
+    },
+    "committed_concurrency": {
+      "count": 10,
+      "files": ["053_arena_correctness_foundation.sql", "055_arena_duel_concurrency.sql", "057_arena_challenge_concurrency.sql", "059_arena_crowd_concurrency.sql", "067_arena_interest_concurrency.sql", "071_canonical_authorization_concurrency.sql", "073_official_submission_concurrency.sql", "076_maintenance_batch_contention.sql", "078_arena_question_concurrency.sql", "080_arena_editorial_concurrency.sql"],
+      "execution_class": "requires a disposable database with independent committed sessions (dblink) and a superuser role",
+      "note": "genuine concurrent RPC contention; must never run against hosted staging"
+    }
+  },
+  "hosted_write_required": {
+    "count": 0,
+    "note": "no suite needs hosted writes; all 89 executed successfully against a disposable database"
+  },
+  "read_only_hosted_reuse": [
+    "The security-relevant invariants of 087/088 (H1/H2/H3) and of the storage/extension/ledger contracts are already re-verified read-only on hosted by the verify-complete mode.",
+    "The 5 read-only suites could be added to a future authorized hosted read-only run; they currently pass locally."
+  ],
+  "extension_installation": {
+    "hosted_install_authorized": false,
+    "note": "pgtap is not installed on hosted (available only). Installing it requires separate authorization."
+  }
+}

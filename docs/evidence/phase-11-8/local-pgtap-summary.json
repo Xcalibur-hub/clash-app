@@ -1,0 +1,32 @@
+{
+  "step": "phase-11-8",
+  "environment": {
+    "builder": "scripts/local-pgtap-staging.mjs (new reviewable tooling; frozen migration bytes untouched)",
+    "project": "clash_p11_pgtap",
+    "cli": "supabase 2.40.7",
+    "postgres_image": "public.ecr.aws/supabase/postgres:17.6.1.002",
+    "storage_api_image": "v1.69.11 aliased onto the CLI-pinned v1.26.5 tag (disposable local only)",
+    "gotrue_image": "public.ecr.aws/supabase/gotrue:v2.179.0",
+    "migrations_applied": 106,
+    "compatibility_manifest_sha256": "5c39f97c62559b1f5ed175be409480fb3515fded61a16f0b1b33cc3e22768110",
+    "frozen_migration_bytes_modified": false,
+    "harness_only_prerequisites": [
+      "disposable postgres role elevated to superuser so dblink TCP sessions work (never on hosted)",
+      "returning-account row seeded after migrations to satisfy suite 066 #20's migration-time precondition"
+    ]
+  },
+  "result": {
+    "files": 89,
+    "assertions": 3444,
+    "result": "PASS",
+    "failed_files": 0,
+    "not_run": 0,
+    "security_suites": { "085_profile_clash_stats": "PASS", "087_critical_authorization": "PASS", "088_h3_reputation_privacy": "PASS", "089_m1_clash_visibility": "PASS" },
+    "dblink_concurrency_suites": { "count": 10, "result": "PASS" }
+  },
+  "progression": [
+    { "run": "step 7 (uncorrected harness)", "files": 89, "assertions": 3283, "files_passed": 77, "assertion_failures": 2, "not_run": 10 },
+    { "run": "step 8 (corrected harness)", "files": 89, "assertions": 3444, "files_passed": 89, "assertion_failures": 0, "not_run": 0 }
+  ],
+  "raw": "docs/evidence/phase-11-8/local-pgtap-final.tap.log"
+}
