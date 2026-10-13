@@ -270,7 +270,6 @@ const styles = StyleSheet.create({
   itemNested: {
     paddingHorizontal: space.sm + 2,
     paddingVertical: space.sm,
-    borderRadius: 18,
     borderWidth: 0,
     borderLeftWidth: 3,
     borderRadius: 0,
