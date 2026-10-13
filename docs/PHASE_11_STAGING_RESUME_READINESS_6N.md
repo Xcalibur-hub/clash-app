@@ -18,7 +18,7 @@ Staging remains **QUARANTINED**. This step does not run recovery.
 
 | Item | Value |
 |---|---|
-| Implementation branch head | `e48f73ccc3360ae6c526eeea60ca0626d93b89cf` |
+| Implementation branch head | `e48f73ccc3360ae6c526eeea60ca0626d93b89cf` (PR head may include docs-only follow-ups) |
 | Baseline | `75ba8149b160f7c2bb1eba70f34993259bc1c35e` |
 | New code | `tools/hosted-staging/resume.go`, `resume_test.go`; wiring in `executor.go` / `main.go` |
 | Empty-DB `migrate` / `preflight` | **Unchanged** — nonempty ledger still refused for `migrate` |
