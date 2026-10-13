@@ -1,0 +1,54 @@
+{
+  "step": "phase-11-16a",
+  "operation": "controlled fixture and authenticated E2E implementation",
+  "hosted_writes_performed": false,
+  "hosted_requests_performed": 0,
+  "staging_state": "QUARANTINED",
+  "cron_state": "inactive",
+  "deliverables": [
+    "scripts/staging-function-e2e-authenticated.mjs (11 executable assertions)",
+    "scripts/staging-fixtures.mjs (deterministic fixture lifecycle, 3 authorizations)",
+    "scripts/staging-host.mjs (leaf host guard, breaks the import cycle)",
+    "scripts/staging-function-e2e-authenticated.test.mjs (6 tests, mocked HTTP)",
+    "scripts/staging-fixtures.test.mjs (10 tests, mocked SQL runner)"
+  ],
+  "offline_tests": {
+    "staging-function-e2e.test.mjs": { "tests": 9, "pass": 9, "fail": 0 },
+    "staging-function-e2e-authenticated.test.mjs": { "tests": 6, "pass": 6, "fail": 0 },
+    "staging-fixtures.test.mjs": { "tests": 10, "pass": 10, "fail": 0 },
+    "staging-functions-deploy.test.mjs": { "tests": 19, "pass": 19, "fail": 0 },
+    "total": 44
+  },
+  "fail_closed_verified": [
+    { "probe": "authenticated suite, no environment", "outcome": "STOPPED, exit 1, 0 HTTP" },
+    { "probe": "7 missing-gate variants against a mock", "outcome": "stopped, results empty, fetch calls 0" },
+    { "probe": "fixtures create, no prefix", "outcome": "REFUSING, exit 2" },
+    { "probe": "fixtures create, prefix and URL but no token", "outcome": "REFUSING, exit 1, no connection" },
+    { "probe": "teardown with only the create token", "outcome": "REFUSING, exit 1" },
+    { "probe": "non-staging project URL", "outcome": "REFUSING, exit 2" },
+    { "probe": "unexpected database state (auth_users=3)", "outcome": "REFUSING before any write" },
+    { "probe": "mid-setup failure at statement 4 of 14", "outcome": "stopped, executed=3, no DELETE, evidence kept" }
+  ],
+  "proposed_hosted_writes": {
+    "statements": 14,
+    "new_auth_accounts": 2,
+    "object_bytes_uploaded": 0,
+    "maximum_counts": {
+      "auth_users": 2, "profiles": 2, "creator_vaults": 1, "vault_drops": 1, "media_objects": 1,
+      "vault_subscriptions": 1, "creator_courses": 1, "course_lessons": 2, "creator_ai_profiles": 1,
+      "creator_ai_conversations": 1, "creator_ai_messages": 1, "digital_creator_sessions": 1
+    },
+    "cleanup": "13 prefix-scoped, ordered, idempotent DELETEs; evidence preserved unless --purge-evidence"
+  },
+  "defects_found_and_fixed": [
+    "ctx.fetchImpl reference error made every authenticated function call fail",
+    "assertScoped reported an unlabeled unscoped write before the unbounded-DELETE case",
+    "circular import deadlocked the harness CLI (Node exit 13); fixed with scripts/staging-host.mjs"
+  ],
+  "authorizations_required": {
+    "create": "STAGING_FIXTURES_CREATE_AUTHORIZATION=fixture-create:zrutlrhhvfcsmssjiijl",
+    "execute": "STAGING_FIXTURES_EXECUTE_AUTHORIZATION=fixture-execute:zrutlrhhvfcsmssjiijl",
+    "cleanup": "STAGING_FIXTURES_CLEANUP_AUTHORIZATION=fixture-cleanup:zrutlrhhvfcsmssjiijl"
+  },
+  "raw_evidence_location": ".expo/staging-e2e/step16a, .expo/staging-fixtures/step16a* (untracked, local only)"
+}

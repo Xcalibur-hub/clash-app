@@ -11,23 +11,13 @@
  * The harness refuses any host that is not exactly the staging Edge Function host.
  */
 import { createHmac } from 'node:crypto';
+import { FUNCTIONS_V1, STAGING_HOST, assertStagingTarget, buildFunctionUrl } from './staging-host.mjs';
 
-export const STAGING_HOST = 'zrutlrhhvfcsmssjiijl.supabase.co';
-export const FUNCTIONS_V1 = '/functions/v1/';
+// Re-exported so existing callers and tests keep their single import site.
+export { FUNCTIONS_V1, STAGING_HOST, assertStagingTarget, buildFunctionUrl };
+
 export const DEPLOYED = ['vault-media-access', 'course-lesson-media-access', 'creator-ai', 'digital-creator'];
 export const NOT_DEPLOYED = ['arena-editorial', 'arena-gifs'];
-
-export function assertStagingTarget(url) {
-  const u = new URL(url);
-  if (u.protocol !== 'https:') throw new Error('refusing: https required');
-  if (u.hostname !== STAGING_HOST) throw new Error(`refusing: not the staging Edge Function host (${u.hostname})`);
-  return true;
-}
-
-export function buildFunctionUrl(name, host = STAGING_HOST) {
-  assertStagingTarget(`https://${host}`);
-  return `https://${host}${FUNCTIONS_V1}${name}`;
-}
 
 /** HS256 JWT builder for negative-auth probes only (never a real credential). */
 export function craftJwt({ secret, role = 'authenticated', exp, sub = '00000000-0000-0000-0000-000000000000' }) {
@@ -144,27 +134,36 @@ export async function runNoFixtureSuite() {
   return results;
 }
 
-/** Fixture prerequisites plus the explicit authorization required to run them. */
-export function planAuthenticated(env = process.env) {
+/**
+ * The PLAN-level gate (Step 15 semantics, tightened in Step 16A): the run is allowed only
+ * when the fixtures exist for this very prefix, the credential inputs are present, and the
+ * separate *execution* authorization was granted. Execution additionally re-checks this in
+ * `authenticatedGate`, so a `runnable: true` here is necessary but never sufficient.
+ */
+export function planAuthenticated(env = process.env, manifest = null) {
+  const ref = STAGING_HOST.split('.')[0];
   const haveUrl = (env.STAGING_SUPABASE_URL ?? '') === `https://${STAGING_HOST}`;
   const haveAnon = Boolean(env.STAGING_ANON_KEY);
   const haveUser = Boolean(env.STAGING_TEST_EMAIL && env.STAGING_TEST_PASSWORD) || Boolean(env.STAGING_TEST_ACCESS_TOKEN);
-  const authorized = env.STAGING_FIXTURES_AUTHORIZATION === `fixtures:${STAGING_HOST.split('.')[0]}`;
-  const runnable = haveUrl && haveAnon && haveUser && authorized;
+  const authorized = env.STAGING_FIXTURES_EXECUTE_AUTHORIZATION === `fixture-execute:${ref}`;
+  const hasManifest = Boolean(manifest?.prefix && manifest?.ids);
+  const prefixMatches = hasManifest && env.STAGING_FIXTURE_PREFIX === manifest.prefix;
+  const runnable = haveUrl && haveAnon && haveUser && authorized && hasManifest && prefixMatches;
   return {
-    runnable, haveUrl, haveAnon, haveUser, authorized,
+    runnable, haveUrl, haveAnon, haveUser, authorized, hasManifest, prefixMatches,
     reason: runnable
-      ? 'fixture credentials and explicit authorization present'
-      : 'NEEDS_FIXTURE_AUTHORIZATION: a test account, the project anon key, and STAGING_FIXTURES_AUTHORIZATION=fixtures:<ref>',
+      ? 'fixtures, credentials and the execution authorization are all present'
+      : `NEEDS_FIXTURE_AUTHORIZATION: fixtures for the run prefix, a test account, the project anon key, and STAGING_FIXTURES_EXECUTE_AUTHORIZATION=fixture-execute:${ref}`,
   };
 }
 
 
 function parse(argv) {
-  const out = { suite: 'no-fixture', evidence: `.expo/staging-e2e/${Date.now()}` };
+  const out = { suite: 'no-fixture', evidence: `.expo/staging-e2e/${Date.now()}`, manifest: '' };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--suite') out.suite = String(argv[++i] ?? '');
     else if (argv[i] === '--evidence-dir') out.evidence = String(argv[++i] ?? '');
+    else if (argv[i] === '--manifest') out.manifest = String(argv[++i] ?? '');
     else throw new Error(`unknown argument: ${argv[i]}`);
   }
   return out;
@@ -188,13 +187,17 @@ if (invokedDirectly()) {
       evidence.authenticated_prerequisites = planAuthenticated();
       evidence.result = 'PLAN ONLY';
     } else if (args.suite === 'authenticated') {
-      const p = planAuthenticated();
+      // The eleven checks are EXECUTABLE. They run only when every gate passes; otherwise
+      // the suite stops without sending an authenticated request.
+      const { runAuthenticatedSuite } = await import('./staging-function-e2e-authenticated.mjs');
+      const manifest = args.manifest ? JSON.parse(fs.readFileSync(args.manifest, 'utf8')) : null;
+      const p = planAuthenticated(process.env, manifest);
+      const run = await runAuthenticatedSuite({ fetchImpl: fetch, manifest, log: (line) => console.log(line) });
       evidence.authenticated_prerequisites = p;
       evidence.plan = AUTHENTICATED_PLAN;
-      evidence.result = 'STOPPED';
-      evidence.reason = p.runnable
-        ? 'authenticated fixture calls are not enabled in this step; run them under the fixture authorization plan'
-        : p.reason;
+      evidence.authenticated = run;
+      evidence.result = run.stopped ? 'STOPPED' : run.failed === 0 ? 'PASS' : 'FAIL';
+      evidence.reason = run.stopped ? run.reason : `${run.passed}/${run.total} authenticated checks passed`;
     } else {
       const results = await runNoFixtureSuite();
       evidence.results = results;

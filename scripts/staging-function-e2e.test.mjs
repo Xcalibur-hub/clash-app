@@ -79,8 +79,15 @@ test('the authenticated suite refuses to run without fixtures and explicit autho
   assert.match(denied.reason, /NEEDS_FIXTURE_AUTHORIZATION/);
   const partial = planAuthenticated({ STAGING_SUPABASE_URL: `https://${STAGING_HOST}`, STAGING_ANON_KEY: 'x' });
   assert.equal(partial.runnable, false);
-  const wrongRef = planAuthenticated({ STAGING_SUPABASE_URL: `https://${STAGING_HOST}`, STAGING_ANON_KEY: 'x', STAGING_TEST_EMAIL: 'a@b.c', STAGING_TEST_PASSWORD: 'x', STAGING_FIXTURES_AUTHORIZATION: 'fixtures:otherref' });
+  const wrongRef = planAuthenticated({ STAGING_SUPABASE_URL: `https://${STAGING_HOST}`, STAGING_ANON_KEY: 'x', STAGING_TEST_EMAIL: 'a@b.c', STAGING_TEST_PASSWORD: 'x', STAGING_FIXTURES_EXECUTE_AUTHORIZATION: 'fixture-execute:otherref' });
   assert.equal(wrongRef.runnable, false);
-  const ok = planAuthenticated({ STAGING_SUPABASE_URL: `https://${STAGING_HOST}`, STAGING_ANON_KEY: 'x', STAGING_TEST_EMAIL: 'a@b.c', STAGING_TEST_PASSWORD: 'x', STAGING_FIXTURES_AUTHORIZATION: `fixtures:${STAGING_HOST.split('.')[0]}` });
-  assert.equal(ok.runnable, true);
+  const full = { STAGING_SUPABASE_URL: `https://${STAGING_HOST}`, STAGING_ANON_KEY: 'x', STAGING_TEST_EMAIL: 'a@b.c', STAGING_TEST_PASSWORD: 'x', STAGING_FIXTURES_EXECUTE_AUTHORIZATION: `fixture-execute:${STAGING_HOST.split('.')[0]}` };
+  // The Step 15 token is NOT enough any more: fixtures + the matching prefix are required too.
+  assert.equal(planAuthenticated({ ...full, STAGING_FIXTURES_AUTHORIZATION: `fixtures:${STAGING_HOST.split('.')[0]}` }).runnable, false);
+  const manifest = { prefix: 'p11f_abcd1234', ids: { dropId: 'p11f_abcd1234_drop' } };
+  assert.equal(planAuthenticated(full, manifest).runnable, false, 'prefix must match the manifest');
+  const okPlan = planAuthenticated({ ...full, STAGING_FIXTURE_PREFIX: manifest.prefix }, manifest);
+  assert.equal(okPlan.runnable, true);
+  assert.equal(okPlan.hasManifest, true);
+  assert.equal(okPlan.prefixMatches, true);
 });
