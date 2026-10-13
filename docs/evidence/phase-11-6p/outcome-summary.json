@@ -1,10 +1,13 @@
 {
   "step": "6P",
-  "verdict": "BLOCKED",
-  "job_verified_inactive": false,
-  "job_verified_quiescent": false,
-  "pause_executed": false,
+  "verdict": "SUCCESS",
+  "job_verified_inactive": true,
+  "job_verified_quiescent": true,
+  "jobid": "1",
+  "job_name": "clash-maintenance",
+  "wrote_active_false": true,
+  "pause_executed": true,
   "staging_quarantine": "RETAINED",
-  "recovery_still_blocked": true,
-  "next": "restore operator IPv6, then re-authorize one pause-cron:zrutlrhhvfcsmssjiijl; do not auto-start 6Q"
+  "resume_still_requires_separate_authorization": true,
+  "step_6q_auto_started": false
 }

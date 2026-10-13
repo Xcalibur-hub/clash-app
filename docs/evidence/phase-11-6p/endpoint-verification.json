@@ -1,5 +1,5 @@
 {
-  "source": "Step 6P pre-connect verification",
+  "source": "Step 6P pre-connect verification (successful attempt)",
   "approved": {
     "project": "clash-staging",
     "project_ref": "zrutlrhhvfcsmssjiijl",
@@ -18,10 +18,10 @@
   "concurrent_hosted_staging_process": false,
   "network_precheck": {
     "aaaa": "2406:da14:1772:ea01:905e:38ac:2bd2:bfe6",
-    "global_ipv6": false,
-    "default_ipv6_route": false,
-    "tcp_5432_ipv6": "UNREACHABLE_NETWORK"
+    "global_ipv6": true,
+    "default_ipv6_route": true,
+    "tcp_5432_ipv6": "CONNECTED",
+    "tcp_connect_ms": 185
   },
-  "pause_executed": false,
-  "writes_performed": false
+  "pause_executed": true
 }

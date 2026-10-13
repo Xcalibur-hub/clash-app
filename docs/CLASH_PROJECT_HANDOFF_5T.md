@@ -2,9 +2,9 @@
 
 12 October 2026. **Frozen integration candidate; clash-staging remains QUARANTINED after partial migration; root cause identified; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
-## Step 6P: authorized live cron pause (BLOCKED before connect)
+## Step 6P: authorized live cron pause (SUCCESS — quarantine retained)
 
-[Step 6P report](PHASE_11_STAGING_CRON_PAUSE_6P.md): authorization `pause-cron:zrutlrhhvfcsmssjiijl` accepted; executor/binary/CA/credential gates passed; **direct IPv6 unreachable** on operator host → **pause not executed**. Job inactive/quiescent **not** verified this step. Quarantine retained. Do not auto-start resume (6Q).
+[Step 6P report](PHASE_11_STAGING_CRON_PAUSE_6P.md): `pause-cron:zrutlrhhvfcsmssjiijl` set `clash-maintenance` (`jobid=1`) **active=false** via `cron.alter_job`; quiescence `history_and_activity_clear`. Staging remains **QUARANTINED**. Resume still needs separate authorization. Do not auto-start 6Q.
 
 ## Step 6O.1: cron pause hardening (FILE-ONLY)
 
