@@ -21,6 +21,25 @@ function publicVaultMediaUrl(path: string | null | undefined): string | null {
   }
 }
 
+/**
+ * The media URL for one discovery item.
+ *
+ * A Vault item may only ever carry media derived from its public path. The visibility gate above
+ * validates `accessLevel` + `publicMediaPath`, so a payload-supplied `mediaUrl` is NOT trusted for
+ * VAULT_PREVIEW: it could point at restricted media, at another bucket, or anywhere else. Deriving
+ * the URL from the public path keeps the client invariant ("Explore never renders private media")
+ * true regardless of what the payload says. Other kinds keep the server URL, because their media is
+ * ordinary public content and the field is part of their contract.
+ */
+function exploreItemMediaUrl(
+  kind: ExploreViralKind | null,
+  mediaUrl: string | null,
+  publicMediaPath: string | null,
+): string | null {
+  if (kind === 'VAULT_PREVIEW') return publicVaultMediaUrl(publicMediaPath);
+  return mediaUrl;
+}
+
 function client() {
   return requireSupabase();
 }
@@ -463,7 +482,7 @@ export async function fetchGlobalViral(limit = 12): Promise<ExploreViralItem[]> 
       score: num(r.score) ?? 0,
       countryCode: str(r.countryCode),
       href: str(r.href),
-      mediaUrl: str(r.mediaUrl) ?? publicVaultMediaUrl(str(r.publicMediaPath)),
+      mediaUrl: exploreItemMediaUrl(kind, str(r.mediaUrl), str(r.publicMediaPath)),
       accessLevel: access === 'free' || access === 'preview' ? access : null,
     });
   }
@@ -509,7 +528,7 @@ function toForYouItem(raw: unknown): ExploreForYouItem | null {
     subtitle: str(r.subtitle),
     creatorId: str(r.creatorId),
     countryCode: str(r.countryCode),
-    mediaUrl: str(r.mediaUrl) ?? publicVaultMediaUrl(str(r.publicMediaPath)),
+    mediaUrl: exploreItemMediaUrl(kind, str(r.mediaUrl), str(r.publicMediaPath)),
     href: str(r.href),
     score: num(r.score) ?? 0,
     accessLevel: access === 'free' || access === 'preview' ? access : null,
@@ -609,7 +628,7 @@ export async function fetchTeleportCandidate(
     title,
     countryCode: str(candidate.countryCode),
     href: str(candidate.href),
-    mediaUrl: str(candidate.mediaUrl) ?? publicVaultMediaUrl(str(candidate.publicMediaPath)),
+    mediaUrl: exploreItemMediaUrl(kind, str(candidate.mediaUrl), str(candidate.publicMediaPath)),
     accessLevel: access === 'free' || access === 'preview' ? access : null,
   };
 }

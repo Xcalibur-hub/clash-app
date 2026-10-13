@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  explorePageOutcome,
   explorePayloadMessage,
   explorePayloadNeedsRetry,
   explorePayloadReport,
@@ -72,5 +73,41 @@ describe('explorePayloadNeedsRetry', () => {
     assert.equal(explorePayloadNeedsRetry('partial'), false);
     assert.equal(explorePayloadNeedsRetry('empty'), false);
     assert.equal(explorePayloadNeedsRetry('ok'), false);
+  });
+});
+
+describe('explorePageOutcome', () => {
+  it('advances the cursor for a genuinely empty page, with no error copy', () => {
+    const outcome = explorePageOutcome(explorePayloadReport(0, 0));
+    assert.equal(outcome.advanceCursor, true, 'an empty page is real progress');
+    assert.equal(outcome.retryThisPage, false);
+    assert.equal(outcome.error, null);
+    assert.equal(outcome.notice, null);
+  });
+
+  it('keeps the cursor and retries the page when every row was unreadable', () => {
+    const outcome = explorePageOutcome(explorePayloadReport(24, 0));
+    assert.equal(outcome.advanceCursor, false, 'advancing would skip that data for the session');
+    assert.equal(outcome.retryThisPage, true, 'Retry must re-request THIS page, not page 0');
+    assert.match(outcome.error, /could not read what the server sent/);
+    assert.equal(outcome.notice, null);
+  });
+
+  it('advances and notes when only some rows were unreadable', () => {
+    const outcome = explorePageOutcome(explorePayloadReport(24, 20));
+    assert.equal(outcome.advanceCursor, true, 'usable rows were returned, so paging continues');
+    assert.equal(outcome.retryThisPage, false);
+    assert.equal(outcome.error, null);
+    assert.match(outcome.notice, /could not be shown/);
+  });
+
+  it('treats a fully mapped page as a plain success', () => {
+    const outcome = explorePageOutcome(explorePayloadReport(24, 24));
+    assert.deepEqual(outcome, { advanceCursor: true, retryThisPage: false, error: null, notice: null });
+  });
+
+  it('defaults to plain success when a caller has no report', () => {
+    assert.deepEqual(explorePageOutcome(undefined), { advanceCursor: true, retryThisPage: false, error: null, notice: null });
+    assert.deepEqual(explorePageOutcome(null), { advanceCursor: true, retryThisPage: false, error: null, notice: null });
   });
 });

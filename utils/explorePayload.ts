@@ -56,3 +56,48 @@ export function explorePayloadMessage(
 export function explorePayloadNeedsRetry(state: ExplorePayloadState): boolean {
   return state === 'all_rejected';
 }
+
+/** What the feed must do with one loaded page. */
+export interface ExplorePageOutcome {
+  /** May the feed cursor move past this page? */
+  advanceCursor: boolean;
+  /** Must the retry action re-request this page instead of reloading the feed from the start? */
+  retryThisPage: boolean;
+  /** Blocking copy, or null. */
+  error: string | null;
+  /** Non-blocking copy, or null. */
+  notice: string | null;
+}
+
+/**
+ * Paging policy for a single page.
+ *
+ * A page whose rows all arrived unreadable must NOT advance the cursor — otherwise that data is
+ * skipped for the rest of the session and no retry can reach it — and the retry must re-request the
+ * same page rather than resetting the feed (which would also discard the pages already loaded).
+ * A genuinely empty page DOES advance: it is real progress with nothing to show.
+ */
+export function explorePageOutcome(
+  report: ExplorePayloadReport | null | undefined,
+  subject = 'Explore',
+): ExplorePageOutcome {
+  if (!report) return { advanceCursor: true, retryThisPage: false, error: null, notice: null };
+  const state = explorePayloadState(report);
+  if (state === 'all_rejected') {
+    return {
+      advanceCursor: false,
+      retryThisPage: true,
+      error: explorePayloadMessage(state, subject),
+      notice: null,
+    };
+  }
+  if (state === 'partial') {
+    return {
+      advanceCursor: true,
+      retryThisPage: false,
+      error: null,
+      notice: explorePayloadMessage(state, subject),
+    };
+  }
+  return { advanceCursor: true, retryThisPage: false, error: null, notice: null };
+}

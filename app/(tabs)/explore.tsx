@@ -70,6 +70,7 @@ import {
   type ForYouFilterId,
 } from '../../utils/exploreNav';
 import {
+  explorePageOutcome,
   explorePayloadMessage,
   explorePayloadNeedsRetry,
   explorePayloadState,
@@ -112,6 +113,8 @@ function ExploreScreen(): React.JSX.Element {
   const [dataNotice,setDataNotice] = React.useState<string|null>(null);
   /** Mapping counts for the current feed, so emptiness and unreadability stay distinguishable. */
   const [feedReport,setFeedReport] = React.useState<ExplorePayloadReport|null>(null);
+  /** True when the last paging attempt could not be read, so Retry must re-request that same page. */
+  const [pagingRetry,setPagingRetry] = React.useState(false);
   React.useEffect(()=>{clearTeleportHistory();return()=>{if(teleportTimer.current)clearTimeout(teleportTimer.current);};},[]);
 
   const [pickerOpen, setPickerOpen] = React.useState(false);
@@ -144,6 +147,7 @@ function ExploreScreen(): React.JSX.Element {
     setError(null);
     setDataNotice(null);
     setFeedReport(null);
+    setPagingRetry(false);
     void Promise.all([fetchExploreWorldSummary(), fetchExploreForYou(24, 0), fetchExploreLive(20)])
       .then(([world, page, liveFeed]) => {
         if (cancelled) return;
@@ -258,22 +262,29 @@ function ExploreScreen(): React.JSX.Element {
       const page = await fetchExploreForYou(24, forYouCursor);
       if(!isCurrent() || generation!==feedGeneration.current)return;
       setForYou((prev) => diversifyByCreator(dedupeExploreItems([...prev, ...page.items])));
-      setForYouCursor(page.nextCursor);
-      // An extra page that could not be read must say so rather than silently appending nothing.
-      const pageState = page.report ? explorePayloadState(page.report) : 'ok';
-      if (explorePayloadNeedsRetry(pageState)) {
-        setError(explorePayloadMessage('all_rejected') ?? 'Could not load more. Scroll to retry.');
-      } else if (pageState === 'partial') {
-        setDataNotice(explorePayloadMessage('partial'));
-      } else {
-        setDataNotice(null);
-      }
+      // An unreadable page must not advance the cursor, or its data is skipped for the session and
+      // no retry can reach it. `retryThisPage` then makes Retry re-request this page, not page 0.
+      const outcome = explorePageOutcome(page.report);
+      if (outcome.advanceCursor) setForYouCursor(page.nextCursor);
+      setPagingRetry(outcome.retryThisPage);
+      setError(outcome.error);
+      setDataNotice(outcome.notice);
     } catch {
       if(isCurrent() && generation===feedGeneration.current)setError('Could not load more. Scroll to retry.');
     } finally {
       if(isCurrent() && generation===feedGeneration.current){paging.current=false;setLoadingMore(false);}
     }
   }, [forYouCursor, isCurrent, loading]);
+
+  /**
+   * Retry routing: a paging failure re-requests the page that failed (the cursor was deliberately
+   * not advanced), so the already-loaded pages and the scroll position survive. Any other failure
+   * keeps the existing behaviour and reloads the feed.
+   */
+  const retryExplore = React.useCallback(() => {
+    if (pagingRetry) void loadMoreForYou();
+    else setRetry((n) => n + 1);
+  }, [pagingRetry, loadMoreForYou]);
 
   const filteredForYou = React.useMemo(() => {
     if (forYouFilter === 'all') return forYou;
@@ -359,7 +370,7 @@ function ExploreScreen(): React.JSX.Element {
         }}
       >
         {compactHeader}
-        {error ? <Pressable accessibilityRole="button" accessibilityLabel="Retry Explore" onPress={()=>setRetry(n=>n+1)}><Text style={{color:t.textSecondary}}>{error} Tap to retry.</Text></Pressable> : null}
+        {error ? <Pressable accessibilityRole="button" accessibilityLabel="Retry Explore" onPress={retryExplore}><Text style={{color:t.textSecondary}}>{error} Tap to retry.</Text></Pressable> : null}
         {dataNotice ? (
           <Text allowFontScaling={false} style={{ color: t.textMuted, marginTop: space.xs }}>
             {dataNotice}

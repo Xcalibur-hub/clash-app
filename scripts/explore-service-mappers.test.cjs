@@ -475,3 +475,54 @@ test('the vault shelf report counts rows the visibility rule refused, without le
   assert.equal(array.length, 1);
   assert.equal(array[0].dropId, 'd1');
 });
+
+// ── S6 finding 4: a Vault item must not render a server-supplied URL ─────────────────────
+
+test('a Vault item never renders a server-supplied media URL', async () => {
+  const hostile = 'https://evil.example/tracker.png';
+  const vault = (over = {}) => viralRow({
+    kind: 'VAULT_PREVIEW', id: 'd1', title: 'Free drop', accessLevel: 'free',
+    publicMediaPath: 'creator/m1.jpg', mediaUrl: hostile, ...over,
+  });
+
+  const viral = await call(() => explore.fetchGlobalViral(), { items: [vault()] });
+  assert.equal(viral[0].mediaUrl, publicMediaUrl('creator/m1.jpg'), 'derived from the public path');
+  assert.equal(viral[0].mediaUrl.includes('evil.example'), false, 'a payload URL must not reach the client');
+
+  const feed = await call(() => explore.fetchExploreForYou(), { items: [vault()], nextCursor: null });
+  assert.equal(feed.items[0].mediaUrl, publicMediaUrl('creator/m1.jpg'), 'the feed obeys the same rule');
+
+  const teleport = await call(() => explore.fetchTeleportCandidate(), { candidate: vault() });
+  assert.equal(teleport.mediaUrl, publicMediaUrl('creator/m1.jpg'), 'so does teleport');
+
+  // A Vault item with no public path is still dropped outright, whatever URL it carries.
+  const dropped = await call(() => explore.fetchGlobalViral(), { items: [vault({ publicMediaPath: null })] });
+  assert.deepEqual(dropped, []);
+
+  // Non-Vault kinds keep the server URL: their contract is unchanged.
+  const take = await call(() => explore.fetchGlobalViral(), {
+    items: [viralRow({ kind: 'TAKE', mediaUrl: 'https://cdn.example/take.jpg' })],
+  });
+  assert.equal(take[0].mediaUrl, 'https://cdn.example/take.jpg');
+  const live = await call(() => explore.fetchExploreForYou(), {
+    items: [viralRow({ kind: 'LIVE_ARENA', mediaUrl: 'https://cdn.example/live.jpg' })], nextCursor: null,
+  });
+  assert.equal(live.items[0].mediaUrl, 'https://cdn.example/live.jpg');
+});
+
+// ── S6 finding 5: an unreadable page must not advance the cursor ─────────────────────────
+
+test('an unreadable page keeps its cursor so a retry can reach it', async () => {
+  const page = await call(() => explore.fetchExploreForYou(), { items: [null, 7], nextCursor: 48 });
+  assert.deepEqual(page.items, []);
+  assert.equal(page.nextCursor, 48, 'the payload still carries the cursor the server sent');
+  const outcome = payload.explorePageOutcome(page.report);
+  assert.equal(outcome.advanceCursor, false, 'the feed must not move past unreadable data');
+  assert.equal(outcome.retryThisPage, true, 'and Retry must re-request this page');
+
+  const partial = await call(() => explore.fetchExploreForYou(), { items: [viralRow(), null], nextCursor: 72 });
+  assert.equal(payload.explorePageOutcome(partial.report).advanceCursor, true, 'usable rows keep paging');
+
+  const empty = await call(() => explore.fetchExploreForYou(), { items: [], nextCursor: 96 });
+  assert.equal(payload.explorePageOutcome(empty.report).advanceCursor, true, 'an empty page is progress');
+});
