@@ -1,0 +1,22 @@
+{
+  "step": "6O.1",
+  "mode": "file-only",
+  "hosted_connection": false,
+  "pause_executed": false,
+  "offline_ready": true,
+  "live_pause_authorized": false,
+  "go_test": "ok",
+  "go_vet": "pass",
+  "pause_cron_related_tests_pass": true,
+  "new_hardening_cases": [
+    "TestPauseCronRollbackUnconfirmedAfterRereadFailure",
+    "TestPauseCronUnexpectedUnfinishedStatus",
+    "TestPauseCronStaleUnfinishedExecution",
+    "TestPauseCronMissingRunHistoryEvidence",
+    "TestPauseCronIncompleteActivityEvidence",
+    "TestPauseCronConcurrentOrNewlyStartedExecution",
+    "TestPauseCronLiveJobPIDBlocksQuiescence",
+    "TestPauseCronQuiescenceTimeout"
+  ],
+  "staging_quarantine_unchanged": true
+}

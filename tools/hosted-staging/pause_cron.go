@@ -23,14 +23,52 @@ const pauseCronAlterProcSQL = `select to_regprocedure('cron.alter_job(bigint,tex
 const pauseCronSelectSQL = `select jobid::text as jobid, jobname, schedule, command, username, active
   from cron.job where jobname=$1 order by jobid`
 const pauseCronAlterSQL = `select cron.alter_job($1::bigint, null, null, null, null, false)`
-const pauseCronRunningSQL = `select count(*)::int as running
-  from cron.job_run_details
-  where jobid=$1::bigint
-    and (
-      status in ('starting','running')
-      or (end_time is null and start_time > now() - interval '15 minutes')
-    )`
-// Test seam for quiescence polling.
+
+// History alone never proves quiescence. Unfinished/ambiguous run rows fail closed.
+// Known in-progress statuses include starting/running plus connecting/sending.
+const pauseCronHistorySQL = `select
+  count(*) filter (
+    where end_time is null
+       or status in ('starting','running','connecting','sending')
+  )::int as unfinished,
+  count(*) filter (
+    where end_time is null
+      and coalesce(start_time, '-infinity'::timestamptz) <= now() - interval '15 minutes'
+  )::int as stale_unfinished,
+  count(*) filter (
+    where end_time is null
+      and status is not null
+      and status not in ('starting','running','connecting','sending','succeeded','failed')
+  )::int as unexpected_status,
+  count(*)::int as history_rows
+from cron.job_run_details
+where jobid=$1::bigint
+  and (
+    end_time is null
+    or start_time is null
+    or start_time > now() - interval '30 minutes'
+  )`
+
+// Live backends matching the maintenance command (or unfinished run PIDs).
+const pauseCronActivitySQL = `select
+  (
+    select count(*)::int
+    from pg_stat_activity
+    where datname = current_database()
+      and pid <> pg_backend_pid()
+      and query ilike '%public.run_maintenance(500)%'
+      and coalesce(state, '') <> 'idle'
+  ) as active_backends,
+  (
+    select count(*)::int
+    from cron.job_run_details d
+    join pg_stat_activity a on a.pid = d.job_pid
+    where d.jobid = $1::bigint
+      and d.end_time is null
+      and d.job_pid is not null
+  ) as live_job_pids`
+
+// Test seams for quiescence polling.
 var pauseCronSleep = time.Sleep
 
 var pauseCronPollInterval = 200 * time.Millisecond
@@ -43,6 +81,15 @@ type pauseCronJob struct {
 	Command  string
 	Username string
 	Active   bool
+}
+
+type quiescenceSnapshot struct {
+	Unfinished       int
+	StaleUnfinished  int
+	UnexpectedStatus int
+	HistoryRows      int
+	ActiveBackends   int
+	LiveJobPIDs      int
 }
 
 func parsePauseCronJobs(rows []map[string]any) ([]pauseCronJob, error) {
@@ -115,15 +162,24 @@ func loadClashMaintenanceJobs(ctx context.Context, s Session) ([]pauseCronJob, e
 	return parsePauseCronJobs(r.Rows)
 }
 
-func runningCount(ctx context.Context, s Session, jobID string) (int, error) {
-	r, e := query(ctx, s, pauseCronRunningSQL, jobID)
-	if e != nil {
-		return 0, e
+// pauseCronRollback never discards a rollback failure. Distinguishes confirmed
+// rollback (return cause) from rollback-unconfirmed (quarantine uncertainty).
+func pauseCronRollback(ctx context.Context, s Session, cause error, unconfirmed string) error {
+	_, rb := query(ctx, s, "rollback")
+	if rb != nil {
+		if unconfirmed == "" {
+			unconfirmed = "pause failed; rollback unconfirmed; quarantine retained"
+		}
+		return errors.New(unconfirmed)
 	}
-	if len(r.Rows) != 1 {
-		return 0, errors.New("incomplete running-job probe")
+	if cause == nil {
+		return errors.New("pause rolled back; quarantine retained")
 	}
-	switch n := r.Rows[0]["running"].(type) {
+	return cause
+}
+
+func asInt(v any, label string) (int, error) {
+	switch n := v.(type) {
 	case int:
 		return n, nil
 	case int32:
@@ -133,22 +189,107 @@ func runningCount(ctx context.Context, s Session, jobID string) (int, error) {
 	case float64:
 		return int(n), nil
 	default:
-		return 0, errors.New("running-job probe malformed")
+		return 0, fmt.Errorf("%s malformed", label)
 	}
+}
+
+func probeCronHistory(ctx context.Context, s Session, jobID string) (quiescenceSnapshot, error) {
+	r, e := query(ctx, s, pauseCronHistorySQL, jobID)
+	if e != nil {
+		return quiescenceSnapshot{}, errors.New("run-history evidence incomplete; quarantine retained")
+	}
+	if len(r.Rows) != 1 {
+		return quiescenceSnapshot{}, errors.New("run-history evidence incomplete; quarantine retained")
+	}
+	row := r.Rows[0]
+	unfinished, e := asInt(row["unfinished"], "unfinished")
+	if e != nil {
+		return quiescenceSnapshot{}, errors.New("run-history evidence incomplete; quarantine retained")
+	}
+	stale, e := asInt(row["stale_unfinished"], "stale_unfinished")
+	if e != nil {
+		return quiescenceSnapshot{}, errors.New("run-history evidence incomplete; quarantine retained")
+	}
+	unexpected, e := asInt(row["unexpected_status"], "unexpected_status")
+	if e != nil {
+		return quiescenceSnapshot{}, errors.New("run-history evidence incomplete; quarantine retained")
+	}
+	historyRows, e := asInt(row["history_rows"], "history_rows")
+	if e != nil {
+		return quiescenceSnapshot{}, errors.New("run-history evidence incomplete; quarantine retained")
+	}
+	return quiescenceSnapshot{
+		Unfinished:       unfinished,
+		StaleUnfinished:  stale,
+		UnexpectedStatus: unexpected,
+		HistoryRows:      historyRows,
+	}, nil
+}
+
+func probeCronActivity(ctx context.Context, s Session, jobID string) (active int, livePIDs int, err error) {
+	r, e := query(ctx, s, pauseCronActivitySQL, jobID)
+	if e != nil {
+		return 0, 0, errors.New("activity evidence incomplete; quarantine retained")
+	}
+	if len(r.Rows) != 1 {
+		return 0, 0, errors.New("activity evidence incomplete; quarantine retained")
+	}
+	active, e = asInt(r.Rows[0]["active_backends"], "active_backends")
+	if e != nil {
+		return 0, 0, errors.New("activity evidence incomplete; quarantine retained")
+	}
+	livePIDs, e = asInt(r.Rows[0]["live_job_pids"], "live_job_pids")
+	if e != nil {
+		return 0, 0, errors.New("activity evidence incomplete; quarantine retained")
+	}
+	return active, livePIDs, nil
+}
+
+func probeQuiescence(ctx context.Context, s Session, jobID string) (quiescenceSnapshot, error) {
+	snap, e := probeCronHistory(ctx, s, jobID)
+	if e != nil {
+		return quiescenceSnapshot{}, e
+	}
+	active, live, e := probeCronActivity(ctx, s, jobID)
+	if e != nil {
+		return quiescenceSnapshot{}, e
+	}
+	snap.ActiveBackends = active
+	snap.LiveJobPIDs = live
+	return snap, nil
+}
+
+// evaluateQuiescence returns (clear, terminalErr). terminalErr stops polling
+// immediately (ambiguous/stale/incomplete). clear=false with nil error means retry.
+func evaluateQuiescence(snap quiescenceSnapshot) (clear bool, terminal error) {
+	if snap.UnexpectedStatus > 0 {
+		return false, errors.New("unexpected unfinished job status; quarantine retained")
+	}
+	if snap.StaleUnfinished > 0 {
+		return false, errors.New("stale unfinished execution; quarantine retained")
+	}
+	if snap.Unfinished > 0 || snap.ActiveBackends > 0 || snap.LiveJobPIDs > 0 {
+		return false, nil
+	}
+	return true, nil
 }
 
 func waitForCronQuiescence(ctx context.Context, s Session, jobID string) error {
 	deadline := time.Now().Add(pauseCronQuiesceTimeout)
 	for {
-		n, e := runningCount(ctx, s, jobID)
+		snap, e := probeQuiescence(ctx, s, jobID)
 		if e != nil {
 			return e
 		}
-		if n == 0 {
+		clear, terminal := evaluateQuiescence(snap)
+		if terminal != nil {
+			return terminal
+		}
+		if clear {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return errors.New("job inactive but execution still running; quarantine retained")
+			return errors.New("quiescence timeout; unknown execution state; quarantine retained")
 		}
 		select {
 		case <-ctx.Done():
@@ -182,6 +323,7 @@ func pauseCron(ctx context.Context, s Session, c Config) (completed int, err err
 		"mechanism":                "cron.alter_job(job_id, active:=false)",
 		"database_security_passed": false,
 		"wrote_active_false":       false,
+		"quiescence_requires":      []string{"job_run_details", "pg_stat_activity"},
 	}
 	defer func() {
 		if evidenceErr := savePauseCronEvidence(c.RunDir, report); evidenceErr != nil && err == nil {
@@ -240,25 +382,20 @@ func pauseCron(ctx context.Context, s Session, c Config) (completed int, err err
 			return 0, e
 		}
 		if _, e = query(ctx, s, pauseCronAlterSQL, job.JobID); e != nil {
-			_, rb := query(ctx, s, "rollback")
-			if rb != nil {
-				return 0, errors.New("pause failed; rollback unconfirmed")
-			}
-			return 0, e
+			return 0, pauseCronRollback(ctx, s, e, "pause failed; rollback unconfirmed; quarantine retained")
 		}
 		// Re-read inside the same transaction before commit.
 		mid, e := loadClashMaintenanceJobs(ctx, s)
 		if e != nil {
-			_, _ = query(ctx, s, "rollback")
-			return 0, e
+			return 0, pauseCronRollback(ctx, s, e, "pause verification failed; rollback unconfirmed; quarantine retained")
 		}
 		midJob, e := expectSingleClashMaintenance(mid)
 		if e != nil || midJob.JobID != job.JobID || midJob.Active {
-			_, rb := query(ctx, s, "rollback")
-			if rb != nil {
-				return 0, errors.New("pause verification failed; rollback unconfirmed")
+			cause := e
+			if cause == nil {
+				cause = errors.New("job remained active after alter_job")
 			}
-			return 0, errors.New("job remained active after alter_job")
+			return 0, pauseCronRollback(ctx, s, cause, "pause verification failed; rollback unconfirmed; quarantine retained")
 		}
 		if _, e = query(ctx, s, "commit"); e != nil {
 			return 0, errors.New("commit outcome unknown; stop and inspect, no retry")
@@ -269,9 +406,10 @@ func pauseCron(ctx context.Context, s Session, c Config) (completed int, err err
 	}
 
 	if e := waitForCronQuiescence(ctx, s, job.JobID); e != nil {
+		report["quiescence"] = "failed"
 		return 0, e
 	}
-	report["quiescence"] = "no_in_progress_execution"
+	report["quiescence"] = "history_and_activity_clear"
 
 	after, e := loadClashMaintenanceJobs(ctx, s)
 	if e != nil {

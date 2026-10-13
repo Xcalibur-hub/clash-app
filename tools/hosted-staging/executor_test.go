@@ -69,6 +69,10 @@ type mock struct {
 	pauseInactive, duplicateCron, missingCronJob    bool
 	wrongCronCommand, alterUnavailable              bool
 	pauseRunning, pauseRunningClearAfter, pausePolls int
+	pauseSelectCalls, failPauseSelectAt             int
+	pauseActivity, pauseLivePIDs                    int
+	pauseHistoryFail, pauseActivityFail             bool
+	pauseHistoryMode                                string // "", "unexpected", "stale", "incomplete"
 	ledger                                          []map[string]any
 	args                                            []any
 }
@@ -176,6 +180,10 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 	case pauseCronAlterProcSQL:
 		return Result{Rows: []map[string]any{{"available": !m.alterUnavailable}}}, nil
 	case pauseCronSelectSQL:
+		m.pauseSelectCalls++
+		if m.failPauseSelectAt > 0 && m.pauseSelectCalls == m.failPauseSelectAt {
+			return Result{}, errors.New("MOCK_SECRET")
+		}
 		if m.missingCronJob {
 			return Result{}, nil
 		}
@@ -191,13 +199,35 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 	case pauseCronAlterSQL:
 		m.pauseInactive = true
 		return Result{Tag: "SELECT 1"}, nil
-	case pauseCronRunningSQL:
+	case pauseCronHistorySQL:
 		m.pausePolls++
-		running := m.pauseRunning
-		if m.pauseRunningClearAfter > 0 && m.pausePolls > m.pauseRunningClearAfter {
-			running = 0
+		if m.pauseHistoryFail {
+			return Result{}, errors.New("MOCK_SECRET")
 		}
-		return Result{Rows: []map[string]any{{"running": running}}}, nil
+		switch m.pauseHistoryMode {
+		case "unexpected":
+			return Result{Rows: []map[string]any{{"unfinished": 1, "stale_unfinished": 0, "unexpected_status": 1, "history_rows": 1}}}, nil
+		case "stale":
+			return Result{Rows: []map[string]any{{"unfinished": 1, "stale_unfinished": 1, "unexpected_status": 0, "history_rows": 1}}}, nil
+		case "incomplete":
+			return Result{Rows: []map[string]any{}}, nil
+		}
+		unfinished := m.pauseRunning
+		if m.pauseRunningClearAfter > 0 && m.pausePolls > m.pauseRunningClearAfter {
+			unfinished = 0
+		}
+		return Result{Rows: []map[string]any{{"unfinished": unfinished, "stale_unfinished": 0, "unexpected_status": 0, "history_rows": unfinished}}}, nil
+	case pauseCronActivitySQL:
+		if m.pauseActivityFail {
+			return Result{}, errors.New("MOCK_SECRET")
+		}
+		active := m.pauseActivity
+		live := m.pauseLivePIDs
+		if m.pauseRunningClearAfter > 0 && m.pausePolls > m.pauseRunningClearAfter {
+			active = 0
+			live = 0
+		}
+		return Result{Rows: []map[string]any{{"active_backends": active, "live_job_pids": live}}}, nil
 	}
 	if q == managedSQL {
 		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true, "cron_preloaded": true, "cron_catalog": true}}}, nil

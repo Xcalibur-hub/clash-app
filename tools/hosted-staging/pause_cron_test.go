@@ -163,8 +163,113 @@ func TestPauseCronQuiescenceTimeout(t *testing.T) {
 	c := configTest(t)
 	os.Mkdir(c.RunDir, 0700)
 	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(&mock{pauseRunning: 1}))
-	if e == nil || !strings.Contains(e.Error(), "still running") {
+	if e == nil || !strings.Contains(e.Error(), "quiescence timeout") || !strings.Contains(e.Error(), "unknown") {
 		t.Fatal(e)
+	}
+}
+
+func TestPauseCronRollbackUnconfirmedAfterRereadFailure(t *testing.T) {
+	c := configTest(t)
+	os.Mkdir(c.RunDir, 0700)
+	m := &mock{failPauseSelectAt: 2, rollbackFail: true}
+	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(m))
+	if e == nil || !strings.Contains(e.Error(), "rollback unconfirmed") {
+		t.Fatal(e)
+	}
+	joined := strings.Join(m.queries, "\n")
+	if !strings.Contains(joined, "begin") || !strings.Contains(joined, pauseCronAlterSQL) || !strings.Contains(joined, "rollback") {
+		t.Fatal("expected begin/alter/rollback path", joined)
+	}
+}
+
+func TestPauseCronUnexpectedUnfinishedStatus(t *testing.T) {
+	c := configTest(t)
+	os.Mkdir(c.RunDir, 0700)
+	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(&mock{pauseHistoryMode: "unexpected"}))
+	if e == nil || !strings.Contains(e.Error(), "unexpected unfinished job status") {
+		t.Fatal(e)
+	}
+}
+
+func TestPauseCronStaleUnfinishedExecution(t *testing.T) {
+	c := configTest(t)
+	os.Mkdir(c.RunDir, 0700)
+	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(&mock{pauseHistoryMode: "stale"}))
+	if e == nil || !strings.Contains(e.Error(), "stale unfinished") {
+		t.Fatal(e)
+	}
+}
+
+func TestPauseCronMissingRunHistoryEvidence(t *testing.T) {
+	c := configTest(t)
+	for _, m := range []*mock{
+		{pauseHistoryMode: "incomplete"},
+		{pauseHistoryFail: true},
+	} {
+		os.RemoveAll(c.RunDir)
+		os.Mkdir(c.RunDir, 0700)
+		_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(m))
+		if e == nil || !strings.Contains(e.Error(), "run-history evidence incomplete") {
+			t.Fatal(e)
+		}
+	}
+}
+
+func TestPauseCronIncompleteActivityEvidence(t *testing.T) {
+	c := configTest(t)
+	os.Mkdir(c.RunDir, 0700)
+	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(&mock{pauseActivityFail: true}))
+	if e == nil || !strings.Contains(e.Error(), "activity evidence incomplete") {
+		t.Fatal(e)
+	}
+}
+
+func TestPauseCronConcurrentOrNewlyStartedExecution(t *testing.T) {
+	oldSleep := pauseCronSleep
+	oldTimeout := pauseCronQuiesceTimeout
+	pauseCronSleep = func(time.Duration) {}
+	pauseCronQuiesceTimeout = 0
+	defer func() {
+		pauseCronSleep = oldSleep
+		pauseCronQuiesceTimeout = oldTimeout
+	}()
+	c := configTest(t)
+	os.Mkdir(c.RunDir, 0700)
+	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(&mock{pauseActivity: 1}))
+	if e == nil || !strings.Contains(e.Error(), "quiescence timeout") {
+		t.Fatal(e)
+	}
+}
+
+func TestPauseCronLiveJobPIDBlocksQuiescence(t *testing.T) {
+	oldSleep := pauseCronSleep
+	oldTimeout := pauseCronQuiesceTimeout
+	pauseCronSleep = func(time.Duration) {}
+	pauseCronQuiesceTimeout = 0
+	defer func() {
+		pauseCronSleep = oldSleep
+		pauseCronQuiesceTimeout = oldTimeout
+	}()
+	c := configTest(t)
+	os.Mkdir(c.RunDir, 0700)
+	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(&mock{pauseLivePIDs: 1}))
+	if e == nil || !strings.Contains(e.Error(), "unknown") {
+		t.Fatal(e)
+	}
+}
+
+func TestEvaluateQuiescenceHelpers(t *testing.T) {
+	if clear, err := evaluateQuiescence(quiescenceSnapshot{}); !clear || err != nil {
+		t.Fatal(clear, err)
+	}
+	if clear, err := evaluateQuiescence(quiescenceSnapshot{Unfinished: 1}); clear || err != nil {
+		t.Fatal(clear, err)
+	}
+	if _, err := evaluateQuiescence(quiescenceSnapshot{UnexpectedStatus: 1}); err == nil {
+		t.Fatal("expected unexpected status")
+	}
+	if _, err := evaluateQuiescence(quiescenceSnapshot{StaleUnfinished: 1}); err == nil {
+		t.Fatal("expected stale")
 	}
 }
 

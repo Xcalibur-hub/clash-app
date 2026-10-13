@@ -5,9 +5,9 @@
 **Baseline:** PR #61 / `b15a2f47dd86258a6d7012b7f9824dad3635f9d2`.  
 **Worktree:** `C:/p116o`, branch `feat/phase-11-cron-pause-6o`.
 
-## Verdict: READY (offline)
+## Verdict: READY (offline) — see also 6O.1 hardening
 
-The fail-closed **`pause-cron`** executor path is implemented and tested. **Do not treat this as authorization to pause hosted cron.** Staging remains **QUARANTINED**.
+The fail-closed **`pause-cron`** executor path is implemented and tested. Rollback/quiescence fail-closed hardening is in [Step 6O.1](PHASE_11_CRON_PAUSE_HARDENING_6O1.md). **Do not treat this as authorization to pause hosted cron.** Staging remains **QUARANTINED**.
 
 | Layer | Status |
 |---|---|
@@ -48,11 +48,11 @@ Target: direct IPv6 `db.zrutlrhhvfcsmssjiijl.supabase.co:5432`, pinned CA, ident
 3. Load/validate single expected job  
 4. If `active=true`: `BEGIN` → `alter_job(..., false)` → in-txn re-read must show `active=false` → `COMMIT`  
 5. If `active=false`: skip write (`already_inactive`)  
-6. Bounded poll of `cron.job_run_details` for in-progress rows (`starting`/`running` or null `end_time` within 15 minutes) — default timeout **30s**  
+6. Bounded poll of `cron.job_run_details` **and** `pg_stat_activity` (see 6O.1) — default timeout **30s**  
 7. Final catalog check: same `jobid`, still exists, `active=false`, schedule/command unchanged  
 8. Unlock  
 
-`active=false` alone is **not** sufficient; quiescence must clear in-progress executions.
+`active=false` and historical run rows alone are **not** sufficient; quiescence must clear unfinished history **and** live backends.
 
 ## 4. Failure and unknown-outcome handling
 
