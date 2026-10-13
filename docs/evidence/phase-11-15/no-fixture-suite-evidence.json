@@ -1,0 +1,251 @@
+{
+  "step": "phase-11-15",
+  "started_at": "2026-10-13T08:15:18.804Z",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "suite": "no-fixture",
+  "results": [
+    {
+      "name": "vault-media-access",
+      "case": "unauth_post",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (79 bytes)"
+    },
+    {
+      "name": "vault-media-access",
+      "case": "malformed_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_INVALID_JWT_FORMAT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (66 bytes)"
+    },
+    {
+      "name": "vault-media-access",
+      "case": "wrong_secret_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_LEGACY_JWT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (58 bytes)"
+    },
+    {
+      "name": "vault-media-access",
+      "case": "expired_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_LEGACY_JWT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (58 bytes)"
+    },
+    {
+      "name": "vault-media-access",
+      "case": "cors_preflight",
+      "status": 200,
+      "body": "ok",
+      "cors": "*",
+      "ok": true,
+      "detail": "status=200; allow-origin=*"
+    },
+    {
+      "name": "vault-media-access",
+      "case": "get_no_auth",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (79 bytes)"
+    },
+    {
+      "name": "course-lesson-media-access",
+      "case": "unauth_post",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (79 bytes)"
+    },
+    {
+      "name": "course-lesson-media-access",
+      "case": "malformed_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_INVALID_JWT_FORMAT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (66 bytes)"
+    },
+    {
+      "name": "course-lesson-media-access",
+      "case": "wrong_secret_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_LEGACY_JWT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (58 bytes)"
+    },
+    {
+      "name": "course-lesson-media-access",
+      "case": "expired_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_LEGACY_JWT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (58 bytes)"
+    },
+    {
+      "name": "course-lesson-media-access",
+      "case": "cors_preflight",
+      "status": 200,
+      "body": "ok",
+      "cors": "*",
+      "ok": true,
+      "detail": "status=200; allow-origin=*"
+    },
+    {
+      "name": "course-lesson-media-access",
+      "case": "get_no_auth",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (79 bytes)"
+    },
+    {
+      "name": "creator-ai",
+      "case": "unauth_post",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (79 bytes)"
+    },
+    {
+      "name": "creator-ai",
+      "case": "malformed_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_INVALID_JWT_FORMAT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (66 bytes)"
+    },
+    {
+      "name": "creator-ai",
+      "case": "wrong_secret_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_LEGACY_JWT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (58 bytes)"
+    },
+    {
+      "name": "creator-ai",
+      "case": "expired_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_LEGACY_JWT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (58 bytes)"
+    },
+    {
+      "name": "creator-ai",
+      "case": "cors_preflight",
+      "status": 200,
+      "body": "ok",
+      "cors": "*",
+      "ok": true,
+      "detail": "status=200; allow-origin=*"
+    },
+    {
+      "name": "creator-ai",
+      "case": "get_no_auth",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (79 bytes)"
+    },
+    {
+      "name": "digital-creator",
+      "case": "unauth_post",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (79 bytes)"
+    },
+    {
+      "name": "digital-creator",
+      "case": "malformed_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_INVALID_JWT_FORMAT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (66 bytes)"
+    },
+    {
+      "name": "digital-creator",
+      "case": "wrong_secret_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_LEGACY_JWT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (58 bytes)"
+    },
+    {
+      "name": "digital-creator",
+      "case": "expired_jwt",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_LEGACY_JWT\",\"message\":\"Invalid JWT\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (58 bytes)"
+    },
+    {
+      "name": "digital-creator",
+      "case": "cors_preflight",
+      "status": 200,
+      "body": "ok",
+      "cors": "*",
+      "ok": true,
+      "detail": "status=200; allow-origin=*"
+    },
+    {
+      "name": "digital-creator",
+      "case": "get_no_auth",
+      "status": 401,
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "rejected with 401; sanitized (79 bytes)"
+    },
+    {
+      "name": "arena-editorial",
+      "case": "not_deployed",
+      "status": 404,
+      "body": "{\"code\":\"NOT_FOUND\",\"message\":\"Requested function was not found\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "status=404 (expected 404: not deployed)"
+    },
+    {
+      "name": "arena-gifs",
+      "case": "not_deployed",
+      "status": 404,
+      "body": "{\"code\":\"NOT_FOUND\",\"message\":\"Requested function was not found\"}",
+      "cors": "*",
+      "ok": true,
+      "detail": "status=404 (expected 404: not deployed)"
+    }
+  ],
+  "summary": {
+    "total": 26,
+    "passed": 26,
+    "failed": 0
+  },
+  "result": "PASS",
+  "secrets_read": false,
+  "hosted_writes": false,
+  "note": "every probe is rejected before any function code runs; no fixture, user, upload or database write"
+}

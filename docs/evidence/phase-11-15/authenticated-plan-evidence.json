@@ -1,0 +1,114 @@
+{
+  "step": "phase-11-15",
+  "started_at": "2026-10-13T08:15:42.852Z",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "suite": "plan",
+  "no_fixture_cases": [
+    "unauth_post",
+    "malformed_jwt",
+    "wrong_secret_jwt",
+    "expired_jwt",
+    "cors_preflight",
+    "get_no_auth"
+  ],
+  "authenticated_plan": [
+    {
+      "id": "auth.sign_in",
+      "area": 1,
+      "fixtures": [
+        "test account"
+      ],
+      "checks": "valid JWT yields a session; Postgres resolves the caller from the JWT"
+    },
+    {
+      "id": "vault.entitled_media",
+      "area": 2,
+      "fixtures": [
+        "account A",
+        "private drop owned by A with a private-media object"
+      ],
+      "checks": "200 + signed URL with expiresIn=120"
+    },
+    {
+      "id": "vault.unauthorized_media",
+      "area": 3,
+      "fixtures": [
+        "account B"
+      ],
+      "checks": "403, no Storage call, no path leak"
+    },
+    {
+      "id": "vault.cross_user_access",
+      "area": 3,
+      "fixtures": [
+        "drop owned by A + account B"
+      ],
+      "checks": "403 identical to a non-existent drop (no existence oracle)"
+    },
+    {
+      "id": "lesson.entitled",
+      "area": 4,
+      "fixtures": [
+        "course + subscriber lesson + active subscription"
+      ],
+      "checks": "200 signed URL; body text still not readable by table SELECT"
+    },
+    {
+      "id": "lesson.denied",
+      "area": 4,
+      "fixtures": [
+        "same course, no/expired subscription"
+      ],
+      "checks": "403, and expired behaves identically to revoked"
+    },
+    {
+      "id": "creator_ai.no_provider",
+      "area": 5,
+      "fixtures": [
+        "creator + conversation"
+      ],
+      "checks": "explicit \"provider not configured\"; never a fabricated answer"
+    },
+    {
+      "id": "digital_creator.no_provider",
+      "area": 5,
+      "fixtures": [
+        "creator digital profile + authorized reply"
+      ],
+      "checks": "explicit \"not connected\"; no arbitrary text rendered"
+    },
+    {
+      "id": "input_validation",
+      "area": 6,
+      "fixtures": [
+        "account A"
+      ],
+      "checks": "wrong types / oversize ids / missing fields yield 400, never 500"
+    },
+    {
+      "id": "response_sanitization",
+      "area": 6,
+      "fixtures": [
+        "any authorized call"
+      ],
+      "checks": "no tokens, env names, stack frames or storage paths in any body"
+    },
+    {
+      "id": "rls_tenant_isolation",
+      "area": 7,
+      "fixtures": [
+        "two accounts, one private row each"
+      ],
+      "checks": "A cannot observe B through any function response; direct table reads denied"
+    }
+  ],
+  "authenticated_prerequisites": {
+    "runnable": false,
+    "haveUrl": false,
+    "haveAnon": false,
+    "haveUser": false,
+    "authorized": false,
+    "reason": "NEEDS_FIXTURE_AUTHORIZATION: a test account, the project anon key, and STAGING_FIXTURES_AUTHORIZATION=fixtures:<ref>"
+  },
+  "result": "PLAN ONLY"
+}
