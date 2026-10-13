@@ -420,7 +420,7 @@ func Run(ctx context.Context, c Config, mode, authorization, password string, di
 	if !authorized(mode, authorization, c.ProjectRef) {
 		return 0, errors.New("explicit mode/project authorization required")
 	}
-	if mode != "preflight" && mode != "migrate" && mode != "inventory" && mode != "fixtures" && mode != "investigate" && mode != "resume" && mode != "pause-cron" {
+	if mode != "preflight" && mode != "migrate" && mode != "inventory" && mode != "fixtures" && mode != "investigate" && mode != "resume" && mode != "pause-cron" && mode != "verify-complete" {
 		return 0, errors.New("unknown or fixture-producing mode refused")
 	}
 	conf, e := connection(c, password)
@@ -462,6 +462,12 @@ func Run(ctx context.Context, c Config, mode, authorization, password string, di
 		return 0, e
 	case "resume":
 		return resume(ctx, s, c, a)
+	case "verify-complete":
+		report, e := verifyComplete(ctx, s, c, a)
+		if evidenceErr := saveVerifyCompleteReport(c.RunDir, report); evidenceErr != nil {
+			e = evidenceErr
+		}
+		return 0, e
 	case "pause-cron":
 		return pauseCron(ctx, s, c)
 	case "fixtures":
@@ -476,5 +482,5 @@ func authorized(mode, auth, ref string) bool {
 	if mode == "fixtures" {
 		prefix = "committed-fixtures"
 	}
-	return (mode == "preflight" || mode == "migrate" || mode == "inventory" || mode == "fixtures" || mode == "store-credential" || mode == "investigate" || mode == "resume" || mode == "pause-cron") && auth == prefix+":"+ref
+	return (mode == "preflight" || mode == "migrate" || mode == "inventory" || mode == "fixtures" || mode == "store-credential" || mode == "investigate" || mode == "resume" || mode == "pause-cron" || mode == "verify-complete") && auth == prefix+":"+ref
 }

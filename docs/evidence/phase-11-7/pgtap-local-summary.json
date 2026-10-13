@@ -1,0 +1,57 @@
+{
+  "step": "phase-11-7",
+  "mode": "local disposable Supabase (Docker) pgTAP/RLS",
+  "harness": {
+    "cli": "supabase 2.40.7",
+    "images": {
+      "postgres": "public.ecr.aws/supabase/postgres:17.6.1.002",
+      "storage_api": "public.ecr.aws/supabase/storage-api:v1.26.5",
+      "gotrue": "public.ecr.aws/supabase/gotrue:v2.179.0"
+    },
+    "migrations_applied": 106,
+    "migrations_source": "reviewed BOM-stripped/asserted compatibility artifacts (same bytes as hosted)",
+    "ledger_rows_after_reset": 106,
+    "buckets_after_reset": ["private-media", "public-media"]
+  },
+  "result": {
+    "files_total": 89,
+    "assertions_total": 3283,
+    "files_fully_passed": 77,
+    "secure_suites": { "085_profile_clash_stats": "PASS", "087_critical_authorization": "PASS", "088_h3_reputation_privacy": "PASS", "089_m1_clash_visibility": "PASS" }
+  },
+  "assertion_failures": [
+    {
+      "file": "001_media_storage.sql",
+      "assertion": 23,
+      "message": "cannot delete storage objects via direct SQL",
+      "observed": "no exception thrown; RLS filtered the row instead",
+      "classification": "environment/version parity",
+      "reason": "local storage-api v1.26.5 does not install the protect_delete trigger that newer storage releases add; application RLS still blocks the delete"
+    },
+    {
+      "file": "066_arena_interest_preferences.sql",
+      "assertion": 20,
+      "message": "returning users migrated without forced onboarding",
+      "observed": "count(*) = 0",
+      "classification": "test precondition",
+      "reason": "migration 20261008134000 backfills `select id,true from auth.users` at migration time; a fresh DB has zero users at that moment, so the assertion is vacuous locally"
+    }
+  ],
+  "not_run": {
+    "files": [
+      "053_arena_correctness_foundation.sql",
+      "055_arena_duel_concurrency.sql",
+      "057_arena_challenge_concurrency.sql",
+      "059_arena_crowd_concurrency.sql",
+      "067_arena_interest_concurrency.sql",
+      "071_canonical_authorization_concurrency.sql",
+      "073_official_submission_concurrency.sql",
+      "076_maintenance_batch_contention.sql",
+      "078_arena_question_concurrency.sql",
+      "080_arena_editorial_concurrency.sql"
+    ],
+    "count": 10,
+    "reason": "each opens independent TCP sessions via dblink; dblink is not a trusted extension and the local `postgres` role is deliberately non-superuser, so `create extension dblink` fails and the concurrency sessions cannot be established",
+    "note": "These are concurrency/contention suites, not RLS or policy suites."
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "step": "phase-11-7",
+  "source": "read-only catalog queries on the local disposable DB (106 migrations applied)",
+  "tables": {
+    "public_tables_with_rls_disabled": 0,
+    "public_tables_anon_select": 25,
+    "public_tables_with_client_insert_update_delete": 3,
+    "client_write_detail": {
+      "comment_upvotes": "authenticated INSERT/DELETE (own upvote only; RLS-scoped)",
+      "comments": "authenticated DELETE (own comment; RLS-scoped)",
+      "takes": "authenticated DELETE (own take; RLS-scoped)"
+    },
+    "anon_writes_any_table": 0
+  },
+  "functions": {
+    "security_definer_total": 413,
+    "security_definer_without_empty_search_path": 0,
+    "security_definer_executable_by_anon": 116,
+    "security_definer_executable_by_anon_invoker_exec": 10,
+    "note": "definer functions are the intended pattern (owner postgres, set search_path=''); anon-executable definers are public read RPCs that self-authorize"
+  },
+  "settlement_rpc_grants": [
+    { "fn": "settle_clash(text)", "owner": "postgres", "definer": true, "search_path": "\"\"", "anon": false, "authenticated": true, "service_role": true },
+    { "fn": "settle_challenge(text)", "owner": "postgres", "definer": true, "search_path": "\"\"", "anon": false, "authenticated": true, "service_role": true },
+    { "fn": "start_clash(text,text,clash_mode)", "owner": "postgres", "definer": true, "search_path": "\"\"", "anon": false, "authenticated": true, "service_role": true },
+    { "fn": "resolve_arena_challenge(uuid,text)", "owner": "postgres", "definer": true, "search_path": "\"\"", "anon": false, "authenticated": true, "service_role": false },
+    { "fn": "settle_arena_room(text)", "owner": "postgres", "definer": true, "search_path": "\"\"", "anon": false, "authenticated": false, "service_role": true },
+    { "fn": "run_maintenance(integer)", "owner": "postgres", "definer": true, "search_path": "\"\"", "anon": false, "authenticated": false, "service_role": true }
+  ],
+  "storage": {
+    "buckets": [
+      { "id": "private-media", "public": false },
+      { "id": "public-media", "public": true }
+    ],
+    "bucket_count": 2,
+    "policies_on_storage_objects": 5
+  }
+}

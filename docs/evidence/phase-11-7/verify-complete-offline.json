@@ -1,0 +1,29 @@
+{
+  "step": "phase-11-7",
+  "tool": "tools/hosted-staging/verify-complete (mode: verify-complete)",
+  "kind": "read-only, separate from the 43-migration recovery investigator",
+  "checks": [
+    "exactly 106 ledger rows",
+    "names/versions/order/statement hashes vs frozen artifacts",
+    "expected post-migration objects (106/103/h3/h2/h1 state)",
+    "managed pgcrypto 1.3 prerequisite and required available extensions",
+    "exact storage bucket inventory (public-media public, private-media private)",
+    "no unexpected schemas / drift",
+    "managed service inventory (managed + publication)",
+    "clash-maintenance exactly one job and inactive"
+  ],
+  "offline_verification": {
+    "gofmt": "clean for changed files",
+    "go vet": "PASS",
+    "go test": "PASS",
+    "new_tests": [
+      "TestVerifyCompleteAcceptsCompleteState (exit 0 + evidence written)",
+      "TestVerifyCompleteRejectsShortLedger",
+      "TestVerifyCompleteRejectsMissingObjects",
+      "TestVerifyCompleteRejectsActiveCron",
+      "TestVerifyCompleteRejectsSameManifestDrift",
+      "TestVerifyCompleteRequiresOwnAuthorization"
+    ]
+  },
+  "hosted_use": "NOT RUN - requires separate authorization (read-only). Command: hosted-staging --mode verify-complete --authorize verify-complete:zrutlrhhvfcsmssjiijl --config <nonsecret config>"
+}

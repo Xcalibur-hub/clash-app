@@ -1,0 +1,22 @@
+{
+  "step": "phase-11-7",
+  "revision": "bc4d54c (verify-complete added on this branch)",
+  "results": [
+    { "check": "tsc --noEmit (app typecheck)", "result": "PASS", "detail": "exit 0, no diagnostics" },
+    { "check": "typecheck:editorial (edge functions)", "result": "PASS", "detail": "exit 0" },
+    { "check": "lint", "result": "NOT RUN", "detail": "package.json defines no lint script/config" },
+    { "check": "expo-doctor", "result": "PASS", "detail": "18/18 checks passed" },
+    { "check": "expo export --platform android", "result": "PASS", "detail": "Hermes bundle entry-b1ebde1378b54f288436d5774c67df21.hbc (9.76 MB) + metadata.json" },
+    { "check": "expo export --platform web", "result": "FAIL", "detail": "native-only module react-native-maps imports react-native internals; web is not a supported target for this app" },
+    { "check": "node unit tests (test:unit)", "result": "PASS", "detail": "539/539" },
+    { "check": "node editorial tests (test:editorial)", "result": "PASS", "detail": "24/24" },
+    { "check": "integration-static-check.cjs", "result": "PASS", "detail": "9/9 repository-only checks; 106 migrations / 89 suites" },
+    { "check": "reputation-privacy-check.cjs", "result": "PASS", "detail": "19 pass / 0 fail" },
+    { "check": "clash-visibility-check.cjs", "result": "PASS", "detail": "26 pass / 0 fail" },
+    { "check": "staging-isolation-check.cjs", "result": "PASS", "detail": "16 pass / 0 fail" },
+    { "check": "go vet ./... (hosted-staging)", "result": "PASS", "detail": "exit 0" },
+    { "check": "go test ./... (hosted-staging)", "result": "PASS", "detail": "ok, includes 6 new verify-complete tests" },
+    { "check": "app/backend RPC + type parity", "result": "PASS", "detail": "typecheck + 539 unit + integration-static against 106-migration schema" },
+    { "check": "realtime publication/subscription vs local stack", "result": "NOT RUN", "detail": "requires the running stack + client runtime; local DB realtime service was started but no client subscription harness was executed" }
+  ]
+}

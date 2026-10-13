@@ -61,21 +61,22 @@ func configTest(t *testing.T) Config {
 }
 
 type mock struct {
-	queries                                         []string
-	fail                                            string
-	rollbackFail, closeFail, badIdentity, badLedger bool
-	cronActive, missingPrefixDeps                   bool
-	lockHeld                                        map[int64]bool
-	mig44Objects                                    bool
-	pauseInactive, duplicateCron, missingCronJob    bool
-	wrongCronCommand, alterUnavailable              bool
+	queries                                          []string
+	fail                                             string
+	rollbackFail, closeFail, badIdentity, badLedger  bool
+	cronActive, missingPrefixDeps                    bool
+	lockHeld                                         map[int64]bool
+	mig44Objects                                     bool
+	completeObjects                                  bool
+	pauseInactive, duplicateCron, missingCronJob     bool
+	wrongCronCommand, alterUnavailable               bool
 	pauseRunning, pauseRunningClearAfter, pausePolls int
-	pauseSelectCalls, failPauseSelectAt             int
-	pauseActivity, pauseLivePIDs                    int
-	pauseHistoryFail, pauseActivityFail             bool
-	pauseHistoryMode                                string // "", "unexpected", "stale", "incomplete"
-	ledger                                          []map[string]any
-	args                                            []any
+	pauseSelectCalls, failPauseSelectAt              int
+	pauseActivity, pauseLivePIDs                     int
+	pauseHistoryFail, pauseActivityFail              bool
+	pauseHistoryMode                                 string // "", "unexpected", "stale", "incomplete"
+	ledger                                           []map[string]any
+	args                                             []any
 }
 
 func (m *mock) Close(context.Context) error {
@@ -260,6 +261,14 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 		}}, nil
 	case recoveryAuthStorageCountsSQL:
 		return Result{Rows: []map[string]any{{"user_count": 0, "object_count": 0, "bucket_count": 2}}}, nil
+	case verifyCompleteObjectsSQL:
+		present := m.completeObjects
+		return Result{Rows: []map[string]any{{
+			"v106_comment_reply_notifications": present, "profile_clash_stats": present,
+			"arena_interest_preferences": present, "explore_challenge_results": present,
+			"h3_reputation_owner_gate": present, "h2_lesson_body_guarded": present,
+			"h1_notify_guarded": present, "reputation_rls_enabled": present,
+		}}}, nil
 	}
 	if q == managedSQL {
 		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true, "cron_preloaded": true, "cron_catalog": true}}}, nil
