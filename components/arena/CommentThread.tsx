@@ -79,10 +79,17 @@ const CommentItem = React.memo(function CommentItem({
   const indent = Math.min(depth, 4) * step;
   const hasText = Boolean(comment.text.trim());
   const nested = depth > 0;
+  const parent = comment.parentId ? state.comments.find((c) => c.id === comment.parentId) : undefined;
+  const parentAuthor = parent ? selectAuthor(state, parent.authorId) : undefined;
+  const nestedCount = React.useMemo(() => {
+    const count = (branch: CommentNode): number =>
+      branch.children.reduce((sum, child) => sum + 1 + count(child), 0);
+    return count(node);
+  }, [node]);
   const handle = author?.handle ? `@${author.handle}` : '@ghost';
 
   return (
-    <View>
+    <View style={depth === 0 ? styles.rootBranch : undefined}>
       {parentRemoved ? (
         <Text
           allowFontScaling={false}
@@ -97,10 +104,14 @@ const CommentItem = React.memo(function CommentItem({
           nested && styles.itemNested,
           nested && {
             marginLeft: indent,
-            backgroundColor: t.surfaceElevated,
+            backgroundColor: 'transparent',
+            borderLeftColor: t.scheme === 'dark' ? '#A98ACC' : '#A882C4',
             borderColor: t.border,
           },
-          !nested && { marginLeft: 0 },
+          !nested && {
+            marginLeft: 0,
+            backgroundColor: t.scheme === 'dark' ? '#1E1A24' : '#FFF9F3',
+          },
         ]}
       >
         <Avatar name={author?.name ?? '?'} tint={author?.tint ?? '#888'} size={nested ? 24 : 30} />
@@ -125,6 +136,12 @@ const CommentItem = React.memo(function CommentItem({
               · {timeAgo(comment.createdAt)}
             </Text>
           </View>
+          {nested && parentAuthor ? (
+            <Text style={[styles.replyContext, { color: t.scheme === 'dark' ? '#C9AEDF' : '#8A598E' }]}
+              numberOfLines={1}>
+              ↳ replying to @{parentAuthor.handle}
+            </Text>
+          ) : null}
           {comment.media ? <CommentMedia media={comment.media} compact={depth >= 2} /> : null}
           {hasText ? (
             <Text allowFontScaling style={[styles.body, { color: t.textPrimary }]}>
@@ -192,7 +209,7 @@ const CommentItem = React.memo(function CommentItem({
                 style={styles.action}
               >
                 <Text allowFontScaling={false} style={[styles.collapseText, { color: t.textSecondary }]}>
-                  {collapsed ? `Show ${node.children.length}` : 'Hide'}
+                  {collapsed ? `Show ${nestedCount} ${nestedCount === 1 ? 'reply' : 'replies'} ↓` : 'Collapse thread ↑'}
                 </Text>
               </Pressable>
             ) : null}
@@ -215,7 +232,12 @@ const CommentItem = React.memo(function CommentItem({
 
       {collapsed
         ? null
-        : node.children.map((child) => (
+        : node.children.length > 0 ? (
+          <View style={[
+            styles.branchChildren,
+            { marginLeft: Math.min(depth, 3) * 4 + 16, borderLeftColor: t.scheme === 'dark' ? '#665376' : '#D1BDD8' },
+          ]}>
+          {node.children.map((child) => (
             <CommentItem
               key={child.comment.id}
               node={child}
@@ -227,22 +249,31 @@ const CommentItem = React.memo(function CommentItem({
               onMore={onMore}
             />
           ))}
+          </View>
+        ) : null}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   list: { gap: space.md + 2 },
+  rootBranch: { gap: 4 },
+  branchChildren: { borderLeftWidth: 2, marginTop: 3, paddingLeft: 4, gap: 6 },
+  replyContext: { fontSize: 11, fontWeight: '700', letterSpacing: 0.1 },
   item: {
     flexDirection: 'row',
     gap: space.sm,
-    paddingVertical: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 20,
   },
   itemNested: {
     paddingHorizontal: space.sm + 2,
     paddingVertical: space.sm,
     borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 0,
+    borderLeftWidth: 3,
+    borderRadius: 0,
     marginTop: 2,
   },
   main: { flex: 1, gap: 6, minWidth: 0 },
@@ -256,7 +287,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xs,
   },
   opText: { ...typeScale.caption, fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
-  body: { fontSize: 15, lineHeight: 21, fontWeight: '400' },
+  body: { fontSize: 15, lineHeight: 23, fontWeight: '400' },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
