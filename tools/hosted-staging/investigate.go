@@ -24,7 +24,7 @@ const investigatePgcryptoAssertSQL = `select exists(
   join pg_catalog.pg_namespace n on n.oid=e.extnamespace
   join pg_catalog.pg_roles r on r.oid=e.extowner
   where e.extname='pgcrypto' and e.extversion='1.3'
-    and n.nspname='extensions' and r.rolname='supabase_admin'
+    and n.nspname='extensions' and r.rolname in ('postgres', 'supabase_admin')
 ) as artifact_assert_would_pass`
 
 const investigateMig44ObjectsSQL = `select

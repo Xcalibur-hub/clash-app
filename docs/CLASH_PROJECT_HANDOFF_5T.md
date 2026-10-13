@@ -2,9 +2,13 @@
 
 12 October 2026. **Frozen integration candidate; clash-staging remains QUARANTINED after partial migration; root cause identified; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
+## Step 6M: pgcrypto artifact correction (FILE-ONLY)
+
+[Step 6M recovery prep](PHASE_11_PGCRYPTO_ARTIFACT_RECOVERY_6M.md): `assert-managed-pgcrypto` now accepts owners **`postgres`** and **`supabase_admin`** only. Artifacts **1–43 unchanged**; artifact 44 + compatibility manifest updated (`5c39f97c…`). **Quarantine retained.** Recommended recovery: **Option A** resume from prefix 43 after new **`resume`** executor mode is implemented and separately authorized. No hosted access in 6M.
+
 ## Step 6L: quarantine investigation (READ-ONLY)
 
-[Step 6L investigation](PHASE_11_STAGING_QUARANTINE_INVESTIGATION_6L.md): ledger **43/43** hash-verified; migration 44 **absent** from ledger and catalogs (`confirmed_absent` rollback). Live `pgcrypto` owner is **`postgres`**; frozen compatibility artifact 44 asserts **`supabase_admin`** — **confirmed root cause**. `clash-maintenance` is **active** (25/25 runs in 1h). Original SQLSTATE unavailable. **Quarantine retained.** Next: authorize compatibility-assert fix + new artifact hashes, then a separate resume/rebuild write plan. No migrate/fixtures/inventory from this step. Step 4C BLOCKED; Step 2F DEFERRED. Primary Crew dirt untouched.
+[Step 6L investigation](PHASE_11_STAGING_QUARANTINE_INVESTIGATION_6L.md): root cause confirmed; superseded by 6M artifact fix (not yet deployed).
 
 ## Step 6K: controlled staging migration (PARTIAL — QUARANTINE)
 

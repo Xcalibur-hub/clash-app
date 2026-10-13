@@ -20,6 +20,7 @@ test('106 outputs deterministic with exactly three BOM removals and one correcti
   assert.equal(a.outputs.length, 106);
   assert.equal(a.manifest.files.filter(f => f.source_sha256 !== f.artifact_sha256).length, 3);
   assert.equal(a.manifest.files.flatMap(f => f.transformations).length, 4);
+  assert.equal(a.manifest.files.filter(f => f.transformations.some(t => t.kind === 'assert-managed-pgcrypto')).length, 1);
 });
 test('altered ordinary source bytes refused before output creation', () => scratch(root => {
   const altered = files.map((f,i) => i ? f : {...f, bytes: Buffer.concat([f.bytes, Buffer.from('\n')])});
