@@ -1,9 +1,10 @@
 import React from 'react';
-import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
+import { FlatList, Platform, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
+import { ArenaDailyDropBanner } from '../../components/arena/ArenaDailyDropBanner';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
 import { ArenaSideRail } from '../../components/arena/ArenaSideRail';
 import { ArenaClashes } from '../../components/arena/ArenaClashes';
@@ -388,6 +389,10 @@ export default function ArenaScreen(): React.JSX.Element {
 
     return (
       <View style={styles.hero}>
+        <ArenaDailyDropBanner
+          liveCount={liveTopics.length}
+          onExploreClashes={() => setArenaMode('clashes')}
+        />
         {heroTopic ? (
           <LiveClashHero
             topic={heroTopic}
@@ -437,10 +442,10 @@ export default function ArenaScreen(): React.JSX.Element {
 
         <View style={styles.feedHead}>
           <Text style={[styles.feedTitle, { color: theme.textPrimary }]}>
-            Your Feed
+            Hot right now
           </Text>
           <Text style={[styles.feedSub, { color: theme.textMuted }]}>
-            Takes from interests, follows, and discovery
+            Takes from your interests and community
           </Text>
           <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         </View>
@@ -615,6 +620,7 @@ const styles = StyleSheet.create({
   },
   feedTitle: {
     ...typeScale.label,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.3,
@@ -622,6 +628,7 @@ const styles = StyleSheet.create({
   },
   feedSub: {
     ...typeScale.meta,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 14,
     fontWeight: '500',
     paddingHorizontal: layout.screenX,
