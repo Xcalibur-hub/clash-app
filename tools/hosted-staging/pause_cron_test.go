@@ -101,7 +101,7 @@ func TestPauseCronRejectsMissingAlterJob(t *testing.T) {
 func TestPauseCronRejectsConcurrentLock(t *testing.T) {
 	c := configTest(t)
 	os.Mkdir(c.RunDir, 0700)
-	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(&mock{lockHeld: true}))
+	_, e := Run(context.Background(), c, "pause-cron", "pause-cron:"+c.ProjectRef, "MOCK_SECRET", dialMock(&mock{lockHeld: map[int64]bool{pauseCronAdvisoryLockKey: true}}))
 	if e == nil || !strings.Contains(e.Error(), "concurrent") {
 		t.Fatal(e)
 	}

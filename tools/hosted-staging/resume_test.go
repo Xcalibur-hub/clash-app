@@ -249,7 +249,7 @@ func TestResumeRejectsActiveCron(t *testing.T) {
 func TestResumeRejectsConcurrentLock(t *testing.T) {
 	c, a := prepareResumeArtifacts(t)
 	os.Mkdir(c.RunDir, 0700)
-	m := &mock{ledger: ledgerPrefix(t, c, a, 43), lockHeld: true}
+	m := &mock{ledger: ledgerPrefix(t, c, a, 43), lockHeld: map[int64]bool{resumeAdvisoryLockKey: true}}
 	_, e := Run(context.Background(), c, "resume", "resume:"+c.ProjectRef, "MOCK_SECRET", dialMock(m))
 	if e == nil || !strings.Contains(e.Error(), "concurrent") {
 		t.Fatal(e)

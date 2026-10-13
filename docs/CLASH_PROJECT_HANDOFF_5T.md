@@ -4,7 +4,7 @@
 
 ## Comprehensive audit (recovery READY for authorized resume)
 
-[Comprehensive audit](PHASE_11_COMPREHENSIVE_BACKEND_AUDIT.md): bucket “failure” was a **false P0** — after migration 43, exactly `public-media`+`private-media` are expected. Recovery storage gate + collect-all investigate fixed offline. Fresh hosted investigate: **all recovery gates PASS**. Local 1→106 and 43→106 sims PASS (stubbed platform). Staging remains **QUARANTINED**. Next: separately authorize **`resume:zrutlrhhvfcsmssjiijl`** only.
+[Comprehensive audit](PHASE_11_COMPREHENSIVE_BACKEND_AUDIT.md): bucket “failure” was a **false P0** — after migration 43, exactly `public-media`+`private-media` are expected. Recovery storage gate + collect-all investigate fixed offline. Fresh hosted investigate: **all recovery gates PASS**. Local 1→106 and 43→106 sims PASS (stubbed platform). Follow-up: resume holds pause-cron lock and rechecks inactive cron; `course-lesson-media-access` `verify_jwt=true` in config. P1-3/P1-5 (course SELECT / settle_* grants) remain **blocked for product approval**. Staging remains **QUARANTINED**. Next: separately authorize **`resume:zrutlrhhvfcsmssjiijl`** only — no hosted writes without that auth.
 
 ## Step 6Q: fresh recovery verification (superseded)
 

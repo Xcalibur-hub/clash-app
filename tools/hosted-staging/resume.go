@@ -212,23 +212,26 @@ func resumePreflight(ctx context.Context, s Session, c Config, a Artifact) (repo
 		return report, e
 	}
 	report["clash_maintenance_jobs"] = jobs.Rows
-	active := false
-	for _, j := range jobs.Rows {
-		if j["active"] == true {
-			active = true
-		}
+	if e := assertClashMaintenanceInactiveForResume(jobs.Rows); e != nil {
+		report["clash_maintenance_active"] = len(jobs.Rows) > 0 && jobs.Rows[0]["active"] == true
+		return report, e
 	}
-	report["clash_maintenance_active"] = active
-	if active || len(jobs.Rows) == 0 {
-		// Active maintenance coexists with DDL only with residual lock risk; fail closed.
-		// Missing job after scheduler migration is unexpected drift.
-		if active {
-			return report, errors.New("active clash-maintenance refused; authorize cron pause before resume")
-		}
-		return report, errors.New("clash-maintenance job missing; unexpected scheduler drift")
-	}
+	report["clash_maintenance_active"] = false
 	report["cron_safety"] = "inactive_job_present_accepted"
 	return report, nil
+}
+
+func assertClashMaintenanceInactiveForResume(jobs []map[string]any) error {
+	if len(jobs) == 0 {
+		return errors.New("clash-maintenance job missing; unexpected scheduler drift")
+	}
+	if len(jobs) != 1 {
+		return errors.New("duplicate clash-maintenance jobs; quarantine retained")
+	}
+	if jobs[0]["active"] == true {
+		return errors.New("active clash-maintenance refused; authorize cron pause before resume")
+	}
+	return nil
 }
 
 func saveResumePreflight(dir string, report map[string]any) error {
@@ -297,6 +300,24 @@ func resume(ctx context.Context, s Session, c Config, a Artifact) (completed int
 			err = unlockErr
 		}
 	}()
+	// Serialize with pause-cron and re-assert inactive cron under both locks (TOCTOU close).
+	if e := acquirePauseCronLock(ctx, s); e != nil {
+		return 0, errors.New("concurrent cron pause in progress; quarantine retained")
+	}
+	defer func() {
+		c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if unlockErr := releasePauseCronLock(c, s); unlockErr != nil && err == nil {
+			err = unlockErr
+		}
+	}()
+	jobs, e := query(ctx, s, investigateCronSQL)
+	if e != nil {
+		return 0, e
+	}
+	if e := assertClashMaintenanceInactiveForResume(jobs.Rows); e != nil {
+		return 0, e
+	}
 	// Revalidate after lock: concurrent writers must not have advanced the ledger.
 	if e := revalidateResumeProgress(ctx, s, a, 0); e != nil {
 		return 0, errors.New("ledger changed before resume execution; quarantine retained")

@@ -64,7 +64,8 @@ type mock struct {
 	queries                                         []string
 	fail                                            string
 	rollbackFail, closeFail, badIdentity, badLedger bool
-	cronActive, missingPrefixDeps, lockHeld         bool
+	cronActive, missingPrefixDeps                   bool
+	lockHeld                                        map[int64]bool
 	mig44Objects                                    bool
 	pauseInactive, duplicateCron, missingCronJob    bool
 	wrongCronCommand, alterUnavailable              bool
@@ -169,13 +170,37 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 		}
 		return Result{Rows: []map[string]any{{"explore_challenges": true, "explore_treasure_hunts": true, "explore_treasure_progress": true, "profiles": true, "media_objects": true}}}, nil
 	case resumeLockSQL:
-		if m.lockHeld {
+		if m.lockHeld == nil {
+			m.lockHeld = map[int64]bool{}
+		}
+		var key int64
+		if len(args) > 0 {
+			switch v := args[0].(type) {
+			case int64:
+				key = v
+			case int:
+				key = int64(v)
+			}
+		}
+		if m.lockHeld[key] {
 			return Result{Rows: []map[string]any{{"acquired": false}}}, nil
 		}
-		m.lockHeld = true
+		m.lockHeld[key] = true
 		return Result{Rows: []map[string]any{{"acquired": true}}}, nil
 	case resumeUnlockSQL:
-		m.lockHeld = false
+		if m.lockHeld == nil {
+			m.lockHeld = map[int64]bool{}
+		}
+		var key int64
+		if len(args) > 0 {
+			switch v := args[0].(type) {
+			case int64:
+				key = v
+			case int:
+				key = int64(v)
+			}
+		}
+		m.lockHeld[key] = false
 		return Result{Rows: []map[string]any{{"released": true}}}, nil
 	case pauseCronAlterProcSQL:
 		return Result{Rows: []map[string]any{{"available": !m.alterUnavailable}}}, nil

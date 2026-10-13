@@ -13,7 +13,7 @@
 | Is 43→106 recovery path verified locally? | **YES** (same caveats) |
 | Is storage bucket discrepancy explained? | **YES — expected** `public-media` + `private-media` from migration 4 (`media_storage`) |
 | Remaining P0 deployment blockers? | **None offline** after recovery-storage fix; hosted **resume still unauthorized** |
-| Remaining P1 security issues? | Spot-audit only — no newly confirmed critical live exploit in this pass; full pgTAP/RLS matrix not re-run against disposable DB |
+| Remaining P1 security issues? | **Yes (policy/product — blocked for approval):** course lesson body SELECT; historical reputation SELECT until H3 confirmed applied on target; settle_* callable by any authenticated |
 | Frontend/backend contract? | No new launch-blocking RPC mismatches proven this pass; Crew UI work remains out of scope |
 | Hosted staging recovery READY or BLOCKED? | **READY for separately authorized resume** (fresh investigate gates all true) |
 | Next authorization? | One bounded `resume:zrutlrhhvfcsmssjiijl` (direct IPv6, pinned CA, corrected manifest) |
@@ -34,7 +34,10 @@
 | ID | Area | Root cause | Evidence | Fix | Status | Validation |
 |---|---|---|---|---|---|---|
 | P1-1 | Security review depth | Full pgTAP/RLS/security suite not re-executed in this disposable environment | Scope/time; Docker sim lacks full Supabase Auth/Realtime | Re-run local `supabase test` / hosted inventory after resume under separate auth | **Needs approval / follow-up** | N/A this pass |
-| P1-2 | SECURITY DEFINER surface | Large corpus of `security definer` RPCs; most set `search_path=''` by convention | Migrations Arena/Vault/World | No silent weaken; keep definer+empty search_path discipline | **Open (monitor)** | Static convention; full grant audit deferred |
+| P1-2 | SECURITY DEFINER surface | Large corpus of `security definer` RPCs; most set `search_path=''` by convention | Migrations Arena/Vault/World — **0** missing `search_path` in spot audit | Keep definer+empty search_path discipline | **Open (monitor)** | Static: 479 definer funcs OK |
+| P1-3 | Course lessons | Published `course_lessons` SELECT does not gate `access_type`/purchase; `body_text` may be readable | `20261004170000_vault_commerce.sql` | Entitlement-aware SELECT policy | **Blocked — needs approval** (user-visible access change) | Spot audit |
+| P1-4 | Reputation privacy | Pre-H3 `reputation_events` `USING (true)`; H3 migration exists but must be confirmed on each target | `clash_engine` + `20261011074540_h3_…` | Ensure H3 applied; no weaken | **Blocked — verify after resume** | Spot audit |
+| P1-5 | Settlement RPCs | `settle_clash` / `settle_challenge` executable by any `authenticated` | clash_engine / explore_play_system | Restrict to parties/service_role | **Blocked — needs approval** (settlement semantics) | Spot audit |
 
 ### P2 — Functional / tooling
 
@@ -43,6 +46,8 @@
 | P2-1 | Investigate fail-fast | First storage boolean failure skipped cron/deps probes | 6Q evidence | Collect-all-then-fail in `investigate.go` | **Fixed** | Hosted attempt-2 recorded all gates |
 | P2-2 | Local sim stubs | Vanilla Postgres lacks PostGIS / realtime.messages.extension / publication | Failures at mig 23 / 82 / 78 | Document required stubs in `simulate-bootstrap.sql` | **Fixed (tooling)** | Resume sim SUCCESS 106 |
 | P2-3 | pg_cron in disposable image | `clash-maintenance` not scheduled locally | NOTICE in sim log | Hosted cron verified separately (6P + investigate-2) | **Accepted gap** | Hosted cron gates PASS |
+| P2-4 | Resume/pause TOCTOU | Distinct advisory locks; cron not rechecked after resume lock | Executor audit | Hold pause-cron lock during resume + re-assert inactive | **Fixed offline** | `go test` |
+| P2-5 | Default anon SELECT | New public tables inherit anon SELECT; relies on RLS always | `initial_arena_schema` | Monitor; never skip RLS | **Open (monitor)** | Spot audit |
 
 ### P3 — Improvements
 
@@ -50,6 +55,8 @@
 |---|---|---|---|
 | P3-1 | Simulation harness | Add one-command docker compose with PostGIS + stubs + wal_level=logical | Documented |
 | P3-2 | Evidence | Keep empty-DB vs recovery storage gates labeled distinctly in reports | Done |
+| P3-3 | Edge config | `course-lesson-media-access` missing `[functions…]` / `verify_jwt` | **Fixed** in `config.toml` |
+| P3-4 | Worktree drift | Desktop Clash (~101) behind p116q (106); extra untracked crews discovery stamp | Do not merge dirty Crew into recovery branch |
 
 ---
 
@@ -108,8 +115,8 @@ Logs: `docs/evidence/phase-11-comprehensive-audit/migration-sim-*.log`
 | Empty-ledger `migrate` | Unchanged (still refuses nonempty) |
 | Resume storage gate | **Corrected** to expected-bucket inventory |
 | Investigate collect-all | **Corrected** |
-| Advisory locks | resume `872314059`; pause-cron `872314060` |
-| Cron inactive required for resume | Intact |
+| Advisory locks | resume `872314059`; pause-cron `872314060`; resume now **also acquires** pause lock and rechecks cron inactive |
+| Cron inactive required for resume | Intact (preflight + post-lock) |
 | Commit-unknown / rollback-unconfirmed | Fail-closed (prior 6O.1) |
 
 ---
@@ -130,8 +137,9 @@ Crew UI / unrelated dirty work: **not merged**.
 
 1. `tools/hosted-staging/recovery_storage.go` (+ tests)  
 2. `investigate.go` — recovery storage + collect-all gates  
-3. `resume.go` — recovery storage instead of empty-bucket gate  
-4. Simulation bootstrap / docs / evidence  
+3. `resume.go` — recovery storage instead of empty-bucket gate; dual advisory lock + post-lock cron recheck  
+4. `supabase/config.toml` — `[functions.course-lesson-media-access]` `verify_jwt = true`  
+5. Simulation bootstrap / docs / evidence  
 
 ---
 
@@ -171,8 +179,8 @@ Crew UI / unrelated dirty work: **not merged**.
 2. **43→106 verified?** Yes (same).  
 3. **Buckets explained?** Yes — expected media_storage pair.  
 4. **Remaining P0?** None for offline recovery tooling; hosted resume awaits auth.  
-5. **Remaining P1?** Full security re-cert deferred.  
+5. **Remaining P1?** Yes — P1-3/P1-5 blocked for product approval; P1-4 verify H3 after resume; full pgTAP/RLS re-cert deferred.  
 6. **Frontend match?** No new P0 contract break found; not fully re-audited.  
 7. **Unverified?** Hosted resume execution; full pgTAP/RLS; Expo/TS matrix; managed Realtime/Auth parity in local sim.  
-8. **Hosted recovery?** **READY** for separately authorized `resume` (gates green).  
-9. **Next auth?** Exactly one: `resume:zrutlrhhvfcsmssjiijl` (plus later security + cron re-enable auths).
+8. **Hosted recovery?** **READY** for separately authorized `resume` (gates green). Staging remains QUARANTINED until that auth.  
+9. **Next auth?** Exactly one: `resume:zrutlrhhvfcsmssjiijl` (plus later security suites + separate cron re-enable auth).
