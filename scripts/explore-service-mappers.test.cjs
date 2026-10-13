@@ -408,3 +408,70 @@ test('the RPC names and parameters Explore sends are unchanged', async () => {
   }
   await assert.rejects(() => explore.fetchExploreCountry('india'), /Invalid country/);
 });
+
+// ── S5: mapping reports tell an empty payload from an unreadable one ─────────────────────
+
+const payload = require('../utils/explorePayload.ts');
+
+test('the feed report separates empty, all-rejected, partial and valid responses', async () => {
+  const feed = (data) => call(() => explore.fetchExploreForYou(), data);
+
+  const empty = await feed({ items: [], nextCursor: null });
+  assert.deepEqual(empty.items, []);
+  assert.deepEqual(empty.report, { received: 0, mapped: 0, rejected: 0 }, 'nothing arrived');
+  assert.equal(payload.explorePayloadState(empty.report), 'empty', 'and that is genuinely empty');
+
+  const allRejected = await feed({
+    items: [null, 7, { kind: 'TAKE' }, viralRow({ title: undefined })], nextCursor: 0,
+  });
+  assert.deepEqual(allRejected.items, []);
+  assert.deepEqual(allRejected.report, { received: 4, mapped: 0, rejected: 4 });
+  const rejectedState = payload.explorePayloadState(allRejected.report);
+  assert.equal(rejectedState, 'all_rejected', 'four rows arrived and none could be read');
+  assert.equal(payload.explorePayloadNeedsRetry(rejectedState), true);
+  assert.match(payload.explorePayloadMessage(rejectedState), /Try again/);
+
+  const partial = await feed({ items: [viralRow(), null, viralRow({ id: undefined })], nextCursor: 12 });
+  assert.equal(partial.items.length, 1, 'safe rows are retained');
+  assert.deepEqual(partial.report, { received: 3, mapped: 1, rejected: 2 });
+  assert.equal(partial.nextCursor, 12, 'pagination is unaffected by rejected rows');
+  assert.equal(payload.explorePayloadState(partial.report), 'partial');
+
+  const valid = await feed({ items: [viralRow(), viralRow({ id: 't2' })], nextCursor: 24 });
+  assert.deepEqual(valid.report, { received: 2, mapped: 2, rejected: 0 });
+  assert.equal(payload.explorePayloadState(valid.report), 'ok');
+});
+
+test('the live report spans both lists and is empty only when nothing arrived', async () => {
+  const live = await call(() => explore.fetchExploreLive(), {
+    topics: [{ id: 'tp1', title: 'Topic' }, null], takes: [7],
+  });
+  assert.equal(live.topics.length, 1);
+  assert.deepEqual(live.report, { received: 3, mapped: 1, rejected: 2 });
+
+  const nothing = await call(() => explore.fetchExploreLive(), {});
+  assert.deepEqual(nothing.report, { received: 0, mapped: 0, rejected: 0 });
+  assert.equal(payload.explorePayloadState(nothing.report), 'empty');
+
+  const unreadable = await call(() => explore.fetchExploreLive(), { topics: [null], takes: ['x'] });
+  assert.deepEqual(unreadable.report, { received: 2, mapped: 0, rejected: 2 });
+  assert.equal(payload.explorePayloadState(unreadable.report), 'all_rejected');
+});
+
+test('the vault shelf report counts rows the visibility rule refused, without leaking them', async () => {
+  const shelf = await call(() => explore.fetchExploreVaultPreviewsWithReport(), [
+    vaultRow({ dropId: 'a', accessLevel: 'subscriber' }),
+    vaultRow({ dropId: 'b', accessLevel: 'preview', publicMediaPath: null }),
+    vaultRow({ dropId: 'c' }),
+  ]);
+  assert.equal(shelf.items.length, 1);
+  assert.deepEqual(shelf.items.map((item) => item.dropId), ['c']);
+  assert.deepEqual(shelf.report, { received: 3, mapped: 1, rejected: 2 });
+  assert.equal(JSON.stringify(shelf.report).includes('b'), false, 'a report is counts only');
+
+  // The array-returning entry point keeps its existing contract.
+  const array = await call(() => explore.fetchExploreVaultPreviews(), [vaultRow()]);
+  assert.equal(Array.isArray(array), true);
+  assert.equal(array.length, 1);
+  assert.equal(array[0].dropId, 'd1');
+});

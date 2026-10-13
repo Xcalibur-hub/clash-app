@@ -4,6 +4,7 @@
  * Vault shelf is FREE + PREVIEW (intentional public teaser) only — never subscriber source paths.
  */
 import { countryByCode } from '../data/exploreCountries';
+import { explorePayloadReport, type ExplorePayloadReport } from '../utils/explorePayload';
 import {
   isExploreVaultVisible,
   normalizeExploreVaultAccess,
@@ -215,6 +216,11 @@ export interface ExploreForYouItem {
 export interface ExploreForYouPage {
   items: ExploreForYouItem[];
   nextCursor: number | null;
+  /**
+   * Additive mapping counts (S5). Optional so existing callers are unaffected; it lets the screen
+   * tell an empty feed apart from a feed whose rows were all unreadable.
+   */
+  report?: ExplorePayloadReport;
 }
 
 export interface ExploreLiveFeed {
@@ -236,6 +242,8 @@ export interface ExploreLiveFeed {
     countryCode: string | null;
     href: string;
   }[];
+  /** Additive mapping counts across both lists (S5). Optional; empty is not an error. */
+  report?: ExplorePayloadReport;
 }
 
 function toChallenge(raw: unknown): ExploreChallenge | null {
@@ -463,11 +471,23 @@ export async function fetchGlobalViral(limit = 12): Promise<ExploreViralItem[]> 
 }
 
 export async function fetchExploreVaultPreviews(limit = 12): Promise<ExploreVaultPreview[]> {
+  return (await fetchExploreVaultPreviewsWithReport(limit)).items;
+}
+
+/**
+ * The same shelf, with the mapping counts attached (S5). One implementation behind both entry
+ * points: the array-returning function keeps its existing signature for every current caller.
+ */
+export async function fetchExploreVaultPreviewsWithReport(
+  limit = 12,
+): Promise<{ items: ExploreVaultPreview[]; report: ExplorePayloadReport }> {
   const { data, error } = await client().rpc('list_explore_vault_previews', { p_limit: limit });
   if (error) throw requestError(error);
-  return (Array.isArray(data) ? data : [])
+  const raw = Array.isArray(data) ? data : [];
+  const items = raw
     .map(toVaultPreview)
     .filter((x): x is ExploreVaultPreview => Boolean(x));
+  return { items, report: explorePayloadReport(raw.length, items.length) };
 }
 
 function toForYouItem(raw: unknown): ExploreForYouItem | null {
@@ -506,12 +526,14 @@ export async function fetchExploreForYou(
   });
   if (error) throw requestError(error);
   const record = asRecord(data);
-  const items = (Array.isArray(record?.items) ? record.items : [])
+  const rawItems = Array.isArray(record?.items) ? record.items : [];
+  const items = rawItems
     .map(toForYouItem)
     .filter((x): x is ExploreForYouItem => Boolean(x));
   return {
     items,
     nextCursor: num(record?.nextCursor),
+    report: explorePayloadReport(rawItems.length, items.length),
   };
 }
 
@@ -519,8 +541,9 @@ export async function fetchExploreLive(limit = 24): Promise<ExploreLiveFeed> {
   const { data, error } = await client().rpc('get_explore_live', { p_limit: limit });
   if (error) throw requestError(error);
   const record = asRecord(data);
-  return {
-    topics: (Array.isArray(record?.topics) ? record.topics : [])
+  const rawTopics = Array.isArray(record?.topics) ? record.topics : [];
+  const rawTakes = Array.isArray(record?.takes) ? record.takes : [];
+  const topics = rawTopics
       .map((item) => {
         const r = asRecord(item);
         const id = str(r?.id);
@@ -535,8 +558,8 @@ export async function fetchExploreLive(limit = 24): Promise<ExploreLiveFeed> {
           href: str(r?.href) ?? `/arena/topic/${id}`,
         };
       })
-      .filter((x): x is NonNullable<typeof x> => Boolean(x)),
-    takes: (Array.isArray(record?.takes) ? record.takes : [])
+      .filter((x): x is NonNullable<typeof x> => Boolean(x));
+  const takes = rawTakes
       .map((item) => {
         const r = asRecord(item);
         const id = str(r?.id);
@@ -553,7 +576,11 @@ export async function fetchExploreLive(limit = 24): Promise<ExploreLiveFeed> {
           href: str(r?.href) ?? `/take/${id}`,
         };
       })
-      .filter((x): x is NonNullable<typeof x> => Boolean(x)),
+      .filter((x): x is NonNullable<typeof x> => Boolean(x));
+  return {
+    topics,
+    takes,
+    report: explorePayloadReport(rawTopics.length + rawTakes.length, topics.length + takes.length),
   };
 }
 

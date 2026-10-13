@@ -69,6 +69,12 @@ import {
   packExploreMosaicRows,
   type ForYouFilterId,
 } from '../../utils/exploreNav';
+import {
+  explorePayloadMessage,
+  explorePayloadNeedsRetry,
+  explorePayloadState,
+  type ExplorePayloadReport,
+} from '../../utils/explorePayload';
 import { tap as hapticTap } from '../../utils/haptics';
 
 /**
@@ -102,6 +108,10 @@ function ExploreScreen(): React.JSX.Element {
   const teleportTimer = React.useRef<ReturnType<typeof setTimeout>|null>(null);
   const [error,setError] = React.useState<string|null>(null);
   const [retry,setRetry] = React.useState(0);
+  /** Non-blocking note when some (but not all) rows were unreadable. Never carries payload data. */
+  const [dataNotice,setDataNotice] = React.useState<string|null>(null);
+  /** Mapping counts for the current feed, so emptiness and unreadability stay distinguishable. */
+  const [feedReport,setFeedReport] = React.useState<ExplorePayloadReport|null>(null);
   React.useEffect(()=>{clearTeleportHistory();return()=>{if(teleportTimer.current)clearTimeout(teleportTimer.current);};},[]);
 
   const [pickerOpen, setPickerOpen] = React.useState(false);
@@ -115,6 +125,12 @@ function ExploreScreen(): React.JSX.Element {
 
   const headerCollapse = useSharedValue(0);
 
+  // Derived from the mapping counts: an unreadable payload must not present as an empty Explore.
+  const feedState = feedReport ? explorePayloadState(feedReport) : 'ok';
+  const feedUnreadable = explorePayloadNeedsRetry(feedState);
+  const liveState = live?.report ? explorePayloadState(live.report) : 'ok';
+  const liveUnreadable = explorePayloadNeedsRetry(liveState);
+
   React.useEffect(() => {
     analytics.track('explore_opened', { realm: 'arena', source: 'explore' });
   }, []);
@@ -126,6 +142,8 @@ function ExploreScreen(): React.JSX.Element {
     setLoadingMore(false);
     setLoading(true);
     setError(null);
+    setDataNotice(null);
+    setFeedReport(null);
     void Promise.all([fetchExploreWorldSummary(), fetchExploreForYou(24, 0), fetchExploreLive(20)])
       .then(([world, page, liveFeed]) => {
         if (cancelled) return;
@@ -134,6 +152,17 @@ function ExploreScreen(): React.JSX.Element {
         setForYou(mixed);
         setForYouCursor(page.nextCursor);
         setLive(liveFeed);
+        setFeedReport(page.report ?? null);
+        // Rows arrived but none could be read: that is a data error, not an empty Explore.
+        const states = [
+          page.report ? explorePayloadState(page.report) : 'ok',
+          liveFeed.report ? explorePayloadState(liveFeed.report) : 'ok',
+        ];
+        if (states.some(explorePayloadNeedsRetry)) {
+          setError(explorePayloadMessage('all_rejected') ?? 'Explore unavailable.');
+        } else if (states.some((state) => state === 'partial')) {
+          setDataNotice(explorePayloadMessage('partial'));
+        }
       })
       .catch(() => {if(!cancelled)setError('Explore unavailable.');})
       .finally(() => {
@@ -230,6 +259,15 @@ function ExploreScreen(): React.JSX.Element {
       if(!isCurrent() || generation!==feedGeneration.current)return;
       setForYou((prev) => diversifyByCreator(dedupeExploreItems([...prev, ...page.items])));
       setForYouCursor(page.nextCursor);
+      // An extra page that could not be read must say so rather than silently appending nothing.
+      const pageState = page.report ? explorePayloadState(page.report) : 'ok';
+      if (explorePayloadNeedsRetry(pageState)) {
+        setError(explorePayloadMessage('all_rejected') ?? 'Could not load more. Scroll to retry.');
+      } else if (pageState === 'partial') {
+        setDataNotice(explorePayloadMessage('partial'));
+      } else {
+        setDataNotice(null);
+      }
     } catch {
       if(isCurrent() && generation===feedGeneration.current)setError('Could not load more. Scroll to retry.');
     } finally {
@@ -322,6 +360,11 @@ function ExploreScreen(): React.JSX.Element {
       >
         {compactHeader}
         {error ? <Pressable accessibilityRole="button" accessibilityLabel="Retry Explore" onPress={()=>setRetry(n=>n+1)}><Text style={{color:t.textSecondary}}>{error} Tap to retry.</Text></Pressable> : null}
+        {dataNotice ? (
+          <Text allowFontScaling={false} style={{ color: t.textMuted, marginTop: space.xs }}>
+            {dataNotice}
+          </Text>
+        ) : null}
       </View>
 
       {searching && !searchResults ? (<ActivityIndicator accessibilityLabel="Loading search" color={t.textPrimary} />) : searching && searchResults ? (
@@ -367,7 +410,7 @@ function ExploreScreen(): React.JSX.Element {
               ) : null
             }
             ListEmptyComponent={
-              !loading ? (
+              !loading && !feedUnreadable ? (
                 <Text allowFontScaling={false} style={{ color: t.textMuted, marginTop: space.md }}>
                   Nothing here yet — try World or Teleport.
                 </Text>
@@ -545,7 +588,9 @@ function ExploreScreen(): React.JSX.Element {
                 </Text>
                 {(live?.topics.length ?? 0) === 0 && (live?.takes.length ?? 0) === 0 ? (
                   <Text allowFontScaling={false} style={{ color: t.textMuted }}>
-                    No live activity right now.
+                    {liveUnreadable
+                      ? explorePayloadMessage('all_rejected') ?? 'Live could not be read. Try again.'
+                      : 'No live activity right now.'}
                   </Text>
                 ) : null}
                 {live?.topics.map((topic) => (
