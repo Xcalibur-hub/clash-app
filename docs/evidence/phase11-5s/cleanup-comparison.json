@@ -1,0 +1,17 @@
+{
+  "containers": {
+    "before": 43,
+    "after": 43,
+    "identical": true
+  },
+  "volumes": {
+    "before": 22,
+    "after": 22,
+    "identical": true
+  },
+  "networks": {
+    "before": 9,
+    "after": 9,
+    "identical": true
+  }
+}

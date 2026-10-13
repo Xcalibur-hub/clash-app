@@ -1,0 +1,23 @@
+[
+  {
+    "type": "volume",
+    "name": "clash_p11bind_5s_20261012_db-config",
+    "project": "clash_p11bind_5s_20261012"
+  },
+  {
+    "type": "volume",
+    "name": "clash_p11bind_5s_20261012_db-data",
+    "project": "clash_p11bind_5s_20261012"
+  },
+  {
+    "type": "volume",
+    "name": "clash_p11bind_5s_20261012_storage-data",
+    "project": "clash_p11bind_5s_20261012"
+  },
+  {
+    "type": "network",
+    "name": "clash_p11bind_5s_20261012_network",
+    "id": "a76455cd0c1b682ef981fe6a86b98dba2e7a0ea51bbd6ad19a87528b8395c6cb",
+    "project": "clash_p11bind_5s_20261012"
+  }
+]

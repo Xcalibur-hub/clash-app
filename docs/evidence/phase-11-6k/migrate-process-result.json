@@ -1,0 +1,14 @@
+{
+    "InvokedAt":  "2026-10-12T16:56:49.8473718Z",
+    "Stdout":  "",
+    "MigratePathLineage":  "e85ce3e4f62490d98c94b9e032d4f68a97e1485f",
+    "ExecutableSha256":  "128cac60fa1e6f982182e8de458eb528f75154fd09baf9d5aa5838e9276db5c1",
+    "Authorization":  "migrate:zrutlrhhvfcsmssjiijl",
+    "ElapsedMs":  604176,
+    "ProjectRef":  "zrutlrhhvfcsmssjiijl",
+    "SourceRevision":  "f2a2b3f7fd5aee33bfd5b4c80e68dce95c90e354",
+    "ExitCode":  1,
+    "ConnectionMode":  "direct",
+    "Stderr":  "database operation failed; diagnostics withheld",
+    "Operation":  "migrate"
+}

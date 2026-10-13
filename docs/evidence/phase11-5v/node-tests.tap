@@ -1,0 +1,415 @@
+TAP version 13
+# Subtest: all frozen source hashes verified; four extension statements; none after 44
+ok 1 - all frozen source hashes verified; four extension statements; none after 44
+  ---
+  duration_ms: 1435.9252
+  ...
+# Subtest: proposal changes exactly the reviewed statement after BOM removal
+ok 2 - proposal changes exactly the reviewed statement after BOM removal
+  ---
+  duration_ms: 4.0638
+  ...
+# Subtest: unreviewed source bytes fail closed
+ok 3 - unreviewed source bytes fail closed
+  ---
+  duration_ms: 8.7533
+  ...
+# Subtest: explicit compose bindings pass but do not claim reachability
+ok 4 - explicit compose bindings pass but do not claim reachability
+  ---
+  duration_ms: 16.6264
+  ...
+# Subtest: reject compose host_ip
+ok 5 - reject compose host_ip
+  ---
+  duration_ms: 24.4424
+  ...
+# Subtest: reject compose host_ip undefined
+ok 6 - reject compose host_ip undefined
+  ---
+  duration_ms: 0.9358
+  ...
+# Subtest: reject compose host_ip 0.0.0.0
+ok 7 - reject compose host_ip 0.0.0.0
+  ---
+  duration_ms: 0.6305
+  ...
+# Subtest: reject compose host_ip ::
+ok 8 - reject compose host_ip ::
+  ---
+  duration_ms: 2.8704
+  ...
+# Subtest: reject compose host_ip ::1
+ok 9 - reject compose host_ip ::1
+  ---
+  duration_ms: 2.7541
+  ...
+# Subtest: reject compose host_ip 192.168.1.10
+ok 10 - reject compose host_ip 192.168.1.10
+  ---
+  duration_ms: 1.371
+  ...
+# Subtest: reject merged wildcard binding and other published services
+ok 11 - reject merged wildcard binding and other published services
+  ---
+  duration_ms: 2.745
+  ...
+# Subtest: reject missing services, wrong ports, host network and wrong project
+ok 12 - reject missing services, wrong ports, host network and wrong project
+  ---
+  duration_ms: 7.1465
+  ...
+# Subtest: creation and running snapshots pass independently
+ok 13 - creation and running snapshots pass independently
+  ---
+  duration_ms: 5.7141
+  ...
+# Subtest: reject Step 5I style empty HostIp at creation
+ok 14 - reject Step 5I style empty HostIp at creation
+  ---
+  duration_ms: 2.6538
+  ...
+# Subtest: reject wildcard or dual-stack actual mapping despite safe request
+ok 15 - reject wildcard or dual-stack actual mapping despite safe request
+  ---
+  duration_ms: 7.7508
+  ...
+# Subtest: reject absent actual mapping, stopped container and publish-all
+ok 16 - reject absent actual mapping, stopped container and publish-all
+  ---
+  duration_ms: 2.0883
+  ...
+# Subtest: reject wrong project, duplicates and missing gateway
+ok 17 - reject wrong project, duplicates and missing gateway
+  ---
+  duration_ms: 49.8241
+  ...
+# Subtest: unpublished exposed ports allowed; actual extra bindings denied
+ok 18 - unpublished exposed ports allowed; actual extra bindings denied
+  ---
+  duration_ms: 1.663
+  ...
+# Subtest: 106 outputs deterministic with exactly three BOM removals and one correction
+ok 19 - 106 outputs deterministic with exactly three BOM removals and one correction
+  ---
+  duration_ms: 6124.595
+  ...
+# Subtest: altered ordinary source bytes refused before output creation
+ok 20 - altered ordinary source bytes refused before output creation
+  ---
+  duration_ms: 2174.383
+  ...
+# Subtest: unexpected extension statement refused
+ok 21 - unexpected extension statement refused
+  ---
+  duration_ms: 1006.0908
+  ...
+# Subtest: source reorder and missing migration refused
+ok 22 - source reorder and missing migration refused
+  ---
+  duration_ms: 2225.5743
+  ...
+# Subtest: unsafe paths and existing directories refused
+ok 23 - unsafe paths and existing directories refused
+  ---
+  duration_ms: 9428.3674
+  ...
+# Subtest: full artifact verifies and detects corruption, extras and manifest tampering
+ok 24 - full artifact verifies and detects corruption, extras and manifest tampering
+  ---
+  duration_ms: 5233.1125
+  ...
+# Subtest: clean UTF-8, CRLF and literal bytes stay identical
+ok 25 - clean UTF-8, CRLF and literal bytes stay identical
+  ---
+  duration_ms: 8.7983
+  ...
+# Subtest: one file-start BOM before comment removes exactly three bytes
+ok 26 - one file-start BOM before comment removes exactly three bytes
+  ---
+  duration_ms: 2.2222
+  ...
+# Subtest: rejects invalid UTF-8
+ok 27 - rejects invalid UTF-8
+  ---
+  duration_ms: 4.339
+  ...
+# Subtest: rejects UTF-16 LE
+ok 28 - rejects UTF-16 LE
+  ---
+  duration_ms: 1.4606
+  ...
+# Subtest: rejects UTF-16 BE
+ok 29 - rejects UTF-16 BE
+  ---
+  duration_ms: 1.15
+  ...
+# Subtest: rejects UTF-32 LE
+ok 30 - rejects UTF-32 LE
+  ---
+  duration_ms: 1.8712
+  ...
+# Subtest: rejects UTF-32 BE
+ok 31 - rejects UTF-32 BE
+  ---
+  duration_ms: 2.1442
+  ...
+# Subtest: rejects NUL
+ok 32 - rejects NUL
+  ---
+  duration_ms: 1.1303
+  ...
+# Subtest: rejects duplicate BOM
+ok 33 - rejects duplicate BOM
+  ---
+  duration_ms: 3.1468
+  ...
+# Subtest: rejects embedded BOM
+ok 34 - rejects embedded BOM
+  ---
+  duration_ms: 2.3374
+  ...
+# Subtest: rejects BOM after whitespace
+ok 35 - rejects BOM after whitespace
+  ---
+  duration_ms: 1.972
+  ...
+# Subtest: rejects leading NBSP
+ok 36 - rejects leading NBSP
+  ---
+  duration_ms: 3.1419
+  ...
+# Subtest: rejects leading zero-width space
+ok 37 - rejects leading zero-width space
+  ---
+  duration_ms: 0.8636
+  ...
+# Subtest: rejects control byte
+ok 38 - rejects control byte
+  ---
+  duration_ms: 0.8913
+  ...
+# Subtest: rejects BOM before executable token
+ok 39 - rejects BOM before executable token
+  ---
+  duration_ms: 0.6727
+  ...
+# Subtest: mojibake heuristic warns but does not rewrite valid Unicode
+ok 40 - mojibake heuristic warns but does not rewrite valid Unicode
+  ---
+  duration_ms: 0.8036
+  ...
+# Subtest: artifact writes verified bytes and refuses existing destination without overwriting
+ok 41 - artifact writes verified bytes and refuses existing destination without overwriting
+  ---
+  duration_ms: 25.0757
+  ...
+# Subtest: unsafe artifact input creates no destination
+ok 42 - unsafe artifact input creates no destination
+  ---
+  duration_ms: 3.3705
+  ...
+# Subtest: actual authorized bootstrap CLI verifies real artifacts and reaches exactly one mocked psql command
+ok 43 - actual authorized bootstrap CLI verifies real artifacts and reaches exactly one mocked psql command
+  ---
+  duration_ms: 7456.1396
+  ...
+# Subtest: failed psql stops once, returns failure and redacts both diagnostic streams
+ok 44 - failed psql stops once, returns failure and redacts both diagnostic streams
+  ---
+  duration_ms: 5056.9258
+  ...
+# Subtest: thrown subprocess exception stops once without exposing its secret message
+ok 45 - thrown subprocess exception stops once without exposing its secret message
+  ---
+  duration_ms: 4843.4836
+  ...
+# Subtest: unauthorized actual bootstrap entry rejects before any client invocation
+ok 46 - unauthorized actual bootstrap entry rejects before any client invocation
+  ---
+  duration_ms: 108.0756
+  ...
+# Subtest: missing generated password rejects actual bootstrap entry before any client invocation
+ok 47 - missing generated password rejects actual bootstrap entry before any client invocation
+  ---
+  duration_ms: 116.1909
+  ...
+# Subtest: missing lifecycle gate rejects authorized entry before any client invocation
+ok 48 - missing lifecycle gate rejects authorized entry before any client invocation
+  ---
+  duration_ms: 4957.5047
+  ...
+# Subtest: unknown bootstrap operation rejects before any client invocation
+ok 49 - unknown bootstrap operation rejects before any client invocation
+  ---
+  duration_ms: 256.9373
+  ...
+# Subtest: execute CLI imports initialized helpers and preserves its authorization guard for both modes
+ok 50 - execute CLI imports initialized helpers and preserves its authorization guard for both modes
+  ---
+  duration_ms: 570.2979
+  ...
+# Subtest: password is read from disposable configuration, not inherited credentials
+ok 51 - password is read from disposable configuration, not inherited credentials
+  ---
+  duration_ms: 6.5006
+  ...
+# Subtest: missing, blank, non-string or line-breaking passwords reject before subprocess
+ok 52 - missing, blank, non-string or line-breaking passwords reject before subprocess
+  ---
+  duration_ms: 3.0288
+  ...
+# Subtest: credentials are forwarded only to authenticated child processes without parent mutation
+ok 53 - credentials are forwarded only to authenticated child processes without parent mutation
+  ---
+  duration_ms: 10.8939
+  ...
+# Subtest: all psql roles use noninteractive auth, name-only forwarding and error stop
+ok 54 - all psql roles use noninteractive auth, name-only forwarding and error stop
+  ---
+  duration_ms: 6.0956
+  ...
+# Subtest: CLI preserves endpoint/version workflow and passes password through child env only
+ok 55 - CLI preserves endpoint/version workflow and passes password through child env only
+  ---
+  duration_ms: 4.6674
+  ...
+# Subtest: safe logging redacts passwords, URL passwords, keys and encoded password forms
+ok 56 - safe logging redacts passwords, URL passwords, keys and encoded password forms
+  ---
+  duration_ms: 2.5862
+  ...
+# Subtest: process exception details cannot escape and native error objects are discarded
+ok 57 - process exception details cannot escape and native error objects are discarded
+  ---
+  duration_ms: 19.2603
+  ...
+# Subtest: malformed private config errors do not print its contents
+ok 58 - malformed private config errors do not print its contents
+  ---
+  duration_ms: 24.6104
+  ...
+# Subtest: lifecycle delegates bootstrap to authenticated helper and contains no bare psql
+ok 59 - lifecycle delegates bootstrap to authenticated helper and contains no bare psql
+  ---
+  duration_ms: 15.792
+  ...
+# Subtest: bootstrap helper import is inert and unauthorized entry never starts clients
+ok 60 - bootstrap helper import is inert and unauthorized entry never starts clients
+  ---
+  duration_ms: 252.4277
+  ...
+# Subtest: PowerShell logging sanitizes actual mocked command output and preserves generic failure
+ok 61 - PowerShell logging sanitizes actual mocked command output and preserves generic failure
+  ---
+  duration_ms: 5279.4189
+  ...
+# Subtest: Windows policy retains Docker system plugin roots with case-insensitive names
+ok 62 - Windows policy retains Docker system plugin roots with case-insensitive names
+  ---
+  duration_ms: 14.5002
+  ...
+# Subtest: mock Compose discovery succeeds for Node Docker and migration clients without inherited credentials
+ok 63 - mock Compose discovery succeeds for Node Docker and migration clients without inherited credentials
+  ---
+  duration_ms: 3.8105
+  ...
+# Subtest: each missing/invalid Windows prerequisite fails explicitly before subprocess execution
+ok 64 - each missing/invalid Windows prerequisite fails explicitly before subprocess execution
+  ---
+  duration_ms: 9.7742
+  ...
+# Subtest: non-Windows filtering does not impose Windows paths or forward unknown variables
+ok 65 - non-Windows filtering does not impose Windows paths or forward unknown variables
+  ---
+  duration_ms: 0.7173
+  ...
+# Subtest: PowerShell mocked lifecycle Docker and Node calls share filtering, discovery, failure gates and restoration
+ok 66 - PowerShell mocked lifecycle Docker and Node calls share filtering, discovery, failure gates and restoration
+  ---
+  duration_ms: 4972.5706
+  ...
+# Subtest: six pinned runtime services and three exact ordered initialization jobs
+ok 67 - six pinned runtime services and three exact ordered initialization jobs
+  ---
+  duration_ms: 19.0715
+  ...
+# Subtest: only DB and gateway publish explicit loopback ports; all resources project scoped
+ok 68 - only DB and gateway publish explicit loopback ports; all resources project scoped
+  ---
+  duration_ms: 2.7904
+  ...
+# Subtest: wildcard or inherited networking fails static gate
+ok 69 - wildcard or inherited networking fails static gate
+  ---
+  duration_ms: 7.9829
+  ...
+# Subtest: fresh secrets and keys share isolated signature; public/privileged keys differ
+ok 70 - fresh secrets and keys share isolated signature; public/privileged keys differ
+  ---
+  duration_ms: 1.5466
+  ...
+# Subtest: bootstrap vendor bytes match pinned upstream hashes
+ok 71 - bootstrap vendor bytes match pinned upstream hashes
+  ---
+  duration_ms: 22.5031
+  ...
+# Subtest: all245 frozen source hashes and89 suites; nine designated concurrency/race suites retained
+ok 72 - all245 frozen source hashes and89 suites; nine designated concurrency/race suites retained
+  ---
+  duration_ms: 1674.6809
+  ...
+# Subtest: TAP success requires real assertion count and matching plan
+ok 73 - TAP success requires real assertion count and matching plan
+  ---
+  duration_ms: 8.6549
+  ...
+# Subtest: exit0 without TAP or incomplete plan fails
+ok 74 - exit0 without TAP or incomplete plan fails
+  ---
+  duration_ms: 5.4659
+  ...
+# Subtest: not ok, SQL failure, bailout, duplicate/out-of-order numbering fail
+ok 75 - not ok, SQL failure, bailout, duplicate/out-of-order numbering fail
+  ---
+  duration_ms: 3.6206
+  ...
+# Subtest: skip andTODO counted separately; unexpectedTODO pass fails
+ok 76 - skip andTODO counted separately; unexpectedTODO pass fails
+  ---
+  duration_ms: 4.7374
+  ...
+# Subtest: inspection distinguishes file intent from unsafe actual host bindings
+ok 77 - inspection distinguishes file intent from unsafe actual host bindings
+  ---
+  duration_ms: 12.0125
+  ...
+# Subtest: future lifecycle refuses missing authorization; default executor cannot run on import
+ok 78 - future lifecycle refuses missing authorization; default executor cannot run on import
+  ---
+  duration_ms: 49.7511
+  ...
+# Subtest: prepare refuses unsafe/existing destinations and detects changed copied bootstrap
+ok 79 - prepare refuses unsafe/existing destinations and detects changed copied bootstrap
+  ---
+  duration_ms: 19505.866
+  ...
+# Subtest: failed-suite emitted assertion counts survive SQL/TAP failure reporting
+ok 80 - failed-suite emitted assertion counts survive SQL/TAP failure reporting
+  ---
+  duration_ms: 0.942
+  ...
+# Subtest: focused security suites cannot silently skip or defer assertions
+ok 81 - focused security suites cannot silently skip or defer assertions
+  ---
+  duration_ms: 0.9258
+  ...
+1..81
+# tests 81
+# suites 0
+# pass 81
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 34575.6822

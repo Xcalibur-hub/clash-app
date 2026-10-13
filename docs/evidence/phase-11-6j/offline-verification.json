@@ -1,0 +1,48 @@
+{
+  "step": "6J",
+  "mode": "file-only",
+  "hosted_connection": false,
+  "migrations_deployed": false,
+  "sql_suites_executed": false,
+  "baseline_commit": "b22f6f798f15294c983cfbfa7369a8863c7c0447",
+  "worktree": "C:/p116j",
+  "branch": "audit/phase-11-migration-deploy-readiness-6j",
+  "deployment_readiness": "READY",
+  "executor_code_changed": false,
+  "seal_candidate": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "frozen_manifest_sha256_git_blob": "a9b30736c87a7fac05c9764404dfd58a876f64db6a3e072e9a348cac8b162b4e",
+  "compatibility_manifest_sha256": "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+  "suite_manifest_sha256": "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+  "frozen_source_files": 245,
+  "migration_artifacts_verified": 106,
+  "migration_artifact_hash_mismatches": 0,
+  "nontransactional_concurrent_scan": "clean",
+  "toplevel_commit_rollback_scan": "clean",
+  "go_test": {
+    "module": "clash/hosted-staging",
+    "result": "ok",
+    "top_level_pass": 60
+  },
+  "go_vet": {
+    "result": "pass"
+  },
+  "rebuild_binary_sha256": "4d64c91b3f0231876c740cf225c29623ac694eae7b1b74b5c28cc93bb5a77ecc",
+  "failure_path_tests_present": [
+    "TestPartialMigrationFirstFailure",
+    "TestCommitUncertaintyStops",
+    "TestLedgerMismatchStops",
+    "TestCleanupFailureReported",
+    "TestWrongDatabaseStopsBeforeMigration",
+    "TestPreflightNonemptyLedgerAndEvidenceFailure",
+    "TestPoolerFailedMigrationStillRollsBack",
+    "TestActualEntrypointAndEvidenceRedaction"
+  ],
+  "transaction_ledger_safety": {
+    "migration_and_ledger_same_transaction": true,
+    "sql_without_ledger_entry_possible_for_transactional_sql": false,
+    "stop_on_first_failure": true,
+    "automatic_resume": false,
+    "automatic_retry": false
+  },
+  "secrets_in_evidence": false
+}

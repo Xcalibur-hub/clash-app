@@ -10,21 +10,33 @@
         "APP_VARIANT": "development"
       }
     },
-   "preview": {
-  "distribution": "internal",
-  "environment": "preview",
-  "node": "22.13.0",
-  "android": {
-    "buildType": "apk"
-  },
-  "env": {
-    "APP_VARIANT": "preview"
-  }
-},
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "node": "22.13.0",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_VARIANT": "preview"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "env": {
         "APP_VARIANT": "production"
+      }
+    },
+    "staging": {
+      "distribution": "internal",
+      "environment": "preview",
+      "channel": "clash-staging",
+      "node": "22.13.0",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_VARIANT": "staging"
       }
     }
   },

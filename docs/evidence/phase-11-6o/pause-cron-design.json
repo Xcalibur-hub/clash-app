@@ -1,0 +1,19 @@
+{
+  "mode": "pause-cron",
+  "writes": "cron.alter_job active=false only",
+  "forbidden": ["cron.unschedule", "delete job", "recreate", "alter schedule", "alter command"],
+  "pre_write_checks": [
+    "identity_tls",
+    "cron_catalog",
+    "alter_job_available",
+    "advisory_lock",
+    "exactly_one_clash_maintenance",
+    "schedule_command_username_match"
+  ],
+  "post_write_checks": [
+    "active_false",
+    "bounded_quiescence_no_in_progress",
+    "job_still_exists_same_id",
+    "schedule_command_unchanged"
+  ]
+}
