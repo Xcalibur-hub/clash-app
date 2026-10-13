@@ -1,187 +1,253 @@
 /**
- * Staging Edge Function deployment (Phase 11 Step 12).
+ * Staging Edge Function deployment (Phase 11 Steps 12–13) — HARDENED.
  *
  * DRY-RUN BY DEFAULT. Nothing is deployed without `--execute`.
  *
- * Safety properties:
- *   · refuses any project ref other than the approved staging ref;
- *   · validates repository inputs (clean tree, expected files) before deploying;
- *   · requires an access token via ENVIRONMENT ONLY (never argv, never logged);
- *   · NEVER passes `--no-verify-jwt`; JWT policy comes from supabase/config.toml;
- *   · deploys only the functions explicitly named in `--only`;
- *   · re-reads the deployed inventory and refuses on any mismatch;
- *   · runs negative-authentication smoke tests and writes sanitized evidence.
+ * Gates, in order, before ANY mutation:
+ *   1. project identity (`--confirm-project` must repeat the pinned ref, and the
+ *      remote project is read back before touching it);
+ *   2. selection: every `--only` name must be in the reviewed APPROVED set;
+ *   3. commit pin: `--commit <sha>` must equal HEAD, with a clean working tree;
+ *   4. pinned CLI: `supabase@2.40.7`, version asserted before use;
+ *   5. manifest ↔ supabase/config.toml verify_jwt cross-check for all functions;
+ *   6. required secrets for the SELECTED SET ONLY, by name, presence-checked.
  *
- * Usage:
- *   node scripts/staging-functions-deploy.mjs --only vault-media-access            # plan
- *   node scripts/staging-functions-deploy.mjs --only vault-media-access --execute   # deploy
+ * After deployment: strict inventory verification (verify_jwt must be a boolean
+ * equal to the expectation), partial-deployment check, then negative-auth smoke
+ * tests. Every captured string is redacted before it can reach a log or evidence.
+ *
+ * The access token travels in the child ENVIRONMENT only — never argv, never
+ * evidence, never logs. No secret value is ever read, printed, generated or
+ * uploaded.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FUNCTIONS, JWT_EXEMPT, PROJECT_REF, PROJECT_HOST, PLATFORM_INJECTED, requiredSecretNames } from './staging-functions.manifest.mjs';
+import {
+  APPROVED_DEPLOYMENT_SET, CLI_SPEC, FUNCTIONS, JWT_EXEMPT, PINNED_CLI_VERSION, PLATFORM_INJECTED, PROJECT_HOST, PROJECT_REF,
+} from './staging-functions.manifest.mjs';
+import {
+  checkCliVersion, checkCommitPin, checkInventory, checkPartialDeployment, checkProjectRef,
+  checkSecretPrereqs, checkSmoke, evidenceIsSanitized, redact, requiredSecretsForSet, selectFunctions,
+} from './staging-functions.lib.mjs';
 
+export const TOKEN_ENV = 'SUPABASE_ACCESS_TOKEN';
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TOKEN_ENV = 'SUPABASE_ACCESS_TOKEN';
 
 export function parseArgs(argv) {
-  const out = { execute: false, only: [], evidence: path.join(ROOT, '.expo', 'staging-deploy', String(Date.now())) };
+  const out = {
+    execute: false, only: [], commit: '', confirmProject: '',
+    evidence: path.join(ROOT, '.expo', 'staging-deploy', String(Date.now())),
+  };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--execute') out.execute = true;
-    else if (argv[i] === '--only') out.only = String(argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    else if (argv[i] === '--evidence-dir') out.evidence = path.resolve(String(argv[++i] ?? ''));
-    else throw new Error(`unknown argument: ${argv[i]}`);
+    const a = argv[i];
+    if (a === '--execute') out.execute = true;
+    else if (a === '--only') out.only = String(argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    else if (a === '--commit') out.commit = String(argv[++i] ?? '').trim();
+    else if (a === '--confirm-project') out.confirmProject = String(argv[++i] ?? '').trim();
+    else if (a === '--evidence-dir') out.evidence = path.resolve(String(argv[++i] ?? ''));
+    else throw new Error(`unknown argument: ${a}`);
   }
-  if (out.only.length === 0) throw new Error('--only <comma separated function names> is required');
+  if (!out.only.length) throw new Error('--only <comma separated function names> is required');
   return out;
 }
 
-export function supabase(args) {
-  // The token travels in the child ENVIRONMENT only; it is never an argument.
-  return execFileSync('npx', ['supabase', ...args], { cwd: ROOT, encoding: 'utf8', env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+/** Runs the PINNED CLI. Output is captured and redacted by the caller. */
+export function cli(args) {
+  try {
+    return { ok: true, out: execFileSync('npx', ['--yes', CLI_SPEC, ...args], { cwd: ROOT, encoding: 'utf8', env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }) };
+  } catch (e) {
+    // Both streams can contain the CLI's own diagnostics; they are redacted here
+    // so a token can never be persisted to a log or to evidence.
+    const out = `${e?.stdout ?? ''}${e?.stderr ?? ''}`.trim() || String(e?.message ?? e);
+    return { ok: false, out: redact(out) };
+  }
 }
 
-export function assertProjectIdentity() {
-  if (PROJECT_REF !== 'zrutlrhhvfcsmssjiijl') throw new Error('refusing: unexpected project reference');
-}
-
-export function assertCleanInputs() {
+export function gitState() {
   const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  if (dirty) throw new Error(`refusing: working tree is not clean (${dirty.split('\n').length} path(s))`);
-  for (const f of FUNCTIONS) {
+  return {
+    commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
+    branch: execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
+    clean: dirty.length === 0,
+    dirtyPaths: dirty ? dirty.split('\n') : [],
+  };
+}
+
+export function validateRepositoryInputs(manifest) {
+  for (const f of manifest) {
     if (!existsSync(path.join(ROOT, 'supabase', 'functions', f.name, 'index.ts'))) throw new Error(`refusing: missing ${f.name}/index.ts`);
   }
   const config = readFileSync(path.join(ROOT, 'supabase', 'config.toml'), 'utf8');
-  for (const f of FUNCTIONS) {
+  for (const f of manifest) {
     const block = config.match(new RegExp(`\\[functions\\.${f.name}\\]([\\s\\S]*?)(?=\\n\\[|$)`));
     const declared = block ? /verify_jwt\s*=\s*(true|false)/.exec(block[1])?.[1] : undefined;
     if (declared !== String(f.verifyJwt)) throw new Error(`refusing: config.toml verify_jwt for ${f.name} is ${declared}, manifest says ${f.verifyJwt}`);
   }
   if (JWT_EXEMPT.length !== 1 || JWT_EXEMPT[0] !== 'arena-editorial') throw new Error('refusing: JWT exemption set changed');
-  return { commit, branch };
-}
-
-export function checkToken() {
-  return {
-    present: (process.env[TOKEN_ENV] ?? '').length > 0,
-    hint: `set ${TOKEN_ENV} in this shell only (never in a file, argv or log); the CLI reads it from the environment`,
-  };
-}
-
-export function checkSecretNames() {
-  const raw = supabase(['secrets', 'list', '--project-ref', PROJECT_REF, '-o', 'json']);
-  const names = new Set((JSON.parse(raw) ?? []).map((r) => String(r.name ?? r.Name ?? '')));
-  // NAMES ONLY — secret values are never requested, read or printed.
-  return { present: [...names].sort(), missing: requiredSecretNames().filter((n) => !names.has(n)) };
-}
-
-export function deployOne(name) {
-  const fn = FUNCTIONS.find((f) => f.name === name);
-  if (!fn) throw new Error(`refusing: ${name} is not a known function`);
-  if (!fn.verifyJwt && !JWT_EXEMPT.includes(name)) throw new Error(`refusing: unexpected JWT exemption for ${name}`);
-  const started = Date.now();
-  supabase(['functions', 'deploy', name, '--project-ref', PROJECT_REF]);
-  return { name, ms: Date.now() - started };
 }
 
 export function fetchDeployed() {
-  const raw = supabase(['functions', 'list', '--project-ref', PROJECT_REF, '-o', 'json']);
-  return (JSON.parse(raw) ?? []).map((r) => ({
-    name: String(r.name ?? r.slug ?? ''),
-    verify_jwt: r.verify_jwt ?? r.verifyJwt ?? null,
-    version: r.version ?? null,
-    updated_at: r.updated_at ?? null,
+  const r = cli(['functions', 'list', '--project-ref', PROJECT_REF, '-o', 'json']);
+  if (!r.ok) throw new Error(`refusing: could not read the deployed inventory`);
+  return (JSON.parse(r.out) ?? []).map((x) => ({
+    name: String(x.name ?? x.slug ?? ''),
+    verify_jwt: typeof x.verify_jwt === 'boolean' ? x.verify_jwt : (typeof x.verifyJwt === 'boolean' ? x.verifyJwt : x.verify_jwt ?? null),
+    version: x.version ?? null,
+    updated_at: x.updated_at ?? null,
   }));
 }
 
-export async function smokeTests(deployedNames) {
+export function readSecretNames() {
+  const r = cli(['secrets', 'list', '--project-ref', PROJECT_REF, '-o', 'json']);
+  if (!r.ok) throw new Error('refusing: could not list secret names');
+  // NAMES ONLY. Values are never requested, read, printed or uploaded.
+  return (JSON.parse(r.out) ?? []).map((x) => String(x.name ?? x.Name ?? ''));
+}
+
+export function writeEvidence(dir, payload) {
+  if (!evidenceIsSanitized(payload)) throw new Error('refusing: evidence would contain a credential-like value');
+  mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, 'deploy-evidence.json');
+  writeFileSync(file, JSON.stringify(payload, null, 2) + '\n', { mode: 0o600 });
+  return file;
+}
+
+export async function smokeTests(names) {
   const results = [];
-  for (const name of deployedNames) {
+  for (const name of names) {
     const url = `https://${PROJECT_HOST}/functions/v1/${name}`;
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: controller.signal });
       clearTimeout(timer);
-      // Every function must reject an unauthenticated call: JWT-enforced ones at
-      // the gateway, arena-editorial at its own missing-secret check.
-      results.push({ name, status: res.status, expected: 401, pass: res.status === 401 });
+      results.push({ name, status: res.status, expected: 401 });
     } catch (e) {
-      results.push({ name, status: 'error', expected: 401, pass: false, detail: String(e?.name ?? e) });
+      results.push({ name, status: 'error', expected: 401, detail: String(e?.name ?? e) });
     }
   }
   return results;
 }
 
-export function writeEvidence(dir, payload) {
-  mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, 'deploy-evidence.json');
-  // Sanitized by construction: names, versions, statuses, timings, commit only.
-  writeFileSync(file, JSON.stringify(payload, null, 2) + '\n', { mode: 0o600 });
-  return file;
-}
-
-export { FUNCTIONS, JWT_EXEMPT, PLATFORM_INJECTED, PROJECT_HOST, PROJECT_REF, requiredSecretNames };
-
-
 function invokedDirectly() {
   return Boolean(process.argv[1]) && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 }
 
-if (invokedDirectly()) {
-  const evidence = { step: 'phase-11-12', mode: 'dry-run', project_ref: PROJECT_REF, started_at: new Date().toISOString() };
+export async function run(argv = process.argv.slice(2)) {
+  const evidence = { step: 'phase-11-13', mode: 'dry-run', project_ref: PROJECT_REF, started_at: new Date().toISOString(), checks: [] };
   let evidenceDir = null;
+  const note = (name, res) => evidence.checks.push({ check: name, ok: res.ok, detail: res.reason });
+  const stop = (reason) => { evidence.result = 'STOPPED'; evidence.reason = redact(reason); return evidence; };
   try {
-    const args = parseArgs(process.argv.slice(2));
+    const args = parseArgs(argv);
     evidenceDir = args.evidence;
     evidence.mode = args.execute ? 'execute' : 'dry-run';
-    evidence.approved = args.only;
-    assertProjectIdentity();
-    evidence.source = assertCleanInputs();
-    evidence.functions = FUNCTIONS.map((f) => ({ name: f.name, verify_jwt: f.verifyJwt, required: f.required, optional: f.optional, platform_injected: PLATFORM_INJECTED }));
-    const unknown = args.only.filter((n) => !FUNCTIONS.some((f) => f.name === n));
-    if (unknown.length) throw new Error(`refusing: not an approved function: ${unknown.join(', ')}`);
-    const token = checkToken();
-    evidence.token_present = token.present;
+    evidence.requested = args.only;
+
+    // 1. project identity — before anything else.
+    const proj = checkProjectRef(PROJECT_REF, args.confirmProject);
+    note('project_identity', proj);
+    if (!proj.ok) { if (args.execute) return stop(proj.reason); }
+
+    // 2. selection must stay inside the reviewed set.
+    const sel = selectFunctions({ requested: args.only, approved: APPROVED_DEPLOYMENT_SET, manifest: FUNCTIONS });
+    note('function_allowlist', sel);
+    if (!sel.ok) return stop(sel.reason);
+    evidence.approved_set = sel.selected;
+
+    // 3. pinned commit + clean tree.
+    const g = gitState();
+    const pin = checkCommitPin({ expected: args.commit, actual: g.commit, clean: g.clean, dirtyPaths: g.dirtyPaths });
+    note('commit_pin', pin);
+    evidence.source = { commit: g.commit, branch: g.branch };
+    if (args.execute && !pin.ok) return stop(pin.reason);
+
+    // 4. repository inputs (files + config.toml parity).
+    validateRepositoryInputs(FUNCTIONS);
+    note('repository_inputs', { ok: true, reason: 'six functions present; config.toml verify_jwt matches the manifest' });
+
+    // 5. pinned CLI version — asserted before any mutation (execute only; the
+    //    plan run stays fully offline).
+    if (args.execute) {
+      const version = cli(['--version']);
+      const cliCheck = version.ok ? checkCliVersion(version.out, PINNED_CLI_VERSION) : { ok: false, reason: 'CLI not runnable' };
+      note('pinned_cli', cliCheck);
+      if (!cliCheck.ok) return stop(cliCheck.reason);
+    } else {
+      note('pinned_cli', { ok: true, reason: `pinned spec ${CLI_SPEC} (asserted only on --execute)` });
+    }
+
+    // 6. secrets required for the SELECTED SET ONLY.
+    const required = requiredSecretsForSet(sel.selected, FUNCTIONS);
+    evidence.required_secrets_for_set = required;
+    if (args.execute) {
+      const present = readSecretNames();
+      const sec = checkSecretPrereqs({ required, present });
+      note('secret_prereqs', sec);
+      if (!sec.ok) return stop(sec.reason);
+    } else {
+      note('secret_prereqs', { ok: true, reason: `plan: ${required.length} required secret(s) for the selected set` });
+    }
+
     if (!args.execute) {
-      evidence.result = 'PLAN ONLY — re-run with --execute after authorization';
-      evidence.evidence_file = writeEvidence(args.evidence, evidence);
-      console.log(JSON.stringify(evidence, null, 2));
-      process.exit(0);
+      evidence.result = 'PLAN ONLY - re-run with --execute, --commit and --confirm-project after authorization';
+      evidence.evidence_file = writeEvidence(evidenceDir, evidence);
+      return evidence;
     }
-    if (!token.present) {
-      evidence.result = 'BLOCKED';
-      evidence.reason = 'missing credential';
-      evidence.how_to_fix = token.hint;
-      evidence.evidence_file = writeEvidence(args.evidence, evidence);
-      console.log(JSON.stringify(evidence, null, 2));
-      process.exit(2);
+
+    // Pre-mutation read-back of the target project.
+    const before = fetchDeployed();
+    evidence.inventory_before = before;
+    note('target_read_back', { ok: true, reason: `${before.length} function(s) already deployed` });
+
+    const deployed = [];
+    for (const name of sel.selected) {
+      const started = Date.now();
+      const r = cli(['functions', 'deploy', name, '--project-ref', PROJECT_REF]);
+      if (!r.ok) return stop(`deploy failed for ${name}: ${r.out}`);
+      deployed.push({ name, ms: Date.now() - started });
+      evidence.deployed = deployed;
     }
-    evidence.secrets = checkSecretNames();
-    if (evidence.secrets.missing.length) throw new Error(`refusing: missing required function secret(s): ${evidence.secrets.missing.join(', ')}`);
-    evidence.deployed = args.only.map((n) => deployOne(n));
-    const inventory = fetchDeployed();
-    evidence.inventory = inventory;
-    const bad = args.only.filter((n) => {
-      const row = inventory.find((r) => r.name === n);
-      const want = FUNCTIONS.find((f) => f.name === n).verifyJwt;
-      return !row || (row.verify_jwt !== null && Boolean(row.verify_jwt) !== want);
-    });
-    if (bad.length) throw new Error(`deployed inventory mismatch for: ${bad.join(', ')}`);
-    evidence.smoke = await smokeTests(args.only);
-    if (evidence.smoke.some((s) => !s.pass)) throw new Error('negative-authentication smoke test failed');
+
+    const after = fetchDeployed();
+    evidence.inventory = after;
+    const inv = checkInventory({ manifest: FUNCTIONS, actual: after });
+    note('inventory_strict', inv);
+    if (!inv.ok) return stop(inv.reason);
+    const partial = checkPartialDeployment({ requested: sel.selected, actual: after });
+    note('partial_deployment', partial);
+    if (!partial.ok) return stop(partial.reason);
+
+    const smoke = await smokeTests(sel.selected);
+    evidence.smoke = smoke;
+    const sm = checkSmoke(smoke);
+    note('negative_auth_smoke', sm);
+    if (!sm.ok) return stop(sm.reason);
+
     evidence.result = 'DEPLOYED AND VERIFIED';
-    evidence.evidence_file = writeEvidence(args.evidence, evidence);
-    console.log(JSON.stringify(evidence, null, 2));
+    evidence.functions = sel.selected.map((n) => {
+      const f = FUNCTIONS.find((x) => x.name === n);
+      return { name: f.name, verify_jwt: f.verifyJwt, required: f.required, optional: f.optional };
+    });
+    evidence.secrets_read = false;
+    evidence.secret_values_present = false;
+    evidence.generated_at = new Date().toISOString();
+    evidence.evidence_file = writeEvidence(evidenceDir, evidence);
+    return evidence;
   } catch (e) {
-    evidence.result = 'STOPPED';
-    evidence.reason = String(e?.message ?? e);
-    evidence.evidence_file = writeEvidence(evidenceDir ?? path.join(ROOT, '.expo', 'staging-deploy', String(Date.now())), evidence);
-    console.log(JSON.stringify(evidence, null, 2));
-    process.exit(1);
+    const stopped = stop(String(e?.message ?? e));
+    try { stopped.evidence_file = writeEvidence(evidenceDir ?? path.join(ROOT, '.expo', 'staging-deploy', String(Date.now())), stopped); } catch { /* nothing further to do */ }
+    return stopped;
   }
 }
+
+if (invokedDirectly()) {
+  const result = await run();
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(result.result === 'STOPPED' ? 1 : 0);
+}
+
+export { APPROVED_DEPLOYMENT_SET, FUNCTIONS, PINNED_CLI_VERSION, PLATFORM_INJECTED, PROJECT_REF, requiredSecretsForSet };
 
