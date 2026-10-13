@@ -191,7 +191,7 @@ function MediaFeedCard({
         {
           width: cardW,
           height,
-          borderRadius: 28,
+          borderRadius: 32,
           shadowColor: t.shadowColor,
           backgroundColor: '#111113',
         },
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(8,8,11,0.45)',
+    backgroundColor: 'rgba(8,8,11,0.58)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -581,10 +581,11 @@ const styles = StyleSheet.create({
   mediaHeadline: {
     ...typeScale.editorial,
     color: '#FAFAF8',
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontSize: 29,
+    lineHeight: 35,
+    fontWeight: '900',
+    letterSpacing: -0.9,
   },
   clashHint: {
     ...typeScale.caption,
