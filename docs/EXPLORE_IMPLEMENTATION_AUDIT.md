@@ -79,3 +79,160 @@ findings above. No conclusion about production readiness is drawn yet.**
 
 Nothing in this branch was executed against hosted staging or production; no data, functions or
 configuration were touched.
+
+---
+
+# Part 2 — Completed audit (the seven items)
+
+**Correction to Part 1.** F4 as originally written ("no automated tests covering Explore") is
+**wrong** and is retracted: the first inventory only scanned `scripts/`. Nine Explore logic suites
+exist under `utils/` and run inside the project's own `test:unit` script, which I executed:
+
+```
+npm run test:unit  ->  # tests 539   # pass 539   # fail 0   (73 test files)
+```
+
+Explore suites: `exploreCountries`, `exploreForYouRank`, `exploreMosaic`, `exploreNav`, `exploreGeo`,
+`exploreGlobeMath`, `exploreTeleport`, `exploreVaultVisibility`, `exploreWorldCanvas` (plus
+`worldMapAdapter`, `vaultWorldPersonality`, `vaultWorldRows`, `creatorWorldDrops`). What is missing is
+narrower, and is stated precisely in §6.6.
+
+## 6.1 What already works (verified)
+
+The whole data path is **server-first**: no Explore screen or component touches Supabase directly —
+`services/exploreService.ts` (682 lines) is the only gateway, and it calls seven deployed RPCs.
+
+| Capability | RPC | Client entry point |
+|---|---|---|
+| World globe data (countries, activity, challenge/treasure flags) | `get_explore_world_summary()` | `fetchExploreWorldSummary` (309) |
+| Country page | `get_explore_country(p_code)` | `fetchExploreCountry` (345) |
+| Global viral rail | `get_global_viral(p_limit)` | `fetchGlobalViral` (432) |
+| Vault shelf (FREE/PREVIEW only) | `list_explore_vault_previews(p_limit)` | `fetchExploreVaultPreviews` (465) |
+| For You feed + cursor paging | `get_explore_for_you(p_limit, p_cursor)` | `fetchExploreForYou` (499) |
+| Live topics + takes | `get_explore_live(p_limit)` | `fetchExploreLive` (518) |
+| Teleport / random discovery | `get_teleport_candidate(...)` | `fetchTeleportCandidate` (560) |
+| Search (groups, countries) | `search_explore(p_query, p_limit)` | `searchExplore` (590) |
+
+Also verified working in the screen: the five-mode IA (For You | World | Live | Play | Meet) driven by
+`EXPLORE_MODES`, debounced search (280 ms) with grouped results, client-side filter chips
+(all/trending/arena/vault/video/challenges), a virtualized For You feed packed into mosaic rows,
+teleport history/memory helpers, and Play/Meet delegating to `PlayHomePanel` / `MeetHomePanel`
+(explore.tsx 343–587). Loading, empty and error-with-retry states exist for the feed.
+
+## 6.2 Incomplete, dead or disconnected
+
+| Item | Evidence | Reading |
+|---|---|---|
+| `ExploreModeBar.tsx` — 4 lines | file length | Effectively empty; `ExploreModeRail` (216) is the real rail. **Verify it is referenced; if not, delete it** (dead code) |
+| `ExploreAccountBoundary.tsx` — 12 lines | file length | A thin `withExploreAccount` gate; signed-out behaviour unverified |
+| Mappers silently drop malformed rows | `toChallenge`/`toTreasure`/`toVaultPreview` return `null`, then `.filter(Boolean)` (336–340) | If a server field is renamed the UI degrades to **"Nothing here yet"** instead of surfacing a contract failure — the highest-value robustness gap |
+| Two `get_explore_world_summary` definitions | `20261003180000` (188) then `20261003190000` (508) | Last definition wins; the client must match the **later** contract. Needs a parity check, not a rewrite |
+| Route data flow | `treasure/[id]` 454, `challenge/[id]` 569, `country/[code]` 495, `meet/[sessionId]` 355, `play/my` 237 — each imports services, none calls `rpc(` directly | Layering is correct; **per-route rendering of live data is not verified in this pass** (open item) |
+
+No Explore surface was found wired to a mock/placeholder service: every mode resolves through a
+documented RPC. "Disconnected" applies to the two tiny components above, not to the feature set.
+
+## 6.3 Security and RLS posture (read from the migrations; no new testing phase)
+
+**Verified sound:**
+
+* Every Explore RPC and helper is `security definer` with `set search_path = ''` — e.g.
+  `explore_country_activity_count`, `explore_public_media_ready`, `explore_actor_hidden`,
+  `world_drop_readable` (20261009180000 lines 4–35; 20261009190000 lines 10–29).
+* Grants are explicit and narrow: `revoke all … from public` then `grant execute … to anon,
+  authenticated` — anonymous discovery is intentional, and `explore_readable_challenges` /
+  `explore_readable_treasures` are **revoked from every role** (20261009180000 line 66).
+* Per-table policies were added for challenges, treasures, entries, results, participation, progress
+  and reactions, all caller-scoped (same file, lines 40–52).
+* The Vault shelf is limited to FREE/PREVIEW **public** media: the server returns only
+  `publicMediaPath` via `explore_vault_preview_rows`, and the client applies
+  `isExploreVaultVisible` / `normalizeExploreVaultAccess` as defence in depth (exploreService 285–307).
+  No subscriber-only source path is reachable from Explore.
+* Geography uses `profiles.public_country_code`, documented as explicit and public (service header).
+
+**Residual risk (documented, not newly tested):**
+
+* **Default privileges.** The security migration records that "explicit anon default privileges
+  survived older REVOKE FROM PUBLIC clauses" and fixes it with a dynamic revoke loop (lines 152–165).
+  The class recurs whenever a new function lands, so a *standing* check belongs in the existing
+  migration-lint scripts — a follow-up recommendation, not a new phase.
+* `search_explore` and the discovery RPCs are anon-callable with client-supplied limits; throttling is
+  not evidenced here (recommendation R2 in the roadmap).
+* Nothing in Explore reads device location; location handling lives entirely in the World service
+  (§6.7), which documents server-side fuzzing and no position persistence.
+
+## 6.4 Performance
+
+| Surface | Lines | memo/useMemo/useCallback | Animation | Geo paths |
+|---|---|---|---|---|
+| `ExploreGlobe.tsx` | 312 | 5 | 0 | 0 |
+| `ExploreWorldCanvas.tsx` | 331 | 7 | 1 | 4 |
+| `ExploreMosaicRow.tsx` | 124 | **0** | 0 | 0 |
+
+* **Feed — the real cost.** `FlatList` over *packed rows* with a varying-height hero span, **no
+  `getItemLayout`**, and `ExploreMosaicRowView` is **not memoised** while `renderItem` builds a new
+  element per row (explore.tsx 350–376) → every parent re-render re-renders every visible row.
+  Row-level memoisation plus stable row heights are the cheapest wins.
+* **Scroll — already correct.** `onScroll` only writes the shared value `headerCollapse` (no React
+  re-render) and the header animates on the UI thread (282–297).
+* **Globe/canvas — not a hot loop.** No per-frame animation; the cost is the `globePaths` / `land`
+  geometry `useMemo`s and the SVG path count. Geometry helpers are pure and already tested
+  (`exploreGlobeMath`, `exploreGeo`, `exploreWorldCanvas`), so hoisting them to module scope is safe.
+* **Live rail.** A horizontal `ScrollView` renders all takes (bounded by `p_limit = 24`) — acceptable
+  while the bound stays small.
+* **Paging.** Cursor-based with a generation guard against stale pages (226–237) — correct.
+
+## 6.5 Safe decomposition of the 937-line screen
+
+Declared inside `app/(tabs)/explore.tsx`: `ExploreScreen` (78), `RoundControl` (610), `SearchHub`
+(643), `styles` (822). The screen body is therefore ~530 lines of mixed state, fetching and layout.
+
+Extraction order — pure moves first, so each step is verifiable by compiling and by the existing unit
+suite before any behaviour is touched:
+
+| Step | Move | Why it is safe |
+|---|---|---|
+| D1 | `SearchHub` (643–820) → `components/explore/SearchHub.tsx` | Already fully props-driven (`results`, `group`, `onGroup`, `onCountry`) — a move with no state |
+| D2 | `RoundControl` (610–642) → `components/explore/RoundControl.tsx` | Dumb presentational component |
+| D3 | `styles` (822–937) → `components/explore/exploreScreenStyles.ts` | Static `StyleSheet.create`; colours are applied inline |
+| D4 | Mode panels → `ExploreForYouPanel`, `ExploreWorldPanel`, `ExploreLivePanel` (551–580) | Explicit props for data + handlers; all state stays in the screen |
+| D5 | Teleport flow → `hooks/useExploreTeleport.ts` | Helpers already unit-tested (`exploreTeleport`) |
+| D6 | Feed + summary → `hooks/useExploreFeed.ts`, `hooks/useExploreSummary.ts` | Target: the screen file ending below the 150-line project rule |
+
+**Non-negotiable reuse.** `ExploreModeRail`, `ExploreMediaTile`, `ExploreDiscoveryCard`,
+`ExploreMosaicRowView`, `ExploreFilterWheel`, `CountryPickerSheet`, `diversifyByCreator`,
+`dedupeExploreItems`, `packExploreMosaicRows`, `EXPLORE_MODES` and `FOR_YOU_FILTERS` already exist and
+are tested — decomposition must **move** code, never re-implement it. No second feed, ranking or
+mosaic implementation may be introduced.
+
+## 6.6 Missing automated tests (precise)
+
+Present: pure logic — 539 tests green, including 9 Explore suites. Absent:
+
+1. **No render/behaviour test of any Explore screen or component.** Nothing imports `app/explore*` or
+   `components/explore/*` for rendering; the existing `*-check.cjs` scripts only scan component
+   *source* statically.
+2. **No service-boundary test.** `toChallenge`, `toTreasure`, `toVaultPreview` and `toViralItem` are
+   untested — exactly where the silent-empty-state class in §6.2 lives.
+3. **No contract-parity test** between the keys the mappers require and the columns the migrations
+   return (the drift the two `get_explore_world_summary` definitions make likely).
+4. **No test for `ExploreAccountBoundary`** (signed-out gate) or for the feed's loading/empty/error
+   branches.
+5. Accessibility helpers (`exploreModeAccessibilityLabel`, `forYouFilterAccessibilityLabel`,
+   `isDuplicateForYouFilterLabel`) *are* tested — keep it that way while extracting.
+
+## 6.7 Explore discovery vs World location-based experiences
+
+Three different concepts share the word "world" — the clearest single source of confusion:
+
+| Concept | What it is | Data path | Used by |
+|---|---|---|---|
+| **Explore World** (discovery) | Globe, country pages, teleport — **no device location** | `get_explore_world_summary`, `get_explore_country`, `get_teleport_candidate` (exploreService) | `app/(tabs)/explore.tsx` mode `world`, `app/explore/country/[code]` |
+| **World** (location-based) | Missions + location-safe drops; precise coordinates go only into RPCs, the server fuzzes before persistence, `nearby` never stores the viewer's position; explicitly "no live markers, trails, heatmaps or background tracking" | `world_active_missions`, `world_mission`, `world_nearby` (worldService header, lines 2–9) | `WorldMissionCard/Beacon`, `WorldDropCard/Marker/Preview`; surfaced from `index.tsx` / `compose.tsx` — **not** Explore |
+| **Creator World** (profile) | A creator's page and modules | `fetchCreatorWorld` + `useCreatorWorld` (`components/vault/world`) | Vault routes |
+
+**Recommendation (documentation and navigation only):** keep the three separate and never merge their
+state. Label the Explore globe as *discovery* (countries and themes, not "near me"); if a bridge is
+wanted, add one explicit **Nearby** entry point in Explore's world mode that *navigates* to the World
+missions surface. That preserves the current privacy posture — the fuzzing and no-persistence
+guarantees live in `worldService` and must not be re-implemented in Explore.
