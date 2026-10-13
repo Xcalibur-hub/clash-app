@@ -66,6 +66,9 @@ type mock struct {
 	rollbackFail, closeFail, badIdentity, badLedger bool
 	cronActive, missingPrefixDeps, lockHeld         bool
 	mig44Objects                                    bool
+	pauseInactive, duplicateCron, missingCronJob    bool
+	wrongCronCommand, alterUnavailable              bool
+	pauseRunning, pauseRunningClearAfter, pausePolls int
 	ledger                                          []map[string]any
 	args                                            []any
 }
@@ -170,6 +173,31 @@ func (m *mock) Query(_ context.Context, q string, args ...any) (Result, error) {
 	case resumeUnlockSQL:
 		m.lockHeld = false
 		return Result{Rows: []map[string]any{{"released": true}}}, nil
+	case pauseCronAlterProcSQL:
+		return Result{Rows: []map[string]any{{"available": !m.alterUnavailable}}}, nil
+	case pauseCronSelectSQL:
+		if m.missingCronJob {
+			return Result{}, nil
+		}
+		cmd := pauseCronExpectedCommand
+		if m.wrongCronCommand {
+			cmd = "select evil()"
+		}
+		row := map[string]any{"jobid": "1", "jobname": pauseCronJobName, "schedule": pauseCronExpectedSchedule, "command": cmd, "username": pauseCronExpectedUsername, "active": !m.pauseInactive}
+		if m.duplicateCron {
+			return Result{Rows: []map[string]any{row, {"jobid": "2", "jobname": pauseCronJobName, "schedule": pauseCronExpectedSchedule, "command": cmd, "username": pauseCronExpectedUsername, "active": true}}}, nil
+		}
+		return Result{Rows: []map[string]any{row}}, nil
+	case pauseCronAlterSQL:
+		m.pauseInactive = true
+		return Result{Tag: "SELECT 1"}, nil
+	case pauseCronRunningSQL:
+		m.pausePolls++
+		running := m.pauseRunning
+		if m.pauseRunningClearAfter > 0 && m.pausePolls > m.pauseRunningClearAfter {
+			running = 0
+		}
+		return Result{Rows: []map[string]any{{"running": running}}}, nil
 	}
 	if q == managedSQL {
 		return Result{Rows: []map[string]any{{"managed": true, "fresh": true, "publication": true, "restricted_role": true, "restricted_files": true, "cron_preloaded": true, "cron_catalog": true}}}, nil

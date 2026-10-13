@@ -2,9 +2,13 @@
 
 12 October 2026. **Frozen integration candidate; clash-staging remains QUARANTINED after partial migration; root cause identified; integrated database security UNVERIFIED.** This document describes repository contracts and prior evidence, not a working hosted release. Start with [the staging readiness plan/checklist](PHASE_11_HOSTED_STAGING_READINESS_5T.md).
 
+## Step 6O: cron pause readiness (FILE-ONLY)
+
+[Step 6O cron pause prep](PHASE_11_CRON_PAUSE_READINESS_6O.md): fail-closed **`pause-cron:zrutlrhhvfcsmssjiijl`** uses `cron.alter_job(..., active:=false)` only (no unschedule). Quiescence polls in-progress runs. Offline READY. **Live pause NOT authorized.** Next: separately authorize one hosted pause, then investigate + resume (6N). Quarantine retained.
+
 ## Step 6N: safe resume executor (FILE-ONLY)
 
-[Step 6N resume readiness](PHASE_11_STAGING_RESUME_READINESS_6N.md): dedicated **`resume:zrutlrhhvfcsmssjiijl`** mode with recovery preflight (exact 43-hash prefix, mig-44 absent, advisory lock, stop-on-first-failure). Empty-DB `migrate` preflight **unchanged**. Offline tests PASS. **Executor READY; operational recovery BLOCKED** until separately authorized **cron pause**, then authorized resume with manifest **`5c39f97c…`**. Quarantine retained. No hosted access in 6N.
+[Step 6N resume readiness](PHASE_11_STAGING_RESUME_READINESS_6N.md): `resume` READY offline; still blocked on cron pause before live recovery.
 
 ## Step 6M: pgcrypto artifact correction (FILE-ONLY)
 
