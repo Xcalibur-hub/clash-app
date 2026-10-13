@@ -13,8 +13,9 @@ import { STAGING_HOST, redactForEvidence } from './staging-host.mjs';
 import {
   AUTHORIZATION_TOKENS, CLAIMS, COUNT_COLUMNS, CREDENTIAL_ENV, EVIDENCE_FILES, MAX_FIXTURE_COUNTS,
   PREFIX_RE, assertScoped, authorizeFixtureAction, buildCountSql, buildFixtureSql, buildIdentitySql,
-  buildResolveSql, buildTeardownSql, credentialPlan, ids, parseCounts, parseResolved, provisionAccounts,
-  redactSecrets, runFixtureAction, signInProbe, validateCounts, verifyAfterCreate, createPsqlRunner,
+  buildOwnershipSql, buildResolveSql, buildTeardownSql, credentialPlan, ids, parseCounts, parseOwnership,
+  parseResolved, provisionAccounts, redactSecrets, runFixtureAction, signInProbe, validateCounts,
+  validateOwnership, verifyAfterCreate, createPsqlRunner,
 } from './staging-fixtures.mjs';
 
 const PREFIX = 'p11f_abcd1234';
@@ -66,13 +67,16 @@ function recordingRunner({ failWriteAt = null, rows = null, row = null } = {}) {
 }
 
 /** Mock HTTP for the Auth Admin API and the sign-in probe. */
-function mockAuth({ alreadyExists = false, wrongUid = false, signInStatus = 200 } = {}) {
+function mockAuth({ alreadyExists = false, wrongUid = false, signInStatus = 200, failCreateAt = null, apiUids = null } = {}) {
   const calls = [];
-  const uids = { a: ids(PREFIX).accountA.uid, b: ids(PREFIX).accountB.uid };
+  let creates = 0;
+  const uids = apiUids ?? { a: ids(PREFIX).accountA.uid, b: ids(PREFIX).accountB.uid };
   const fetchImpl = async (url, init = {}) => {
     calls.push({ url, method: init.method ?? 'GET', body: init.body, headers: init.headers ?? {} });
     const json = (status, body) => ({ status, text: async () => JSON.stringify(body) });
     if (url.endsWith('/auth/v1/admin/users') && init.method === 'POST') {
+      creates += 1;
+      if (failCreateAt && creates === failCreateAt) return json(500, { msg: 'internal error' });
       if (alreadyExists) return json(422, { msg: 'user already registered' });
       const email = JSON.parse(init.body).email;
       return json(200, { id: email.includes('.a@') ? uids.a : uids.b });
@@ -305,7 +309,7 @@ test('create refuses without separated credentials, and never echoes one', async
 });
 
 test('a failed sign-in probe stops the run and keeps cleanup available', async () => {
-  const runner = recordingRunner();
+  const runner = recordingRunner({ rows: [inventory(), ''] });
   const res = await runFixtureAction({ action: 'create', env: baseEnv(), runSql: runner.run, fetchImpl: mockAuth({ signInStatus: 400 }).fetchImpl });
   assert.equal(res.ok, false);
   assert.equal(res.reason_code, 'SIGNIN_PROBE_FAILED');
@@ -318,7 +322,7 @@ test('a successful create verifies the exact inventory, including the trigger no
   const created = inventory({ auth_users: 2, identities: 2, profiles: 2, notifications: 1, creator_vaults: 1,
     vault_drops: 1, media_objects: 1, vault_subscriptions: 1, creator_courses: 1, course_lessons: 2,
     creator_ai_profiles: 1, creator_ai_conversations: 1, creator_ai_messages: 1 });
-  const runner = recordingRunner({ rows: [inventory(), created] });
+  const runner = recordingRunner({ rows: [inventory(), '', created] });
   const res = await runFixtureAction({ action: 'create', env: baseEnv(), runSql: runner.run, fetchImpl: mockAuth().fetchImpl });
   assert.equal(res.ok, true, res.reason);
   assert.equal(res.identity_mode, 'admin-api');
@@ -328,7 +332,7 @@ test('a successful create verifies the exact inventory, including the trigger no
 });
 
 test('a create that produces the wrong inventory is refused, with cleanup left available', async () => {
-  const runner = recordingRunner({ rows: [inventory(), inventory({ auth_users: 2 })] });
+  const runner = recordingRunner({ rows: [inventory(), '', inventory({ auth_users: 2 })] });
   const res = await runFixtureAction({ action: 'create', env: baseEnv(), runSql: runner.run, fetchImpl: mockAuth().fetchImpl });
   assert.equal(res.ok, false);
   assert.match(res.reason, /notifications=0/);
@@ -338,7 +342,7 @@ test('a create that produces the wrong inventory is refused, with cleanup left a
 });
 
 test('a partial setup failure stops, reports where, and issues no DELETE', async () => {
-  const runner = recordingRunner({ failWriteAt: 3, row: inventory() });
+  const runner = recordingRunner({ failWriteAt: 3, rows: [inventory(), ''] });
   const res = await runFixtureAction({ action: 'create', env: baseEnv(), runSql: runner.run, fetchImpl: mockAuth().fetchImpl });
   assert.equal(res.ok, false);
   assert.equal(res.executed, 2);
@@ -353,6 +357,11 @@ test('teardown resolves the accounts, deletes, and verifies the prefix is empty 
   const runSql = async (sql) => {
     seen.push(sql);
     if (!/^\s*select/i.test(sql)) return '';
+    if (/'account'::text/.test(sql)) {
+      return ['account', 'profile', 'profile'].map((kind, idx) => idx === 0
+        ? `${kind}|${RESOLVED.a.uid}|${ids(PREFIX).accountA.email}`
+        : `${kind}|${RESOLVED[idx === 1 ? 'a' : 'b'].profileId}|${PREFIX}_${idx === 1 ? 'a' : 'b'}`).join('\n');
+    }
     return /count\(\*\)/.test(sql) ? inventory() : resolveRow;
   };
   const res = await runFixtureAction({ action: 'teardown', env: baseEnv(), runSql, fetchImpl: mockAuth().fetchImpl });
@@ -397,4 +406,150 @@ test('evidence can only be purged from a fixed list', () => {
   assert.deepEqual(EVIDENCE_FILES.sort(), ['fixture-create-evidence.json', 'fixture-status-evidence.json', 'fixture-teardown-evidence.json'].sort());
   assert.equal(EVIDENCE_FILES.every((f) => !f.includes('/') && !f.includes('..')), true);
   assert.equal(EVIDENCE_FILES.some((f) => f.endsWith('manifest.json')), false, 'the manifest is never purged by the evidence flag');
+});
+
+// ── Step 16A.2 finding 1: clean-prefix ownership via the prefix-derived EMAILS ─────────────
+const API_A = '11111111-2222-3333-4444-555555555555';
+const API_B = '66666666-7777-8888-9999-000000000000';
+const ownershipRow = (uid, tag) => `account|${uid}|${ids(PREFIX)[tag === 'a' ? 'accountA' : 'accountB'].email}\nprofile|u_${uid.replace(/-/g, '')}|${PREFIX}_${tag}`;
+
+test('the ownership probe finds an account whose UID the Admin API assigned', () => {
+  const ownership = parseOwnership(ownershipRow(API_A, 'a'), PREFIX);
+  assert.equal(ownership.accounts.length, 1);
+  assert.equal(ownership.uids.a, API_A, 'the resolved UID is the API-assigned one');
+  assert.equal(ownership.clean, false);
+  const verdict = validateOwnership(ownership);
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.reason, /prefix is not clean \(accounts already exist: a:11111111/);
+  // The derived-id pre-flight this replaces would have seen nothing at all.
+  assert.notEqual(API_A, ids(PREFIX).accountA.uid);
+  assert.equal(buildCountSql(PREFIX).includes(API_A), false, 'the old count cannot know a server-assigned UID');
+  const sql = buildOwnershipSql(PREFIX);
+  assert.ok(sql.includes(ids(PREFIX).accountA.email) && sql.includes(ids(PREFIX).accountB.email), 'resolution is by email');
+  assert.ok(sql.includes("escape '!'"), 'the underscore in the prefix is escaped for the handle pattern');
+});
+
+test('ambiguous, unattributable and inconsistent state is all refused', () => {
+  const email = ids(PREFIX).accountA.email;
+  const cases = {
+    'duplicate account rows': `account|${API_A}|${email}\naccount|${API_B}|${email}`,
+    'account with no profile row': `account|${API_A}|${email}`,
+    'profile belonging to nobody': `profile|u_ffffffffffffffffffffffffffffffff|${PREFIX}_a`,
+    'a row with a run-derived id': `row|${ids(PREFIX).vaultId}`,
+    'an unexpected email': `account|${API_A}|someone-else@example.com`,
+    'a non-uuid account id': `account|not-a-uuid|${email}`,
+    'an unrecognised probe row': 'mystery|whatever',
+  };
+  for (const [label, probe] of Object.entries(cases)) {
+    const verdict = validateOwnership(parseOwnership(probe, PREFIX));
+    assert.equal(verdict.ok, false, `${label} must be refused`);
+    assert.match(verdict.reason, /REFUSING/);
+  }
+  assert.equal(validateOwnership(null).ok, false);
+  const empty = parseOwnership('\n', PREFIX);
+  assert.equal(empty.clean, true);
+  assert.equal(validateOwnership(empty).ok, true);
+  assert.equal(empty.accounts.length, 0);
+});
+
+test('create refuses a prefix that is dirty in a way only email resolution can see', async () => {
+  // Accounts exist with API-assigned UIDs, so every derived-id count is zero — the old gate passed.
+  const runner = recordingRunner({ rows: [inventory(), ownershipRow(API_A, 'a')] });
+  const res = await runFixtureAction({ action: 'create', env: baseEnv(), runSql: runner.run, fetchImpl: mockAuth().fetchImpl });
+  assert.equal(res.ok, false);
+  assert.match(res.reason, /prefix is not clean/);
+  assert.equal(res.resolved_uids.a, API_A);
+  assert.equal(res.ownership.clean, false);
+  assert.equal(res.executed, 0);
+  assert.equal(res.stopped, true);
+  assert.equal(runner.seen.some((s) => /^\s*insert/i.test(s)), false, 'nothing was written');
+});
+
+// ── Step 16A.2 finding 2: provisioning counts as a hosted mutation ─────────────────────────
+test('a half-finished provisioning keeps the created account ids and states the cleanup scope', async () => {
+  const { fetchImpl, calls } = mockAuth({ failCreateAt: 2 });
+  const provision = await provisionAccounts({ prefix: PREFIX, env: baseEnv(), fetchImpl });
+  assert.equal(provision.ok, false);
+  assert.equal(provision.uids.a, ids(PREFIX).accountA.uid, 'the created account is not discarded');
+  assert.equal(provision.uids.b, undefined);
+  assert.equal(provision.created_accounts.length, 1);
+  assert.equal(provision.created_accounts[0].tag, 'a');
+  assert.equal(provision.created_accounts[0].email, ids(PREFIX).accountA.email);
+  assert.equal(provision.partial, true);
+  assert.equal(provision.cleanup_required, true);
+  assert.equal(provision.cleanup_scope, 'accounts_only');
+  assert.match(provision.mutation, /hosted account/);
+  assert.deepEqual(provision.attempted, ['a', 'b']);
+  assert.equal(calls.filter((c) => c.method === 'POST').length, 2);
+});
+
+test('the runner reports partial provisioning as a hosted mutation needing cleanup', async () => {
+  const runner = recordingRunner({ rows: [inventory(), ''] });
+  const res = await runFixtureAction({ action: 'create', env: baseEnv(), runSql: runner.run, fetchImpl: mockAuth({ failCreateAt: 2 }).fetchImpl });
+  assert.equal(res.ok, false);
+  assert.equal(res.stopped, true);
+  assert.equal(res.partial_provision, true);
+  assert.equal(res.partial_state, true);
+  assert.equal(res.cleanup_required, true);
+  assert.equal(res.cleanup_scope, 'accounts_only');
+  assert.equal(res.cleanup_available, true);
+  assert.equal(res.evidence_preserved, true);
+  assert.equal(res.hosted_mutations.auth_admin_users_created, 1, 'the mutation is counted');
+  assert.equal(res.account_uids.a, ids(PREFIX).accountA.uid);
+  assert.match(res.reason, /account provisioning stopped/);
+  assert.equal(runner.seen.some((s) => /^\s*insert/i.test(s)), false, 'no fixture row was written');
+});
+
+test('a failed sign-in probe reports two created accounts and the cleanup requirement', async () => {
+  const runner = recordingRunner({ rows: [inventory(), ''] });
+  const res = await runFixtureAction({ action: 'create', env: baseEnv(), runSql: runner.run, fetchImpl: mockAuth({ signInStatus: 400 }).fetchImpl });
+  assert.equal(res.reason_code, 'SIGNIN_PROBE_FAILED');
+  assert.equal(res.created_accounts.length, 2);
+  assert.equal(res.hosted_mutations.auth_admin_users_created, 2);
+  assert.equal(res.partial_state, true);
+  assert.equal(res.cleanup_required, true);
+  assert.equal(res.cleanup_scope, 'accounts_only');
+  assert.match(res.reason, /accounts exist but sign-in failed/);
+});
+
+test('a successful create and a teardown both report their hosted mutations', async () => {
+  const created = inventory({ auth_users: 2, identities: 2, profiles: 2, notifications: 1, creator_vaults: 1,
+    vault_drops: 1, media_objects: 1, vault_subscriptions: 1, creator_courses: 1, course_lessons: 2,
+    creator_ai_profiles: 1, creator_ai_conversations: 1, creator_ai_messages: 1 });
+  const createRunner = recordingRunner({ rows: [inventory(), '', created] });
+  const create = await runFixtureAction({ action: 'create', env: baseEnv(), runSql: createRunner.run, fetchImpl: mockAuth().fetchImpl });
+  assert.equal(create.ok, true, create.reason);
+  assert.equal(create.hosted_mutations.auth_admin_users_created, 2);
+  assert.equal(create.hosted_mutations.fixture_rows_inserted, buildFixtureSql(PREFIX, { uids: create.account_uids }).setup.length);
+  assert.equal(create.ownership.clean, true);
+  assert.equal(create.manifest.accounts.length, 2);
+
+  const resolveRow = `${RESOLVED.a.uid}|${ids(PREFIX).accountA.email}\n${RESOLVED.b.uid}|${ids(PREFIX).accountB.email}`;
+  const seen = [];
+  const tear = await runFixtureAction({ action: 'teardown', env: baseEnv(), fetchImpl: mockAuth().fetchImpl,
+    runSql: async (sql) => {
+      seen.push(sql);
+      if (!/^\s*select/i.test(sql)) return '';
+      if (/'account'::text/.test(sql)) return ownershipRow(RESOLVED.a.uid, 'a');
+      return /count\(\*\)/.test(sql) ? inventory() : resolveRow;
+    } });
+  assert.equal(tear.ok, true, tear.reason);
+  assert.equal(tear.hosted_mutations.rows_deleted, buildTeardownSql(PREFIX, RESOLVED).length);
+  assert.equal(tear.hosted_mutations.auth_admin_users_deleted, 2);
+  assert.equal(tear.ownership_before.clean, false, 'a teardown reports the state it found without refusing');
+});
+
+test('a teardown still runs while the prefix is dirty (only a create refuses)', async () => {
+  const seen = [];
+  const res = await runFixtureAction({ action: 'teardown', env: baseEnv(), fetchImpl: mockAuth().fetchImpl,
+    runSql: async (sql) => {
+      seen.push(sql);
+      if (!/^\s*select/i.test(sql)) return '';
+      if (/'account'::text/.test(sql)) return ownershipRow(RESOLVED.a.uid, 'a');
+      if (/count\(\*\)/.test(sql)) return inventory();
+      return `${RESOLVED.a.uid}|${ids(PREFIX).accountA.email}`;
+    } });
+  assert.equal(res.stopped, undefined);
+  assert.equal(res.ownership_before.accounts.length, 1);
+  assert.ok(seen.some((s) => /^\s*delete/i.test(s)), 'cleanup is still performed');
 });

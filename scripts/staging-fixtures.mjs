@@ -241,6 +241,99 @@ export function parseResolved(uids, stdout, prefix) {
   return out;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Step 16A.2, finding 1 — ownership is established from the PREFIX-DERIVED EMAILS.
+ *
+ * A pre-flight that looked only for the ids this module derives by `md5(prefix:…)` would find
+ * nothing when the accounts were created by the Auth Admin API, which assigns its own UIDs. The
+ * prefix is therefore resolved from the two deterministic emails, and every related row is then
+ * checked against ids that actually exist. Anything unattributable is reported, never assumed.
+ */
+export function buildOwnershipSql(prefix) {
+  const i = ids(prefix);
+  const emailList = list([i.accountA.email, i.accountB.email]);
+  const rowIds = [i.vaultId, i.dropId, i.mediaId, i.subscriptionId, i.courseId, i.lessonEntitledId,
+    i.lessonDeniedId, i.conversationId, i.messageId];
+  const rowList = list(rowIds);
+  return `select 'account'::text as kind, u.id::text || '|' || coalesce(u.email, '') as value
+            from auth.users u where u.email in ${emailList}
+     union all
+     select 'profile'::text as kind, p.id || '|' || coalesce(p.handle, '') as value
+            from public.profiles p where p.handle like ${q(`${prefix}!_%`)} escape '!'
+     union all
+     select 'row'::text as kind, r.id || '' as value from (
+       select id from public.creator_vaults where id in ${rowList}
+       union all select id from public.vault_drops where id in ${rowList}
+       union all select id from public.media_objects where id in ${rowList}
+       union all select id from public.vault_subscriptions where id in ${rowList}
+       union all select id from public.creator_courses where id in ${rowList}
+       union all select id from public.course_lessons where id in ${rowList}
+       union all select id from public.creator_ai_conversations where id in ${rowList}
+       union all select id from public.creator_ai_messages where id in ${rowList}
+     ) r`;
+}
+
+/**
+ * Parses the ownership probe. `ok`/`clean` means: no account, no profile, no row and no malformed
+ * line — i.e. the prefix is provably untouched and anything created next belongs to this run alone.
+ */
+export function parseOwnership(stdout, prefix) {
+  const i = ids(prefix);
+  const tagByEmail = { [i.accountA.email]: 'a', [i.accountB.email]: 'b' };
+  const seen = {};
+  const accounts = [];
+  const foreign = [];
+  const ambiguous = [];
+  const malformed = [];
+  const text = String(stdout ?? '');
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const sep = trimmed.indexOf('|');
+    const kind = sep === -1 ? trimmed : trimmed.slice(0, sep);
+    const value = sep === -1 ? '' : trimmed.slice(sep + 1);
+    if (kind === 'account') {
+      const [uid, email] = value.split('|');
+      const tag = tagByEmail[email];
+      if (!tag) { malformed.push(`account with an unexpected email (${email || 'none'})`); continue; }
+      if (!UUID_RE.test(uid ?? '')) { malformed.push(`account ${tag} has a non-uuid id`); continue; }
+      if (seen[tag]) { ambiguous.push(`two rows for ${email}`); continue; }
+      seen[tag] = true;
+      accounts.push({ tag, uid, email, profileId: `u_${uid.replace(/-/g, '')}` });
+      continue;
+    }
+    if (kind === 'profile') {
+      const [id, handle] = value.split('|');
+      if (!accounts.some((a) => a.profileId === id)) foreign.push(`profile belonging to no resolved account (${id} / ${handle})`);
+      continue;
+    }
+    if (kind === 'row') { foreign.push(`row with a run-derived id (${value})`); continue; }
+    malformed.push(`unrecognised probe row (${trimmed.slice(0, 40)})`);
+  }
+  // An account must come with the profile row its trigger creates; a missing one is a contradiction.
+  for (const account of accounts) {
+    if (!text.includes(`${account.profileId}|`)) foreign.push(`account ${account.tag} has no profile row (inconsistent state)`);
+  }
+  const uids = Object.fromEntries(accounts.map((a) => [a.tag, a.uid]));
+  const clean = accounts.length === 0 && foreign.length === 0 && ambiguous.length === 0 && malformed.length === 0;
+  return { ok: clean, clean, accounts, uids, foreign, ambiguous, malformed };
+}
+
+/** Fail-closed verdict for the ownership probe, used before any hosted mutation. */
+export function validateOwnership(ownership) {
+  if (!ownership || typeof ownership.ok !== 'boolean') return { ok: false, reason: 'REFUSING: unreadable ownership probe' };
+  if (ownership.malformed.length) return { ok: false, reason: `REFUSING: ambiguous or unreadable state (${ownership.malformed.join('; ')})` };
+  if (ownership.ambiguous.length) return { ok: false, reason: `REFUSING: ambiguous state (${ownership.ambiguous.join('; ')})` };
+  if (ownership.foreign.length) return { ok: false, reason: `REFUSING: rows exist that this run cannot attribute (${ownership.foreign.join('; ')})` };
+  if (ownership.accounts.length) {
+    const listed = ownership.accounts.map((a) => `${a.tag}:${a.uid}`).join(', ');
+    return { ok: false, reason: `REFUSING: prefix is not clean (accounts already exist: ${listed}) — nothing was written` };
+  }
+  return { ok: true, reason: 'prefix is provably untouched' };
+}
+
 /** Every row the run writes that is NOT an account (accounts may come from the Admin API). */
 export function buildFixtureSql(prefix, identity = {}) {
   const i = ids(prefix, identity);
@@ -425,7 +518,24 @@ export async function provisionAccounts({ prefix, env = process.env, fetchImpl =
   if (!userPassword) return { ok: false, reason: `REFUSING: ${CREDENTIAL_ENV.fixtureUserPassword} is required` };
   const i = ids(prefix);
   const created = {};
+  const preexisting = {};
+  const attempted = [];
+  const emailOf = (tag) => (tag === 'a' ? i.accountA.email : i.accountB.email);
+  /** Finding 2: a partial provisioning result is NEVER discarded — it is reported with cleanup scope. */
+  const partial = (reason) => ({
+    ok: false,
+    reason,
+    uids: { ...created },
+    created_accounts: Object.entries(created).map(([tag, uid]) => ({ tag, uid, email: emailOf(tag) })),
+    preexisting_accounts: Object.entries(preexisting).map(([tag, uid]) => ({ tag, uid, email: emailOf(tag) })),
+    attempted,
+    partial: Object.keys(created).length > 0,
+    mutation: Object.keys(created).length > 0 ? 'hosted account(s) were created' : 'no hosted mutation',
+    cleanup_required: Object.keys(created).length > 0,
+    cleanup_scope: Object.keys(created).length > 0 ? 'accounts_only' : 'none',
+  });
   for (const [tag, account] of [['a', i.accountA], ['b', i.accountB]]) {
+    attempted.push(tag);
     let res;
     try {
       res = await fetchImpl(`https://${STAGING_HOST}/auth/v1/admin/users`, {
@@ -435,7 +545,7 @@ export async function provisionAccounts({ prefix, env = process.env, fetchImpl =
         signal: AbortSignal.timeout(20000),
       });
     } catch (e) {
-      return { ok: false, reason: `account ${tag}: network ${e?.name}` };
+      return partial(`account ${tag}: network ${e?.name}`);
     }
     const text = await res.text();
     const json = safeJson(text);
@@ -445,12 +555,22 @@ export async function provisionAccounts({ prefix, env = process.env, fetchImpl =
     }
     if (res.status === 409 || res.status === 422) {
       const found = await findAccounts({ prefix, env, fetchImpl });
-      if (found.ok && found.uids?.[tag]) { created[tag] = found.uids[tag]; continue; }
-      return { ok: false, reason: `account ${tag}: exists but could not be resolved` };
+      if (found.ok && found.uids?.[tag]) { preexisting[tag] = found.uids[tag]; created[tag] = found.uids[tag]; continue; }
+      return partial(`account ${tag}: exists but could not be resolved`);
     }
-    return { ok: false, reason: redactSecrets(`account ${tag}: admin API returned ${res.status} ${text.slice(0, 120)}`, env) };
+    return partial(redactSecrets(`account ${tag}: admin API returned ${res.status} ${text.slice(0, 120)}`, env));
   }
-  return { ok: true, uids: created };
+  return {
+    ok: true,
+    uids: created,
+    created_accounts: Object.entries(created).filter(([tag]) => !preexisting[tag]).map(([tag, uid]) => ({ tag, uid, email: emailOf(tag) })),
+    preexisting_accounts: Object.entries(preexisting).map(([tag, uid]) => ({ tag, uid, email: emailOf(tag) })),
+    attempted,
+    partial: false,
+    mutation: 'Auth Admin API users created',
+    cleanup_required: true,
+    cleanup_scope: 'accounts_and_rows',
+  };
 }
 
 /** Finds this run's accounts by their prefix-derived emails (bounded to one page). */
@@ -580,16 +700,39 @@ export function verifyAfterCreate(parsed) {
 
 /** SQL-fallback account provisioning: writes `auth.users` AND `auth.identities` together. */
 async function provisionBySql({ prefix, env, runSql }) {
-  for (const sql of buildIdentitySql(prefix)) {
+  const statements = buildIdentitySql(prefix);
+  let executed = 0;
+  for (const sql of statements) {
     try {
       await runSql(sql);
+      executed += 1;
     } catch (e) {
-      return { ok: false, reason: redactSecrets(`identity SQL failed: ${String(e?.message ?? e)}`, env) };
+      // The fallback can also stop half-way: report what exists so cleanup can finish the job.
+      const resolved = parseResolved(null, await runSql(buildResolveSql(prefix)), prefix);
+      const created_accounts = [['a', resolved.a], ['b', resolved.b]]
+        .filter(([, r]) => Boolean(r?.uid))
+        .map(([tag, r]) => ({ tag, uid: r.uid }));
+      return {
+        ok: false,
+        reason: redactSecrets(`identity SQL failed after ${executed}/${statements.length} statements: ${String(e?.message ?? e)}`, env),
+        uids: { a: resolved.a.uid, b: resolved.b.uid },
+        created_accounts,
+        attempted: ['a', 'b'],
+        partial: Boolean(resolved.a.uid || resolved.b.uid),
+        mutation: resolved.a.uid || resolved.b.uid ? 'hosted account(s) were created by SQL' : 'no hosted mutation',
+        cleanup_required: Boolean(resolved.a.uid || resolved.b.uid),
+        cleanup_scope: resolved.a.uid || resolved.b.uid ? 'accounts_only' : 'none',
+      };
     }
   }
   const resolved = parseResolved(null, await runSql(buildResolveSql(prefix)), prefix);
-  if (!resolved.a.uid || !resolved.b.uid) return { ok: false, reason: 'identity SQL did not produce both accounts' };
-  return { ok: true, uids: { a: resolved.a.uid, b: resolved.b.uid } };
+  if (!resolved.a.uid || !resolved.b.uid) {
+    return { ok: false, reason: 'identity SQL did not produce both accounts', uids: { a: resolved.a.uid, b: resolved.b.uid },
+      created_accounts: [], partial: Boolean(resolved.a.uid || resolved.b.uid), cleanup_required: true, cleanup_scope: 'accounts_only' };
+  }
+  return { ok: true, uids: { a: resolved.a.uid, b: resolved.b.uid }, created_accounts: [
+    { tag: 'a', uid: resolved.a.uid }, { tag: 'b', uid: resolved.b.uid }], attempted: ['a', 'b'], partial: false,
+    mutation: 'auth.users + auth.identities inserted', cleanup_required: true, cleanup_scope: 'accounts_and_rows' };
 }
 
 /**
@@ -618,17 +761,43 @@ export async function runFixtureAction({ action, env = process.env, runSql, fetc
   const gate = validateCounts(before, { expectZero: action === 'create', enforceCeilings: action === 'create' });
   if (!gate.ok) return { ...base, ok: false, stopped: true, executed: 0, reason: gate.reason, observed: before.counts ?? null };
 
+  // ── Ownership pre-flight (finding 1): resolve the prefix from its deterministic EMAILS, because
+  // the Auth Admin API assigns its own UIDs. Everything related is then checked against the ids
+  // that actually exist, and unattributable state is reported rather than assumed away.
+  // It REFUSES a dirty prefix only for `create`; a teardown legitimately runs while rows exist.
+  const ownership = parseOwnership(await runSql(buildOwnershipSql(prefix)), prefix);
+  const ownershipReport = { clean: ownership.clean, accounts: ownership.accounts, foreign: ownership.foreign,
+    ambiguous: ownership.ambiguous, malformed: ownership.malformed };
+  const owned = validateOwnership(ownership);
+  if (action === 'create' && !owned.ok) {
+    return { ...base, ok: false, stopped: true, executed: 0, reason: owned.reason,
+      ownership: ownershipReport, resolved_uids: ownership.uids, observed: gate.counts };
+  }
+
   if (action === 'create') {
     const provision = identityMode === 'admin-api'
       ? await provisionAccounts({ prefix, env, fetchImpl })
       : await provisionBySql({ prefix, env, runSql });
-    if (!provision.ok) return { ...base, ok: false, stopped: true, executed: 0, reason: provision.reason, observed: gate.counts };
+    const createdAccounts = provision.created_accounts ?? [];
+    const mutations = { auth_admin_users_created: createdAccounts.length, auth_admin_users_deleted: 0 };
+    if (!provision.ok) {
+      // A partially provisioned password is a hosted mutation: keep the ids and say what is needed.
+      return { ...base, ok: false, stopped: true, executed: 0, observed: gate.counts,
+        account_uids: provision.uids ?? {}, created_accounts: createdAccounts,
+        partial_state: Boolean(provision.partial), partial_provision: provision.partial === true,
+        cleanup_required: provision.cleanup_required === true, cleanup_scope: provision.cleanup_scope ?? 'accounts_only',
+        cleanup_available: true, evidence_preserved: true, hosted_mutations: mutations,
+        reason: `account provisioning stopped: ${provision.reason}` };
+    }
     const uids = provision.uids;
     // The check a bare SQL insert fails: the accounts must be able to sign in for real.
     const probe = await signInProbe({ prefix, uids, env, fetchImpl });
     if (!probe.ok) {
-      return { ...base, ok: false, stopped: true, executed: 0, account_uids: uids, observed: gate.counts,
-        reason_code: 'SIGNIN_PROBE_FAILED', reason: probe.reason, cleanup_available: true, evidence_preserved: true };
+      return { ...base, ok: false, stopped: true, executed: 0, account_uids: uids,
+        created_accounts: createdAccounts, partial_state: true, cleanup_required: true,
+        cleanup_scope: 'accounts_only', cleanup_available: true, evidence_preserved: true,
+        hosted_mutations: mutations, observed: gate.counts, reason_code: 'SIGNIN_PROBE_FAILED',
+        reason: `accounts exist but sign-in failed, so no fixture row was written: ${probe.reason}` };
     }
     const { setup } = buildFixtureSql(prefix, { uids });
     let executed = 0;
@@ -650,8 +819,10 @@ export async function runFixtureAction({ action, env = process.env, runSql, fetc
         reason: verify.reason, observed: after.counts ?? null, cleanup_available: true, evidence_preserved: true };
     }
     return { ...base, ok: true, executed, total: setup.length, account_uids: uids, observed: verify.counts,
-      manifest: { step: 'phase-11-16a.1', prefix, project_ref: PROJECT_REF, identity_mode: identityMode,
-        created_at: now.toISOString(), ids: ids(prefix, { uids }), claims: CLAIMS, counts: verify.counts },
+      ownership: ownershipReport, hosted_mutations: { ...mutations, fixture_rows_inserted: setup.length },
+      manifest: { step: 'phase-11-16a.2', prefix, project_ref: PROJECT_REF, identity_mode: identityMode,
+        created_at: now.toISOString(), ids: ids(prefix, { uids }), claims: CLAIMS, counts: verify.counts,
+        accounts: createdAccounts },
       reason: 'fixtures created, verified, and the accounts proved they can sign in' };
   }
 
@@ -674,7 +845,8 @@ export async function runFixtureAction({ action, env = process.env, runSql, fetc
   const after = parseCounts(await runSql(buildCountSql(prefix, { uids: { a: resolved.a.uid, b: resolved.b.uid } })));
   const done = validateCounts(after, { expectZero: true });
   return { ...base, ok: done.ok, executed, total: statements.length, account_uids: { a: resolved.a.uid, b: resolved.b.uid },
-    observed: after.counts ?? null, admin_api: api,
+    observed: after.counts ?? null, admin_api: api, ownership_before: ownershipReport,
+    hosted_mutations: { auth_admin_users_deleted: (api.deleted ?? []).length, rows_deleted: executed },
     reason: done.ok ? 'teardown complete: every run-owned row is gone (idempotent)' : done.reason };
 }
 
@@ -732,6 +904,10 @@ if (process.argv[1]?.endsWith('staging-fixtures.mjs')) {
       evidence.observed = parsed.counts ?? null;
       evidence.inventory_readable = parsed.ok === true;
       if (!parsed.ok) evidence.reason = `REFUSING: unreadable inventory (${parsed.reason})`;
+      const ownership = parseOwnership(await runSql(buildOwnershipSql(prefix)), prefix);
+      evidence.ownership = { clean: ownership.clean, accounts: ownership.accounts, foreign: ownership.foreign,
+        ambiguous: ownership.ambiguous, malformed: ownership.malformed, resolved_uids: ownership.uids };
+      evidence.ownership_verdict = validateOwnership(ownership);
       evidence.ceilings = MAX_FIXTURE_COUNTS;
       evidence.within_ceilings = parsed.ok ? validateCounts(parsed) : { ok: false, reason: 'inventory unreadable' };
       evidence.authorizations = {
@@ -739,7 +915,8 @@ if (process.argv[1]?.endsWith('staging-fixtures.mjs')) {
         execute: authorizeFixtureAction('execute').ok,
         cleanup: authorizeFixtureAction('cleanup').ok,
       };
-      evidence.result = parsed.ok ? (Object.values(parsed.counts).every((v) => v === 0) ? 'ABSENT' : 'PRESENT') : 'STOPPED';
+      const empty = parsed.ok && Object.values(parsed.counts).every((v) => v === 0);
+      evidence.result = parsed.ok ? (empty && ownership.clean ? 'ABSENT' : 'PRESENT') : 'STOPPED';
     } else {
       // Authorization comes FIRST: with no token we do not even open a connection.
       const auth = authorizeFixtureAction(action === 'teardown' ? 'cleanup' : action);
