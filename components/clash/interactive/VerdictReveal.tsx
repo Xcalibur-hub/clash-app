@@ -14,7 +14,6 @@ import type { ServerVerdict } from '../../../services/clashEngineService';
 import type { Side } from '../../../store';
 import { radius, space, typeScale, useThemeColors } from '../../../theme';
 import { CountUp } from '../../shared/CountUp';
-import { sideTone } from '../duelPalette';
 import { notify as hapticNotify } from '../../../utils/haptics';
 
 export interface VerdictRevealProps {
@@ -46,6 +45,8 @@ export function VerdictReveal({
   const pct = verdict.jurySize > 0 ? Math.round(verdict.agreement * 100) : 0;
   const judgeWord = verdict.jurySize === 1 ? 'judgment' : 'judgments';
   const total = Math.max(1, verdict.sideAScore + verdict.sideBScore);
+  const sideAColor = dark ? '#B89BD9' : '#9A70BF';
+  const sideBColor = dark ? '#F3AB91' : '#D57E64';
   const aShare = verdict.sideAScore / total;
   const bShare = verdict.sideBScore / total;
 
@@ -88,7 +89,7 @@ export function VerdictReveal({
           content,
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text allowFontScaling={false} style={[styles.eyebrow, { color: dark ? '#E7D6E3' : '#635262' }]}>
           THE PEOPLE HAVE SPOKEN
         </Text>
         {!isDraw ? (
@@ -121,21 +122,21 @@ export function VerdictReveal({
           <View
             style={[
               styles.barA,
-              { flex: Math.max(aShare, 0.04), backgroundColor: sideTone('A').tone },
+              { flex: Math.max(aShare, 0.04), backgroundColor: sideAColor },
             ]}
           />
           <View
             style={[
               styles.barB,
-              { flex: Math.max(bShare, 0.04), backgroundColor: sideTone('B').tone },
+              { flex: Math.max(bShare, 0.04), backgroundColor: sideBColor },
             ]}
           />
         </View>
         <View style={styles.tally}>
-          <Text allowFontScaling={false} style={[styles.tallyText, { color: sideTone('A').tone }]}>
+          <Text allowFontScaling={false} style={[styles.tallyText, { color: dark ? '#DDC6F2' : '#65417C' }]}>
             A · {verdict.sideAScore}
           </Text>
-          <Text allowFontScaling={false} style={[styles.tallyText, { color: sideTone('B').tone }]}>
+          <Text allowFontScaling={false} style={[styles.tallyText, { color: dark ? '#FFCEBB' : '#8B432F' }]}>
             B · {verdict.sideBScore}
           </Text>
         </View>
