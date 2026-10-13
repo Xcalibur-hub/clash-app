@@ -1,0 +1,19 @@
+{
+  "step": "phase-11-9",
+  "environment": {
+    "project": "clash_p11_pgtap (disposable local, C:/p119op)",
+    "postgres": "17.6.1.002",
+    "ledger": 106,
+    "note": "local-only; storage-api v1.69.11 aliased onto the pinned tag; disposable postgres elevated to superuser for dblink"
+  },
+  "results": [
+    { "suite": "arena/clash E2E (scripts/phase11_arena_e2e_validation.sql)", "result": "PASS", "assertions": "32/32", "coverage": "take creation, challenge, accept, duel, judgement, settlement, verdict, reputation, profile_clash_stats, comment/reply notifications, blocks, self-notification guard", "raw": "local-arena-e2e.tap.log" },
+    { "suite": "functional smoke (scripts/local-staging-smoke.mjs)", "result": "PASS", "assertions": "14/14", "coverage": "sign-up, sign-in, session refresh, profile RPC (+ direct select denied), my_profile_id, anon read, authenticated RPC, storage own-namespace upload/read, disallowed-MIME denial, cross-namespace denial, Realtime subscribe, cleanup", "raw": "local-functional-smoke.json" },
+    { "suite": "maintenance safety (scripts/phase11_maintenance_safety.sql)", "result": "PASS", "assertions": "12 PASS / 1 UNVERIFIED / 0 FAIL", "coverage": "privilege boundaries (anon/authenticated denied, service_role allowed, logger owner-only), idempotency (stable 16-key payload, no partial failure, second run settles/expires nothing), no unexpected entity deletion, failure-ledger cap 1000 and 8-day prune, runtime 13.9ms/3.5ms", "raw": "local-maintenance-safety.tap.log" }
+  ],
+  "not_exercised_locally": [
+    "Edge Function invocation (edge-runtime excluded from the disposable stack)",
+    "Android/iOS device UI paths (component/contract checks only)",
+    "Hosted Auth/PostgREST/Realtime/Storage runtime (read-only catalog facts only)"
+  ]
+}
