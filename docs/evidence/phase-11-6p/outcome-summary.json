@@ -1,0 +1,10 @@
+{
+  "step": "6P",
+  "verdict": "BLOCKED",
+  "job_verified_inactive": false,
+  "job_verified_quiescent": false,
+  "pause_executed": false,
+  "staging_quarantine": "RETAINED",
+  "recovery_still_blocked": true,
+  "next": "restore operator IPv6, then re-authorize one pause-cron:zrutlrhhvfcsmssjiijl; do not auto-start 6Q"
+}

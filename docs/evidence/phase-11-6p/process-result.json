@@ -1,0 +1,13 @@
+{
+  "operation": "pause-cron",
+  "authorization": "pause-cron:zrutlrhhvfcsmssjiijl",
+  "project_ref": "zrutlrhhvfcsmssjiijl",
+  "source_revision": "80b6db468e9f6f97b0391f3b04fb07054dc6329f",
+  "executable_sha256": "e6265e381dee81b88dba706358aff32bd23df623d36e20b0d71681b272a68f56",
+  "connection_mode": "direct",
+  "invoked": false,
+  "exit_code": null,
+  "stdout": "",
+  "stderr": "",
+  "block_reason": "direct_ipv6_unreachable"
+}

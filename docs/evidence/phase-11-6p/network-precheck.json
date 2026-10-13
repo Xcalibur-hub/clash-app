@@ -1,0 +1,10 @@
+{
+  "timestamp_utc": "2026-10-13T02:48:01.3571709Z",
+  "aaaa": ["2406:da14:1772:ea01:905e:38ac:2bd2:bfe6"],
+  "a_records": [],
+  "global_ipv6_addresses": [],
+  "ipv6_default_routes": [],
+  "tcp_5432_ipv6": "UNREACHABLE_NETWORK",
+  "pause_executed": false,
+  "reason": "host has no global IPv6 address/route; direct IPv6 required for approved pause-cron"
+}
