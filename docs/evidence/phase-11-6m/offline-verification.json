@@ -1,0 +1,21 @@
+{
+  "step": "6M",
+  "mode": "file-only",
+  "hosted_connection": false,
+  "staging_quarantine_unchanged": true,
+  "correction": "assert-managed-pgcrypto owner in ('postgres','supabase_admin')",
+  "artifact_44_sha256_old": "de384efd4f41ef992377b53eccc230a59110d91669c873d06431a868f0b5af11",
+  "artifact_44_sha256_new": "380b693fd09edcefbe30028c8ed5de72ae9716776198f1d45c6ed8a1ef17f261",
+  "compatibility_manifest_sha256_old": "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+  "compatibility_manifest_sha256_new": "5c39f97c62559b1f5ed175be409480fb3515fded61a16f0b1b33cc3e22768110",
+  "suite_manifest_sha256": "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+  "seal_git_blob_manifest_sha256": "a9b30736c87a7fac05c9764404dfd58a876f64db6a3e072e9a348cac8b162b4e",
+  "artifacts_1_through_43_unchanged": true,
+  "prefix_mismatch_count": 0,
+  "frozen_source_migrations_106_unchanged": true,
+  "integration_files_245_unchanged": true,
+  "node_regression_tests": "pass",
+  "go_test": "ok",
+  "go_vet": "pass",
+  "recommended_recovery": "option_a_resume_from_prefix_43_after_resume_implementation"
+}

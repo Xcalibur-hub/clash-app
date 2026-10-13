@@ -7,6 +7,14 @@ import { toComment, toTake, toUser, PUBLIC_PROFILE_FIELDS } from './arenaMappers
 import type { ServerVerdict } from './clashEngineService';
 import { requestError, requireSupabase } from './supabaseClient';
 import type { ChallengerComment, HoodId, Take, User } from '../store/types';
+import {
+  parseProfileClashStats,
+  withClashStats,
+  type ProfileClashStats,
+} from '../utils/profileClashStats';
+
+export type { ProfileClashStats };
+export { parseProfileClashStats, withClashStats };
 
 /** The profile's result in a settled Clash. */
 export type ClashOutcome = 'won' | 'lost' | 'draw';
@@ -40,10 +48,26 @@ export interface ProfilePatch {
   homeHood?: Exclude<HoodId, 'for-you'>;
 }
 
+/** Authoritative settled Clash counts. Throws on transport/RPC failure. */
+export async function fetchProfileClashStats(profileId: string): Promise<ProfileClashStats> {
+  const { data, error } = await requireSupabase().rpc('profile_clash_stats', { p_profile_id: profileId });
+  if (error) throw requestError(error);
+  const parsed = parseProfileClashStats(data);
+  if (!parsed) throw new Error('profile_clash_stats returned an unexpected payload');
+  return parsed;
+}
+
 export async function fetchProfileById(profileId: string): Promise<User | null> {
   const { data, error } = await requireSupabase().from('profiles').select(PUBLIC_PROFILE_FIELDS).eq('id', profileId).maybeSingle();
   if (error) throw requestError(error);
-  return data ? toUser(data) : null;
+  if (!data) return null;
+  const user = toUser(data);
+  try {
+    return withClashStats(user, await fetchProfileClashStats(profileId));
+  } catch {
+    // Leave wins/clashes null — never invent a verified zero after a failed query.
+    return user;
+  }
 }
 
 export async function fetchProfileTakes(profileId: string): Promise<Take[]> {
@@ -78,6 +102,7 @@ export async function fetchProfileReplies(profileId: string): Promise<ProfileRep
 /** Clashes the profile took part in (as Take author or challenger), newest first. */
 export async function fetchProfileClashes(profileId: string): Promise<ProfileClash[]> {
   const { data, error } = await requireSupabase().rpc('profile_clash_list', { p_profile_id: profileId });
+  if (error?.code === '42501') return [];
   if (error) throw requestError(error);
   if (!Array.isArray(data)) return [];
   return data.flatMap((entry) => {

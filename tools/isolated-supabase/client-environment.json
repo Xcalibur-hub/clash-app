@@ -1,0 +1,25 @@
+{
+  "allowed": [
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "DOCKER_CONTEXT",
+    "PROGRAMFILES",
+    "PROGRAMDATA",
+    "PSMODULEPATH"
+  ],
+  "windows_required": [
+    "PATH",
+    "SYSTEMROOT",
+    "USERPROFILE",
+    "PROGRAMFILES",
+    "PROGRAMDATA"
+  ]
+}

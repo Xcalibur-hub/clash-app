@@ -1,0 +1,67 @@
+{
+    "scope":  "offline mocks and file verification only",
+    "baseline":  "2ff9b0eb0181b98769d878e1f8e69a8c7fba0d4f",
+    "node":  {
+                 "skip":  0,
+                 "pass":  81,
+                 "fail":  0
+             },
+    "go":  {
+               "subtests":  82,
+               "top_level":  52,
+               "skip":  0,
+               "leaf_cases":  123,
+               "fail":  0
+           },
+    "exit_codes":  {
+                       "node":  0,
+                       "go":  0,
+                       "vet":  0,
+                       "modules":  0,
+                       "build":  0
+                   },
+    "frozen":  {
+                   "frozen_source_files":  245,
+                   "vendor_templates":  4,
+                   "passed":  true
+               },
+    "artifacts":  {
+                      "artifact_dir":  "C:\\p11diag\\.expo\\migration-compatibility-hosted-5u-final",
+                      "artifact_manifest_sha256":  "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+                      "suite_manifest_sha256":  "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+                      "migrations":  106,
+                      "adapted_suites":  10,
+                      "total_suites":  89,
+                      "source_hashes":  245,
+                      "sql_executed":  false
+                  },
+    "executable_sha256":  "3d71f3a1d8a565ae294649a8d6ae9f0607071a9cc68d60210af4dd408afa7d5a",
+    "identity_regressions":  [
+                                 "TestIdentityGateDiagnostics/database",
+                                 "TestIdentityGateDiagnostics/current_role",
+                                 "TestIdentityGateDiagnostics/session_role",
+                                 "TestIdentityGateDiagnostics/ssl_false",
+                                 "TestIdentityGateDiagnostics/ssl_null",
+                                 "TestIdentityGateDiagnostics/ssl_malformed",
+                                 "TestIdentityGateDiagnostics/database_malformed",
+                                 "TestIdentityGateDiagnostics/role_null",
+                                 "TestIdentityGateDiagnostics/session_role_malformed",
+                                 "TestIdentityGateDiagnostics/version_malformed",
+                                 "TestIdentityGateDiagnostics/version_null",
+                                 "TestIdentityGateDiagnostics/wrong_version",
+                                 "TestIdentityGateDiagnostics",
+                                 "TestIdentityGateRowShape/0",
+                                 "TestIdentityGateRowShape/2",
+                                 "TestIdentityGateRowShape",
+                                 "TestIdentityGateMalformedMissingAndMultipleFailures",
+                                 "TestIdentityGateQueryFailureAndChangedBackend",
+                                 "TestIdentityGateEvidenceWriteFailure",
+                                 "TestIdentityGateSuccessAndPIDContract"
+                             ],
+    "initial_go_run":  {
+                           "exit_code":  1,
+                           "cause":  "Missing generated hosted-suites.json in fresh worktree; artifact prepared offline before final successful run"
+                       },
+    "live_connections":  0,
+    "sql_suites_executed":  0
+}

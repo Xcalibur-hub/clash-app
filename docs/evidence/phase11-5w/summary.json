@@ -1,0 +1,44 @@
+{
+  "scope": "offline only",
+  "baseline_pr45": "4b2aa0638cb3ee0d1866705bbe7f788aff54462d",
+  "step5v_parent": "cd6100c407538898f989891fc864fbc6fe5f6257",
+  "seal": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "frozen_hashes": 245,
+  "artifacts": 106,
+  "bundled_not_executed_suites": 89,
+  "vendor_templates": 4,
+  "artifact_manifest_sha256": "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+  "suite_manifest_sha256": "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+  "node": {
+    "pass": 81,
+    "fail": 0,
+    "skip": 0,
+    "exit_code": 0
+  },
+  "go": {
+    "top_level_pass": 46,
+    "subtests_pass": 68,
+    "leaf_cases_pass": 105,
+    "fail": 0,
+    "skip": 0
+  },
+  "exit_codes": {
+    "go-tests": 0,
+    "go-vet": 0,
+    "go-mod-verify": 0,
+    "go-build": 0,
+    "go-build-info": 0
+  },
+  "binary": {
+    "sha256": "1700f196489a3268e7aa771efc72635c1d4f55a0e49c0142bb7f38b0d5b91597",
+    "format": "PE32+ AMD64 Windows",
+    "executed": false
+  },
+  "initial_offline_setup_failure": "TestTenFrozenAdaptations failed before required prepare.cjs fixture generation; all final tests passed after offline preparation. No assertions weakened.",
+  "primary_status_and_six_dirty_tracked_hashes_unchanged": true,
+  "projects_created": 0,
+  "database_connections": 0,
+  "sql_suites_executed": 0,
+  "real_credential_api_calls": 0,
+  "docker_operations": 0
+}

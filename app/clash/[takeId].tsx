@@ -23,6 +23,7 @@ import { Notice } from '../../components/shared/Notice';
 import { ArenaIcon, BackIcon, ShareIcon } from '../../components/shared/icons';
 import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { useOperationScope } from '../../hooks/useOperationScope';
 import { analytics } from '../../services/analytics';
 import { currentViewerProfileId } from '../../services/apiService';
 import {
@@ -87,15 +88,24 @@ export default function ClashScreen(): React.JSX.Element {
   const { takeId } = useLocalSearchParams<{ takeId: string | string[] }>();
   const id = Array.isArray(takeId) ? takeId[0] : takeId;
   const { state, dispatch } = useClash();
-  const { signedIn } = useAuth();
+  const { signedIn, user } = useAuth();
+  const accountId = user?.id ?? null;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const requireAuth = useRequireAuth();
   const t = useThemeColors();
 
-  const [view, setView] = React.useState<ClashView | null | undefined>(undefined);
-  const [reputation, setReputation] = React.useState(0);
-  const [coins, setCoins] = React.useState(0);
+  const [viewState, setViewState] = React.useState<{ scope: () => boolean; value: ClashView | null } | null>(null);
+  const isCurrent = useOperationScope(JSON.stringify([accountId, id]));
+  const loadGeneration = React.useRef(0);
+  const view = viewState?.scope === isCurrent && isCurrent() ? viewState.value : undefined;
+  const [rewards, setRewards] = React.useState<{
+    accountId: string | null; takeId: string; scope: () => boolean; reputation: number; coins: number;
+  } | null>(null);
+  // Mask prior-owner values during render, before effects run on account change.
+  const ownsRewards = rewards?.accountId === accountId && rewards?.takeId === id && rewards?.scope === isCurrent && isCurrent();
+  const reputation = ownsRewards ? rewards.reputation : 0;
+  const coins = ownsRewards ? rewards.coins : 0;
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [pendingSide, setPendingSide] = React.useState<Side | null>(null);
@@ -143,10 +153,15 @@ export default function ClashScreen(): React.JSX.Element {
   }, [state, id, view]);
 
   const load = React.useCallback(async (): Promise<void> => {
+    if (!isCurrent()) return;
+    const generation = ++loadGeneration.current;
+    const active = (): boolean => isCurrent() && loadGeneration.current === generation;
     setError(null);
     try {
       const next = await fetchClashViewForTake(id);
-      setView(next);
+      if (!active()) return;
+      setViewState({ scope: isCurrent, value: next });
+      setRewards(null);
       if (!next) return;
       if (next.battleMode === 'DUEL' && next.roomId) return;
       if (!openedRef.current) {
@@ -164,24 +179,32 @@ export default function ClashScreen(): React.JSX.Element {
         });
       }
       const me = await currentViewerProfileId();
-      if (me) {
+      if (!active()) return;
+      if (accountId && me) {
         const events = await fetchReputationEvents(me);
+        if (!active()) return;
         const mine = events.filter((event) => event.clashId === next.clashId);
-        setReputation(mine.reduce((sum, event) => sum + event.reputationDelta, 0));
-        setCoins(mine.reduce((sum, event) => sum + event.coinsDelta, 0));
+        setRewards({ accountId, takeId: id, scope: isCurrent,
+          reputation: mine.reduce((sum, event) => sum + event.reputationDelta, 0),
+          coins: mine.reduce((sum, event) => sum + event.coinsDelta, 0),
+        });
       }
     } catch (e) {
-      setError(errorText(e));
+      if (active()) { setViewState(null); setRewards(null); setError(errorText(e)); }
     }
-  }, [id]);
+  }, [id, accountId, isCurrent]);
 
   useFocusEffect(
     React.useCallback(() => {
+      setViewState(null);
       void load();
       const timer = setInterval(() => {
         void load();
       }, POLL_MS);
-      return () => clearInterval(timer);
+      return () => {
+        loadGeneration.current += 1;
+        clearInterval(timer);
+      };
     }, [load]),
   );
 

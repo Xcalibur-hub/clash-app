@@ -1,0 +1,6 @@
+{
+    "unschedule_without_auth":  false,
+    "rationale":  "Frozen clash_scheduler schedules bounded idempotent run_maintenance(500). Fresh preflight requires empty auth/storage/ledger and zero public relations. On that baseline maintenance is a no-op against user data; cron is an approved frozen-migration side effect, not an unauthorized extra operation.",
+    "frozen_sql_altered":  false,
+    "assessment":  "PASS"
+}

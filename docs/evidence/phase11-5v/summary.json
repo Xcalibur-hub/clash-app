@@ -1,0 +1,41 @@
+{
+  "recommendation": "BLOCKED",
+  "baseline_commit": "4b2aa0638cb3ee0d1866705bbe7f788aff54462d",
+  "frozen_seal": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "frozen_source_hashes_verified": 245,
+  "migration_artifacts_verified": 106,
+  "source_sql_suites_bundled_not_executed": 89,
+  "dblink_adapters_bundled_not_executed": 10,
+  "artifact_manifest_sha256": "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+  "suite_manifest_sha256": "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+  "node_tests": {
+    "pass": 81,
+    "fail": 0,
+    "exit_code": 0
+  },
+  "go_tests": {
+    "top_level_pass": 28,
+    "subtests_pass": 23,
+    "leaf_cases_pass": 47,
+    "exit_code": 0
+  },
+  "go_mod_verify_exit_code": 0,
+  "go_vet_exit_code": 0,
+  "go_build_exit_code": 0,
+  "build_sha256": "ae701026fe7676ef2ef8d00cd03726b7e8f1b46f648c267a3b84bff26c1e9ba9",
+  "organization": {
+    "id": "dninpemahklihtxcjrnz",
+    "name": "Xcalibur-hub-2's Org",
+    "plan": "free",
+    "quoted_project_monthly_cost": 0
+  },
+  "project_creation_calls": 0,
+  "projects_created": 0,
+  "project_reference": null,
+  "database_connections": 0,
+  "database_preflight": "NOT EXECUTED",
+  "migrations_applied": 0,
+  "sql_suites_executed": 0,
+  "primary_status_and_six_tracked_dirty_hashes_unchanged": true,
+  "evidence_transcoding": "PowerShell UTF-16 outputs converted to UTF-8; trailing whitespace removed only in copied evidence"
+}

@@ -1,0 +1,69 @@
+{
+  "ledger_count": 43,
+  "first_43_integrity": true,
+  "migration_44_ledger_entry": false,
+  "migration_44_objects_present": false,
+  "migration_44_rollback": "confirmed_absent",
+  "unexpected_ledger_entries": false,
+  "pgcrypto": [
+    {
+      "owner": "postgres",
+      "owner_is_postgres": true,
+      "owner_is_supabase_admin": false,
+      "schema": "extensions",
+      "version": "1.3"
+    }
+  ],
+  "artifact_pgcrypto_assert": [
+    {
+      "artifact_assert_would_pass": false
+    }
+  ],
+  "clash_maintenance_jobs": [
+    {
+      "active": true,
+      "command": "select public.run_maintenance(500)",
+      "jobid": "1",
+      "jobname": "clash-maintenance",
+      "schedule": "* * * * *",
+      "username": "postgres"
+    }
+  ],
+  "clash_maintenance_runs_1h": [
+    {
+      "failed_1h": 0,
+      "runs_1h": 25,
+      "succeeded_1h": 25
+    }
+  ],
+  "failure_classification": {
+    "evidence": "offline artifact assert + live pgcrypto owner + artifact_assert_would_pass",
+    "most_likely": "artifact_pgcrypto_owner_assert_requires_supabase_admin_but_hosted_owner_is_postgres",
+    "sqlstate": "unavailable_from_original_migrate"
+  },
+  "identity_gate": {
+    "database_match": true,
+    "current_role_match": true,
+    "session_role_match": true,
+    "backend_ssl_observed": true,
+    "postgres_17_match": true,
+    "failure_reason": "none"
+  },
+  "stop_condition": "none",
+  "quarantine_retained": true,
+  "first_entry": {
+    "expected_file": "20260926120000_initial_arena_schema.sql",
+    "hash_match": true,
+    "index": 1,
+    "name": "initial_arena_schema",
+    "version": "20260926120000"
+  },
+  "last_entry": {
+    "expected_file": "20261003200000_explore_for_you_ia.sql",
+    "hash_match": true,
+    "index": 43,
+    "name": "explore_for_you_ia",
+    "version": "20261003200000"
+  },
+  "hash_mismatches": 0
+}

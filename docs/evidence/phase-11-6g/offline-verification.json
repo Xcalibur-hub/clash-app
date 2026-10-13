@@ -1,0 +1,21 @@
+﻿{
+    "frozen_source_files":  245,
+    "pooler_used":  false,
+    "source_revision":  "5ce5641708b49fac2270ee008b4a298a0a62f199",
+    "exit_code":  1,
+    "executable_sha256":  "baf063e20aebdf1180bd68652166460ecb65ca24d5d7b303f1a7c47f148a52fe",
+    "migration_eligible":  false,
+    "sql_suites_executed":  0,
+    "go_test":  "PASS",
+    "artifact_manifest_sha256":  "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+    "failure":  "unexpected application objects; review required",
+    "unexpected_schema_names":  [
+                                    "pgbouncer"
+                                ],
+    "migrations":  106,
+    "ca_sha256":  "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "suite_manifest_sha256":  "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+    "connection_mode":  "direct",
+    "pgcrypto_owner_accepted":  "postgres",
+    "migrations_executed":  0
+}

@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../store/AuthProvider';
+import { useOperationScope } from '../../hooks/useOperationScope';
 import { useNotificationUnread } from '../../store/NotificationUnreadProvider';
 import {
   fetchNotifications,
@@ -22,7 +23,14 @@ import { tap as hapticTap } from '../../utils/haptics';
 
 /** Activity inbox — real `notifications` rows, actor avatars, read state. */
 export default function NotificationsTab(): React.JSX.Element {
-  const { signedIn, loading } = useAuth();
+  const { user } = useAuth();
+  return <NotificationsInbox key={user?.id ?? 'guest'} />;
+}
+
+function NotificationsInbox(): React.JSX.Element {
+  const { signedIn, loading, user } = useAuth();
+  const isCurrent = useOperationScope(user?.id ?? 'guest');
+  const loadGeneration = React.useRef(0);
   const { refresh: refreshUnread } = useNotificationUnread();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -33,26 +41,34 @@ export default function NotificationsTab(): React.JSX.Element {
   const [refreshing, setRefreshing] = React.useState(false);
 
   const load = React.useCallback(async (): Promise<void> => {
+    const generation = ++loadGeneration.current;
+    const active = (): boolean => isCurrent() && generation === loadGeneration.current;
     const rows = await fetchNotifications();
+    if (!active()) return;
     setItems(rows);
     void refreshUnread();
     const ids = [...new Set(rows.map((row) => row.actorId).filter((id): id is string => id !== null))];
     if (ids.length > 0) {
       const users = await fetchProfilesByIds(ids);
+      if (!active()) return;
       setActors(new Map(users.map((user) => [user.id, user])));
     } else {
       setActors(new Map());
     }
-  }, [refreshUnread]);
+  }, [refreshUnread, isCurrent]);
 
   useFocusEffect(
     React.useCallback(() => {
       if (!signedIn) return;
+      setItems(null);
+      setActors(new Map());
       void load();
+      return () => { loadGeneration.current += 1; };
     }, [signedIn, load]),
   );
 
   const open = async (item: AppNotification): Promise<void> => {
+    if (!isCurrent()) return;
     if (item.readAt === null) {
       setItems((prev) => prev?.map((row) => (row.id === item.id ? { ...row, readAt: Date.now() } : row)) ?? prev);
       void markNotificationRead(item.id).catch(() => undefined);
@@ -78,9 +94,10 @@ export default function NotificationsTab(): React.JSX.Element {
         if (item.entityId) {
           try {
             const clash = await fetchClashById(item.entityId);
+            if (!isCurrent()) return;
             router.push(clash ? `/clash/${clash.takeId}` : '/(tabs)/profile');
           } catch {
-            router.push('/(tabs)/profile');
+            if (isCurrent()) router.push('/(tabs)/profile');
           }
         } else {
           router.push('/(tabs)/profile');

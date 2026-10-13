@@ -1,0 +1,7 @@
+{
+  "inspection": "read-only local interface and routing inventory",
+  "global_ipv6_addresses": 0,
+  "ipv6_default_routes": 0,
+  "database_probes": 0,
+  "network_changes": 0
+}

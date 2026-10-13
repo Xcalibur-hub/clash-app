@@ -1,0 +1,22 @@
+{
+  "step_6j_authorizes_migrate": false,
+  "step_6i_authorizes_migrate": false,
+  "required_future_migrate_authorization": {
+    "mode": "migrate",
+    "authorize": "migrate:zrutlrhhvfcsmssjiijl",
+    "connection_mode": "direct",
+    "host": "db.zrutlrhhvfcsmssjiijl.supabase.co",
+    "port": 5432,
+    "database": "postgres",
+    "user": "postgres",
+    "ca_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "artifact_manifest_sha256": "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+    "suite_manifest_sha256": "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+    "migrations": 106,
+    "fresh_preflight_immediately_before": true,
+    "stop_and_quarantine_on_failure": true,
+    "distinct_from_inventory": true,
+    "distinct_from_fixtures": true
+  },
+  "recovery_policy": "stop-and-quarantine; no automatic retry, resume, reset, or blind ledger repair"
+}
