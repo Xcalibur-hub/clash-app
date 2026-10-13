@@ -1,0 +1,17 @@
+﻿source: schema_name | policies 
+-------------+----------
+ cron        |        2
+ public      |      118
+ realtime    |        1
+ storage     |        5
+(4 rows)
+
+
+restored-into-c10_restore: schema_name | policies 
+-------------+----------
+ public      |      118
+ realtime    |        1
+ storage     |        5
+(3 rows)
+
+
