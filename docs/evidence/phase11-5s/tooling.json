@@ -1,0 +1,6 @@
+{
+  "endpoint": "npipe:////./pipe/dockerDesktopLinuxEngine",
+  "cli": "2.40.7",
+  "engine": "28.3.3",
+  "compose": "2.39.2-desktop.1"
+}

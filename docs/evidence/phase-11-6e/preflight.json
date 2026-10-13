@@ -1,0 +1,518 @@
+{
+  "application_objects": [
+    {
+      "relations": 0,
+      "routines": 0,
+      "types": 0,
+      "unexpected_schemas": 1
+    }
+  ],
+  "available_extensions": [
+    {
+      "installed": false,
+      "name": "dblink",
+      "relocatable": true,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.2"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.0.0"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.1.0"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.2.0"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.3.1"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.4.0"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.4.1"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.4.2"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.5.2"
+    },
+    {
+      "installed": false,
+      "name": "pg_cron",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "1.6.4"
+    },
+    {
+      "installed": true,
+      "name": "pgcrypto",
+      "relocatable": true,
+      "schema": null,
+      "superuser": true,
+      "trusted": true,
+      "version": "1.3"
+    },
+    {
+      "installed": false,
+      "name": "pgtap",
+      "relocatable": true,
+      "schema": null,
+      "superuser": false,
+      "trusted": false,
+      "version": "1.3.1"
+    },
+    {
+      "installed": false,
+      "name": "pgtap",
+      "relocatable": true,
+      "schema": null,
+      "superuser": false,
+      "trusted": false,
+      "version": "1.3.2"
+    },
+    {
+      "installed": false,
+      "name": "pgtap",
+      "relocatable": true,
+      "schema": null,
+      "superuser": false,
+      "trusted": false,
+      "version": "1.3.3"
+    },
+    {
+      "installed": false,
+      "name": "postgis",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "3.3.7"
+    },
+    {
+      "installed": false,
+      "name": "postgis",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "3.3.7next"
+    },
+    {
+      "installed": false,
+      "name": "postgis",
+      "relocatable": false,
+      "schema": null,
+      "superuser": true,
+      "trusted": false,
+      "version": "unpackaged"
+    }
+  ],
+  "database_security_passed": false,
+  "existing_data": [
+    {
+      "buckets": false,
+      "objects": false,
+      "users": false
+    }
+  ],
+  "identity_gate": {
+    "database_match": true,
+    "current_role_match": true,
+    "session_role_match": true,
+    "backend_ssl_observed": true,
+    "postgres_17_match": true,
+    "failure_reason": "none"
+  },
+  "installed_extensions": [
+    {
+      "name": "pgcrypto",
+      "owner": "postgres",
+      "schema": "extensions",
+      "version": "1.3"
+    }
+  ],
+  "managed": [
+    {
+      "cron_catalog": false,
+      "cron_preloaded": true,
+      "managed": true,
+      "publication": true,
+      "restricted_files": true,
+      "restricted_role": true
+    }
+  ],
+  "role_inheritance": [
+    {
+      "admin_option": false,
+      "granted_role": "anon",
+      "inherit_option": false,
+      "member_role": "authenticator",
+      "set_option": true
+    },
+    {
+      "admin_option": true,
+      "granted_role": "anon",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    },
+    {
+      "admin_option": false,
+      "granted_role": "authenticated",
+      "inherit_option": false,
+      "member_role": "authenticator",
+      "set_option": true
+    },
+    {
+      "admin_option": true,
+      "granted_role": "authenticated",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    },
+    {
+      "admin_option": true,
+      "granted_role": "authenticator",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    },
+    {
+      "admin_option": true,
+      "granted_role": "pg_create_subscription",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    },
+    {
+      "admin_option": true,
+      "granted_role": "pg_monitor",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    },
+    {
+      "admin_option": true,
+      "granted_role": "pg_read_all_data",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    },
+    {
+      "admin_option": false,
+      "granted_role": "pg_read_all_settings",
+      "inherit_option": true,
+      "member_role": "pg_monitor",
+      "set_option": true
+    },
+    {
+      "admin_option": false,
+      "granted_role": "pg_read_all_stats",
+      "inherit_option": true,
+      "member_role": "pg_monitor",
+      "set_option": true
+    },
+    {
+      "admin_option": true,
+      "granted_role": "pg_signal_backend",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    },
+    {
+      "admin_option": false,
+      "granted_role": "pg_stat_scan_tables",
+      "inherit_option": true,
+      "member_role": "pg_monitor",
+      "set_option": true
+    },
+    {
+      "admin_option": false,
+      "granted_role": "service_role",
+      "inherit_option": false,
+      "member_role": "authenticator",
+      "set_option": true
+    },
+    {
+      "admin_option": true,
+      "granted_role": "service_role",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    },
+    {
+      "admin_option": false,
+      "granted_role": "supabase_privileged_role",
+      "inherit_option": true,
+      "member_role": "postgres",
+      "set_option": true
+    }
+  ],
+  "roles": [
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "anon",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "authenticated",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": false,
+      "member": true,
+      "name": "authenticator",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "pg_create_subscription",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "pg_database_owner",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": false,
+      "name": "pg_execute_server_program",
+      "superuser": false,
+      "usable": false
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "pg_monitor",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "pg_read_all_data",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "pg_read_all_settings",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "pg_read_all_stats",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": false,
+      "name": "pg_read_server_files",
+      "superuser": false,
+      "usable": false
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "pg_signal_backend",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "pg_stat_scan_tables",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": false,
+      "name": "pg_write_server_files",
+      "superuser": false,
+      "usable": false
+    },
+    {
+      "bypass_rls": true,
+      "create_db": true,
+      "create_role": true,
+      "inherits": true,
+      "member": true,
+      "name": "postgres",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": true,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "service_role",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": true,
+      "create_db": true,
+      "create_role": true,
+      "inherits": true,
+      "member": false,
+      "name": "supabase_admin",
+      "superuser": true,
+      "usable": false
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": true,
+      "inherits": false,
+      "member": false,
+      "name": "supabase_auth_admin",
+      "superuser": false,
+      "usable": false
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": true,
+      "member": true,
+      "name": "supabase_privileged_role",
+      "superuser": false,
+      "usable": true
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": false,
+      "inherits": false,
+      "member": false,
+      "name": "supabase_realtime_admin",
+      "superuser": false,
+      "usable": false
+    },
+    {
+      "bypass_rls": false,
+      "create_db": false,
+      "create_role": true,
+      "inherits": false,
+      "member": false,
+      "name": "supabase_storage_admin",
+      "superuser": false,
+      "usable": false
+    }
+  ]
+}

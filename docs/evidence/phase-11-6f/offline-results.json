@@ -1,0 +1,22 @@
+﻿{
+    "baseline":  "0330ef1b5ac8ede2571ecef650786957e1e6a6f7",
+    "branch":  "audit/phase-11-hosted-db-compat-6f",
+    "tls_identity_unchanged":  true,
+    "unexpected_schema_names":  "allowlisted nspname inventory; still fail-closed on non-zero count",
+    "pgcrypto_gate":  "accept supabase_admin or postgres; require version 1.3 schema extensions",
+    "go_test":  "PASS",
+    "go_vet":  "PASS",
+    "live_connections":  0,
+    "prepare":  {
+                    "suite_manifest_sha256":  "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+                    "frozen_source_files":  245,
+                    "migrations":  106,
+                    "artifact_manifest_sha256":  "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a"
+                },
+    "scope":  "file-only offline investigation",
+    "go_module":  "clash/hosted-staging",
+    "sql_executed":  false,
+    "credential_access":  false,
+    "go_test_pass_actions":  141,
+    "go_test_fail_actions":  0
+}

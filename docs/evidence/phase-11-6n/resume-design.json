@@ -1,0 +1,23 @@
+{
+  "mode": "resume",
+  "does_not_weaken_empty_migrate_preflight": true,
+  "recovery_preflight": [
+    "corrected_manifest_and_artifact_44",
+    "identity_pg17_ssl",
+    "pgcrypto_managed_ready",
+    "no_unexpected_schemas",
+    "empty_auth_storage",
+    "prefix_dependencies_present",
+    "migration_44_objects_absent",
+    "exact_ledger_prefix_43_hashes",
+    "clash_maintenance_present_and_inactive"
+  ],
+  "execution": {
+    "range": "artifacts[43..105]",
+    "txn": "begin -> sql -> ledger insert -> commit",
+    "revalidate_after_lock_and_each_commit": true,
+    "advisory_lock": "pg_try_advisory_lock(872314059)",
+    "no_retry_skip_repair_reset": true
+  },
+  "cron_policy": "refuse_active_clash_maintenance"
+}
