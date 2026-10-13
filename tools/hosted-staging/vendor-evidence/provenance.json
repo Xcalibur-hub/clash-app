@@ -1,0 +1,17 @@
+[
+  {
+    "file": "cli-connect.go.txt",
+    "url": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/internal/utils/connect.go",
+    "sha256": "d665915954bd9ab413f2a49843fdf1095f3d9644a47bf8425748bf28e8d517e9"
+  },
+  {
+    "file": "cli-LICENSE",
+    "url": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/LICENSE",
+    "sha256": "81f7d60afa4316010b1c0df8eb8f0c80b27586a86b72f1bde85e129bfd10d52a"
+  },
+  {
+    "file": "cli-pgx-wrapper.go.txt",
+    "url": "https://raw.githubusercontent.com/supabase/cli/v2.40.7/pkg/pgxv5/connect.go",
+    "sha256": "61ec2c0039d7504afc0c20c774f240924b51a2f301ab46838cc5148d3c3d73c4"
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "source": "Step 6K pre-connect verification",
+  "approved": {
+    "project": "clash-staging",
+    "project_ref": "zrutlrhhvfcsmssjiijl",
+    "host": "db.zrutlrhhvfcsmssjiijl.supabase.co",
+    "port": 5432,
+    "database": "postgres",
+    "username": "postgres",
+    "connection_mode": "direct"
+  },
+  "executor_revision": "f2a2b3f7fd5aee33bfd5b4c80e68dce95c90e354",
+  "migrate_path_lineage": "e85ce3e4f62490d98c94b9e032d4f68a97e1485f",
+  "binary_sha256": "128cac60fa1e6f982182e8de458eb528f75154fd09baf9d5aa5838e9276db5c1",
+  "ca_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+  "network_precheck": {
+    "global_ipv6": true,
+    "default_ipv6_route": true,
+    "aaaa": true,
+    "tcp_5432_ipv6": "CONNECTED",
+    "tcp_connect_ms": 210
+  },
+  "credential_target_present": true,
+  "credential_username_expected": "postgres",
+  "concurrent_hosted_staging_process": false
+}

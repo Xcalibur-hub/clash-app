@@ -1,0 +1,17 @@
+{
+  "versus_step_6i_environment": {
+    "postgres_17": "confirmed",
+    "empty_application_ledger": "confirmed",
+    "pgcrypto_extensions_owner_allowlist": "confirmed",
+    "postgis_in_available_extensions": "confirmed",
+    "pg_cron_preloaded": "confirmed",
+    "cron_catalog_empty_before_migrate": "confirmed",
+    "nontransactional_ddl_in_frozen_106": "confirmed_absent",
+    "security_definer_rls_grant_correctness": "potential_post_deploy",
+    "hosted_privilege_deltas_vs_local": "potential",
+    "pgbouncer_owner_contents": "unresolved",
+    "clash_maintenance_cron_activation": "potential_side_effect"
+  },
+  "frozen_sql_altered": false,
+  "hashes_altered": false
+}

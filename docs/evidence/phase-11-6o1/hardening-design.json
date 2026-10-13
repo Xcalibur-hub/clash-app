@@ -1,0 +1,28 @@
+{
+  "step": "6O.1",
+  "baseline": "2b09e12b4e8a0cd163153977d3cbb8397cde9d7a",
+  "rollback": {
+    "helper": "pauseCronRollback",
+    "never_discard_failure": true,
+    "confirmed": "return cause; quarantine retained",
+    "unconfirmed": "rollback unconfirmed; quarantine retained"
+  },
+  "quiescence": {
+    "history_alone_insufficient": true,
+    "requires": ["cron.job_run_details", "pg_stat_activity"],
+    "in_progress_statuses": ["starting", "running", "connecting", "sending"],
+    "fail_closed": [
+      "unexpected_unfinished_status",
+      "stale_unfinished",
+      "incomplete_history",
+      "incomplete_activity",
+      "timeout_unknown_state"
+    ]
+  },
+  "unchanged": {
+    "mechanism": "cron.alter_job active=false only",
+    "job_name": "clash-maintenance",
+    "advisory_lock": 872314060,
+    "authorization": "pause-cron:zrutlrhhvfcsmssjiijl"
+  }
+}

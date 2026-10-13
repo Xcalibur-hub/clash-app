@@ -1,0 +1,9 @@
+{
+  "attempt": "earlier_same_day_block",
+  "aaaa": ["2406:da14:1772:ea01:905e:38ac:2bd2:bfe6"],
+  "global_ipv6_addresses": [],
+  "ipv6_default_routes": [],
+  "tcp_5432_ipv6": "UNREACHABLE_NETWORK",
+  "pause_executed": false,
+  "reason": "host had no global IPv6 address/route; no write performed"
+}

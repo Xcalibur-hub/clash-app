@@ -10,17 +10,51 @@ export interface ReputationBarProps {
   /** Server-authoritative rank string when available. */
   rank?: RankName | string;
   streak?: number;
+  /**
+   * Own-only Arena facet scores from `get_my_arena_reputation`.
+   * Omit when unavailable — never invent zeros from a failed fetch.
+   */
+  facets?: Readonly<Record<string, number>>;
+  /** Own-only Arena standing label (NEWCOMER / CONTRIBUTOR / …). */
+  standing?: string;
+}
+
+const FACET_ORDER = ['DEBATE', 'EVIDENCE', 'TRUST', 'ENTERTAINMENT', 'MIND_IMPACT'] as const;
+
+function facetLine(
+  standing: string | undefined,
+  facets: Readonly<Record<string, number>> | undefined,
+): string | null {
+  if (!standing && !facets) return null;
+  const parts: string[] = [];
+  if (standing) parts.push(standing.replace(/_/g, ' '));
+  if (facets) {
+    for (const key of FACET_ORDER) {
+      const score = facets[key];
+      if (typeof score === 'number' && score > 0) {
+        parts.push(`${key.replace(/_/g, ' ')} ${score}`);
+      }
+    }
+  }
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 /**
  * Editorial reputation / credibility — not an XP game HUD.
  * Rank label prefers server `rank`; falls back to local rankFor.
  */
-export function ReputationBar({ reputation, rank, streak = 0 }: ReputationBarProps): React.JSX.Element {
+export function ReputationBar({
+  reputation,
+  rank,
+  streak = 0,
+  facets,
+  standing,
+}: ReputationBarProps): React.JSX.Element {
   const t = useThemeColors();
   const derived = rankFor(reputation);
   const label = (rank && String(rank).trim().length > 0 ? String(rank) : derived.name).toUpperCase();
   const { next, toNext } = rankProgress(reputation);
+  const facetsSummary = facetLine(standing, facets);
 
   return (
     <View
@@ -39,6 +73,11 @@ export function ReputationBar({ reputation, rank, streak = 0 }: ReputationBarPro
       {streak > 0 ? (
         <Text allowFontScaling={false} style={[styles.streak, { color: t.textMuted }]}>
           {streak} day streak
+        </Text>
+      ) : null}
+      {facetsSummary ? (
+        <Text allowFontScaling={false} style={[styles.facets, { color: t.textMuted }]}>
+          {facetsSummary}
         </Text>
       ) : null}
 
@@ -75,6 +114,10 @@ const styles = StyleSheet.create({
   },
   streak: {
     ...typeScale.meta,
+  },
+  facets: {
+    ...typeScale.meta,
+    marginTop: 2,
   },
   rule: {
     height: StyleSheet.hairlineWidth,

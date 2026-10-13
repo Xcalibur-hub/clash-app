@@ -1,0 +1,15 @@
+{
+  "baseline_pr": 44,
+  "baseline_commit": "068a188e751c4b2f7feaa4de787d0945b4e87d27",
+  "candidate_seal": "a92a550527f810913b01f6e6411dc78996c71a06",
+  "frozen_hashes_verified": 245,
+  "migration_artifacts_verified": 106,
+  "frozen_sql_sources_prepared": 89,
+  "hosted_dblink_adaptations": 10,
+  "top_level_dblink_calls_mapped": 317,
+  "nested_dblink_calls_mapped": 1,
+  "managed_vendor_hashes_verified": 4,
+  "artifact_manifest_sha256": "8f50541d3eed55bd905117a217bc8118a6b5483d1ffec2e5d0477b2be71b8c8a",
+  "suite_manifest_sha256": "12cac2a2b0119cb99110061800e14ea167f0928919da4bbd4e464dc0fbead7fe",
+  "sql_executed": false
+}

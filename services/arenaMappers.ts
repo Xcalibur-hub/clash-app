@@ -99,8 +99,9 @@ export function toUser(row: PublicProfile & { coins?: number }): User {
     rank: row.rank,
     reputation: row.reputation,
     coins: row.coins ?? 0,
-    clashes: 0,
-    wins: 0,
+    // Hydrated by profile_clash_stats — never invent zeros here.
+    clashes: null,
+    wins: null,
     streak: row.streak,
     badges: [],
   };

@@ -1,0 +1,13 @@
+{
+  "step": "6P",
+  "verdict": "SUCCESS",
+  "job_verified_inactive": true,
+  "job_verified_quiescent": true,
+  "jobid": "1",
+  "job_name": "clash-maintenance",
+  "wrote_active_false": true,
+  "pause_executed": true,
+  "staging_quarantine": "RETAINED",
+  "resume_still_requires_separate_authorization": true,
+  "step_6q_auto_started": false
+}

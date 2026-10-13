@@ -1,0 +1,20 @@
+{
+  "step": "6N",
+  "mode": "file-only",
+  "hosted_connection": false,
+  "resume_executed": false,
+  "executor_offline_ready": true,
+  "operational_recovery_blocked_on": "active_clash_maintenance_requires_separate_pause_authorization",
+  "authorization": "resume:zrutlrhhvfcsmssjiijl",
+  "required_manifest_sha256": "5c39f97c62559b1f5ed175be409480fb3515fded61a16f0b1b33cc3e22768110",
+  "required_artifact_44_sha256": "380b693fd09edcefbe30028c8ed5de72ae9716776198f1d45c6ed8a1ef17f261",
+  "prefix_count": 43,
+  "remaining_migrations": 63,
+  "advisory_lock_key": 872314059,
+  "go_test": "ok",
+  "go_vet": "pass",
+  "node_compatibility_tests": "pass",
+  "resume_top_level_pass": 16,
+  "fresh_migrate_still_rejects_nonempty_ledger": true,
+  "staging_quarantine_unchanged": true
+}

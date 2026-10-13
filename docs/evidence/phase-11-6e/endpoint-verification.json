@@ -1,0 +1,43 @@
+{
+  "source": "Step 6E direct-endpoint verification before connect",
+  "approved_authorization": {
+    "project": "clash-staging",
+    "project_ref": "zrutlrhhvfcsmssjiijl",
+    "region": "ap-northeast-1",
+    "host": "db.zrutlrhhvfcsmssjiijl.supabase.co",
+    "port": 5432,
+    "database": "postgres",
+    "username": "postgres",
+    "connection_mode": "direct"
+  },
+  "dashboard_connection_information": {
+    "official_direct_connection_string_form": "postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres",
+    "docs_url": "https://supabase.com/docs/guides/database/connecting-to-postgres#direct-connection",
+    "derived_host": "db.zrutlrhhvfcsmssjiijl.supabase.co",
+    "derived_port": 5432,
+    "matches_authorization": true
+  },
+  "prior_authenticated_management_metadata": {
+    "evidence": "docs/evidence/phase-11-5z/management-metadata.json",
+    "project_id": "zrutlrhhvfcsmssjiijl",
+    "project_name": "clash-staging",
+    "organization_id": "dninpemahklihtxcjrnz",
+    "region": "ap-northeast-1",
+    "status": "ACTIVE_HEALTHY",
+    "database_version_management": "17.11.0.003"
+  },
+  "live_dashboard_session": {
+    "attempted": true,
+    "result": "blocked_sign_in",
+    "note": "Browser reached Supabase sign-in / GitHub OAuth; no interactive login performed. Local Supabase CLI token is for a different account and received HTTP 403 for this project."
+  },
+  "network_precheck": {
+    "global_ipv6": true,
+    "default_ipv6_route": true,
+    "aaaa": true,
+    "tcp_5432_ipv6": "CONNECTED"
+  },
+  "verification_decision": "PASS_with_documented_dashboard_direct_form_plus_prior_management_identity_and_owner_authorization",
+  "executor_will_use_host": "db.zrutlrhhvfcsmssjiijl.supabase.co",
+  "executor_will_refuse_pooler_host": true
+}
