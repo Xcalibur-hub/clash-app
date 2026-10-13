@@ -441,11 +441,18 @@ export default function ArenaScreen(): React.JSX.Element {
         />
 
         <View style={styles.feedHead}>
-          <Text style={[styles.feedTitle, { color: theme.textPrimary }]}>
-            Hot right now
+          <View style={styles.feedKickerRow}>
+            <View style={[styles.feedKickerDot, { backgroundColor: theme.scheme === 'dark' ? '#F0AD96' : '#D98569' }]} />
+            <Text style={[styles.feedKicker, { color: theme.textSecondary }]}>
+              YOUR DAILY PULSE
+            </Text>
+            <Text style={[styles.feedIssue, { color: theme.textMuted }]}>LIVE / 24H</Text>
+          </View>
+          <Text allowFontScaling style={[styles.feedTitle, { color: theme.textPrimary }]}>
+            Hot right <Text style={{ color: theme.scheme === 'dark' ? '#F3AB91' : '#D47A62' }}>now.</Text>
           </Text>
-          <Text style={[styles.feedSub, { color: theme.textMuted }]}>
-            Takes from your interests and community
+          <Text style={[styles.feedSub, { color: theme.textSecondary }]}>
+            The takes sparking conversations in your world
           </Text>
           <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         </View>
@@ -613,26 +620,23 @@ const styles = StyleSheet.create({
   listDimmed: { opacity: 0.35 },
   list: { flexGrow: 1 },
   hero: { paddingBottom: space.xs, gap: space.md },
-  feedHead: {
-    paddingTop: space.md,
-    paddingBottom: space.md,
-    gap: 6,
+  feedHead: { paddingTop: space.xl, paddingBottom: space.lg, gap: 8 },
+  feedKickerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: layout.screenX,
   },
+  feedKickerDot: { width: 9, height: 9, borderRadius: 3, transform: [{ rotate: '-15deg' }] },
+  feedKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
+  feedIssue: { fontSize: 10, fontWeight: '700', marginLeft: 'auto', letterSpacing: 0.6 },
   feedTitle: {
     ...typeScale.label,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 39, lineHeight: 44, fontWeight: '900', letterSpacing: -1.8,
     paddingHorizontal: layout.screenX,
   },
   feedSub: {
-    ...typeScale.meta,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 14,
-    fontWeight: '500',
-    paddingHorizontal: layout.screenX,
-    marginBottom: space.xs,
+    ...typeScale.meta, fontSize: 13, lineHeight: 19,
+    fontWeight: '500', paddingHorizontal: layout.screenX, marginBottom: space.sm,
   },
 });
 
