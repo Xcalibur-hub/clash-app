@@ -1,6 +1,6 @@
 /**
  * Arena primary navigation vocabulary (UI/IA only).
- * Four destinations within the existing Arena screen.
+ * Four clear destinations within the existing Arena screen.
  */
 
 export type ArenaMode =
@@ -11,9 +11,9 @@ export type ArenaMode =
 
 export const ARENA_MODES: readonly { id: ArenaMode; label: string }[] = [
   { id: 'for_you', label: 'Home' },
-  { id: 'clashes', label: 'Live Clashes' },
-  { id: 'community', label: 'Communities' },
-  { id: 'topics', label: 'Topics & Trends' },
+  { id: 'clashes', label: 'Live' },
+  { id: 'community', label: 'Groups' },
+  { id: 'topics', label: 'Discover' },
 ] as const;
 
 export const DEFAULT_ARENA_MODE: ArenaMode = 'for_you';
