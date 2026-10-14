@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../../store/AuthProvider';
 import { useMediaPicker, type PickedMedia } from '../../hooks/useMediaPicker';
 import { useThemeColors, space } from '../../theme';
@@ -42,10 +42,17 @@ function PrivateAssistBody({ roomId, duel, disabled, onPublished }: {
     finally{inFlight.current=false;if(alive.current)setBusy(false);}
   };
   const button=(label:string,fn:()=>void,locked=false)=><Pressable key={label} accessibilityRole="button" accessibilityLabel={label} disabled={locked||busy} onPress={fn} style={{padding:10,opacity:locked||busy?0.45:1}}><Text style={{color:t.textPrimary}}>{label}</Text></Pressable>;
-  return <View style={{padding:space.sm,borderColor:t.border,borderWidth:1,borderRadius:12}}>
-    {button(fighter?'Private assist inbox':'Send a private assist',()=>setOpen(v=>!v))}
+  return <View style={[styles.panel,{borderColor:t.border,backgroundColor:t.surfaceElevated}]}>
+    <Pressable accessibilityRole="button" accessibilityState={{expanded:open}} accessibilityLabel={fighter?'Toggle private assist inbox':'Toggle private assist composer'} onPress={()=>setOpen(v=>!v)} style={styles.header}>
+      <View style={styles.headerCopy}>
+        <Text style={[styles.eyebrow,{color:t.textMuted}]}>PRIVATE SUPPORT</Text>
+        <Text style={[styles.headerTitle,{color:t.textPrimary}]}>{fighter?'Your assist inbox':'Help a fighter'}</Text>
+        <Text style={[styles.headerHint,{color:t.textSecondary}]}>{fighter?'Only you can read assists addressed to you':'Your message goes only to the fighter you choose'}</Text>
+      </View>
+      <Text style={[styles.expand,{color:t.textPrimary}]}>{open?'−':'+'}</Text>
+    </Pressable>
     {open?<>
-      <Text style={{color:t.textMuted}}>Only the selected fighter receives the assist. Publishing is their explicit choice.</Text>
+      <Text style={[styles.notice,{color:t.textSecondary}]}>{fighter?'Accepting an assist keeps it private until you explicitly publish it.':'Only the selected fighter receives this assist.'}</Text>
       {fighter?<ScrollView style={{maxHeight:240}}>
         {rows.length===0&&!error?<Text style={{color:t.textMuted}}>No private assists.</Text>:null}
         {rows.map(row=><View key={row.id} style={{paddingVertical:10,borderBottomWidth:1,borderColor:t.border}}>
@@ -58,7 +65,7 @@ function PrivateAssistBody({ roomId, duel, disabled, onPublished }: {
         </View>)}
         {rows.length>=30?button('Load older assists',()=>void action(async()=>{const older=await listPrivateAssists(account,roomId,rows.at(-1));if(alive.current)setRows(current=>[...current,...older.filter(a=>!current.some(b=>b.id===a.id))]);},false)):null}
       </ScrollView>:<>
-        <View style={{flexDirection:'row'}}>{button(`${side==='A'?'✓ ':''}Fighter A`,()=>setSide('A'),disabled)}{button(`${side==='B'?'✓ ':''}Fighter B`,()=>setSide('B'),disabled)}</View>
+        <View style={styles.sideRow}>{(['A','B'] as const).map(option=><Pressable key={option} accessibilityRole="button" accessibilityState={{selected:side===option}} accessibilityLabel={`Assist Fighter ${option}`} disabled={disabled||busy} onPress={()=>setSide(option)} style={[styles.sideChoice,{borderColor:side===option?t.textPrimary:t.border,backgroundColor:side===option?t.background:'transparent',opacity:disabled||busy?0.45:1}]}><Text style={[styles.sideLabel,{color:t.textPrimary}]}>{side===option?'✓  ':''}Fighter {option}</Text></Pressable>)}</View>
         <TextInput accessibilityLabel="Private assist text" value={body} onChangeText={setBody} maxLength={500} multiline editable={!disabled&&!busy} style={{color:t.textPrimary,minHeight:55,borderWidth:1,borderColor:t.border,padding:8}} placeholder="A source, thought or helpful counterpoint" placeholderTextColor={t.textMuted}/>
         <View style={{flexDirection:'row'}}>{button('Attach photo',()=>void action(async()=>{const p=await picker.pickImage();if(p&&alive.current){setPicked(p);setUploaded(null);}}),disabled)}{button('Attach video',()=>void action(async()=>{const p=await picker.pickVideo();if(p&&alive.current){setPicked(p);setUploaded(null);}}),disabled)}</View>
         {picked?<Text style={{color:t.textMuted}}>{picked.kind} attached privately</Text>:null}
@@ -83,3 +90,17 @@ function AssistAttachment({account,assist}:{account:string;assist:PrivateAssist}
     <MediaViewer visible={Boolean(url)} uri={url} kind={assist.mediaKind??'image'} onClose={()=>setUrl(null)}/>
   </>;
 }
+
+const styles = StyleSheet.create({
+  panel: { marginHorizontal: space.sm, marginVertical: space.xs, padding: space.md, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, gap: space.sm },
+  header: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  headerCopy: { flex: 1, gap: 3 },
+  eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  headerTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
+  headerHint: { fontSize: 12, lineHeight: 17 },
+  expand: { fontSize: 23, fontWeight: '500', minWidth: 32, textAlign: 'center' },
+  notice: { fontSize: 12, lineHeight: 18 },
+  sideRow: { flexDirection: 'row', gap: space.sm },
+  sideChoice: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sideLabel: { fontSize: 13, fontWeight: '700' },
+});
