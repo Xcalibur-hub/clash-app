@@ -69,13 +69,19 @@ export function ArenaClashes({
         <View style={styles.liveTopline}>
           <LivePulse dotOnly size={8} />
           <Text style={[styles.kicker, { color: t.textSecondary }]}>ARENA LIVE</Text>
-          <Text style={[styles.liveCount, { color: t.textMuted }]}>{live.length + liveEntries.length} live now</Text>
+          <Text style={[styles.liveCount, { color: t.textMuted }]}>
+            {loading ? 'Checking live…' : error ? 'Live count unavailable' : `${live.length + liveEntries.length} live now`}
+          </Text>
         </View>
         <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>The live stage.</Text>
         <Text style={[styles.sub, { color: t.textSecondary }]}>
           Watch real-time text and media clashes. Follow the arguments, react with the crowd, and support a fighter.
         </Text>
-        {!hasLive ? (
+        {!hasLive && (loading || error) ? (
+          <Text style={[styles.empty, { color: t.textMuted }]}>
+            {loading ? 'Loading live Clashes…' : 'Couldn’t load live Clashes. Retrying…'}
+          </Text>
+        ) : !hasLive ? (
           <View style={styles.noLive}>
             <Text style={[styles.noLiveTitle, { color: t.textPrimary }]}>No rooms broadcasting right now</Text>
             <Text style={[styles.empty, { color: t.textMuted }]}>
@@ -93,7 +99,9 @@ export function ArenaClashes({
                 accessibilityLabel={`Watch live Clash: ${entry.title}`}
                 style={[styles.row, { borderColor: t.border }]}
                 onPress={() => { hapticPress(); router.push(clashDiscoveryDestination(entry)); }}>
-                <Text style={[styles.liveLabel, { color: t.textPrimary }]}>● LIVE DUEL</Text>
+                <Text style={[styles.liveLabel, { color: t.textPrimary }]}>
+                  {entry.roomId ? '● LIVE DUEL' : '● LIVE CLASH'}
+                </Text>
                 <Text style={[styles.proposition, { color: t.textPrimary }]} numberOfLines={3}>{entry.title}</Text>
                 <Text style={[styles.enter, { color: t.textPrimary }]}>WATCH CLASH →</Text>
               </Pressable>

@@ -488,7 +488,6 @@ const styles = StyleSheet.create({
   eyebrow: {
     ...typeScale.label,
     fontWeight: '800',
-    letterSpacing: 0.4,
     fontSize: 21,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     letterSpacing: -0.7,
