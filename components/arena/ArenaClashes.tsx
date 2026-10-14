@@ -9,7 +9,7 @@ import type { LiveArenaTopic } from '../../services/liveArenaService';
 import { fetchClashDiscovery } from '../../services/arenaClashDiscoveryService';
 import { useAuth } from '../../store/AuthProvider';
 import { clashDiscoveryDestination, type ClashDiscoveryEntry, type ClashDiscoveryState } from '../../utils/arenaClashDiscovery';
-import { layout, radius, space, typeScale, useTheme, useThemeColors } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { plural } from '../../utils/format';
 import { press as hapticPress } from '../../utils/haptics';
 import { LivePulse } from '../liveArena/LivePulse';
@@ -33,7 +33,6 @@ export function ArenaClashes({
   onWatch,
 }: ArenaClashesProps): React.JSX.Element {
   const t = useThemeColors();
-  const { scheme } = useTheme();
   const router = useRouter();
   const { user } = useAuth();
   const [discovery, setDiscovery] = React.useState<{ ownerId: string | null; entries: ClashDiscoveryEntry[] }>({ ownerId: null, entries: [] });
@@ -61,6 +60,8 @@ export function ArenaClashes({
   }, [user?.id]));
   const live = topics.filter(isLive);
   const rest = topics.filter((topic) => !isLive(topic));
+  const liveEntries = entries.filter((entry) => entry.state === 'LIVE');
+  const hasLive = live.length > 0 || liveEntries.length > 0;
 
   return (
     <View style={styles.wrap} accessibilityLabel="Clashes">
@@ -68,13 +69,13 @@ export function ArenaClashes({
         <View style={styles.liveTopline}>
           <LivePulse dotOnly size={8} />
           <Text style={[styles.kicker, { color: t.textSecondary }]}>ARENA LIVE</Text>
-          <Text style={[styles.liveCount, { color: t.textMuted }]}>{live.length} live now</Text>
+          <Text style={[styles.liveCount, { color: t.textMuted }]}>{live.length + liveEntries.length} live now</Text>
         </View>
         <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>The live stage.</Text>
         <Text style={[styles.sub, { color: t.textSecondary }]}>
           Watch real-time text and media clashes. Follow the arguments, react with the crowd, and support a fighter.
         </Text>
-        {live.length === 0 ? (
+        {!hasLive ? (
           <View style={styles.noLive}>
             <Text style={[styles.noLiveTitle, { color: t.textPrimary }]}>No rooms broadcasting right now</Text>
             <Text style={[styles.empty, { color: t.textMuted }]}>
@@ -87,6 +88,16 @@ export function ArenaClashes({
           </View>
         ) : (
           <View style={styles.liveStack}>
+            {liveEntries.map((entry) => (
+              <Pressable key={entry.id} accessibilityRole="button"
+                accessibilityLabel={`Watch live Clash: ${entry.title}`}
+                style={[styles.row, { borderColor: t.border }]}
+                onPress={() => { hapticPress(); router.push(clashDiscoveryDestination(entry)); }}>
+                <Text style={[styles.liveLabel, { color: t.textPrimary }]}>● LIVE DUEL</Text>
+                <Text style={[styles.proposition, { color: t.textPrimary }]} numberOfLines={3}>{entry.title}</Text>
+                <Text style={[styles.enter, { color: t.textPrimary }]}>WATCH CLASH →</Text>
+              </Pressable>
+            ))}
             {live.map((topic) => (
               <ClashRow key={topic.id} topic={topic} live onPress={() => {
                 hapticPress();
@@ -114,7 +125,7 @@ export function ArenaClashes({
       {loading ? <Text style={[styles.empty, { color: t.textMuted }]}>Loading Clashes…</Text> : null}
       {!user ? <Text style={[styles.empty, { color: t.textMuted }]}>Sign in to see your Challenges and Clash history.</Text> : null}
       {error ? <Text accessibilityRole="alert" style={[styles.empty, { color: t.textMuted }]}>Couldn’t load Clashes. Retrying…</Text> : null}
-      {(['PENDING', 'LIVE', 'UPCOMING', 'COMPLETED'] as ClashDiscoveryState[]).map(section => (
+      {(['PENDING', 'UPCOMING', 'COMPLETED'] as ClashDiscoveryState[]).map(section => (
         <View key={section}>
           <Text style={[styles.section, { color: t.textMuted }]}>{section}</Text>
           {user && !loading && !error && !entries.some(entry => entry.state === section) ? (
@@ -136,7 +147,7 @@ export function ArenaClashes({
       </Text>
       {rest.length === 0 && live.length === 0 ? (
         <Text style={[styles.empty, { color: t.textMuted }]}>
-          Nothing else scheduled yet.
+          No other topic rooms right now.
         </Text>
       ) : (
         rest.map((topic) => (
