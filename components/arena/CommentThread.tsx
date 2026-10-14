@@ -10,6 +10,9 @@ import { ArenaIcon, ArrowBigUpIcon, CommentIcon, MoreIcon } from '../shared/icon
 import { PressableScale } from '../shared/PressableScale';
 import { CommentMedia } from './CommentMedia';
 
+const ROOT_PAGE_SIZE = 8;
+const REPLY_PAGE_SIZE = 4;
+
 export interface CommentThreadProps {
   nodes: CommentNode[];
   takeAuthorId?: string;
@@ -28,9 +31,13 @@ export function CommentThread({
   onClash,
   onMore,
 }: CommentThreadProps): React.JSX.Element {
+  const t = useThemeColors();
+  const [visibleCount, setVisibleCount] = React.useState(ROOT_PAGE_SIZE);
+  const visible = nodes.slice(0, visibleCount);
+  const remaining = nodes.length - visible.length;
   return (
     <View style={styles.list}>
-      {nodes.map((node) => (
+      {visible.map((node) => (
         <CommentItem
           key={node.comment.id}
           node={node}
@@ -42,6 +49,18 @@ export function CommentThread({
           onMore={onMore}
         />
       ))}
+      {remaining > 0 ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`Show more discussion threads, ${remaining} remaining`}
+          onPress={() => { hapticTap(); setVisibleCount((count) => count + ROOT_PAGE_SIZE); }}
+          style={[styles.loadMore, { borderColor: t.borderStrong, backgroundColor: t.surfaceElevated }]}>
+          <Text style={[styles.loadMoreText, { color: t.textPrimary }]}>
+            Show {Math.min(ROOT_PAGE_SIZE, remaining)} more conversations ↓
+          </Text>
+          <Text style={[styles.loadMoreHint, { color: t.textMuted }]}>
+            {remaining} threads remaining
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -68,6 +87,7 @@ const CommentItem = React.memo(function CommentItem({
   const { state } = useClash();
   const t = useThemeColors();
   const [collapsed, setCollapsed] = React.useState(false);
+  const [visibleReplies, setVisibleReplies] = React.useState(REPLY_PAGE_SIZE);
   const comment = node.comment;
   const author = selectAuthor(state, comment.authorId);
   const upvoted = state.upvotedCommentIds.includes(comment.id);
@@ -237,7 +257,7 @@ const CommentItem = React.memo(function CommentItem({
             styles.branchChildren,
             { marginLeft: Math.min(depth, 3) * 4 + 16, borderLeftColor: t.scheme === 'dark' ? '#665376' : '#D1BDD8' },
           ]}>
-          {node.children.map((child) => (
+          {node.children.slice(0, visibleReplies).map((child) => (
             <CommentItem
               key={child.comment.id}
               node={child}
@@ -249,6 +269,16 @@ const CommentItem = React.memo(function CommentItem({
               onMore={onMore}
             />
           ))}
+          {node.children.length > visibleReplies ? (
+            <Pressable accessibilityRole="button"
+              accessibilityLabel={`Show more replies, ${node.children.length - visibleReplies} remaining`}
+              style={styles.moreReplies}
+              onPress={() => { hapticTap(); setVisibleReplies((count) => count + REPLY_PAGE_SIZE); }}>
+              <Text style={[styles.moreRepliesText, { color: t.scheme === 'dark' ? '#D6B9FA' : '#8052A5' }]}>
+                ↳ View {Math.min(REPLY_PAGE_SIZE, node.children.length - visibleReplies)} more replies
+              </Text>
+            </Pressable>
+          ) : null}
           </View>
         ) : null}
     </View>
@@ -257,6 +287,11 @@ const CommentItem = React.memo(function CommentItem({
 
 const styles = StyleSheet.create({
   list: { gap: space.md + 2 },
+  loadMore: { minHeight: 66, borderRadius: 18, borderWidth: 1, padding: 15, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  loadMoreText: { fontSize: 14, fontWeight: '800' },
+  loadMoreHint: { fontSize: 11, fontWeight: '600' },
+  moreReplies: { minHeight: 42, justifyContent: 'center', paddingLeft: 12 },
+  moreRepliesText: { fontSize: 12, fontWeight: '800' },
   rootBranch: { gap: 4 },
   branchChildren: { borderLeftWidth: 2, marginTop: 3, paddingLeft: 4, gap: 6 },
   replyContext: { fontSize: 11, fontWeight: '700', letterSpacing: 0.1 },
