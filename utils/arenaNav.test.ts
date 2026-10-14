@@ -19,7 +19,7 @@ describe('arena navigation', () => {
     );
     assert.deepEqual(
       ARENA_MODES.map((m) => m.label),
-      ['Home', 'Live Clashes', 'Communities', 'Topics & Trends'],
+      ['Home', 'Live', 'Groups', 'Discover'],
     );
   });
 
