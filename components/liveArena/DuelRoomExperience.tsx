@@ -35,6 +35,7 @@ import { ImmersiveClash } from './ImmersiveClash';
 import { softFill } from './liveArenaStyles';
 import type { LiveRoomMessageProps } from './LiveRoomMessage';
 import { useArenaCrowd } from '../../hooks/useArenaCrowd';
+import { PrivateAssistPanel } from './PrivateAssistPanel';
 import type { CrowdMessage } from '../../utils/arenaCrowd';
 
 type Actions = Pick<
@@ -308,7 +309,11 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
             presentation.canPublish ? 0 : keyboardOpen ? space.xs : Math.max(props.paddingBottom, space.sm)
           }
           stageFooter={
-            showOutcome ? (
+            <>
+            <PrivateAssistPanel roomId={room.roomId} duel={duel}
+              disabled={duel.status!=='open'||!['open','final_arguments'].includes(room.phase)||props.threadLocked}
+              onPublished={props.onRefresh}/>
+            {showOutcome ? (
               <View style={styles.outcome}>
                 <DuelRoomOutcome
                   key={duel.clashId}
@@ -319,7 +324,8 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                   onReturn={props.onReturn}
                 />
               </View>
-            ) : null
+            ) : null}
+            </>
           }
           fighterComposer={
             presentation.canPublish ? (
