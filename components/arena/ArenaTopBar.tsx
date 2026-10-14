@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { selectViewer, useClash } from '../../store';
-import { space, typeScale, useThemeColors } from '../../theme';
+import { space, typeScale, useTheme, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
 import { SearchIcon } from '../shared/icons';
@@ -27,6 +27,7 @@ export function ArenaTopBar({
   const { open } = useSidebar();
   const router = useRouter();
   const t = useThemeColors();
+  const { scheme } = useTheme();
   const reduced = useReducedMotion();
 
   return (
@@ -39,7 +40,7 @@ export function ArenaTopBar({
         >
           CLASH
         </Animated.Text>
-        <View style={[styles.brandDot, { backgroundColor: t.scheme === 'dark' ? '#DDB1E8' : '#EB634E' }]} />
+        <View style={[styles.brandDot, { backgroundColor: scheme === 'dark' ? '#DDB1E8' : '#EB634E' }]} />
         {contextLine ? (
           <Animated.Text
             entering={reduced ? undefined : FadeIn.delay(80).duration(320)}
