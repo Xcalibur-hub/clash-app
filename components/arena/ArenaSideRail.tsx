@@ -2,7 +2,7 @@
 import React from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { ArenaIcon, CreatorsIcon, HashIcon, SparklesIcon } from '../shared/icons';
-import { layout, useThemeColors } from '../../theme';
+import { layout, useTheme, useThemeColors } from '../../theme';
 import { ARENA_MODES, arenaModeAccessibilityLabel, type ArenaMode } from '../../utils/arenaNav';
 import { tap } from '../../utils/haptics';
 
@@ -21,7 +21,8 @@ export function ArenaSideRail({
   onChange: (mode: ArenaMode) => void;
 }): React.JSX.Element {
   const t = useThemeColors();
-  const dark = t.scheme === 'dark';
+  const { scheme } = useTheme();
+  const dark = scheme === 'dark';
   return (
     <ScrollView
       horizontal
