@@ -414,3 +414,8 @@ verify_jwt = false
 [functions.arena-gifs]
 enabled = true
 verify_jwt = true
+
+# Recipient-only private assist signing; service credential stays server-side.
+[functions.arena-assist-media-access]
+enabled = true
+verify_jwt = true
