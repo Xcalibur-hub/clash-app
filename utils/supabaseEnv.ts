@@ -19,6 +19,15 @@ export function isLocalSupabaseUrl(url: string = process.env.EXPO_PUBLIC_SUPABAS
 /** This project's local API port (see supabase/config.toml [api].port). */
 export const LOCAL_SUPABASE_API_PORT = 55321;
 
+/** A disposable local stack must never overwrite the development session. */
+export function supabaseAuthStorageKey(url: string): string {
+  if (!isLocalSupabaseUrl(url)) return 'sb-clash-hosted-auth-token';
+  const origin = new URL(url).origin;
+  return new URL(url).port === String(LOCAL_SUPABASE_API_PORT)
+    ? 'sb-clash-local-auth-token'
+    : `sb-clash-local:${origin}:auth-token`;
+}
+
 export function localSupabaseApiUrl(): string {
   return `http://127.0.0.1:${LOCAL_SUPABASE_API_PORT}`;
 }
