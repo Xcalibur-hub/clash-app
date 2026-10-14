@@ -4,16 +4,14 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
-import { ArenaDailyDropBanner } from '../../components/arena/ArenaDailyDropBanner';
+import { ArenaLiveGateway } from '../../components/arena/ArenaLiveGateway';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
 import { ArenaSideRail } from '../../components/arena/ArenaSideRail';
 import { ArenaClashes } from '../../components/arena/ArenaClashes';
 import { ArenaCommunity } from '../../components/arena/ArenaCommunity';
 import { ArenaTopics } from '../../components/arena/ArenaTopics';
-import { ArenaTopicDeck } from '../../components/liveArena/ArenaTopicDeck';
 import { ArenaAtmosphere } from '../../components/liveArena/ArenaAtmosphere';
 import { ArenaEntrance } from '../../components/liveArena/ArenaEntrance';
-import { LiveClashHero } from '../../components/liveArena/LiveClashHero';
 import { consumeArenaEntrance } from '../../utils/arenaEntranceState';
 import { FreshTakesSection } from '../../components/arena/FreshTakesSection';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
@@ -49,7 +47,7 @@ import {
   type User,
 } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, space, typeScale, useTheme, useThemeColors } from '../../theme';
 import { DEFAULT_ARENA_MODE, type ArenaMode } from '../../utils/arenaNav';
 import {
   arenaFlatListData,
@@ -80,6 +78,7 @@ export default function ArenaScreen(): React.JSX.Element {
   const now = useClock(30_000);
   const requireAuth = useRequireAuth();
   const theme = useThemeColors();
+  const { scheme } = useTheme();
 
   const [arenaMode, setArenaMode] = React.useState<ArenaMode>(DEFAULT_ARENA_MODE);
   const [scope, setScope] = React.useState<FeedScope>('for-you');
@@ -389,37 +388,10 @@ export default function ArenaScreen(): React.JSX.Element {
 
     return (
       <View style={styles.hero}>
-        <ArenaDailyDropBanner
-          liveCount={liveTopics.length}
-          onExploreClashes={() => setArenaMode('clashes')}
+        <ArenaLiveGateway
+          liveCount={liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
+          onOpen={() => setArenaMode('clashes')}
         />
-        {heroTopic ? (
-          <LiveClashHero
-            topic={heroTopic}
-            onWatch={() => openTopic(heroTopic.id)}
-            onEnter={() => {
-              if (heroTopic.viewerRoomId) openRoom(heroTopic.viewerRoomId);
-              else openTopic(heroTopic.id);
-            }}
-          />
-        ) : null}
-
-        {liveTopics.length > 0 ? (
-          <ArenaTopicDeck
-            topics={liveTopics}
-            onOpen={(topicId) => openTopic(topicId)}
-            onChoose={(topicId, stance) => openTopic(topicId, stance)}
-            onWatch={(topicId) => openTopic(topicId)}
-            onEnter={(topicId, roomId) => {
-              if (roomId) openRoom(roomId);
-              else openTopic(topicId);
-            }}
-            onJoinDebate={(topicId, roomId) => {
-              if (roomId) openRoom(roomId);
-              else openTopic(topicId);
-            }}
-          />
-        ) : null}
 
         <FreshTakesSection
           items={freshItems}
@@ -442,14 +414,14 @@ export default function ArenaScreen(): React.JSX.Element {
 
         <View style={styles.feedHead}>
           <View style={styles.feedKickerRow}>
-            <View style={[styles.feedKickerDot, { backgroundColor: theme.scheme === 'dark' ? '#F0AD96' : '#D98569' }]} />
+            <View style={[styles.feedKickerDot, { backgroundColor: scheme === 'dark' ? '#F0AD96' : '#D98569' }]} />
             <Text style={[styles.feedKicker, { color: theme.textSecondary }]}>
               YOUR DAILY PULSE
             </Text>
             <Text style={[styles.feedIssue, { color: theme.textMuted }]}>LIVE / 24H</Text>
           </View>
           <Text allowFontScaling style={[styles.feedTitle, { color: theme.textPrimary }]}>
-            Hot right <Text style={{ color: theme.scheme === 'dark' ? '#F3AB91' : '#D47A62' }}>now.</Text>
+            Hot right <Text style={{ color: scheme === 'dark' ? '#F3AB91' : '#D47A62' }}>now.</Text>
           </Text>
           <Text style={[styles.feedSub, { color: theme.textSecondary }]}>
             The takes sparking conversations in your world
@@ -479,7 +451,7 @@ export default function ArenaScreen(): React.JSX.Element {
     theme.textPrimary,
     theme.textMuted,
     theme.textSecondary,
-    theme.scheme,
+    scheme,
     toggleReaction,
   ]);
 
