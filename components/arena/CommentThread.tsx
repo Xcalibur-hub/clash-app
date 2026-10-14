@@ -14,6 +14,8 @@ import { fetchProfilesByIds } from '../../services/apiService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { errorText } from '../../services/supabaseClient';
 
+const useRemoteParent = (enabled?: boolean): boolean => Boolean(enabled && isSupabaseConfigured);
+
 const ROOT_PAGE_SIZE = 8;
 const REPLY_PAGE_SIZE = 4;
 
@@ -82,6 +84,7 @@ export function CommentBranch(props: Omit<CommentThreadProps, 'nodes'> & { node:
 interface CommentItemProps {
   node: CommentNode;
   serverReplies?: boolean;
+  parentHandle?: string;
   depth: number;
   takeAuthorId?: string;
   onUpvote: (comment: ChallengerComment) => void;
@@ -94,6 +97,7 @@ const CommentItem = React.memo(function CommentItem({
   node,
   depth,
   serverReplies,
+  parentHandle,
   takeAuthorId,
   onUpvote,
   onReply,
@@ -116,7 +120,7 @@ const CommentItem = React.memo(function CommentItem({
   const upvoted = state.upvotedCommentIds.includes(comment.id);
   const isViewer = comment.authorId === state.viewer.id;
   const isOp = takeAuthorId !== undefined && comment.authorId === takeAuthorId;
-  const parentRemoved = Boolean(comment.parentId) && !state.comments.some((c) => c.id === comment.parentId);
+  const parentRemoved = !useRemoteParent(serverReplies) && Boolean(comment.parentId) && !state.comments.some((c) => c.id === comment.parentId);
   // Cap indent so nested media stays usable on small screens.
   const step = depth >= 3 ? 10 : 14;
   const indent = Math.min(depth, 4) * step;
@@ -205,10 +209,10 @@ const CommentItem = React.memo(function CommentItem({
               · {timeAgo(comment.createdAt)}
             </Text>
           </View>
-          {nested && parentAuthor ? (
+          {nested && (parentHandle || parentAuthor?.handle) ? (
             <Text style={[styles.replyContext, { color: t.scheme === 'dark' ? '#C9AEDF' : '#8A598E' }]}
               numberOfLines={1}>
-              ↳ replying to @{parentAuthor.handle}
+              ↳ replying to @{parentHandle ?? parentAuthor?.handle}
             </Text>
           ) : null}
           {comment.media ? <CommentMedia media={comment.media} compact={depth >= 2} /> : null}
@@ -330,6 +334,7 @@ const CommentItem = React.memo(function CommentItem({
               onClash={onClash}
               onMore={onMore}
               serverReplies={serverReplies}
+              parentHandle={author?.handle}
             />
           ))}
           {!useRemote && node.children.length > visibleReplies ? (
