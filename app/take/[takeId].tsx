@@ -97,6 +97,8 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
   const [sort, setSort] = React.useState<CommentSort>('best');
   const [pagedRoots, setPagedRoots] = React.useState<ChallengerComment[]>([]);
+  const [locallyCreated, setLocallyCreated] = React.useState<ChallengerComment[]>([]);
+  React.useEffect(() => { setLocallyCreated([]); }, [accountScope]);
   const [pageCursor, setPageCursor] = React.useState<DiscussionCursor | null>(null);
   const [pageBusy, setPageBusy] = React.useState(false);
   const [pageError, setPageError] = React.useState<string | null>(null);
@@ -333,7 +335,9 @@ export default function TakeDetailScreen(): React.JSX.Element {
   // Only server-returned roots become top-level threads. Existing hydrated
   // children are attached when available, never promoted as orphan roots.
   const nodes = pageReady
-    ? pagedRoots.map((root): CommentNode => ({ comment: root, children: [] }))
+    ? [...locallyCreated.filter((item) => !item.parentId && item.takeId === take.id &&
+        !pagedRoots.some((root) => root.id === item.id)), ...pagedRoots]
+        .map((root): CommentNode => ({ comment: root, children: [] }))
     : buildCommentTree(comments, sort);
   const hasMedia = Boolean(take.media);
   const shortText = take.text.trim().length < 48;
@@ -369,7 +373,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
           ]}
           renderItem={({ item }) => (
             <View style={styles.threadItem}>
-              <CommentBranch node={item} serverReplies={pageReady} takeAuthorId={author.id}
+              <CommentBranch node={item} serverReplies={pageReady} locallyCreated={locallyCreated} takeAuthorId={author.id}
                 onUpvote={upvote} onReply={reply}
                 onClash={clashFromComment} onMore={more} />
             </View>
@@ -538,6 +542,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
             }
             replyingTo={replyTo?.handle}
             onDone={() => setReplyTo(null)}
+            onCreated={(comment) => setLocallyCreated((items) => [...items.filter((item) => item.id !== comment.id), comment])}
           />
         </View>
       </KeyboardAvoidingView>
