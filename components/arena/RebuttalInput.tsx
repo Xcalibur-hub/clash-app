@@ -60,6 +60,7 @@ export interface RebuttalInputProps {
   replyDepth?: number;
   replyingTo?: string;
   onDone?: () => void;
+  onCreated?: (comment: import('../../store').ChallengerComment) => void;
 }
 
 /**
@@ -72,6 +73,7 @@ export function RebuttalInput({
   replyDepth = 0,
   replyingTo,
   onDone,
+  onCreated,
 }: RebuttalInputProps): React.JSX.Element {
   const { state, dispatch } = useClash();
   const requireAuth = useRequireAuth();
@@ -201,6 +203,7 @@ export function RebuttalInput({
         });
       }
       dispatch(createComment(comment));
+      onCreated?.(comment);
       setDraft('');
       clearAttachments();
       uploaded.current=null;
