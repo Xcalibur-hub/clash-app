@@ -67,7 +67,7 @@ export function ArenaClashes({
     <View style={styles.wrap} accessibilityLabel="Clashes">
       <View style={[styles.liveIntro, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
         <View style={styles.liveTopline}>
-          <LivePulse dotOnly size={8} />
+          {hasLive ? <LivePulse dotOnly size={8} /> : <View style={[styles.idleDot, { backgroundColor: t.textMuted }]} />}
           <Text style={[styles.kicker, { color: t.textSecondary }]}>ARENA LIVE</Text>
           <Text style={[styles.liveCount, { color: t.textMuted }]}>
             {loading ? 'Checking live…' : error ? 'Live count unavailable' : `${live.length + liveEntries.length} live now`}
@@ -230,6 +230,7 @@ function ClashRow({
 const styles = StyleSheet.create({
   liveIntro: { marginTop: space.md, borderWidth: 1, borderRadius: 22, padding: space.md, gap: space.sm },
   liveTopline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  idleDot: { width: 8, height: 8, borderRadius: 4 },
   liveCount: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
   liveStack: { gap: 8, marginTop: space.xs },
   noLive: { gap: 8, marginTop: space.sm },
