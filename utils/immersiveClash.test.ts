@@ -113,6 +113,6 @@ describe('immersive Clash rules', () => {
     );
     assert.doesNotMatch(src, /DEV_LAYOUT_ROWS|showDevLayout|FloatingReaction/);
     assert.match(src, /crowd\?\.messages/);
-    assert.match(src, /PUBLIC CHAT/);
+    assert.match(src, /LIVE CROWD/);
   });
 });
