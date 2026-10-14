@@ -27,6 +27,7 @@ export interface CommentThreadProps {
   onClash: (comment: ChallengerComment) => void;
   onMore: (comment: ChallengerComment) => void;
   serverReplies?: boolean;
+  locallyCreated?: readonly ChallengerComment[];
 }
 
 /** Immersive conversation — top-level replies stay open; nested replies float as soft plates. */
@@ -38,6 +39,7 @@ export function CommentThread({
   onClash,
   onMore,
   serverReplies,
+  locallyCreated,
 }: CommentThreadProps): React.JSX.Element {
   const t = useThemeColors();
   const [visibleCount, setVisibleCount] = React.useState(ROOT_PAGE_SIZE);
@@ -56,6 +58,7 @@ export function CommentThread({
           onClash={onClash}
           onMore={onMore}
           serverReplies={serverReplies}
+          locallyCreated={locallyCreated}
         />
       ))}
       {remaining > 0 ? (
@@ -78,13 +81,14 @@ export function CommentThread({
 export function CommentBranch(props: Omit<CommentThreadProps, 'nodes'> & { node: CommentNode }): React.JSX.Element {
   return <CommentItem node={props.node} depth={0} takeAuthorId={props.takeAuthorId}
     onUpvote={props.onUpvote} onReply={props.onReply}
-    onClash={props.onClash} onMore={props.onMore} serverReplies={props.serverReplies} />;
+    onClash={props.onClash} onMore={props.onMore} serverReplies={props.serverReplies} locallyCreated={props.locallyCreated} />;
 }
 
 interface CommentItemProps {
   node: CommentNode;
   serverReplies?: boolean;
   parentHandle?: string;
+  locallyCreated?: readonly ChallengerComment[];
   depth: number;
   takeAuthorId?: string;
   onUpvote: (comment: ChallengerComment) => void;
@@ -98,6 +102,7 @@ const CommentItem = React.memo(function CommentItem({
   depth,
   serverReplies,
   parentHandle,
+  locallyCreated,
   takeAuthorId,
   onUpvote,
   onReply,
@@ -152,8 +157,13 @@ const CommentItem = React.memo(function CommentItem({
   React.useEffect(() => {
     return () => { ++replySeq.current; };
   }, [comment.id, comment.takeId]);
+  // Confirmed local posts should not disappear while a paged branch is open.
+  // Keep this scoped to this parent and de-duplicate against fetched children.
+  const addedChildren = (locallyCreated ?? []).filter((item) =>
+    item.takeId === comment.takeId && item.parentId === comment.id);
   const childNodes: CommentNode[] = useRemote
-    ? remoteChildren.map((child) => ({ comment: child, children: [] }))
+    ? [...addedChildren, ...remoteChildren.filter((item) => !addedChildren.some((fresh) => fresh.id === item.id))]
+        .map((child) => ({ comment: child, children: [] }))
     : node.children;
   const nestedCount = React.useMemo(() => {
     const count = (branch: CommentNode): number =>
@@ -336,6 +346,7 @@ const CommentItem = React.memo(function CommentItem({
               onMore={onMore}
               serverReplies={serverReplies}
               parentHandle={author?.handle}
+              locallyCreated={locallyCreated}
             />
           ))}
           {!useRemote && node.children.length > visibleReplies ? (
