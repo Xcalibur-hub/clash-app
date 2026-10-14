@@ -28,7 +28,7 @@ export async function fetchDiscussionPage(
   if (!takeId || (parentId !== null && !parentId)) throw new Error('Invalid discussion target');
   if (sort !== 'best' && sort !== 'new') throw new Error('Invalid discussion sort');
   if (cursor && (!/^[a-zA-Z0-9_-]{1,128}$/.test(cursor.id) ||
-    !/^\\d{4}-\\d{2}-\\d{2}T[0-9:.]+(?:Z|[+-][0-9:]+)$/.test(cursor.createdAt) ||
+    !/^\d{4}-\d{2}-\d{2}T[0-9:.]+(?:Z|[+-][0-9:]+)$/.test(cursor.createdAt) ||
     !Number.isFinite(Date.parse(cursor.createdAt)) ||
     (sort === 'best' && (!Number.isSafeInteger(cursor.upvotes) || (cursor.upvotes ?? -1) < 0)))) {
     throw new Error('Invalid discussion cursor');
