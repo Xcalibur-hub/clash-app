@@ -427,6 +427,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </Text>
           ) : (
             <CommentThread
+              key={`${take.id}:${sort}`}
               nodes={nodes}
               takeAuthorId={author.id}
               onUpvote={upvote}
