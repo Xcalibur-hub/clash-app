@@ -39,7 +39,7 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
   };
   return <View style={[styles.wrap,{ paddingBottom }]} accessibilityLabel="Live crowd">
     <View style={styles.heading}>
-      <Text style={[styles.label,{color:t.textSecondary}]}>CROWD · PUBLIC CHAT</Text>
+      <Text style={[styles.label,{color:t.textSecondary}]}>LIVE CROWD</Text>
       <Text accessibilityLiveRegion="polite" style={[styles.state,{color:t.textMuted}]}>
         {crowd?.connected ? 'Live' : crowd?.context ? 'Reconnecting…' : ''}
       </Text>
@@ -58,19 +58,19 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
       ListHeaderComponent={crowd?.hasOlder ? <Pressable disabled={crowd.olderBusy} accessibilityRole="button" style={styles.hit}
         onPress={() => { atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loading…' : 'Load earlier chat'}</Text></Pressable> : null}
       ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{unavailableReason ?? (crowd?.loading ? 'Loading Crowd…' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.')}</Text>}
-      renderItem={({item}) => <View style={styles.row}>
+      renderItem={({item}) => <View style={[styles.row,{borderBottomColor:t.border}]}>
         <Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}]}>
           <Text style={styles.name}>@{item.author.handle}</Text>{'  '}{item.body}
         </Text>
         {onReport ? <Pressable onPress={() => onReport(item)} accessibilityRole="button" accessibilityLabel={`Report or block @${item.author.handle}`} style={styles.menu}><Text style={{color:t.textMuted}}>···</Text></Pressable> : null}
       </View>}/>
-    {unseen ? <Pressable accessibilityRole="button" style={styles.hit} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>Latest chat ↓</Text></Pressable> : null}
+    {unseen ? <Pressable accessibilityRole="button" style={[styles.latestButton,{borderColor:t.border,backgroundColor:t.surfaceElevated}]} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>Latest chat ↓</Text></Pressable> : null}
     {crowd?.context ? canSend ? <View style={[styles.composer,{borderColor:t.border}]}>
       <TextInput value={draft} onChangeText={setDraft} placeholder="Message the Crowd" placeholderTextColor={t.textMuted}
         accessibilityLabel="Public Crowd message" multiline maxLength={500} editable={!crowd.sending}
         style={[styles.input,{color:t.textPrimary}]} />
       <Pressable disabled={crowd.sending || !validCrowdText(draft.trim())} accessibilityRole="button" accessibilityLabel="Send public Crowd message"
-        onPress={() => void send()} style={styles.hit}><Text style={{color:t.textPrimary,opacity:validCrowdText(draft.trim()) ? 1 : 0.4}}>{crowd.sending ? 'Sending…' : 'Send'}</Text></Pressable>
+        onPress={() => void send()} style={[styles.sendButton,{backgroundColor:t.surfaceElevated,borderColor:t.border}]}><Text style={{color:t.textPrimary,opacity:validCrowdText(draft.trim()) ? 1 : 0.4}}>{crowd.sending ? 'Sending…' : 'Send'}</Text></Pressable>
     </View> : <Text style={[styles.empty,{color:t.textMuted}]}>Crowd chat is read-only.</Text> : null}
   </View>;
 }
@@ -79,9 +79,11 @@ const styles = StyleSheet.create({
   heading:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
   label:{...typeScale.caption,fontSize:11,fontWeight:'700'},state:{...typeScale.caption,fontSize:11},
   stream:{flex:1,minHeight:0},content:{paddingVertical:8,gap:4,flexGrow:1},
-  row:{flexDirection:'row',alignItems:'flex-start'},line:{...typeScale.body,fontSize:14,lineHeight:20,flex:1,paddingVertical:8},
+  row:{flexDirection:'row',alignItems:'flex-start',borderBottomWidth:StyleSheet.hairlineWidth},line:{...typeScale.body,fontSize:14,lineHeight:21,flex:1,paddingVertical:10},
   name:{fontWeight:'700',fontSize:13},menu:{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'},
   empty:{...typeScale.caption,paddingVertical:12},notice:{gap:4},hit:{minHeight:44,minWidth:44,justifyContent:'center',paddingHorizontal:8},
-  composer:{flexDirection:'row',alignItems:'center',borderTopWidth:StyleSheet.hairlineWidth,gap:8},
+  latestButton:{alignSelf:'center',borderRadius:18,borderWidth:StyleSheet.hairlineWidth,minHeight:36,paddingHorizontal:14,justifyContent:'center'},
+  sendButton:{minHeight:38,minWidth:62,alignItems:'center',justifyContent:'center',borderRadius:12,borderWidth:StyleSheet.hairlineWidth},
+  composer:{flexDirection:'row',alignItems:'center',borderTopWidth:StyleSheet.hairlineWidth,gap:8,paddingTop:space.xs},
   input:{flex:1,minHeight:44,maxHeight:92,fontSize:14,paddingVertical:8},
 });
