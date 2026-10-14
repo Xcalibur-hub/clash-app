@@ -129,11 +129,13 @@ export function ArenaClashes({
           <Text style={[styles.quickSub, { color: t.textMuted }]}>Past verdicts</Text>
         </Pressable>
       </View>
-      <Text style={[styles.section, { color: t.textMuted }]}>YOUR CLASHES</Text>
+      <Text style={[styles.section, { color: t.textMuted }]}>YOUR ACTIVITY</Text>
       {loading ? <Text style={[styles.empty, { color: t.textMuted }]}>Loading Clashes…</Text> : null}
       {!user ? <Text style={[styles.empty, { color: t.textMuted }]}>Sign in to see your Challenges and Clash history.</Text> : null}
       {error ? <Text accessibilityRole="alert" style={[styles.empty, { color: t.textMuted }]}>Couldn’t load Clashes. Retrying…</Text> : null}
-      {(['PENDING', 'UPCOMING', 'COMPLETED'] as ClashDiscoveryState[]).map(section => (
+      {(['PENDING', 'UPCOMING', 'COMPLETED'] as ClashDiscoveryState[]).filter(section =>
+        entries.some(entry => entry.state === section)
+      ).map(section => (
         <View key={section}>
           <Text style={[styles.section, { color: t.textMuted }]}>{section}</Text>
           {user && !loading && !error && !entries.some(entry => entry.state === section) ? (
@@ -151,11 +153,11 @@ export function ArenaClashes({
         </View>
       ))}
       <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
-        RELEVANT
+        TOPIC ROOMS
       </Text>
       {rest.length === 0 && live.length === 0 ? (
         <Text style={[styles.empty, { color: t.textMuted }]}>
-          No other topic rooms right now.
+          No topic rooms to explore right now.
         </Text>
       ) : (
         rest.map((topic) => (
@@ -226,14 +228,14 @@ function ClashRow({
 }
 
 const styles = StyleSheet.create({
-  liveIntro: { marginHorizontal: layout.screenX, marginTop: space.md, borderWidth: 1, borderRadius: 22, padding: space.md, gap: space.sm },
+  liveIntro: { marginTop: space.md, borderWidth: 1, borderRadius: 22, padding: space.md, gap: space.sm },
   liveTopline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   liveCount: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
   liveStack: { gap: 8, marginTop: space.xs },
   noLive: { gap: 8, marginTop: space.sm },
   noLiveTitle: { fontSize: 16, fontWeight: '800' },
   secondaryAction: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 12, padding: 12 },
-  liveSecondary: { flexDirection: 'row', paddingHorizontal: layout.screenX, gap: 10, marginTop: space.md },
+  liveSecondary: { flexDirection: 'row', gap: 10, marginTop: space.md },
   quickLink: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: 15, padding: 12, gap: 5 },
   quickTitle: { fontSize: 13, fontWeight: '800' },
   quickSub: { fontSize: 11 },
