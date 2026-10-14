@@ -1,5 +1,5 @@
 /** Always-visible, single-purpose door to Arena Live.
- * Live counts use only confirmed live topics; never fabricate watchers or rooms.
+ * Counts represent confirmed topic rooms only; canonical duels are discovered on Live.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -25,14 +25,14 @@ export function ArenaLiveGateway({
         <View style={[styles.dot, { backgroundColor: liveCount > 0 ? '#D75C4D' : t.textMuted }]} />
         <Text style={[styles.kicker, { color: t.textSecondary }]}>ARENA LIVE</Text>
         <Text style={[styles.count, { color: t.textMuted }]}>
-          {liveCount > 0 ? `${liveCount} live` : 'No active rooms'}
+          {liveCount > 0 ? `${liveCount} topic ${liveCount === 1 ? 'room' : 'rooms'} live` : 'Explore live Clashes'}
         </Text>
       </View>
       <Text style={[styles.heading, { color: t.textPrimary }]}>Watch a Clash <Text>↗</Text></Text>
       <Text style={[styles.body, { color: t.textSecondary }]}>
         {liveCount > 0
           ? 'Step into the live stage: two fighters, real-time arguments, and the crowd.'
-          : 'The stage opens here when a debate goes live. Explore upcoming matches and challenges.'}
+          : 'Watch ongoing duels, explore topic rooms, or follow upcoming challenges.'}
       </Text>
       <Text style={[styles.action, { color: t.textPrimary }]}>OPEN LIVE STAGE  →</Text>
     </Pressable>
