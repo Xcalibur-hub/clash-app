@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   dot: { height: 7, width: 7, borderRadius: 4 },
   kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   count: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
-  heading: { fontSize: 23, fontWeight: '850', letterSpacing: -0.7 },
+  heading: { fontSize: 23, fontWeight: '800', letterSpacing: -0.7 },
   body: { fontSize: 13, lineHeight: 19 },
   action: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5, paddingTop: 4 },
 });
