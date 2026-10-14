@@ -9,6 +9,10 @@ import { Avatar } from '../shared/Avatar';
 import { ArenaIcon, ArrowBigUpIcon, CommentIcon, MoreIcon } from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
 import { CommentMedia } from './CommentMedia';
+import { fetchDiscussionPage, type DiscussionCursor } from '../../services/arenaDiscussionService';
+import { fetchProfilesByIds } from '../../services/apiService';
+import { isSupabaseConfigured } from '../../services/supabaseClient';
+import { errorText } from '../../services/supabaseClient';
 
 const ROOT_PAGE_SIZE = 8;
 const REPLY_PAGE_SIZE = 4;
@@ -20,6 +24,7 @@ export interface CommentThreadProps {
   onReply: (comment: ChallengerComment) => void;
   onClash: (comment: ChallengerComment) => void;
   onMore: (comment: ChallengerComment) => void;
+  serverReplies?: boolean;
 }
 
 /** Immersive conversation — top-level replies stay open; nested replies float as soft plates. */
@@ -30,6 +35,7 @@ export function CommentThread({
   onReply,
   onClash,
   onMore,
+  serverReplies,
 }: CommentThreadProps): React.JSX.Element {
   const t = useThemeColors();
   const [visibleCount, setVisibleCount] = React.useState(ROOT_PAGE_SIZE);
@@ -47,6 +53,7 @@ export function CommentThread({
           onReply={onReply}
           onClash={onClash}
           onMore={onMore}
+          serverReplies={serverReplies}
         />
       ))}
       {remaining > 0 ? (
@@ -69,11 +76,12 @@ export function CommentThread({
 export function CommentBranch(props: Omit<CommentThreadProps, 'nodes'> & { node: CommentNode }): React.JSX.Element {
   return <CommentItem node={props.node} depth={0} takeAuthorId={props.takeAuthorId}
     onUpvote={props.onUpvote} onReply={props.onReply}
-    onClash={props.onClash} onMore={props.onMore} />;
+    onClash={props.onClash} onMore={props.onMore} serverReplies={props.serverReplies} />;
 }
 
 interface CommentItemProps {
   node: CommentNode;
+  serverReplies?: boolean;
   depth: number;
   takeAuthorId?: string;
   onUpvote: (comment: ChallengerComment) => void;
@@ -85,16 +93,24 @@ interface CommentItemProps {
 const CommentItem = React.memo(function CommentItem({
   node,
   depth,
+  serverReplies,
   takeAuthorId,
   onUpvote,
   onReply,
   onClash,
   onMore,
 }: CommentItemProps): React.JSX.Element {
-  const { state } = useClash();
+  const { state, dispatch } = useClash();
   const t = useThemeColors();
   const [collapsed, setCollapsed] = React.useState(false);
   const [visibleReplies, setVisibleReplies] = React.useState(REPLY_PAGE_SIZE);
+  const [remoteChildren, setRemoteChildren] = React.useState<ChallengerComment[]>([]);
+  const [replyCursor, setReplyCursor] = React.useState<DiscussionCursor | null>(null);
+  const [replyLoaded, setReplyLoaded] = React.useState(false);
+  const [replyBusy, setReplyBusy] = React.useState(false);
+  const [replyError, setReplyError] = React.useState<string | null>(null);
+  const replyRequest = React.useRef(false);
+  const replySeq = React.useRef(0);
   const comment = node.comment;
   const author = selectAuthor(state, comment.authorId);
   const upvoted = state.upvotedCommentIds.includes(comment.id);
@@ -108,6 +124,32 @@ const CommentItem = React.memo(function CommentItem({
   const nested = depth > 0;
   const parent = comment.parentId ? state.comments.find((c) => c.id === comment.parentId) : undefined;
   const parentAuthor = parent ? selectAuthor(state, parent.authorId) : undefined;
+  const useRemote = Boolean(serverReplies && isSupabaseConfigured);
+  const loadReplies = React.useCallback(() => {
+    if (!useRemote || replyRequest.current || (replyLoaded && !replyCursor)) return;
+    const seq = replySeq.current;
+    replyRequest.current = true;
+    setReplyBusy(true); setReplyError(null);
+    void fetchDiscussionPage(comment.takeId, 'new', comment.id, replyLoaded ? replyCursor : null)
+      .then(async (page) => {
+        const profiles = await fetchProfilesByIds([...new Set(page.items.map((c) => c.authorId))]);
+        if (seq !== replySeq.current) return;
+        dispatch({ type: 'discussion/profiles', users: profiles });
+        setRemoteChildren((previous) => [...previous, ...page.items.filter((c) => !previous.some((old) => old.id === c.id))]);
+        setReplyCursor(page.next); setReplyLoaded(true);
+        setCollapsed(false);
+      }).catch((error) => {
+        if (seq === replySeq.current) setReplyError(errorText(error));
+      }).finally(() => {
+        if (seq === replySeq.current) { replyRequest.current = false; setReplyBusy(false); }
+      });
+  }, [useRemote, replyLoaded, replyCursor, comment.id, comment.takeId, dispatch]);
+  React.useEffect(() => {
+    return () => { ++replySeq.current; };
+  }, [comment.id, comment.takeId]);
+  const childNodes: CommentNode[] = useRemote
+    ? remoteChildren.map((child) => ({ comment: child, children: [] }))
+    : node.children;
   const nestedCount = React.useMemo(() => {
     const count = (branch: CommentNode): number =>
       branch.children.reduce((sum, child) => sum + 1 + count(child), 0);
@@ -224,7 +266,7 @@ const CommentItem = React.memo(function CommentItem({
                 </Text>
               </PressableScale>
             ) : null}
-            {node.children.length > 0 ? (
+            {!useRemote && node.children.length > 0 ? (
               <Pressable
                 onPress={() => {
                   hapticTap();
@@ -257,14 +299,27 @@ const CommentItem = React.memo(function CommentItem({
         </View>
       </View>
 
+      {useRemote && !replyLoaded ? (
+        <Pressable accessibilityRole="button" style={styles.moreReplies} disabled={replyBusy}
+          onPress={() => { hapticTap(); loadReplies(); }}>
+          <Text style={[styles.moreRepliesText, { color: t.textSecondary }]}>
+            {replyBusy ? 'Loading replies…' : '↳ View replies'}
+          </Text>
+        </Pressable>
+      ) : null}
+      {replyError ? (
+        <Pressable accessibilityRole="button" onPress={loadReplies} style={styles.moreReplies}>
+          <Text style={[styles.moreRepliesText, { color: t.textSecondary }]}>{replyError} · Retry</Text>
+        </Pressable>
+      ) : null}
       {collapsed
         ? null
-        : node.children.length > 0 ? (
+        : childNodes.length > 0 ? (
           <View style={[
             styles.branchChildren,
             { marginLeft: Math.min(depth, 3) * 4 + 16, borderLeftColor: t.scheme === 'dark' ? '#665376' : '#D1BDD8' },
           ]}>
-          {node.children.slice(0, visibleReplies).map((child) => (
+          {childNodes.slice(0, useRemote ? childNodes.length : visibleReplies).map((child) => (
             <CommentItem
               key={child.comment.id}
               node={child}
@@ -274,15 +329,24 @@ const CommentItem = React.memo(function CommentItem({
               onReply={onReply}
               onClash={onClash}
               onMore={onMore}
+              serverReplies={serverReplies}
             />
           ))}
-          {node.children.length > visibleReplies ? (
+          {!useRemote && node.children.length > visibleReplies ? (
             <Pressable accessibilityRole="button"
               accessibilityLabel={`Show more replies, ${node.children.length - visibleReplies} remaining`}
               style={styles.moreReplies}
               onPress={() => { hapticTap(); setVisibleReplies((count) => count + REPLY_PAGE_SIZE); }}>
               <Text style={[styles.moreRepliesText, { color: t.scheme === 'dark' ? '#D6B9FA' : '#8052A5' }]}>
                 ↳ View {Math.min(REPLY_PAGE_SIZE, node.children.length - visibleReplies)} more replies
+              </Text>
+            </Pressable>
+          ) : null}
+          {useRemote && replyCursor ? (
+            <Pressable accessibilityRole="button" style={styles.moreReplies} disabled={replyBusy}
+              onPress={() => { hapticTap(); loadReplies(); }}>
+              <Text style={[styles.moreRepliesText, { color: t.textSecondary }]}>
+                {replyBusy ? 'Loading replies…' : '↳ Load more replies'}
               </Text>
             </Pressable>
           ) : null}
