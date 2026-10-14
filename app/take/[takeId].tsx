@@ -100,6 +100,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const [pageBusy, setPageBusy] = React.useState(false);
   const [pageError, setPageError] = React.useState<string | null>(null);
   const [pageReady, setPageReady] = React.useState(false);
+  const [pageRetry, setPageRetry] = React.useState(0);
   const pageRequest = React.useRef(false);
   const pageSeq = React.useRef(0);
   React.useEffect(() => {
@@ -118,7 +119,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
       if (seq === pageSeq.current) { pageRequest.current = false; setPageBusy(false); }
     });
     return () => { ++pageSeq.current; };
-  }, [id, sort, accountScope, dispatch]);
+  }, [id, sort, accountScope, dispatch, pageRetry]);
   const loadMoreRoots = React.useCallback(() => {
     if (!id || !pageCursor || pageRequest.current) return;
     const seq = pageSeq.current;
@@ -385,8 +386,8 @@ export default function TakeDetailScreen(): React.JSX.Element {
                 </Pressable>
               ) : null}
               {pageError && !pageBusy && isSupabaseConfigured ? (
-                <Pressable accessibilityRole="button" onPress={() => { setSort((v) => v === 'best' ? 'new' : 'best'); }}>
-                  <Text style={{ color: theme.textPrimary }}>Retry by changing sort</Text>
+                <Pressable accessibilityRole="button" onPress={() => setPageRetry((count) => count + 1)}>
+                  <Text style={{ color: theme.textPrimary }}>Retry loading conversations</Text>
                 </Pressable>
               ) : null}
             </View>
