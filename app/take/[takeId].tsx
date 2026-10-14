@@ -54,7 +54,7 @@ import {
   type User,
   type Take,
 } from '../../store';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, space, typeScale, useTheme, useThemeColors } from '../../theme';
 import {
   clashStartErrorMessage,
   shouldOpenExistingClash,
@@ -93,6 +93,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const react = useTakeReaction();
   const theme = useThemeColors();
+  const { scheme } = useTheme();
 
   const [sort, setSort] = React.useState<CommentSort>('best');
   const [pagedRoots, setPagedRoots] = React.useState<ChallengerComment[]>([]);
@@ -481,7 +482,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
           <View style={styles.threadHead}>
             <View style={styles.threadEyebrowRow}>
-              <View style={[styles.threadAccent, { backgroundColor: theme.scheme === 'dark' ? '#C9A5EC' : '#9E73BB' }]} />
+              <View style={[styles.threadAccent, { backgroundColor: scheme === 'dark' ? '#C9A5EC' : '#9E73BB' }]} />
               <Text style={[styles.threadEyebrow, { color: theme.textSecondary }]}>
                 THE DISCUSSION
               </Text>
@@ -490,7 +491,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
               </Text>
             </View>
             <Text allowFontScaling style={[styles.threadTitle, { color: theme.textPrimary }]}>
-              Join the conversation<Text style={{ color: theme.scheme === 'dark' ? '#D6B9FA' : '#9968B5' }}> ↗</Text>
+              Join the conversation<Text style={{ color: scheme === 'dark' ? '#D6B9FA' : '#9968B5' }}> ↗</Text>
             </Text>
             <Text style={[styles.threadDescription, { color: theme.textSecondary }]}>
               Follow the lines to see who replied to whom. Collapse branches to focus on the arguments.
