@@ -1,5 +1,7 @@
 # Phase 3.1 -- Canonical Arena Live completion checkpoint
 
+Historical checkpoint: the Storage migration blocker and then-uncommitted assist work were subsequently addressed in [Phase 3.1A](CANONICAL_ARENA_LIVE_3_1A.md). The failures and results below describe the original run and are retained as evidence.
+
 ## BLOCKED -- stopped on a fresh migration prerequisite
 
 Date: 2026-10-14. Branch `feat/arena-v2-editorial-ui`; baseline `e17071f6b240c1d89fe3f33437d7d8b74fada334`. PR #65 must remain DRAFT. **This phase is not complete and must not deploy.** The original Arena Live audit was read before edits.

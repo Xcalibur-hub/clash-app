@@ -1,0 +1,8 @@
+{
+  "storage_owner": "supabase_storage_admin",
+  "postgres_owner_usage": false,
+  "postgres_owner_member": false,
+  "postgres_superuser": false,
+  "migration_count": 104,
+  "assist_storage_policies": 0
+}

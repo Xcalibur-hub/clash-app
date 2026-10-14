@@ -1,0 +1,6 @@
+BEGIN
+{"supautils" : null, "current_role" : "[REDACTED]", "policy_grants" : "{\"[REDACTED]\":[\"auth.audit_log_entries\",\"auth.identities\",\"auth.mfa_factors\",\"auth.refresh_tokens\",\"auth.sessions\",\"auth.users\",\"realtime.messages\",\"storage.buckets\",\"storage.migrations\",\"storage.objects\",\"storage.s3_multipart_uploads\",\"storage.s3_multipart_uploads_parts\"]}"}
+DO
+ROLLBACK
+
+NOTICE:  fresh_session_policy_create=true

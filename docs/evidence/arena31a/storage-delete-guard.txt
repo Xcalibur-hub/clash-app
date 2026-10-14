@@ -1,0 +1,9 @@
+BEGIN
+INSERT 0 2
+INSERT 0 1
+SET
+{"sub":"00000000-0000-0000-0000-000000003301","role":"authenticated"}
+{"foreign_rows_deleted" : 0}
+RESET
+{"foreign_row_retained" : true, "protect_delete_trigger_count" : 0}
+ROLLBACK

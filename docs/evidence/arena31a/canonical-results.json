@@ -1,0 +1,66 @@
+{
+  "results": [
+    {
+      "label": "three disposable authenticated accounts",
+      "result": "PASS"
+    },
+    {
+      "label": "A creates Take and B challenges through authenticated RPCs",
+      "result": "PASS"
+    },
+    {
+      "label": "concurrent author acceptance is idempotent; exactly one canonical Clash/Room and two fighters",
+      "result": "PASS"
+    },
+    {
+      "label": "both fighters publish; concurrent same-key retry deduplicated and altered payload denied",
+      "result": "PASS"
+    },
+    {
+      "label": "spectator joins; official arguments denied before and after membership",
+      "result": "PASS"
+    },
+    {
+      "label": "actual Crowd WebSocket delivery and disconnected gap recovery",
+      "result": "PASS"
+    },
+    {
+      "label": "canonical Room appears in server Live discovery",
+      "result": "PASS"
+    },
+    {
+      "label": "private text assist: recipient-only REST/RPC, concurrent retry, accept and explicit idempotent official publication",
+      "result": "PASS"
+    },
+    {
+      "label": "selected fighter rejects; rejected assist cannot be published",
+      "result": "PASS"
+    },
+    {
+      "label": "real private PNG: server signer recipient-only, direct Storage denied, block revokes signing, exact bytes retrieved",
+      "result": "PASS"
+    },
+    {
+      "label": "explicit accepted image publication uses a fighter-owned public copy; private original owner/visibility unchanged",
+      "result": "PASS"
+    },
+    {
+      "label": "real MP4 upload/completion/official submission and byte-identical HTTP retrieval; native playback not asserted",
+      "result": "PASS"
+    },
+    {
+      "label": "judging opens by server-controlled test clock; spectator casts actual judgement",
+      "result": "PASS"
+    },
+    {
+      "label": "concurrent settlement returns one authoritative verdict",
+      "result": "PASS"
+    },
+    {
+      "label": "closed Crowd rejects new writes",
+      "result": "PASS"
+    }
+  ],
+  "real_auth": true,
+  "target": "http://127.0.0.1:57721"
+}
