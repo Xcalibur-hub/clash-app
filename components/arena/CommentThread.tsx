@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ChallengerComment } from '../../store';
 import { selectAuthor, useClash, type CommentNode } from '../../store';
-import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { radius, space, typeScale, useTheme, useThemeColors } from '../../theme';
 import { compact, timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
@@ -106,6 +106,7 @@ const CommentItem = React.memo(function CommentItem({
 }: CommentItemProps): React.JSX.Element {
   const { state, dispatch } = useClash();
   const t = useThemeColors();
+  const { scheme } = useTheme();
   const [collapsed, setCollapsed] = React.useState(false);
   const [visibleReplies, setVisibleReplies] = React.useState(REPLY_PAGE_SIZE);
   const [remoteChildren, setRemoteChildren] = React.useState<ChallengerComment[]>([]);
@@ -178,12 +179,12 @@ const CommentItem = React.memo(function CommentItem({
           nested && {
             marginLeft: indent,
             backgroundColor: 'transparent',
-            borderLeftColor: t.scheme === 'dark' ? '#A98ACC' : '#A882C4',
+            borderLeftColor: scheme === 'dark' ? '#A98ACC' : '#A882C4',
             borderColor: t.border,
           },
           !nested && {
             marginLeft: 0,
-            backgroundColor: t.scheme === 'dark' ? '#1E1A24' : '#FFF9F3',
+            backgroundColor: scheme === 'dark' ? '#1E1A24' : '#FFF9F3',
           },
         ]}
       >
@@ -210,7 +211,7 @@ const CommentItem = React.memo(function CommentItem({
             </Text>
           </View>
           {nested && (parentHandle || parentAuthor?.handle) ? (
-            <Text style={[styles.replyContext, { color: t.scheme === 'dark' ? '#C9AEDF' : '#8A598E' }]}
+            <Text style={[styles.replyContext, { color: scheme === 'dark' ? '#C9AEDF' : '#8A598E' }]}
               numberOfLines={1}>
               ↳ replying to @{parentHandle ?? parentAuthor?.handle}
             </Text>
@@ -321,7 +322,7 @@ const CommentItem = React.memo(function CommentItem({
         : childNodes.length > 0 ? (
           <View style={[
             styles.branchChildren,
-            { marginLeft: Math.min(depth, 3) * 4 + 16, borderLeftColor: t.scheme === 'dark' ? '#665376' : '#D1BDD8' },
+            { marginLeft: Math.min(depth, 3) * 4 + 16, borderLeftColor: scheme === 'dark' ? '#665376' : '#D1BDD8' },
           ]}>
           {childNodes.slice(0, useRemote ? childNodes.length : visibleReplies).map((child) => (
             <CommentItem
@@ -342,7 +343,7 @@ const CommentItem = React.memo(function CommentItem({
               accessibilityLabel={`Show more replies, ${node.children.length - visibleReplies} remaining`}
               style={styles.moreReplies}
               onPress={() => { hapticTap(); setVisibleReplies((count) => count + REPLY_PAGE_SIZE); }}>
-              <Text style={[styles.moreRepliesText, { color: t.scheme === 'dark' ? '#D6B9FA' : '#8052A5' }]}>
+              <Text style={[styles.moreRepliesText, { color: scheme === 'dark' ? '#D6B9FA' : '#8052A5' }]}>
                 ↳ View {Math.min(REPLY_PAGE_SIZE, node.children.length - visibleReplies)} more replies
               </Text>
             </Pressable>
