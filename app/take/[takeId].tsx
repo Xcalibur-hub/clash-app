@@ -28,6 +28,8 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useTakeReaction } from '../../hooks/useTakeReaction';
 import { useOperationScope } from '../../hooks/useOperationScope';
 import { toggleUpvote, fetchTakeById, fetchProfilesByIds } from '../../services/apiService';
+import { fetchDiscussionPage, type DiscussionCursor } from '../../services/arenaDiscussionService';
+import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { ClashModeSheet } from '../../components/clash/ClashModeSheet';
 import { startClash, type ClashMode } from '../../services/clashEngineService';
 import { analytics } from '../../services/analytics';
@@ -93,6 +95,46 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const theme = useThemeColors();
 
   const [sort, setSort] = React.useState<CommentSort>('best');
+  const [pagedRoots, setPagedRoots] = React.useState<ChallengerComment[]>([]);
+  const [pageCursor, setPageCursor] = React.useState<DiscussionCursor | null>(null);
+  const [pageBusy, setPageBusy] = React.useState(false);
+  const [pageError, setPageError] = React.useState<string | null>(null);
+  const [pageReady, setPageReady] = React.useState(false);
+  const pageRequest = React.useRef(false);
+  const pageSeq = React.useRef(0);
+  React.useEffect(() => {
+    const seq = ++pageSeq.current;
+    setPagedRoots([]); setPageCursor(null); setPageReady(false); setPageError(null);
+    if (!isSupabaseConfigured || !id) return;
+    pageRequest.current = true; setPageBusy(true);
+    void fetchDiscussionPage(id, sort).then(async (page) => {
+      const profiles = await fetchProfilesByIds([...new Set(page.items.map((item) => item.authorId))]);
+      if (seq !== pageSeq.current) return;
+      dispatch({ type: 'discussion/profiles', users: profiles });
+      setPagedRoots(page.items); setPageCursor(page.next); setPageReady(true);
+    }).catch((error) => {
+      if (seq === pageSeq.current) setPageError(errorText(error));
+    }).finally(() => {
+      if (seq === pageSeq.current) { pageRequest.current = false; setPageBusy(false); }
+    });
+    return () => { ++pageSeq.current; };
+  }, [id, sort, accountScope, dispatch]);
+  const loadMoreRoots = React.useCallback(() => {
+    if (!id || !pageCursor || pageRequest.current) return;
+    const seq = pageSeq.current;
+    pageRequest.current = true; setPageBusy(true); setPageError(null);
+    void fetchDiscussionPage(id, sort, null, pageCursor).then(async (page) => {
+      const profiles = await fetchProfilesByIds([...new Set(page.items.map((item) => item.authorId))]);
+      if (seq !== pageSeq.current) return;
+      dispatch({ type: 'discussion/profiles', users: profiles });
+      setPagedRoots((current) => [...current, ...page.items.filter((item) => !current.some((root) => root.id === item.id))]);
+      setPageCursor(page.next);
+    }).catch((error) => {
+      if (seq === pageSeq.current) setPageError(errorText(error));
+    }).finally(() => {
+      if (seq === pageSeq.current) { pageRequest.current = false; setPageBusy(false); }
+    });
+  }, [id, sort, pageCursor, dispatch]);
   const [replyTo, setReplyTo] = React.useState<{ comment: ChallengerComment; handle: string } | null>(null);
   const [menu, setMenu] = React.useState<MenuTarget | null>(null);
   const [followingAuthor, setFollowingAuthor] = React.useState(false);
@@ -286,7 +328,13 @@ export default function TakeDetailScreen(): React.JSX.Element {
   }
 
   const comments = selectCommentsForTake(state, take.id);
-  const nodes = buildCommentTree(comments, sort);
+  // Only server-returned roots become top-level threads. Existing hydrated
+  // children are attached when available, never promoted as orphan roots.
+  const nodes = pageReady
+    ? pagedRoots.map((root) => buildCommentTree(
+        [root, ...comments.filter((c) => c.parentId === root.id)], sort,
+      )[0]).filter((node): node is CommentNode => Boolean(node))
+    : buildCommentTree(comments, sort);
   const hasMedia = Boolean(take.media);
   const shortText = take.text.trim().length < 48;
   const isViewerAuthor = author.id === state.viewer.id;
@@ -326,6 +374,23 @@ export default function TakeDetailScreen(): React.JSX.Element {
                 onClash={clashFromComment} onMore={more} />
             </View>
           )}
+          ListFooterComponent={
+            <View style={styles.pagingFooter}>
+              {pageError ? <Text style={{ color: theme.textMuted }}>{pageError}</Text> : null}
+              {pageBusy ? <Text style={{ color: theme.textMuted }}>Loading conversations…</Text> : null}
+              {pageReady && pageCursor && !pageBusy ? (
+                <Pressable accessibilityRole="button" onPress={loadMoreRoots}
+                  style={[styles.pageButton, { backgroundColor: theme.surfaceElevated }]}>
+                  <Text style={{ color: theme.textPrimary, fontWeight: '800' }}>Load more conversations ↓</Text>
+                </Pressable>
+              ) : null}
+              {pageError && !pageBusy && isSupabaseConfigured ? (
+                <Pressable accessibilityRole="button" onPress={() => { setSort((v) => v === 'best' ? 'new' : 'best'); }}>
+                  <Text style={{ color: theme.textPrimary }}>Retry by changing sort</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          }
           ListEmptyComponent={
             <Text style={[styles.empty, { color: theme.textMuted }]}>
               No replies yet — start the conversation.
@@ -513,6 +578,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: layout.screenX, paddingBottom: space.md },
   headerContent: { gap: space.md, paddingBottom: space.sm },
   threadItem: { paddingBottom: space.md },
+  pagingFooter: { paddingVertical: space.md, alignItems: 'center', gap: 10 },
+  pageButton: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16 },
   missing: { paddingHorizontal: space.lg },
   topRow: {
     flexDirection: 'row',
