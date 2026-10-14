@@ -65,6 +65,13 @@ export function CommentThread({
   );
 }
 
+/** One root branch, for use in virtualized Take Detail lists. */
+export function CommentBranch(props: Omit<CommentThreadProps, 'nodes'> & { node: CommentNode }): React.JSX.Element {
+  return <CommentItem node={props.node} depth={0} takeAuthorId={props.takeAuthorId}
+    onUpvote={props.onUpvote} onReply={props.onReply}
+    onClash={props.onClash} onMore={props.onMore} />;
+}
+
 interface CommentItemProps {
   node: CommentNode;
   depth: number;
