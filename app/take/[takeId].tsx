@@ -332,9 +332,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
   // Only server-returned roots become top-level threads. Existing hydrated
   // children are attached when available, never promoted as orphan roots.
   const nodes = pageReady
-    ? pagedRoots.map((root) => buildCommentTree(
-        [root, ...comments.filter((c) => c.parentId === root.id)], sort,
-      )[0]).filter((node): node is CommentNode => Boolean(node))
+    ? pagedRoots.map((root): CommentNode => ({ comment: root, children: [] }))
     : buildCommentTree(comments, sort);
   const hasMedia = Boolean(take.media);
   const shortText = take.text.trim().length < 48;
@@ -370,7 +368,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
           ]}
           renderItem={({ item }) => (
             <View style={styles.threadItem}>
-              <CommentBranch node={item} takeAuthorId={author.id}
+              <CommentBranch node={item} serverReplies={pageReady} takeAuthorId={author.id}
                 onUpvote={upvote} onReply={reply}
                 onClash={clashFromComment} onMore={more} />
             </View>
