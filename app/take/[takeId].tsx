@@ -1,9 +1,9 @@
 import React from 'react';
 import {
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CommentThread } from '../../components/arena/CommentThread';
+import { CommentBranch } from '../../components/arena/CommentThread';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { RebuttalInput } from '../../components/arena/RebuttalInput';
 import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
@@ -47,6 +47,7 @@ import {
   toggleSave,
   useClash,
   type ChallengerComment,
+  type CommentNode,
   type CommentSort,
   type User,
   type Take,
@@ -303,18 +304,35 @@ export default function TakeDetailScreen(): React.JSX.Element {
         style={styles.fill}
         keyboardVerticalOffset={0}
       >
-        <ScrollView
+        <FlatList<CommentNode>
+          key={`${take.id}:${sort}`}
+          data={nodes}
+          keyExtractor={(node) => node.comment.id}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          initialNumToRender={5}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          removeClippedSubviews={false}
           contentContainerStyle={[
             styles.content,
-            {
-              paddingTop: insets.top + space.xs,
-              paddingBottom: space.xl,
-            },
+            { paddingTop: insets.top + space.xs, paddingBottom: space.xl },
           ]}
-        >
+          renderItem={({ item }) => (
+            <View style={styles.threadItem}>
+              <CommentBranch node={item} takeAuthorId={author.id}
+                onUpvote={upvote} onReply={reply}
+                onClash={clashFromComment} onMore={more} />
+            </View>
+          )}
+          ListEmptyComponent={
+            <Text style={[styles.empty, { color: theme.textMuted }]}>
+              No replies yet — start the conversation.
+            </Text>
+          }
+          ListHeaderComponent={
+            <View style={styles.headerContent}>
           <View style={styles.topRow}>
             <Pressable
               onPress={() => router.back()}
@@ -421,22 +439,9 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </View>
           </View>
 
-          {nodes.length === 0 ? (
-            <Text allowFontScaling={false} style={[styles.empty, { color: theme.textMuted }]}>
-              No replies yet — start the conversation.
-            </Text>
-          ) : (
-            <CommentThread
-              key={`${take.id}:${sort}`}
-              nodes={nodes}
-              takeAuthorId={author.id}
-              onUpvote={upvote}
-              onReply={reply}
-              onClash={clashFromComment}
-              onMore={more}
-            />
-          )}
-        </ScrollView>
+            </View>
+          }
+        />
 
         <View
           style={[
@@ -505,10 +510,9 @@ export default function TakeDetailScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fill: { flex: 1 },
-  content: {
-    paddingHorizontal: layout.screenX,
-    gap: space.md,
-  },
+  content: { paddingHorizontal: layout.screenX, paddingBottom: space.md },
+  headerContent: { gap: space.md, paddingBottom: space.sm },
+  threadItem: { paddingBottom: space.md },
   missing: { paddingHorizontal: space.lg },
   topRow: {
     flexDirection: 'row',
