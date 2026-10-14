@@ -9,7 +9,7 @@ import type { LiveArenaTopic } from '../../services/liveArenaService';
 import { fetchClashDiscovery } from '../../services/arenaClashDiscoveryService';
 import { useAuth } from '../../store/AuthProvider';
 import { clashDiscoveryDestination, type ClashDiscoveryEntry, type ClashDiscoveryState } from '../../utils/arenaClashDiscovery';
-import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import { layout, radius, space, typeScale, useTheme, useThemeColors } from '../../theme';
 import { plural } from '../../utils/format';
 import { press as hapticPress } from '../../utils/haptics';
 import { LivePulse } from '../liveArena/LivePulse';
@@ -33,6 +33,7 @@ export function ArenaClashes({
   onWatch,
 }: ArenaClashesProps): React.JSX.Element {
   const t = useThemeColors();
+  const { scheme } = useTheme();
   const router = useRouter();
   const { user } = useAuth();
   const [discovery, setDiscovery] = React.useState<{ ownerId: string | null; entries: ClashDiscoveryEntry[] }>({ ownerId: null, entries: [] });
@@ -63,34 +64,53 @@ export function ArenaClashes({
 
   return (
     <View style={styles.wrap} accessibilityLabel="Clashes">
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-        CLASHES
-      </Text>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-        Live Clashes
-      </Text>
-      <Text style={[styles.sub, { color: t.textSecondary }]}>
-        Follow upcoming duels and revisit completed Clashes.
-      </Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Open Hall of Fame archive"
-        style={[styles.hallEntry, { backgroundColor: t.scheme === 'dark' ? '#49375D' : '#E9D8FF' }]}
-        onPress={() => { hapticPress(); router.push('/arena/hall-of-fame'); }}>
-        <Text style={[styles.hallEyebrow, { color: t.scheme === 'dark' ? '#EADDF5' : '#625073' }]}>
-          THE ARENA ARCHIVE  ↗
+      <View style={[styles.liveIntro, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
+        <View style={styles.liveTopline}>
+          <LivePulse dotOnly size={8} />
+          <Text style={[styles.kicker, { color: t.textSecondary }]}>ARENA LIVE</Text>
+          <Text style={[styles.liveCount, { color: t.textMuted }]}>{live.length} live now</Text>
+        </View>
+        <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>The live stage.</Text>
+        <Text style={[styles.sub, { color: t.textSecondary }]}>
+          Watch real-time text and media clashes. Follow the arguments, react with the crowd, and support a fighter.
         </Text>
-        <Text style={[styles.hallTitle, { color: t.scheme === 'dark' ? '#FFF7EE' : '#28202C' }]}>
-          Hall of Fame ✳
-        </Text>
-        <Text style={[styles.hallSub, { color: t.scheme === 'dark' ? '#EADDF5' : '#625073' }]}>
-          Revisit real settled Clashes
-        </Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Open Challenge Inbox"
-        style={[styles.row,{borderColor:t.border}]} onPress={()=>{hapticPress();router.push('/arena/challenges');}}>
-        <Text style={[styles.enter,{color:t.textPrimary}]}>CHALLENGE INBOX</Text>
-        <Text style={[styles.empty,{color:t.textMuted}]}>Incoming and outgoing invitations</Text>
-      </Pressable>
-
+        {live.length === 0 ? (
+          <View style={styles.noLive}>
+            <Text style={[styles.noLiveTitle, { color: t.textPrimary }]}>No rooms broadcasting right now</Text>
+            <Text style={[styles.empty, { color: t.textMuted }]}>
+              When a Clash starts, you'll find it here. Explore conversations or check your challenges meanwhile.
+            </Text>
+            <Pressable accessibilityRole="button" style={[styles.secondaryAction, { borderColor: t.border }]}
+              onPress={() => { hapticPress(); router.push('/arena/challenges'); }}>
+              <Text style={[styles.enter, { color: t.textPrimary }]}>VIEW MY CHALLENGES →</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.liveStack}>
+            {live.map((topic) => (
+              <ClashRow key={topic.id} topic={topic} live onPress={() => {
+                hapticPress();
+                if (topic.viewerRoomId) onEnter(topic); else onWatch(topic);
+              }} />
+            ))}
+          </View>
+        )}
+      </View>
+      <View style={styles.liveSecondary}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Challenge Inbox"
+          onPress={() => { hapticPress(); router.push('/arena/challenges'); }}
+          style={[styles.quickLink, { borderColor: t.border }]}>
+          <Text style={[styles.quickTitle, { color: t.textPrimary }]}>Challenges ↗</Text>
+          <Text style={[styles.quickSub, { color: t.textMuted }]}>Invites and requests</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Hall of Fame archive"
+          onPress={() => { hapticPress(); router.push('/arena/hall-of-fame'); }}
+          style={[styles.quickLink, { borderColor: t.border }]}>
+          <Text style={[styles.quickTitle, { color: t.textPrimary }]}>Hall of Fame ↗</Text>
+          <Text style={[styles.quickSub, { color: t.textMuted }]}>Past verdicts</Text>
+        </Pressable>
+      </View>
+      <Text style={[styles.section, { color: t.textMuted }]}>YOUR CLASHES</Text>
       {loading ? <Text style={[styles.empty, { color: t.textMuted }]}>Loading Clashes…</Text> : null}
       {!user ? <Text style={[styles.empty, { color: t.textMuted }]}>Sign in to see your Challenges and Clash history.</Text> : null}
       {error ? <Text accessibilityRole="alert" style={[styles.empty, { color: t.textMuted }]}>Couldn’t load Clashes. Retrying…</Text> : null}
@@ -111,32 +131,12 @@ export function ArenaClashes({
           ))}
         </View>
       ))}
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>LIVE TOPIC ROOMS</Text>
-      {live.length === 0 ? (
-        <Text style={[styles.empty, { color: t.textMuted }]}>
-          No live Clashes right now.
-        </Text>
-      ) : (
-        live.map((topic) => (
-          <ClashRow
-            key={topic.id}
-            topic={topic}
-            live
-            onPress={() => {
-              hapticPress();
-              if (topic.viewerRoomId) onEnter(topic);
-              else onWatch(topic);
-            }}
-          />
-        ))
-      )}
-
       <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
         RELEVANT
       </Text>
       {rest.length === 0 && live.length === 0 ? (
         <Text style={[styles.empty, { color: t.textMuted }]}>
-          No recent Clashes to show.
+          Nothing else scheduled yet.
         </Text>
       ) : (
         rest.map((topic) => (
@@ -207,6 +207,18 @@ function ClashRow({
 }
 
 const styles = StyleSheet.create({
+  liveIntro: { marginHorizontal: layout.screenX, marginTop: space.md, borderWidth: 1, borderRadius: 22, padding: space.md, gap: space.sm },
+  liveTopline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  liveCount: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
+  liveStack: { gap: 8, marginTop: space.xs },
+  noLive: { gap: 8, marginTop: space.sm },
+  noLiveTitle: { fontSize: 16, fontWeight: '800' },
+  secondaryAction: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 12, padding: 12 },
+  liveSecondary: { flexDirection: 'row', paddingHorizontal: layout.screenX, gap: 10, marginTop: space.md },
+  quickLink: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: 15, padding: 12, gap: 5 },
+  quickTitle: { fontSize: 13, fontWeight: '800' },
+  quickSub: { fontSize: 11 },
+
   hallEntry: { borderRadius: 24, padding: 20, gap: 8, marginVertical: 8 },
   hallEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.1 },
   hallTitle: { fontSize: 27, lineHeight: 32, fontWeight: '900', letterSpacing: -0.8 },
