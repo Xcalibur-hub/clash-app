@@ -68,10 +68,9 @@ export function ImmersiveClash({
   onReportCrowd,
 }: ImmersiveClashProps): React.JSX.Element {
   const t = useThemeColors();
-  const stageFlex = judgingFocus ? 0.78 : condensed ? 0.42 : 0.58;
-  const crowdFlex = judgingFocus ? 0.22 : condensed ? 0.58 : 0.42;
+  const stageFlex = judgingFocus ? 0.72 : condensed ? 0.34 : 0.55;
+  const crowdFlex = judgingFocus ? 0.28 : condensed ? 0.66 : 0.45;
   const compact = condensed || judgingFocus;
-  const stage = React.useRef<ScrollView>(null);
 
   return (
     <View style={styles.root} accessibilityLabel="Live Clash">
@@ -85,10 +84,10 @@ export function ImmersiveClash({
       />
 
       <View style={[styles.stage, { flex: stageFlex }]}>
-        <ScrollView ref={stage} style={styles.stageScroll}
+        <ScrollView style={styles.stageScroll}
           contentContainerStyle={styles.stageContent} showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => { if (condensed) stage.current?.scrollToEnd({ animated: false }); }}>
+          accessibilityLabel="Clash stage and official arguments">
           <ClashProposition text={proposition} condensed={compact} />
           {roleLabel ? (
             <Text
@@ -125,7 +124,7 @@ export function ImmersiveClash({
         </ScrollView>
       </View>
 
-      <View style={[styles.crowd, { flex: crowdFlex }]}>
+      <View style={[styles.crowd, { flex: crowdFlex, borderTopColor: t.border }]}>
         <LiveCrowdLayer
           unavailableReason={crowdUnavailableReason}
           key={crowd?.identityVersion ?? 0}
@@ -157,7 +156,7 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingTop: space.xs,
   },
-  crowd: { minHeight: 0 },
+  crowd: { minHeight: 0, borderTopWidth: StyleSheet.hairlineWidth },
   role: {
     ...typeScale.caption,
     fontSize: 11,
