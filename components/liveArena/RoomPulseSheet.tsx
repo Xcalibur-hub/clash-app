@@ -22,6 +22,7 @@ import Animated, {
 import type { ArenaPulseLeader, ArenaRoomPulse } from '../../services/liveArenaService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { pulseAccessibilitySummary } from '../../utils/roomPulseScore';
+import { DECORATIVE_MOTION_FROZEN } from '../../utils/decorativeMotion';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
 import { softFill } from './liveArenaStyles';
@@ -140,13 +141,13 @@ function PulseNode({ leader }: { leader: ArenaPulseLeader }): React.JSX.Element 
   const pos = NODE_POS[leader.category] ?? { top: 100, left: 100 };
 
   React.useEffect(() => {
-    if (reduced) return;
+    if (reduced || DECORATIVE_MOTION_FROZEN) return;
     drift.value = withRepeat(withTiming(1, { duration: 3200 }), -1, true);
   }, [drift, reduced]);
 
   const anim = useAnimatedStyle(() => ({
     transform: [
-      { translateY: reduced ? 0 : (drift.value - 0.5) * 6 },
+      { translateY: reduced || DECORATIVE_MOTION_FROZEN ? 0 : (drift.value - 0.5) * 6 },
       {
         scale: withSpring(1, { damping: 16, stiffness: 180 }),
       },

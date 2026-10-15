@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { typeScale } from '../../theme';
+import { DECORATIVE_MOTION_FROZEN } from '../../utils/decorativeMotion';
 import { LIVE_TINT, PULSE_MAX, PULSE_MIN } from './liveArenaStyles';
 
 export interface LivePulseProps {
@@ -32,7 +33,7 @@ export function LivePulse({
   const pulse = useSharedValue(PULSE_MAX);
 
   React.useEffect(() => {
-    if (reduced) {
+    if (reduced || DECORATIVE_MOTION_FROZEN) {
       pulse.value = PULSE_MAX;
       return;
     }

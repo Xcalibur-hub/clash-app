@@ -13,10 +13,8 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import {
-  atmospherePalette,
-  type ArenaAtmosphereMood,
-} from '../../utils/arenaAtmosphere';
+import { atmospherePalette, type ArenaAtmosphereMood } from '../../utils/arenaAtmosphere';
+import { DECORATIVE_MOTION_FROZEN } from '../../utils/decorativeMotion';
 import { useThemeColors } from '../../theme';
 
 export interface ArenaAtmosphereProps {
@@ -51,7 +49,7 @@ function AtmosphereBlob({
   const breathe = useSharedValue(1);
 
   React.useEffect(() => {
-    if (reduced) {
+    if (reduced || DECORATIVE_MOTION_FROZEN) {
       drift.value = 0;
       breathe.value = 1;
       return;
