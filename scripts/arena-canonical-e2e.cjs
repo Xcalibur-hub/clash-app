@@ -3,8 +3,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {createClient}=require('@supabase/supabase-js');
 const root=path.resolve(process.argv[2]||'');
 assert.equal(path.dirname(root),path.resolve('.expo'),'Isolated ignored test root required');
-assert.match(path.basename(root),/^(arena31-20261014-(prepared|final)|arena31a-20261014)$/,'Reviewed disposable directory required');
-const config=JSON.parse(fs.readFileSync(path.join(root,'compose.json'))),project=path.basename(root)==='arena31a-20261014'?'clash_p11bind_arena31a_20261014':'clash_p11bind_arena31_20261014';
+assert.match(path.basename(root),/^(arena31-20261014-(prepared|final)|arena31a-20261014|arena32b-20261014)$/,'Reviewed disposable directory required');
+const actualDeno=path.basename(root)==='arena32b-20261014';
+const config=JSON.parse(fs.readFileSync(path.join(root,'compose.json'))),project=actualDeno?'clash_p11bind_arena32b_20261014':path.basename(root)==='arena31a-20261014'?'clash_p11bind_arena31a_20261014':'clash_p11bind_arena31_20261014';
 assert.equal(config.name,project);assert.ok(fs.existsSync(root+'/migration-complete.json'));
 const url='http://127.0.0.1:57721',key=config.services.storage.environment.ANON_KEY,serviceKey=config.services.storage.environment.SERVICE_KEY;
 const options={auth:{persistSession:false,autoRefreshToken:false}};
@@ -59,7 +60,7 @@ async function verifyAssists(a,b,c,roomId){
  assert.equal((await signAssist(b,imageKey)).status,403,'other fighter cannot use recipient signer');
  const allowed=await signAssist(a,imageKey);assert.equal(allowed.status,200);const signed=await allowed.json();assert.equal(signed.expiresIn,60);
  assert.ok((await b.storage.from('private-media').createSignedUrl(plan.path,60)).error,'other fighter cannot sign attachment');
- const imageResponse=await fetch(signed.url);assert.equal(imageResponse.status,200);assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()),png);
+ const imageResponse=await fetch(new URL(signed.relativeUrl??signed.url,url));assert.equal(imageResponse.status,200);assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()),png);
  await rpc(a,'block_profile',{p_target_id:users[2].profile});assert.equal((await signAssist(a,imageKey)).status,403);await rpc(a,'unblock_profile',{p_target_id:users[2].profile});
  pass('real private PNG: server signer recipient-only, direct Storage denied, block revokes signing, exact bytes retrieved');
  await rpc(a,'respond_arena_private_assist',{p_id:imageKey,p_action:'ACCEPTED'});
@@ -89,7 +90,8 @@ async function verifyVerdict(a,c,roomId,clashId){
  assert.equal((await c.rpc('post_arena_crowd_message',{p_room_id:roomId,p_body:'After close',p_request_key:randomUUID()})).error?.code,'P0003');pass('closed Crowd rejects new writes');
 }
 async function main(){
- await new Promise(resolve=>signer.listen(0,'127.0.0.1',resolve));signerUrl='http://127.0.0.1:'+signer.address().port;
+ if(actualDeno)signerUrl=url+'/functions/v1/arena-assist-media-access';
+ else{await new Promise(resolve=>signer.listen(0,'127.0.0.1',resolve));signerUrl='http://127.0.0.1:'+signer.address().port;}
  for(let i=0;i<3;i++){
   const existing=fs.existsSync(root+'/accounts.private.json')?JSON.parse(fs.readFileSync(root+'/accounts.private.json')):null;
   const u=existing?.[i]??{email:'arena31-'+randomUUID()+'@example.test',password:'Arena31-'+randomUUID()};

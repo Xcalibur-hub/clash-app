@@ -4,7 +4,9 @@ for(const ext of ['.ts','.tsx'])Module._extensions[ext]=(m,f)=>m._compile(babel.
 let account='a',fail=false,calls=[],uploads=0,hold=false,finish;
 const memory=new Map(),storage={async getItem(k){return memory.get(k)??null;},async setItem(k,v){memory.set(k,v);},async removeItem(k){memory.delete(k);}};
 const assist={id:'id',body:'Private help',status:'ACCEPTED',createdAt:'2026-10-14T00:00:00.123456+00:00',mediaId:'private',mediaPath:'owner/private.png',mediaKind:'image',publishedMessageId:null};
-const client={rpc(name,args){calls.push({name,args});return hold?new Promise(r=>finish=()=>r({data:[assist],error:null})):Promise.resolve({data:name==='list_arena_private_assists'?[assist]:null,error:fail?{code:'network',message:'lost response'}:null});},functions:{async invoke(name,args){assert.equal(name,'arena-assist-media-access');assert.deepEqual(args,{body:{assistId:assist.id}});return {data:{url:'https://private.invalid/signed',expiresIn:60},error:null};}}};
+let signedUrl='/storage/v1/object/sign/private-media/owner/private.png?token=fixture';
+let relativeUrl=signedUrl;signedUrl='http://kong:8000'+relativeUrl;
+const client={storage:{from(bucket){assert.equal(bucket,'private-media');return {getPublicUrl(){return {data:{publicUrl:'https://backend.invalid/storage/v1/object/public/private-media/'}};}};}},rpc(name,args){calls.push({name,args});return hold?new Promise(r=>finish=()=>r({data:[assist],error:null})):Promise.resolve({data:name==='list_arena_private_assists'?[assist]:null,error:fail?{code:'network',message:'lost response'}:null});},functions:{async invoke(name,args){assert.equal(name,'arena-assist-media-access');assert.deepEqual(args,{body:{assistId:assist.id}});return {data:{url:signedUrl,relativeUrl,expiresIn:60},error:null};}}};
 const original=Module._load;
 Module._load=function(request,parent){
  if(request==='./supabaseClient'&&parent.filename.endsWith('arenaAssistService.ts'))return {currentUserId:async()=>account,requireSupabase:()=>client,requestError:e=>Object.assign(new Error(e.message),{code:e.code}),SupabaseError:class extends Error{constructor(m,c){super(m);this.code=c;}}};
@@ -24,7 +26,9 @@ async function main(){
  fail=true;await assert.rejects(s.incorporatePrivateAssist('a','room',assist));const key=calls.at(-1).args.p_request_key,mediaId=calls.at(-1).args.p_public_media_id;
  fail=false;await s.incorporatePrivateAssist('a','room',assist);assert.equal(calls.at(-1).args.p_request_key,key);assert.equal(calls.at(-1).args.p_public_media_id,mediaId);assert.equal(uploads,1);pass('lost publish response reuses one copied media object and official key');
  assert.equal(memory.has('assist-public-copy:v1:a:room:id'),false);pass('confirmed publication removes pending media copy cache');
- await s.privateAssistMediaUrl('a',assist);pass('private viewer invokes server signer by assist ID only, with 60-second URL');
+ assert.equal(await s.privateAssistMediaUrl('a',assist),'https://backend.invalid'+relativeUrl);pass('relative signed capability resolves against client backend origin');
+ relativeUrl=undefined;signedUrl='https://foreign.invalid/storage/v1/object/sign/private-media/owner/private.png';await assert.rejects(s.privateAssistMediaUrl('a',assist),{code:'media_access'});pass('foreign signed URL origin rejected');
+ signedUrl='https://backend.invalid/storage/v1/object/sign/private-media/owner/private.png?legacy=1';assert.equal(await s.privateAssistMediaUrl('a',assist),signedUrl);pass('legacy same-backend absolute response remains compatible');
  await s.respondPrivateAssist('a','id','REJECTED');assert.equal(calls.at(-1).name,'respond_arena_private_assist');await s.reportPrivateAssist('a','id');assert.equal(calls.at(-1).args.p_reason,'harassment');pass('accept/reject/report actions use server RPCs');
  console.log(`${count}/${count} assist service checks passed; controlled transport, not native verification.`);
 }

@@ -30,7 +30,7 @@ async function test(label,mode,status,body={assistId:id},auth=true){scenario=mod
  await test('thrown secret-bearing error redacted','throws',502);
  await test('unexpected signed URL rejected','bad-url',502);
  await test('revocation while signing suppresses capability','revoked',403);
- const out=JSON.parse(await test('exact authorized object signed for sixty seconds','',200));assert.equal(checks,2);assert.ok(out.url.startsWith(config.url+'/storage/v1/object/sign/private-media/'));
+ const out=JSON.parse(await test('exact authorized object signed for sixty seconds','',200));assert.equal(checks,2);assert.ok(out.relativeUrl.startsWith('/storage/v1/object/sign/private-media/'));assert.ok(!out.relativeUrl.includes('isolated.invalid'));assert.equal(out.url,config.url+out.relativeUrl);
  const source=fs.readFileSync('supabase/migrations/20261014122051_canonical_arena_assist_rpcs.sql','utf8');assert.ok(!/create\s+policy[^;]*storage\.objects/i.test(source));count++;console.log('PASS assist migration has no managed Storage policy DDL');
  console.log(`${count}/${count} signer checks passed; mocked upstreams.`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

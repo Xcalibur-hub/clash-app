@@ -54,7 +54,13 @@ export async function privateAssistMediaUrl(account: string, assist: PrivateAssi
   const {data,error} = await requireSupabase().functions.invoke('arena-assist-media-access',{body:{assistId:assist.id}});
   await guard(account);
   if (error || !data || typeof data.url !== 'string' || data.expiresIn !== 60) throw new SupabaseError('Private media unavailable','media_access');
-  return data.url;
+  // getPublicUrl only constructs a backend URL; it does not publish this asset.
+  const base = new URL(requireSupabase().storage.from('private-media').getPublicUrl('').data.publicUrl);
+  const signed = new URL(typeof data.relativeUrl === 'string' ? data.relativeUrl : data.url,base);
+  if (signed.origin !== base.origin || !signed.pathname.startsWith('/storage/v1/object/sign/private-media/')) {
+    throw new SupabaseError('Private media unavailable','media_access');
+  }
+  return signed.href;
 }
 export async function uploadPrivateAssistMedia(account: string, picked: PickedMedia): Promise<string> {
   await guard(account);

@@ -64,7 +64,10 @@ export function createAssistMediaHandler(config: Config, fetcher: typeof fetch =
       // Do not deliver a freshly signed capability if access changed while signing.
       const recheck = await authorize();
       if (!recheck.ok || JSON.stringify(target(await recheck.json())) !== JSON.stringify(media)) return json({ error: 'forbidden' }, 403);
-      return json({ url: config.url + '/storage/v1' + result.signedURL, expiresIn: 60 });
+      // SUPABASE_URL can be container-internal. New clients resolve the relative
+      // capability themselves; retain the original field for older hosted clients.
+      const relativeUrl = '/storage/v1' + result.signedURL;
+      return json({ url: config.url + relativeUrl, relativeUrl, expiresIn: 60 });
     } catch { return json({ error: 'request_unavailable' }, 502); }
     finally { clearTimeout(timer); }
   };
