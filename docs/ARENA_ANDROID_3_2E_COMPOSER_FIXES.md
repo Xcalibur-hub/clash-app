@@ -61,6 +61,19 @@ A rejected publish leaves its upload behind: media bytes are uploaded *before* `
 
 ## Still open (not fixed here)
 
-- **Take-detail hero overlap** (from 3.2D, reconfirmed): a two-line Take body overlaps the "Your Feed" summary block in `app/take/[takeId].tsx`.
+- **Take-detail hero**: the 3.2D "overlap" was not reproducible (see the follow-up section below); the responsive hardening there is committed, while the visual look still awaits an eye (image reading blocked this session).
 - Rate limiter consumed on the shared stack until its hour window rolls over.
 - Reduce-motion still unsupported; TalkBack label quality still unverified (no node dump on this device).
+
+## Follow-up: Take detail hero layout (`components/arena/TakeDetailHero.tsx`)
+
+**Reported symptom (from 3.2D): a two-line Take body overlapping the summary block under the hero.**
+
+**Not reproducible, and not reachable by construction.** The hero renders the Take copy as a child of the media card, and that card sets `overflow: 'hidden'`, so the headline can only be clipped by the card — never painted over the following section. The string seen "overlapping" in 3.2D (`Your Feed / Takes from interests, follows, and discovery`) exists nowhere in the app source; it was inside that Take's **video poster**, which is a screenshot of the app UI. Measured on the 92-character Take at font scale 1.0 (four headline lines): the headline bands end at `y≈1208`, the author row is a separate band at `y≈1280–1304`, and the next section's first text band starts at `y≈1572` — clean gaps, no collision.
+
+**The real weakness in that code is fixed instead, without a redesign.** The card height was `min(520, max(360, round(cardW * 1.12)))`, ignoring the overlay it carries: a body past the five-line cap, or a very large system font scale (≈2.1× and above), exceeds that number and is cut off by `overflow: 'hidden'` — the headline is bottom-anchored, so the *top* of the text is what disappears. `utils/takeHeroLayout.ts` now returns `max(plate, measuredCopyHeight)` and the hero measures its copy via `onLayout`, so the plate keeps its editorial proportion while the card grows when the copy needs more room. Safe areas, gradient scrim, play badge, `numberOfLines`, `allowFontScaling`, media rendering and iOS behaviour are unchanged.
+
+**Device checks (SM-A505F):** the 92-character (video), 37-character (video) and 27-character (image) Takes were opened at font scale 1.1 and 1.3 — the screen mounts (`take_opened` fires per open), scroll and back work, and `0 FATAL EXCEPTION` in logcat across the runs.
+
+**Visual confirmation: BLOCKED.** The chat image reader rejected every screenshot in this session, including a 24 KB JPEG crop, so — per the standing rule — no visual PASS is claimed from pixel metrics. Captures are stored for owner review: `.expo/32e2-device-1.0-multiline.png`, `.expo/32e2-1.3-take_609b0b7355c8de2c.png`, `.expo/32e2-1.3-take_58603553f0ffaf9d.png`, `.expo/32e2-1.3-take_b9112b7620478af7.png`.
+
