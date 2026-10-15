@@ -74,9 +74,9 @@ export function ArenaClashes({
             {loading ? 'Checking live…' : error ? 'Live count unavailable' : `${live.length + liveEntries.length} live now`}
           </Text>
         </View>
-        <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>The live stage.</Text>
+        <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>Where takes meet their match.</Text>
         <Text style={[styles.sub, { color: t.textSecondary }]}>
-          Watch real-time text and media clashes. Follow the arguments, react with the crowd, and support a fighter.
+          Two sides. One room. Follow the arguments, back a fighter, and see where the crowd stands.
         </Text>
         {!hasLive && (loading || error) ? (
           <Text style={[styles.empty, { color: t.textMuted }]}>
@@ -84,9 +84,9 @@ export function ArenaClashes({
           </Text>
         ) : !hasLive ? (
           <View style={styles.noLive}>
-            <Text style={[styles.noLiveTitle, { color: t.textPrimary }]}>No rooms broadcasting right now</Text>
+            <Text style={[styles.noLiveTitle, { color: t.textPrimary }]}>The stage is quiet.</Text>
             <Text style={[styles.empty, { color: t.textMuted }]}>
-              When a Clash starts, you'll find it here. Explore conversations or check your challenges meanwhile.
+              The next live duel will appear here. Until then, catch up on your challenges.
             </Text>
             <Pressable accessibilityRole="button" style={[styles.secondaryAction, { borderColor: t.border }]}
               onPress={() => { hapticPress(); router.push('/arena/challenges'); }}>
@@ -98,13 +98,16 @@ export function ArenaClashes({
             {liveEntries.map((entry) => (
               <Pressable key={entry.id} accessibilityRole="button"
                 accessibilityLabel={`Watch live Clash: ${entry.title}`}
-                style={[styles.row, { borderColor: t.border }]}
+                style={[styles.row, styles.featuredDuel, { borderColor: t.border, backgroundColor: t.surface }]}
                 onPress={() => { hapticPress(); router.push(clashDiscoveryDestination(entry)); }}>
-                <Text style={[styles.liveLabel, { color: t.textPrimary }]}>
-                  {entry.roomId ? '● LIVE DUEL' : '● LIVE CLASH'}
-                </Text>
+                <View style={styles.rowTop}>
+                  <Text style={[styles.liveLabel, { color: t.textPrimary }]}>
+                    {entry.roomId ? '● LIVE DUEL' : '● LIVE CLASH'}
+                  </Text>
+                  <Text style={[styles.meta, { color: t.textMuted }]}>HAPPENING NOW</Text>
+                </View>
                 <Text style={[styles.proposition, { color: t.textPrimary }]} numberOfLines={3}>{entry.title}</Text>
-                <Text style={[styles.enter, { color: t.textPrimary }]}>WATCH CLASH →</Text>
+                <View style={styles.actionLine}><Text style={[styles.enter, { color: t.textPrimary }]}>WATCH THE DUEL</Text><Text style={[styles.actionArrow, { color: t.textPrimary }]}>↗</Text></View>
               </Pressable>
             ))}
             {live.map((topic) => (
@@ -199,8 +202,8 @@ function ClashRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${live ? 'Live' : 'Clash'}. ${topic.title}. Enter`}
-      style={[styles.row, { borderColor: t.border }]}
+      accessibilityLabel={`${live ? 'Live' : 'Clash'}. ${topic.title}. ${topic.viewerRoomId ? 'Enter your room' : 'View topic'}`}
+      style={[styles.row, { borderColor: t.border, backgroundColor: t.surface }]}
     >
       <View style={styles.rowTop}>
         {live ? (
@@ -228,21 +231,27 @@ function ClashRow({
       >
         {topic.title}
       </Text>
-      <Text allowFontScaling={false} style={[styles.enter, { color: t.textPrimary }]}>
-        ENTER
-      </Text>
+      <View style={styles.actionLine}>
+        <Text allowFontScaling={false} style={[styles.enter, { color: t.textPrimary }]}>
+          {topic.viewerRoomId ? 'ENTER YOUR ROOM' : 'VIEW DISCUSSION'}
+        </Text>
+        <Text style={[styles.actionArrow, { color: t.textPrimary }]}>↗</Text>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  liveIntro: { marginTop: space.md, borderWidth: 1, borderRadius: 22, padding: space.md, gap: space.sm },
+  liveIntro: { marginTop: space.md, borderWidth: 1, borderRadius: 26, padding: 22, gap: space.sm },
   liveTopline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   idleDot: { width: 8, height: 8, borderRadius: 4 },
   liveCount: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
-  liveStack: { gap: 8, marginTop: space.xs },
-  noLive: { gap: 8, marginTop: space.sm },
-  noLiveTitle: { fontSize: 16, fontWeight: '800' },
+  liveStack: { gap: 10, marginTop: space.md },
+  featuredDuel: { borderWidth: 1.2, paddingVertical: 20, gap: 14 },
+  actionLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
+  actionArrow: { fontSize: 20, fontWeight: '600' },
+  noLive: { gap: 12, marginTop: space.md, paddingVertical: space.md },
+  noLiveTitle: { fontSize: 20, letterSpacing: -0.5, fontWeight: '800' },
   secondaryAction: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 12, padding: 12 },
   liveSecondary: { flexDirection: 'row', gap: 10, marginTop: space.md },
   quickLink: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: 15, padding: 12, gap: 5 },
@@ -267,11 +276,12 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typeScale.section,
-    fontSize: 24,
+    fontSize: 29,
+    lineHeight: 34,
     fontWeight: '800',
-    letterSpacing: -0.4,
+    letterSpacing: -1.1,
   },
-  sub: { ...typeScale.meta, fontSize: 14, lineHeight: 20, marginBottom: space.sm },
+  sub: { ...typeScale.meta, fontSize: 14, lineHeight: 21, marginBottom: space.sm },
   section: {
     ...typeScale.caption,
     fontSize: 11,
@@ -283,8 +293,8 @@ const styles = StyleSheet.create({
   row: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.lg,
-    padding: space.md,
-    gap: space.sm,
+    padding: 18,
+    gap: 12,
     marginTop: space.xs,
   },
   rowTop: {
@@ -303,10 +313,10 @@ const styles = StyleSheet.create({
   meta: { ...typeScale.caption, fontSize: 12 },
   proposition: {
     ...typeScale.label,
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '700',
-    lineHeight: 22,
-    letterSpacing: -0.2,
+    lineHeight: 25,
+    letterSpacing: -0.45,
   },
   enter: {
     ...typeScale.label,
