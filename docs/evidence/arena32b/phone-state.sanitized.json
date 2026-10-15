@@ -1,0 +1,16 @@
+{
+  "owned_isolated_source": true,
+  "status": "settled",
+  "closes_at": "2026-10-15T03:43:58.005862+00:00",
+  "assists": [
+    {
+      "status": "ACCEPTED",
+      "published": false
+    }
+  ],
+  "verdicts": [
+    {
+      "winner_side": "A"
+    }
+  ]
+}
