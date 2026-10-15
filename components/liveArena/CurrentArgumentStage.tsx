@@ -45,7 +45,7 @@ export function CurrentArgumentStage({
 
   const content = !message || !speaker ? (
     <Text style={[styles.empty, { color: t.textMuted }]}>
-      Waiting for the first argument.
+      The stage is ready. Waiting for the first fighter argument.
     </Text>
   ) : (
     <>
@@ -59,7 +59,7 @@ export function CurrentArgumentStage({
       >
         {preview}
       </Text>
-      <Text style={[styles.attr, { color: t.textMuted }]}>— {speaker.name}</Text>
+      <Text style={[styles.attr, { color: t.textSecondary }]}>ARGUMENT BY {speaker.name}</Text>
       {truncated ? (
         <Pressable
           accessibilityRole="button"
@@ -81,7 +81,7 @@ export function CurrentArgumentStage({
           onPress={onOpenFull}
           style={styles.readMoreHit}
         >
-          <Text style={[styles.historyCue, { color: t.textMuted }]}>History</Text>
+          <Text style={[styles.historyCue, { color: t.textSecondary }]}>View argument history  →</Text>
         </Pressable>
       )}
     </>
@@ -114,8 +114,8 @@ const styles = StyleSheet.create({
   },
   argument: {
     ...typeScale.body,
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: 19,
+    lineHeight: 27,
     fontWeight: '600',
     letterSpacing: -0.25,
     textAlign: 'center',
@@ -126,8 +126,9 @@ const styles = StyleSheet.create({
   },
   attr: {
     ...typeScale.caption,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     textAlign: 'center',
   },
   empty: {
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
   },
   readMoreHit: {
     alignSelf: 'center',
-    minHeight: 40,
+    minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: space.sm,
   },

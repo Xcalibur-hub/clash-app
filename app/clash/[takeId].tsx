@@ -5,7 +5,7 @@
  * settlement, reputation, and Blind reveal. No fabricated live aggregates.
  */
 import React from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -318,8 +318,8 @@ export default function ClashScreen(): React.JSX.Element {
       <LinearGradient
         colors={
           t.scheme === 'light'
-            ? ['rgba(196,165,116,0.14)', 'rgba(126,154,168,0.10)', 'transparent']
-            : ['rgba(196,165,116,0.12)', 'rgba(126,154,168,0.10)', 'transparent']
+            ? ['rgba(249,208,105,0.24)', 'rgba(224,189,249,0.13)', 'transparent']
+            : ['rgba(139,102,175,0.24)', 'rgba(236,158,131,0.10)', 'transparent']
         }
         locations={[0, 0.42, 1]}
         style={styles.stageWash}
@@ -354,10 +354,10 @@ export default function ClashScreen(): React.JSX.Element {
           </Pressable>
           <View style={styles.titleBlock}>
             <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textPrimary }]}>
-              {blind ? 'Blind Clash' : 'Clash'}
+              {blind ? 'BLIND CLASH' : 'THE CLASH'}
             </Text>
             <Text allowFontScaling={false} style={[styles.subEyebrow, { color: t.textMuted }]}>
-              Judgement
+              PICK A SIDE · MAKE IT COUNT
             </Text>
             <ClashCountdown
               closesAt={view.closesAt}
@@ -488,14 +488,15 @@ const styles = StyleSheet.create({
   eyebrow: {
     ...typeScale.label,
     fontWeight: '800',
-    letterSpacing: 0.4,
-    fontSize: 17,
+    fontSize: 21,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    letterSpacing: -0.7,
   },
   subEyebrow: {
     ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
   noticeBox: {

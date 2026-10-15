@@ -1,0 +1,7 @@
+BEGIN
+DO
+DO
+ROLLBACK
+
+NOTICE:  caught_duplicate_publication=true
+NOTICE:  post_error_policy_create=false sqlstate=42501

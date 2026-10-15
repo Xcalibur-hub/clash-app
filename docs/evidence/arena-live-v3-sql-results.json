@@ -1,0 +1,133 @@
+{
+  "suites": [
+    {
+      "file": "025_live_arena.sql",
+      "exit": 0,
+      "assertions": 233,
+      "failed": 0,
+      "plan": "233"
+    },
+    {
+      "file": "026_live_arena_spectator.sql",
+      "exit": 0,
+      "assertions": 20,
+      "failed": 0,
+      "plan": "20"
+    },
+    {
+      "file": "027_arena_spectator_upgrade.sql",
+      "exit": 0,
+      "assertions": 22,
+      "failed": 0,
+      "plan": "22"
+    },
+    {
+      "file": "028_arena_feel_alive.sql",
+      "exit": 0,
+      "assertions": 11,
+      "failed": 0,
+      "plan": "11"
+    },
+    {
+      "file": "029_list_arena_topic_rooms.sql",
+      "exit": 0,
+      "assertions": 5,
+      "failed": 0,
+      "plan": "5"
+    },
+    {
+      "file": "030_watch_arena_room.sql",
+      "exit": 0,
+      "assertions": 5,
+      "failed": 0,
+      "plan": "5"
+    },
+    {
+      "file": "046_arena_game_layer.sql",
+      "exit": 0,
+      "assertions": 117,
+      "failed": 0,
+      "plan": "117"
+    },
+    {
+      "file": "049_arena_expressive_media.sql",
+      "exit": 0,
+      "assertions": 7,
+      "failed": 0,
+      "plan": "7"
+    },
+    {
+      "file": "054_arena_duel_foundation.sql",
+      "exit": 0,
+      "assertions": 78,
+      "failed": 0,
+      "plan": "78"
+    },
+    {
+      "file": "056_arena_challenge_lifecycle.sql",
+      "exit": 0,
+      "assertions": 82,
+      "failed": 0,
+      "plan": "82"
+    },
+    {
+      "file": "058_arena_crowd_chat.sql",
+      "exit": 0,
+      "assertions": 61,
+      "failed": 0,
+      "plan": "61"
+    },
+    {
+      "file": "062_arena_content_visibility.sql",
+      "exit": 0,
+      "assertions": 20,
+      "failed": 0,
+      "plan": "20"
+    },
+    {
+      "file": "064_arena_discovery_states.sql",
+      "exit": 0,
+      "assertions": 15,
+      "failed": 0,
+      "plan": "15"
+    },
+    {
+      "file": "069_arena_challenge_inbox.sql",
+      "exit": 0,
+      "assertions": 39,
+      "failed": 0,
+      "plan": "39"
+    },
+    {
+      "file": "070_canonical_authorization.sql",
+      "exit": 0,
+      "assertions": 50,
+      "failed": 0,
+      "plan": "50"
+    },
+    {
+      "file": "072_official_retry_and_recovery.sql",
+      "exit": 0,
+      "assertions": 38,
+      "failed": 0,
+      "plan": "38"
+    },
+    {
+      "file": "074_historical_canonical_entry.sql",
+      "exit": 0,
+      "assertions": 21,
+      "failed": 0,
+      "plan": "21"
+    },
+    {
+      "file": "075_maintenance_failure_recovery.sql",
+      "exit": 0,
+      "assertions": 43,
+      "failed": 0,
+      "plan": "43"
+    }
+  ],
+  "assertions": 867,
+  "failures": 0,
+  "blocked": 0
+}

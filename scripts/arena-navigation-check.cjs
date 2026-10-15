@@ -125,7 +125,8 @@ async function main() {
     ...require('../theme/layout.ts'),
     ...require('../theme/typography.ts'),
     ...require('../theme/colors.ts'),
-    useThemeColors: () => require('../theme/palettes.ts').darkTheme
+    useThemeColors: () => require('../theme/palettes.ts').darkTheme,
+    useTheme: () => ({ scheme: 'dark' })
   };
   const {
     ArenaSideRail

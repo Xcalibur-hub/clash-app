@@ -1,0 +1,10 @@
+[
+  {
+    "file": "001_media_storage.sql",
+    "exit": 0,
+    "assertions": 25,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 25
+  }
+]

@@ -3,10 +3,9 @@
  * Confrontation stage: judgement energy, not a chat list.
  */
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { Side, TakeMedia, User } from '../../../store';
 import { space, useThemeColors } from '../../../theme';
-import { CrossedSwords } from '../CrossedSwords';
 import { ClashSideCard } from './ClashSideCard';
 
 export interface ClashMatchupProps {
@@ -42,7 +41,7 @@ export function ClashMatchup({
 }: ClashMatchupProps): React.JSX.Element {
   const t = useThemeColors();
   const active = selectedSide ?? myBallot;
-  const swordKey = `${sideA?.id ?? 'a'}-${sideB?.id ?? 'b'}-${settled ? 'done' : 'open'}`;
+  const dark = t.scheme === 'dark';
 
   return (
     <View style={styles.wrap}>
@@ -66,11 +65,11 @@ export function ClashMatchup({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <View style={[styles.rule, { backgroundColor: t.borderStrong }]} />
-        <View style={[styles.swordPlate, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-          <CrossedSwords triggerKey={swordKey} size={36} color={t.textMuted} cooldownMs={4000} />
+        <View style={[styles.rule, { backgroundColor: dark ? '#BCA1D8' : '#BA91CF' }]} />
+        <View style={[styles.vsPlate, { backgroundColor: dark ? '#F6D87B' : '#FFDE76' }]}>
+          <Text allowFontScaling={false} style={styles.vsText}>VS</Text>
         </View>
-        <View style={[styles.rule, { backgroundColor: t.borderStrong }]} />
+        <View style={[styles.rule, { backgroundColor: dark ? '#E9A58F' : '#E59B85' }]} />
       </View>
       <ClashSideCard
         side="B"
@@ -99,16 +98,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: space.sm,
     paddingVertical: 2,
-    marginVertical: -10,
+    marginVertical: -15,
     zIndex: 2,
   },
-  rule: { flex: 1, height: StyleSheet.hairlineWidth, maxWidth: 48 },
-  swordPlate: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: StyleSheet.hairlineWidth,
+  rule: { flex: 1, height: 2, maxWidth: 76 },
+  vsPlate: {
+    width: 62,
+    height: 62,
+    borderRadius: 22,
+    transform: [{ rotate: '-9deg' }],
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#2B202A',
+  },
+  vsText: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -1.8,
+    color: '#2B202A',
+    transform: [{ rotate: '9deg' }],
   },
 });

@@ -1,0 +1,5 @@
+ERROR: must be owner of table objects (SQLSTATE 42501)                                                             
+At statement: 12                                                                                                   
+create policy "selected fighter may read private assist media" on storage.objects                                  
+ for select to authenticated using (bucket_id='private-media' and public.arena_private_assist_media_readable(name))
+Try rerunning the command with --debug to troubleshoot the error.

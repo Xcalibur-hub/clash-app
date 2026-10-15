@@ -20,6 +20,7 @@ export default function ArenaLayout(): React.JSX.Element {
       <Stack.Screen name="topic/[topicId]" />
       <Stack.Screen name="room/[roomId]" />
       <Stack.Screen name="challenges" />
+      <Stack.Screen name="hall-of-fame" />
     </Stack>
   );
 }

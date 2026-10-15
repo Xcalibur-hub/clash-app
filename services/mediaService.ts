@@ -104,6 +104,24 @@ export async function deleteMedia(mediaId: string, bucket: string, path: string)
   if (error) throw requestError(error);
 }
 
+/**
+ * Reclaim an upload created by a composer draft that was abandoned before it
+ * ever reached a published Take. Scoped to exactly one approved plan: the video
+ * poster sibling (when asked) and `plan.path`. `delete_media` is owner-scoped
+ * (it refuses "not your media"), so media owned by anybody else is unreachable
+ * from here.
+ */
+export async function discardUpload(
+  plan: MediaUploadPlan,
+  options?: { videoPoster?: boolean },
+): Promise<void> {
+  if (options?.videoPoster) {
+    // A missing or unreadable poster must never block tombstoning the media row.
+    await requireSupabase().storage.from(plan.bucket).remove([posterPathForVideo(plan.path)]);
+  }
+  await deleteMedia(plan.id, plan.bucket, plan.path);
+}
+
 /** Permanent URL for public media only. */
 export function getPublicMediaUrl(bucket: string, path: string): string {
   return requireSupabase().storage.from(bucket).getPublicUrl(path).data.publicUrl;

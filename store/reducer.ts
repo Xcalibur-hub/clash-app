@@ -76,6 +76,7 @@ export type ClashAction =
   | { type: 'arena/loading' }
   | { type: 'arena/error'; message: string }
   | { type: 'data/hydrate'; snapshot: ArenaSnapshot }
+  | { type: 'discussion/profiles'; users: readonly User[] }
   | { type: 'viewer/set'; viewer: User }
   | { type: 'take/save'; takeId: string }
   | { type: 'take/react'; takeId: string }
@@ -219,6 +220,9 @@ export function clashReducer(state: ClashState, action: ClashAction): ClashState
         arenaLive: true,
       };
     }
+
+    case 'discussion/profiles':
+      return { ...state, users: { ...state.users, ...Object.fromEntries(action.users.map((user) => [user.id, user])) } };
 
     case 'viewer/set': {
       if (action.viewer.id === state.viewer.id) return state;

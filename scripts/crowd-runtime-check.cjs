@@ -61,9 +61,24 @@ async function main() {
     }
     f.takeId=`crowd-local-${run}`;
     must(await admin.from('takes').insert({id:f.takeId,author_id:f.users[0].profileId,hood:'techtakes',is_runtime_fixture:true,text:'[LOCAL TEST] Crowd runtime validation — retained only for verification'}));
-    const duel=await rpc(admin,'create_arena_duel',{p_take_id:f.takeId,p_fighter_b_id:f.users[1].profileId,p_request_key:randomUUID()});
+    const createArgs={p_take_id:f.takeId,p_fighter_b_id:f.users[1].profileId,p_request_key:randomUUID()};
+    const [duel,duplicateDuel]=await Promise.all([
+      rpc(admin,'create_arena_duel',createArgs),rpc(admin,'create_arena_duel',createArgs),
+    ]);
+    assert.equal(duplicateDuel.clashId,duel.clashId);assert.equal(duplicateDuel.roomId,duel.roomId);
+    assert.equal(must(await admin.from('clashes').select('id').eq('take_id',f.takeId)).length,1);
+    assert.equal(must(await admin.from('arena_rooms').select('id').eq('clash_id',duel.clashId)).length,1);
+    console.log('PASS concurrent same-key trusted creation produces exactly one canonical Clash and Room');
     f.roomId=duel.roomId; f.topicId=must(await admin.from('arena_rooms').select('topic_id').eq('id',f.roomId).single()).topic_id;
     for(const u of f.users) clients.push(await login(u));
+    const officialArgs={p_room_id:f.roomId,p_operation:'message',p_payload:{body:'[LOCAL TEST] Concurrent official argument'},p_request_key:randomUUID()};
+    const [official,retry]=await Promise.all([
+      rpc(clients[0],'submit_arena_official',officialArgs),rpc(clients[0],'submit_arena_official',officialArgs),
+    ]);
+    assert.equal(official.id,retry.id);
+    assert.equal(must(await admin.from('arena_room_messages').select('id').eq('room_id',f.roomId).eq('id',official.id)).length,1);
+    assert.equal((await clients[0].rpc('submit_arena_official',{...officialArgs,p_payload:{body:'Altered payload'}})).error?.code,'P0006');
+    console.log('PASS concurrent same-key authenticated official submission returns one row; altered payload is rejected');
     await rpc(clients[0],'post_arena_room_message',{p_room_id:f.roomId,p_body:'[LOCAL TEST] Official argument remains on the Stage.'});
     for(const i of [2,3]) await rpc(clients[i],'watch_arena_room',{p_room_id:f.roomId});
     const typingSeen=[0,0]; const typingJoined=[false,false]; const typingChannels=[];

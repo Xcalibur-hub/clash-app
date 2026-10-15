@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TakeComposerFields } from '../../components/arena/TakeComposerFields';
@@ -17,14 +17,25 @@ import { analytics } from '../../services/analytics';
 import { postTake, type NewTakeMedia } from '../../services/apiService';
 import { createQuestion } from '../../services/arenaQuestionService';
 import { currentUserId } from '../../services/supabaseClient';
+import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
 import { validQuestionChoices } from '../../utils/arenaQuestions';
+import {
+  canReclaimDraftUpload,
+  isPublishEnabled,
+  publishCtaLabel,
+  publishFailureCopy,
+  publishHelperCopy,
+  publishPhase,
+} from '../../utils/takeComposerState';
 import { SegmentedTabs } from '../../components/shared/SegmentedTabs';
 import {
   completeUpload,
   createUpload,
+  discardUpload,
   failUpload,
   getPublicMediaUrl,
   readPickedBytes,
+  type MediaUploadPlan,
   uploadFile,
   uploadVideoPoster,
 } from '../../services/mediaService';
@@ -93,14 +104,35 @@ export default function CreateTakeScreen(): React.JSX.Element {
   const [posting, setPosting] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const placeholder = React.useMemo(suggestPrompt, []);
+  const keyboardOpen = useKeyboardVisible();
+  /** Upload owned by this composer session; reclaimed only if never published. */
+  const draftUpload = React.useRef<{ plan: MediaUploadPlan; videoPoster: boolean; published: boolean } | null>(null);
 
   const charsLeft = MAX_CHARS - text.length;
   const overLimit = charsLeft < 0;
   const hasDraft = text.trim().length > 0 || media !== null || (kind==='question' && Boolean(sideA||sideB));
-  const canDrop = text.trim().length > 0 && !overLimit && !posting && (kind==='take'||validQuestionChoices(sideA,sideB));
+  const phase = publishPhase({
+    kind,
+    hasText: text.trim().length > 0,
+    overLimit,
+    charsOver: Math.max(0, -charsLeft),
+    choicesValid: validQuestionChoices(sideA, sideB),
+    uploading,
+    publishing: posting,
+  });
+  const canDrop = isPublishEnabled(phase);
+
+  /** Reclaims media only from an abandoned draft that never reached a Take. */
+  const reclaimDraftUpload = (): void => {
+    const draft = draftUpload.current;
+    if (!draft || !canReclaimDraftUpload(draft)) return;
+    draftUpload.current = null;
+    void discardUpload(draft.plan, { videoPoster: draft.videoPoster }).catch(() => undefined);
+  };
 
   const doDismiss = (): void => {
     hapticTap();
+    reclaimDraftUpload();
     if (router.canGoBack()) {
       router.back();
       return;
@@ -134,6 +166,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
   const uploadMedia = async (picked: PickedMedia): Promise<NewTakeMedia> => {
     const mime = mimeFor(picked);
     const plan = await createUpload(picked.kind, mime, 'public');
+    draftUpload.current = { plan, videoPoster: picked.kind === 'video', published: false };
     try {
       const bytes = await readPickedBytes(picked.uri);
       await uploadFile(plan, bytes, mime);
@@ -196,11 +229,13 @@ export default function CreateTakeScreen(): React.JSX.Element {
         take_has_media: Boolean(newMedia),
         media_type: newMedia ? (media?.kind === 'video' ? 'video' : 'image') : 'none',
       });
+      if (draftUpload.current) draftUpload.current.published = true;
       dispatch(createTake(take));
       router.replace('/(tabs)');
     } catch (error) {
-      // The draft stays put — a failed drop never loses the take.
-      dispatch(showNotice(errorText(error)));
+      // The draft stays put — a failed drop never loses the take, and a rejected
+      // duplicate keeps its uploaded media so the corrected retry can publish it.
+      dispatch(showNotice(publishFailureCopy(error, errorText(error))));
     } finally {
       setUploading(false);
       setPosting(false);
@@ -210,15 +245,17 @@ export default function CreateTakeScreen(): React.JSX.Element {
 
   return (
     <AuroraBackground tone="arena">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.root}
-      >
+      <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0} style={styles.root}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.content,
-            { paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.xxl },
+            {
+              paddingTop: insets.top + space.md,
+              // The IME already lifts the content, so drop the home-indicator
+              // inset while it is up instead of stacking both into a blank gap.
+              paddingBottom: keyboardOpen ? space.md : insets.bottom + space.xxl,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
         >
@@ -262,9 +299,9 @@ export default function CreateTakeScreen(): React.JSX.Element {
           <View style={{ height: space.xxl }} />
         </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>
+        <View style={[styles.footer, { paddingBottom: keyboardOpen ? space.md : insets.bottom + space.md }]}>
           <GlowButton
-            label={uploading ? 'Uploading…' : posting ? 'Publishing…' : kind==='question'?'Publish question':'Drop It'}
+            label={publishCtaLabel(phase, kind)}
             onPress={() => {
               void drop();
             }}
@@ -275,8 +312,12 @@ export default function CreateTakeScreen(): React.JSX.Element {
             accessibilityLabel={kind==='question'?'Publish your A/B question':'Drop your take into the Arena'}
             accessibilityHint={kind==='question'?'Publishes a question with two choices':'Publishes your take'}
           />
-          <Text allowFontScaling={false} style={[styles.disclaimer, { color: theme.textMuted }]}>
-            {kind==='question' ? (canDrop?'Voting closes after 24 hours.':'Add a question and two distinct choices.') : canDrop ? 'Your take self-destructs after 24 hours.' : 'Write something first.'}
+          <Text
+            allowFontScaling={false}
+            accessibilityLiveRegion="polite"
+            style={[styles.disclaimer, { color: theme.textMuted }]}
+          >
+            {publishHelperCopy(phase, kind, Math.max(0, -charsLeft))}
           </Text>
         </View>
       </KeyboardAvoidingView>

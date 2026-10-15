@@ -2,11 +2,10 @@
  * Accessible judgement controls — secondary to tapping Side cards.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import type { Side } from '../../../store';
 import { radius, space, typeScale, useThemeColors } from '../../../theme';
 import { PressableScale } from '../../shared/PressableScale';
-import { useDuelSurface } from './clashTheme';
 
 export interface ClashJudgeControlsProps {
   sideAHandle: string | null;
@@ -27,7 +26,7 @@ export function ClashJudgeControls({
   return (
     <View style={styles.wrap}>
       <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-        Or choose below
+        CAST YOUR VOTE
       </Text>
       <View style={styles.row}>
         <JudgeButton
@@ -63,7 +62,12 @@ function JudgeButton({
   onPress: () => void;
 }): React.JSX.Element {
   const t = useThemeColors();
-  const { tone, soft, selectedFill } = useDuelSurface(side);
+  const dark = t.scheme === 'dark';
+  const tone = dark ? '#211B29' : '#261E2A';
+  const soft = side === 'A'
+    ? (dark ? '#C6ACEB' : '#E4D1FF')
+    : (dark ? '#F4A88F' : '#FFC3A9');
+  const selectedFill = side === 'A' ? '#B492E4' : '#F09277';
   return (
     <PressableScale
       onPress={onPress}
@@ -74,17 +78,17 @@ function JudgeButton({
       style={[
         styles.btn,
         {
-          borderColor: tone,
+          borderColor: pending ? tone : 'transparent',
           backgroundColor: pending ? selectedFill : soft,
           opacity: busy && !pending ? 0.45 : 1,
         },
       ]}
     >
       <Text allowFontScaling={false} style={[styles.btnLabel, { color: tone }]}>
-        {pending ? 'Locking…' : `Side ${side}`}
+        {pending ? 'LOCKING…' : `VOTE SIDE ${side} ↗`}
       </Text>
       <Text allowFontScaling={false} style={[styles.btnHandle, { color: t.textMuted }]} numberOfLines={1}>
-        {handle ? `@${handle}` : `Side ${side}`}
+        {handle ? `@${handle}` : `VOTE SIDE ${side}`}
       </Text>
     </PressableScale>
   );
@@ -94,22 +98,22 @@ const styles = StyleSheet.create({
   wrap: { gap: space.sm },
   kicker: {
     ...typeScale.caption,
-    letterSpacing: 0.4,
-    fontWeight: '500',
+    letterSpacing: 1.6,
+    fontWeight: '800',
     textAlign: 'center',
   },
   row: { flexDirection: 'row', gap: space.sm },
   btn: {
     flex: 1,
-    minHeight: 56,
-    paddingVertical: space.sm + 2,
+    minHeight: 88,
+    paddingVertical: space.md,
     paddingHorizontal: space.sm,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 22,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
   },
-  btnLabel: { ...typeScale.label, fontWeight: '700', letterSpacing: 0.2 },
+  btnLabel: { ...typeScale.label, fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }), fontSize: 15, fontWeight: '900', letterSpacing: -0.3 },
   btnHandle: { ...typeScale.meta, fontSize: 12 },
 });

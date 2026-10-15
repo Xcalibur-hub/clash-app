@@ -3,6 +3,7 @@ import {
   Image,
   Pressable,
   StyleSheet,
+  Platform,
   Text,
   useWindowDimensions,
   View,
@@ -190,7 +191,7 @@ function MediaFeedCard({
         {
           width: cardW,
           height,
-          borderRadius: 28,
+          borderRadius: 32,
           shadowColor: t.shadowColor,
           backgroundColor: '#111113',
         },
@@ -379,16 +380,16 @@ function TextFeedCard({
         {
           width: cardW,
           borderRadius: 26,
-          backgroundColor: t.surface,
+          backgroundColor: t.scheme === 'dark' ? '#292433' : '#F5E9DB',
           shadowColor: t.shadowColor,
         },
       ]}
     >
-      <View style={[styles.textBlob, { backgroundColor: accent.soft }]} />
-      <View style={[styles.textEdge, { backgroundColor: accent.ink }]} />
+      <View style={[styles.textBlob, { backgroundColor: t.scheme === 'dark' ? '#67517E' : '#E9B9D5' }]} />
+      <View style={[styles.textEdge, { backgroundColor: t.scheme === 'dark' ? '#BBA2DB' : '#D9756D' }]} />
 
       <View style={styles.textTop}>
-        <Text allowFontScaling={false} style={[styles.hoodCaps, { color: accent.ink }]}>
+        <Text allowFontScaling={false} style={[styles.hoodCaps, { color: t.scheme === 'dark' ? '#D6B8F2' : '#733F6A' }]}>
           {hood.toUpperCase()}
           {pulse ? ` · ${pulseLabel(pulse)}` : ''}
         </Text>
@@ -407,13 +408,13 @@ function TextFeedCard({
 
       <Text
         allowFontScaling
-        style={[styles.textHeadline, { color: t.textPrimary }]}
+        style={[styles.textHeadline, { color: t.scheme === 'dark' ? '#FFF6EE' : '#251F28' }]}
         numberOfLines={6}
       >
         {take.text}
       </Text>
 
-      <Squiggle size={110} color={accent.ink} opacity={0.28} style={styles.textDoodle} />
+      <Squiggle size={110} color={t.scheme === 'dark' ? '#C8A5E3' : '#B65785'} opacity={0.5} style={styles.textDoodle} />
 
       {topComment ? (
         <TakeStoryBeat
@@ -435,7 +436,7 @@ function TextFeedCard({
       <View style={styles.textFooter}>
         <View style={styles.textAuthor}>
           <Avatar name={author.name} tint={author.tint} size={24} />
-          <Text allowFontScaling={false} style={[styles.textHandle, { color: t.textMuted }]}>
+          <Text allowFontScaling={false} style={[styles.textHandle, { color: t.scheme === 'dark' ? '#D6C9D9' : '#6B5965' }]}>
             @{author.handle}
             {isViewer ? ' · You' : ''} · {timeAgo(take.createdAt)}
           </Text>
@@ -533,7 +534,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(8,8,11,0.45)',
+    backgroundColor: 'rgba(8,8,11,0.58)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -580,10 +581,11 @@ const styles = StyleSheet.create({
   mediaHeadline: {
     ...typeScale.editorial,
     color: '#FAFAF8',
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontSize: 29,
+    lineHeight: 35,
+    fontWeight: '900',
+    letterSpacing: -0.9,
   },
   clashHint: {
     ...typeScale.caption,
@@ -641,10 +643,10 @@ const styles = StyleSheet.create({
   },
   textCard: {
     overflow: 'hidden',
-    paddingHorizontal: space.lg,
-    paddingTop: space.md,
-    paddingBottom: space.sm,
-    minHeight: 280,
+    paddingHorizontal: 23,
+    paddingTop: 24,
+    paddingBottom: 18,
+    minHeight: 330,
     shadowOpacity: 0.1,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
@@ -652,11 +654,12 @@ const styles = StyleSheet.create({
   },
   textBlob: {
     position: 'absolute',
-    top: -40,
-    right: -30,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    top: -70,
+    right: -52,
+    width: 228,
+    height: 228,
+    borderRadius: 114,
+    opacity: 0.8,
   },
   textEdge: {
     position: 'absolute',
@@ -674,16 +677,18 @@ const styles = StyleSheet.create({
   },
   hoodCaps: {
     ...typeScale.caption,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
   textHeadline: {
     ...typeScale.editorial,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontSize: 33,
+    lineHeight: 39,
+    fontWeight: '900',
+    letterSpacing: -1.25,
     zIndex: 1,
     marginBottom: space.lg,
   },
@@ -703,6 +708,7 @@ const styles = StyleSheet.create({
   },
   textHandle: {
     ...typeScale.meta,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 12,
     fontWeight: '600',
     flex: 1,

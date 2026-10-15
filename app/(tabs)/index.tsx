@@ -1,18 +1,17 @@
 import React from 'react';
-import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
+import { FlatList, Platform, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
+import { ArenaLiveGateway } from '../../components/arena/ArenaLiveGateway';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
 import { ArenaSideRail } from '../../components/arena/ArenaSideRail';
 import { ArenaClashes } from '../../components/arena/ArenaClashes';
 import { ArenaCommunity } from '../../components/arena/ArenaCommunity';
 import { ArenaTopics } from '../../components/arena/ArenaTopics';
-import { ArenaTopicDeck } from '../../components/liveArena/ArenaTopicDeck';
 import { ArenaAtmosphere } from '../../components/liveArena/ArenaAtmosphere';
 import { ArenaEntrance } from '../../components/liveArena/ArenaEntrance';
-import { LiveClashHero } from '../../components/liveArena/LiveClashHero';
 import { consumeArenaEntrance } from '../../utils/arenaEntranceState';
 import { FreshTakesSection } from '../../components/arena/FreshTakesSection';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
@@ -48,7 +47,7 @@ import {
   type User,
 } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, space, typeScale, useTheme, useThemeColors } from '../../theme';
 import { DEFAULT_ARENA_MODE, type ArenaMode } from '../../utils/arenaNav';
 import {
   arenaFlatListData,
@@ -79,6 +78,7 @@ export default function ArenaScreen(): React.JSX.Element {
   const now = useClock(30_000);
   const requireAuth = useRequireAuth();
   const theme = useThemeColors();
+  const { scheme } = useTheme();
 
   const [arenaMode, setArenaMode] = React.useState<ArenaMode>(DEFAULT_ARENA_MODE);
   const [scope, setScope] = React.useState<FeedScope>('for-you');
@@ -388,33 +388,10 @@ export default function ArenaScreen(): React.JSX.Element {
 
     return (
       <View style={styles.hero}>
-        {heroTopic ? (
-          <LiveClashHero
-            topic={heroTopic}
-            onWatch={() => openTopic(heroTopic.id)}
-            onEnter={() => {
-              if (heroTopic.viewerRoomId) openRoom(heroTopic.viewerRoomId);
-              else openTopic(heroTopic.id);
-            }}
-          />
-        ) : null}
-
-        {liveTopics.length > 0 ? (
-          <ArenaTopicDeck
-            topics={liveTopics}
-            onOpen={(topicId) => openTopic(topicId)}
-            onChoose={(topicId, stance) => openTopic(topicId, stance)}
-            onWatch={(topicId) => openTopic(topicId)}
-            onEnter={(topicId, roomId) => {
-              if (roomId) openRoom(roomId);
-              else openTopic(topicId);
-            }}
-            onJoinDebate={(topicId, roomId) => {
-              if (roomId) openRoom(roomId);
-              else openTopic(topicId);
-            }}
-          />
-        ) : null}
+        <ArenaLiveGateway
+          liveCount={liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
+          onOpen={() => setArenaMode('clashes')}
+        />
 
         <FreshTakesSection
           items={freshItems}
@@ -436,11 +413,18 @@ export default function ArenaScreen(): React.JSX.Element {
         />
 
         <View style={styles.feedHead}>
-          <Text style={[styles.feedTitle, { color: theme.textPrimary }]}>
-            Your Feed
+          <View style={styles.feedKickerRow}>
+            <View style={[styles.feedKickerDot, { backgroundColor: scheme === 'dark' ? '#F0AD96' : '#D98569' }]} />
+            <Text style={[styles.feedKicker, { color: theme.textSecondary }]}>
+              YOUR DAILY PULSE
+            </Text>
+            <Text style={[styles.feedIssue, { color: theme.textMuted }]}>LIVE / 24H</Text>
+          </View>
+          <Text allowFontScaling style={[styles.feedTitle, { color: theme.textPrimary }]}>
+            Hot right <Text style={{ color: scheme === 'dark' ? '#F3AB91' : '#D47A62' }}>now.</Text>
           </Text>
-          <Text style={[styles.feedSub, { color: theme.textMuted }]}>
-            Takes from interests, follows, and discovery
+          <Text style={[styles.feedSub, { color: theme.textSecondary }]}>
+            The takes sparking conversations in your world
           </Text>
           <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         </View>
@@ -466,6 +450,8 @@ export default function ArenaScreen(): React.JSX.Element {
     state.arenaStatus,
     theme.textPrimary,
     theme.textMuted,
+    theme.textSecondary,
+    scheme,
     toggleReaction,
   ]);
 
@@ -608,24 +594,23 @@ const styles = StyleSheet.create({
   listDimmed: { opacity: 0.35 },
   list: { flexGrow: 1 },
   hero: { paddingBottom: space.xs, gap: space.md },
-  feedHead: {
-    paddingTop: space.md,
-    paddingBottom: space.md,
-    gap: 6,
+  feedHead: { paddingTop: space.xl, paddingBottom: space.lg, gap: 8 },
+  feedKickerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: layout.screenX,
   },
+  feedKickerDot: { width: 9, height: 9, borderRadius: 3, transform: [{ rotate: '-15deg' }] },
+  feedKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
+  feedIssue: { fontSize: 10, fontWeight: '700', marginLeft: 'auto', letterSpacing: 0.6 },
   feedTitle: {
     ...typeScale.label,
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontSize: 39, lineHeight: 44, fontWeight: '900', letterSpacing: -1.8,
     paddingHorizontal: layout.screenX,
   },
   feedSub: {
-    ...typeScale.meta,
-    fontSize: 14,
-    fontWeight: '500',
-    paddingHorizontal: layout.screenX,
-    marginBottom: space.xs,
+    ...typeScale.meta, fontSize: 13, lineHeight: 19,
+    fontWeight: '500', paddingHorizontal: layout.screenX, marginBottom: space.sm,
   },
 });
 

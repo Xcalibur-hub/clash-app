@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, type AppStateStatus } from 'react-native';
 import { createClient, type PostgrestError, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../supabase/database.types';
-import { isLocalSupabaseUrl } from '../utils/supabaseEnv';
+import { isLocalSupabaseUrl, supabaseAuthStorageKey } from '../utils/supabaseEnv';
 import { logger } from './logger';
 
 /**
@@ -70,7 +70,7 @@ function buildClient(): ClashSupabaseClient | null {
     auth: {
       storage: AsyncStorage,
       // Isolate local vs hosted sessions on the same physical device.
-      storageKey: isLocalSupabase ? 'sb-clash-local-auth-token' : 'sb-clash-hosted-auth-token',
+      storageKey: supabaseAuthStorageKey(url),
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

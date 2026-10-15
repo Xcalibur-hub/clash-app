@@ -9,6 +9,7 @@ import { HOOD_LABEL } from '../../data/hoods';
 import type { Take, User } from '../../store';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { resolveStillUrl } from '../../utils/mediaStill';
+import { heroCardHeight } from '../../utils/takeHeroLayout';
 import { Avatar } from '../shared/Avatar';
 import { PlayIcon } from '../shared/icons';
 import { MediaViewer } from '../shared/MediaViewer';
@@ -29,6 +30,8 @@ export function TakeDetailHero({
   const media = take.media;
   const [failed, setFailed] = React.useState(false);
   const [viewerOpen, setViewerOpen] = React.useState(false);
+  /** Measured copy overlay height, so the plate can grow to fit long bodies. */
+  const [copyHeight, setCopyHeight] = React.useState(0);
 
   React.useEffect(() => {
     setFailed(false);
@@ -42,7 +45,7 @@ export function TakeDetailHero({
   const playUrl = media.url;
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
   const cardW = width - space.md * 2;
-  const height = Math.min(520, Math.max(360, Math.round(cardW * 1.12)));
+  const height = heroCardHeight({ cardWidth: cardW, copyHeight });
 
   return (
     <>
@@ -92,7 +95,13 @@ export function TakeDetailHero({
           </View>
         ) : null}
 
-        <View style={styles.copy}>
+        <View
+          style={styles.copy}
+          onLayout={(event) => {
+            const next = Math.ceil(event.nativeEvent.layout.height);
+            setCopyHeight((previous) => (Math.abs(previous - next) > 1 ? next : previous));
+          }}
+        >
           <Text allowFontScaling style={styles.headline} numberOfLines={5}>
             {take.text}
           </Text>

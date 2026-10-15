@@ -62,6 +62,10 @@ Module._load = function(request, parent, isMain) {
   if (request === 'expo-linear-gradient') return { LinearGradient: ({ children, style }) => React.createElement(RN.View, { style }, children) };
   if (request === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
   const resolved = Module._resolveFilename(request, parent).replaceAll('\\','/');
+  if (resolved.endsWith('/store/AuthProvider.tsx')) return { useAuth: () => ({ user: { id: 'render-account' } }) };
+  if (resolved.endsWith('/hooks/useMediaPicker.ts')) return { useMediaPicker: () => ({ pickImage: async () => null, pickVideo: async () => null }) };
+  if (resolved.endsWith('/services/arenaAssistService.ts')) return {};
+  if (resolved.endsWith('/components/shared/MediaViewer.tsx')) return { MediaViewer: () => null };
   if (resolved.endsWith('/hooks/useArenaCrowd.ts')) return { useArenaCrowd: () => ({ messages: [],context: null,loading: true,error: null,connected: false,sending: false,hasOlder: false,olderBusy: false,refresh: async () => {},loadOlder: async () => {},send: async () => false }) };
   if (theme && resolved === `${root.replaceAll('\\','/')}/theme/index.ts`) return theme;
   if (resolved.endsWith('/utils/haptics.ts')) return { tap: noop, press: noop, judge: noop, notify: noop };

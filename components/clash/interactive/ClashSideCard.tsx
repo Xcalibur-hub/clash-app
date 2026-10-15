@@ -3,7 +3,7 @@
  * Opinion typography is the hero; side tint is a quiet edge cue.
  */
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
@@ -51,7 +51,15 @@ export function ClashSideCard({
   pending = false,
 }: ClashSideCardProps): React.JSX.Element {
   const t = useThemeColors();
-  const { tone, soft, line, selectedFill } = useDuelSurface(side);
+  const { tone } = useDuelSurface(side);
+  const dark = t.scheme === 'dark';
+  const soft = side === 'A'
+    ? (dark ? '#47345E' : '#E7D7FF')
+    : (dark ? '#623F47' : '#FFD1B8');
+  const selectedFill = side === 'A'
+    ? (dark ? '#624580' : '#D5B8FF')
+    : (dark ? '#7A4B4B' : '#FFB996');
+  const editorialInk = dark ? '#FFF7F1' : '#251D2A';
   const reduced = useReducedMotion();
   const progress = useSharedValue(reduced ? 1 : 0);
   const weight = useSharedValue(emphasized ? 1 : diminished ? -1 : 0);
@@ -115,13 +123,13 @@ export function ClashSideCard({
 
   const onMedia = mediaFirst;
   const labelColor = onMedia ? 'rgba(245,242,236,0.78)' : tone;
-  const bodyColor = onMedia ? '#FAFAF8' : t.textPrimary;
-  const metaColor = onMedia ? 'rgba(245,242,236,0.62)' : t.textMuted;
+  const bodyColor = onMedia ? '#FAFAF8' : editorialInk;
+  const metaColor = onMedia ? 'rgba(245,242,236,0.62)' : (dark ? '#E3D1E7' : '#675466');
 
   const head = (
     <View style={styles.head}>
       <Text allowFontScaling={false} style={[styles.sideLabel, { color: labelColor }]}>
-        Side {side}
+        {side === 'A' ? '01  ·  SIDE A' : '02  ·  SIDE B'}
       </Text>
       {winner ? (
         <Text allowFontScaling={false} style={[styles.winner, { color: labelColor }]}>
@@ -133,7 +141,7 @@ export function ClashSideCard({
         </Text>
       ) : selectable ? (
         <Text allowFontScaling={false} style={[styles.hint, { color: metaColor }]}>
-          Tap to judge
+          TAP TO VOTE ↗
         </Text>
       ) : null}
     </View>
@@ -172,7 +180,7 @@ export function ClashSideCard({
         styles.card,
         mediaFirst ? styles.cardMedia : null,
         {
-          borderColor: winner || emphasized ? tone : line,
+          borderColor: winner || emphasized ? tone : 'transparent',
           backgroundColor: emphasized ? selectedFill : soft,
           borderLeftColor: tone,
           shadowColor: t.shadowColor,
@@ -251,12 +259,12 @@ export function ClashSideCard({
 const styles = StyleSheet.create({
   card: {
     gap: space.sm,
-    paddingVertical: space.lg + 2,
-    paddingHorizontal: space.md + 2,
-    borderRadius: radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderLeftWidth: 3,
-    minHeight: 156,
+    paddingVertical: 24,
+    paddingHorizontal: 22,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderLeftWidth: 5,
+    minHeight: 206,
   },
   cardMedia: {
     minHeight: 228,
@@ -279,8 +287,8 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sideLabel: {
     ...typeScale.caption,
-    letterSpacing: 0.6,
-    fontWeight: '600',
+    letterSpacing: 1.3,
+    fontWeight: '900',
     fontSize: 11,
   },
   winner: { ...typeScale.caption, letterSpacing: 0.3, fontWeight: '700', fontSize: 11 },
@@ -291,10 +299,11 @@ const styles = StyleSheet.create({
   hiddenName: { ...typeScale.label },
   text: {
     ...typeScale.takeText,
-    fontSize: 20,
-    lineHeight: 29,
-    letterSpacing: -0.25,
-    fontWeight: '600',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontSize: 26,
+    lineHeight: 33,
+    letterSpacing: -0.8,
+    fontWeight: '800',
   },
   textOnMedia: {
     ...typeScale.takeText,

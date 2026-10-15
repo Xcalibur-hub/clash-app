@@ -1,73 +1,90 @@
-/** Persistent, labelled navigation within the existing Arena screen. */
+/** Arena V2 compact destination selector — retains all four existing modes. */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { ArenaIcon, CreatorsIcon, HashIcon, SparklesIcon } from '../shared/icons';
-import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import { layout, useTheme, useThemeColors } from '../../theme';
 import { ARENA_MODES, arenaModeAccessibilityLabel, type ArenaMode } from '../../utils/arenaNav';
 import { tap } from '../../utils/haptics';
+
 const ICONS = {
   for_you: SparklesIcon,
   clashes: ArenaIcon,
   community: CreatorsIcon,
-  topics: HashIcon
+  topics: HashIcon,
 };
+
 export function ArenaSideRail({
   mode,
-  onChange
+  onChange,
 }: {
   mode: ArenaMode;
   onChange: (mode: ArenaMode) => void;
 }): React.JSX.Element {
   const t = useThemeColors();
-  return <View style={styles.shell} accessibilityRole="tablist" accessibilityLabel="Arena destinations">
-  {ARENA_MODES.map(item => {
-      const selected = item.id === mode,
-        Icon = ICONS[item.id];
-      return <Pressable key={item.id} onPress={() => {
-        if (!selected) {
-          tap();
-          onChange(item.id);
-        }
-      }} accessibilityRole="tab" accessibilityState={{
-        selected
-      }} accessibilityLabel={arenaModeAccessibilityLabel(item.label, selected)} style={({
-        pressed
-      }) => [styles.item, {
-        borderColor: selected ? t.textPrimary : t.border,
-        backgroundColor: selected ? t.surfaceMuted : t.background,
-        opacity: pressed ? 0.7 : 1
-      }]}>
-   <Icon size={17} color={selected ? t.textPrimary : t.textMuted} /><Text style={[styles.label, {
-          color: selected ? t.textPrimary : t.textSecondary
-        }]}>{item.label}</Text>
-  </Pressable>;
-    })}
- </View>;
+  const { scheme } = useTheme();
+  const dark = scheme === 'dark';
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
+      contentContainerStyle={styles.shell}
+      accessibilityRole="tablist"
+      accessibilityLabel="Arena destinations"
+    >
+      {ARENA_MODES.map((item) => {
+        const selected = item.id === mode;
+        const Icon = ICONS[item.id];
+        const fill = selected ? t.textPrimary : dark ? '#23242A' : '#EDEAE2';
+        const textColor = selected ? t.background : t.textSecondary;
+        return (
+          <Pressable
+            key={item.id}
+            onPress={() => {
+              if (!selected) {
+                tap();
+                onChange(item.id);
+              }
+            }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            accessibilityLabel={arenaModeAccessibilityLabel(item.label, selected)}
+            style={({ pressed }) => [
+              styles.item,
+              { backgroundColor: fill, opacity: pressed ? 0.78 : 1 },
+            ]}
+          >
+            <Icon size={15} color={textColor} />
+            <Text style={[styles.label, { color: textColor }]}>{item.label}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
 }
+
 const styles = StyleSheet.create({
+  scroll: { flexGrow: 0 },
   shell: {
     paddingHorizontal: layout.screenX,
-    paddingVertical: space.sm,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space.xs
-  },
-  item: {
-    width: '48%',
-    flexGrow: 1,
-    minHeight: 44,
+    paddingTop: 7,
+    paddingBottom: 13,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.sm,
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.md
+    gap: 8,
+  },
+  item: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 15,
+    paddingVertical: 7,
+    borderRadius: 22,
   },
   label: {
-    ...typeScale.caption,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 13,
     fontWeight: '700',
-    flexShrink: 1
-  }
+  },
 });

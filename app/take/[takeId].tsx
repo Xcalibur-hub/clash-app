@@ -1,9 +1,9 @@
 import React from 'react';
 import {
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CommentThread } from '../../components/arena/CommentThread';
+import { CommentBranch } from '../../components/arena/CommentThread';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { RebuttalInput } from '../../components/arena/RebuttalInput';
 import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
@@ -28,6 +28,8 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useTakeReaction } from '../../hooks/useTakeReaction';
 import { useOperationScope } from '../../hooks/useOperationScope';
 import { toggleUpvote, fetchTakeById, fetchProfilesByIds } from '../../services/apiService';
+import { fetchDiscussionPage, type DiscussionCursor } from '../../services/arenaDiscussionService';
+import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { ClashModeSheet } from '../../components/clash/ClashModeSheet';
 import { startClash, type ClashMode } from '../../services/clashEngineService';
 import { analytics } from '../../services/analytics';
@@ -47,11 +49,12 @@ import {
   toggleSave,
   useClash,
   type ChallengerComment,
+  type CommentNode,
   type CommentSort,
   type User,
   type Take,
 } from '../../store';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, space, typeScale, useTheme, useThemeColors } from '../../theme';
 import {
   clashStartErrorMessage,
   shouldOpenExistingClash,
@@ -90,8 +93,52 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const react = useTakeReaction();
   const theme = useThemeColors();
+  const { scheme } = useTheme();
 
   const [sort, setSort] = React.useState<CommentSort>('best');
+  const [pagedRoots, setPagedRoots] = React.useState<ChallengerComment[]>([]);
+  const [locallyCreated, setLocallyCreated] = React.useState<ChallengerComment[]>([]);
+  React.useEffect(() => { setLocallyCreated([]); }, [accountScope]);
+  const [pageCursor, setPageCursor] = React.useState<DiscussionCursor | null>(null);
+  const [pageBusy, setPageBusy] = React.useState(false);
+  const [pageError, setPageError] = React.useState<string | null>(null);
+  const [pageReady, setPageReady] = React.useState(false);
+  const [pageRetry, setPageRetry] = React.useState(0);
+  const pageRequest = React.useRef(false);
+  const pageSeq = React.useRef(0);
+  React.useEffect(() => {
+    const seq = ++pageSeq.current;
+    setPagedRoots([]); setPageCursor(null); setPageReady(false); setPageError(null);
+    if (!isSupabaseConfigured || !id) return;
+    pageRequest.current = true; setPageBusy(true);
+    void fetchDiscussionPage(id, sort).then(async (page) => {
+      const profiles = await fetchProfilesByIds([...new Set(page.items.map((item) => item.authorId))]);
+      if (seq !== pageSeq.current) return;
+      dispatch({ type: 'discussion/profiles', users: profiles });
+      setPagedRoots(page.items); setPageCursor(page.next); setPageReady(true);
+    }).catch((error) => {
+      if (seq === pageSeq.current) setPageError(errorText(error));
+    }).finally(() => {
+      if (seq === pageSeq.current) { pageRequest.current = false; setPageBusy(false); }
+    });
+    return () => { ++pageSeq.current; };
+  }, [id, sort, accountScope, dispatch, pageRetry]);
+  const loadMoreRoots = React.useCallback(() => {
+    if (!id || !pageCursor || pageRequest.current) return;
+    const seq = pageSeq.current;
+    pageRequest.current = true; setPageBusy(true); setPageError(null);
+    void fetchDiscussionPage(id, sort, null, pageCursor).then(async (page) => {
+      const profiles = await fetchProfilesByIds([...new Set(page.items.map((item) => item.authorId))]);
+      if (seq !== pageSeq.current) return;
+      dispatch({ type: 'discussion/profiles', users: profiles });
+      setPagedRoots((current) => [...current, ...page.items.filter((item) => !current.some((root) => root.id === item.id))]);
+      setPageCursor(page.next);
+    }).catch((error) => {
+      if (seq === pageSeq.current) setPageError(errorText(error));
+    }).finally(() => {
+      if (seq === pageSeq.current) { pageRequest.current = false; setPageBusy(false); }
+    });
+  }, [id, sort, pageCursor, dispatch]);
   const [replyTo, setReplyTo] = React.useState<{ comment: ChallengerComment; handle: string } | null>(null);
   const [menu, setMenu] = React.useState<MenuTarget | null>(null);
   const [followingAuthor, setFollowingAuthor] = React.useState(false);
@@ -285,7 +332,13 @@ export default function TakeDetailScreen(): React.JSX.Element {
   }
 
   const comments = selectCommentsForTake(state, take.id);
-  const nodes = buildCommentTree(comments, sort);
+  // Only server-returned roots become top-level threads. Existing hydrated
+  // children are attached when available, never promoted as orphan roots.
+  const nodes = pageReady
+    ? [...locallyCreated.filter((item) => !item.parentId && item.takeId === take.id &&
+        !pagedRoots.some((root) => root.id === item.id)), ...pagedRoots]
+        .map((root): CommentNode => ({ comment: root, children: [] }))
+    : buildCommentTree(comments, sort);
   const hasMedia = Boolean(take.media);
   const shortText = take.text.trim().length < 48;
   const isViewerAuthor = author.id === state.viewer.id;
@@ -303,18 +356,52 @@ export default function TakeDetailScreen(): React.JSX.Element {
         style={styles.fill}
         keyboardVerticalOffset={0}
       >
-        <ScrollView
+        <FlatList<CommentNode>
+          key={`${take.id}:${sort}`}
+          data={nodes}
+          keyExtractor={(node) => node.comment.id}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          initialNumToRender={5}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          removeClippedSubviews={false}
           contentContainerStyle={[
             styles.content,
-            {
-              paddingTop: insets.top + space.xs,
-              paddingBottom: space.xl,
-            },
+            { paddingTop: insets.top + space.xs, paddingBottom: space.xl },
           ]}
-        >
+          renderItem={({ item }) => (
+            <View style={styles.threadItem}>
+              <CommentBranch node={item} serverReplies={pageReady} locallyCreated={locallyCreated} takeAuthorId={author.id}
+                onUpvote={upvote} onReply={reply}
+                onClash={clashFromComment} onMore={more} />
+            </View>
+          )}
+          ListFooterComponent={
+            <View style={styles.pagingFooter}>
+              {pageError ? <Text style={{ color: theme.textMuted }}>{pageError}</Text> : null}
+              {pageBusy ? <Text style={{ color: theme.textMuted }}>Loading conversations…</Text> : null}
+              {pageReady && pageCursor && !pageBusy ? (
+                <Pressable accessibilityRole="button" onPress={loadMoreRoots}
+                  style={[styles.pageButton, { backgroundColor: theme.surfaceElevated }]}>
+                  <Text style={{ color: theme.textPrimary, fontWeight: '800' }}>Load more conversations ↓</Text>
+                </Pressable>
+              ) : null}
+              {pageError && !pageBusy && isSupabaseConfigured ? (
+                <Pressable accessibilityRole="button" onPress={() => setPageRetry((count) => count + 1)}>
+                  <Text style={{ color: theme.textPrimary }}>Retry loading conversations</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          }
+          ListEmptyComponent={
+            <Text style={[styles.empty, { color: theme.textMuted }]}>
+              No replies yet — start the conversation.
+            </Text>
+          }
+          ListHeaderComponent={
+            <View style={styles.headerContent}>
           <View style={styles.topRow}>
             <Pressable
               onPress={() => router.back()}
@@ -398,32 +485,32 @@ export default function TakeDetailScreen(): React.JSX.Element {
           />
 
           <View style={styles.threadHead}>
-            <View style={styles.threadTitleWrap}>
-              <Text allowFontScaling={false} style={[styles.threadTitle, { color: theme.textPrimary }]}>
-                Conversation
+            <View style={styles.threadEyebrowRow}>
+              <View style={[styles.threadAccent, { backgroundColor: scheme === 'dark' ? '#C9A5EC' : '#9E73BB' }]} />
+              <Text style={[styles.threadEyebrow, { color: theme.textSecondary }]}>
+                THE DISCUSSION
               </Text>
-              <View style={[styles.threadRule, { backgroundColor: theme.borderStrong }]} />
+              <Text style={[styles.threadCount, { color: theme.textMuted }]}>
+                {comments.length} {comments.length === 1 ? 'REPLY' : 'REPLIES'}
+              </Text>
             </View>
-            <View style={styles.sortWrap}>
-              <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" compact />
+            <Text allowFontScaling style={[styles.threadTitle, { color: theme.textPrimary }]}>
+              Join the conversation<Text style={{ color: scheme === 'dark' ? '#D6B9FA' : '#9968B5' }}> ↗</Text>
+            </Text>
+            <Text style={[styles.threadDescription, { color: theme.textSecondary }]}>
+              Follow the lines to see who replied to whom. Collapse branches to focus on the arguments.
+            </Text>
+            <View style={styles.threadFilters}>
+              <Text style={[styles.threadSortLabel, { color: theme.textMuted }]}>SORT BY</Text>
+              <View style={styles.sortWrap}>
+                <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" compact />
+              </View>
             </View>
           </View>
 
-          {nodes.length === 0 ? (
-            <Text allowFontScaling={false} style={[styles.empty, { color: theme.textMuted }]}>
-              No replies yet — start the conversation.
-            </Text>
-          ) : (
-            <CommentThread
-              nodes={nodes}
-              takeAuthorId={author.id}
-              onUpvote={upvote}
-              onReply={reply}
-              onClash={clashFromComment}
-              onMore={more}
-            />
-          )}
-        </ScrollView>
+            </View>
+          }
+        />
 
         <View
           style={[
@@ -455,6 +542,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
             }
             replyingTo={replyTo?.handle}
             onDone={() => setReplyTo(null)}
+            onCreated={(comment) => setLocallyCreated((items) => [...items.filter((item) => item.id !== comment.id), comment])}
           />
         </View>
       </KeyboardAvoidingView>
@@ -492,10 +580,11 @@ export default function TakeDetailScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fill: { flex: 1 },
-  content: {
-    paddingHorizontal: layout.screenX,
-    gap: space.md,
-  },
+  content: { paddingHorizontal: layout.screenX, paddingBottom: space.md },
+  headerContent: { gap: space.md, paddingBottom: space.sm },
+  threadItem: { paddingBottom: space.md },
+  pagingFooter: { paddingVertical: space.md, alignItems: 'center', gap: 10 },
+  pageButton: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16 },
   missing: { paddingHorizontal: space.lg },
   topRow: {
     flexDirection: 'row',
@@ -533,25 +622,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  threadHead: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: space.md,
-    paddingTop: space.sm,
-  },
-  threadTitleWrap: { flex: 1, gap: 8 },
+  threadHead: { gap: 9, paddingTop: space.xl, paddingBottom: space.sm },
+  threadEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  threadAccent: { width: 10, height: 10, borderRadius: 3, transform: [{ rotate: '18deg' }] },
+  threadEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
+  threadCount: { marginLeft: 'auto', fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
   threadTitle: {
-    ...typeScale.section,
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.35,
+    ...typeScale.section, fontSize: 26, lineHeight: 32, fontWeight: '900', letterSpacing: -0.8,
   },
-  threadRule: {
-    height: StyleSheet.hairlineWidth,
-    width: '100%',
-  },
-  sortWrap: { maxWidth: 148, paddingBottom: 2 },
+  threadDescription: { fontSize: 12, lineHeight: 19, fontWeight: '500' },
+  threadFilters: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 7 },
+  threadSortLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  sortWrap: { width: 148 },
   empty: {
     ...typeScale.meta,
     fontSize: 14,

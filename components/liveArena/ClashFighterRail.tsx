@@ -62,7 +62,7 @@ export function ClashFighterRail({
             <Avatar
               name={fighter.name}
               tint={fighter.tint ?? t.textMuted}
-              size={focused && !condensed ? avatar + 8 : avatar}
+              size={avatar}
             />
             <Text
               allowFontScaling
@@ -75,6 +75,7 @@ export function ClashFighterRail({
             >
               {fighter.name}
             </Text>
+            {focused ? <Text style={[styles.latest, { color: t.textSecondary }]}>LATEST ARGUMENT</Text> : null}
             {!condensed ? (
               <Text
                 allowFontScaling={false}
@@ -128,7 +129,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
   },
-  waiting: { opacity: 0.48 },
+  waiting: { opacity: 0.72 },
+  latest: { fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textAlign: 'center' },
   name: {
     ...typeScale.label,
     fontSize: 16,

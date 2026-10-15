@@ -1,4 +1,4 @@
-﻿-- Phase 14.0 â€” Explore global discovery.
+-- Phase 14.0 â€” Explore global discovery.
 -- Explicit public country on profiles (never GPS).
 -- Challenges + treasure hunts foundations.
 -- Bounded Explore RPCs with moderation / Vault free-only safety.
