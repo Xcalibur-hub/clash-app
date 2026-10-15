@@ -3,9 +3,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {createClient}=require('@supabase/supabase-js');
 const root=path.resolve(process.argv[2]||'');
 assert.equal(path.dirname(root),path.resolve('.expo'),'Isolated ignored test root required');
-assert.match(path.basename(root),/^(arena31-20261014-(prepared|final)|arena31a-20261014|arena32b-20261014)$/,'Reviewed disposable directory required');
-const actualDeno=path.basename(root)==='arena32b-20261014';
-const config=JSON.parse(fs.readFileSync(path.join(root,'compose.json'))),project=actualDeno?'clash_p11bind_arena32b_20261014':path.basename(root)==='arena31a-20261014'?'clash_p11bind_arena31a_20261014':'clash_p11bind_arena31_20261014';
+assert.match(path.basename(root),/^(arena31-20261014-(prepared|final)|arena31a-20261014|arena32b-20261014|arena32c-20261015)$/,'Reviewed disposable directory required');
+const actualDeno=/^arena32[bc]-2026101[45]$/.test(path.basename(root));
+const config=JSON.parse(fs.readFileSync(path.join(root,'compose.json'))),project=path.basename(root)==='arena32c-20261015'?'clash_p11bind_arena32c_20261015':actualDeno?'clash_p11bind_arena32b_20261014':path.basename(root)==='arena31a-20261014'?'clash_p11bind_arena31a_20261014':'clash_p11bind_arena31_20261014';
 assert.equal(config.name,project);assert.ok(fs.existsSync(root+'/migration-complete.json'));
 const url='http://127.0.0.1:57721',key=config.services.storage.environment.ANON_KEY,serviceKey=config.services.storage.environment.SERVICE_KEY;
 const options={auth:{persistSession:false,autoRefreshToken:false}};

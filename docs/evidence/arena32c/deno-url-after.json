@@ -1,0 +1,9 @@
+{
+  "actual_deno": true,
+  "selected_fighter_authorized": true,
+  "client_url_origin": "http://127.0.0.1:57721",
+  "legacy_url_retained": true,
+  "relative_field_present": true,
+  "http_status": 200,
+  "exact_png_bytes": true
+}

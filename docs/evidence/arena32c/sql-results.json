@@ -1,0 +1,106 @@
+[
+  {
+    "file": "001_media_storage.sql",
+    "exit": 0,
+    "assertions": 25,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 25
+  },
+  {
+    "file": "054_arena_duel_foundation.sql",
+    "exit": 0,
+    "assertions": 78,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 78
+  },
+  {
+    "file": "055_arena_duel_concurrency.sql",
+    "exit": 0,
+    "assertions": 17,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 17
+  },
+  {
+    "file": "056_arena_challenge_lifecycle.sql",
+    "exit": 0,
+    "assertions": 82,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 82
+  },
+  {
+    "file": "057_arena_challenge_concurrency.sql",
+    "exit": 0,
+    "assertions": 36,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 36
+  },
+  {
+    "file": "058_arena_crowd_chat.sql",
+    "exit": 0,
+    "assertions": 61,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 61
+  },
+  {
+    "file": "059_arena_crowd_concurrency.sql",
+    "exit": 0,
+    "assertions": 13,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 13
+  },
+  {
+    "file": "070_canonical_authorization.sql",
+    "exit": 0,
+    "assertions": 50,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 50
+  },
+  {
+    "file": "072_official_retry_and_recovery.sql",
+    "exit": 0,
+    "assertions": 38,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 38
+  },
+  {
+    "file": "073_official_submission_concurrency.sql",
+    "exit": 0,
+    "assertions": 12,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 12
+  },
+  {
+    "file": "074_historical_canonical_entry.sql",
+    "exit": 0,
+    "assertions": 21,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 21
+  },
+  {
+    "file": "090_canonical_private_assists.sql",
+    "exit": 0,
+    "assertions": 47,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 47
+  },
+  {
+    "file": "091_private_assist_media_target.sql",
+    "exit": 0,
+    "assertions": 15,
+    "failed": 0,
+    "skipped": 0,
+    "plan": 15
+  }
+]

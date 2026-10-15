@@ -7,6 +7,7 @@ import { useAuth } from '../../store/AuthProvider';
 import { selectAuthor, useClash, type Take } from '../../store';
 import { createArenaChallenge, listArenaChallenges, resolveArenaChallenge } from '../../services/arenaChallengeService';
 import { errorText } from '../../services/supabaseClient';
+import { linkedRoomAfterAccept } from '../../utils/arenaAcceptNavigation';
 import { challengeCanAct, validCounterPosition, type ArenaChallenge } from '../../utils/arenaChallengePayload';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
@@ -107,7 +108,8 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
     setLoaded(false);
     setComposer(false);
     setText('');
-    setConfirmed(null);
+    // Do not clear `confirmed` here: resetting it cancels the accept→Room navigation
+    // timeout when viewer hydration or take remount races the confirmation beat.
     setDeckOpen(false);
   }, [take.id, viewerId]);
 
@@ -119,10 +121,11 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
     if (!confirmed) return undefined;
     setDeckOpen(false);
     const delay = reduced ? 160 : 1100;
+    const roomId = confirmed.roomId;
     const id = setTimeout(() => {
-      const roomId = confirmed.roomId;
       setConfirmed(null);
-      router.push(`/arena/room/${roomId}`);
+      // replace: back should not return to the Take mid-fight after acceptance.
+      router.replace(`/arena/room/${roomId}`);
     }, delay);
     return () => clearTimeout(id);
   }, [confirmed, reduced, router]);
@@ -148,11 +151,14 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
     setError(null);
     try {
       const result = await resolveArenaChallenge(ch.id, 'ACCEPT');
-      if (!focused.current) return;
-      removeLocal(ch.id);
-      if (result.status === 'ACCEPTED' && result.roomId) {
+      // Server acceptance with a linked Room must enter the Room even if the Take
+      // briefly blurred during the await (modal/focus races). Skipping navigation
+      // left users on the Take after a successful accept.
+      const roomId = linkedRoomAfterAccept(result);
+      if (roomId) {
+        if (focused.current) removeLocal(ch.id);
         setConfirmed({
-          roomId: result.roomId,
+          roomId,
           fighterA: {
             name: takeAuthor?.name ?? 'Fighter A',
             handle: takeAuthor?.handle ?? 'fighter_a',
@@ -163,13 +169,16 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
             handle: ch.challenger.handle,
           },
         });
-      } else {
-        await load();
-        throw new Error('Challenge could not be accepted.');
+        return;
       }
-    } catch (e) {
-      setError(typeof e === 'object' && e && 'message' in e ? String((e as Error).message) : errorText(e));
+      if (!focused.current) return;
       await load();
+      throw new Error('Challenge could not be accepted.');
+    } catch (e) {
+      if (focused.current) {
+        setError(typeof e === 'object' && e && 'message' in e ? String((e as Error).message) : errorText(e));
+        await load();
+      }
       throw e;
     } finally {
       working.current = false;
@@ -205,13 +214,14 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
     setError(null);
     try {
       const result = await operation();
-      if (!focused.current) return;
-      setComposer(false);
-      setText('');
-      await load();
-      if (result.status === 'ACCEPTED' && result.roomId) {
+      const roomId = linkedRoomAfterAccept(result);
+      if (roomId) {
+        if (focused.current) {
+          setComposer(false);
+          setText('');
+        }
         setConfirmed({
-          roomId: result.roomId,
+          roomId,
           fighterA: {
             name: takeAuthor?.name ?? 'Fighter A',
             handle: takeAuthor?.handle ?? 'fighter_a',
@@ -222,7 +232,13 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
             handle: result.challenger.handle,
           },
         });
-      } else if (result.status === 'EXPIRED' || result.status === 'CANCELLED') {
+        return;
+      }
+      if (!focused.current) return;
+      setComposer(false);
+      setText('');
+      await load();
+      if (result.status === 'EXPIRED' || result.status === 'CANCELLED') {
         setError(`Challenge ${result.status.toLowerCase()}.`);
       }
     } catch (e) {
