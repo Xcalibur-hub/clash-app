@@ -106,7 +106,7 @@ export function ArenaClashes({
                   <Text style={[styles.meta, { color: t.textMuted }]}>HAPPENING NOW</Text>
                 </View>
                 <Text style={[styles.proposition, { color: t.textPrimary }]} numberOfLines={3}>{entry.title}</Text>
-                <View style={styles.actionLine}><Text style={[styles.enter, { color: t.textPrimary }]}>WATCH THE DUEL</Text><Text style={[styles.actionArrow, { color: t.textPrimary }]}>↗</Text></View>
+                <View style={styles.actionLine}><Text style={[styles.enter, { color: t.textPrimary }]}>{entry.roomId ? 'WATCH THE DUEL' : 'VIEW LIVE CLASH'}</Text><Text style={[styles.actionArrow, { color: t.textPrimary }]}>↗</Text></View>
               </Pressable>
             ))}
             {live.map((topic) => (
