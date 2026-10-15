@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../store/AuthProvider';
+import { guardDecision, navLog } from '../utils/navDiagnostics';
 
 /**
  * The one reusable gate for account-owned actions. Call it at the top of a
@@ -14,8 +15,10 @@ export function useRequireAuth(): () => boolean {
   const router = useRouter();
 
   return useCallback((): boolean => {
-    if (loading) return false;
-    if (signedIn) return true;
+    const decision = guardDecision({ signedIn, loading });
+    navLog('require-auth', { action: decision });
+    if (decision === 'bail:loading') return false;
+    if (decision === 'allow') return true;
     router.push('/auth');
     return false;
   }, [loading, signedIn, router]);

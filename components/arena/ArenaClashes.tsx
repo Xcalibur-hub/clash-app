@@ -12,6 +12,7 @@ import { clashDiscoveryDestination, type ClashDiscoveryEntry, type ClashDiscover
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { plural } from '../../utils/format';
 import { press as hapticPress } from '../../utils/haptics';
+import { cardDestination, navLog } from '../../utils/navDiagnostics';
 import { LivePulse } from '../liveArena/LivePulse';
 
 export interface ArenaClashesProps {
@@ -109,6 +110,13 @@ export function ArenaClashes({
             {live.map((topic) => (
               <ClashRow key={topic.id} topic={topic} live onPress={() => {
                 hapticPress();
+                navLog('card-press', {
+                  surface: 'live-clashes-active',
+                  destination: cardDestination(topic.viewerRoomId, topic.id),
+                  topicId: topic.id,
+                  roomId: topic.viewerRoomId ?? null,
+                  action: topic.viewerRoomId ? 'enter-room' : 'open-topic',
+                });
                 if (topic.viewerRoomId) onEnter(topic); else onWatch(topic);
               }} />
             ))}

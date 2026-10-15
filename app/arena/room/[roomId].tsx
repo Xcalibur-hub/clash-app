@@ -48,6 +48,7 @@ import { Notice } from '../../../components/shared/Notice';
 import { ArenaIcon } from '../../../components/shared/icons';
 import { useClock } from '../../../hooks/useClock';
 import { useRequireAuth } from '../../../hooks/useRequireAuth';
+import { navLog } from '../../../utils/navDiagnostics';
 import { useArenaBackup } from '../../../hooks/useArenaBackup';
 import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
 import { useRoomTyping } from '../../../hooks/useRoomTyping';
@@ -131,6 +132,11 @@ function RoomScope(): React.JSX.Element {
   const roomId = Array.isArray(raw) ? raw[0] : raw;
   const router = useRouter();
   const requireAuth = useRequireAuth();
+
+  React.useEffect(() => {
+    navLog('room-mounted', { roomId, mounted: true });
+  }, [roomId]);
+
   const insets = useSafeAreaInsets();
   const t = useThemeColors();
   const now = useClock(1_000);
@@ -173,6 +179,10 @@ function RoomScope(): React.JSX.Element {
     recordFinal,
     upgradeToDebater,
   } = useLiveArenaRoom(roomId, viewerAuthor);
+
+  React.useEffect(() => {
+    if (room?.roomId) navLog('room-request', { roomId: room.roomId, requested: true });
+  }, [room?.roomId]);
 
   const [replyTo, setReplyTo] = React.useState<ArenaMessage | null>(null);
   const [expressiveTab, setExpressiveTab] = React.useState<ExpressiveMainTab | null>(null);
