@@ -280,6 +280,9 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       <KeyboardAvoidingView
         style={[styles.root, styles.layer]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // Android hide events can retain a nonzero avoidance offset. Disable
+        // avoidance when hidden so the Stage regains its full height.
+        enabled={Platform.OS === 'ios' || keyboardOpen}
       >
         <ImmersiveClash
           duel={duel}
