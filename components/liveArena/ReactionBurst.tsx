@@ -64,7 +64,7 @@ export function FloatingReaction({
 
   if (!visible) return null;
   return (
-    <Animated.View pointerEvents="none" style={[styles.float, style]}>
+    <Animated.View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.float, style]}>
       <Text style={styles.emoji}>{emoji}</Text>
     </Animated.View>
   );
@@ -87,7 +87,7 @@ export function ReactionBurst({
   if (burstKey == null) return null;
   const n = Math.max(1, Math.min(5, count));
   return (
-    <View pointerEvents="none" style={styles.burst}>
+    <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.burst}>
       {Array.from({ length: n }, (_, i) => (
         <View key={`${burstKey}-${i}`} style={styles.slot}>
           <FloatingReaction
@@ -127,7 +127,7 @@ export function ClashPulse({ active, color = 'rgba(245,215,110,0.35)' }: ClashPu
     transform: [{ scale: 0.92 + pulse.value * 0.18 }],
   }));
 
-  return <Animated.View pointerEvents="none" style={[styles.pulse, { backgroundColor: color }, style]} />;
+  return <Animated.View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.pulse, { backgroundColor: color }, style]} />;
 }
 
 export interface StickerPopProps {

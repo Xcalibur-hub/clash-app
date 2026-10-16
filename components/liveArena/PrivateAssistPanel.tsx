@@ -73,7 +73,7 @@ function PrivateAssistBody({ roomId, duel, disabled, onPublished }: {
       </>}
       {disabled?<Text style={{color:t.textMuted}}>Assist submissions and responses are closed.</Text>:null}
       {busy?<Text style={{color:t.textMuted}}>Updating…</Text>:null}
-      {notice?<Text style={{color:t.textMuted}}>{notice}</Text>:null}
+      {notice?<Text accessibilityLiveRegion="polite" style={{color:t.textMuted}}>{notice}</Text>:null}
       {error?<Text accessibilityRole="alert" style={{color:t.textPrimary}}>{error}</Text>:null}
     </>:null}
   </View>;

@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { hexWithAlpha, matchupMetrics, sidePlateBorder } from './liveArenaStyles.ts';
+import {
+  crowdRowLabel,
+  hexWithAlpha,
+  matchupMetrics,
+  phaseAnnouncement,
+  sidePlateBorder,
+} from './liveArenaStyles.ts';
 
 describe('live arena stage metrics', () => {
   it('keeps the full split on a roomy screen at normal font scale', () => {
@@ -34,5 +40,31 @@ describe('live arena stage metrics', () => {
     assert.equal(hexWithAlpha('#2F6FEB', 9), 'rgba(47,111,235,1)', 'alpha clamps');
     assert.equal(sidePlateBorder('#2F6FEB', 'light'), 'rgba(47,111,235,0.28)');
     assert.equal(sidePlateBorder('#E5484D', 'dark'), 'rgba(229,72,77,0.34)');
+  });
+});
+
+describe('chat row labels', () => {
+  it('collapses whitespace and normalizes the handle', () => {
+    assert.equal(crowdRowLabel('maya', 'hello   crowd'), '@maya: hello crowd');
+    assert.equal(crowdRowLabel('@liam', '  spaced  '), '@liam: spaced');
+    assert.equal(crowdRowLabel('maya', 'line\nbreak'), '@maya: line break');
+  });
+
+  it('bounds the announcement length so one message cannot run away', () => {
+    const long = crowdRowLabel('maya', 'x'.repeat(400));
+    assert.ok(long.length <= 240);
+    assert.ok(long.endsWith('…'));
+    assert.equal(crowdRowLabel('maya', 'y'.repeat(50), Number.NaN).length, '@maya: '.length + 50);
+    assert.equal(crowdRowLabel('maya', 'z'.repeat(50), 20).length, 20);
+  });
+});
+
+describe('phase announcements', () => {
+  it('names the server phase, never a device clock', () => {
+    assert.equal(phaseAnnouncement('OPEN'), 'Clash phase: Open floor');
+    assert.equal(phaseAnnouncement('FINAL_ARGUMENTS'), 'Clash phase: Final arguments');
+    assert.equal(phaseAnnouncement('JUDGING'), 'Clash phase: Judging');
+    assert.equal(phaseAnnouncement('SETTLED'), 'Clash phase: Settled');
+    assert.equal(phaseAnnouncement('CANCELLED'), 'Clash phase: No verdict');
   });
 });

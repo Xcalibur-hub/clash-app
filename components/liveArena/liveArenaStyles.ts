@@ -121,3 +121,25 @@ export function matchupMetrics({
   };
 }
 
+
+/** Soft chip fill for role/state labels inside the stage. */
+export function chipFill(t: SemanticTheme): string {
+  return t.scheme === 'light' ? 'rgba(17,17,19,0.06)' : 'rgba(255,255,255,0.07)';
+}
+
+/**
+ * Screen-reader label for a chat row: whitespace collapsed and length bounded so
+ * one long message cannot become an unbounded announcement.
+ */
+export function crowdRowLabel(handle: string, body: string, max = 240): string {
+  const who = handle.trim().replace(/^@+/, '');
+  const said = body.replace(/\s+/g, ' ').trim();
+  const line = `@${who}: ${said}`;
+  const limit = Number.isFinite(max) && max > 8 ? Math.floor(max) : 240;
+  return line.length <= limit ? line : `${line.slice(0, limit - 1).trimEnd()}…`;
+}
+
+/** Announcement for a server-reported phase change (never a device clock). */
+export function phaseAnnouncement(status: ArenaRoomStatus): string {
+  return `Clash phase: ${ROOM_STATUS_LABEL[status]}`;
+}
