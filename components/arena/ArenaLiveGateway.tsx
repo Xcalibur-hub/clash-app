@@ -1,56 +1,49 @@
-/** Always-visible, single-purpose door to Arena Live.
- * Counts represent confirmed topic rooms only; canonical duels are discovered on Live.
- */
+/** Compact entry to Live. Home content remains the primary surface. */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { layout, space, useThemeColors } from '../../theme';
+import { layout, useThemeColors } from '../../theme';
 import { tap } from '../../utils/haptics';
 
-export function ArenaLiveGateway({
-  liveCount,
-  onOpen,
-}: {
+export function ArenaLiveGateway({ liveCount, onOpen }: {
   liveCount: number;
   onOpen: () => void;
 }): React.JSX.Element {
   const t = useThemeColors();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel="Explore live clashes and debates"
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Explore live Clashes and debates"
       onPress={() => { tap(); onOpen(); }}
       style={({ pressed }) => [styles.card, {
         backgroundColor: t.surfaceElevated, borderColor: t.border,
-        opacity: pressed ? 0.78 : 1,
-      }]}>
-      <View style={styles.top}>
-        <View style={[styles.dot, { backgroundColor: liveCount > 0 ? '#D75C4D' : t.textMuted }]} />
-        <Text style={[styles.kicker, { color: t.textSecondary }]}>ARENA LIVE</Text>
-        <Text style={[styles.count, { color: t.textMuted }]}>
-          {liveCount > 0 ? `${liveCount} topic ${liveCount === 1 ? 'room' : 'rooms'} live` : 'Explore live Clashes'}
+        opacity: pressed ? 0.76 : 1,
+      }]}
+    >
+      <View style={[styles.dot, { backgroundColor: liveCount > 0 ? '#D75C4D' : t.textMuted }]} />
+      <View style={styles.copy}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
+          {liveCount > 0 ? 'Live in the Arena' : 'Watch a Clash'}
+        </Text>
+        <Text style={[styles.sub, { color: t.textSecondary }]} numberOfLines={1}>
+          {liveCount > 0
+            ? `${liveCount} ${liveCount === 1 ? 'room' : 'rooms'} happening now`
+            : 'Duels, challenges and verdicts'}
         </Text>
       </View>
-      <View style={styles.headlineRow}>
-        <Text style={[styles.heading, { color: t.textPrimary }]}>The arena is open.</Text>
-        <Text style={[styles.headingArrow, { color: t.textPrimary }]}>↗</Text>
-      </View>
-      <Text style={[styles.body, { color: t.textSecondary }]}>
-        {liveCount > 0
-          ? 'Two fighters. One debate. Pick a side and follow every argument.'
-          : 'Discover live debates, find your side, and join the conversation.'}
-      </Text>
-      <Text style={[styles.action, { color: t.textPrimary }]}>EXPLORE LIVE CLASHES  →</Text>
+      <Text style={[styles.arrow, { color: t.textPrimary }]}>↗</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: layout.screenX, borderWidth: 1, borderRadius: 24, paddingHorizontal: 20, paddingVertical: 20, gap: 12 },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  dot: { height: 7, width: 7, borderRadius: 4 },
-  kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  count: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
-  headlineRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  heading: { flex: 1, fontSize: 27, lineHeight: 32, fontWeight: '800', letterSpacing: -1 },
-  headingArrow: { fontSize: 24, fontWeight: '500' },
-  body: { fontSize: 14, lineHeight: 21 },
-  action: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8, paddingTop: 6 },
+  card: {
+    marginHorizontal: layout.screenX, borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14,
+    minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: 12,
+  },
+  dot: { width: 9, height: 9, borderRadius: 5 },
+  copy: { flex: 1, gap: 3, minWidth: 0 },
+  title: { fontSize: 16, lineHeight: 21, fontWeight: '800', letterSpacing: -0.3 },
+  sub: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  arrow: { fontSize: 23, fontWeight: '500' },
 });
