@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 24,
     lineHeight: 30,
-    fontWeight: '750',
+    fontWeight: '700',
     letterSpacing: -0.6,
   },
   clashHint: {
