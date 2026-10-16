@@ -2,11 +2,12 @@
  * Side A vs Side B matchup — broadcast identity without leaking live tallies.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Avatar } from '../shared/Avatar';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { arenaSidesForTheme } from '../../theme/arenaSides';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { matchupMetrics, sidePlateBorder, softFill } from './liveArenaStyles';
 
 export interface ClashMatchupBarProps {
   duel?: ArenaDuel;
@@ -35,7 +36,10 @@ function DuelMatchup({
   highlightSide?: 'A' | 'B' | null;
 }): React.JSX.Element {
   const t = useThemeColors();
-  const avatarSize = stage ? 56 : 36;
+  const { a, b } = arenaSidesForTheme(t);
+  const { width, fontScale } = useWindowDimensions();
+  const metrics = matchupMetrics({ width, fontScale });
+  const avatarSize = stage ? metrics.avatarSize : 36;
   const sides = [
     { side: 'A' as const, fighter: duel.fighterA, position: duel.sourceText },
     { side: 'B' as const, fighter: duel.fighterB, position: duel.counterPosition },
@@ -51,13 +55,23 @@ function DuelMatchup({
             {index === 1 ? (
               <Text
                 allowFontScaling={false}
-                style={[styles.duelVs, stage && styles.duelVsStage, { color: t.textMuted }]}
+                style={[styles.duelVs, stage && { marginTop: metrics.vsMarginTop, fontSize: 13 }, { color: t.textMuted }]}
                 accessibilityLabel="versus"
               >
                 VS
               </Text>
             ) : null}
-            <View style={[styles.duelCol, emphasized && { opacity: 1 }, highlightSide && !emphasized && { opacity: 0.72 }]}>
+            <View
+              style={[
+                styles.duelCol,
+                {
+                  backgroundColor: softFill(t),
+                  borderColor: sidePlateBorder(side === 'A' ? a.ink : b.ink, t.scheme),
+                },
+                emphasized && { opacity: 1 },
+                highlightSide && !emphasized && { opacity: 0.72 },
+              ]}
+            >
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open Fighter ${side}, ${fighter.name}'s profile`}
@@ -69,7 +83,7 @@ function DuelMatchup({
                 <Text
                   allowFontScaling
                   numberOfLines={1}
-                  style={[styles.duelName, stage && styles.duelNameStage, { color: t.textPrimary }]}
+                  style={[styles.duelName, stage && { fontSize: metrics.nameSize }, { color: t.textPrimary }]}
                 >
                   {fighter.name}
                 </Text>
@@ -90,7 +104,7 @@ function DuelMatchup({
               <Text
                 selectable
                 style={[styles.duelPosition, stage && styles.duelPositionStage, { color: t.textSecondary }]}
-                numberOfLines={stage ? 4 : 3}
+                numberOfLines={stage ? metrics.positionLines : 3}
               >
                 {position?.trim()
                   ? `“${position.trim()}”`
@@ -208,6 +222,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: space.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.md,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.xs,
   },
   fighterHit: {
     minHeight: 44,
@@ -221,7 +239,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
   },
-  duelNameStage: { fontSize: 17 },
   duelHandle: {
     ...typeScale.caption,
     fontSize: 12,
@@ -251,7 +268,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     marginTop: 28,
   },
-  duelVsStage: { marginTop: 40, fontSize: 13 },
   wrap: { gap: 8 },
   wrapRoom: { gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
