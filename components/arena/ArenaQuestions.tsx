@@ -30,10 +30,10 @@ export function ArenaQuestions({topicId,refreshToken=0}:{topicId?:string;refresh
   {!user?<Text style={{color:t.textMuted}}>Sign in to explore questions.</Text>:loading?<Text style={{color:t.textMuted}}>Loading questions…</Text>:null}
   {error?<Text accessibilityRole="alert" style={{color:t.textMuted}}>Questions could not update. Pull down to retry.</Text>:null}
   {user&&!loading&&!error&&!items.length?<Text style={{color:t.textMuted}}>No open questions here yet.</Text>:null}
-  {visibleItems.map(take=><View key={take.id} style={{gap:space.sm}}>
+  {visibleItems.map(take=><View key={take.id} style={{gap:space.sm,borderWidth:1,borderColor:t.border,borderRadius:16,padding:14,backgroundColor:t.surfaceElevated}}>
    <Pressable accessibilityRole="button" accessibilityLabel={`Open discussion: ${take.text}`} onPress={()=>router.push('/take/'+take.id)} style={{minHeight:44,justifyContent:'center'}}>
     <Text style={{...typeScale.body,color:t.textPrimary}}>{take.text}</Text>
-    <Text style={{...typeScale.caption,color:t.textSecondary}}>Open discussion</Text>
+    <Text style={{...typeScale.caption,color:t.textSecondary}}>View discussion  ↗</Text>
    </Pressable>
    {take.question?<QuestionVotePanel takeId={take.id} choices={take.question}/>:null}
   </View>)}
