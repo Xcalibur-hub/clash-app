@@ -5,6 +5,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ArenaRoomStatus } from '../../services/liveArenaService';
 import { space, typeScale, useThemeColors } from '../../theme';
+import { phaseAnnouncement } from './liveArenaStyles';
 
 const STEPS: readonly { key: ArenaRoomStatus; label: string }[] = [
   { key: 'OPEN', label: 'Open' },
@@ -38,7 +39,7 @@ export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX
   const urgent = status === 'FINAL_ARGUMENTS' || status === 'JUDGING';
 
   return (
-    <View style={styles.wrap}>
+    <View style={styles.wrap} accessibilityLiveRegion="polite" accessibilityLabel={phaseAnnouncement(status)}>
       <Text
         allowFontScaling={false}
         style={[
