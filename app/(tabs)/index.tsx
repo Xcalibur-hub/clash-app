@@ -224,12 +224,10 @@ export default function ArenaScreen(): React.JSX.Element {
       .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [feed, state]);
 
-  /** Remaining Takes become the calmer YOUR FEED list (no Fresh Takes duplicates). */
-  const listFeed = React.useMemo(() => {
-    if (freshItems.length === 0) return feed;
-    const freshIds = new Set(freshItems.map((item) => item.take.id));
-    return feed.filter((take) => !freshIds.has(take.id));
-  }, [feed, freshItems]);
+  // Fresh Takes is a featured preview, not a separate feed partition.
+  // Keep every eligible Take in the main list so New/For You never looks empty
+  // merely because the first few Takes are featured above.
+  const listFeed = feed;
 
   const openClash = React.useCallback(
     (takeId: string): void => {
@@ -527,7 +525,7 @@ export default function ArenaScreen(): React.JSX.Element {
 
   // Cold-start failure: no mock content underneath — only the error empty state.
   // Non-feed Arena modes use header-only surfaces (no Take FlatList rows).
-  // Fresh Takes slice may empty listFeed — still not a true empty when feed has items.
+  // The featured preview and main list share the same eligible feed.
   const listData = arenaFlatListData(arenaMode, state.arenaStatus, listFeed);
   const showEmpty = shouldShowArenaFeedEmpty(arenaMode, state.arenaStatus, feed.length);
 
