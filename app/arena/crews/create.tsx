@@ -16,7 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CrewCrest } from '../../../components/crews/CrewCrest';
-import { GlowButton } from '../../../components/shared/GlowButton';
+import { GroupButton } from '../../../components/arena/groups/GroupButton';
 import { BackIcon } from '../../../components/shared/icons';
 import { useRequireAuth } from '../../../hooks/useRequireAuth';
 import {
@@ -99,7 +99,7 @@ export default function CreateCrewScreen(): React.JSX.Element {
           <BackIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
         <Text allowFontScaling={false} style={[styles.barTitle, { color: t.textPrimary }]}>
-          Create Crew
+          Create group
         </Text>
       </View>
 
@@ -245,13 +245,12 @@ export default function CreateCrewScreen(): React.JSX.Element {
           })}
         </View>
 
-        <GlowButton
+        <GroupButton
           label={busy ? 'CREATING…' : 'CREATE CREW'}
           onPress={() => {
             void submit();
           }}
           disabled={busy || name.trim().length < 2 || slug.trim().length < 2}
-          style={{ marginTop: space.xl }}
         />
       </ScrollView>
     </KeyboardAvoidingView>
