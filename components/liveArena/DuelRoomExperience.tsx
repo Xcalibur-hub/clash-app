@@ -289,7 +289,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           proposition={proposition}
           live={live}
           statusLabel={statusLabel}
-          spectatorCount={crowd.context?.spectatorCount ?? null}
+          spectatorCount={crowd.context?.spectatorCount ?? props.spectatorCount}
           crowd={crowd}
           crowdUnavailableReason={cancelled ? 'Crowd chat is unavailable because this Clash was cancelled.' : undefined}
           onReportCrowd={props.onReportCrowd}
