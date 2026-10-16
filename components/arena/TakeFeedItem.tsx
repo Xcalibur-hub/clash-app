@@ -167,7 +167,7 @@ function MediaFeedCard({
   const isVideo = media.kind === 'video';
   const [failed, setFailed] = React.useState(false);
   const [swordKey, setSwordKey] = React.useState(0);
-  const height = Math.min(510, Math.max(380, Math.round(width * 1.04)));
+  const height = Math.min(460, Math.max(340, Math.round(width * 0.98)));
   const showImage = Boolean(still) && !failed;
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
   const pulse = takePulse(take);
@@ -191,7 +191,7 @@ function MediaFeedCard({
         {
           width: cardW,
           height,
-          borderRadius: 24,
+          borderRadius: 20,
           shadowColor: t.shadowColor,
           backgroundColor: '#111113',
         },
@@ -379,13 +379,13 @@ function TextFeedCard({
         styles.textCard,
         {
           width: cardW,
-          borderRadius: 22,
+          borderRadius: 18,
           backgroundColor: t.scheme === 'dark' ? '#252329' : '#F7F2EA',
           shadowColor: t.shadowColor,
         },
       ]}
     >
-      <View style={[styles.textBlob, { backgroundColor: t.scheme === 'dark' ? '#403747' : '#EDE1EA' }]} />
+      <View style={[styles.textBlob, { backgroundColor: t.scheme === 'dark' ? '#403747' : '#EDE1EA' }]} pointerEvents="none" />
       <View style={[styles.textEdge, { backgroundColor: t.scheme === 'dark' ? '#BBA2DB' : '#A4759C' }]} />
 
       <View style={styles.textTop}>
@@ -414,7 +414,7 @@ function TextFeedCard({
         {take.text}
       </Text>
 
-      <Squiggle size={64} color={t.scheme === 'dark' ? '#C8A5E3' : '#A4759C'} opacity={0.28} style={styles.textDoodle} />
+      <Squiggle size={44} color={t.scheme === 'dark' ? '#C8A5E3' : '#A4759C'} opacity={0.2} style={styles.textDoodle} />
 
       {topComment ? (
         <TakeStoryBeat
@@ -509,7 +509,7 @@ function OverlayAction({
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    marginBottom: space.md,
+    marginBottom: space.lg,
   },
   card: {
     overflow: 'hidden',
@@ -582,10 +582,10 @@ const styles = StyleSheet.create({
     ...typeScale.editorial,
     color: '#FAFAF8',
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 27,
-    lineHeight: 33,
-    fontWeight: '800',
-    letterSpacing: -0.7,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '750',
+    letterSpacing: -0.6,
   },
   clashHint: {
     ...typeScale.caption,
@@ -643,10 +643,10 @@ const styles = StyleSheet.create({
   },
   textCard: {
     overflow: 'hidden',
-    paddingHorizontal: 22,
-    paddingTop: 21,
+    paddingHorizontal: 20,
+    paddingTop: 19,
     paddingBottom: 18,
-    minHeight: 290,
+    minHeight: 245,
     shadowOpacity: 0.1,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
@@ -654,12 +654,12 @@ const styles = StyleSheet.create({
   },
   textBlob: {
     position: 'absolute',
-    top: -92,
-    right: -72,
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    opacity: 0.48,
+    top: -72,
+    right: -65,
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    opacity: 0.26,
   },
   textEdge: {
     position: 'absolute',
@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: space.md,
+    marginBottom: space.sm,
     zIndex: 1,
   },
   hoodCaps: {
@@ -685,16 +685,16 @@ const styles = StyleSheet.create({
   textHeadline: {
     ...typeScale.editorial,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 29,
-    lineHeight: 35,
-    fontWeight: '800',
-    letterSpacing: -0.9,
+    fontSize: 26,
+    lineHeight: 33,
+    fontWeight: '700',
+    letterSpacing: -0.65,
     zIndex: 1,
     marginBottom: space.md,
   },
   textDoodle: {
     marginBottom: space.xs,
-    opacity: 0.65,
+    opacity: 0.45,
   },
   textFooter: {
     marginTop: 'auto',
