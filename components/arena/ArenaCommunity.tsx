@@ -49,7 +49,7 @@ export function ArenaCommunity({
       active = false;
     };
   }, [signedIn, refreshToken, offset]));
-  const card = (crew: ArenaCrew) => <View key={crew.id} style={[styles.card, {
+  const card = (crew: ArenaCrew) => <Pressable key={crew.id} accessibilityRole="button" accessibilityLabel={'Open ' + crew.name} onPress={() => router.push('/arena/crews/' + crew.slug)} style={[styles.card, {
     borderColor: t.border
   }]}><Text style={[styles.name, {
       color: t.textPrimary
@@ -63,13 +63,15 @@ export function ArenaCommunity({
   {crew.specialties.length ? <Text style={[styles.body, {
       color: t.textMuted
     }]}>{crew.specialties.join(' · ')}</Text> : null}
- </View>;
+ <Text style={[styles.body, { color: t.textPrimary, fontWeight: '700' }]}>View group  ↗</Text>
+ </Pressable>;
   return <View style={styles.wrap} accessibilityLabel="Communities">
   <Text style={[styles.title, {
       color: t.textPrimary
-    }]}>Communities</Text><Text style={[styles.body, {
+    }]}>Groups</Text><Text style={[styles.body, {
       color: t.textSecondary
-    }]}>Your Crews, shared interests, and real people. Membership never determines your vote.</Text>
+    }]}>Your Crews, shared interests, and real people. Find your people and join conversations that matter.</Text>
+  <Pressable accessibilityRole="button" onPress={() => router.push('/arena/crews/create')} style={[styles.createButton, { backgroundColor: t.textPrimary }]}><Text style={[styles.createLabel, { color: t.background }]}>+ Create a group</Text></Pressable>
   {!signedIn ? <Pressable style={styles.link} accessibilityRole="button" onPress={() => router.push('/auth')}><Text style={{
         color: t.textPrimary
       }}>Sign in to explore Crews</Text></Pressable> : loading ? <Text style={{
@@ -107,7 +109,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typeScale.section,
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '800'
   },
   name: {
@@ -133,5 +135,7 @@ const styles = StyleSheet.create({
   pages: {
     flexDirection: 'row',
     justifyContent: 'space-between'
-  }
+  },
+  createButton: { alignSelf: 'flex-start', minHeight: 44, borderRadius: 13, paddingHorizontal: 16, justifyContent: 'center', marginVertical: 6 },
+  createLabel: { fontSize: 13, fontWeight: '800' }
 });

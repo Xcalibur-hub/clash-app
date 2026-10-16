@@ -45,7 +45,7 @@ export function CurrentArgumentStage({
 
   const content = !message || !speaker ? (
     <Text style={[styles.empty, { color: t.textMuted }]}>
-      The stage is ready. Waiting for the first fighter argument.
+      Awaiting the opening argument.
     </Text>
   ) : (
     <>
@@ -107,15 +107,15 @@ const styles = StyleSheet.create({
   wrap: {
     flexGrow: 1,
     flexShrink: 1,
-    minHeight: 72,
+    minHeight: 64,
     justifyContent: 'center',
     paddingHorizontal: layout.screenX + 8,
     gap: space.sm,
   },
   argument: {
     ...typeScale.body,
-    fontSize: 19,
-    lineHeight: 27,
+    fontSize: 18,
+    lineHeight: 25,
     fontWeight: '600',
     letterSpacing: -0.25,
     textAlign: 'center',

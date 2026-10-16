@@ -73,15 +73,15 @@ export function FreshTakesSection({
 }
 
 const styles = StyleSheet.create({
-  section: { paddingTop: space.lg, paddingBottom: space.lg, gap: space.md },
-  head: { paddingHorizontal: layout.screenX, paddingBottom: 4, gap: 10 },
+  section: { paddingTop: space.md, paddingBottom: space.sm, gap: space.sm },
+  head: { paddingHorizontal: layout.screenX, paddingBottom: 2, gap: 5 },
   kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   kickerMark: { width: 9, height: 9, borderRadius: 3, transform: [{ rotate: '18deg' }] },
   kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   issue: { fontSize: 10, fontWeight: '700', marginLeft: 'auto', letterSpacing: 0.6 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: {
-    flexShrink: 1, fontSize: 36, lineHeight: 43, fontWeight: '800', letterSpacing: -1.7,
+    flexShrink: 1, fontSize: 27, lineHeight: 34, fontWeight: '800', letterSpacing: -1.1,
   },
   count: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
   countText: { fontSize: 12, fontWeight: '800', letterSpacing: 0 },

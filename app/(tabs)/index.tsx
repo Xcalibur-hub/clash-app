@@ -386,10 +386,7 @@ export default function ArenaScreen(): React.JSX.Element {
 
     return (
       <View style={styles.hero}>
-        <ArenaLiveGateway
-          liveCount={liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
-          onOpen={() => setArenaMode('clashes')}
-        />
+
 
         <FreshTakesSection
           items={freshItems}
@@ -408,6 +405,11 @@ export default function ArenaScreen(): React.JSX.Element {
           onMore={(take) => {
             void openMenu(take);
           }}
+        />
+
+        <ArenaLiveGateway
+          liveCount={liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
+          onOpen={() => setArenaMode('clashes')}
         />
 
         <View style={styles.feedHead}>
@@ -591,8 +593,8 @@ const styles = StyleSheet.create({
   listLayer: { zIndex: 1 },
   listDimmed: { opacity: 0.35 },
   list: { flexGrow: 1 },
-  hero: { paddingBottom: space.xs, gap: space.md },
-  feedHead: { paddingTop: space.xl, paddingBottom: space.lg, gap: 8 },
+  hero: { paddingBottom: space.xs, gap: space.sm },
+  feedHead: { paddingTop: space.md, paddingBottom: space.sm, gap: 6 },
   feedKickerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: layout.screenX,
@@ -603,7 +605,7 @@ const styles = StyleSheet.create({
   feedTitle: {
     ...typeScale.label,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 39, lineHeight: 44, fontWeight: '900', letterSpacing: -1.8,
+    fontSize: 27, lineHeight: 34, fontWeight: '800', letterSpacing: -1.1,
     paddingHorizontal: layout.screenX,
   },
   feedSub: {

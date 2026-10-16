@@ -83,9 +83,9 @@ export function ArenaTopBar({
 const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: space.md,
-    paddingBottom: space.sm,
+    paddingBottom: 6,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     zIndex: 2,
   },
@@ -93,19 +93,19 @@ const styles = StyleSheet.create({
   brand: {
     ...typeScale.title,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 38,
-    lineHeight: 43,
-    letterSpacing: -1.5,
+    fontSize: 30,
+    lineHeight: 36,
+    letterSpacing: -1.2,
     fontWeight: '800',
   },
   context: {
     ...typeScale.caption,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     letterSpacing: -0.1,
   },
-  brandDot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, left: 151, top: 4 },
+  brandDot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, left: 120, top: 2 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: 4 },
   iconBtn: {
     width: 36,

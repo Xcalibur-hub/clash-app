@@ -356,6 +356,38 @@ export default function TakeDetailScreen(): React.JSX.Element {
         style={styles.fill}
         keyboardVerticalOffset={0}
       >
+        <View style={[styles.stickyTop, { paddingTop: insets.top + space.xs, backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+          <View style={styles.topRow}>
+            <Pressable
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              hitSlop={8}
+              style={styles.iconHit}
+            >
+              <BackIcon size={20} color={theme.textPrimary} />
+            </Pressable>
+            <Text allowFontScaling={false} style={[styles.hood, { color: theme.textMuted }]}>
+              {HOOD_LABEL[take.hood]}
+            </Text>
+            <Pressable
+              onPress={() =>
+                setMenu({
+                  target: author,
+                  isSelf: isViewerAuthor,
+                  following: followingAuthor,
+                  reportTarget: { kind: 'take', id: take.id },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="More actions"
+              hitSlop={8}
+              style={styles.iconHit}
+            >
+              <MoreIcon size={20} color={theme.textMuted} strokeWidth={2.2} />
+            </Pressable>
+          </View>
+        </View>
         <FlatList<CommentNode>
           key={`${take.id}:${sort}`}
           data={nodes}
@@ -369,7 +401,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
           removeClippedSubviews={false}
           contentContainerStyle={[
             styles.content,
-            { paddingTop: insets.top + space.xs, paddingBottom: space.xl },
+            { paddingTop: space.md, paddingBottom: space.xl },
           ]}
           renderItem={({ item }) => (
             <View style={styles.threadItem}>
@@ -402,36 +434,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
           }
           ListHeaderComponent={
             <View style={styles.headerContent}>
-          <View style={styles.topRow}>
-            <Pressable
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              hitSlop={8}
-              style={styles.iconHit}
-            >
-              <BackIcon size={20} color={theme.textPrimary} />
-            </Pressable>
-            <Text allowFontScaling={false} style={[styles.hood, { color: theme.textMuted }]}>
-              {HOOD_LABEL[take.hood]}
-            </Text>
-            <Pressable
-              onPress={() =>
-                setMenu({
-                  target: author,
-                  isSelf: isViewerAuthor,
-                  following: followingAuthor,
-                  reportTarget: { kind: 'take', id: take.id },
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="More actions"
-              hitSlop={8}
-              style={styles.iconHit}
-            >
-              <MoreIcon size={20} color={theme.textMuted} strokeWidth={2.2} />
-            </Pressable>
-          </View>
+
 
           {hasMedia ? (
             <TakeDetailHero take={take} author={author} isViewer={isViewerAuthor} />
@@ -498,7 +501,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
               Join the conversation<Text style={{ color: scheme === 'dark' ? '#D6B9FA' : '#9968B5' }}> ↗</Text>
             </Text>
             <Text style={[styles.threadDescription, { color: theme.textSecondary }]}>
-              Follow the lines to see who replied to whom. Collapse branches to focus on the arguments.
+              Read the replies or add your perspective.
             </Text>
             <View style={styles.threadFilters}>
               <Text style={[styles.threadSortLabel, { color: theme.textMuted }]}>SORT BY</Text>
@@ -581,7 +584,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   fill: { flex: 1 },
   content: { paddingHorizontal: layout.screenX, paddingBottom: space.md },
-  headerContent: { gap: space.md, paddingBottom: space.sm },
+  stickyTop: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: layout.screenX, zIndex: 10 },
+  headerContent: { gap: space.sm, paddingBottom: space.sm },
   threadItem: { paddingBottom: space.md },
   pagingFooter: { paddingVertical: space.md, alignItems: 'center', gap: 10 },
   pageButton: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16 },
@@ -604,31 +608,31 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
-  textStage: { gap: space.md, paddingTop: space.xs },
+  textStage: { gap: space.sm, paddingTop: space.xs },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   authorText: { flex: 1, gap: 1 },
   authorName: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
   authorMeta: { ...typeScale.meta, fontSize: 12 },
   takeShort: {
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 25,
+    lineHeight: 32,
     fontWeight: '800',
     letterSpacing: -0.9,
     paddingVertical: space.sm,
   },
   takeLong: {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 21,
+    lineHeight: 29,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  threadHead: { gap: 9, paddingTop: space.xl, paddingBottom: space.sm },
+  threadHead: { gap: 7, paddingTop: space.md, paddingBottom: space.sm },
   threadEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   threadAccent: { width: 10, height: 10, borderRadius: 3, transform: [{ rotate: '18deg' }] },
   threadEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
   threadCount: { marginLeft: 'auto', fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
   threadTitle: {
-    ...typeScale.section, fontSize: 26, lineHeight: 32, fontWeight: '900', letterSpacing: -0.8,
+    ...typeScale.section, fontSize: 21, lineHeight: 27, fontWeight: '800', letterSpacing: -0.8,
   },
   threadDescription: { fontSize: 12, lineHeight: 19, fontWeight: '500' },
   threadFilters: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 7 },

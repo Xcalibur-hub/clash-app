@@ -73,9 +73,9 @@ export function ArenaClashes({
             {loading ? 'Checking live…' : error ? 'Live count unavailable' : `${live.length + liveEntries.length} live now`}
           </Text>
         </View>
-        <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>Where takes meet their match.</Text>
+        <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>Live Arena</Text>
         <Text style={[styles.sub, { color: t.textSecondary }]}>
-          Two sides. One room. Follow the arguments, back a fighter, and see where the crowd stands.
+          Watch live debates, choose a side, or revisit recent verdicts.
         </Text>
         {!hasLive && (loading || error) ? (
           <Text style={[styles.empty, { color: t.textMuted }]}>
@@ -83,9 +83,9 @@ export function ArenaClashes({
           </Text>
         ) : !hasLive ? (
           <View style={styles.noLive}>
-            <Text style={[styles.noLiveTitle, { color: t.textPrimary }]}>The stage is quiet.</Text>
+            <Text style={[styles.noLiveTitle, { color: t.textPrimary }]}>No live duels yet</Text>
             <Text style={[styles.empty, { color: t.textMuted }]}>
-              The next live duel will appear here. Until then, catch up on your challenges.
+              Your challenges and completed clashes are below.
             </Text>
             <Pressable accessibilityRole="button" style={[styles.secondaryAction, { borderColor: t.border }]}
               onPress={() => { hapticPress(); router.push('/arena/challenges'); }}>
@@ -234,7 +234,7 @@ function ClashRow({
 }
 
 const styles = StyleSheet.create({
-  liveIntro: { marginTop: space.md, borderWidth: 1, borderRadius: 26, padding: 22, gap: space.sm },
+  liveIntro: { marginTop: space.sm, borderWidth: StyleSheet.hairlineWidth, borderRadius: 18, padding: 16, gap: 6 },
   liveTopline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   idleDot: { width: 8, height: 8, borderRadius: 4 },
   liveCount: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
@@ -242,9 +242,9 @@ const styles = StyleSheet.create({
   featuredDuel: { borderWidth: 1.2, paddingVertical: 20, gap: 14 },
   actionLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
   actionArrow: { fontSize: 20, fontWeight: '600' },
-  noLive: { gap: 12, marginTop: space.md, paddingVertical: space.md },
-  noLiveTitle: { fontSize: 20, letterSpacing: -0.5, fontWeight: '800' },
-  secondaryAction: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 12, padding: 12 },
+  noLive: { gap: 7, marginTop: space.sm, paddingVertical: 4 },
+  noLiveTitle: { fontSize: 16, letterSpacing: -0.3, fontWeight: '700' },
+  secondaryAction: { alignSelf: 'flex-start', borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 10 },
   liveSecondary: { flexDirection: 'row', gap: 10, marginTop: space.md },
   quickLink: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: 15, padding: 12, gap: 5 },
   quickTitle: { fontSize: 13, fontWeight: '800' },
