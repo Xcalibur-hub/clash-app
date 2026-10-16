@@ -48,13 +48,15 @@ export function ArenaTopics({
   return <View style={styles.wrap} accessibilityLabel="Topics and Trends">
   <Text style={[styles.title, {
       color: t.textPrimary
-    }]}>Topics & Trends</Text>
+    }]}>Discover</Text>
   <Text style={[styles.body, {
       color: t.textSecondary
-    }]}>Explore your interests and the discussions happening now.</Text>
+    }]}>Find questions, trending topics and conversations.</Text>
+  {questionTopic?<Pressable accessibilityRole="button" onPress={()=>setQuestionTopic(undefined)} style={styles.link}><Text style={{color:t.textSecondary}}>← All questions</Text></Pressable>:null}
+  <ArenaQuestions topicId={questionTopic} refreshToken={refreshToken}/>
   <Text style={[styles.heading, {
       color: t.textPrimary
-    }]}>Topics</Text>
+    }]}>Explore topics</Text>
   {loading ? <Text style={{
       color: t.textMuted
     }}>Loading topics...</Text> : !signedIn ? <Pressable onPress={() => router.push('/auth')} style={styles.row} accessibilityRole="button"><Text style={{
@@ -76,8 +78,6 @@ export function ArenaTopics({
         }}>Explore {interest.hoods.length > 1 ? hood : interest.name}</Text></Pressable>)}
    <Pressable accessibilityRole="button" onPress={()=>setQuestionTopic(interest.id)} style={styles.link}><Text style={{color:t.textPrimary}}>Questions about {interest.name}</Text></Pressable>
   </View>)}
-  {questionTopic?<Pressable accessibilityRole="button" onPress={()=>setQuestionTopic(undefined)} style={styles.link}><Text style={{color:t.textSecondary}}>All questions</Text></Pressable>:null}
-  <ArenaQuestions topicId={questionTopic} refreshToken={refreshToken}/>
   <Text style={[styles.heading, {
       color: t.textPrimary
     }]}>Active discussions</Text>
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typeScale.section,
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '800'
   },
   heading: {
