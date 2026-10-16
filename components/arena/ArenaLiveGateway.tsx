@@ -15,7 +15,7 @@ export function ArenaLiveGateway({
 }): React.JSX.Element {
   const t = useThemeColors();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel="Open Arena Live"
+    <Pressable accessibilityRole="button" accessibilityLabel="Explore live clashes and debates"
       onPress={() => { tap(); onOpen(); }}
       style={({ pressed }) => [styles.card, {
         backgroundColor: t.surfaceElevated, borderColor: t.border,
@@ -28,24 +28,29 @@ export function ArenaLiveGateway({
           {liveCount > 0 ? `${liveCount} topic ${liveCount === 1 ? 'room' : 'rooms'} live` : 'Explore live Clashes'}
         </Text>
       </View>
-      <Text style={[styles.heading, { color: t.textPrimary }]}>Watch a Clash <Text>↗</Text></Text>
+      <View style={styles.headlineRow}>
+        <Text style={[styles.heading, { color: t.textPrimary }]}>The arena is open.</Text>
+        <Text style={[styles.headingArrow, { color: t.textPrimary }]}>↗</Text>
+      </View>
       <Text style={[styles.body, { color: t.textSecondary }]}>
         {liveCount > 0
-          ? 'Step into the live stage: two fighters, real-time arguments, and the crowd.'
-          : 'Watch ongoing duels, explore topic rooms, or follow upcoming challenges.'}
+          ? 'Two fighters. One debate. Pick a side and follow every argument.'
+          : 'Discover live debates, find your side, and join the conversation.'}
       </Text>
-      <Text style={[styles.action, { color: t.textPrimary }]}>OPEN LIVE STAGE  →</Text>
+      <Text style={[styles.action, { color: t.textPrimary }]}>EXPLORE LIVE CLASHES  →</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: layout.screenX, borderWidth: 1, borderRadius: 20, padding: space.md, gap: 8 },
+  card: { marginHorizontal: layout.screenX, borderWidth: 1, borderRadius: 24, paddingHorizontal: 20, paddingVertical: 20, gap: 12 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   dot: { height: 7, width: 7, borderRadius: 4 },
   kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   count: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
-  heading: { fontSize: 23, fontWeight: '800', letterSpacing: -0.7 },
-  body: { fontSize: 13, lineHeight: 19 },
-  action: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5, paddingTop: 4 },
+  headlineRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  heading: { flex: 1, fontSize: 27, lineHeight: 32, fontWeight: '800', letterSpacing: -1 },
+  headingArrow: { fontSize: 24, fontWeight: '500' },
+  body: { fontSize: 14, lineHeight: 21 },
+  action: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8, paddingTop: 6 },
 });
