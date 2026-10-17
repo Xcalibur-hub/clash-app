@@ -1,0 +1,13 @@
+{
+  "checks": {
+    "device_connected": true,
+    "metro_reachable": true,
+    "real_android_bundle_served": true,
+    "bundle_executed": true,
+    "usable_clash_ui": false
+  },
+  "pass": false,
+  "screen": "arena",
+  "bundle_build_ms": 311,
+  "failure": "launch_gate_incomplete"
+}

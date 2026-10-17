@@ -1,0 +1,19 @@
+{
+  "tested_commit": "e214b33426574abf8662e9a9be515393f6c7d5fc",
+  "device": "Samsung A50 SM-A505F",
+  "device_connected": true,
+  "bundle_http_200": true,
+  "js_executed": true,
+  "native_arena_launch_gate": "FAIL: onboarding, both attempts",
+  "groups_guest_navigation": "PASS",
+  "live_discovery_navigation": "PASS",
+  "live_zero_count_claim": "FAIL: source unavailable",
+  "authenticated_groups_and_duel_stage": "BLOCKED: existing backend unreachable and guest session",
+  "auth_ime_open_dismiss": "PASS",
+  "auth_keyboard_scroll_automation": "FAIL: occluded app bounds touched IME; draft recovered",
+  "room_keyboard": "NOT TESTED",
+  "backend_modified": false,
+  "source_code_modified": false,
+  "screenshot_count": 11,
+  "metro_task_stopped": true
+}

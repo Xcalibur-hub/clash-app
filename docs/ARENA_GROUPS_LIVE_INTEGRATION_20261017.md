@@ -1,5 +1,7 @@
 # Arena Groups + Live integration — 17 October 2026
 
+Follow-up: [physical A50 review](ARENA_PR70_ANDROID_REVIEW_20261017.md) detected the phone and verified guest navigation, but the native cold-launch gate failed on onboarding and the existing backend was unreachable. The results below remain the original automated-validation snapshot.
+
 **Automated checks: PASS. Native Android preflight: BLOCKED (no connected device).** This is an integration candidate, not a production-readiness determination.
 
 Branch: `integration/arena-groups-live-20261017`. Exact starting commit and target branch head: `76bf0bf0d3c54e8ec92311dcd878dd2ef8711bae` / `integration/arena-approved-baseline-20261016`. Isolated worktree: `.expo/arena-integration-20261017`. The primary checkout remains on its existing branch with its unrelated untracked files intact.
