@@ -123,7 +123,7 @@ export function matchupMetrics({
 
 
 /** Soft chip fill for role/state labels inside the stage. */
-export function chipFill(t: SemanticTheme): string {
+export function chipFill(t: Pick<SemanticTheme, 'scheme'>): string {
   return t.scheme === 'light' ? 'rgba(17,17,19,0.06)' : 'rgba(255,255,255,0.07)';
 }
 
