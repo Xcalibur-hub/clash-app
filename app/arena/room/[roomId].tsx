@@ -48,6 +48,7 @@ import { Notice } from '../../../components/shared/Notice';
 import { ArenaIcon } from '../../../components/shared/icons';
 import { useClock } from '../../../hooks/useClock';
 import { useRequireAuth } from '../../../hooks/useRequireAuth';
+import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
 import { navLog } from '../../../utils/navDiagnostics';
 import { useArenaBackup } from '../../../hooks/useArenaBackup';
 import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
@@ -132,6 +133,7 @@ function RoomScope(): React.JSX.Element {
   const roomId = Array.isArray(raw) ? raw[0] : raw;
   const router = useRouter();
   const requireAuth = useRequireAuth();
+  const keyboardOpen = useKeyboardVisible();
 
   React.useEffect(() => {
     navLog('room-mounted', { roomId, mounted: true });
@@ -859,7 +861,7 @@ function RoomScope(): React.JSX.Element {
                 {orphanEvidence}
               </>
             }
-            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + space.xxl }]}
+            contentContainerStyle={[styles.list, { paddingBottom: keyboardOpen ? space.md : insets.bottom + space.xxl }]}
             refreshing={refreshing}
             onRefresh={() => void refresh()}
             showsVerticalScrollIndicator={false}
@@ -929,7 +931,7 @@ function RoomScope(): React.JSX.Element {
             ) : (
               <View style={styles.flex} />
             )}
-            <View style={{ paddingBottom: Math.max(insets.bottom, space.sm) }}>
+            <View style={{ paddingBottom: keyboardOpen ? space.sm : Math.max(insets.bottom, space.sm) }}>
               {isDebater && accepting && !isDuel ? (
                 <View style={styles.backupBar}>
                   <VaultActionButton

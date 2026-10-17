@@ -3,6 +3,7 @@ import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { useArenaCrowd } from '../../hooks/useArenaCrowd';
 import { validCrowdText, type CrowdMessage } from '../../utils/arenaCrowd';
+import { crowdRowLabel } from './liveArenaStyles';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 
 export type CrowdModel = ReturnType<typeof useArenaCrowd>;
@@ -58,16 +59,16 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
       ListHeaderComponent={crowd?.hasOlder ? <Pressable disabled={crowd.olderBusy} accessibilityRole="button" style={styles.hit}
         onPress={() => { atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loading…' : 'Load earlier chat'}</Text></Pressable> : null}
       ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{unavailableReason ?? (crowd?.loading ? 'Loading Crowd…' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.')}</Text>}
-      renderItem={({item}) => <View style={[styles.row,{borderBottomColor:t.border}]}>
+      renderItem={({item}) => <View style={[styles.row,{borderBottomColor:t.border}]} accessibilityRole="text" accessibilityLabel={crowdRowLabel(item.author.handle, item.body)}>
         <Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}]}>
           <Text style={styles.name}>@{item.author.handle}</Text>{'  '}{item.body}
         </Text>
         {onReport ? <Pressable onPress={() => onReport(item)} accessibilityRole="button" accessibilityLabel={`Report or block @${item.author.handle}`} style={styles.menu}><Text style={{color:t.textMuted}}>···</Text></Pressable> : null}
       </View>}/>
-    {unseen ? <Pressable accessibilityRole="button" style={[styles.latestButton,{borderColor:t.border,backgroundColor:t.surfaceElevated}]} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>Latest chat ↓</Text></Pressable> : null}
+    {unseen ? <Pressable accessibilityRole="button" accessibilityHint="Scrolls the crowd chat to the newest message" style={[styles.latestButton,{borderColor:t.border,backgroundColor:t.surfaceElevated}]} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>Latest chat ↓</Text></Pressable> : null}
     {crowd?.context ? canSend ? <View style={[styles.composer,{borderColor:t.border}]}>
       <TextInput value={draft} onChangeText={setDraft} placeholder="Message the Crowd" placeholderTextColor={t.textMuted}
-        accessibilityLabel="Public Crowd message" multiline maxLength={500} editable={!crowd.sending}
+        accessibilityLabel="Public Crowd message" accessibilityHint="Public chat, visible to everyone in this Clash" multiline maxLength={500} editable={!crowd.sending} blurOnSubmit={false} returnKeyType="default"
         style={[styles.input,{color:t.textPrimary}]} />
       <Pressable disabled={crowd.sending || !validCrowdText(draft.trim())} accessibilityRole="button" accessibilityLabel="Send public Crowd message"
         onPress={() => void send()} style={[styles.sendButton,{backgroundColor:t.surfaceElevated,borderColor:t.border}]}><Text style={{color:t.textPrimary,opacity:validCrowdText(draft.trim()) ? 1 : 0.4}}>{crowd.sending ? 'Sending…' : 'Send'}</Text></Pressable>
