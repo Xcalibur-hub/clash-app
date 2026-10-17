@@ -5,7 +5,8 @@ import { layout, useThemeColors } from '../../theme';
 import { tap } from '../../utils/haptics';
 
 export function ArenaLiveGateway({ liveCount, onOpen }: {
-  liveCount: number;
+  /** Count of returned live topics, not a total viewer or Room count. */
+  liveCount: number | null;
   onOpen: () => void;
 }): React.JSX.Element {
   const t = useThemeColors();
@@ -15,18 +16,18 @@ export function ArenaLiveGateway({ liveCount, onOpen }: {
       accessibilityLabel="Explore live Clashes and debates"
       onPress={() => { tap(); onOpen(); }}
       style={({ pressed }) => [styles.card, {
-        backgroundColor: t.surfaceElevated, borderColor: t.border,
+        backgroundColor: t.surface, borderColor: t.border,
         opacity: pressed ? 0.76 : 1,
       }]}
     >
-      <View style={[styles.dot, { backgroundColor: liveCount > 0 ? '#D75C4D' : t.textMuted }]} />
+      <View style={[styles.dot, { backgroundColor: liveCount !== null && liveCount > 0 ? '#D75C4D' : t.textMuted }]} />
       <View style={styles.copy}>
         <Text style={[styles.title, { color: t.textPrimary }]}>
-          {liveCount > 0 ? 'Live in the Arena' : 'Watch a Clash'}
+          {liveCount !== null && liveCount > 0 ? 'Live in the Arena' : 'Watch a Clash'}
         </Text>
         <Text style={[styles.sub, { color: t.textSecondary }]} numberOfLines={1}>
-          {liveCount > 0
-            ? `${liveCount} ${liveCount === 1 ? 'room' : 'rooms'} happening now`
+          {liveCount !== null && liveCount > 0
+            ? `${liveCount} live ${liveCount === 1 ? 'discussion' : 'discussions'} to explore`
             : 'Duels, challenges and verdicts'}
         </Text>
       </View>
@@ -38,8 +39,8 @@ export function ArenaLiveGateway({ liveCount, onOpen }: {
 const styles = StyleSheet.create({
   card: {
     marginHorizontal: layout.screenX, borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14,
-    minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
+    minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: 12,
   },
   dot: { width: 9, height: 9, borderRadius: 5 },
   copy: { flex: 1, gap: 3, minWidth: 0 },

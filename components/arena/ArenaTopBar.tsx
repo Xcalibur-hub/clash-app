@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { selectViewer, useClash } from '../../store';
-import { space, typeScale, useTheme, useThemeColors } from '../../theme';
+import { space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
 import { SearchIcon } from '../shared/icons';
@@ -27,7 +27,6 @@ export function ArenaTopBar({
   const { open } = useSidebar();
   const router = useRouter();
   const t = useThemeColors();
-  const { scheme } = useTheme();
   const reduced = useReducedMotion();
 
   return (
@@ -40,7 +39,6 @@ export function ArenaTopBar({
         >
           CLASH
         </Animated.Text>
-        <View style={[styles.brandDot, { backgroundColor: scheme === 'dark' ? '#DDB1E8' : '#EB634E' }]} />
         {contextLine ? (
           <Animated.Text
             entering={reduced ? undefined : FadeIn.delay(80).duration(320)}
@@ -72,6 +70,7 @@ export function ArenaTopBar({
           accessibilityRole="button"
           accessibilityLabel="Open menu"
           hitSlop={8}
+          style={styles.iconBtn}
         >
           <Avatar name={viewer.name} tint={viewer.tint} size={34} />
         </Pressable>
@@ -83,7 +82,7 @@ export function ArenaTopBar({
 const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: space.md,
-    paddingBottom: 6,
+    paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -93,7 +92,7 @@ const styles = StyleSheet.create({
   brand: {
     ...typeScale.title,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 30,
+    fontSize: 28,
     lineHeight: 36,
     letterSpacing: -1.2,
     fontWeight: '800',
@@ -103,14 +102,13 @@ const styles = StyleSheet.create({
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 10,
     fontWeight: '600',
-    letterSpacing: -0.1,
+    letterSpacing: 1.5,
   },
-  brandDot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, left: 120, top: 2 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: 4 },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,

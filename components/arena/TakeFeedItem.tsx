@@ -1,49 +1,19 @@
 import React from 'react';
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  Platform,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { HOOD_LABEL } from '../../data/hoods';
 import type { ChallengerComment, Take, User } from '../../store';
-import {
-  arenaAccentForHood,
-  layout,
-  pulseAccent,
-  radius,
-  space,
-  typeScale,
-  useThemeColors,
-} from '../../theme';
+import { layout, useThemeColors } from '../../theme';
 import { compact, timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { resolveStillUrl } from '../../utils/mediaStill';
 import { pulseLabel, takePulse } from '../../utils/takePulse';
-import { CrossedSwords } from '../clash/CrossedSwords';
 import { Avatar } from '../shared/Avatar';
-import { Squiggle } from '../shared/Doodles';
-import {
-  ArenaIcon,
-  ArrowBigUpIcon,
-  BookmarkIcon,
-  CommentIcon,
-  MoreIcon,
-  PlayIcon,
-  ShareIcon,
-} from '../shared/icons';
-import { PressableScale } from '../shared/PressableScale';
-import { TakeActionRow } from './TakeActionRow';
+import { ArenaIcon, ArrowBigUpIcon, BookmarkIcon, CommentIcon, MoreIcon, PlayIcon, ShareIcon } from '../shared/icons';
 import { ChallengeTakeButton } from './TakeChallenges';
 import { TakeStoryBeat } from './TakeStoryBeat';
 import { QuestionVotePanel } from './QuestionVotePanel';
-
 export interface TakeFeedItemProps {
   take: Take;
   author: User;
@@ -59,90 +29,10 @@ export interface TakeFeedItemProps {
   onSave: () => void;
   onShare: () => void;
   onMore: () => void;
-  /** Only the first few visible items should enter with motion. */
   index?: number;
 }
-
-/**
- * Immersive feed card — media fills the surface; text-only gets editorial poster.
- * Not a Reddit list row.
- */
-function TakeFeedItemBase(props: TakeFeedItemProps): React.JSX.Element {
-  const {
-    take,
-    author,
-    isViewer,
-    isSaved,
-    hasReacted,
-    commentCount,
-    topComment,
-    topCommentAuthor,
-    onOpenDetail,
-    onOpenClash,
-    onReact,
-    onSave,
-    onShare,
-    onMore,
-    index = 0,
-  } = props;
-  const reduced = useReducedMotion();
-  const entering =
-    reduced || index > 4
-      ? undefined
-      : FadeInDown.delay(index * 40)
-          .springify()
-          .damping(20)
-          .stiffness(260);
-
-  const hasMedia = Boolean(take.media);
-  const body = hasMedia ? (
-    <MediaFeedCard
-      take={take}
-      author={author}
-      isViewer={isViewer}
-      isSaved={isSaved}
-      hasReacted={hasReacted}
-      commentCount={commentCount}
-      topComment={topComment}
-      topCommentAuthor={topCommentAuthor}
-      onOpenDetail={onOpenDetail}
-      onOpenClash={onOpenClash}
-      onReact={onReact}
-      onSave={onSave}
-      onShare={onShare}
-      onMore={onMore}
-    />
-  ) : (
-    <TextFeedCard
-      take={take}
-      author={author}
-      isViewer={isViewer}
-      isSaved={isSaved}
-      hasReacted={hasReacted}
-      commentCount={commentCount}
-      topComment={topComment}
-      topCommentAuthor={topCommentAuthor}
-      onOpenDetail={onOpenDetail}
-      onOpenClash={onOpenClash}
-      onReact={onReact}
-      onSave={onSave}
-      onShare={onShare}
-      onMore={onMore}
-    />
-  );
-
-  return (
-    <Animated.View entering={entering} style={styles.wrap}>
-      {body}
-      {take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : null}
-      {!isViewer && <ChallengeTakeButton takeId={take.id} />}
-    </Animated.View>
-  );
-}
-
-export const TakeFeedItem = React.memo(TakeFeedItemBase);
-
-function MediaFeedCard({
+/** Editorial feed card. Media, copy and actions occupy their own space at every font size. */
+function TakeFeedItemBase({
   take,
   author,
   isViewer,
@@ -157,568 +47,249 @@ function MediaFeedCard({
   onSave,
   onShare,
   onMore,
-}: Omit<TakeFeedItemProps, 'index'>): React.JSX.Element {
-  const t = useThemeColors();
-  const router = useRouter();
-  const { width } = useWindowDimensions();
-  const cardW = Math.round(width * 0.92);
-  const media = take.media!;
-  const still = resolveStillUrl(media);
-  const isVideo = media.kind === 'video';
+  index = 0
+}: TakeFeedItemProps): React.JSX.Element {
+  const t = useThemeColors(),
+    router = useRouter(),
+    reduced = useReducedMotion();
+  const pulse = takePulse(take),
+    still = take.media ? resolveStillUrl(take.media) : null;
   const [failed, setFailed] = React.useState(false);
-  const [swordKey, setSwordKey] = React.useState(0);
-  const height = Math.min(460, Math.max(340, Math.round(width * 0.98)));
-  const showImage = Boolean(still) && !failed;
-  const hood = HOOD_LABEL[take.hood] ?? take.hood;
-  const pulse = takePulse(take);
-
-  React.useEffect(() => {
-    setFailed(false);
-  }, [still]);
-
-  const clash = (): void => {
-    setSwordKey((k) => k + 1);
-    onOpenClash();
-  };
-
-  return (
-    <PressableScale
-      onPress={onOpenDetail}
-      accessibilityRole="button"
-      accessibilityLabel="Open take"
-      style={[
-        styles.card,
-        {
-          width: cardW,
-          height,
-          borderRadius: 20,
-          shadowColor: t.shadowColor,
-          backgroundColor: '#111113',
-        },
-      ]}
-    >
-      {showImage ? (
-        <Image
-          source={{ uri: still as string }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <LinearGradient
-          colors={[...(media.colors.length >= 2 ? media.colors : (['#2A2A2E', '#111113'] as const))]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
-
-      <LinearGradient
-        colors={['rgba(8,8,11,0.45)', 'transparent', 'transparent']}
-        locations={[0, 0.28, 1]}
-        style={styles.topVeil}
-        pointerEvents="none"
-      />
-      <LinearGradient
-        colors={['transparent', 'rgba(8,8,11,0.35)', 'rgba(8,8,11,0.82)']}
-        locations={[0.35, 0.62, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-
-      {isVideo ? (
-        <View style={styles.playBadge} pointerEvents="none">
-          <PlayIcon size={16} color="#FAFAF8" strokeWidth={2.4} />
-        </View>
-      ) : null}
-
-      <View style={styles.mediaTop}>
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            router.push(`/profile/${author.id}`);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${author.name}'s profile`}
-          style={styles.authorHit}
-        >
-          <Avatar name={author.name} tint={author.tint} size={28} />
-          <View style={styles.authorMeta}>
-            <Text allowFontScaling={false} style={styles.handleOnMedia} numberOfLines={1}>
-              @{author.handle}
-              {isViewer ? ' · You' : ''}
-            </Text>
-            <Text allowFontScaling={false} style={styles.hoodOnMedia} numberOfLines={1}>
-              {hood} · {timeAgo(take.createdAt)}
-              {pulse ? ` · ${pulseLabel(pulse)}` : ''}
-            </Text>
-          </View>
+  React.useEffect(() => setFailed(false), [still]);
+  return <Animated.View entering={reduced || index > 4 ? undefined : FadeInDown.delay(index * 30).duration(220)} style={styles.wrap}>
+    <View style={[styles.card, {
+      backgroundColor: t.surface,
+      borderColor: t.border
+    }]}>
+      <View style={styles.header}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${author.name}'s profile`} onPress={() => {
+          hapticTap();
+          router.push(`/profile/${author.id}`);
+        }} style={styles.author}>
+          <Avatar name={author.name} tint={author.tint} size={32} />
+          <View style={styles.byline}><Text numberOfLines={1} style={[styles.name, {
+              color: t.textPrimary
+            }]}>{author.name}{isViewer ? ' · You' : ''}</Text>
+            <Text numberOfLines={1} style={[styles.meta, {
+              color: t.textMuted
+            }]}>@{author.handle} · {timeAgo(take.createdAt)}</Text></View>
         </Pressable>
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            onMore();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="More take actions"
-          hitSlop={8}
-          style={styles.moreHit}
-        >
-          <MoreIcon size={18} color="#FAFAF8" strokeWidth={2.2} />
-        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="More take actions" onPress={() => {
+          hapticTap();
+          onMore();
+        }} style={styles.more}><MoreIcon size={20} color={t.textSecondary} /></Pressable>
       </View>
-
-      <View style={styles.mediaLower}>
-        <Text allowFontScaling style={styles.mediaHeadline} numberOfLines={4}>
-          {take.text}
-        </Text>
-
-        {topComment ? (
-          <TakeStoryBeat
-            comment={topComment}
-            author={topCommentAuthor}
-            clashCount={take.clashes}
-            pulse={pulse}
-            onOpen={onOpenDetail}
-            onMedia
-          />
-        ) : take.clashes > 0 ? (
-          <Text allowFontScaling={false} style={styles.clashHint}>
-            {`⚔ CLASH ACTIVE · ${compact(take.clashes)} in the fight`}
-          </Text>
-        ) : null}
-
-        <View style={styles.overlayActions}>
-          <OverlayAction
-            icon={ArrowBigUpIcon}
-            label={compact(take.reactions)}
-            active={hasReacted}
-            onPress={onReact}
-            a11y="React to this take"
-          />
-          <OverlayAction
-            icon={CommentIcon}
-            label={commentCount > 0 ? compact(commentCount) : ''}
-            onPress={onOpenDetail}
-            a11y="Open rebuttals"
-          />
-          <Pressable
-            onPress={() => {
-              hapticTap();
-              clash();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Clash on this take"
-            style={styles.clashOverlay}
-          >
-            <View style={styles.swordHit}>
-              <CrossedSwords
-                triggerKey={swordKey || null}
-                size={28}
-                color="#FAFAF8"
-                cooldownMs={400}
-                hapticOnImpact
-              />
-            </View>
-            <ArenaIcon size={14} color="#111113" strokeWidth={2.6} />
-            <Text allowFontScaling={false} style={styles.clashOverlayText}>
-              CLASH
-            </Text>
-          </Pressable>
-          <View style={{ flex: 1 }} />
-          <OverlayAction
-            icon={ShareIcon}
-            label=""
-            onPress={onShare}
-            a11y="Share this take"
-          />
-          <OverlayAction
-            icon={BookmarkIcon}
-            label=""
-            active={isSaved}
-            onPress={onSave}
-            a11y={isSaved ? 'Remove from saved' : 'Save this take'}
-          />
-        </View>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Open take: ${take.text}`} onPress={onOpenDetail} style={styles.story}>
+        <Text style={[styles.community, {
+          color: t.textMuted
+        }]}>{HOOD_LABEL[take.hood] ?? take.hood}{pulse ? ` · ${pulseLabel(pulse)}` : ''}</Text>
+        <Text numberOfLines={6} style={[styles.headline, {
+          color: t.textPrimary
+        }]}>{take.text}</Text>
+        {take.media ? <View style={[styles.media, {
+          backgroundColor: t.surfaceElevated
+        }]}>
+          {still && !failed ? <Image source={{
+            uri: still
+          }} resizeMode="cover" style={StyleSheet.absoluteFill} onError={() => setFailed(true)} /> : <Text style={[styles.mediaFallback, {
+            color: t.textMuted
+          }]}>Preview unavailable · Open Take</Text>}
+          {take.media.kind === 'video' ? <View style={styles.play}><PlayIcon size={20} color="#FFFFFF" /></View> : null}
+          <View style={styles.mediaLabel}><Text style={styles.mediaKind}>{take.media.kind.toUpperCase()}</Text></View>
+        </View> : null}
+      </Pressable>
+      <View style={styles.responses}>
+        {topComment ? <TakeStoryBeat comment={topComment} author={topCommentAuthor} clashCount={take.clashes} pulse={pulse === 'clash' ? null : pulse} onOpen={onOpenDetail} /> : take.clashes > 0 ? <Text style={[styles.meta, {
+          color: t.textMuted
+        }]}>{compact(take.clashes)} {take.clashes === 1 ? 'Clash' : 'Clashes'} · View the discussion</Text> : null}
       </View>
-    </PressableScale>
-  );
+      <View style={[styles.actions, {
+        borderColor: t.border
+      }]}>
+        {[{
+          Icon: ArrowBigUpIcon,
+          label: compact(take.reactions),
+          a11y: 'React to this take',
+          onPress: onReact,
+          selected: hasReacted
+        }, {
+          Icon: CommentIcon,
+          label: commentCount > 0 ? compact(commentCount) : '',
+          a11y: 'Open rebuttals',
+          onPress: onOpenDetail
+        }, {
+          Icon: ArenaIcon,
+          label: 'Clash',
+          a11y: 'Clash on this take',
+          onPress: onOpenClash,
+          primary: true
+        }, {
+          Icon: ShareIcon,
+          label: '',
+          a11y: 'Share this take',
+          onPress: onShare
+        }, {
+          Icon: BookmarkIcon,
+          label: '',
+          a11y: isSaved ? 'Remove from saved' : 'Save this take',
+          onPress: onSave,
+          selected: isSaved
+        }].map(({
+          Icon,
+          label,
+          a11y,
+          onPress,
+          selected,
+          primary
+        }) => <Pressable key={a11y} accessibilityRole="button" accessibilityLabel={a11y} accessibilityState={selected === undefined ? undefined : {
+          selected
+        }} onPress={() => {
+          hapticTap();
+          onPress();
+        }} style={({
+          pressed
+        }) => [styles.actionButton, {
+          backgroundColor: primary ? t.textPrimary : selected ? t.surfaceElevated : 'transparent',
+          opacity: pressed ? 0.65 : 1
+        }]}>
+          <Icon size={17} color={primary ? t.background : selected ? t.textPrimary : t.textSecondary} />
+          {label ? <Text style={[styles.actionLabel, {
+            color: primary ? t.background : t.textSecondary
+          }]}>{label}</Text> : null}
+        </Pressable>)}
+      </View>
+      {take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : null}
+      {!isViewer ? <ChallengeTakeButton takeId={take.id} /> : null}
+    </View>
+  </Animated.View>;
 }
-
-function TextFeedCard({
-  take,
-  author,
-  isViewer,
-  isSaved,
-  hasReacted,
-  commentCount,
-  topComment,
-  topCommentAuthor,
-  onOpenDetail,
-  onOpenClash,
-  onReact,
-  onSave,
-  onShare,
-  onMore,
-}: Omit<TakeFeedItemProps, 'index'>): React.JSX.Element {
-  const t = useThemeColors();
-  const { width } = useWindowDimensions();
-  const accent = arenaAccentForHood(take.hood, t.scheme, take.id);
-  const cardW = Math.round(width * 0.92);
-  const [swordKey, setSwordKey] = React.useState(0);
-  const hood = HOOD_LABEL[take.hood] ?? take.hood;
-  const pulse = takePulse(take);
-  const clashTone = pulseAccent('clash', t.scheme);
-
-  return (
-    <PressableScale
-      onPress={onOpenDetail}
-      accessibilityRole="button"
-      accessibilityLabel="Open take"
-      style={[
-        styles.textCard,
-        {
-          width: cardW,
-          borderRadius: 18,
-          backgroundColor: t.scheme === 'dark' ? '#252329' : '#F7F2EA',
-          shadowColor: t.shadowColor,
-        },
-      ]}
-    >
-      <View style={[styles.textBlob, { backgroundColor: t.scheme === 'dark' ? '#403747' : '#EDE1EA' }]} pointerEvents="none" />
-      <View style={[styles.textEdge, { backgroundColor: t.scheme === 'dark' ? '#BBA2DB' : '#A4759C' }]} />
-
-      <View style={styles.textTop}>
-        <Text allowFontScaling={false} style={[styles.hoodCaps, { color: t.scheme === 'dark' ? '#D6B8F2' : '#733F6A' }]}>
-          {hood.toUpperCase()}
-          {pulse ? ` · ${pulseLabel(pulse)}` : ''}
-        </Text>
-        <Pressable
-          onPress={() => {
-            hapticTap();
-            onMore();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="More take actions"
-          hitSlop={8}
-        >
-          <MoreIcon size={18} color={t.textMuted} strokeWidth={2.2} />
-        </Pressable>
-      </View>
-
-      <Text
-        allowFontScaling
-        style={[styles.textHeadline, { color: t.scheme === 'dark' ? '#FFF6EE' : '#251F28' }]}
-        numberOfLines={6}
-      >
-        {take.text}
-      </Text>
-
-      <Squiggle size={44} color={t.scheme === 'dark' ? '#C8A5E3' : '#A4759C'} opacity={0.2} style={styles.textDoodle} />
-
-      {topComment ? (
-        <TakeStoryBeat
-          comment={topComment}
-          author={topCommentAuthor}
-          clashCount={take.clashes}
-          pulse={pulse}
-          onOpen={onOpenDetail}
-        />
-      ) : take.clashes > 0 ? (
-        <Text
-          allowFontScaling={false}
-          style={[styles.clashHintText, { color: clashTone?.ink ?? t.textMuted }]}
-        >
-          {`⚔ CLASH ACTIVE · ${compact(take.clashes)} in the fight`}
-        </Text>
-      ) : null}
-
-      <View style={styles.textFooter}>
-        <View style={styles.textAuthor}>
-          <Avatar name={author.name} tint={author.tint} size={24} />
-          <Text allowFontScaling={false} style={[styles.textHandle, { color: t.scheme === 'dark' ? '#D6C9D9' : '#6B5965' }]}>
-            @{author.handle}
-            {isViewer ? ' · You' : ''} · {timeAgo(take.createdAt)}
-          </Text>
-        </View>
-        <View style={styles.textActions}>
-          <TakeActionRow
-            reactions={take.reactions}
-            commentCount={commentCount}
-            isSaved={isSaved}
-            hasReacted={hasReacted}
-            onReact={onReact}
-            onComment={onOpenDetail}
-            onClash={() => {
-              setSwordKey((k) => k + 1);
-              onOpenClash();
-            }}
-            onShare={onShare}
-            onSave={onSave}
-          />
-          <View style={styles.swordAnchor} pointerEvents="none">
-            <CrossedSwords
-              triggerKey={swordKey || null}
-              size={36}
-              color={accent.ink}
-              cooldownMs={400}
-            />
-          </View>
-        </View>
-      </View>
-    </PressableScale>
-  );
-}
-
-function OverlayAction({
-  icon: Icon,
-  label,
-  active,
-  onPress,
-  a11y,
-}: {
-  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
-  label: string;
-  active?: boolean;
-  onPress: () => void;
-  a11y: string;
-}): React.JSX.Element {
-  const color = active ? '#FFFFFF' : 'rgba(250,250,248,0.88)';
-  return (
-    <Pressable
-      onPress={() => {
-        hapticTap();
-        onPress();
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={a11y}
-      accessibilityState={active ? { selected: true } : undefined}
-      style={styles.overlayAction}
-      hitSlop={6}
-    >
-      <Icon size={17} color={color} strokeWidth={active ? 2.4 : 2.1} />
-      {label ? (
-        <Text allowFontScaling={false} style={[styles.overlayLabel, { color }]}>
-          {label}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
-
+export const TakeFeedItem = React.memo(TakeFeedItemBase);
 const styles = StyleSheet.create({
   wrap: {
-    alignItems: 'center',
-    marginBottom: space.lg,
+    paddingHorizontal: layout.screenX,
+    marginBottom: 16
   },
   card: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 18,
     overflow: 'hidden',
-    shadowOpacity: 0.14,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
+    paddingTop: 10,
+    paddingBottom: 4
   },
-  topVeil: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 110,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 16,
+    paddingRight: 8,
+    gap: 8
   },
-  playBadge: {
-    position: 'absolute',
-    top: '44%',
-    left: '50%',
-    marginLeft: -24,
-    marginTop: -24,
+  author: {
+    minHeight: 44,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  byline: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  name: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700'
+  },
+  meta: {
+    fontSize: 11,
+    lineHeight: 17
+  },
+  more: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  story: {
+    paddingTop: 12,
+    gap: 12
+  },
+  community: {
+    fontSize: 10,
+    lineHeight: 16,
+    fontWeight: '700',
+    letterSpacing: 0.9,
+    paddingHorizontal: 16,
+    textTransform: 'uppercase'
+  },
+  headline: {
+    fontSize: 22,
+    lineHeight: 30,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    paddingHorizontal: 16
+  },
+  media: {
+    aspectRatio: 1.6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+    overflow: 'hidden'
+  },
+  mediaFallback: {
+    padding: 20,
+    fontSize: 12
+  },
+  play: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(8,8,11,0.58)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
-  mediaTop: {
+  mediaLabel: {
     position: 'absolute',
-    top: space.md,
-    left: space.md,
-    right: space.md,
+    bottom: 10,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingVertical: 4,
+    paddingHorizontal: 7,
+    borderRadius: 5
+  },
+  mediaKind: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    letterSpacing: 1,
+    fontWeight: '700'
+  },
+  responses: {
+    paddingHorizontal: 16,
+    paddingTop: 12
+  },
+  actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 2,
+    gap: 4,
+    marginHorizontal: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 8,
+    paddingVertical: 6
   },
-  authorHit: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  authorMeta: { flex: 1, gap: 1 },
-  handleOnMedia: {
-    ...typeScale.label,
-    color: '#FAFAF8',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  hoodOnMedia: {
-    ...typeScale.caption,
-    color: 'rgba(250,250,248,0.72)',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  moreHit: {
-    width: 32,
-    height: 32,
+  actionButton: {
+    minHeight: 44,
+    minWidth: 44,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  mediaLower: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: space.lg,
-    paddingBottom: space.md,
-    gap: space.md,
-    zIndex: 2,
-  },
-  mediaHeadline: {
-    ...typeScale.editorial,
-    color: '#FAFAF8',
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '700',
-    letterSpacing: -0.6,
-  },
-  clashHint: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    color: 'rgba(250,250,248,0.72)',
-  },
-  clashHintText: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    marginTop: space.sm,
-  },
-  overlayActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  overlayAction: {
-    minHeight: 40,
-    minWidth: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 4,
-  },
-  overlayLabel: {
-    ...typeScale.meta,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  clashOverlay: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 5,
-    backgroundColor: '#FAFAF8',
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    minHeight: 34,
-    position: 'relative',
+    borderRadius: 12,
+    paddingHorizontal: 8
   },
-  clashOverlayText: {
-    ...typeScale.label,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    color: '#111113',
-  },
-  swordHit: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textCard: {
-    overflow: 'hidden',
-    paddingHorizontal: 20,
-    paddingTop: 19,
-    paddingBottom: 18,
-    minHeight: 245,
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
-  },
-  textBlob: {
-    position: 'absolute',
-    top: -72,
-    right: -65,
-    width: 156,
-    height: 156,
-    borderRadius: 78,
-    opacity: 0.26,
-  },
-  textEdge: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-  },
-  textTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: space.sm,
-    zIndex: 1,
-  },
-  hoodCaps: {
-    ...typeScale.caption,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  textHeadline: {
-    ...typeScale.editorial,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 26,
-    lineHeight: 33,
-    fontWeight: '700',
-    letterSpacing: -0.65,
-    zIndex: 1,
-    marginBottom: space.md,
-  },
-  textDoodle: {
-    marginBottom: space.xs,
-    opacity: 0.45,
-  },
-  textFooter: {
-    marginTop: 'auto',
-    gap: space.xs,
-    zIndex: 1,
-  },
-  textAuthor: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  textHandle: {
-    ...typeScale.meta,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+  actionLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
-  },
-  textActions: {
-    position: 'relative',
-  },
-  swordAnchor: {
-    position: 'absolute',
-    left: '42%',
-    top: -8,
-  },
+    fontWeight: '600'
+  }
 });

@@ -54,7 +54,7 @@ import {
   type User,
   type Take,
 } from '../../store';
-import { layout, space, typeScale, useTheme, useThemeColors } from '../../theme';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
 import {
   clashStartErrorMessage,
   shouldOpenExistingClash,
@@ -93,7 +93,6 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const react = useTakeReaction();
   const theme = useThemeColors();
-  const { scheme } = useTheme();
 
   const [sort, setSort] = React.useState<CommentSort>('best');
   const [pagedRoots, setPagedRoots] = React.useState<ChallengerComment[]>([]);
@@ -352,7 +351,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.fill}
         keyboardVerticalOffset={0}
       >
@@ -394,7 +393,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
           keyExtractor={(node) => node.comment.id}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           initialNumToRender={5}
           maxToRenderPerBatch={6}
           windowSize={7}
@@ -404,7 +403,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
             { paddingTop: space.md, paddingBottom: space.xl },
           ]}
           renderItem={({ item }) => (
-            <View style={styles.threadItem}>
+            <View style={[styles.threadItem, { borderLeftColor: theme.border }]}>
               <CommentBranch node={item} serverReplies={pageReady} locallyCreated={locallyCreated} takeAuthorId={author.id}
                 onUpvote={upvote} onReply={reply}
                 onClash={clashFromComment} onMore={more} />
@@ -427,7 +426,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
               ) : null}
             </View>
           }
-          ListEmptyComponent={
+          ListEmptyComponent={pageBusy || pageError ? null :
             <Text style={[styles.empty, { color: theme.textMuted }]}>
               No replies yet — start the conversation.
             </Text>
@@ -489,16 +488,16 @@ export default function TakeDetailScreen(): React.JSX.Element {
 
           <View style={styles.threadHead}>
             <View style={styles.threadEyebrowRow}>
-              <View style={[styles.threadAccent, { backgroundColor: scheme === 'dark' ? '#C9A5EC' : '#9E73BB' }]} />
+
               <Text style={[styles.threadEyebrow, { color: theme.textSecondary }]}>
                 THE DISCUSSION
               </Text>
               <Text style={[styles.threadCount, { color: theme.textMuted }]}>
-                {comments.length} {comments.length === 1 ? 'REPLY' : 'REPLIES'}
+                {nodes.length} {nodes.length === 1 ? 'THREAD' : 'THREADS'} LOADED
               </Text>
             </View>
             <Text allowFontScaling style={[styles.threadTitle, { color: theme.textPrimary }]}>
-              Join the conversation<Text style={{ color: scheme === 'dark' ? '#D6B9FA' : '#9968B5' }}> ↗</Text>
+              A different point of view.
             </Text>
             <Text style={[styles.threadDescription, { color: theme.textSecondary }]}>
               Read the replies or add your perspective.
@@ -520,7 +519,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
             styles.inputBar,
             {
               borderTopColor: theme.border,
-              backgroundColor: theme.background,
+              backgroundColor: theme.surface,
               paddingBottom: Math.max(insets.bottom, space.sm),
             },
           ]}
@@ -586,7 +585,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: layout.screenX, paddingBottom: space.md },
   stickyTop: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: layout.screenX, zIndex: 10 },
   headerContent: { gap: space.sm, paddingBottom: space.sm },
-  threadItem: { paddingBottom: space.md },
+  threadItem: { marginBottom: 16, paddingLeft: 10, paddingVertical: 8, borderLeftWidth: 1 },
   pagingFooter: { paddingVertical: space.md, alignItems: 'center', gap: 10 },
   pageButton: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16 },
   missing: { paddingHorizontal: space.lg },
@@ -630,14 +629,14 @@ const styles = StyleSheet.create({
   threadEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   threadAccent: { width: 10, height: 10, borderRadius: 3, transform: [{ rotate: '18deg' }] },
   threadEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
-  threadCount: { marginLeft: 'auto', fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  threadCount: { flexShrink: 1, marginLeft: 'auto', fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
   threadTitle: {
     ...typeScale.section, fontSize: 21, lineHeight: 27, fontWeight: '800', letterSpacing: -0.8,
   },
   threadDescription: { fontSize: 12, lineHeight: 19, fontWeight: '500' },
-  threadFilters: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 7 },
+  threadFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 },
   threadSortLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  sortWrap: { width: 148 },
+  sortWrap: { minWidth: 160, flexGrow: 1, maxWidth: 240 },
   empty: {
     ...typeScale.meta,
     fontSize: 14,
