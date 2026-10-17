@@ -2,7 +2,7 @@
 import React from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { ArenaIcon, CreatorsIcon, HashIcon, SparklesIcon } from '../shared/icons';
-import { layout, useTheme, useThemeColors } from '../../theme';
+import { layout, useThemeColors } from '../../theme';
 import { ARENA_MODES, arenaModeAccessibilityLabel, type ArenaMode } from '../../utils/arenaNav';
 import { tap } from '../../utils/haptics';
 
@@ -21,8 +21,6 @@ export function ArenaSideRail({
   onChange: (mode: ArenaMode) => void;
 }): React.JSX.Element {
   const t = useThemeColors();
-  const { scheme } = useTheme();
-  const dark = scheme === 'dark';
   return (
     <ScrollView
       horizontal
@@ -35,7 +33,7 @@ export function ArenaSideRail({
       {ARENA_MODES.map((item) => {
         const selected = item.id === mode;
         const Icon = ICONS[item.id];
-        const fill = selected ? t.textPrimary : dark ? '#23242A' : '#EDEAE2';
+        const fill = selected ? t.textPrimary : t.surface;
         const textColor = selected ? t.background : t.textSecondary;
         return (
           <Pressable
@@ -68,7 +66,7 @@ const styles = StyleSheet.create({
   shell: {
     paddingHorizontal: layout.screenX,
     paddingTop: 7,
-    paddingBottom: 10,
+    paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -80,7 +78,7 @@ const styles = StyleSheet.create({
     gap: 7,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 22,
+    borderRadius: 14,
   },
   label: {
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),

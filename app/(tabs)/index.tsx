@@ -16,7 +16,6 @@ import { consumeArenaEntrance } from '../../utils/arenaEntranceState';
 import { FreshTakesSection } from '../../components/arena/FreshTakesSection';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
 import { TakeFeedItem } from '../../components/arena/TakeFeedItem';
-import { TrendingBattlesSection } from '../../components/arena/TrendingBattlesSection';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
 import { ArenaIcon, CompassIcon, UserIcon } from '../../components/shared/icons';
@@ -27,7 +26,6 @@ import { analytics } from '../../services/analytics';
 import { fetchLiveTopics, type LiveArenaTopic, type Stance } from '../../services/liveArenaService';
 import { fetchInterestCatalogue, fetchMyArenaInterests } from '../../services/arenaInterestService';
 import { prioritizeInterestTopics } from '../../utils/arenaInterests';
-import type { ArenaTrendingBattle } from '../../services/arenaTrendService';
 import { fetchFollowState, fetchFollowingIds } from '../../services/socialService';
 import { errorText } from '../../services/supabaseClient';
 import {
@@ -72,7 +70,7 @@ interface FeedMenu {
 /** THE ARENA — the live 24h feed, Reddit-like density with CLASH identity. */
 export default function ArenaScreen(): React.JSX.Element {
   const { state, dispatch, reloadArena } = useClash();
-  const { signedIn } = useAuth();
+  const { signedIn, user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const now = useClock(30_000);
@@ -88,7 +86,12 @@ export default function ArenaScreen(): React.JSX.Element {
   const [refreshing, setRefreshing] = React.useState(false);
   const [menu, setMenu] = React.useState<FeedMenu | null>(null);
   /** Today's live Topic(s). Empty when none is running — the card simply hides. */
-  const [liveTopics, setLiveTopics] = React.useState<LiveArenaTopic[]>([]);
+  const [liveTopicSnapshot, setLiveTopicSnapshot] = React.useState<{ owner: string | null; topics: LiveArenaTopic[] }>({ owner: null, topics: [] });
+  const [topicsBusy, setLiveTopicsLoading] = React.useState(true);
+  const [liveTopicsError, setLiveTopicsError] = React.useState(false);
+  const owner = user?.id ?? null;
+  const liveTopics = liveTopicSnapshot.owner === owner ? liveTopicSnapshot.topics : [];
+  const liveTopicsLoading = topicsBusy || liveTopicSnapshot.owner !== owner;
   const liveTopicRequest = React.useRef(0);
   const [entrance, setEntrance] = React.useState(false);
   /** Guards against double taps racing the reaction RPC for the same Take. */
@@ -118,16 +121,28 @@ export default function ArenaScreen(): React.JSX.Element {
    */
   const loadLiveTopics = React.useCallback(async (): Promise<void> => {
     const request = ++liveTopicRequest.current;
+    setLiveTopicsLoading(true);
+    setLiveTopicsError(false);
     try {
       const topics = await fetchLiveTopics();
-      if (!signedIn) { if (request === liveTopicRequest.current) setLiveTopics(topics); return; }
-      const [catalogue, preferences] = await Promise.all([fetchInterestCatalogue(), fetchMyArenaInterests()]);
-      if (request === liveTopicRequest.current) setLiveTopics(prioritizeInterestTopics(topics, catalogue, preferences));
+      // Interest ordering is optional; its failure must not discard genuine topics.
+      let ordered = topics;
+      if (signedIn) {
+        try {
+          const [catalogue, preferences] = await Promise.all([fetchInterestCatalogue(), fetchMyArenaInterests()]);
+          ordered = prioritizeInterestTopics(topics, catalogue, preferences);
+        } catch { /* Keep the server's topic order. */ }
+      }
+      if (request === liveTopicRequest.current) setLiveTopicSnapshot({ owner, topics: ordered });
     } catch {
-      // A missing Topic is an ordinary day, not an error worth a notice.
-      if (request === liveTopicRequest.current) setLiveTopics([]);
+      if (request === liveTopicRequest.current) {
+        setLiveTopicsError(true);
+        setLiveTopicSnapshot({ owner, topics: [] });
+      }
+    } finally {
+      if (request === liveTopicRequest.current) setLiveTopicsLoading(false);
     }
-  }, [signedIn]);
+  }, [signedIn, owner]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -162,7 +177,7 @@ export default function ArenaScreen(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [signedIn, refreshKey]);
+  }, [signedIn, owner, refreshKey]);
 
   const onRefresh = React.useCallback(async (): Promise<void> => {
     setRefreshing(true);
@@ -335,17 +350,6 @@ export default function ArenaScreen(): React.JSX.Element {
     [dispatch, openClash, openDetail, openMenu, requireAuth, shareTake, state, toggleReaction],
   );
 
-  const openTrendingBattle = React.useCallback(
-    (battle: ArenaTrendingBattle): void => {
-      if (!requireAuth()) return;
-      hapticPress();
-      analytics.track('arena_trending_entered', { realm: 'arena' });
-      if (battle.hotRoomId) openRoom(battle.hotRoomId);
-      else openTopic(battle.topicId);
-    },
-    [openRoom, openTopic, requireAuth],
-  );
-
   const heroTopic = liveTopics[0] ?? null;
 
   const header = React.useMemo(() => {
@@ -353,6 +357,8 @@ export default function ArenaScreen(): React.JSX.Element {
       return (
         <ArenaClashes
           topics={liveTopics}
+          topicsLoading={liveTopicsLoading}
+          topicsError={liveTopicsError}
           onEnter={(topic) => {
             if (topic.viewerRoomId) openRoom(topic.viewerRoomId);
             else openTopic(topic.id);
@@ -368,7 +374,6 @@ export default function ArenaScreen(): React.JSX.Element {
       return (
         <>
           <ArenaTopics refreshToken={refreshKey} onOpenTopic={openTopic} onOpenRoom={openRoom} />
-          <TrendingBattlesSection refreshToken={refreshKey} onEnter={openTrendingBattle} serverOnly />
         </>
       );
     }
@@ -408,7 +413,7 @@ export default function ArenaScreen(): React.JSX.Element {
         />
 
         <ArenaLiveGateway
-          liveCount={liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
+          liveCount={liveTopicsLoading || liveTopicsError ? null : liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
           onOpen={() => setArenaMode('clashes')}
         />
 
@@ -416,15 +421,15 @@ export default function ArenaScreen(): React.JSX.Element {
           <View style={styles.feedKickerRow}>
             <View style={[styles.feedKickerDot, { backgroundColor: scheme === 'dark' ? '#F0AD96' : '#D98569' }]} />
             <Text style={[styles.feedKicker, { color: theme.textSecondary }]}>
-              YOUR DAILY PULSE
+              THE CONVERSATION
             </Text>
-            <Text style={[styles.feedIssue, { color: theme.textMuted }]}>LIVE / 24H</Text>
+            <Text style={[styles.feedIssue, { color: theme.textMuted }]}>24H TAKES</Text>
           </View>
           <Text allowFontScaling style={[styles.feedTitle, { color: theme.textPrimary }]}>
-            Hot right <Text style={{ color: scheme === 'dark' ? '#F3AB91' : '#D47A62' }}>now.</Text>
+            A fresh perspective.
           </Text>
           <Text style={[styles.feedSub, { color: theme.textSecondary }]}>
-            The takes sparking conversations in your world
+            Your feed. Room for a different point of view.
           </Text>
           <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         </View>
@@ -436,13 +441,14 @@ export default function ArenaScreen(): React.JSX.Element {
     freshItems,
     heroTopic,
     liveTopics,
+    liveTopicsLoading,
+    liveTopicsError,
     now,
     openClash,
     openDetail,
     openMenu,
     openRoom,
     openTopic,
-    openTrendingBattle,
     refreshKey,
     requireAuth,
     scope,
@@ -533,7 +539,7 @@ export default function ArenaScreen(): React.JSX.Element {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} />
+      {arenaMode === 'community' ? <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} /> : null}
       <ArenaTopBar paddingTop={insets.top} contextLine="ARENA" />
       <ArenaSideRail mode={arenaMode} onChange={setArenaMode} />
       <FlatList
@@ -545,6 +551,8 @@ export default function ArenaScreen(): React.JSX.Element {
         ListEmptyComponent={showEmpty ? empty : null}
         contentContainerStyle={[styles.list, { paddingBottom: dockBottomPadding(insets.bottom) }]}
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         refreshing={refreshing}
         onRefresh={() => {
           void onRefresh();
@@ -594,7 +602,7 @@ const styles = StyleSheet.create({
   listDimmed: { opacity: 0.35 },
   list: { flexGrow: 1 },
   hero: { paddingBottom: space.xs, gap: space.sm },
-  feedHead: { paddingTop: space.md, paddingBottom: space.sm, gap: 6 },
+  feedHead: { paddingTop: 24, paddingBottom: 14, gap: 10 },
   feedKickerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: layout.screenX,
@@ -605,7 +613,7 @@ const styles = StyleSheet.create({
   feedTitle: {
     ...typeScale.label,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 27, lineHeight: 34, fontWeight: '800', letterSpacing: -1.1,
+    fontSize: 28, lineHeight: 36, fontWeight: '800', letterSpacing: -1.1,
     paddingHorizontal: layout.screenX,
   },
   feedSub: {
