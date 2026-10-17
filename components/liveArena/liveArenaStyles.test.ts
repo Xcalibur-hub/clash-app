@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  chipFill,
   crowdRowLabel,
   hexWithAlpha,
   matchupMetrics,
@@ -66,5 +67,14 @@ describe('phase announcements', () => {
     assert.equal(phaseAnnouncement('JUDGING'), 'Clash phase: Judging');
     assert.equal(phaseAnnouncement('SETTLED'), 'Clash phase: Settled');
     assert.equal(phaseAnnouncement('CANCELLED'), 'Clash phase: No verdict');
+  });
+});
+describe('role chip fill', () => {
+  it('uses a soft scheme-aware fill so a role chip reads at small sizes', () => {
+    const light = chipFill({ scheme: 'light' });
+    const dark = chipFill({ scheme: 'dark' });
+    assert.notEqual(light, dark, 'light and dark do not share a fill');
+    assert.match(light, /^rgba\(/);
+    assert.match(dark, /^rgba\(/);
   });
 });

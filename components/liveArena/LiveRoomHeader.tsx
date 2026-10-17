@@ -19,7 +19,7 @@ import { ClashMatchupBar } from './ClashMatchupBar';
 import { LivePulse } from './LivePulse';
 import { LiveRoomPhaseRail } from './LiveRoomPhaseRail';
 import { LiveRoomPresenceStrip } from './LiveRoomPresenceStrip';
-import { roomStatusLabel, secondsLabel } from './liveArenaStyles';
+import { chipFill, roomStatusLabel, secondsLabel } from './liveArenaStyles';
 
 export interface LiveRoomHeaderProps {
   room: ArenaRoom;
@@ -126,10 +126,20 @@ export function LiveRoomHeader({
         <Text allowFontScaling={false} style={[styles.liveLine, { color: t.textSecondary }]}>
           {live ? 'LIVE' : room.status === 'SETTLED' ? 'DECIDED' : 'ROOM'}
           {roomIndex != null ? ` · Room ${roomIndex}` : ''}
-          {roleLine ? ` · ${roleLine}` : ''}
           {` · ${crowdLine}`}
           {countdown ? ` · ${countdown}` : ''}
         </Text>
+        {roleLine ? (
+          <View
+            style={[styles.roleChip, { backgroundColor: chipFill(t), borderColor: t.border }]}
+            accessibilityRole="text"
+            accessibilityLabel={`Your role: ${roleLine}`}
+          >
+            <Text allowFontScaling={false} style={[styles.roleChipText, { color: t.textSecondary }]}>
+              {roleLine}
+            </Text>
+          </View>
+        ) : null}
         {onPulsePress ? (
           <Pressable
             onPress={() => {
@@ -243,6 +253,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   pulseDot: { width: 6, height: 6, borderRadius: 3 },
+  roleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  roleChipText: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
   matchup: {
     paddingLeft: 28,
     paddingRight: 4,
