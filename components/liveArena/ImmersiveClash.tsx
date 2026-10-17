@@ -4,6 +4,15 @@
  */
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { chipFill } from './liveArenaStyles';
+import { ReactionBurst } from './ReactionBurst';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import type { ArenaMessage } from '../../services/liveArenaService';
 import { ClashEventHeader } from './ClashEventHeader';
@@ -19,6 +28,7 @@ export interface ImmersiveClashProps {
   proposition: string;
   live: boolean;
   statusLabel: string;
+  phaseLabel?: string;
   spectatorCount: number | null;
   focusSide: 'A' | 'B' | null;
   latestMessage: ArenaMessage | null;
@@ -39,6 +49,8 @@ export interface ImmersiveClashProps {
   crowd?: LiveCrowdLayerProps['crowd'];
   crowdUnavailableReason?: string;
   onReportCrowd?: LiveCrowdLayerProps['onReport'];
+  /** Real reaction burst on the newest Stage message, or null. */
+  reactionBurst?: { emoji: string; key: string } | null;
 }
 
 export function ImmersiveClash({
@@ -46,6 +58,7 @@ export function ImmersiveClash({
   proposition,
   live,
   statusLabel,
+  phaseLabel,
   spectatorCount,
   focusSide,
   latestMessage,
@@ -66,10 +79,27 @@ export function ImmersiveClash({
   crowd,
   crowdUnavailableReason,
   onReportCrowd,
+  reactionBurst = null,
 }: ImmersiveClashProps): React.JSX.Element {
   const t = useThemeColors();
   const stageFlex = judgingFocus ? 0.72 : condensed ? 0.34 : 0.55;
-  const crowdFlex = judgingFocus ? 0.28 : condensed ? 0.66 : 0.45;
+  const reduced = useReducedMotion();
+  const split = useSharedValue(stageFlex);
+  React.useEffect(() => {
+    // Phase changes (OPEN -> FINAL -> JUDGING) move the split instead of snapping.
+    split.value = reduced
+      ? stageFlex
+      : withTiming(stageFlex, { duration: 280, easing: Easing.out(Easing.cubic) });
+  }, [stageFlex, reduced, split]);
+  const stageStyle = useAnimatedStyle(() => ({
+    flexGrow: split.value,
+    flexBasis: 0,
+  }));
+  const crowdStyle = useAnimatedStyle(() => ({
+    flexGrow: 1 - split.value,
+    flexBasis: 0,
+  }));
+  // The Crowd takes the remaining share of the same animated split.
   const compact = condensed || judgingFocus;
 
   return (
@@ -77,26 +107,34 @@ export function ImmersiveClash({
       <ClashEventHeader
         live={live}
         statusLabel={statusLabel}
+        phaseLabel={phaseLabel}
         spectatorCount={spectatorCount}
         paddingTop={paddingTop}
         onBack={onBack}
         onMore={onMore}
       />
 
-      <View style={[styles.stage, { flex: stageFlex }]}>
+      <Animated.View style={[styles.stage, stageStyle]}>
         <ScrollView style={styles.stageScroll}
           contentContainerStyle={styles.stageContent} showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           accessibilityLabel="Clash stage and official arguments">
           <ClashProposition text={proposition} condensed={compact} />
           {roleLabel ? (
+            <View
+              style={[styles.roleChip, { backgroundColor: chipFill(t), borderColor: t.border }]}
+              accessible
+              accessibilityRole="text"
+              accessibilityLiveRegion="polite"
+              accessibilityLabel={'Your role: ' + roleLabel}
+            >
             <Text
               allowFontScaling={false}
               style={[styles.role, { color: t.textMuted }]}
-              accessibilityLiveRegion="polite"
             >
               {roleLabel}
             </Text>
+            </View>
           ) : null}
           <ClashFighterRail
             duel={duel}
@@ -122,9 +160,12 @@ export function ImmersiveClash({
           ) : null}
           {stageFooter}
         </ScrollView>
-      </View>
+      </Animated.View>
 
-      <View style={[styles.crowd, { flex: crowdFlex, borderTopColor: t.border }]}>
+      <Animated.View style={[styles.crowd, { borderTopColor: t.border }, crowdStyle]}>
+        {reactionBurst ? (
+          <ReactionBurst emoji={reactionBurst.emoji} burstKey={reactionBurst.key} />
+        ) : null}
         <LiveCrowdLayer
           unavailableReason={crowdUnavailableReason}
           key={crowd?.identityVersion ?? 0}
@@ -133,7 +174,7 @@ export function ImmersiveClash({
           subdued={judgingFocus}
           paddingBottom={crowdPaddingBottom}
         />
-      </View>
+      </Animated.View>
 
       {fighterComposer ? (
         <View style={[styles.composer, { borderTopColor: t.border }]}>
@@ -157,6 +198,13 @@ const styles = StyleSheet.create({
     paddingTop: space.xs,
   },
   crowd: { minHeight: 0, borderTopWidth: StyleSheet.hairlineWidth },
+  roleChip: {
+    alignSelf: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
   role: {
     ...typeScale.caption,
     fontSize: 11,

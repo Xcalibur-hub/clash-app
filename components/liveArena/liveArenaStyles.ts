@@ -143,3 +143,45 @@ export function crowdRowLabel(handle: string, body: string, max = 240): string {
 export function phaseAnnouncement(status: ArenaRoomStatus): string {
   return `Clash phase: ${ROOM_STATUS_LABEL[status]}`;
 }
+/**
+ * Plate fill behind a fighter side of the Stage. Derived from that fighter real
+ * tint, so red and blue stay distinguishable without inventing a colour.
+ */
+export function sidePlateFill(tint: string, scheme: 'light' | 'dark'): string {
+  return hexWithAlpha(tint, scheme === 'light' ? 0.06 : 0.1);
+}
+
+export interface ReactionBurstSignal {
+  emoji: string;
+  /** Replay token: changes only when the real count behind it changed. */
+  key: string;
+}
+
+export interface ReactionCount {
+  emoji: string;
+  count: number;
+}
+
+/**
+ * A burst is allowed only when a real reaction count on the current message
+ * rises. The first observation of a message is a baseline (no burst on paint),
+ * decreases and unchanged counts are ignored, and the count itself is never
+ * returned - only the emoji - so no tally is exposed before settlement.
+ */
+export function reactionBurstFor(
+  previous: readonly ReactionCount[] | null,
+  next: readonly ReactionCount[] | null,
+  messageId: string | null,
+): ReactionBurstSignal | null {
+  if (!messageId || !next || next.length === 0 || !previous) return null;
+  const before = new Map(previous.map((row) => [row.emoji, row.count]));
+  let best: { emoji: string; delta: number } | null = null;
+  for (const row of next) {
+    if (!row.emoji || !Number.isFinite(row.count)) continue;
+    const delta = row.count - (before.get(row.emoji) ?? 0);
+    if (delta > 0 && (best === null || delta > best.delta)) best = { emoji: row.emoji, delta };
+  }
+  if (best === null) return null;
+  const total = next.find((row) => row.emoji === best.emoji)?.count ?? 0;
+  return { emoji: best.emoji, key: `${messageId}:${best.emoji}:${total}` };
+}
