@@ -1,7 +1,7 @@
 import React from 'react';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { LucideIcon } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -35,6 +35,14 @@ export function RealmTabBar({
   const insets = useSafeAreaInsets();
   const t = useThemeColors();
   const { unread } = useNotificationUnread();
+  const [keyboardVisible, setKeyboardVisible] = React.useState(false);
+  React.useEffect(() => {
+    if (realm !== 'arena') return;
+    setKeyboardVisible(Keyboard.isVisible?.() ?? false);
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); setKeyboardVisible(false); };
+  }, [realm]);
   const tabs = realm === 'vault' ? VAULT_TABS : ARENA_TABS;
   const activeKey = state.routes[state.index]?.key;
 
@@ -66,15 +74,15 @@ export function RealmTabBar({
         accessibilityLabel={centred ? 'Create a take' : entry.label}
       >
         {centred ? (
-          <View style={styles.create}>
-            <Icon size={17} color={DOCK_ICON_ON} strokeWidth={2.4} />
+          <View style={[styles.create, realm === 'arena' && { backgroundColor: t.textPrimary }]}>
+            <Icon size={17} color={realm === 'arena' ? t.background : DOCK_ICON_ON} strokeWidth={2.4} />
           </View>
         ) : (
           <View style={styles.iconWrap}>
-            <View style={[styles.activeHalo, focused && styles.activeHaloOn]}>
+            <View style={[styles.activeHalo, focused && (realm === 'arena' ? { backgroundColor: t.textPrimary } : styles.activeHaloOn)]}>
               <Icon
                 size={20}
-                color={focused ? DOCK_ICON_ON : DOCK_ICON}
+                color={realm === 'arena' ? focused ? t.background : t.textMuted : focused ? DOCK_ICON_ON : DOCK_ICON}
                 strokeWidth={1.9}
               />
             </View>
@@ -93,20 +101,22 @@ export function RealmTabBar({
 
   const shiftTarget: Realm = realm === 'vault' ? 'arena' : 'vault';
 
+  if (realm === 'arena' && keyboardVisible) return <View />;
+
   return (
-    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 8) }]} pointerEvents="box-none">
-      <View style={styles.dock}>
+    <View style={[styles.wrap, realm === 'arena' && styles.arenaWrap, { paddingBottom: Math.max(insets.bottom, 8) }]} pointerEvents="box-none">
+      <View style={[styles.dock, realm === 'arena' && [styles.arenaDock, { backgroundColor: t.surfaceElevated, borderColor: t.border }]]}>
         {state.routes.map(renderTab)}
         <Pressable
           onPress={() => {
             hapticTap();
             onShiftRealm(shiftTarget);
           }}
-          style={styles.shift}
+          style={[styles.shift, realm === 'arena' && { width: 44 }]}
           accessibilityRole="button"
           accessibilityLabel={realm === 'vault' ? 'Return to Arena' : 'Open The Vault'}
         >
-          <ShiftIcon size={20} color={DOCK_ICON} strokeWidth={1.9} />
+          <ShiftIcon size={20} color={realm === 'arena' ? t.textMuted : DOCK_ICON} strokeWidth={1.9} />
         </Pressable>
       </View>
       <Text style={styles.srOnly} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -117,6 +127,8 @@ export function RealmTabBar({
 }
 
 const styles = StyleSheet.create({
+  arenaWrap: { paddingHorizontal: 16 },
+  arenaDock: { maxWidth: 392, paddingHorizontal: 4, borderWidth: StyleSheet.hairlineWidth, shadowOpacity: 0.08, elevation: 3 },
   wrap: {
     position: 'absolute',
     left: 0,
