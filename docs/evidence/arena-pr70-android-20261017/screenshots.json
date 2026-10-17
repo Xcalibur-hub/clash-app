@@ -1,0 +1,68 @@
+[
+  {
+    "file": "arena-gate-failure.png",
+    "bytes": 34843,
+    "sha256": "373065e2cf196e2fc7d57443710abd626e242db020117c51ba1e5ae8039782f4",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "arena-home-offline.png",
+    "bytes": 146452,
+    "sha256": "aa79f115fac46b400a0dc48c6cd95a1011a051743fbbb97ed569b225a19fcdf6",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "auth-keyboard-closed.png",
+    "bytes": 134078,
+    "sha256": "b5cdd9d3d7eb3d21eb0b603e7346e06d657c902a68298b1f33facc5fd4b3dd9c",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "auth-keyboard-open.png",
+    "bytes": 179199,
+    "sha256": "3abdbc551680762b5ace74a6365f31976790b1c589304314b3450d452ecea74a",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "auth-keyboard-scrolled.png",
+    "bytes": 175494,
+    "sha256": "b5b7aca82affc16a7efd03b9e4e85fec45812c5be729c8026c3c5d38e5fe917d",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "candidate-loading.png",
+    "bytes": 37957,
+    "sha256": "e7490b167f8622976aa65f91ff5b366fef11b62bdaa07e2feb870a8c96e3ece7",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "final-home-offline.png",
+    "bytes": 145916,
+    "sha256": "63bda3da13be4cbeda2789947cc2c8e094d0903f23a65ba673eb61face6c2af7",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "groups-explore.png",
+    "bytes": 215785,
+    "sha256": "63e80334c7f62a463885f882b7dacd56171992f3a301a5f58e2aaf43cb2a8ce7",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "groups-joined.png",
+    "bytes": 195539,
+    "sha256": "9dbd0fdc6e44f147d6ea7e425db56b9aad7e8f9484449846297bcf142d0bb2b0",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "live-offline-empty.png",
+    "bytes": 224790,
+    "sha256": "0f818d7c18223151519860c7a56d46699e1516d33321b9b91b56ba2c770c479a",
+    "storage": "private ignored review directory; not published"
+  },
+  {
+    "file": "onboarding-on-relaunch.png",
+    "bytes": 138510,
+    "sha256": "edd51ba9f312795f2827dc2d08563829cf9f9fadfd238d9c0fc1399371090e55",
+    "storage": "private ignored review directory; not published"
+  }
+]
