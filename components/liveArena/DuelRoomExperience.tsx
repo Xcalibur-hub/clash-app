@@ -36,6 +36,7 @@ import { softFill } from './liveArenaStyles';
 import type { LiveRoomMessageProps } from './LiveRoomMessage';
 import { useArenaCrowd } from '../../hooks/useArenaCrowd';
 import { PrivateAssistPanel } from './PrivateAssistPanel';
+import { useDuelReactionBurst } from './useDuelReactionBurst';
 import type { CrowdMessage } from '../../utils/arenaCrowd';
 
 type Actions = Pick<
@@ -102,6 +103,9 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const [keyboardOpen, setKeyboardOpen] = React.useState(false);
   const joining = React.useRef(false);
   const lastMomentId = React.useRef<string | null>(null);
+  // Android keeps a stale navigation-bar inset while the keyboard is up, so the
+  // bottom inset collapses instead of double-padding the composer.
+  const bottomInset = keyboardOpen ? 0 : props.paddingBottom;
 
   const transcript = React.useMemo(
     () => duelTranscript(duel, messages),
@@ -113,10 +117,18 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   );
 
   const proposition = duel.sourceText?.trim() || room.topic.title;
+  const reactionBurst = useDuelReactionBurst(moment.message);
   const live =
     duel.status === 'open' &&
     (room.phase === 'open' || room.phase === 'final_arguments');
   const statusLabel = live ? 'LIVE' : presentation.stage.toUpperCase();
+  // Phase must stay readable while the Clash is live: OPEN and FINAL are both
+  // "LIVE", so the header carries a short phase chip alongside it.
+  const phaseLabel = live
+    ? room.phase === 'final_arguments'
+      ? 'FINAL'
+      : 'OPEN'
+    : undefined;
   const atmosphereMood = duelAtmosphereMood(duel, room.phase);
   const judgingFocus = room.phase === 'judging' && duel.status === 'open';
   const showOutcome =
@@ -289,7 +301,9 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           proposition={proposition}
           live={live}
           statusLabel={statusLabel}
+          phaseLabel={phaseLabel}
           spectatorCount={crowd.context?.spectatorCount ?? props.spectatorCount}
+          reactionBurst={reactionBurst}
           crowd={crowd}
           crowdUnavailableReason={cancelled ? 'Crowd chat is unavailable because this Clash was cancelled.' : undefined}
           onReportCrowd={props.onReportCrowd}
@@ -309,7 +323,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           onMore={() => setMoreOpen(true)}
           roleLabel={presentation.role}
           crowdPaddingBottom={
-            presentation.canPublish ? 0 : keyboardOpen ? space.xs : Math.max(props.paddingBottom, space.sm)
+            presentation.canPublish ? 0 : keyboardOpen ? space.xs : Math.max(bottomInset, space.sm)
           }
           stageFooter={
             <>
@@ -335,7 +349,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
               <View
                 style={{
                   paddingHorizontal: layout.screenX,
-                  paddingBottom: Math.max(props.paddingBottom, space.sm),
+                  paddingBottom: Math.max(bottomInset, space.sm),
                 }}
               >
                 {props.composer}
