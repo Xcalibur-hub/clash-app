@@ -1,328 +1,415 @@
-/**
- * Arena Clashes surface — competitive list from real live topic data only.
- * No fabricated viewers, timers, scores, or momentum.
- */
+/** Discovery uses server states; preview reads never create Room membership. */
 import React from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { LiveArenaTopic } from '../../services/liveArenaService';
 import { fetchClashDiscovery } from '../../services/arenaClashDiscoveryService';
+import { fetchClashView, type ClashView } from '../../services/clashEngineService';
 import { useAuth } from '../../store/AuthProvider';
 import { clashDiscoveryDestination, type ClashDiscoveryEntry, type ClashDiscoveryState } from '../../utils/arenaClashDiscovery';
-import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
-import { plural } from '../../utils/format';
+import { layout, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
-import { cardDestination, navLog } from '../../utils/navDiagnostics';
-import { LivePulse } from '../liveArena/LivePulse';
-
+import { Avatar } from '../shared/Avatar';
 export interface ArenaClashesProps {
   topics: readonly LiveArenaTopic[];
+  topicsLoading?: boolean;
+  topicsError?: boolean;
   onEnter: (topic: LiveArenaTopic) => void;
   onWatch: (topic: LiveArenaTopic) => void;
 }
-
-function isLive(topic: LiveArenaTopic): boolean {
-  return (
-    topic.status === 'live' &&
-    (topic.phase === 'open' || topic.phase === 'final_arguments')
-  );
-}
-
+const isLive = (topic: LiveArenaTopic): boolean => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments');
 export function ArenaClashes({
   topics,
+  topicsLoading = false,
+  topicsError = false,
   onEnter,
-  onWatch,
+  onWatch
 }: ArenaClashesProps): React.JSX.Element {
-  const t = useThemeColors();
-  const router = useRouter();
-  const { user } = useAuth();
-  const [discovery, setDiscovery] = React.useState<{ ownerId: string | null; entries: ClashDiscoveryEntry[] }>({ ownerId: null, entries: [] });
-  const entries = discovery.ownerId === (user?.id ?? null) ? discovery.entries : [];
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(false);
+  const t = useThemeColors(),
+    router = useRouter(),
+    {
+      user
+    } = useAuth();
+  const owner = user?.id ?? null;
+  const [discovery, setDiscovery] = React.useState<{
+    ownerId: string | null;
+    entries: ClashDiscoveryEntry[];
+  }>({
+    ownerId: null,
+    entries: []
+  });
+  const [loading, setLoading] = React.useState(true),
+    [error, setError] = React.useState(false),
+    [retry, setRetry] = React.useState(0);
+  const entries = discovery.ownerId === owner ? discovery.entries : [];
   useFocusEffect(React.useCallback(() => {
-    let active = true;
-    let request = 0;
-    setDiscovery({ ownerId: user?.id ?? null, entries: [] });
-    setLoading(true);
+    let active = true,
+      request = 0;
+    setDiscovery({
+      ownerId: owner,
+      entries: []
+    });
+    setLoading(Boolean(owner));
     setError(false);
     const load = async (): Promise<void> => {
       const current = ++request;
-      if (!user) { setLoading(false); return; }
+      if (!owner) return;
       try {
         const result = await fetchClashDiscovery();
-        if (active && current === request) { setDiscovery({ ownerId: user.id, entries: result }); setError(false); }
-      } catch { if (active && current === request) setError(true); }
-      finally { if (active && current === request) setLoading(false); }
+        if (active && current === request) {
+          setDiscovery({
+            ownerId: owner,
+            entries: result
+          });
+          setError(false);
+        }
+      } catch {
+        if (active && current === request) setError(true);
+      } finally {
+        if (active && current === request) setLoading(false);
+      }
     };
     void load();
-    const timer = setInterval(() => void load(), 20_000);
-    return () => { active = false; clearInterval(timer); };
-  }, [user?.id]));
-  const live = topics.filter(isLive);
-  const rest = topics.filter((topic) => !isLive(topic));
-  const liveEntries = entries.filter((entry) => entry.state === 'LIVE');
-  const hasLive = live.length > 0 || liveEntries.length > 0;
-
-  return (
-    <View style={styles.wrap} accessibilityLabel="Clashes">
-      <View style={[styles.liveIntro, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-        <View style={styles.liveTopline}>
-          {hasLive ? <LivePulse dotOnly size={8} /> : <View style={[styles.idleDot, { backgroundColor: t.textMuted }]} />}
-          <Text style={[styles.kicker, { color: t.textSecondary }]}>ARENA LIVE</Text>
-          <Text style={[styles.liveCount, { color: t.textMuted }]}>
-            {loading ? 'Checking live…' : error ? 'Live count unavailable' : `${live.length + liveEntries.length} live now`}
-          </Text>
-        </View>
-        <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>Live Arena</Text>
-        <Text style={[styles.sub, { color: t.textSecondary }]}>
-          Watch live debates, choose a side, or revisit recent verdicts.
-        </Text>
-        {!hasLive && (loading || error) ? (
-          <Text style={[styles.empty, { color: t.textMuted }]}>
-            {loading ? 'Loading live Clashes…' : 'Couldn’t load live Clashes. Retrying…'}
-          </Text>
-        ) : !hasLive ? (
-          <View style={styles.noLive}>
-            <Text style={[styles.noLiveTitle, { color: t.textPrimary }]}>No live duels yet</Text>
-            <Text style={[styles.empty, { color: t.textMuted }]}>
-              Your challenges and completed clashes are below.
-            </Text>
-            <Pressable accessibilityRole="button" style={[styles.secondaryAction, { borderColor: t.border }]}
-              onPress={() => { hapticPress(); router.push('/arena/challenges'); }}>
-              <Text style={[styles.enter, { color: t.textPrimary }]}>VIEW MY CHALLENGES →</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.liveStack}>
-            {liveEntries.map((entry) => (
-              <Pressable key={entry.id} accessibilityRole="button"
-                accessibilityLabel={`Watch live Clash: ${entry.title}`}
-                style={[styles.row, styles.featuredDuel, { borderColor: t.border, backgroundColor: t.surface }]}
-                onPress={() => { hapticPress(); router.push(clashDiscoveryDestination(entry)); }}>
-                <View style={styles.rowTop}>
-                  <Text style={[styles.liveLabel, { color: t.textPrimary }]}>
-                    {entry.roomId ? '● LIVE DUEL' : '● LIVE CLASH'}
-                  </Text>
-                  <Text style={[styles.meta, { color: t.textMuted }]}>HAPPENING NOW</Text>
-                </View>
-                <Text style={[styles.proposition, { color: t.textPrimary }]} numberOfLines={3}>{entry.title}</Text>
-                <View style={styles.actionLine}><Text style={[styles.enter, { color: t.textPrimary }]}>{entry.roomId ? 'WATCH THE DUEL' : 'VIEW LIVE CLASH'}</Text><Text style={[styles.actionArrow, { color: t.textPrimary }]}>↗</Text></View>
-              </Pressable>
-            ))}
-            {live.map((topic) => (
-              <ClashRow key={topic.id} topic={topic} live onPress={() => {
-                hapticPress();
-                navLog('card-press', {
-                  surface: 'live-clashes-active',
-                  destination: cardDestination(topic.viewerRoomId, topic.id),
-                  topicId: topic.id,
-                  roomId: topic.viewerRoomId ?? null,
-                  action: topic.viewerRoomId ? 'enter-room' : 'open-topic',
-                });
-                if (topic.viewerRoomId) onEnter(topic); else onWatch(topic);
-              }} />
-            ))}
-          </View>
-        )}
-      </View>
-      <View style={styles.liveSecondary}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open Challenge Inbox"
-          onPress={() => { hapticPress(); router.push('/arena/challenges'); }}
-          style={[styles.quickLink, { borderColor: t.border }]}>
-          <Text style={[styles.quickTitle, { color: t.textPrimary }]}>Challenges ↗</Text>
-          <Text style={[styles.quickSub, { color: t.textMuted }]}>Invites and requests</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open Hall of Fame archive"
-          onPress={() => { hapticPress(); router.push('/arena/hall-of-fame'); }}
-          style={[styles.quickLink, { borderColor: t.border }]}>
-          <Text style={[styles.quickTitle, { color: t.textPrimary }]}>Hall of Fame ↗</Text>
-          <Text style={[styles.quickSub, { color: t.textMuted }]}>Past verdicts</Text>
-        </Pressable>
-      </View>
-      <Text style={[styles.section, { color: t.textMuted }]}>YOUR ACTIVITY</Text>
-      {loading ? <Text style={[styles.empty, { color: t.textMuted }]}>Loading Clashes…</Text> : null}
-      {!user ? <Text style={[styles.empty, { color: t.textMuted }]}>Sign in to see your Challenges and Clash history.</Text> : null}
-      {error ? <Text accessibilityRole="alert" style={[styles.empty, { color: t.textMuted }]}>Couldn’t load Clashes. Retrying…</Text> : null}
-      {(['PENDING', 'UPCOMING', 'COMPLETED'] as ClashDiscoveryState[]).filter(section =>
-        entries.some(entry => entry.state === section)
-      ).map(section => (
-        <View key={section}>
-          <Text style={[styles.section, { color: t.textMuted }]}>{section}</Text>
-          {user && !loading && !error && !entries.some(entry => entry.state === section) ? (
-            <Text style={[styles.empty, { color: t.textMuted }]}>No {section.toLowerCase()} Clashes.</Text>
-          ) : null}
-          {entries.filter(entry => entry.state === section).map(entry => (
-            <Pressable key={entry.id} style={[styles.row, { borderColor: t.border }]}
-              accessibilityRole="button" accessibilityLabel={`${entry.state}. ${entry.title}. ${entry.kind === 'CHALLENGE' ? 'View Take' : 'Open Clash'}`}
-              onPress={() => { hapticPress(); router.push(clashDiscoveryDestination(entry)); }}>
-              <Text style={[styles.phase, { color: t.textMuted }]}>{entry.status.toUpperCase()}</Text>
-              <Text style={[styles.proposition, { color: t.textPrimary }]} numberOfLines={3}>{entry.title}</Text>
-              <Text style={[styles.enter, { color: t.textPrimary }]}>{entry.kind === 'CHALLENGE' ? 'VIEW TAKE · AWAITING ACCEPTANCE' : entry.state === 'COMPLETED' ? 'VIEW CLASH' : 'OPEN CLASH'}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ))}
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
-        TOPIC ROOMS
-      </Text>
-      {rest.length === 0 && live.length === 0 ? (
-        <Text style={[styles.empty, { color: t.textMuted }]}>
-          No topic rooms to explore right now.
-        </Text>
-      ) : (
-        rest.map((topic) => (
-          <ClashRow
-            key={topic.id}
-            topic={topic}
-            live={false}
-            onPress={() => {
-              hapticPress();
-              if (topic.viewerRoomId) onEnter(topic);
-              else onWatch(topic);
-            }}
-          />
-        ))
-      )}
+    const timer = owner ? setInterval(() => void load(), 20_000) : null;
+    return () => {
+      active = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [owner, retry]));
+  const live = topics.filter(isLive),
+    rest = topics.filter(topic => !isLive(topic));
+  const liveEntries = entries.filter(entry => entry.state === 'LIVE');
+  const openTopic = (topic: LiveArenaTopic): void => {
+    hapticPress();
+    if (topic.viewerRoomId) onEnter(topic);else onWatch(topic);
+  };
+  return <View style={styles.wrap} accessibilityLabel="Clashes">
+    <Text style={[styles.kicker, {
+      color: t.textMuted
+    }]}>TWO SIDES. ONE STAGE.</Text>
+    <Text accessibilityRole="header" style={[styles.title, {
+      color: t.textPrimary
+    }]}>Live Arena</Text>
+    <Text style={[styles.body, {
+      color: t.textSecondary
+    }]}>Hear the arguments. Back a fighter. Make up your own mind.</Text>
+    <View style={styles.shortcuts}>
+      {([['Challenges', 'Invites and requests', '/arena/challenges'], ['Hall of Fame', 'Results and verdicts', '/arena/hall-of-fame']] as const).map(([title, sub, route]) => <Pressable key={route} accessibilityRole="button" accessibilityLabel={title === 'Challenges' ? 'Open Challenge Inbox' : 'Open Hall of Fame archive'} onPress={() => {
+        hapticPress();
+        router.push(route);
+      }} style={[styles.shortcut, {
+        borderColor: t.border,
+        backgroundColor: t.surface
+      }]}>
+          <Text style={[styles.shortcutTitle, {
+          color: t.textPrimary
+        }]}>{title} ↗</Text><Text style={[styles.caption, {
+          color: t.textMuted
+        }]}>{sub}</Text>
+        </Pressable>)}
     </View>
-  );
+    <View style={styles.sectionHead}><Text accessibilityRole="header" style={[styles.heading, {
+        color: t.textPrimary
+      }]}>On the stage</Text><Text style={[styles.caption, {
+        color: t.textMuted
+      }]}>1v1 CLASHES</Text></View>
+    {!owner ? <Pressable accessibilityRole="button" onPress={() => router.push('/auth')} style={[styles.notice, {
+      borderColor: t.border
+    }]}><Text style={[styles.heading, {
+        color: t.textPrimary
+      }]}>Find your ringside seat</Text><Text style={[styles.body, {
+        color: t.textSecondary
+      }]}>Sign in to discover Clashes and see your challenge history. ↗</Text></Pressable> : loading ? <Text style={[styles.status, {
+      color: t.textMuted
+    }]}>Checking live Clashes…</Text> : error ? <View style={styles.status}><Text accessibilityRole="alert" style={[styles.body, {
+        color: t.textSecondary
+      }]}>Live Clashes are unavailable. These are not empty results.</Text><Pressable accessibilityRole="button" onPress={() => setRetry(n => n + 1)} style={styles.action}><Text style={{
+          color: t.textPrimary
+        }}>Try again</Text></Pressable></View> : liveEntries.length === 0 ? <View style={[styles.notice, {
+      borderColor: t.border
+    }]}><Text style={[styles.heading, {
+        color: t.textPrimary
+      }]}>No live Clashes right now</Text><Text style={[styles.body, {
+        color: t.textSecondary
+      }]}>Pending invitations and completed results stay in their own sections below.</Text></View> : liveEntries.map((entry, index) => <DuelDiscoveryCard key={`${owner}:${entry.id}`} entry={entry} loadIdentity={index < 8} onOpen={() => {
+      hapticPress();
+      router.push(clashDiscoveryDestination(entry));
+    }} />)}
+    {(['PENDING', 'UPCOMING', 'COMPLETED'] as ClashDiscoveryState[]).filter(section => entries.some(entry => entry.state === section)).map(section => <View key={section} style={styles.history}>
+      <Text accessibilityRole="header" style={[styles.heading, {
+        color: t.textPrimary
+      }]}>{section === 'PENDING' ? 'Awaiting acceptance' : section === 'UPCOMING' ? 'Coming up' : 'The archive'}</Text>
+      {entries.filter(entry => entry.state === section).map(entry => <Pressable key={entry.id} accessibilityRole="button" accessibilityLabel={`${entry.state}. ${entry.title}. ${entry.kind === 'CHALLENGE' ? 'View Take' : 'Open Clash'}`} onPress={() => {
+        hapticPress();
+        router.push(clashDiscoveryDestination(entry));
+      }} style={[styles.historyRow, {
+        borderColor: t.border
+      }]}>
+        <Text style={[styles.kicker, {
+          color: t.textMuted
+        }]}>{entry.state} · {entry.status.toUpperCase()}</Text><Text style={[styles.rowTitle, {
+          color: t.textPrimary
+        }]}>{entry.title}</Text><Text style={[styles.caption, {
+          color: t.textSecondary
+        }]}>{entry.kind === 'CHALLENGE' ? 'View Take · Awaiting acceptance' : 'Open Clash'} ↗</Text>
+      </Pressable>)}
+    </View>)}
+    <View style={styles.sectionHead}><Text accessibilityRole="header" style={[styles.heading, {
+        color: t.textPrimary
+      }]}>Topic rooms</Text><Text style={[styles.caption, {
+        color: t.textMuted
+      }]}>DISCUSS TOGETHER</Text></View>
+    {topicsLoading ? <Text style={[styles.status, {
+      color: t.textMuted
+    }]}>Loading discussions…</Text> : topicsError ? <Text accessibilityRole="alert" style={[styles.status, {
+      color: t.textMuted
+    }]}>Couldn't load discussions. Pull down to retry.</Text> : topics.length === 0 ? <Text style={[styles.status, {
+      color: t.textMuted
+    }]}>No topic rooms to explore right now.</Text> : [...live, ...rest].map(topic => <Pressable key={topic.id} accessibilityRole="button" accessibilityLabel={`${isLive(topic) ? 'Live' : topic.phase}. ${topic.title}. ${topic.viewerRoomId ? 'Enter your room' : 'View topic'}`} onPress={() => openTopic(topic)} style={[styles.historyRow, {
+      borderColor: t.border
+    }]}>
+        <View style={styles.metaRow}><Text style={[styles.kicker, {
+          color: isLive(topic) ? '#C86156' : t.textMuted
+        }]}>{isLive(topic) ? 'LIVE DISCUSSION' : topic.phase.replace(/_/g, ' ').toUpperCase()}</Text><Text style={[styles.caption, {
+          color: t.textMuted
+        }]}>{topic.participantCount} joined</Text></View>
+        <Text style={[styles.rowTitle, {
+        color: t.textPrimary
+      }]}>{topic.title}</Text><Text style={[styles.caption, {
+        color: t.textSecondary
+      }]}>{topic.viewerRoomId ? 'Enter your room' : 'View discussion'} ↗</Text>
+      </Pressable>)}
+  </View>;
 }
-
-function ClashRow({
-  topic,
-  live,
-  onPress,
+function DuelDiscoveryCard({
+  entry,
+  loadIdentity,
+  onOpen
 }: {
-  topic: LiveArenaTopic;
-  live: boolean;
-  onPress: () => void;
+  entry: ClashDiscoveryEntry;
+  loadIdentity: boolean;
+  onOpen: () => void;
 }): React.JSX.Element {
   const t = useThemeColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${live ? 'Live' : 'Clash'}. ${topic.title}. ${topic.viewerRoomId ? 'Enter your room' : 'View topic'}`}
-      style={[styles.row, { borderColor: t.border, backgroundColor: t.surface }]}
-    >
-      <View style={styles.rowTop}>
-        {live ? (
-          <View style={styles.liveBadge}>
-            <LivePulse dotOnly size={6} />
-            <Text allowFontScaling={false} style={[styles.liveLabel, { color: t.textPrimary }]}>
-              LIVE
-            </Text>
+  const {
+    user
+  } = useAuth();
+  const owner = user?.id ?? null;
+  const [preview, setPreview] = React.useState<{
+    owner: string;
+    view: ClashView | null;
+  } | null>(null);
+  useFocusEffect(React.useCallback(() => {
+    let active = true;
+    setPreview(null);
+    if (owner && loadIdentity) void fetchClashView(entry.id).then(view => {
+      if (active) setPreview({
+        owner,
+        view: view && view.clashId === entry.id && view.roomId === entry.roomId ? view : null
+      });
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [entry.id, entry.roomId, owner, loadIdentity]));
+  const view = preview?.owner === owner ? preview?.view : null;
+  const ended = view && view.status !== 'open';
+  if (preview?.owner === owner && !preview.view) return <View style={[styles.notice, {
+    borderColor: t.border
+  }]}><Text style={[styles.body, {
+      color: t.textSecondary
+    }]}>This Clash is no longer available. Pull down to refresh discovery.</Text></View>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${ended ? 'View' : 'Watch live'} Clash: ${entry.title}`} onPress={onOpen} style={({
+    pressed
+  }) => [styles.duelCard, {
+    backgroundColor: t.surface,
+    borderColor: t.border,
+    opacity: pressed ? 0.8 : 1
+  }]}>
+    <View style={styles.metaRow}><Text style={[styles.kicker, {
+        color: ended ? t.textMuted : '#C86156'
+      }]}>{ended ? view.status.toUpperCase() : entry.roomId ? 'LIVE · 1v1' : 'LIVE CLASH'}</Text><Text style={[styles.caption, {
+        color: t.textMuted
+      }]}>ARENA</Text></View>
+    <Text style={[styles.proposition, {
+      color: t.textPrimary
+    }]}>{entry.title}</Text>
+    {entry.roomId ? <View style={styles.fighters}>
+      {(['A', 'B'] as const).map((side, i) => {
+        const fighter = view?.revealed ? side === 'A' ? view.sideA : view.sideB : null;
+        return <React.Fragment key={side}>{i === 1 ? <Text style={[styles.versus, {
+            color: t.textMuted
+          }]}>vs</Text> : null}
+          <View style={[styles.fighter, {
+            borderColor: side === 'A' ? '#A3524C' : '#4C6C9C'
+          }]}>
+            {fighter ? <Avatar name={fighter.name} tint={fighter.tint} size={28} /> : <Text style={[styles.fighterLetter, {
+              color: t.textSecondary
+            }]}>{side}</Text>}
+            <View style={{
+              flex: 1,
+              minWidth: 0
+            }}><Text style={[styles.caption, {
+                color: t.textMuted
+              }]}>FIGHTER {side}</Text><Text numberOfLines={2} style={[styles.fighterName, {
+                color: t.textPrimary
+              }]}>{fighter?.name ?? (view?.mode === 'BLIND' && !view.revealed ? 'Identity hidden' : 'View in room')}</Text></View>
           </View>
-        ) : (
-          <Text allowFontScaling={false} style={[styles.phase, { color: t.textMuted }]}>
-            {topic.phase.replace(/_/g, ' ').toUpperCase()}
-          </Text>
-        )}
-        {topic.participantCount > 0 ? (
-          <Text style={[styles.meta, { color: t.textMuted }]}>
-            {plural(topic.participantCount, 'joined', 'joined')}
-          </Text>
-        ) : null}
-      </View>
-      <Text
-        allowFontScaling
-        numberOfLines={3}
-        style={[styles.proposition, { color: t.textPrimary }]}
-      >
-        {topic.title}
-      </Text>
-      <View style={styles.actionLine}>
-        <Text allowFontScaling={false} style={[styles.enter, { color: t.textPrimary }]}>
-          {topic.viewerRoomId ? 'ENTER YOUR ROOM' : 'VIEW DISCUSSION'}
-        </Text>
-        <Text style={[styles.actionArrow, { color: t.textPrimary }]}>↗</Text>
-      </View>
-    </Pressable>
-  );
+        </React.Fragment>;
+      })}
+    </View> : null}
+    <View style={[styles.entry, {
+      borderColor: t.border
+    }]}><Text style={[styles.entryText, {
+        color: t.textPrimary
+      }]}>{ended ? 'View result' : entry.roomId ? 'Watch the duel' : 'View Clash'}</Text><Text style={{
+        color: t.textPrimary,
+        fontSize: 22
+      }}>↗</Text></View>
+  </Pressable>;
 }
-
 const styles = StyleSheet.create({
-  liveIntro: { marginTop: space.sm, borderWidth: StyleSheet.hairlineWidth, borderRadius: 18, padding: 16, gap: 6 },
-  liveTopline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  idleDot: { width: 8, height: 8, borderRadius: 4 },
-  liveCount: { marginLeft: 'auto', fontSize: 11, fontWeight: '700' },
-  liveStack: { gap: 10, marginTop: space.md },
-  featuredDuel: { borderWidth: 1.2, paddingVertical: 20, gap: 14 },
-  actionLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
-  actionArrow: { fontSize: 20, fontWeight: '600' },
-  noLive: { gap: 7, marginTop: space.sm, paddingVertical: 4 },
-  noLiveTitle: { fontSize: 16, letterSpacing: -0.3, fontWeight: '700' },
-  secondaryAction: { alignSelf: 'flex-start', borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 10 },
-  liveSecondary: { flexDirection: 'row', gap: 10, marginTop: space.md },
-  quickLink: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: 15, padding: 12, gap: 5 },
-  quickTitle: { fontSize: 13, fontWeight: '800' },
-  quickSub: { fontSize: 11 },
-
-  hallEntry: { borderRadius: 24, padding: 20, gap: 8, marginVertical: 8 },
-  hallEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.1 },
-  hallTitle: { fontSize: 27, lineHeight: 32, fontWeight: '900', letterSpacing: -0.8 },
-  hallSub: { fontSize: 13, fontWeight: '600' },
   wrap: {
     paddingHorizontal: layout.screenX,
-    paddingTop: space.md,
-    paddingBottom: space.xl,
-    gap: space.sm,
+    paddingTop: 20,
+    paddingBottom: 28,
+    gap: 12
   },
   kicker: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.6,
+    fontSize: 10,
+    lineHeight: 16,
+    fontWeight: '700',
+    letterSpacing: 1.4
   },
   title: {
-    ...typeScale.section,
-    fontSize: 29,
-    lineHeight: 34,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: '800',
-    letterSpacing: -1.1,
+    letterSpacing: -1.2
   },
-  sub: { ...typeScale.meta, fontSize: 14, lineHeight: 21, marginBottom: space.sm },
-  section: {
-    ...typeScale.caption,
+  body: {
+    fontSize: 14,
+    lineHeight: 21
+  },
+  caption: {
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-    marginTop: space.md,
+    lineHeight: 17
   },
-  empty: { ...typeScale.meta, fontSize: 13, lineHeight: 18 },
-  row: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.lg,
-    padding: 18,
-    gap: 12,
-    marginTop: space.xs,
-  },
-  rowTop: {
+  shortcuts: {
     flexDirection: 'row',
+    gap: 10,
+    marginTop: 8
+  },
+  shortcut: {
+    flex: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
+    padding: 14,
+    minHeight: 72,
+    gap: 6
+  },
+  shortcutTitle: {
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 20
   },
-  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  liveLabel: {
-    ...typeScale.label,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  phase: { ...typeScale.caption, fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
-  meta: { ...typeScale.caption, fontSize: 12 },
-  proposition: {
-    ...typeScale.label,
-    fontSize: 19,
-    fontWeight: '700',
+  heading: {
+    fontSize: 18,
     lineHeight: 25,
-    letterSpacing: -0.45,
+    fontWeight: '700',
+    letterSpacing: -0.4
   },
-  enter: {
-    ...typeScale.label,
+  notice: {
+    padding: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    gap: 8
+  },
+  status: {
+    paddingVertical: 16
+  },
+  action: {
+    minHeight: 44,
+    justifyContent: 'center'
+  },
+  history: {
+    gap: 12,
+    marginTop: 16
+  },
+  historyRow: {
+    paddingVertical: 18,
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth
+  },
+  rowTitle: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '600',
+    letterSpacing: -0.3
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8
+  },
+  duelCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 20,
+    padding: 18,
+    gap: 20
+  },
+  proposition: {
+    fontSize: 23,
+    lineHeight: 30,
+    fontWeight: '700',
+    letterSpacing: -0.6
+  },
+  fighters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  fighter: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 8,
+    borderLeftWidth: 2
+  },
+  fighterLetter: {
+    fontSize: 20,
+    fontWeight: '700'
+  },
+  fighterName: {
     fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginTop: 2,
+    lineHeight: 18,
+    fontWeight: '600'
   },
+  versus: {
+    fontSize: 11,
+    fontStyle: 'italic'
+  },
+  entry: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 14,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  entryText: {
+    fontSize: 14,
+    fontWeight: '700'
+  }
 });

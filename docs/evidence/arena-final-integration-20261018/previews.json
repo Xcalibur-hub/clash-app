@@ -1,0 +1,14 @@
+{
+  "fixture_data_only": true,
+  "native_evidence": false,
+  "screens": [
+    {
+      "file": "six-dark-preview.png",
+      "sha256": "c9114ad3b9e0772a259c1be4a1cb8b584a45cf956e5aeb4ddeb0f32230b8772f"
+    },
+    {
+      "file": "six-light-preview.png",
+      "sha256": "9320dac8d78dcdd5bc344683ba71063b03d1a8e125443fcc6b849a9dbe1b8d9c"
+    }
+  ]
+}

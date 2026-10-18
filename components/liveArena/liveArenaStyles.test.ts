@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import {
   chipFill,
   crowdRowLabel,
+  reactionBurstFor,
+  sidePlateFill,
   hexWithAlpha,
   matchupMetrics,
   phaseAnnouncement,
@@ -76,5 +78,29 @@ describe('role chip fill', () => {
     assert.notEqual(light, dark, 'light and dark do not share a fill');
     assert.match(light, /^rgba\(/);
     assert.match(dark, /^rgba\(/);
+  });
+});
+describe('side plates and reaction bursts', () => {
+  it('tints a fighter plate from that fighter real side colour', () => {
+    assert.equal(sidePlateFill('#E5484D', 'light'), 'rgba(229,72,77,0.06)');
+    assert.equal(sidePlateFill('#E5484D', 'dark'), 'rgba(229,72,77,0.1)');
+    assert.equal(sidePlateFill('#2F6FEB', 'light'), 'rgba(47,111,235,0.06)');
+    assert.equal(sidePlateFill('nope', 'light'), 'rgba(128,128,128,0.06)');
+  });
+
+  it('bursts only on a real rise, never on paint or a decrease', () => {
+    assert.equal(reactionBurstFor(null, [{ emoji: 'F', count: 2 }], 'm1'), null);
+    assert.equal(reactionBurstFor([{ emoji: 'F', count: 2 }], [{ emoji: 'F', count: 2 }], 'm1'), null);
+    assert.equal(reactionBurstFor([{ emoji: 'F', count: 3 }], [{ emoji: 'F', count: 1 }], 'm1'), null);
+    assert.equal(reactionBurstFor([{ emoji: 'F', count: 2 }], [{ emoji: 'F', count: 3 }], 'm1')?.emoji, 'F');
+    assert.equal(reactionBurstFor([], [{ emoji: 'C', count: 1 }], 'm1')?.key, 'm1:C:1');
+    assert.equal(reactionBurstFor([{ emoji: 'F', count: 1 }], [{ emoji: 'F', count: 9 }, { emoji: 'C', count: 8 }], 'm1')?.emoji, 'F');
+    assert.equal(reactionBurstFor([{ emoji: 'F', count: 2 }], [{ emoji: 'F', count: 3 }], null), null);
+    assert.equal(reactionBurstFor([{ emoji: 'F', count: 2 }], [], 'm1'), null);
+  });
+
+  it('returns only an emoji and a replay key, never a tally', () => {
+    const signal = reactionBurstFor([{ emoji: 'X', count: 4 }], [{ emoji: 'X', count: 7 }], 'm9');
+    assert.deepEqual(Object.keys(signal ?? {}).sort(), ['emoji', 'key']);
   });
 });

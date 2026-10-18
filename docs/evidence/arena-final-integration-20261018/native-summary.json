@@ -1,0 +1,78 @@
+{
+  "physical_device": "Samsung A50",
+  "native_screenshots_private": true,
+  "screenshots": [
+    {
+      "file": "arena-home.png",
+      "bytes": 117979,
+      "sha256": "ff447fd2be08e79c6f46df8ae51843ac8acdf86146e40359a21ef5f8c0443a31",
+      "published": false
+    },
+    {
+      "file": "groups.png",
+      "bytes": 214197,
+      "sha256": "19d1c307ffa867a9e9e69d8dee97d709bbc6a390bf6607fa217856c37e319d06",
+      "published": false
+    },
+    {
+      "file": "groups-joined.png",
+      "bytes": 194151,
+      "sha256": "daf4d98429ad73b10c748427381c34188c42e389ddd74bb0a1c9aecd9e19f38e",
+      "published": false
+    },
+    {
+      "file": "native-current.png",
+      "bytes": 35718,
+      "sha256": "a25dbf5dd0f7f83a1e2cc25f27a6998a1c6d224eac23848385c503fd5d752f86",
+      "published": false
+    },
+    {
+      "file": "after-bundle.png",
+      "bytes": 138684,
+      "sha256": "b326d3725a6bfc1e90e3b133b6fd805cdf829d4cc7265dc069d855c61e58535b",
+      "published": false
+    }
+  ],
+  "gates": [
+    {
+      "directory": "native-gate",
+      "pass": false,
+      "failure": "launch_gate_prerequisite_failed",
+      "stage": "metro_status"
+    },
+    {
+      "directory": "native-gate-ready",
+      "checks": {
+        "device_connected": true,
+        "metro_reachable": true,
+        "real_android_bundle_served": true,
+        "bundle_executed": true,
+        "usable_clash_ui": false
+      },
+      "pass": false,
+      "screen": "arena",
+      "bundle_build_ms": 12979,
+      "failure": "launch_gate_incomplete"
+    },
+    {
+      "directory": "native-gate-corrected",
+      "checks": {
+        "device_connected": true,
+        "metro_reachable": true,
+        "real_android_bundle_served": true,
+        "bundle_executed": true,
+        "usable_clash_ui": false
+      },
+      "pass": false,
+      "screen": "arena",
+      "bundle_build_ms": 127682,
+      "failure": "launch_gate_incomplete"
+    }
+  ],
+  "manual_home_after_skip": true,
+  "groups_explore_joined_interactions": true,
+  "review_interrupted_when_device_left_clash": true,
+  "unrelated_app_captures_removed": true,
+  "live_discover_review_completed": false,
+  "no_explicit_login_or_logout": true
+}

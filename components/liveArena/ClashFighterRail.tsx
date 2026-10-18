@@ -11,7 +11,8 @@ import Animated, {
 import { Avatar } from '../shared/Avatar';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { duelActiveSpeakers } from '../../utils/duelPresentation';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { sidePlateBorder, sidePlateFill } from './liveArenaStyles';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 
 export interface ClashFighterRailProps {
   duel: ArenaDuel;
@@ -57,7 +58,18 @@ export function ClashFighterRail({
             accessibilityState={{ selected: focused }}
             disabled={!onOpenProfile}
             onPress={() => onOpenProfile?.(fighter.id)}
-            style={[styles.col, waiting && styles.waiting]}
+            style={[
+              styles.col,
+              styles.plate,
+              {
+                // Real per-fighter tint: red and blue sides stay distinct.
+                backgroundColor: sidePlateFill(fighter.tint ?? t.textMuted, t.scheme),
+                borderColor: focused
+                  ? sidePlateBorder(fighter.tint ?? t.textMuted, t.scheme)
+                  : 'transparent',
+              },
+              waiting && styles.waiting,
+            ]}
           >
             <Avatar
               name={fighter.name}
@@ -128,6 +140,11 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignItems: 'center',
     gap: 5,
+  },
+  plate: {
+    borderRadius: radius.lg,
+    paddingVertical: space.xs,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   waiting: { opacity: 0.72 },
   latest: { fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textAlign: 'center' },
