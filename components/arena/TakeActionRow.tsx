@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { arena, arenaColors } from '../../theme/arena';
 import { compact } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaIcon, ArrowBigUpIcon, BookmarkIcon, CommentIcon, ShareIcon } from '../shared/icons';
@@ -63,7 +64,7 @@ function MetaAction({
         hapticTap();
         if (!reduced) {
           bounce.value = withSequence(
-            withSpring(1.18, { damping: 12, stiffness: 400 }),
+            withSpring(1.035, { damping: 18, stiffness: 400 }),
             withSpring(1, { damping: 14, stiffness: 280 }),
           );
         }
@@ -80,7 +81,7 @@ function MetaAction({
       </Animated.View>
       {label ? (
         <Text
-          allowFontScaling={false}
+          allowFontScaling
           style={[styles.metaLabel, { color: active ? activeColor : idleColor, fontWeight: active ? '600' : '400' }]}
         >
           {label}
@@ -105,6 +106,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
     prominence = 'feed',
   } = props;
   const t = useThemeColors();
+  const c = arenaColors(t);
   const reduced = useReducedMotion();
   const clashPulse = useSharedValue(1);
   const clashAnim = useAnimatedStyle(() => ({
@@ -118,20 +120,20 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
         hapticTap();
         if (!reduced) {
           clashPulse.value = withSequence(
-            withTiming(0.94, { duration: 90 }),
+            withTiming(0.97, { duration: 90 }),
             withSpring(1, { damping: 14, stiffness: 320 }),
           );
         }
         onClash();
       }}
       accessibilityRole="button"
-      accessibilityLabel={conversation && props.readOnly ? 'View Clash history' : 'Clash on this take'}
-      style={[styles.clash, conversation && styles.clashProminent, { backgroundColor: t.clashFill }]}
+      accessibilityLabel={conversation ? 'View Clash history' : 'Clash on this take'}
+      style={[styles.clash, conversation && styles.clashProminent, { backgroundColor: conversation ? c.inset : t.clashFill }]}
     >
       <Animated.View style={[styles.clashInner, clashAnim]}>
-        <ArenaIcon size={conversation ? 14 : 13} color={t.clashText} strokeWidth={2.6} />
-        <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
-          {conversation && props.readOnly ? 'History' : 'CLASH'}
+        <ArenaIcon size={conversation ? 16 : 13} color={conversation ? c.ink : t.clashText} strokeWidth={2} />
+        <Text style={[styles.clashText, { color: conversation ? c.ink : t.clashText }]}>
+          {conversation ? 'Duels' : 'CLASH'}
         </Text>
       </Animated.View>
     </PressableScale>
@@ -148,7 +150,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
           accessibilityLabel="React to this take"
           onPress={onReact}
           activeColor={t.textPrimary}
-          idleColor={t.textMuted}
+          idleColor={c.muted}
         />
         <MetaAction
           icon={CommentIcon}
@@ -156,7 +158,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
           accessibilityLabel="Jump to replies"
           onPress={onComment}
           activeColor={t.textPrimary}
-          idleColor={t.textMuted}
+          idleColor={c.muted}
         />
         <MetaAction
           icon={ShareIcon}
@@ -164,7 +166,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
           accessibilityLabel="Share this take"
           onPress={onShare}
           activeColor={t.textPrimary}
-          idleColor={t.textMuted}
+          idleColor={c.muted}
         />
         <MetaAction
           icon={BookmarkIcon}
@@ -173,7 +175,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
           accessibilityLabel={isSaved ? 'Remove from saved' : 'Save this take'}
           onPress={onSave}
           activeColor={t.textPrimary}
-          idleColor={t.textMuted}
+          idleColor={c.muted}
         />
         <View style={styles.spacer} />
         {clashButton}
@@ -232,11 +234,13 @@ const styles = StyleSheet.create({
     paddingTop: space.sm,
   },
   rowConversation: {
-    paddingVertical: space.xs,
+    paddingVertical: 8,
+    gap: 4,
+    flexWrap: 'wrap',
   },
   metaAction: {
-    minHeight: 40,
-    minWidth: 36,
+    minHeight: arena.hit,
+    minWidth: arena.hit,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -251,8 +255,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   clashProminent: {
-    minHeight: 40,
-    paddingHorizontal: space.lg,
+    minHeight: arena.hit,
+    paddingHorizontal: 10,
   },
   clashInner: {
     flexDirection: 'row',
@@ -262,8 +266,8 @@ const styles = StyleSheet.create({
   clashText: {
     ...typeScale.label,
     fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.7,
+    fontWeight: '600',
+    letterSpacing: 0,
   },
   spacer: { flex: 1 },
 });

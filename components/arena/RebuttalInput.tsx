@@ -26,8 +26,9 @@ import type { TenorGif } from '../../services/tenorService';
 import { currentUserId,errorText } from '../../services/supabaseClient';
 import { useAuth } from '../../store/AuthProvider';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { arena, arenaColors } from '../../theme/arena';
+import Animated, { LinearTransition, useReducedMotion } from 'react-native-reanimated';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
-import { Avatar } from '../shared/Avatar';
 import { CloseIcon, ImageIcon, StickerIcon, VideoIcon } from '../shared/icons';
 import { GifPickerSheet } from './GifPickerSheet';
 import { TakeMediaPreview } from './TakeMediaPreview';
@@ -81,6 +82,8 @@ export function RebuttalInput({
   const requireAuth = useRequireAuth();
   const { pickImage, pickVideo } = useMediaPicker();
   const t = useThemeColors();
+  const c = arenaColors(t);
+  const reduced = useReducedMotion();
   const [draft, setDraft] = React.useState('');
   const [media, setMedia] = React.useState<PickedMedia | null>(null);
   const [gif, setGif] = React.useState<TenorGif | null>(null);
@@ -271,10 +274,10 @@ export function RebuttalInput({
   );
 
   return (
-    <View style={styles.wrap}>
+    <Animated.View layout={reduced ? undefined : LinearTransition.duration(arena.motion.duration)} style={styles.wrap}>
       {replyingTo ? (
         <View style={styles.replyRow}>
-          <Text allowFontScaling={false} style={[styles.replyLabel, { color: t.textMuted }]}>
+          <Text style={[styles.replyLabel, { color: c.muted }]}>
             Replying to @{replyingTo}
           </Text>
           <Pressable
@@ -288,6 +291,7 @@ export function RebuttalInput({
             accessibilityLabel="Cancel reply"
             disabled={pending}
             hitSlop={8}
+            style={{ minHeight: arena.hit, justifyContent: 'center' }}
           >
             <Text allowFontScaling={false} style={[styles.cancel, { color: t.textSecondary }]}>
               Cancel
@@ -297,7 +301,6 @@ export function RebuttalInput({
       ) : null}
 
       <View style={styles.composerRow}>
-        <Avatar name={state.viewer.name} tint={state.viewer.tint} size={expanded ? 28 : 26} />
         <View
           style={[
             styles.box,
@@ -317,10 +320,10 @@ export function RebuttalInput({
               if (!draft.trim() && !hasAttachment && !pending) setFocused(false);
             }}
             placeholder="Write a reply…"
-            placeholderTextColor={t.textMuted}
+            placeholderTextColor={c.muted}
             multiline={expanded}
             editable={!pending}
-            style={[styles.input, !expanded && { flex: 1 }, { color: t.textPrimary, minHeight: expanded ? 44 : 36 }]}
+            style={[styles.input, !expanded && { flex: 1 }, { color: c.ink, minHeight: expanded ? 56 : 44 }]}
             accessibilityLabel={parentId ? 'Reply to rebuttal' : 'Add to the conversation'}
           />
 
@@ -351,7 +354,7 @@ export function RebuttalInput({
                 {uploading || pending ? (
                   <ActivityIndicator size="small" color={t.textMuted} />
                 ) : (
-                  <Text allowFontScaling={false} style={[styles.count, { color: t.textMuted }]}>
+                  <Text style={[styles.count, { color: c.muted }]}>
                     {MAX - draft.length}
                   </Text>
                 )}
@@ -364,7 +367,7 @@ export function RebuttalInput({
                   accessibilityLabel={parentId ? 'Send reply' : 'Send'}
                   style={[styles.send, { backgroundColor: t.clashFill }, !canSend && styles.off]}
                 >
-                  <Text allowFontScaling={false} style={[styles.sendText, { color: t.clashText }]}>
+                  <Text style={[styles.sendText, { color: t.clashText }]}>
                     {uploading ? '…' : 'Send'}
                   </Text>
                 </Pressable>
@@ -373,38 +376,15 @@ export function RebuttalInput({
           ) : (
             <View style={styles.compactActions}>
               <Pressable
-                onPress={openGifPicker}
-                accessibilityRole="button"
-                accessibilityLabel="Attach GIF"
-                hitSlop={6}
-                style={styles.iconBtn}
-              >
-                <StickerIcon size={17} color={t.textMuted} strokeWidth={2} />
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  void attach('image');
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Attach photo"
-                hitSlop={6}
-                style={styles.iconBtn}
-              >
-                <ImageIcon size={17} color={t.textMuted} strokeWidth={2} />
-              </Pressable>
-              <Pressable
                 onPress={() => {
                   setFocused(true);
                   inputRef.current?.focus();
                 }}
-                disabled={!canSend}
                 accessibilityRole="button"
-                accessibilityLabel="Send"
-                style={[styles.sendCompact, { backgroundColor: t.clashFill }, !canSend && styles.off]}
+                accessibilityLabel="Show reply attachments"
+                style={styles.iconBtn}
               >
-                <Text allowFontScaling={false} style={[styles.sendText, { color: t.clashText }]}>
-                  ↑
-                </Text>
+                <ImageIcon size={19} color={c.muted} strokeWidth={1.8} />
               </Pressable>
             </View>
           )}
@@ -422,7 +402,7 @@ export function RebuttalInput({
           setFocused(true);
         }}
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -436,20 +416,18 @@ const styles = StyleSheet.create({
   },
   replyLabel: { ...typeScale.meta, fontSize: 12 },
   cancel: { ...typeScale.meta, fontSize: 12, fontWeight: '600' },
-  composerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  composerRow: { flexDirection: 'row', alignItems: 'flex-start' },
   box: {
+    ...arena.input,
     flex: 1,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingTop: 4,
     paddingBottom: 4,
     gap: 8,
   },
-  boxCompact: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, gap: 4 },
+  boxCompact: { flexDirection: 'row', alignItems: 'center', paddingVertical: 0, gap: 4 },
   input: {
-    ...typeScale.body,
-    fontSize: 15,
+    ...arena.type.body,
     paddingVertical: 6,
     maxHeight: 96,
   },
@@ -465,21 +443,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     right: 6,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(8,8,11,0.72)',
   },
   toolbar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: space.sm,
+    gap: 4,
   },
   attachRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sendRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto' },
   compactActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -495,15 +474,10 @@ const styles = StyleSheet.create({
   count: { ...typeScale.data, fontSize: 10 },
   send: {
     paddingHorizontal: 12,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendCompact: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    minHeight: arena.hit,
+    minWidth: arena.hit,
+    paddingVertical: 10,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },

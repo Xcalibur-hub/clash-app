@@ -1,11 +1,13 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { LinearTransition, useReducedMotion } from 'react-native-reanimated';
+import { arena, arenaColors } from '../../theme/arena';
 import type { ChallengerComment } from '../../store';
 import { selectAuthor, useClash, type CommentNode } from '../../store';
-import { radius, space, typeScale, useTheme, useThemeColors } from '../../theme';
+import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { compact, timeAgo } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
-import { Avatar } from '../shared/Avatar';
+import { ArenaAvatar } from './ui/ArenaPrimitives';
 import { ArenaIcon, ArrowBigUpIcon, CommentIcon, MoreIcon } from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
 import { CommentMedia } from './CommentMedia';
@@ -71,7 +73,7 @@ export function CommentThread({
           <Text style={[styles.loadMoreText, { color: t.textPrimary }]}>
             Show {Math.min(ROOT_PAGE_SIZE, remaining)} more conversations ↓
           </Text>
-          <Text style={[styles.loadMoreHint, { color: t.textMuted }]}>
+          <Text style={[styles.loadMoreHint, { color: t.textSecondary }]}>
             {remaining} threads remaining
           </Text>
         </Pressable>
@@ -116,7 +118,8 @@ const CommentItem = React.memo(function CommentItem({
 }: CommentItemProps): React.JSX.Element {
   const { state, dispatch } = useClash();
   const t = useThemeColors();
-  const { scheme } = useTheme();
+  const colors = arenaColors(t);
+  const reduced = useReducedMotion();
   const [collapsed, setCollapsed] = React.useState(false);
   const [visibleReplies, setVisibleReplies] = React.useState(REPLY_PAGE_SIZE);
   const [remoteChildren, setRemoteChildren] = React.useState<ChallengerComment[]>([]);
@@ -178,11 +181,11 @@ const CommentItem = React.memo(function CommentItem({
   const handle = author?.handle ? `@${author.handle}` : '@ghost';
 
   return (
-    <View style={depth === 0 ? styles.rootBranch : undefined}>
+    <Animated.View layout={reduced ? undefined : LinearTransition.duration(arena.motion.duration)} style={depth === 0 ? styles.rootBranch : undefined}>
       {parentRemoved ? (
         <Text
-          allowFontScaling={false}
-          style={[styles.removedNote, { marginLeft: indent + space.sm, color: t.textMuted }]}
+          allowFontScaling
+          style={[styles.removedNote, { marginLeft: indent + space.sm, color: colors.muted }]}
         >
           {'\u21B3 [removed]'}
         </Text>
@@ -194,7 +197,7 @@ const CommentItem = React.memo(function CommentItem({
           nested && {
             marginLeft: 0,
             backgroundColor: 'transparent',
-            borderLeftColor: scheme === 'dark' ? '#A98ACC' : '#A882C4',
+            borderLeftColor: colors.strongLine,
             borderColor: t.border,
           },
           !nested && {
@@ -203,30 +206,35 @@ const CommentItem = React.memo(function CommentItem({
           },
         ]}
       >
-        <Avatar name={author?.name ?? '?'} tint={author?.tint ?? '#888'} size={nested ? 24 : 30} />
+        <ArenaAvatar name={author?.name ?? '?'} size={nested ? 24 : 30} />
         <View style={styles.main}>
           <View style={styles.meta}>
-            <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+            <Text allowFontScaling style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
               {handle}
             </Text>
             {isOp ? (
               <View style={[styles.opBadge, { backgroundColor: t.surfaceMuted }]}>
-                <Text allowFontScaling={false} style={[styles.opText, { color: t.textPrimary }]}>
+                <Text allowFontScaling style={[styles.opText, { color: t.textPrimary }]}>
                   OP
                 </Text>
               </View>
             ) : null}
             {isViewer ? (
-              <Text allowFontScaling={false} style={[styles.you, { color: t.textSecondary }]}>
+              <Text allowFontScaling style={[styles.you, { color: t.textSecondary }]}>
                 You
               </Text>
             ) : null}
-            <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
+            <Text allowFontScaling style={[styles.handle, { color: colors.muted }]} numberOfLines={1}>
               · {timeAgo(comment.createdAt)}
             </Text>
+            <View style={styles.spacer} />
+            <Pressable onPress={() => { hapticTap(); onMore(comment); }} accessibilityRole="button"
+              accessibilityLabel="More actions" style={styles.more}>
+              <MoreIcon size={15} color={colors.muted} strokeWidth={2} />
+            </Pressable>
           </View>
           {nested && (parentHandle || parentAuthor?.handle) ? (
-            <Text style={[styles.replyContext, { color: scheme === 'dark' ? '#C9AEDF' : '#8A598E' }]}
+            <Text style={[styles.replyContext, { color: colors.muted }]}
               numberOfLines={1}>
               ↳ replying to @{parentHandle ?? parentAuthor?.handle}
             </Text>
@@ -250,7 +258,7 @@ const CommentItem = React.memo(function CommentItem({
             >
               <ArrowBigUpIcon size={15} color={upvoted ? t.textPrimary : t.textMuted} strokeWidth={upvoted ? 2.4 : 2} />
               <Text
-                allowFontScaling={false}
+                allowFontScaling
                 style={[styles.actionText, { color: upvoted ? t.textPrimary : t.textMuted }]}
               >
                 {compact(comment.upvotes)}
@@ -268,7 +276,7 @@ const CommentItem = React.memo(function CommentItem({
               style={styles.action}
             >
               <CommentIcon size={14} color={t.textMuted} strokeWidth={2} />
-              <Text allowFontScaling={false} style={[styles.actionText, { color: t.textMuted }]}>
+              <Text allowFontScaling style={[styles.actionText, { color: colors.muted }]}>
                 Reply
               </Text>
             </Pressable>
@@ -283,7 +291,7 @@ const CommentItem = React.memo(function CommentItem({
                 style={[styles.clash, { backgroundColor: t.clashFill }]}
               >
                 <ArenaIcon size={11} color={t.clashText} strokeWidth={2.6} />
-                <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
+                <Text allowFontScaling style={[styles.clashText, { color: t.clashText }]}>
                   Challenge
                 </Text>
               </PressableScale>
@@ -299,24 +307,11 @@ const CommentItem = React.memo(function CommentItem({
                 accessibilityLabel={collapsed ? 'Expand replies' : 'Collapse replies'}
                 style={styles.action}
               >
-                <Text allowFontScaling={false} style={[styles.collapseText, { color: t.textSecondary }]}>
+                <Text allowFontScaling style={[styles.collapseText, { color: t.textSecondary }]}>
                   {collapsed ? `Show ${nestedCount} ${nestedCount === 1 ? 'reply' : 'replies'} ↓` : 'Collapse thread ↑'}
                 </Text>
               </Pressable>
             ) : null}
-            <View style={styles.spacer} />
-            <Pressable
-              onPress={() => {
-                hapticTap();
-                onMore(comment);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="More actions"
-              hitSlop={8}
-              style={styles.more}
-            >
-              <MoreIcon size={15} color={t.textMuted} strokeWidth={2.2} />
-            </Pressable>
           </View>
         </View>
       </View>
@@ -339,7 +334,7 @@ const CommentItem = React.memo(function CommentItem({
         : childNodes.length > 0 ? (
           <View style={[
             styles.branchChildren,
-            { marginLeft: depth < 3 ? 12 : 0, borderLeftColor: scheme === 'dark' ? '#665376' : '#D1BDD8' },
+            { marginLeft: depth < 3 ? 12 : 0, borderLeftColor: colors.strongLine },
           ]}>
           {childNodes.slice(0, useRemote ? childNodes.length : visibleReplies).map((child) => (
             <CommentItem
@@ -362,7 +357,7 @@ const CommentItem = React.memo(function CommentItem({
               accessibilityLabel={`Show more replies, ${node.children.length - visibleReplies} remaining`}
               style={styles.moreReplies}
               onPress={() => { hapticTap(); setVisibleReplies((count) => count + REPLY_PAGE_SIZE); }}>
-              <Text style={[styles.moreRepliesText, { color: scheme === 'dark' ? '#D6B9FA' : '#8052A5' }]}>
+              <Text style={[styles.moreRepliesText, { color: colors.secondary }]}>
                 ↳ View {Math.min(REPLY_PAGE_SIZE, node.children.length - visibleReplies)} more replies
               </Text>
             </Pressable>
@@ -377,7 +372,7 @@ const CommentItem = React.memo(function CommentItem({
           ) : null}
           </View>
         ) : null}
-    </View>
+    </Animated.View>
   );
 });
 
@@ -386,10 +381,10 @@ const styles = StyleSheet.create({
   loadMore: { minHeight: 66, borderRadius: 18, borderWidth: 1, padding: 15, alignItems: 'center', justifyContent: 'center', gap: 4 },
   loadMoreText: { fontSize: 14, fontWeight: '800' },
   loadMoreHint: { fontSize: 11, fontWeight: '600' },
-  moreReplies: { minHeight: 42, justifyContent: 'center', paddingLeft: 12 },
+  moreReplies: { minHeight: 44, justifyContent: 'center', paddingLeft: 12 },
   moreRepliesText: { fontSize: 12, fontWeight: '800' },
   rootBranch: { gap: 4 },
-  branchChildren: { borderLeftWidth: 2, marginTop: 3, paddingLeft: 4, gap: 6 },
+  branchChildren: { borderLeftWidth: 1, marginTop: 0, paddingLeft: 4, gap: 6 },
   replyContext: { fontSize: 11, fontWeight: '700', letterSpacing: 0.1 },
   item: {
     flexDirection: 'row',
@@ -399,8 +394,8 @@ const styles = StyleSheet.create({
     borderRadius: 0,
   },
   itemNested: {
-    paddingHorizontal: space.sm + 2,
-    paddingVertical: space.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderWidth: 0,
     borderLeftWidth: 0,
     borderRadius: 0,
@@ -417,7 +412,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xs,
   },
   opText: { ...typeScale.caption, fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
-  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
+  body: { ...arena.type.body },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -425,10 +420,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingTop: 2,
   },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
+  action: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 44, minWidth: 44 },
   actionText: { ...typeScale.meta, fontSize: 12 },
   collapseText: { ...typeScale.meta, fontSize: 12, fontWeight: '600' },
   clash: {
+    minHeight: 44,
+    minWidth: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,

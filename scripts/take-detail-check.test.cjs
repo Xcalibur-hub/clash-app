@@ -27,7 +27,7 @@ const original = Module._load;
 Module._load = function (r, parent) {
   const own = parent && !parent.filename.includes('node_modules');
   if (own && r === 'react') return hooks;
-  if (r === 'react-native') return { FlatList: 'List', KeyboardAvoidingView: 'Keyboard', Pressable: 'Button', View: 'View', Text: 'Text', ActivityIndicator: 'Spinner', Platform: { OS: 'android' }, StyleSheet: { create: s => s }, Share: { share() {} } };
+  if (r === 'react-native') return { FlatList: 'List', KeyboardAvoidingView: 'Keyboard', Pressable: 'Button', View: 'View', Text: 'Text', ActivityIndicator: 'Spinner', Platform: { OS: 'android', select: choices => choices.android ?? choices.default }, StyleSheet: { create: s => s }, Share: { share() {} } };
   if (r === 'expo-constants') return { expoConfig: { extra: { appVariant: 'development' } } };
   if (r === 'expo-router') return { useFocusEffect: f => hooks.useEffect(f, [f]), useRouter: () => router, useLocalSearchParams: () => ({ takeId: 'take' }) };
   if (r === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 24, bottom: 24 }) };
@@ -97,4 +97,20 @@ test('account change rejects the prior account’s late archived response', asyn
   reset(); state.takes = []; let resolve; pendingFetch = new Promise(r => { resolve = r; }); render();
   uid = 'b'; pendingFetch = new Promise(() => {}); render(); resolve(take); await flush();
   const tree = render(); assert.ok(find(tree, 'Spinner')); assert.equal(find(tree, 'TakeActionRow'), undefined);
+});
+
+test('editorial route keeps compact challenge access and the real voting disclosure', () => {
+  reset(); let tree = render();
+  assert.equal(find(tree, 'TakeChallenges').props.compact, true);
+  assert.equal(find(tree, 'MindshiftPanel'), undefined);
+  nodes(tree).find(n => n.props?.accessibilityLabel === 'Your perspective').props.onPress();
+  tree = render(); assert.ok(find(tree, 'MindshiftPanel'));
+});
+
+test('new reply-sort controls update the existing list state without replacing the route', () => {
+  reset(); let tree = render();
+  find(tree, 'ArenaReplySort').props.onChange('new'); tree = render();
+  assert.equal(find(tree, 'ArenaReplySort').props.value, 'new');
+  assert.equal(find(tree, 'List').key, React.Children.toArray([React.createElement('List', { key: 'take:new' })])[0].key);
+  assert.equal(events.length, 0);
 });

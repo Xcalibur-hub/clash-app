@@ -1,0 +1,92 @@
+[
+  {
+    "filename": "dark-active-320-keyboard.png",
+    "bytes": 70412,
+    "sha256": "7573c9c4a57365179a1ec10a394e2701ab281bcdc66b924c9f1709dc0b8014fc",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "dark-active-320.png",
+    "bytes": 105107,
+    "sha256": "866a2f9bf7afcd481db622abb6cc7d245dcd5340cacb4d7691252a4ce2d1361f",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "dark-active-360.png",
+    "bytes": 106058,
+    "sha256": "bf62cdb1d395704e85fa9d64b1c7dbd4040564c60bfe3865aa5c0a7037e0293d",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "dark-archived-320.png",
+    "bytes": 105598,
+    "sha256": "a918fc173a0768fbce3061b2ed9bb07f6a7e5d00e83fbf24cb36bd656223642e",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "dark-archived-360.png",
+    "bytes": 108708,
+    "sha256": "d4853f2a36da482b98d3af4d05800221a14e68125f984a906b0baf9b02475ef3",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "light-active-320-fontscale.png",
+    "bytes": 106033,
+    "sha256": "783d9ff4eaea3eb8671da651a1586c5e7041adb5712ad3de074ea8ea0f75ed4c",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "light-active-320.png",
+    "bytes": 105166,
+    "sha256": "202f85d2cafea68d43d42a598188dc511dfdb1fa0d29344146127491592c22c4",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "light-active-360.png",
+    "bytes": 106061,
+    "sha256": "a643175d9e09fce34533ff760659542cd543d0eab3636472f91f2a941821e0e0",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "light-archived-320.png",
+    "bytes": 105523,
+    "sha256": "2a3e055b60bc15e7a2be1e114a4ec62239efe7181fa55921b1238d5619cf501c",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  },
+  {
+    "filename": "light-archived-360.png",
+    "bytes": 108575,
+    "sha256": "be87f54c2cba7ac40c03faf94d59af069171c6ba3dd34aa2ce4d13af7df9c213",
+    "kind": "React Native Web / actual Take components",
+    "before": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+    "fixture_data": "clearly labeled offline UI preview only",
+    "native_capture": false
+  }
+]

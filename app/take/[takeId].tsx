@@ -20,12 +20,12 @@ import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
 import { TakeActionRow } from '../../components/arena/TakeActionRow';
 import { TakeChallenges } from '../../components/arena/TakeChallenges';
 import { QuestionVotePanel } from '../../components/arena/QuestionVotePanel';
-import { TakeDetailHero } from '../../components/arena/TakeDetailHero';
-import { Avatar } from '../../components/shared/Avatar';
+import { TakeEditorialHeader } from '../../components/arena/TakeEditorialHeader';
+import { ArenaDivider, ArenaSectionHeading } from '../../components/arena/ui/ArenaPrimitives';
+import { ArenaReplySort } from '../../components/arena/ui/ArenaReplySort';
+import { arena, arenaColors } from '../../theme/arena';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { SegmentedTabs } from '../../components/shared/SegmentedTabs';
 import { BackIcon, MoreIcon } from '../../components/shared/icons';
-import { HOOD_LABEL } from '../../data/hoods';
 import { useClock } from '../../hooks/useClock';
 import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
 import { takeIsArchived } from '../../utils/takeDetail';
@@ -60,20 +60,13 @@ import {
   type User,
   type Take,
 } from '../../store';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { space, useThemeColors } from '../../theme';
 import {
   clashStartErrorMessage,
   shouldOpenExistingClash,
   validateClashStart,
 } from '../../utils/clashStart';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
-import { timeAgo, timeLeftLabel } from '../../utils/format';
-
-const SORTS: readonly { key: CommentSort; label: string }[] = [
-  { key: 'best', label: 'Best' },
-  { key: 'new', label: 'New' },
-];
-
 export interface MenuTarget {
   target: User;
   isSelf: boolean;
@@ -81,11 +74,7 @@ export interface MenuTarget {
   reportTarget: { kind: 'take' | 'comment'; id: string };
 }
 
-/**
- * Compact Take discussion — social story/article conversation.
- * Media stays inline; expired discussions retain readable history.
- * Backend / reply / clash logic unchanged.
- */
+/** Editorial Take discussion. Challenge eligibility and navigation remain server-bound. */
 export default function TakeDetailScreen(): React.JSX.Element {
   const { takeId, challenge } = useLocalSearchParams<{ takeId: string | string[]; challenge?: string }>();
   const id = Array.isArray(takeId) ? takeId[0] : takeId;
@@ -99,6 +88,8 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const react = useTakeReaction();
   const theme = useThemeColors();
+  const colors = arenaColors(theme);
+  const [perspectiveOpen, setPerspectiveOpen] = React.useState(false);
   const now = useClock(1000);
   const keyboardVisible = useKeyboardVisible();
   const listRef = React.useRef<FlatList<CommentNode>>(null);
@@ -400,8 +391,6 @@ export default function TakeDetailScreen(): React.JSX.Element {
         !pagedRoots.some((root) => root.id === item.id)), ...pagedRoots]
         .map((root): CommentNode => ({ comment: root, children: [] }))
     : buildCommentTree(comments, sort);
-  const hasMedia = Boolean(take.media);
-  const shortText = take.text.trim().length < 48;
   const isViewerAuthor = author.id === state.viewer.id;
 
   const openClash = (): void => {
@@ -428,8 +417,8 @@ export default function TakeDetailScreen(): React.JSX.Element {
             >
               <BackIcon size={20} color={theme.textPrimary} />
             </Pressable>
-            <Text allowFontScaling={false} style={[styles.hood, { color: theme.textMuted }]}>
-              {HOOD_LABEL[take.hood]}
+            <Text style={[arena.type.label, { color: colors.secondary, flex: 1, minWidth: 0, textAlign: 'center' }]}>
+              Arena / Discussion
             </Text>
             <Pressable
               onPress={() =>
@@ -461,10 +450,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
           maxToRenderPerBatch={6}
           windowSize={7}
           removeClippedSubviews={false}
-          contentContainerStyle={[
-            styles.content,
-            { paddingTop: 12, paddingBottom: 12 },
-          ]}
+          contentContainerStyle={styles.content}
           renderItem={({ item }) => (
             <View style={[styles.threadItem, { borderBottomColor: theme.border }]}>
               <CommentBranch node={item} serverReplies={pageReady} locallyCreated={locallyCreated} takeAuthorId={author.id} readOnly={archived}
@@ -490,53 +476,14 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </View> : null
           }
           ListEmptyComponent={pageBusy || pageError || (isSupabaseConfigured && !pageReady) ? null :
-            <Text style={[styles.empty, { color: theme.textMuted }]}>
-              {archived ? 'No replies were posted.' : 'No replies yet — add your perspective.'}
-            </Text>
+            <View style={styles.empty}>
+              <Text style={[arena.type.heading, { color: colors.ink }]}>{archived ? 'A quiet discussion' : 'Start the conversation'}</Text>
+              <Text style={[arena.type.body, { color: colors.muted }]}>{archived ? 'No replies were posted.' : 'No replies yet — add your perspective.'}</Text>
+            </View>
           }
           ListHeaderComponent={
             <View style={styles.headerContent}>
-
-
-          {(
-            <View style={styles.textStage}>
-              <View style={styles.authorRow}>
-                <Avatar name={author.name} tint={author.tint} size={34} />
-                <View style={styles.authorText}>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.authorName, { color: theme.textPrimary }]}
-                    numberOfLines={1}
-                  >
-                    @{author.handle}
-                    {isViewerAuthor ? ' · You' : ''}
-                  </Text>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.authorMeta, { color: theme.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    {timeAgo(take.createdAt)} · {archived ? 'Archived' : timeLeftLabel(take.expiresAt)}
-                  </Text>
-                </View>
-              </View>
-              <Text
-                allowFontScaling
-                style={[shortText ? styles.takeShort : styles.takeLong, { color: theme.textPrimary }]}
-              >
-                {take.text}
-              </Text>
-            </View>
-          )}
-
-          {hasMedia ? <TakeDetailHero take={take} author={author} isViewer={isViewerAuthor} compact /> : null}
-          {archived ? <View style={[styles.archive, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
-            <Text style={[styles.archiveTitle, { color: theme.textPrimary }]}>Archived discussion</Text>
-            <Text style={[styles.archiveBody, { color: theme.textSecondary }]}>Replies, Take votes and new challenges are closed.</Text>
-          </View> : null}
-          {take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : <MindshiftPanel takeId={take.id} />}
-
-          <TakeChallenges take={take} openComposer={challenge === '1'} readOnly={archived} onTakeRefreshed={refreshChallengeTake} />
+          <TakeEditorialHeader take={take} author={author} archived={archived} isViewer={isViewerAuthor} />
           <TakeActionRow
             reactions={take.reactions}
             commentCount={comments.length}
@@ -552,23 +499,19 @@ export default function TakeDetailScreen(): React.JSX.Element {
             }}
             prominence="conversation"
           />
-
-          <View style={styles.threadHead}>
-            <View style={styles.threadEyebrowRow}>
-
-              <Text style={[styles.threadEyebrow, { color: theme.textSecondary }]}>
-                THE DISCUSSION
-              </Text>
-              <Text style={[styles.threadCount, { color: theme.textMuted }]}>
-                {nodes.length} {nodes.length === 1 ? 'THREAD' : 'THREADS'} LOADED
-              </Text>
-            </View>
-            <View style={styles.threadFilters}>
-              <View style={styles.sortWrap}>
-                <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" compact />
-              </View>
-            </View>
+          <ArenaDivider />
+          <TakeChallenges compact take={take} openComposer={challenge === '1'} readOnly={archived} onTakeRefreshed={refreshChallengeTake} />
+          <View style={[styles.perspective, { borderColor: colors.line }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={take.question ? 'Question voting' : 'Your perspective'}
+              accessibilityState={{ expanded: perspectiveOpen }} onPress={() => setPerspectiveOpen(value => !value)} style={styles.perspectiveToggle}>
+              <Text style={[arena.type.label, { color: colors.secondary }]}>{take.question ? 'Question voting' : 'Your perspective'}</Text>
+              <Text style={[arena.type.label, { color: colors.muted }]}>{perspectiveOpen ? '−' : '+'}</Text>
+            </Pressable>
+            {perspectiveOpen ? (take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : <MindshiftPanel takeId={take.id} />) : null}
           </View>
+          <ArenaSectionHeading title="Discussion" detail={pageError ? 'Couldn’t refresh discussion' : pageBusy ? 'Updating…' : isSupabaseConfigured && !pageReady ? 'Connecting…' : `Showing ${nodes.length} ${nodes.length === 1 ? 'thread' : 'threads'}`}>
+            <ArenaReplySort value={sort} onChange={setSort} />
+          </ArenaSectionHeading>
 
             </View>
           }
@@ -584,7 +527,10 @@ export default function TakeDetailScreen(): React.JSX.Element {
             },
           ]}
         >
-          {archived ? <Text style={[styles.archiveBody, { color: theme.textMuted, paddingVertical: 8 }]}>Archived · replies are closed</Text> : <RebuttalInput
+          {archived ? <View style={styles.archiveBar}>
+            <Text style={[arena.type.label, { color: colors.secondary }]}>Archived discussion</Text>
+            <Text style={[arena.type.meta, { color: colors.muted }]}>Replies are closed · History stays available</Text>
+          </View> : <RebuttalInput
             focusRequest={focusRequest}
             takeId={take.id}
             parentId={replyTo?.comment.id}
@@ -641,69 +587,19 @@ export default function TakeDetailScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  archive: { padding: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 4 },
-  archiveTitle: { fontSize: 12, fontWeight: '700' },
-  archiveBody: { fontSize: 12, lineHeight: 18 },
-  root: { flex: 1 },
-  fill: { flex: 1 },
-  content: { paddingHorizontal: layout.screenX, paddingBottom: space.md },
-  stickyTop: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: layout.screenX, zIndex: 10 },
-  headerContent: { gap: space.sm, paddingBottom: space.sm },
-  threadItem: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  pagingFooter: { paddingVertical: space.md, alignItems: 'center', gap: 10 },
-  pageButton: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16 },
-  missing: { paddingHorizontal: space.lg },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 44,
-  },
-  iconHit: {
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  hood: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  textStage: { gap: space.sm, paddingTop: space.xs },
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  authorText: { flex: 1, gap: 1 },
-  authorName: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
-  authorMeta: { ...typeScale.meta, fontSize: 12 },
-  takeShort: {
-    fontSize: 22,
-    lineHeight: 29,
-    fontWeight: '800',
-    letterSpacing: -0.9,
-    paddingVertical: 4,
-  },
-  takeLong: {
-    fontSize: 20,
-    lineHeight: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  threadHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 12, paddingBottom: 4 },
-  threadEyebrowRow: { gap: 4 },
-  threadEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
-  threadCount: { flexShrink: 1, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
-  threadFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', paddingTop: 0 },
-  sortWrap: { alignSelf: 'flex-start' },
-  empty: {
-    ...typeScale.meta,
-    fontSize: 14,
-    paddingVertical: space.lg,
-    lineHeight: 20,
-  },
-  inputBar: {
-    paddingHorizontal: layout.screenX,
-    paddingTop: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
+  root: { flex: 1 }, fill: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingBottom: 16, width: '100%', maxWidth: arena.measure, alignSelf: 'center' },
+  stickyTop: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, zIndex: 10 },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, gap: 4 },
+  iconHit: { minWidth: arena.hit, minHeight: arena.hit, justifyContent: 'center', alignItems: 'center' },
+  headerContent: { gap: 0 },
+  threadItem: { paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth },
+  perspective: { borderBottomWidth: StyleSheet.hairlineWidth },
+  perspectiveToggle: { minHeight: arena.hit, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  pagingFooter: { paddingVertical: 16, alignItems: 'center', gap: 10 },
+  pageButton: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, minHeight: arena.hit },
+  missing: { paddingHorizontal: 20 },
+  empty: { paddingVertical: 24, gap: 6 },
+  inputBar: { paddingHorizontal: 16, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  archiveBar: { paddingVertical: 6, gap: 2 },
 });

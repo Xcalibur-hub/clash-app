@@ -6,7 +6,8 @@ const hooks={...React,useState(v){const i=index++;if(!(i in cells))cells[i]=v;re
 const RN={View:'View',Text:'Text',TextInput:'Input',Pressable:'Button',Image:'Image',ActivityIndicator:'Spinner',Modal:'Modal',FlatList:'List',StyleSheet:{create:x=>x,absoluteFill:{}},useWindowDimensions:()=>({width:360,height:800})};
 const state={viewer:{id:'profile-a',name:'A',tint:'#888'},takes:[],upvotedCommentIds:[],reactedTakeIds:[]};
 const original=Module._load;Module._load=function(r,parent){const file=parent?.filename.replaceAll('\\','/')??'';const own=!file.includes('node_modules')&&file.includes('/Clash/');
- if(own&&r==='react')return hooks;if(r==='react-native')return RN;
+ if(own&&r==='react')return hooks;if(r==='react-native')return {...RN,Platform:{OS:'android',select:choices=>choices.android??choices.default}};
+ if(r==='react-native-reanimated')return{__esModule:true,default:{View:'View'},useReducedMotion:()=>true};
  if(r==='react-native-safe-area-context')return{useSafeAreaInsets:()=>({top:0,bottom:0})};
  if(own&&r.endsWith('/AuthProvider'))return{useAuth:()=>({user:uid?{id:uid}:null})};
  if(own&&r.endsWith('/useRequireAuth'))return{useRequireAuth:()=>()=>Boolean(uid)};

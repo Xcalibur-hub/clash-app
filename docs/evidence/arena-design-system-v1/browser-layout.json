@@ -1,0 +1,1077 @@
+[
+  {
+    "filename": "dark-active-320-keyboard.html",
+    "preview_label": "UI PREVIEW ONLY · dark · active · 320 dp · simulated IME · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Challenge history",
+        "width": 185.203125,
+        "height": 44
+      },
+      {
+        "label": "Challenge",
+        "width": 98.796875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 288,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Challenge with this rebuttal",
+        "width": 89.734375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Attach photo",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Attach video",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Attach GIF",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Send",
+        "width": 55.203125,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "dark-active-320.html",
+    "preview_label": "UI PREVIEW ONLY · dark · active · 320 dp · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Challenge history",
+        "width": 185.203125,
+        "height": 44
+      },
+      {
+        "label": "Challenge",
+        "width": 98.796875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 288,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Challenge with this rebuttal",
+        "width": 89.734375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Show reply attachments",
+        "width": 44,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "dark-active-360.html",
+    "preview_label": "UI PREVIEW ONLY · dark · active · 360 dp · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Challenge history",
+        "width": 225.203125,
+        "height": 44
+      },
+      {
+        "label": "Challenge",
+        "width": 98.796875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 328,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Challenge with this rebuttal",
+        "width": 89.734375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Show reply attachments",
+        "width": 44,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "dark-archived-320.html",
+    "preview_label": "UI PREVIEW ONLY · dark · archived · 320 dp · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 288,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Replies are closed",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Replies are closed",
+        "width": 49.609375,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "dark-archived-360.html",
+    "preview_label": "UI PREVIEW ONLY · dark · archived · 360 dp · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 328,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Replies are closed",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Replies are closed",
+        "width": 49.609375,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "light-active-320-fontscale.html",
+    "preview_label": "UI PREVIEW ONLY · light · active · 320 dp · 140% text · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 48.578125,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 86.359375,
+        "height": 44
+      },
+      {
+        "label": "Challenge history",
+        "width": 158.3125,
+        "height": 52.796875
+      },
+      {
+        "label": "Challenge",
+        "width": 125.6875,
+        "height": 52
+      },
+      {
+        "label": "Your perspective",
+        "width": 288,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 66.640625,
+        "height": 46.59375
+      },
+      {
+        "label": "New",
+        "width": 67.25,
+        "height": 46.59375
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 62.21875,
+        "height": 44
+      },
+      {
+        "label": "Challenge with this rebuttal",
+        "width": 108.953125,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 143.40625,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 62.21875,
+        "height": 44
+      },
+      {
+        "label": "Show reply attachments",
+        "width": 44,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "light-active-320.html",
+    "preview_label": "UI PREVIEW ONLY · light · active · 320 dp · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Challenge history",
+        "width": 185.203125,
+        "height": 44
+      },
+      {
+        "label": "Challenge",
+        "width": 98.796875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 288,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Challenge with this rebuttal",
+        "width": 89.734375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Show reply attachments",
+        "width": 44,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "light-active-360.html",
+    "preview_label": "UI PREVIEW ONLY · light · active · 360 dp · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Challenge history",
+        "width": 225.203125,
+        "height": 44
+      },
+      {
+        "label": "Challenge",
+        "width": 98.796875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 328,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Challenge with this rebuttal",
+        "width": 89.734375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Reply",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Show reply attachments",
+        "width": 44,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "light-archived-320.html",
+    "preview_label": "UI PREVIEW ONLY · light · archived · 320 dp · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 288,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Replies are closed",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Replies are closed",
+        "width": 49.609375,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "filename": "light-archived-360.html",
+    "preview_label": "UI PREVIEW ONLY · light · archived · 360 dp · not native",
+    "after_horizontal_overflow": false,
+    "buttons": [
+      {
+        "label": "Back",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "React to this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Jump to replies",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Share this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Save this take",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "View Clash history",
+        "width": 73.421875,
+        "height": 44
+      },
+      {
+        "label": "Your perspective",
+        "width": 328,
+        "height": 44
+      },
+      {
+        "label": "Best",
+        "width": 55.609375,
+        "height": 44
+      },
+      {
+        "label": "New",
+        "width": 56.03125,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 8 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Replies are closed",
+        "width": 49.609375,
+        "height": 44
+      },
+      {
+        "label": "Collapse replies",
+        "width": 102.5,
+        "height": 44
+      },
+      {
+        "label": "More actions",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Upvote reply, 3 upvotes",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "label": "Replies are closed",
+        "width": 49.609375,
+        "height": 44
+      }
+    ],
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  }
+]
