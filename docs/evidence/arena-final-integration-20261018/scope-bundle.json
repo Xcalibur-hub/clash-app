@@ -1,0 +1,11 @@
+{
+  "base": "7b32d3f0bf9a1d90cc5c1fef6cdaebbd58174267",
+  "implementation": "d06845c95e480c3d0936d7599453f2deef452a4a",
+  "source_pr_blobs_verified": 20,
+  "protected_paths_unchanged": true,
+  "bundle": {
+    "bytes": 10584597,
+    "sha256": "ec3595828e5bc7ed8d67448d063b04b03c1591c6bad3711a1c654a267aac0ed3",
+    "all_integrated_markers": true
+  }
+}
