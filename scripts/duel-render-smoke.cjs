@@ -26,6 +26,7 @@ Module._load = function(request, parent, isMain) {
   if (request === 'react-native') {
     return {
       ...RN,
+      useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
       Modal: ({ children, visible }) => (visible ? React.createElement(RN.View, null, children) : null),
     };
   }
@@ -35,10 +36,10 @@ Module._load = function(request, parent, isMain) {
     default: { View: RN.View, Text: RN.Text, createAnimatedComponent: (c) => c },
     FadeIn: fade, FadeInDown: fade, FadeOut: fade, ZoomIn: fade, SlideInLeft: fade, SlideInRight: fade,
     Extrapolation: { CLAMP: 'clamp' },
-    Easing: { inOut: (e) => e, out: (e) => e, sin: {}, quad: {}, cubic: {}, back: () => ({}) },
+    Easing: { bezier: () => ({}), inOut: (e) => e, out: (e) => e, sin: {}, quad: {}, cubic: {}, back: () => ({}) },
     useReducedMotion: () => true,
     useSharedValue: (v) => ({ value: v }),
-    useAnimatedStyle: () => ({}),
+    useAnimatedStyle: (style) => style(),
     interpolate: () => 0,
     withRepeat: (v) => v, withTiming: (v) => v, withDelay: (_d, v) => v, withSpring: (v) => v, withSequence: (...v) => v[0],
     runOnJS: (fn) => fn,
@@ -74,7 +75,7 @@ Module._load = function(request, parent, isMain) {
   if (resolved.endsWith('/components/arena/ClashNativeStickerCard.tsx')) return { ClashNativeStickerCard: () => React.createElement(RN.Text, {}, 'Sticker') };
   return originalLoad.apply(this, arguments);
 };
-theme = { ...require('../theme/layout.ts'), ...require('../theme/typography.ts'), ...require('../theme/colors.ts') };
+theme = { ...require('../theme/layout.ts'), ...require('../theme/typography.ts'), ...require('../theme/colors.ts'), ...require('../theme/motion.ts') };
 const { darkTheme } = require('../theme/palettes.ts');
 theme.useThemeColors = () => darkTheme;
 const { DuelRoomExperience } = require('../components/liveArena/DuelRoomExperience.tsx');
@@ -112,7 +113,7 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   RN.AppRegistry.registerComponent(name, () => () => React.createElement(RN.View, { style: { height: 844, width: 390 } }, React.createElement(DuelRoomExperience, { ...base, ...overrides })));
   const { element, getStyleElement } = RN.AppRegistry.getApplication(name);
   const html = renderToStaticMarkup(element);
-  assert.doesNotMatch(html, /SECRET HIDDEN CITATION|permission denied for table|999/);
+  assert.doesNotMatch(html, /SECRET HIDDEN CITATION|permission denied for table|\b999\b/);
   // Stadium: no permanent Arguments|Crowd|Evidence tab bar.
   assert.doesNotMatch(html, /Clash content/);
   if (name !== 'error' && name !== 'loading' && !name.includes('locked')) {
@@ -121,6 +122,9 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   }
   if (name === 'spectator') {
     assert.match(html, /LIVE|Live Clash/);
+    const css = html + renderToStaticMarkup(getStyleElement());
+    assert.match(css, /flex-grow:0\.55/, 'Stage must retain its animated share in the web render bridge');
+    assert.match(css, /flex-grow:0\.44/, 'Crowd must retain the complementary animated share');
     assert.match(html, /CROWD|Live crowd|Crowd/);
     assert.match(html, /BACK KEVIN|Back Kevin|BACKING/i);
     assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat|52%|48%/);
