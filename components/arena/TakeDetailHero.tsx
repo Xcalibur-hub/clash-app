@@ -46,7 +46,7 @@ export function TakeDetailHero({
   const isVideo = media.kind === 'video';
   const playUrl = media.url;
   const hood = HOOD_LABEL[take.hood] ?? take.hood;
-  const cardW = width - space.md * 2;
+  const cardW = Math.min(width - space.md * 2, 648);
   const height = heroCardHeight({ cardWidth: cardW, copyHeight });
 
   return (

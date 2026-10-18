@@ -25,7 +25,7 @@ const original = Module._load;
 Module._load = function (r, parent) {
   const own = parent && !parent.filename.includes('node_modules');
   if (own && r === 'react') return hooks;
-  if (r === 'react-native') return { View: 'View', Text: 'Text', Modal: 'Modal', FlatList: 'List', Pressable: 'Button', TextInput: 'Input', KeyboardAvoidingView: 'Keyboard', ScrollView: 'Scroll', Image: 'Image', ActivityIndicator: 'Spinner', Platform: { OS: 'android' }, StyleSheet: { create: x => x }, AppState: { currentState: 'active', addEventListener: (_, fn) => { listeners.push(fn); return { remove() {} }; } }, Share: {} };
+  if (r === 'react-native') return { View: 'View', Text: 'Text', Modal: 'Modal', FlatList: 'List', Pressable: 'Button', TextInput: 'Input', KeyboardAvoidingView: 'Keyboard', ScrollView: 'Scroll', Image: 'Image', ActivityIndicator: 'Spinner', Platform: { OS: 'android', select: choices => choices.android ?? choices.default }, StyleSheet: { create: x => x }, AppState: { currentState: 'active', addEventListener: (_, fn) => { listeners.push(fn); return { remove() {} }; } }, Share: {} };
   if (r === 'react-native-reanimated') return { __esModule: true, default: { View: 'View' }, useReducedMotion: () => true };
   if (r === 'expo-router') return { useRouter: () => router, useFocusEffect: fn => hooks.useEffect(fn, [fn]), useLocalSearchParams: () => ({ takeId: 'take' }) };
   if (r === 'expo-constants') return { expoConfig: { extra: { appVariant: 'development' } } };
@@ -159,4 +159,24 @@ test('mapper retains already-public server eligibility metadata', () => {
   reset(); const { toTake } = require('../services/arenaMappers.ts');
   const mapped = toTake({ id: 'take', author_id: 'owner', text: 'Fixture', hood: 'techtakes', created_at: new Date(0).toISOString(), expires_at: new Date(9e6).toISOString(), status: 'expired', is_runtime_fixture: true, media_kind: null, clashes_count: 0, reactions_count: 0 });
   assert.equal(mapped.status, 'expired'); assert.equal(mapped.isRuntimeFixture, true);
+});
+
+test('compact summary exposes one creation action and preserves accepted Room links after expansion', async () => {
+  reset(); history = [{ ...challenge, status: 'ACCEPTED', roomId: 'room', clashId: 'clash', resolvedAt: new Date(2000).toISOString() }];
+  const props = { take: base, openComposer: false, compact: true };
+  render(TakeChallenges, props); await flush(); let tree = render(TakeChallenges, props);
+  assert.equal(nodes(tree).filter(n => n.props?.onPress && text(n).trim() === 'Challenge').length, 1);
+  assert.equal(nodes(tree).filter(n => n.props?.onPress && text(n).trim() === 'OPEN DUEL').length, 0);
+  button(tree, 'Challenge history').props.onPress(); tree = render(TakeChallenges, props);
+  button(tree, 'OPEN DUEL').props.onPress(); assert.deepEqual(routes, ['/arena/room/room']);
+});
+
+test('compact archived history cannot open creation but still expands accepted history', async () => {
+  reset(); history = [{ ...challenge, status: 'ACCEPTED', roomId: 'room', clashId: 'clash', resolvedAt: new Date(2000).toISOString() }];
+  const props = { take: { ...base, status: 'expired' }, openComposer: true, readOnly: true, compact: true };
+  render(TakeChallenges, props); await flush(); let tree = render(TakeChallenges, props);
+  assert.equal(node(tree, 'Modal').props.visible, false);
+  button(tree, 'Challenge history').props.onPress(); tree = render(TakeChallenges, props);
+  button(tree, 'OPEN DUEL').props.onPress(); assert.deepEqual(routes, ['/arena/room/room']);
+  assert.equal(node(tree, 'Modal').props.visible, false);
 });

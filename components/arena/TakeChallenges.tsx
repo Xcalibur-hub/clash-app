@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppState, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useReducedMotion } from 'react-native-reanimated';
+import Animated, { LinearTransition, useReducedMotion } from 'react-native-reanimated';
 import { useClock } from '../../hooks/useClock';
 import { useOperationScope } from '../../hooks/useOperationScope';
 import { takeChallengeIneligibility, challengeIneligibilityMessage, type ChallengeIneligibility } from '../../utils/takeChallengeEligibility';
@@ -17,6 +17,7 @@ import { press as hapticPress } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
 import { FullScreenChallengeDeck } from './FullScreenChallengeDeck';
 import { ClashConfirmedOverlay, type ClashConfirmedFighter } from './ClashConfirmedOverlay';
+import { arena, arenaColors } from '../../theme/arena';
 
 export function ChallengeTakeButton({ takeId, take }: { takeId: string; take?: Take }): React.JSX.Element {
   const router = useRouter();
@@ -54,8 +55,10 @@ export function ChallengeTakeButton({ takeId, take }: { takeId: string; take?: T
   );
 }
 
-export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRefreshed }: { take: Take; openComposer: boolean; readOnly?: boolean; onTakeRefreshed?: (take: Take | null) => void }): React.JSX.Element | null {
+export function TakeChallenges({ take, openComposer, readOnly = false, compact = false, onTakeRefreshed }: { take: Take; openComposer: boolean; readOnly?: boolean; compact?: boolean; onTakeRefreshed?: (take: Take | null) => void }): React.JSX.Element | null {
   const t = useThemeColors();
+  const colors = arenaColors(t);
+  const [detailsExpanded, setDetailsExpanded] = React.useState(false);
   const router = useRouter();
   const requireAuth = useRequireAuth();
   const reduced = useReducedMotion();
@@ -142,6 +145,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRef
     // timeout when viewer hydration or take remount races the confirmation beat.
     setDeckOpen(false);
   }, [take.id, viewerId, user?.id]);
+  React.useEffect(() => { setDetailsExpanded(false); }, [scope]);
 
   const refreshSource = (fresh: Take | null): void => {
     if (fresh) setCheckedTake({ scope, take: fresh });
@@ -317,6 +321,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRef
     <Pressable
       key={label}
       accessibilityRole="button"
+      accessibilityLabel={label}
       disabled={disabled}
       onPress={action}
       style={[styles.button, { opacity: disabled ? 0.5 : 1 }]}
@@ -328,8 +333,18 @@ export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRef
   if (!signedIn || (readOnly && loaded && items.length === 0)) return null;
 
   return (
-    <View style={[styles.section, { borderColor: t.border }]}>
-      {reason ? <Text accessibilityRole="alert" style={[styles.body, { color: t.textMuted }]}>{challengeIneligibilityMessage(reason)}</Text> : null}
+    <Animated.View layout={reduced ? undefined : LinearTransition.duration(arena.motion.duration)} style={[styles.section, compact && styles.compactSection, { borderColor: t.border }]}>
+      {compact ? <View style={styles.summary}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Challenge history" accessibilityState={{ expanded: detailsExpanded }}
+          onPress={() => setDetailsExpanded(value => !value)} style={styles.summaryToggle}>
+          <Text style={[arena.type.label, { color: colors.ink }]}>{closed ? 'Challenge history' : 'Challenges'}</Text>
+          <Text style={[arena.type.meta, { color: colors.muted }]}>{error ? 'Couldn’t refresh' : !loaded ? 'Loading…' : items.length ? 'View available challenges' : 'No challenges yet'} {detailsExpanded ? '−' : '+'}</Text>
+        </Pressable>
+        {!isAuthor && !closed && !ownPending ? button(checking ? 'Checking…' : 'Challenge', () => void openChallenge(), checking || busy || !loaded) : null}
+        {isAuthor && !closed && pending.length > 0 ? button('Review', () => setDeckOpen(true), busy || !loaded) : null}
+      </View> : null}
+      {reason ? <Text accessibilityRole="alert" style={[styles.body, compact && arena.type.meta, { color: colors.muted }]}>{challengeIneligibilityMessage(reason)}</Text> : null}
+      {compact && error ? <Text accessibilityRole="alert" style={[arena.type.meta, { color: colors.secondary }]}>{error}</Text> : null}
       {rejection && !takeChallengeIneligibility(source, now) && !readOnly && !isAuthor
         ? button('Check challenge eligibility', () => void openChallenge(), checking || busy) : null}
       <ClashConfirmedOverlay
@@ -349,6 +364,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRef
         onPass={onPass}
       />
 
+      {!compact || detailsExpanded ? <>
       {isAuthor ? (
         <>
           <Text style={[styles.heading, { color: t.textPrimary }]}>{closed ? 'Challenge history' : 'Incoming Challenges'}</Text>
@@ -399,7 +415,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRef
       ) : (
         <>
           <Text style={[styles.label, { color: t.textPrimary }]}>Your Challenges</Text>
-          {!closed && !ownPending && button(checking ? 'Checking…' : '⚔ CHALLENGE', () => void openChallenge(), busy || checking || !loaded)}
+          {!compact && !closed && !ownPending && button(checking ? 'Checking…' : '⚔ CHALLENGE', () => void openChallenge(), busy || checking || !loaded)}
           {error ? (
             <Text accessibilityRole="alert" style={{ color: t.textSecondary }}>
               {error}
@@ -450,6 +466,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRef
               });
           })
         : null}
+      </> : null}
 
       <Modal
         visible={composer && !closed}
@@ -499,11 +516,14 @@ export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRef
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  compactSection: { gap: 6, paddingVertical: 6, borderTopWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  summary: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
+  summaryToggle: { flex: 1, minWidth: 150, minHeight: arena.hit, justifyContent: 'center', gap: 1 },
   section: { gap: space.sm, paddingVertical: space.md, borderTopWidth: StyleSheet.hairlineWidth },
   reviewBlock: { gap: space.sm, paddingBottom: space.sm },
   reviewBtn: {
@@ -536,10 +556,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   label: { ...typeScale.label },
-  body: { ...typeScale.body },
+  body: { ...arena.type.body },
   actions: { flexDirection: 'row', gap: space.md },
   button: { paddingVertical: space.sm, minHeight: 44, justifyContent: 'center', paddingHorizontal: space.md },
-  backdrop: { flex: 1, justifyContent: 'center', padding: space.lg, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { flexGrow: 0, maxHeight: '85%', borderRadius: 12 },
-  input: { minHeight: 120, borderWidth: 1, padding: space.sm, textAlignVertical: 'top' },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: { ...arena.sheet, flexGrow: 0, maxHeight: '85%' },
+  input: { ...arena.input, ...arena.type.body, minHeight: 112, padding: space.sm, textAlignVertical: 'top' },
 });

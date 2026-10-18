@@ -1,0 +1,24 @@
+{
+  "base": "8b42768ff62510a74de1a36c3ebb5bbf16622161",
+  "branch": "design/arena-design-system-v1",
+  "protected_paths_unchanged": [
+    "supabase",
+    "services",
+    "hooks",
+    "store",
+    "components/liveArena",
+    "components/arena/groups",
+    "components/arena/ArenaCommunity.tsx",
+    "app/(tabs)",
+    "app/arena/room",
+    "app/arena/crews",
+    "app/clash",
+    "theme/palettes.ts",
+    "theme/ThemeProvider.tsx",
+    "package.json",
+    "package-lock.json"
+  ],
+  "no_database_operations": true,
+  "no_native_settings_written": true,
+  "no_fixtures_entered_backend": true
+}
