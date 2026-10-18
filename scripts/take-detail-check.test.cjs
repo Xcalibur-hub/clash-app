@@ -29,7 +29,7 @@ Module._load = function (r, parent) {
   if (own && r === 'react') return hooks;
   if (r === 'react-native') return { FlatList: 'List', KeyboardAvoidingView: 'Keyboard', Pressable: 'Button', View: 'View', Text: 'Text', ActivityIndicator: 'Spinner', Platform: { OS: 'android' }, StyleSheet: { create: s => s }, Share: { share() {} } };
   if (r === 'expo-constants') return { expoConfig: { extra: { appVariant: 'development' } } };
-  if (r === 'expo-router') return { useRouter: () => router, useLocalSearchParams: () => ({ takeId: 'take' }) };
+  if (r === 'expo-router') return { useFocusEffect: f => hooks.useEffect(f, [f]), useRouter: () => router, useLocalSearchParams: () => ({ takeId: 'take' }) };
   if (r === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 24, bottom: 24 }) };
   if (own && r.endsWith('/AuthProvider')) return { useAuth: () => ({ user: { id: uid }, signedIn: true }) };
   if (own && r === '../../store') return { useClash: () => ({ state, dispatch }), selectAuthor: () => author, selectCommentsForTake: () => [], buildCommentTree: () => [], selectIsSaved: () => false, selectHasReacted: () => false };
@@ -51,7 +51,7 @@ const Screen = require('../app/take/[takeId].tsx').default;
 const nodes = v => !v || typeof v !== 'object' ? [] : [v, ...React.Children.toArray(v.props?.children).flatMap(nodes), ...nodes(v.props?.ListHeaderComponent), ...nodes(v.props?.ListFooterComponent), ...nodes(v.props?.ListEmptyComponent)];
 const render = () => { index = 0; const tree = Screen(); const run = effects; effects = []; run.forEach(f => f()); return tree; };
 const find = (tree, type) => nodes(tree).find(n => n.type === type);
-function reset() { for (const c of cells) c?.cleanup?.(); cells = []; effects = []; uid = 'a'; now = 100; request = 0; events = []; canBack = true; state.takes = [take]; }
+function reset() { for (const c of cells) c?.cleanup?.(); cells = []; effects = []; uid = 'a'; now = 100; request = 0; events = []; canBack = true; pendingFetch = new Promise(() => {}); state.takes = [take]; }
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
 test('active Take retains voting, composer and challenge contracts; reply action focuses composer', () => {

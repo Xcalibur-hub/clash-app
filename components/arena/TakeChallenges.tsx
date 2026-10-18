@@ -2,10 +2,13 @@ import React from 'react';
 import { AppState, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useReducedMotion } from 'react-native-reanimated';
+import { useClock } from '../../hooks/useClock';
+import { useOperationScope } from '../../hooks/useOperationScope';
+import { takeChallengeIneligibility, challengeIneligibilityMessage, type ChallengeIneligibility } from '../../utils/takeChallengeEligibility';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuth } from '../../store/AuthProvider';
-import { selectAuthor, useClash, type Take } from '../../store';
-import { createArenaChallenge, listArenaChallenges, resolveArenaChallenge } from '../../services/arenaChallengeService';
+import { selectAuthor, showNotice, useClash, type Take } from '../../store';
+import { createArenaChallenge, listArenaChallenges, resolveArenaChallenge, fetchEligibleChallengeTake, ChallengeEligibilityError } from '../../services/arenaChallengeService';
 import { errorText } from '../../services/supabaseClient';
 import { linkedRoomAfterAccept } from '../../utils/arenaAcceptNavigation';
 import { challengeCanAct, validCounterPosition, type ArenaChallenge } from '../../utils/arenaChallengePayload';
@@ -15,34 +18,60 @@ import { PressableScale } from '../shared/PressableScale';
 import { FullScreenChallengeDeck } from './FullScreenChallengeDeck';
 import { ClashConfirmedOverlay, type ClashConfirmedFighter } from './ClashConfirmedOverlay';
 
-export function ChallengeTakeButton({ takeId }: { takeId: string }): React.JSX.Element {
+export function ChallengeTakeButton({ takeId, take }: { takeId: string; take?: Take }): React.JSX.Element {
   const router = useRouter();
   const requireAuth = useRequireAuth();
+  const { user } = useAuth();
+  const { state, dispatch } = useClash();
+  const isCurrent = useOperationScope(`${user?.id ?? 'guest'}:${takeId}`);
+  const now = useClock(1000);
   const t = useThemeColors();
+  const [checking, setChecking] = React.useState(false);
+  const busy = React.useRef(false);
+  React.useEffect(() => { busy.current = false; setChecking(false); }, [user?.id, takeId]);
+  const source = take ?? state.takes.find(item => item.id === takeId);
+  const reason = source ? takeChallengeIneligibility(source, now) : null;
   return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel="Challenge this take"
-      onPress={() => {
-        if (!requireAuth()) return;
-        hapticPress();
-        router.push({ pathname: '/take/[takeId]', params: { takeId, challenge: '1' } });
-      }}
-      style={styles.button}
-    >
-      <Text style={[styles.label, { color: t.textPrimary }]}>{'⚔ Challenge'}</Text>
+    <PressableScale accessibilityRole="button" accessibilityLabel="Challenge this take"
+      disabled={checking || Boolean(reason)} accessibilityState={{ disabled: checking || Boolean(reason), busy: checking }}
+      onPress={async () => {
+        if (busy.current || (source && takeChallengeIneligibility(source)) || !requireAuth()) return;
+        busy.current = true; setChecking(true);
+        try {
+          const fresh = await fetchEligibleChallengeTake(takeId);
+          if (!isCurrent()) return;
+          if (fresh.authorId === state.viewer.id) return;
+          hapticPress();
+          router.push({ pathname: '/take/[takeId]', params: { takeId, challenge: '1' } });
+        } catch (error) {
+          if (isCurrent()) dispatch(showNotice(errorText(error)));
+        } finally { if (isCurrent()) { busy.current = false; setChecking(false); } }
+      }} style={styles.button}>
+      <Text style={[styles.label, { color: reason ? t.textMuted : t.textPrimary }]}>
+        {reason === 'archived' ? 'Archived' : reason ? 'Challenges closed' : checking ? 'Checking…' : '⚔ Challenge'}
+      </Text>
     </PressableScale>
   );
 }
 
-export function TakeChallenges({ take, openComposer, readOnly = false }: { take: Take; openComposer: boolean; readOnly?: boolean }): React.JSX.Element | null {
+export function TakeChallenges({ take, openComposer, readOnly = false, onTakeRefreshed }: { take: Take; openComposer: boolean; readOnly?: boolean; onTakeRefreshed?: (take: Take | null) => void }): React.JSX.Element | null {
   const t = useThemeColors();
   const router = useRouter();
   const requireAuth = useRequireAuth();
   const reduced = useReducedMotion();
-  const { signedIn } = useAuth();
+  const { signedIn, user } = useAuth();
   const { state } = useClash();
   const viewerId = state.viewer.id;
+  const scope = `${user?.id ?? 'guest'}:${take.id}`;
+  const isCurrent = useOperationScope(scope);
+  const now = useClock(1000);
+  const [checkedTake, setCheckedTake] = React.useState<{ scope: string; take: Take } | null>(null);
+  const [rejection, setRejection] = React.useState<ChallengeIneligibility | null>(null);
+  const [checking, setChecking] = React.useState(false);
+  const checkingRef = React.useRef(false);
+  const source = checkedTake?.scope === scope ? checkedTake.take : take;
+  const reason = takeChallengeIneligibility(take, now) ?? takeChallengeIneligibility(source, now) ?? rejection;
+  const closed = readOnly || Boolean(reason);
   const isAuthor = viewerId === take.authorId;
   const takeAuthor = selectAuthor(state, take.authorId);
   const [items, setItems] = React.useState<ArenaChallenge[]>([]);
@@ -106,18 +135,40 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
   React.useEffect(() => {
     setItems([]);
     setLoaded(false);
+    setCheckedTake(null); setRejection(null); setChecking(false); checkingRef.current = false;
     setComposer(false);
     setText('');
     // Do not clear `confirmed` here: resetting it cancels the accept→Room navigation
     // timeout when viewer hydration or take remount races the confirmation beat.
     setDeckOpen(false);
-  }, [take.id, viewerId]);
+  }, [take.id, viewerId, user?.id]);
 
+  const refreshSource = (fresh: Take | null): void => {
+    if (fresh) setCheckedTake({ scope, take: fresh });
+    onTakeRefreshed?.(fresh);
+  };
+  const handleEligibilityError = (error: unknown): void => {
+    if (error instanceof ChallengeEligibilityError) {
+      refreshSource(error.take); setRejection(error.reason); setComposer(false); setDeckOpen(false);
+    }
+    setError(errorText(error));
+  };
+  const openChallenge = async (): Promise<void> => {
+    if (checkingRef.current || readOnly || takeChallengeIneligibility(take) || takeChallengeIneligibility(source) || isAuthor || !requireAuth()) return;
+    checkingRef.current = true; setChecking(true); setError(null);
+    try {
+      const fresh = await fetchEligibleChallengeTake(take.id);
+      if (!isCurrent()) return;
+      refreshSource(fresh); setRejection(null);
+      if (fresh.authorId !== viewerId) setComposer(true);
+    } catch (error) { if (isCurrent()) handleEligibilityError(error); }
+    finally { if (isCurrent()) { checkingRef.current = false; setChecking(false); } }
+  };
   React.useEffect(() => {
-    if (openComposer && !isAuthor && signedIn && !readOnly) setComposer(true);
+    if (openComposer && !isAuthor && signedIn && !closed) void openChallenge();
   }, [openComposer, isAuthor, signedIn, take.id, readOnly]);
 
-  React.useEffect(() => { if (readOnly) { setComposer(false); setDeckOpen(false); } }, [readOnly]);
+  React.useEffect(() => { if (closed) { setComposer(false); setDeckOpen(false); } }, [closed]);
 
   React.useEffect(() => {
     if (!confirmed) return undefined;
@@ -137,8 +188,8 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
     [items],
   );
   const history = React.useMemo(
-    () => items.filter((ch) => readOnly || !challengeCanAct(ch)),
-    [items, readOnly],
+    () => items.filter((ch) => closed || !challengeCanAct(ch)),
+    [items, closed],
   );
 
   const removeLocal = (id: string): void => {
@@ -147,6 +198,8 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
 
   const onAccept = async (ch: ArenaChallenge): Promise<void> => {
     if (working.current || !requireAuth()) throw new Error('Busy');
+    const reasonNow = takeChallengeIneligibility(take) ?? takeChallengeIneligibility(source);
+    if (readOnly || reasonNow) { setRejection(reasonNow ?? 'unavailable'); setDeckOpen(false); throw new Error(challengeIneligibilityMessage(reasonNow ?? 'unavailable')); }
     working.current = true;
     generation.current++;
     setBusy(true);
@@ -244,11 +297,19 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
         setError(`Challenge ${result.status.toLowerCase()}.`);
       }
     } catch (e) {
-      setError(errorText(e));
+      if (isCurrent()) handleEligibilityError(e);
     } finally {
       working.current = false;
       setBusy(false);
     }
+  };
+
+  const sendChallenge = (): void => {
+    const currentReason = takeChallengeIneligibility(take) ?? takeChallengeIneligibility(source);
+    if (readOnly || currentReason) {
+      setRejection(currentReason ?? 'unavailable'); setComposer(false); return;
+    }
+    void run(() => createArenaChallenge(take.id, text));
   };
 
   const ownPending = items.some((ch) => ch.challengerId === viewerId && challengeCanAct(ch));
@@ -268,6 +329,9 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
 
   return (
     <View style={[styles.section, { borderColor: t.border }]}>
+      {reason ? <Text accessibilityRole="alert" style={[styles.body, { color: t.textMuted }]}>{challengeIneligibilityMessage(reason)}</Text> : null}
+      {rejection && !takeChallengeIneligibility(source, now) && !readOnly && !isAuthor
+        ? button('Check challenge eligibility', () => void openChallenge(), checking || busy) : null}
       <ClashConfirmedOverlay
         visible={Boolean(confirmed)}
         fighterA={confirmed?.fighterA ?? { name: '', handle: '' }}
@@ -275,7 +339,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
       />
 
       <FullScreenChallengeDeck
-        visible={deckOpen && !confirmed && !readOnly}
+        visible={deckOpen && !confirmed && !closed}
         challenges={pending}
         takeText={take.text}
         busy={busy}
@@ -287,10 +351,10 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
 
       {isAuthor ? (
         <>
-          <Text style={[styles.heading, { color: t.textPrimary }]}>{readOnly ? 'Challenge history' : 'Incoming Challenges'}</Text>
+          <Text style={[styles.heading, { color: t.textPrimary }]}>{closed ? 'Challenge history' : 'Incoming Challenges'}</Text>
           {!loaded ? (
             button('Reload Challenges', () => void load())
-          ) : pending.length > 0 && !readOnly ? (
+          ) : pending.length > 0 && !closed ? (
             <View style={styles.reviewBlock}>
               <Text style={[styles.body, { color: t.textSecondary, paddingHorizontal: space.md }]}>
                 {pending.length} pending Challenge{pending.length === 1 ? '' : 's'} waiting for you.
@@ -307,7 +371,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
                 <Text style={[styles.reviewLabel, { color: t.textPrimary }]}>Review Challenges</Text>
               </PressableScale>
             </View>
-          ) : !readOnly ? (
+          ) : !closed ? (
             <Text style={[styles.body, { color: t.textMuted, paddingHorizontal: space.md }]}>
               No pending Challenges.
             </Text>
@@ -335,7 +399,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
       ) : (
         <>
           <Text style={[styles.label, { color: t.textPrimary }]}>Your Challenges</Text>
-          {!readOnly && !ownPending && button('⚔ CHALLENGE', () => setComposer(true), busy || !loaded)}
+          {!closed && !ownPending && button(checking ? 'Checking…' : '⚔ CHALLENGE', () => void openChallenge(), busy || checking || !loaded)}
           {error ? (
             <Text accessibilityRole="alert" style={{ color: t.textSecondary }}>
               {error}
@@ -388,7 +452,7 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
         : null}
 
       <Modal
-        visible={composer}
+        visible={composer && !closed}
         transparent
         animationType="none"
         onRequestClose={() => {
@@ -428,8 +492,8 @@ export function TakeChallenges({ take, openComposer, readOnly = false }: { take:
             ) : null}
             {button(
               busy ? 'Sending…' : 'SEND CHALLENGE',
-              () => void run(() => createArenaChallenge(take.id, text)),
-              busy || !validCounterPosition(text) || ownPending,
+              sendChallenge,
+              busy || checking || closed || !validCounterPosition(text) || ownPending,
             )}
             {button('Close', () => setComposer(false))}
           </ScrollView>

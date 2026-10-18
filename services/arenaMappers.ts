@@ -31,7 +31,7 @@ function toMedia(row: TableRow<'takes'>): TakeMedia | undefined {
 }
 
 /** Postgres timestamps are ISO strings; the store counts milliseconds. */
-export function toTake(row: TableRow<'takes'>): Take {
+export function toTake(row: TableRow<'takes'> & { is_runtime_fixture?: boolean }): Take {
   return {
     question: questionChoices(row),
     id: row.id,
@@ -40,6 +40,8 @@ export function toTake(row: TableRow<'takes'>): Take {
     hood: row.hood,
     createdAt: Date.parse(row.created_at),
     expiresAt: Date.parse(row.expires_at),
+    status: row.status,
+    isRuntimeFixture: row.is_runtime_fixture,
     clashes: row.clashes_count,
     reactions: row.reactions_count,
     media: toMedia(row),

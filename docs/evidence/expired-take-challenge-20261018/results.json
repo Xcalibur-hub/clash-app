@@ -1,0 +1,50 @@
+{
+  "typecheck": {
+    "exit": 0
+  },
+  "unit": {
+    "exit": 0,
+    "tests": 500,
+    "suites": 126,
+    "failed": 0,
+    "skipped": 0
+  },
+  "challenge_regressions": {
+    "exit": 0,
+    "tests": 23
+  },
+  "navigation_and_eligibility": {
+    "exit": 0,
+    "tests": 9
+  },
+  "take_detail": {
+    "exit": 0,
+    "tests": 6
+  },
+  "arena_visual": {
+    "exit": 0,
+    "tests": 16
+  },
+  "challenge_inbox": {
+    "exit": 0,
+    "controlled_checks": 18
+  },
+  "arena_engagement": {
+    "exit": 0,
+    "controlled_checks": 8
+  },
+  "android_export": {
+    "exit": 1,
+    "result": "INTERRUPTED",
+    "cause": "C: disk exhausted; task-owned export stopped; partial output removed"
+  },
+  "expo_doctor": "NOT RUN",
+  "database_security_tests": "NOT RUN",
+  "native": {
+    "original_rejection": "REPRODUCED",
+    "candidate_archive_and_history": "PASS",
+    "near_deadline_and_open_composer_expiry": "CONTROLLED TESTS ONLY"
+  },
+  "normal_metro_preserved": 8081,
+  "task_metro_8083_stopped": true
+}

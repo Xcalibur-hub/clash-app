@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import Constants from 'expo-constants';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentBranch } from '../../components/arena/CommentThread';
 import { PostActionsSheet } from '../../components/arena/PostActionsSheet';
@@ -36,6 +36,7 @@ import { toggleUpvote, fetchTakeById, fetchProfilesByIds } from '../../services/
 import { fetchDiscussionPage, type DiscussionCursor } from '../../services/arenaDiscussionService';
 import { isSupabaseConfigured, isLocalSupabase } from '../../services/supabaseClient';
 import { ClashModeSheet } from '../../components/clash/ClashModeSheet';
+import { fetchEligibleChallengeTake, ChallengeEligibilityError } from '../../services/arenaChallengeService';
 import { startClash, type ClashMode } from '../../services/clashEngineService';
 import { analytics } from '../../services/analytics';
 import { logger } from '../../services/logger';
@@ -166,10 +167,11 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const [takeLoad, setTakeLoad] = React.useState<{ scope: string; status: 'loading' | 'missing' | 'error'; error?: string }>({ scope: accountScope, status: 'loading' });
   const [takeRetry, setTakeRetry] = React.useState(0);
   const [remoteContext, setRemoteContext] = React.useState<{ take: Take; author: User;scope:string } | null>(null);
-  const take = state.takes.find((item) => item.id === id) ?? (remoteContext?.scope===accountScope&&remoteContext.take.id === id ? remoteContext.take : undefined);
+  const take = takeLoad.scope === accountScope && takeLoad.status === 'missing' ? undefined :
+    (remoteContext?.scope === accountScope && remoteContext.take.id === id ? remoteContext.take : state.takes.find(item => item.id === id));
   const author = take ? selectAuthor(state, take.authorId) ?? (remoteContext?.scope === accountScope && remoteContext.author.id === take.authorId ? remoteContext.author : undefined) : undefined;
-  React.useEffect(() => {
-    if (!id || (take && author)) return;
+  useFocusEffect(React.useCallback(() => {
+    if (!id) return;
     let active = true;
     setTakeLoad({ scope: accountScope, status: 'loading' });
     void fetchTakeById(id).then(async found => {
@@ -181,7 +183,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
       else setTakeLoad({ scope: accountScope, status: 'missing' });
     }).catch(e => { if (active && isCurrent()) setTakeLoad({ scope: accountScope, status: 'error', error: errorText(e) }); });
     return () => { active = false; };
-  }, [id, take, author, dispatch,accountScope,isCurrent,takeRetry]);
+  }, [id, accountScope, isCurrent, takeRetry]));
 
   React.useEffect(() => {
     clashCommentRef.current = clashComment;
@@ -240,7 +242,16 @@ export default function TakeDetailScreen(): React.JSX.Element {
     [dispatch, requireAuth, state.upvotedCommentIds,isCurrent],
   );
 
-  const archived = take ? takeIsArchived(take.expiresAt, now) : false;
+  const refreshChallengeTake = (fresh: Take | null): void => {
+    if (!fresh) { setTakeLoad({ scope: accountScope, status: 'missing' }); return; }
+    if (author?.id === fresh.authorId) setRemoteContext({ scope: accountScope, take: fresh, author });
+  };
+  const archived = take ? take.status === 'expired' || takeIsArchived(take.expiresAt, now) : false;
+  const clashChecking = React.useRef(false);
+  React.useEffect(() => {
+    clashChecking.current = false; clashStartingRef.current = false; clashCommentRef.current = null;
+    setClashComment(null); setClashStarting(false); setClashStartError(null);
+  }, [accountScope]);
   const requestReply = (): void => {
     if (archived) { listRef.current?.scrollToEnd({ animated: true }); return; }
     setReplyTo(null); setFocusRequest(n => n + 1);
@@ -257,18 +268,26 @@ export default function TakeDetailScreen(): React.JSX.Element {
   );
 
   const clashFromComment = React.useCallback(
-    (comment: ChallengerComment): void => {
-      if (!take || archived) return;
+    async (comment: ChallengerComment): Promise<void> => {
+      if (!take || archived || clashChecking.current) return;
       if (authLoading) {
         dispatch(showNotice('Still signing in…'));
         return;
       }
       if (!requireAuth()) return;
-      hapticPress();
-      setClashStartError(null);
-      setClashComment(comment);
+      clashChecking.current = true;
+      try {
+        const fresh = await fetchEligibleChallengeTake(take.id, true);
+        if (!isCurrent()) return;
+        refreshChallengeTake(fresh);
+        hapticPress(); setClashStartError(null); setClashComment(comment);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof ChallengeEligibilityError) refreshChallengeTake(error.take);
+        dispatch(showNotice(errorText(error)));
+      } finally { if (isCurrent()) clashChecking.current = false; }
     },
-    [take, archived, authLoading, requireAuth, dispatch],
+    [take, archived, authLoading, requireAuth, dispatch, isCurrent, author, accountScope],
   );
 
   const startChosenClash = React.useCallback(
@@ -295,7 +314,11 @@ export default function TakeDetailScreen(): React.JSX.Element {
       setClashStartError(null);
 
       try {
+        const fresh = await fetchEligibleChallengeTake(take.id, true);
+        if (!isCurrent()) return;
+        refreshChallengeTake(fresh);
         const clashId = await startClash(take.id, comment.id, mode);
+        if (!isCurrent()) return;
         analytics.track('clash_started', { realm: 'arena', clash_mode: mode });
         // Close sheet only after success — unmounting Modal mid-flight was
         // swallowing navigation on Android.
@@ -307,6 +330,8 @@ export default function TakeDetailScreen(): React.JSX.Element {
           logger.warn('start_clash returned empty id', { takeId: take.id, mode });
         }
       } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof ChallengeEligibilityError) refreshChallengeTake(error.take);
         logger.warn('start_clash failed', {
           takeId: take.id,
           mode,
@@ -319,12 +344,12 @@ export default function TakeDetailScreen(): React.JSX.Element {
           router.push(`/clash/${take.id}`);
           return;
         }
-        setClashStartError(clashStartErrorMessage(error));
+        setClashStartError(error instanceof ChallengeEligibilityError ? error.message : clashStartErrorMessage(error));
         setClashStarting(false);
         clashStartingRef.current = false;
       }
     },
-    [take, router, signedIn, authLoading],
+    [take, router, signedIn, authLoading, isCurrent, author, accountScope],
   );
 
   const more = React.useCallback(
@@ -511,7 +536,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
           </View> : null}
           {take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : <MindshiftPanel takeId={take.id} />}
 
-          <TakeChallenges take={take} openComposer={challenge === '1'} readOnly={archived} />
+          <TakeChallenges take={take} openComposer={challenge === '1'} readOnly={archived} onTakeRefreshed={refreshChallengeTake} />
           <TakeActionRow
             reactions={take.reactions}
             commentCount={comments.length}
@@ -601,7 +626,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
         }}
       />
       <ClashModeSheet
-        visible={clashComment !== null}
+        visible={clashComment !== null && !archived}
         submitting={clashStarting}
         error={clashStartError}
         onClose={() => {
