@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -9,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentBranch } from '../../components/arena/CommentThread';
@@ -24,12 +26,15 @@ import { EmptyState } from '../../components/shared/EmptyState';
 import { SegmentedTabs } from '../../components/shared/SegmentedTabs';
 import { BackIcon, MoreIcon } from '../../components/shared/icons';
 import { HOOD_LABEL } from '../../data/hoods';
+import { useClock } from '../../hooks/useClock';
+import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
+import { takeIsArchived } from '../../utils/takeDetail';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useTakeReaction } from '../../hooks/useTakeReaction';
 import { useOperationScope } from '../../hooks/useOperationScope';
 import { toggleUpvote, fetchTakeById, fetchProfilesByIds } from '../../services/apiService';
 import { fetchDiscussionPage, type DiscussionCursor } from '../../services/arenaDiscussionService';
-import { isSupabaseConfigured } from '../../services/supabaseClient';
+import { isSupabaseConfigured, isLocalSupabase } from '../../services/supabaseClient';
 import { ClashModeSheet } from '../../components/clash/ClashModeSheet';
 import { startClash, type ClashMode } from '../../services/clashEngineService';
 import { analytics } from '../../services/analytics';
@@ -76,8 +81,8 @@ export interface MenuTarget {
 }
 
 /**
- * Immersive Take Detail — social story/article conversation.
- * Media opens as a large hero with copy on-plate; text Takes stay editorial.
+ * Compact Take discussion — social story/article conversation.
+ * Media stays inline; expired discussions retain readable history.
  * Backend / reply / clash logic unchanged.
  */
 export default function TakeDetailScreen(): React.JSX.Element {
@@ -93,6 +98,17 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const react = useTakeReaction();
   const theme = useThemeColors();
+  const now = useClock(1000);
+  const keyboardVisible = useKeyboardVisible();
+  const listRef = React.useRef<FlatList<CommentNode>>(null);
+  const [focusRequest, setFocusRequest] = React.useState(0);
+  const variant = Constants.expoConfig?.extra?.appVariant;
+  const localBadgeVisible = isLocalSupabase && (variant === 'development' ||
+    (variant !== 'preview' && variant !== 'production' && __DEV__));
+  const leave = (): void => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
 
   const [sort, setSort] = React.useState<CommentSort>('best');
   const [pagedRoots, setPagedRoots] = React.useState<ChallengerComment[]>([]);
@@ -147,19 +163,25 @@ export default function TakeDetailScreen(): React.JSX.Element {
   const clashCommentRef = React.useRef<ChallengerComment | null>(null);
   const clashStartingRef = React.useRef(false);
 
+  const [takeLoad, setTakeLoad] = React.useState<{ scope: string; status: 'loading' | 'missing' | 'error'; error?: string }>({ scope: accountScope, status: 'loading' });
+  const [takeRetry, setTakeRetry] = React.useState(0);
   const [remoteContext, setRemoteContext] = React.useState<{ take: Take; author: User;scope:string } | null>(null);
   const take = state.takes.find((item) => item.id === id) ?? (remoteContext?.scope===accountScope&&remoteContext.take.id === id ? remoteContext.take : undefined);
-  const author = take ? selectAuthor(state, take.authorId) ?? (remoteContext?.author.id === take.authorId ? remoteContext.author : undefined) : undefined;
+  const author = take ? selectAuthor(state, take.authorId) ?? (remoteContext?.scope === accountScope && remoteContext.author.id === take.authorId ? remoteContext.author : undefined) : undefined;
   React.useEffect(() => {
     if (!id || (take && author)) return;
     let active = true;
+    setTakeLoad({ scope: accountScope, status: 'loading' });
     void fetchTakeById(id).then(async found => {
-      if (!found) return;
+      if (!active || !isCurrent()) return;
+      if (!found) { setTakeLoad({ scope: accountScope, status: 'missing' }); return; }
       const [profile] = await fetchProfilesByIds([found.authorId]);
-      if (active && isCurrent() && profile) setRemoteContext({ take: found, author: profile,scope:accountScope });
-    }).catch(e => { if (active && isCurrent()) dispatch(showNotice(errorText(e))); });
+      if (!active || !isCurrent()) return;
+      if (profile) setRemoteContext({ take: found, author: profile, scope: accountScope });
+      else setTakeLoad({ scope: accountScope, status: 'missing' });
+    }).catch(e => { if (active && isCurrent()) setTakeLoad({ scope: accountScope, status: 'error', error: errorText(e) }); });
     return () => { active = false; };
-  }, [id, take, author, dispatch,accountScope,isCurrent]);
+  }, [id, take, author, dispatch,accountScope,isCurrent,takeRetry]);
 
   React.useEffect(() => {
     clashCommentRef.current = clashComment;
@@ -218,17 +240,25 @@ export default function TakeDetailScreen(): React.JSX.Element {
     [dispatch, requireAuth, state.upvotedCommentIds,isCurrent],
   );
 
+  const archived = take ? takeIsArchived(take.expiresAt, now) : false;
+  const requestReply = (): void => {
+    if (archived) { listRef.current?.scrollToEnd({ animated: true }); return; }
+    setReplyTo(null); setFocusRequest(n => n + 1);
+  };
+
   const reply = React.useCallback(
     (comment: ChallengerComment): void => {
+      if (archived) return;
+      setFocusRequest(n => n + 1);
       const commentAuthor = selectAuthor(state, comment.authorId);
       setReplyTo({ comment, handle: commentAuthor?.handle ?? '' });
     },
-    [state],
+    [state, archived],
   );
 
   const clashFromComment = React.useCallback(
     (comment: ChallengerComment): void => {
-      if (!take) return;
+      if (!take || archived) return;
       if (authLoading) {
         dispatch(showNotice('Still signing in…'));
         return;
@@ -238,7 +268,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
       setClashStartError(null);
       setClashComment(comment);
     },
-    [take, authLoading, requireAuth, dispatch],
+    [take, archived, authLoading, requireAuth, dispatch],
   );
 
   const startChosenClash = React.useCallback(
@@ -258,6 +288,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
         return;
       }
       if (!take || !comment || clashStartingRef.current) return;
+      if (takeIsArchived(take.expiresAt, Date.now())) { setClashStartError('This Take is archived. New challenges are closed.'); return; }
 
       clashStartingRef.current = true;
       setClashStarting(true);
@@ -319,13 +350,19 @@ export default function TakeDetailScreen(): React.JSX.Element {
           { backgroundColor: theme.background, paddingTop: insets.top + space.md },
         ]}
       >
-        <EmptyState
-          icon={BackIcon}
-          title="This take is no longer live"
-          body="Every take expires after 24 hours."
-          actionLabel="BACK"
-          onAction={() => router.back()}
-        />
+        {takeLoad.scope !== accountScope || takeLoad.status === 'loading' ? (
+          <View style={{ gap: 16 }} accessibilityLabel="Loading Take">
+            <ActivityIndicator color={theme.textMuted} />
+            <Text style={{ color: theme.textSecondary }}>Loading discussion…</Text>
+            <Pressable accessibilityRole="button" onPress={leave}><Text style={{ color: theme.textPrimary }}>Back</Text></Pressable>
+          </View>
+        ) : (
+          <EmptyState icon={BackIcon}
+            title={takeLoad.status === 'error' ? "Couldn't load this Take" : 'Take unavailable'}
+            body={takeLoad.status === 'error' ? takeLoad.error ?? 'Please try again.' : 'It may have been removed or you may no longer have access.'}
+            actionLabel={takeLoad.status === 'error' ? 'RETRY' : 'BACK'}
+            onAction={takeLoad.status === 'error' ? () => setTakeRetry(n => n + 1) : leave} />
+        )}
       </View>
     );
   }
@@ -351,14 +388,14 @@ export default function TakeDetailScreen(): React.JSX.Element {
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         style={styles.fill}
         keyboardVerticalOffset={0}
       >
         <View style={[styles.stickyTop, { paddingTop: insets.top + space.xs, backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-          <View style={styles.topRow}>
+          <View style={[styles.topRow, localBadgeVisible && { paddingLeft: 52 }]}>
             <Pressable
-              onPress={() => router.back()}
+              onPress={leave}
               accessibilityRole="button"
               accessibilityLabel="Back"
               hitSlop={8}
@@ -388,6 +425,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
           </View>
         </View>
         <FlatList<CommentNode>
+          ref={listRef}
           key={`${take.id}:${sort}`}
           data={nodes}
           keyExtractor={(node) => node.comment.id}
@@ -400,16 +438,16 @@ export default function TakeDetailScreen(): React.JSX.Element {
           removeClippedSubviews={false}
           contentContainerStyle={[
             styles.content,
-            { paddingTop: space.md, paddingBottom: space.xl },
+            { paddingTop: 12, paddingBottom: 12 },
           ]}
           renderItem={({ item }) => (
-            <View style={[styles.threadItem, { borderLeftColor: theme.border }]}>
-              <CommentBranch node={item} serverReplies={pageReady} locallyCreated={locallyCreated} takeAuthorId={author.id}
+            <View style={[styles.threadItem, { borderBottomColor: theme.border }]}>
+              <CommentBranch node={item} serverReplies={pageReady} locallyCreated={locallyCreated} takeAuthorId={author.id} readOnly={archived}
                 onUpvote={upvote} onReply={reply}
                 onClash={clashFromComment} onMore={more} />
             </View>
           )}
-          ListFooterComponent={
+          ListFooterComponent={pageError || pageBusy || pageCursor ?
             <View style={styles.pagingFooter}>
               {pageError ? <Text style={{ color: theme.textMuted }}>{pageError}</Text> : null}
               {pageBusy ? <Text style={{ color: theme.textMuted }}>Loading conversations…</Text> : null}
@@ -424,20 +462,18 @@ export default function TakeDetailScreen(): React.JSX.Element {
                   <Text style={{ color: theme.textPrimary }}>Retry loading conversations</Text>
                 </Pressable>
               ) : null}
-            </View>
+            </View> : null
           }
-          ListEmptyComponent={pageBusy || pageError ? null :
+          ListEmptyComponent={pageBusy || pageError || (isSupabaseConfigured && !pageReady) ? null :
             <Text style={[styles.empty, { color: theme.textMuted }]}>
-              No replies yet — start the conversation.
+              {archived ? 'No replies were posted.' : 'No replies yet — add your perspective.'}
             </Text>
           }
           ListHeaderComponent={
             <View style={styles.headerContent}>
 
 
-          {hasMedia ? (
-            <TakeDetailHero take={take} author={author} isViewer={isViewerAuthor} />
-          ) : (
+          {(
             <View style={styles.textStage}>
               <View style={styles.authorRow}>
                 <Avatar name={author.name} tint={author.tint} size={34} />
@@ -455,7 +491,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
                     style={[styles.authorMeta, { color: theme.textMuted }]}
                     numberOfLines={1}
                   >
-                    {timeAgo(take.createdAt)} · {timeLeftLabel(take.expiresAt)}
+                    {timeAgo(take.createdAt)} · {archived ? 'Archived' : timeLeftLabel(take.expiresAt)}
                   </Text>
                 </View>
               </View>
@@ -468,16 +504,22 @@ export default function TakeDetailScreen(): React.JSX.Element {
             </View>
           )}
 
+          {hasMedia ? <TakeDetailHero take={take} author={author} isViewer={isViewerAuthor} compact /> : null}
+          {archived ? <View style={[styles.archive, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+            <Text style={[styles.archiveTitle, { color: theme.textPrimary }]}>Archived discussion</Text>
+            <Text style={[styles.archiveBody, { color: theme.textSecondary }]}>Replies, Take votes and new challenges are closed.</Text>
+          </View> : null}
           {take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : <MindshiftPanel takeId={take.id} />}
 
-          <TakeChallenges take={take} openComposer={challenge === '1'} />
+          <TakeChallenges take={take} openComposer={challenge === '1'} readOnly={archived} />
           <TakeActionRow
             reactions={take.reactions}
             commentCount={comments.length}
             isSaved={selectIsSaved(state, take.id)}
             hasReacted={selectHasReacted(state, take.id)}
-            onReact={() => void react(take)}
-            onComment={() => setReplyTo(null)}
+            readOnly={archived}
+            onReact={() => { if (!archived) void react(take); }}
+            onComment={requestReply}
             onClash={openClash}
             onShare={() => void Share.share({ message: `CLASH — @${author.handle}: "${take.text}"` })}
             onSave={() => {
@@ -496,14 +538,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
                 {nodes.length} {nodes.length === 1 ? 'THREAD' : 'THREADS'} LOADED
               </Text>
             </View>
-            <Text allowFontScaling style={[styles.threadTitle, { color: theme.textPrimary }]}>
-              A different point of view.
-            </Text>
-            <Text style={[styles.threadDescription, { color: theme.textSecondary }]}>
-              Read the replies or add your perspective.
-            </Text>
             <View style={styles.threadFilters}>
-              <Text style={[styles.threadSortLabel, { color: theme.textMuted }]}>SORT BY</Text>
               <View style={styles.sortWrap}>
                 <SegmentedTabs<CommentSort> value={sort} items={SORTS} onChange={setSort} label="Sort replies" compact />
               </View>
@@ -520,11 +555,12 @@ export default function TakeDetailScreen(): React.JSX.Element {
             {
               borderTopColor: theme.border,
               backgroundColor: theme.surface,
-              paddingBottom: Math.max(insets.bottom, space.sm),
+              paddingBottom: keyboardVisible ? 6 : Math.max(insets.bottom, 8),
             },
           ]}
         >
-          <RebuttalInput
+          {archived ? <Text style={[styles.archiveBody, { color: theme.textMuted, paddingVertical: 8 }]}>Archived · replies are closed</Text> : <RebuttalInput
+            focusRequest={focusRequest}
             takeId={take.id}
             parentId={replyTo?.comment.id}
             replyDepth={
@@ -545,7 +581,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
             replyingTo={replyTo?.handle}
             onDone={() => setReplyTo(null)}
             onCreated={(comment) => setLocallyCreated((items) => [...items.filter((item) => item.id !== comment.id), comment])}
-          />
+          />}
         </View>
       </KeyboardAvoidingView>
 
@@ -580,12 +616,15 @@ export default function TakeDetailScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
+  archive: { padding: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 4 },
+  archiveTitle: { fontSize: 12, fontWeight: '700' },
+  archiveBody: { fontSize: 12, lineHeight: 18 },
   root: { flex: 1 },
   fill: { flex: 1 },
   content: { paddingHorizontal: layout.screenX, paddingBottom: space.md },
   stickyTop: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: layout.screenX, zIndex: 10 },
   headerContent: { gap: space.sm, paddingBottom: space.sm },
-  threadItem: { marginBottom: 16, paddingLeft: 10, paddingVertical: 8, borderLeftWidth: 1 },
+  threadItem: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   pagingFooter: { paddingVertical: space.md, alignItems: 'center', gap: 10 },
   pageButton: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16 },
   missing: { paddingHorizontal: space.lg },
@@ -613,30 +652,24 @@ const styles = StyleSheet.create({
   authorName: { ...typeScale.label, fontWeight: '700', fontSize: 15 },
   authorMeta: { ...typeScale.meta, fontSize: 12 },
   takeShort: {
-    fontSize: 25,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 29,
     fontWeight: '800',
     letterSpacing: -0.9,
-    paddingVertical: space.sm,
+    paddingVertical: 4,
   },
   takeLong: {
-    fontSize: 21,
-    lineHeight: 29,
+    fontSize: 20,
+    lineHeight: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  threadHead: { gap: 7, paddingTop: space.md, paddingBottom: space.sm },
-  threadEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  threadAccent: { width: 10, height: 10, borderRadius: 3, transform: [{ rotate: '18deg' }] },
+  threadHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 12, paddingBottom: 4 },
+  threadEyebrowRow: { gap: 4 },
   threadEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
-  threadCount: { flexShrink: 1, marginLeft: 'auto', fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
-  threadTitle: {
-    ...typeScale.section, fontSize: 21, lineHeight: 27, fontWeight: '800', letterSpacing: -0.8,
-  },
-  threadDescription: { fontSize: 12, lineHeight: 19, fontWeight: '500' },
-  threadFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', paddingTop: 12 },
-  threadSortLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  sortWrap: { minWidth: 160, flexGrow: 1, maxWidth: 240 },
+  threadCount: { flexShrink: 1, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  threadFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', paddingTop: 0 },
+  sortWrap: { alignSelf: 'flex-start' },
   empty: {
     ...typeScale.meta,
     fontSize: 14,
@@ -645,7 +678,7 @@ const styles = StyleSheet.create({
   },
   inputBar: {
     paddingHorizontal: layout.screenX,
-    paddingTop: space.sm,
+    paddingTop: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

@@ -1,0 +1,13 @@
+{
+  "native_archive_visible": true,
+  "native_expired_reaction_disabled": true,
+  "native_expired_reply_disabled": true,
+  "native_composer_absent": true,
+  "native_new_challenge_absent": true,
+  "native_sort_preserved": true,
+  "native_back_returns_arena": true,
+  "local_badge_back_nonoverlap": true,
+  "active_composer_keyboard": "NOT TESTED",
+  "media": "NOT TESTED",
+  "light_theme": "NOT TESTED"
+}

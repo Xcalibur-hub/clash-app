@@ -22,6 +22,7 @@ const REPLY_PAGE_SIZE = 4;
 export interface CommentThreadProps {
   nodes: CommentNode[];
   takeAuthorId?: string;
+  readOnly?: boolean;
   onUpvote: (comment: ChallengerComment) => void;
   onReply: (comment: ChallengerComment) => void;
   onClash: (comment: ChallengerComment) => void;
@@ -34,6 +35,7 @@ export interface CommentThreadProps {
 export function CommentThread({
   nodes,
   takeAuthorId,
+  readOnly,
   onUpvote,
   onReply,
   onClash,
@@ -53,6 +55,7 @@ export function CommentThread({
           node={node}
           depth={0}
           takeAuthorId={takeAuthorId}
+          readOnly={readOnly}
           onUpvote={onUpvote}
           onReply={onReply}
           onClash={onClash}
@@ -81,7 +84,7 @@ export function CommentThread({
 export function CommentBranch(props: Omit<CommentThreadProps, 'nodes'> & { node: CommentNode }): React.JSX.Element {
   return <CommentItem node={props.node} depth={0} takeAuthorId={props.takeAuthorId}
     onUpvote={props.onUpvote} onReply={props.onReply}
-    onClash={props.onClash} onMore={props.onMore} serverReplies={props.serverReplies} locallyCreated={props.locallyCreated} />;
+    onClash={props.onClash} onMore={props.onMore} readOnly={props.readOnly} serverReplies={props.serverReplies} locallyCreated={props.locallyCreated} />;
 }
 
 interface CommentItemProps {
@@ -91,6 +94,7 @@ interface CommentItemProps {
   locallyCreated?: readonly ChallengerComment[];
   depth: number;
   takeAuthorId?: string;
+  readOnly?: boolean;
   onUpvote: (comment: ChallengerComment) => void;
   onReply: (comment: ChallengerComment) => void;
   onClash: (comment: ChallengerComment) => void;
@@ -99,6 +103,7 @@ interface CommentItemProps {
 
 const CommentItem = React.memo(function CommentItem({
   node,
+  readOnly = false,
   depth,
   serverReplies,
   parentHandle,
@@ -187,14 +192,14 @@ const CommentItem = React.memo(function CommentItem({
           styles.item,
           nested && styles.itemNested,
           nested && {
-            marginLeft: indent,
+            marginLeft: 0,
             backgroundColor: 'transparent',
             borderLeftColor: scheme === 'dark' ? '#A98ACC' : '#A882C4',
             borderColor: t.border,
           },
           !nested && {
             marginLeft: 0,
-            backgroundColor: scheme === 'dark' ? '#1E1A24' : '#FFF9F3',
+            backgroundColor: t.background,
           },
         ]}
       >
@@ -257,7 +262,9 @@ const CommentItem = React.memo(function CommentItem({
                 onReply(comment);
               }}
               accessibilityRole="button"
-              accessibilityLabel="Reply"
+              disabled={readOnly}
+              accessibilityState={{ disabled: readOnly }}
+              accessibilityLabel={readOnly ? "Replies are closed" : "Reply"}
               style={styles.action}
             >
               <CommentIcon size={14} color={t.textMuted} strokeWidth={2} />
@@ -265,7 +272,7 @@ const CommentItem = React.memo(function CommentItem({
                 Reply
               </Text>
             </Pressable>
-            {isViewer ? (
+            {isViewer && !readOnly ? (
               <PressableScale
                 onPress={() => {
                   hapticTap();
@@ -332,13 +339,14 @@ const CommentItem = React.memo(function CommentItem({
         : childNodes.length > 0 ? (
           <View style={[
             styles.branchChildren,
-            { marginLeft: Math.min(depth, 3) * 4 + 16, borderLeftColor: scheme === 'dark' ? '#665376' : '#D1BDD8' },
+            { marginLeft: depth < 3 ? 12 : 0, borderLeftColor: scheme === 'dark' ? '#665376' : '#D1BDD8' },
           ]}>
           {childNodes.slice(0, useRemote ? childNodes.length : visibleReplies).map((child) => (
             <CommentItem
               key={child.comment.id}
               node={child}
               depth={depth + 1}
+              readOnly={readOnly}
               takeAuthorId={takeAuthorId}
               onUpvote={onUpvote}
               onReply={onReply}
@@ -386,15 +394,15 @@ const styles = StyleSheet.create({
   item: {
     flexDirection: 'row',
     gap: space.sm,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    borderRadius: 0,
   },
   itemNested: {
     paddingHorizontal: space.sm + 2,
     paddingVertical: space.sm,
     borderWidth: 0,
-    borderLeftWidth: 3,
+    borderLeftWidth: 0,
     borderRadius: 0,
     marginTop: 2,
   },
@@ -409,15 +417,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.xs,
   },
   opText: { ...typeScale.caption, fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
-  body: { fontSize: 15, lineHeight: 23, fontWeight: '400' },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
+    gap: 12,
     flexWrap: 'wrap',
     paddingTop: 2,
   },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 30 },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
   actionText: { ...typeScale.meta, fontSize: 12 },
   collapseText: { ...typeScale.meta, fontSize: 12, fontWeight: '600' },
   clash: {
@@ -435,6 +443,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   spacer: { flex: 1 },
-  more: { padding: 2 },
+  more: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   removedNote: { ...typeScale.caption, fontSize: 10, paddingTop: space.xs },
 });

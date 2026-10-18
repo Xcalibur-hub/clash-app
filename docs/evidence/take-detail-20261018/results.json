@@ -1,0 +1,36 @@
+{
+  "typecheck": {
+    "exit_code": 0
+  },
+  "unit": {
+    "exit_code": 0,
+    "tests": 500,
+    "suites": 126,
+    "failed": 0,
+    "skipped": 0
+  },
+  "navigation": {
+    "exit_code": 0,
+    "tests": 5
+  },
+  "actual_take_screen": {
+    "exit_code": 0,
+    "tests": 6
+  },
+  "arena_engagement": {
+    "exit_code": 0,
+    "checks": 8
+  },
+  "android_export": {
+    "command": "Expo Android development JavaScript export",
+    "exit_code": 0,
+    "bytes": 10581387,
+    "sha256": "6cad17fa47e1bb1afaa9e5014f8a0618bff6bd4cd57c178c478063a75e0b304a",
+    "markers_verified": true,
+    "temporary_diagnostics_absent": true,
+    "native_build": false
+  },
+  "physical_scope": "targeted archived Take and legacy navigation only",
+  "database_tests_run": false,
+  "expo_doctor_run": false
+}
