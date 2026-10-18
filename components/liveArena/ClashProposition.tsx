@@ -20,7 +20,7 @@ export function ClashProposition({
     <Text
       accessibilityRole="header"
       selectable
-      numberOfLines={condensed ? 2 : 3}
+      numberOfLines={condensed ? 2 : undefined}
       style={[
         styles.text,
         condensed && styles.condensed,
@@ -35,11 +35,11 @@ export function ClashProposition({
 const styles = StyleSheet.create({
   text: {
     ...typeScale.title,
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '800',
+    fontSize: 18,
+    lineHeight: 25,
+    fontWeight: '600',
     letterSpacing: -0.55,
-    textAlign: 'center',
+    textAlign: 'left',
     paddingHorizontal: layout.screenX + 4,
   },
   condensed: {

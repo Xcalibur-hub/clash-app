@@ -1,0 +1,114 @@
+{
+  "bundles": [
+    {
+      "kind": "android-export",
+      "exit": 0,
+      "bytes": 10613229,
+      "sha256": "c5e8d83fa2ecc33bfa9b857efb0cc7697f61d343b21d1508d3172f25d513fc0d",
+      "demo_canary": true,
+      "demo_identity_text": true,
+      "demo_label": true
+    },
+    {
+      "kind": "production-export",
+      "exit": 0,
+      "bytes": 8119921,
+      "sha256": "034f43f667a5c97f32ee03c42b4ca7f107d2f11f26529314cb56b4aac5ceeca8",
+      "demo_canary": false,
+      "demo_identity_text": false,
+      "demo_label": false
+    }
+  ],
+  "release_source_integrity": [
+    {
+      "file": "app/(tabs)/index.tsx",
+      "release_source_match": true,
+      "sha256": "e8695abf27d7823a68e6f04a8a1a079ed6b6865ee777c3dce70642e79a2ee705"
+    },
+    {
+      "file": "components/arena/ArenaClashes.tsx",
+      "release_source_match": true,
+      "sha256": "f2d78a34df5e30295574f0b5c429f68e9a36787d2fe32156271bc723884bf23d"
+    },
+    {
+      "file": "components/arena/ArenaLiveGateway.tsx",
+      "release_source_match": true,
+      "sha256": "d023ff99fca8817eedbf2b55f4b0db4be581fa64ed72911751af24f0d7c625dd"
+    },
+    {
+      "file": "components/arena/ClashConfirmedOverlay.tsx",
+      "release_source_match": true,
+      "sha256": "88efde81748850ba4cd2c464dc94559d88a976d7d06a762c0105a8b94d0d4f67"
+    },
+    {
+      "file": "components/arena/FullScreenChallengeDeck.tsx",
+      "release_source_match": true,
+      "sha256": "d3eab7615fb2f9d6b721457034a93b5a14c57d422c0d880e8bf6d33fd905a1d1"
+    },
+    {
+      "file": "components/arena/ui/ArenaPrimitives.tsx",
+      "release_source_match": true,
+      "sha256": "f73c7e80a3e944da514b416cde2976cae8df4ae36ff471f544e4332606fefa4e"
+    },
+    {
+      "file": "components/liveArena/ClashBackingActions.tsx",
+      "release_source_match": true,
+      "sha256": "9999872407ba9cdad9e5552913af8cfcdf9559e084541a889024319b72ded9dd"
+    },
+    {
+      "file": "components/liveArena/ClashEventHeader.tsx",
+      "release_source_match": true,
+      "sha256": "c889d397e8b64f4f0d63d82ec14e1f60d63afcc80ea1824430f5383b285c91fa"
+    },
+    {
+      "file": "components/liveArena/ClashFighterRail.tsx",
+      "release_source_match": true,
+      "sha256": "5c3b79b621b097295e23539cf9e854085327176b39f8bc8d2bbea03fc99d0859"
+    },
+    {
+      "file": "components/liveArena/ClashProposition.tsx",
+      "release_source_match": true,
+      "sha256": "41082f91689b0942b3065ebeca6f6a3c371be55b2f7230da83d03256397f1b3f"
+    },
+    {
+      "file": "components/liveArena/CurrentArgumentStage.tsx",
+      "release_source_match": true,
+      "sha256": "ef3ab7ea938019408124acdb450c817aaeab4134a525beddf0b8fd0bd19dd17d"
+    },
+    {
+      "file": "components/liveArena/DuelRoomExperience.tsx",
+      "release_source_match": true,
+      "sha256": "e3d313539fd2e3f45cc8e76e6decc92efd3e5bf11ac78112a97db7a0e4855f35"
+    },
+    {
+      "file": "components/liveArena/ImmersiveClash.tsx",
+      "release_source_match": true,
+      "sha256": "6c4b063b331f4aa9780837ccc87160725528a17dae472ef422959be54f620b23"
+    },
+    {
+      "file": "components/liveArena/LiveCrowdLayer.tsx",
+      "release_source_match": true,
+      "sha256": "49ce506a606ad0b9ae8b01afbcd4592c7b41e4ad06ddab986405abc4a8430cf2"
+    },
+    {
+      "file": "components/liveArena/PrivateAssistPanel.tsx",
+      "release_source_match": true,
+      "sha256": "79913d50bb4d12bd162c44cb591f8e1d05af6970fd37085259207c1f881ef306"
+    },
+    {
+      "file": "components/arena/ChallengeInvitation.tsx",
+      "release_source_match": true,
+      "sha256": "2749f9b1b3452425dc30b45b6041cbe147d38323784eb7fb70017d74846dd8f5"
+    },
+    {
+      "file": "components/arena/LiveDuelCard.tsx",
+      "release_source_match": true,
+      "sha256": "62096a4090d61e446ba107c21916db6671662e6e7613ca3b76a6b3923a0c4078"
+    },
+    {
+      "file": "components/arena/ui/ArenaSheet.tsx",
+      "release_source_match": true,
+      "sha256": "546a08c3779b427e72709d0d696571422946ae260431c6f3d1e25d288cbbc1e3"
+    }
+  ]
+}

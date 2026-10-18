@@ -1,6 +1,6 @@
 /** Public Crowd presentation. Only server-authorized rows; no layout fixtures. */
 import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import type { useArenaCrowd } from '../../hooks/useArenaCrowd';
 import { validCrowdText, type CrowdMessage } from '../../utils/arenaCrowd';
 import { crowdRowLabel } from './liveArenaStyles';
@@ -60,8 +60,8 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
         onPress={() => { atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loading…' : 'Load earlier chat'}</Text></Pressable> : null}
       ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{unavailableReason ?? (crowd?.loading ? 'Loading Crowd…' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.')}</Text>}
       renderItem={({item}) => <View style={[styles.row,{borderBottomColor:t.border}]} accessibilityRole="text" accessibilityLabel={crowdRowLabel(item.author.handle, item.body)}>
-        <Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}]}>
-          <Text style={styles.name}>@{item.author.handle}</Text>{'  '}{item.body}
+        <Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>
+          <Text style={[styles.name, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>@{item.author.handle}</Text>{'  '}{item.body}
         </Text>
         {onReport ? <Pressable onPress={() => onReport(item)} accessibilityRole="button" accessibilityLabel={`Report or block @${item.author.handle}`} style={styles.menu}><Text style={{color:t.textMuted}}>···</Text></Pressable> : null}
       </View>}/>
@@ -80,11 +80,11 @@ const styles = StyleSheet.create({
   heading:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
   label:{...typeScale.caption,fontSize:11,fontWeight:'700'},state:{...typeScale.caption,fontSize:11},
   stream:{flex:1,minHeight:0},content:{paddingVertical:8,gap:4,flexGrow:1},
-  row:{flexDirection:'row',alignItems:'flex-start',borderBottomWidth:StyleSheet.hairlineWidth},line:{...typeScale.body,fontSize:14,lineHeight:21,flex:1,paddingVertical:10},
+  row:{flexDirection:'row',alignItems:'flex-start',borderBottomWidth:StyleSheet.hairlineWidth},line:{...typeScale.body,fontSize:13,lineHeight:19,flex:1,minWidth:0,paddingVertical:8},
   name:{fontWeight:'700',fontSize:13},menu:{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'},
   empty:{...typeScale.caption,paddingVertical:12},notice:{gap:4},hit:{minHeight:44,minWidth:44,justifyContent:'center',paddingHorizontal:8},
-  latestButton:{alignSelf:'center',borderRadius:18,borderWidth:StyleSheet.hairlineWidth,minHeight:36,paddingHorizontal:14,justifyContent:'center'},
-  sendButton:{minHeight:38,minWidth:62,alignItems:'center',justifyContent:'center',borderRadius:12,borderWidth:StyleSheet.hairlineWidth},
+  latestButton:{alignSelf:'center',borderRadius:18,borderWidth:StyleSheet.hairlineWidth,minHeight:44,paddingHorizontal:14,justifyContent:'center'},
+  sendButton:{minHeight:44,minWidth:62,alignItems:'center',justifyContent:'center',borderRadius:12,borderWidth:StyleSheet.hairlineWidth},
   composer:{flexDirection:'row',alignItems:'center',borderTopWidth:StyleSheet.hairlineWidth,gap:8,paddingTop:space.xs},
   input:{flex:1,minHeight:44,maxHeight:92,fontSize:14,paddingVertical:8},
 });

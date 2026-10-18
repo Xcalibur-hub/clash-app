@@ -81,3 +81,5 @@ for (const kind of ['home', 'take', 'groups', 'discover', 'live', 'room']) test(
   }
   assert.equal(buttons, 0);
 });
+
+test('demo discovery fighter identities agree with the Room opened by its local adapter',()=>{const state=createDemoState(now),duel=demoDuel(state),html=renderDemo('live').html;assert.ok(html.includes(duel.fighterA.name));assert.ok(html.includes(duel.fighterB.name));for(const author of state.data.authors.slice(2))assert.ok(!html.includes(author.name),'Discovery must not advertise a different fighter: '+author.name);});

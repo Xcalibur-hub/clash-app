@@ -11,6 +11,7 @@ import Animated, {
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import type { ArenaMessage } from '../../services/liveArenaService';
 import { duelArgumentPreview } from '../../utils/duelPresentation';
+import { arena } from '../../theme/arena';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -49,6 +50,7 @@ export function CurrentArgumentStage({
     </Text>
   ) : (
     <>
+      <Text style={[styles.attr, { color: t.textSecondary }]}>OFFICIAL ARGUMENT</Text>
       <Text
         selectable
         style={[
@@ -108,17 +110,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexShrink: 1,
     minHeight: 64,
-    justifyContent: 'center',
-    paddingHorizontal: layout.screenX + 8,
+    justifyContent: 'flex-start',
+    paddingTop: 12,
+    paddingHorizontal: layout.screenX,
     gap: space.sm,
   },
   argument: {
-    ...typeScale.body,
-    fontSize: 18,
-    lineHeight: 25,
+    ...arena.type.statement,
+    fontSize: 22,
+    lineHeight: 30,
     fontWeight: '600',
     letterSpacing: -0.25,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   argumentCondensed: {
     fontSize: 16,
@@ -129,7 +132,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   empty: {
     ...typeScale.body,
@@ -138,9 +141,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   readMoreHit: {
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
     minHeight: 44,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 12,
     paddingHorizontal: space.sm,
   },
   readMore: {

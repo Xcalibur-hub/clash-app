@@ -123,8 +123,8 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   if (name === 'spectator') {
     assert.match(html, /LIVE|Live Clash/);
     const css = html + renderToStaticMarkup(getStyleElement());
-    assert.match(css, /flex-grow:0\.55/, 'Stage must retain its animated share in the web render bridge');
-    assert.match(css, /flex-grow:0\.44/, 'Crowd must retain the complementary animated share');
+    assert.match(css, /flex-grow:0\.68/, 'Official Stage must retain its primary share in the web render bridge');
+    assert.match(css, /flex-grow:0\.3(?:2|19)/, 'Crowd must retain the complementary animated share');
     assert.match(html, /CROWD|Live crowd|Crowd/);
     assert.match(html, /BACK KEVIN|Back Kevin|BACKING/i);
     assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat|52%|48%/);
@@ -196,9 +196,9 @@ for (const [name, element] of Object.entries(challengeCases)) {
   const html = renderToStaticMarkup(React.createElement(RN.View, { style: { width: 390, minHeight: 780 } }, element));
   if (name === 'challenge-fullscreen') {
     assert.match(html, /Rohan/);
-    assert.match(html, /ACCEPT/);
-    assert.match(html, /PASS/);
-    assert.match(html, /CHALLENGE/);
+    assert.match(html, /Accept challenge/);
+    assert.match(html, /Pass/);
+    assert.match(html, /Challenge invitation|CHALLENGE/);
     assert.match(html, /THEIR TAKE|YOUR TAKE/);
     assert.match(html, /2 PENDING|PENDING/);
   }

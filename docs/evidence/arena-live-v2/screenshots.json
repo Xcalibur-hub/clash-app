@@ -1,0 +1,146 @@
+[
+  {
+    "file": "dark-challenge-after-320.png",
+    "bytes": 73540,
+    "sha256": "7885b7890c1bfd055711694397943d7a57ac982f9df89c7843e9d1eb43993899",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-challenge-after-360.png",
+    "bytes": 76394,
+    "sha256": "773d546b42aa0baefae22fab104e8e7810dd43765dd5c8c799ed327f45f13b9b",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-challenge-after-430.png",
+    "bytes": 74995,
+    "sha256": "40310ddea387bf44b08a346de45e61e5db67dd17c09d40886a023d002aa39abf",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-challenge-before-360.png",
+    "bytes": 91534,
+    "sha256": "5abfbcdaeb299b6f6a4658dd90bcfef245e33b706f7c81ef5ec2b4aa0839a8d6",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-live-after-320.png",
+    "bytes": 58548,
+    "sha256": "0977ca979837e8527804a15c935837b77546377cf81393ce40e86e62e7d6eedf",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-live-after-360.png",
+    "bytes": 67390,
+    "sha256": "bd0526f881d045a85bc03f3f7be551884c3bc0c246d16c5f62b3b2179f0b76eb",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-live-after-430.png",
+    "bytes": 69457,
+    "sha256": "60d6b8f9a87581aba8a71bf5af9d5e28d79c72346d85c74ecb3895054610d908",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-live-before-360.png",
+    "bytes": 42079,
+    "sha256": "890c45bab2ef5967537d1fd0399648b3da2f1c00387fc9c49f4e34535069b027",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-room-after-320.png",
+    "bytes": 73688,
+    "sha256": "a70354653ac231782383f5fafddbda1b660ca330e5286483d9daa8a08f2b7a26",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-room-after-360.png",
+    "bytes": 83679,
+    "sha256": "d18154f71db25f08c9cdd0deb8d889d4562ce72feaabda6e5607a590e0ccba7d",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-room-after-430.png",
+    "bytes": 90668,
+    "sha256": "14f620847fd3873a401b2cd245a9b6014eaf022a385a0518369a24e11deeab4a",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "dark-room-before-360.png",
+    "bytes": 80738,
+    "sha256": "88512baa39e5c7a7147e4e3f8e1d3cc7120eb7fb27f3eb1883f2a48a734e8bc2",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-challenge-after-320.png",
+    "bytes": 72231,
+    "sha256": "6a5ca30bfcafb1c3708ce6a9f31b1c22ec3cd7c27b85a2e705901af5a13a87ff",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-challenge-after-360.png",
+    "bytes": 75757,
+    "sha256": "e758e9178e31ec33e16469dae1aeeee8243104c4ba92b830e6d38a487274d3dd",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-challenge-after-430.png",
+    "bytes": 74457,
+    "sha256": "b754b6ebe206e10ea890dc43ca1819db76f709e8eb950b64e8bb9ce18117ad6e",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-challenge-before-360.png",
+    "bytes": 90817,
+    "sha256": "ff30ab4ab6f75c0f0545fa45917b7aae3b2e16bd91732a4f918fe03c965fc941",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-live-after-320.png",
+    "bytes": 56477,
+    "sha256": "0739ce98cebc33763b0bb4edfd9207a3e15c125ad77c9e74329bbbc09fbd264e",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-live-after-360.png",
+    "bytes": 65423,
+    "sha256": "7eaacc68e92a3d224fae3ae74e1f7dbfd78164a6514703cf69aee05bc42f4daa",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-live-after-430.png",
+    "bytes": 66968,
+    "sha256": "0b039ea9c80df32e9171f50c96fd1804f9aad021f45b82e4f64cacfd1ec60a42",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-live-before-360.png",
+    "bytes": 42518,
+    "sha256": "fe836c539cd23988072b3072572125ebac741ed63a84137444ed6129a68a62a8",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-room-after-320.png",
+    "bytes": 72342,
+    "sha256": "57a18202d4f696485c740034e7b0765d9584594ac1acf05e3b9ee87085de5e84",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-room-after-360.png",
+    "bytes": 82485,
+    "sha256": "5eede6dc545f27baf067f2bb30224e493760512acb4bac78c385d02e9284aebc",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-room-after-430.png",
+    "bytes": 89902,
+    "sha256": "b9e9dc1e111eb59139bca6e79eb0d6e55801fdbe9b18f142b199b511d0db4b7e",
+    "kind": "Actual-component offline browser preview; not native"
+  },
+  {
+    "file": "light-room-before-360.png",
+    "bytes": 79710,
+    "sha256": "abe96a7f1fdcb6c053190a3caadb1c82b1d539e248abd2f6362756d2ac09054e",
+    "kind": "Actual-component offline browser preview; not native"
+  }
+]

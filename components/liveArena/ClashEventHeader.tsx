@@ -131,7 +131,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   statusGroup: {
+    flexShrink: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
     minWidth: 0,

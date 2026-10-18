@@ -17,6 +17,9 @@ import type { CrowdModel } from '../../liveArena/LiveCrowdLayer';
 import { takeChallengeIneligibility } from '../../../utils/takeChallengeEligibility';
 import { validCrowdText } from '../../../utils/arenaCrowd';
 import { DemoMedia } from './DemoMedia';
+import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
+import { DemoLiveDiscovery } from './DemoLiveDiscovery';
+import { DemoChallenge } from './DemoChallenge';
 import { DemoConstellation, DemoForm, DemoSheet, DemoText, DemoThread } from './DemoParts';
 import { createDemoState, demoDuel, demoReducer, visibleDemoAssists, type DemoAction, type DemoMediaKind, type DemoState, type DemoTake, type Page, type Phase, type Role } from './model';
 
@@ -33,6 +36,7 @@ export function DemoArena({ onExit, initialPage, initialTheme }: DemoArenaProps)
 
 function DemoSurface({ state: s, dispatch, onExit }: { state: DemoState; dispatch: Dispatch; onExit: () => void }): React.JSX.Element {
   const c = arenaColors(useThemeColors()), insets = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardVisible();
   const [sheet, setSheet] = React.useState<Sheet>(), [status, setStatus] = React.useState<'populated' | 'empty' | 'loading' | 'error'>('populated');
   const back = React.useCallback(() => { setSheet(undefined); if (s.history.length || s.page.kind !== 'home') dispatch({ type: 'back' }); else onExit(); }, [dispatch, onExit, s.history.length, s.page.kind]);
   React.useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (sheet) setSheet(undefined); else back(); return true; }); return () => sub.remove(); }, [back, sheet]);
@@ -52,21 +56,14 @@ function DemoSurface({ state: s, dispatch, onExit }: { state: DemoState; dispatc
       </View>
       <Text style={[arena.type.meta, { color: c.secondary, paddingBottom: 8 }]}>DEMO · Fictional people, counts and results · Local actions only</Text>
     </View>
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'ios' || keyboardOpen}>
       {status !== 'populated' ? <View style={[styles.content, { flex: 1, justifyContent: 'center' }]}>
         <DemoText heading>{status === 'error' ? 'DEMO · Couldn’t load Arena' : status === 'loading' ? 'DEMO · Loading conversations…' : 'DEMO · Nothing here yet'}</DemoText>
         <DemoText>This is an explicitly simulated {status} state.</DemoText><ArenaButton label={status === 'error' ? 'Retry demo' : 'Show demo content'} onPress={() => setStatus('populated')} />
       </View> : s.page.kind === 'home' ? <DemoHome state={s} dispatch={dispatch} navigate={navigate} openRoom={openRoom} onMore={() => setSheet({ kind: 'scenarios' })} />
         : s.page.kind === 'take' ? <DemoTakeDetail key={item.take.id} item={item} state={s} dispatch={dispatch} sheet={setSheet} openRoom={openRoom} />
-        : s.page.kind === 'live' ? <ScrollView contentContainerStyle={styles.content}>
-          <DemoText heading>Live, together.</DemoText><DemoText>Simulated 1v1 events · no real viewers or competitions</DemoText>
-          {([0, 1, 2, 4] as const).map((index, i) => <ArenaSurface key={index} style={{ gap: 12 }}>
-            <ArenaBadge>DEMO · {['OPEN', 'FINAL', 'SETTLED', 'CANCELLED'][i]}</ArenaBadge><DemoText heading>{s.data.takes[index].take.text}</DemoText>
-            <ArenaIdentity name={s.data.authors[0].name} detail="Fighter A · DEMO" side="A" /><ArenaIdentity name={s.data.authors[1].name} detail="Fighter B · DEMO" side="B" />
-            <DemoText>{[42, 18, 64, 0][i]} simulated spectators · Text / image / video / GIF previews</DemoText>
-            <ArenaButton label="Enter demo duel" onPress={() => openRoom(s.data.takes[index].take.id, (['OPEN', 'FINAL', 'SETTLED', 'CANCELLED'] as Phase[])[i])} />
-          </ArenaSurface>)}
-        </ScrollView>
+        : s.page.kind === 'live' ? <DemoLiveDiscovery state={s} onOpen={openRoom} onChallenge={() => navigate({ kind: 'challenge' })} />
+        : s.page.kind === 'challenge' ? <DemoChallenge state={s} onAccept={() => openRoom(s.data.takes[0].take.id)} onPass={() => { notice('Demo invitation passed. No real decision was submitted.'); navigate({ kind: 'live' }); }} />
         : s.page.kind === 'room' ? <DemoRoom state={s} dispatch={dispatch} onBack={back} onAssists={() => setSheet({ kind: 'assists' })} onHistory={() => setSheet({ kind: 'arguments' })} />
         : s.page.kind === 'groups' ? <DemoGroups state={s} navigate={navigate} />
         : s.page.kind === 'group' ? <ScrollView contentContainerStyle={styles.content}>
@@ -81,7 +78,7 @@ function DemoSurface({ state: s, dispatch, onExit }: { state: DemoState; dispatc
         : <DemoDiscover state={s} navigate={navigate} />}
     </KeyboardAvoidingView>
     {s.notice ? <View style={[styles.notice, { backgroundColor: c.inset }]}><Text accessibilityLiveRegion="polite" style={[arena.type.meta, { color: c.ink, flex: 1 }]}>DEMO · {s.notice}</Text><ArenaButton label="Dismiss" variant="tertiary" onPress={() => notice('')} /></View> : null}
-    {showTabs ? <View style={[styles.tabs, { paddingBottom: Math.max(insets.bottom, 8), borderTopColor: c.line }]} accessibilityRole="tablist">{tabs.map(tab => <ArenaButton key={tab} label={titles[tab]} selected={s.page.kind === tab} variant={s.page.kind === tab ? 'secondary' : 'tertiary'} onPress={() => navigate({ kind: tab }, true)} style={{ flex: 1, paddingHorizontal: 3 }} />)}</View> : <View style={{ height: insets.bottom }} />}
+    {showTabs && !keyboardOpen ? <View style={[styles.tabs, { paddingBottom: Math.max(insets.bottom, 8), borderTopColor: c.line }]} accessibilityRole="tablist">{tabs.map(tab => <ArenaButton key={tab} label={titles[tab]} selected={s.page.kind === tab} variant={s.page.kind === tab ? 'secondary' : 'tertiary'} onPress={() => navigate({ kind: tab }, true)} style={{ flex: 1, paddingHorizontal: 3 }} />)}</View> : <View style={{ height: keyboardOpen ? 0 : insets.bottom }} />}
     {sheet ? <DemoSheet title={sheet.kind === 'assists' ? 'Private assists' : sheet.kind} onClose={() => setSheet(undefined)}>
       {sheet.kind === 'reply' ? <DemoForm label="Write a demo reply" onSend={(text, media) => { dispatch({ type: 'reply', id: sheet.id, parentId: sheet.parentId, text, media, at: Date.now() }); setSheet(undefined); }} /> : null}
       {sheet.kind === 'challenge' ? <><DemoText>A local counter-position. The normal 30-minute eligibility rule is retained for this simulation.</DemoText><DemoForm label="Demo counter-position (20–500 characters)" attachments={false} max={500} onSend={text => { dispatch({ type: 'challenge', id: sheet.id, text, at: Date.now() }); setSheet(undefined); }} /></> : null}
@@ -148,13 +145,15 @@ function DemoDiscover({ state: s, navigate }: { state: DemoState; navigate: (pag
 }
 
 function DemoRoom({ state: s, dispatch, onBack, onAssists, onHistory }: { state: DemoState; dispatch: Dispatch; onBack: () => void; onAssists: () => void; onHistory: () => void }): React.JSX.Element {
+  const keyboardOpen = useKeyboardVisible();
   const [reaction, setReaction] = React.useState<{ emoji: string; key: string } | null>(null), [ballot, setBallot] = React.useState<string>();
   const duel = demoDuel(s), closed = duel.status !== 'open', last = s.official.at(-1)!;
   const latest: ArenaMessage = { id: last.id, roomId: 'demo-room', kind: 'text', body: last.text, parentMessageId: null, createdAt: s.now, mediaUrl: null, mediaKind: null, gifProvider: null, gifExternalId: null, isOwn: s.role === `fighter_${last.side.toLowerCase()}`, author: { ...s.data.authors[last.side === 'A' ? 0 : 1], avatarTint: s.data.authors[0].tint }, reactions: [], replyCount: 0, argumentVotes: null };
   const crowd: CrowdModel = { messages: s.crowd, context: { roomId: 'demo-room', canSend: !closed, spectatorCount: 42, serverNow: new Date(s.now).toISOString(), closesAt: new Date(s.now + 1800000).toISOString() }, loading: false, error: null, connected: true, sending: false, hasOlder: false, olderBusy: false, identityVersion: ['spectator', 'fighter_a', 'fighter_b'].indexOf(s.role), refresh: async () => {}, loadOlder: async () => {}, send: async (text, key) => { if (closed || !validCrowdText(text)) return false; dispatch({ type: 'crowd', text, key }); return true; } };
-  return <View style={{ flex: 1 }}><ScrollView horizontal style={{ flexGrow: 0 }} showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 8 }}>{(['OPEN', 'FINAL', 'JUDGING', 'SETTLED', 'DRAW', 'CANCELLED'] as Phase[]).map(phase => <ArenaButton key={phase} label={phase} selected={s.phase === phase} variant="tertiary" onPress={() => { setBallot(undefined); dispatch({ type: 'phase', phase }); }} />)}</ScrollView>
+  return <View style={{ flex: 1 }}>{!keyboardOpen ? <><ScrollView horizontal style={{ flexGrow: 0 }} showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 8 }}>{(['OPEN', 'FINAL', 'JUDGING', 'SETTLED', 'DRAW', 'CANCELLED'] as Phase[]).map(phase => <ArenaButton key={phase} label={phase} selected={s.phase === phase} variant="tertiary" onPress={() => { setBallot(undefined); dispatch({ type: 'phase', phase }); }} />)}</ScrollView>
     <ScrollView horizontal style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 8 }}>{(['spectator', 'fighter_a', 'fighter_b'] as Role[]).map(role => <ArenaButton key={role} label={role === 'spectator' ? 'Spectator' : role === 'fighter_a' ? 'Fighter A' : 'Fighter B'} selected={s.role === role} variant="tertiary" onPress={() => dispatch({ type: 'role', role })} />)}<ArenaButton label="Private assists" onPress={onAssists} /></ScrollView>
-    <ImmersiveClash duel={duel} proposition={duel.sourceText!} live={!closed} statusLabel={closed ? 'DEMO HISTORY' : 'DEMO LIVE'} phaseLabel={s.phase} spectatorCount={42} focusSide={last.side} latestMessage={latest} paddingTop={4} backingSide={s.backing} onBackSide={side => dispatch({ type: 'backing', side })} canBack={!closed && s.role === 'spectator'} onBack={onBack} onOpenProfile={() => dispatch({ type: 'notice', text: 'Fictional fighter profile. No real profile was opened.' })} onViewHistory={onHistory} onMore={() => dispatch({ type: 'notice', text: 'Use the demo phase and role selectors above. No real moderation is available.' })} roleLabel={`DEMO · ${s.role}`} crowd={crowd} reactionBurst={reaction}
+    </> : null}
+    <ImmersiveClash condensed={keyboardOpen} duel={duel} proposition={duel.sourceText!} live={!closed} statusLabel={closed ? 'DEMO HISTORY' : 'DEMO LIVE'} phaseLabel={s.phase} spectatorCount={42} focusSide={last.side} latestMessage={latest} paddingTop={4} backingSide={s.backing} onBackSide={side => dispatch({ type: 'backing', side })} canBack={!closed && s.role === 'spectator'} onBack={onBack} onOpenProfile={() => dispatch({ type: 'notice', text: 'Fictional fighter profile. No real profile was opened.' })} onViewHistory={onHistory} onMore={() => dispatch({ type: 'notice', text: 'Use the demo phase and role selectors above. No real moderation is available.' })} roleLabel={`DEMO · ${s.role}`} crowd={crowd} reactionBurst={reaction}
       stageFooter={<View style={{ paddingHorizontal: 16, gap: 8 }}>{duel.verdict ? <DemoText heading>{s.phase === 'DRAW' ? 'DRAW · 3–3' : 'Fighter A · 4–2'} · SCRIPTED DEMO RESULT</DemoText> : s.phase === 'CANCELLED' ? <DemoText>Cancelled · no verdict · DEMO</DemoText> : s.phase === 'JUDGING' ? <><DemoText>Demo judgement · no rewards or real verdict</DemoText><View style={styles.row}>{s.role === 'spectator' ? ['A', 'B'].map(side => <ArenaButton key={side} label={ballot === side ? `Voted ${side} · demo` : `Demo vote ${side}`} disabled={!!ballot} onPress={() => setBallot(side)} />) : <DemoText>Demo fighters cannot judge.</DemoText>}</View></> : <View style={styles.row}>{['👏', '🔥', '🤔'].map(emoji => <ArenaButton key={emoji} label={emoji} onPress={() => { setReaction({ emoji, key: String(Date.now()) }); dispatch({ type: 'notice', text: 'Reaction simulated locally.' }); }} />)}<ArenaButton label="Argument history" onPress={onHistory} /></View>}</View>}
       fighterComposer={s.role !== 'spectator' && ['OPEN', 'FINAL'].includes(s.phase) ? <View style={{ padding: 12 }}><DemoForm label="Official demo argument" attachments={false} max={1200} onSend={text => dispatch({ type: 'official', text })} /></View> : undefined} />
   </View>;

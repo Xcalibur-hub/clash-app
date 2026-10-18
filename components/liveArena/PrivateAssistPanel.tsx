@@ -8,19 +8,19 @@ import { incorporatePrivateAssist, listPrivateAssists, privateAssistMediaUrl, re
   sendPrivateAssist, uploadPrivateAssistMedia, type PrivateAssist } from '../../services/arenaAssistService';
 import { MediaViewer } from '../shared/MediaViewer';
 
-export function PrivateAssistPanel({ roomId, duel, disabled, onPublished }: {
-  roomId: string; duel: ArenaDuel; disabled: boolean; onPublished: () => Promise<void>;
+export function PrivateAssistPanel({ roomId, duel, disabled, onPublished, initiallyOpen = false }: {
+  initiallyOpen?: boolean; roomId: string; duel: ArenaDuel; disabled: boolean; onPublished: () => Promise<void>;
 }): React.JSX.Element | null {
   const {user}=useAuth();
-  return <PrivateAssistBody key={`${roomId}:${user?.id??'guest'}`} roomId={roomId} duel={duel} disabled={disabled} onPublished={onPublished}/>;
+  return <PrivateAssistBody key={`${roomId}:${user?.id??'guest'}`} roomId={roomId} duel={duel} disabled={disabled} onPublished={onPublished} initiallyOpen={initiallyOpen}/>;
 }
-function PrivateAssistBody({ roomId, duel, disabled, onPublished }: {
-  roomId: string; duel: ArenaDuel; disabled: boolean; onPublished: () => Promise<void>;
+function PrivateAssistBody({ roomId, duel, disabled, onPublished, initiallyOpen = false }: {
+  initiallyOpen?: boolean; roomId: string; duel: ArenaDuel; disabled: boolean; onPublished: () => Promise<void>;
 }): React.JSX.Element | null {
   const t=useThemeColors(), {user}=useAuth(), picker=useMediaPicker();
   const account=user?.id;
   const fighter=['fighter_a','fighter_b'].includes(duel.viewerRelationship);
-  const [open,setOpen]=React.useState(false),[side,setSide]=React.useState<'A'|'B'>('A');
+  const [open,setOpen]=React.useState(initiallyOpen),[side,setSide]=React.useState<'A'|'B'>('A');
   const [body,setBody]=React.useState(''),[picked,setPicked]=React.useState<PickedMedia|null>(null);
   const [uploaded,setUploaded]=React.useState<string|null>(null),[rows,setRows]=React.useState<PrivateAssist[]>([]);
   const [error,setError]=React.useState<string|null>(null),[busy,setBusy]=React.useState(false),[notice,setNotice]=React.useState('');
@@ -41,7 +41,7 @@ function PrivateAssistBody({ roomId, duel, disabled, onPublished }: {
     catch{if(alive.current)setError('Assist could not update. Check access or try again.');}
     finally{inFlight.current=false;if(alive.current)setBusy(false);}
   };
-  const button=(label:string,fn:()=>void,locked=false)=><Pressable key={label} accessibilityRole="button" accessibilityLabel={label} disabled={locked||busy} onPress={fn} style={{padding:10,opacity:locked||busy?0.45:1}}><Text style={{color:t.textPrimary}}>{label}</Text></Pressable>;
+  const button=(label:string,fn:()=>void,locked=false)=><Pressable key={label} accessibilityRole="button" accessibilityLabel={label} disabled={locked||busy} onPress={fn} style={{minHeight:44,minWidth:44,justifyContent:'center',padding:10,opacity:locked||busy?0.45:1}}><Text style={{color:t.textPrimary}}>{label}</Text></Pressable>;
   return <View style={[styles.panel,{borderColor:t.border,backgroundColor:t.surfaceElevated}]}>
     <Pressable accessibilityRole="button" accessibilityState={{expanded:open}} accessibilityLabel={fighter?'Toggle private assist inbox':'Toggle private assist composer'} onPress={()=>setOpen(v=>!v)} style={styles.header}>
       <View style={styles.headerCopy}>
@@ -85,7 +85,7 @@ function AssistAttachment({account,assist}:{account:string;assist:PrivateAssist}
   const alive=React.useRef(true);
   React.useEffect(()=>{alive.current=true;return ()=>{alive.current=false;};},[]);
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel="View private attachment" onPress={()=>void privateAssistMediaUrl(account,assist).then(u=>{if(alive.current){setUrl(u);setFailed(false);}}).catch(()=>{if(alive.current)setFailed(true);})}><Text style={{color:t.textPrimary}}>View private {assist.mediaKind}</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="View private attachment" style={{minHeight:44,justifyContent:'center'}} onPress={()=>void privateAssistMediaUrl(account,assist).then(u=>{if(alive.current){setUrl(u);setFailed(false);}}).catch(()=>{if(alive.current)setFailed(true);})}><Text style={{color:t.textPrimary}}>View private {assist.mediaKind}</Text></Pressable>
     {failed?<Text accessibilityRole="alert" style={{color:t.textPrimary}}>Private attachment unavailable. Try again.</Text>:null}
     <MediaViewer visible={Boolean(url)} uri={url} kind={assist.mediaKind??'image'} onClose={()=>setUrl(null)}/>
   </>;

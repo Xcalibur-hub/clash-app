@@ -13,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { Avatar } from '../shared/Avatar';
-import { ArenaAtmosphere } from '../liveArena/ArenaAtmosphere';
+
 
 export interface ClashConfirmedFighter {
   name: string;
@@ -39,20 +39,20 @@ export function ClashConfirmedOverlay({
   return (
     <Modal visible transparent animationType={reduced ? 'none' : 'fade'} statusBarTranslucent>
       <View style={[styles.root, { backgroundColor: t.background }]} accessibilityViewIsModal>
-        <ArenaAtmosphere mood="live" energy={0.5} />
+
         <View style={styles.content}>
           <Animated.Text
             entering={reduced ? undefined : FadeIn.duration(200)}
             style={[styles.kicker, { color: t.textMuted }]}
           >
-            CLASH
+            CLASH CONFIRMED
           </Animated.Text>
           <Animated.Text
             entering={reduced ? undefined : FadeInDown.delay(40).springify().damping(16)}
             style={[styles.title, { color: t.textPrimary }]}
             accessibilityRole="header"
           >
-            CONFIRMED
+            You're in.
           </Animated.Text>
 
           <View style={styles.row}>
@@ -60,7 +60,7 @@ export function ClashConfirmedOverlay({
               entering={reduced ? undefined : SlideInLeft.delay(80).springify().damping(15)}
               style={styles.col}
             >
-              <Avatar name={fighterA.name} tint={fighterA.tint ?? t.textMuted} size={80} />
+              <Avatar name={fighterA.name} tint={fighterA.tint ?? t.textMuted} size={56} />
               <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
                 {fighterA.name}
               </Text>
@@ -92,7 +92,7 @@ export function ClashConfirmedOverlay({
             entering={reduced ? undefined : FadeIn.delay(280).duration(240)}
             style={[styles.enter, { color: t.textSecondary }]}
           >
-            ENTERING ARENA
+            Opening your Live Room
           </Animated.Text>
         </View>
       </View>
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   content: {
     zIndex: 1,
     paddingHorizontal: space.lg,
-    gap: space.xl,
+    gap: space.lg,
     alignItems: 'center',
   },
   kicker: {

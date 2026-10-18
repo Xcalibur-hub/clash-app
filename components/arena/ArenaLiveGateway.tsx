@@ -23,12 +23,12 @@ export function ArenaLiveGateway({ liveCount, onOpen }: {
       <View style={[styles.dot, { backgroundColor: liveCount !== null && liveCount > 0 ? '#D75C4D' : t.textMuted }]} />
       <View style={styles.copy}>
         <Text style={[styles.title, { color: t.textPrimary }]}>
-          {liveCount !== null && liveCount > 0 ? 'Live in the Arena' : 'Watch a Clash'}
+          {liveCount !== null && liveCount > 0 ? 'Conversations are happening' : 'Find your next debate'}
         </Text>
         <Text style={[styles.sub, { color: t.textSecondary }]} numberOfLines={1}>
           {liveCount !== null && liveCount > 0
             ? `${liveCount} live ${liveCount === 1 ? 'discussion' : 'discussions'} to explore`
-            : 'Duels, challenges and verdicts'}
+            : 'Two perspectives. Find a duel to watch.'}
         </Text>
       </View>
       <Text style={[styles.arrow, { color: t.textPrimary }]}>↗</Text>

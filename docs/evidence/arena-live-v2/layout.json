@@ -1,0 +1,178 @@
+[
+  {
+    "file": "dark-challenge-after-320.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-challenge-after-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-challenge-after-430.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-challenge-before-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-live-after-320.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-live-after-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-live-after-430.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-live-before-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": false
+  },
+  {
+    "file": "dark-room-after-320.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-room-after-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-room-after-430.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "dark-room-before-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [
+      {
+        "label": "Back Alex Morgan. Support during the Clash, not a judgement.",
+        "width": 158,
+        "height": 40
+      },
+      {
+        "label": "Back Priya Shah. Support during the Clash, not a judgement.",
+        "width": 158,
+        "height": 40
+      },
+      {
+        "label": "Send public Crowd message",
+        "width": 62,
+        "height": 38
+      }
+    ],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-challenge-after-320.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-challenge-after-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-challenge-after-430.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-challenge-before-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-live-after-320.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-live-after-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-live-after-430.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-live-before-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": false
+  },
+  {
+    "file": "light-room-after-320.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-room-after-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-room-after-430.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [],
+    "font_faces_loaded": true
+  },
+  {
+    "file": "light-room-before-360.html",
+    "horizontal_overflow": false,
+    "undersized_targets": [
+      {
+        "label": "Back Alex Morgan. Support during the Clash, not a judgement.",
+        "width": 158,
+        "height": 40
+      },
+      {
+        "label": "Back Priya Shah. Support during the Clash, not a judgement.",
+        "width": 158,
+        "height": 40
+      },
+      {
+        "label": "Send public Crowd message",
+        "width": 62,
+        "height": 38
+      }
+    ],
+    "font_faces_loaded": true
+  }
+]

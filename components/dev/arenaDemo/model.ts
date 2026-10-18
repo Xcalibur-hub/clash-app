@@ -6,7 +6,7 @@ import { validCrowdText } from '../../../utils/arenaCrowd';
 import { takeChallengeIneligibility } from '../../../utils/takeChallengeEligibility';
 
 export const DEMO_CANARY = 'CLASH_DEMO_ARENA_FIXTURES_V1_NOT_FOR_RELEASE';
-export type Page = { kind: 'home' | 'take' | 'live' | 'room' | 'groups' | 'group' | 'discover' | 'topic'; id?: string };
+export type Page = { kind: 'challenge' | 'home' | 'take' | 'live' | 'room' | 'groups' | 'group' | 'discover' | 'topic'; id?: string };
 export type Phase = 'OPEN' | 'FINAL' | 'JUDGING' | 'SETTLED' | 'DRAW' | 'CANCELLED';
 export type Role = 'spectator' | 'fighter_a' | 'fighter_b';
 export type DemoMediaKind = 'image' | 'video' | 'gif';

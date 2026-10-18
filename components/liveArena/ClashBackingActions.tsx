@@ -24,7 +24,7 @@ export function ClashBackingActions({
   const [fighterA, fighterB] = duelActiveSpeakers(duel);
 
   return (
-    <View style={styles.row} accessibilityLabel="Back a fighter">
+    <View><Text style={{ color: t.textMuted, fontSize: 11, paddingHorizontal: layout.screenX, paddingBottom: 8 }}>SOCIAL SUPPORT / NOT A JUDGEMENT</Text><View style={styles.row} accessibilityLabel="Back a fighter">
       {([
         { side: 'A' as const, name: fighterA.name },
         { side: 'B' as const, name: fighterB.name },
@@ -53,7 +53,6 @@ export function ClashBackingActions({
             ]}
           >
             <Text
-              allowFontScaling={false}
               numberOfLines={1}
               style={[styles.label, { color: on ? t.background : t.textPrimary }]}
             >
@@ -62,7 +61,7 @@ export function ClashBackingActions({
           </Pressable>
         );
       })}
-    </View>
+    </View></View>
   );
 }
 
@@ -75,7 +74,7 @@ const styles = StyleSheet.create({
   },
   btn: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 999,
     alignItems: 'center',

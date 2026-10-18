@@ -1,0 +1,62 @@
+{
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit",
+    "exit": 0
+  },
+  "unit": {
+    "command": "npm run test:unit (same package-defined file list also executed directly with Node)",
+    "tests": 500,
+    "suites": 126,
+    "failed": 0,
+    "skipped": 0,
+    "exit": 0
+  },
+  "focused": {
+    "command": "node --test components/arena/ArenaVisualCompletion.test.cjs scripts/arena-demo-check.test.cjs scripts/arena-live-v2-check.test.cjs scripts/take-challenge-check.test.cjs scripts/take-detail-check.test.cjs scripts/arena-design-check.test.cjs",
+    "tests": 92,
+    "failed": 0,
+    "skipped": 0,
+    "exit": 0
+  },
+  "final_history_recheck": {
+    "command": "node --test components/arena/ArenaVisualCompletion.test.cjs scripts/arena-live-v2-check.test.cjs",
+    "tests": 23,
+    "failed": 0,
+    "skipped": 0,
+    "exit": 0,
+    "overlaps_focused": true
+  },
+  "stage": {
+    "command": "node scripts/duel-render-smoke.cjs",
+    "scenarios": 22,
+    "exit": 0,
+    "controlled_render": true
+  },
+  "assist": {
+    "command": "node scripts/assist-service-check.cjs",
+    "checks": 10,
+    "exit": 0,
+    "controlled_transport": true
+  },
+  "signer": {
+    "command": "node scripts/assist-signer-check.cjs",
+    "checks": 14,
+    "exit": 0,
+    "mocked": true
+  },
+  "crowd": {
+    "command": "node scripts/crowd-service-check.cjs",
+    "reported_checks": 7,
+    "exit": 0,
+    "controlled_transport": true
+  },
+  "expo_doctor": {
+    "command": "node node_modules/expo-doctor/build/index.js",
+    "passed": 18,
+    "total": 18,
+    "exit": 0
+  },
+  "database": "NOT RUN; no backend/schema changes",
+  "android": "PARTIAL demo review; see android.json",
+  "cleanup": "BLOCKED: ADB daemon unresponsive; restart permission pending"
+}

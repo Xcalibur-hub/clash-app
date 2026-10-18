@@ -1,0 +1,47 @@
+{
+  "device": "Samsung A50 SM-A505F",
+  "bundle_from_phone": true,
+  "bundle_status": 200,
+  "usable_normal_and_demo_ui": true,
+  "live_dark_light": "PASS demo",
+  "challenge_dark_light": "PASS demo",
+  "expired_controls": [
+    {
+      "label": "Pass on this challenge",
+      "enabled": "false"
+    },
+    {
+      "label": "Accept this challenge",
+      "enabled": "false"
+    }
+  ],
+  "simulated_acceptance_to_room": "PASS demo; not real RPC",
+  "exact_two_fighters_and_official_argument": "PASS demo",
+  "crowd_expand_and_stage_focus": "PASS demo",
+  "room_dark_light": "PASS demo",
+  "keyboard_initial": "FAIL: composer obscured by IME",
+  "keyboard_fix": "Implemented and compilation/regression checked; physical recheck not confirmed",
+  "crowd_send": "BLOCKED before tapping; no success claimed",
+  "accessibility": "Later three bounded attempts failed; stopped coordinate automation",
+  "manual_recheck": "Owner asked, no response recorded",
+  "cleanup": {
+    "status": "BLOCKED",
+    "reason": "Existing ADB daemon unresponsive, including read-only 5037 protocol query",
+    "failed_operation": "initial force-stop in restoration helper timed out before preference copy",
+    "original_preferences": ".expo/live-v2/native/prefs.original.xml (private)",
+    "original_forwards": ".expo/live-v2/native/adb-original.txt (private)",
+    "last_verified_temporary_host": "localhost:8083",
+    "task_forward_added": "tcp:8083",
+    "original_forwards_preserved_until_restore_attempt": [
+      "8081",
+      "55321"
+    ],
+    "task_metro": "exit 1; no 8083 listener observed afterwards; not a clean-stop claim",
+    "adb_restart": "Permission requested; not performed without response"
+  },
+  "explicit_login_logout": false,
+  "app_data_cleared": false,
+  "permissions_changed": false,
+  "native_install": false,
+  "backend_config_changed": false
+}

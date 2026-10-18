@@ -113,7 +113,7 @@ function harness(file, component, props = {}, signedIn = true, reduced = true) {
         };
       }
     },
-    ...Object.fromEntries(['Pressable', 'ScrollView', 'Text', 'View', 'Image'].map(x => [x, x]))
+    ...Object.fromEntries(['Pressable', 'ScrollView', 'FlatList', 'Text', 'View', 'Image'].map(x => [x, x]))
   };
   const animation = {
     duration() {
@@ -123,7 +123,13 @@ function harness(file, component, props = {}, signedIn = true, reduced = true) {
       return this;
     }
   };
+  const primitiveButton = ({ label, accessibilityLabel, onPress, disabled }) => React.createElement('Pressable', { accessibilityLabel: accessibilityLabel ?? label, onPress, disabled }, label);
+  let pureCard;
   const requireMock = name => {
+    if (name === './LiveDuelCard') return { LiveDuelCard: pureCard ??= load(path.join(root, 'components/arena/LiveDuelCard.tsx'), requireMock).LiveDuelCard };
+    if (name.endsWith('/ui/ArenaPrimitives')) return { ArenaButton: primitiveButton };
+    if (name.endsWith('/theme/arena')) return { arena: { type: { statement: {}, heading: {}, body: {}, meta: {}, eyebrow: {}, label: {} } }, arenaColors: t => ({ surface: t.surface, line: t.border, ink: t.textPrimary, muted: t.textMuted }) };
+
     if (name === "../../utils/topicConstellation") return load(path.join(root, "utils/topicConstellation.ts"), () => { throw Error("Unexpected graph dependency"); });
     if (name === "./TakeFeedCard") return load(path.join(root, "components/arena/TakeFeedCard.tsx"), requireMock);
     if (name === '../../hooks/useClock') return { useClock: () => Date.now() };
@@ -253,6 +259,15 @@ function harness(file, component, props = {}, signedIn = true, reduced = true) {
     mi = 0;
     effects = [];
     tree = renderComponent(props);
+    function expand(node) {
+      if (!node || typeof node !== 'object') return node;
+      if (Array.isArray(node)) return node.map(expand);
+      if (node.type === primitiveButton || node.type === pureCard) return expand(node.type(node.props));
+      if (node.type === 'FlatList') node.props.children = [node.props.ListHeaderComponent, ...node.props.data.map((item,index) => node.props.renderItem({item,index})), !node.props.data.length && node.props.ListEmptyComponent];
+      if (node.props?.children) node.props.children = expand(node.props.children);
+      return node;
+    }
+    tree = expand(tree);
     if (typeof tree?.type === "function" && file.endsWith("TakeFeedItem.tsx")) tree = tree.type(tree.props);
     effects.forEach((effect, index) => {
       if (activeEffects.get(index)?.effect !== effect) {
@@ -271,7 +286,7 @@ function harness(file, component, props = {}, signedIn = true, reduced = true) {
   const text = (node = tree) => walkText(node).replace(/\s+/g, ' ').trim();
   const press = label => {
     const button = nodes().find(n => n.type === 'Pressable' && (n.props.accessibilityLabel === label || text(n).trim() === label));
-    assert.ok(button, 'Missing control: ' + label);
+    assert.ok(button, 'Missing control: ' + label + '; available: ' + nodes().filter(n => n.type === 'Pressable').map(n => n.props.accessibilityLabel).join(' | '));
     button.props.onPress();
     render();
   };
@@ -430,7 +445,8 @@ test('guest Live discovery is a sign-in gate, not a fabricated zero', () => {
   }, false);
   assert.equal(h.calls.length, 0);
   assert.match(h.text(), /Sign in to discover/);
-  assert.match(h.text(), /Couldn't load discussions/);
+  h.press('Topic rooms');
+  assert.match(h.text(), /load discussions/);
   assert.doesNotMatch(h.text(), /0 live|No live Clashes|No topic rooms/);
   h.blur();
 });
@@ -441,7 +457,7 @@ test('Live failure and successful empty response are distinct', async () => {
   });
   h.calls[0].reject(Error('offline'));
   await h.settle();
-  assert.match(h.text(), /unavailable/);
+  assert.match(h.text(), /load Clashes/);
   assert.doesNotMatch(h.text(), /No live Clashes|No topic rooms/);
   h.press('Try again');
   h.calls[1].resolve([]);
@@ -472,13 +488,19 @@ test('pending, upcoming and cancelled records retain their authoritative state a
     roomId: null
   }]);
   await h.settle();
-  h.press('PENDING. Test proposition. View Take');
-  assert.equal(h.routes.at(-1), '/take/take');
-  h.press('UPCOMING. Test proposition. Open Clash');
+  assert.doesNotMatch(h.text(), /Awaiting acceptance|cancelled|UPCOMING/);
+  h.press('Open Challenge Inbox'); assert.equal(h.routes.at(-1), '/arena/challenges');
+  h.press('Open Clash history');
+  h.press('Open Hall of Fame archive'); assert.equal(h.routes.at(-1), '/arena/hall-of-fame');
+  const cancelled = h.nodes().find(n => typeof n.type === 'function'); assert.ok(cancelled);
+  assert.equal(discovery.clashDiscoveryDestination({ ...entry, kind: 'CHALLENGE', roomId: null }), '/take/take');
+  assert.equal(discovery.clashDiscoveryDestination({ ...entry, roomId: null }), '/clash/take');
+  h.press('Coming up');
+  const scheduled = h.nodes().find(n => typeof n.type === 'function'); assert.ok(scheduled);
+  h.mountChild(scheduled.type, scheduled.props); h.press('View Clash. UPCOMING. Test proposition');
   assert.equal(h.routes.at(-1), '/arena/room/room');
-  h.press('COMPLETED. Test proposition. Open Clash');
+  h.mountChild(cancelled.type, cancelled.props); h.press('View Clash. CANCELLED. Test proposition');
   assert.equal(h.routes.at(-1), '/clash/take');
-  assert.equal(h.nodes().filter(n => typeof n.type === 'function').length, 0);
   h.blur();
 });
 test('fighter preview respects BLIND identity, ended status and account isolation', async () => {
@@ -507,6 +529,7 @@ test('fighter preview respects BLIND identity, ended status and account isolatio
   await h.settle();
   assert.match(h.text(), /Identity hidden/);
   assert.doesNotMatch(h.text(), /Secret|LIVE/);
+  assert.doesNotMatch(h.text(), /On the stage/);
   assert.match(h.text(), /View result/);
   h.auth.user = {
     id: 'b'
@@ -541,7 +564,7 @@ test('fighter preview reveals only authorized server identities and keeps canoni
   await h.settle();
   assert.match(h.text(), /Allowed A/);
   assert.match(h.text(), /Allowed B/);
-  h.press('Watch live Clash: Test proposition');
+  h.press('Watch Duel. LIVE. Test proposition');
   assert.equal(h.routes.at(-1), '/arena/room/room');
   h.blur();
 });
@@ -659,12 +682,16 @@ test('denied or mismatched preview removes stale metadata rather than displaying
     assert.equal(h.nodes().filter(n => n.type === 'Pressable').length, 0); h.blur();
   }
 });
-test('discovery bounds preview reads and never creates membership', async () => {
+test('discovery virtualizes preview reads and supports identities beyond the first eight without creating membership', async () => {
   const h = harness('components/arena/ArenaClashes.tsx', 'ArenaClashes', { topics: [] });
   h.calls[0].resolve(Array.from({ length: 12 }, (_, i) => ({ ...entry, id: 'duel-' + i }))); await h.settle();
   const cards = h.nodes().filter(n => typeof n.type === 'function');
-  assert.equal(cards.length, 12); assert.equal(cards.filter(c => c.props.loadIdentity).length, 8);
-  h.mountChild(cards[11].type, cards[11].props); assert.equal(h.calls.length, 1); h.blur();
+  assert.equal(cards.length, 12); assert.equal(cards.filter(c => c.props.loadIdentity).length, 12);
+  const list = h.nodes().find(n => n.type === 'FlatList');
+  assert.equal(list.props.initialNumToRender, 4); assert.equal(list.props.maxToRenderPerBatch, 6); assert.equal(list.props.windowSize, 5);
+  assert.equal(h.calls.length, 1, 'Discovery alone must not eagerly hydrate every card');
+  h.mountChild(cards[11].type, cards[11].props); assert.equal(h.calls.length, 2);
+  assert.equal(h.calls.at(-1).kind, 'preview'); assert.equal(h.calls.at(-1).args, 'duel-11'); h.blur();
 });
 test('Home gateway distinguishes topic counts from Room or viewer totals and leaves unknown counts unlabeled', () => {
   for (const count of [null, 0, 1, 3]) {

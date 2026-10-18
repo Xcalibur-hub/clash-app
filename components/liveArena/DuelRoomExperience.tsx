@@ -36,6 +36,8 @@ import { softFill } from './liveArenaStyles';
 import type { LiveRoomMessageProps } from './LiveRoomMessage';
 import { useArenaCrowd } from '../../hooks/useArenaCrowd';
 import { PrivateAssistPanel } from './PrivateAssistPanel';
+import { ArenaSheet } from '../arena/ui/ArenaSheet';
+import { ArenaButton } from '../arena/ui/ArenaPrimitives';
 import { useDuelReactionBurst } from './useDuelReactionBurst';
 import type { CrowdMessage } from '../../utils/arenaCrowd';
 
@@ -100,6 +102,8 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const [watching, setWatching] = React.useState(false);
   const [watchError, setWatchError] = React.useState(false);
   const [entrance, setEntrance] = React.useState(true);
+  const [assistOpen, setAssistOpen] = React.useState(false);
+  React.useEffect(() => { setAssistOpen(false); }, [room.roomId, duel.viewerRelationship]);
   const [keyboardOpen, setKeyboardOpen] = React.useState(false);
   const joining = React.useRef(false);
   const lastMomentId = React.useRef<string | null>(null);
@@ -327,9 +331,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           }
           stageFooter={
             <>
-            <PrivateAssistPanel roomId={room.roomId} duel={duel}
-              disabled={duel.status!=='open'||!['open','final_arguments'].includes(room.phase)||props.threadLocked}
-              onPublished={props.onRefresh}/>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 }}><ArenaButton label="Transcript" variant="tertiary" onPress={() => setHistoryOpen(true)} />{duel.viewerRelationship !== 'staff' ? <ArenaButton label={presentation.canPublish ? 'Assist inbox' : 'Private assist'} variant="tertiary" onPress={() => setAssistOpen(true)} /> : null}</View>
             {showOutcome ? (
               <View style={styles.outcome}>
                 <DuelRoomOutcome
@@ -359,6 +361,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         />
       </KeyboardAvoidingView>
 
+      {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen roomId={room.roomId} duel={duel} disabled={duel.status !== 'open' || !['open', 'final_arguments'].includes(room.phase) || props.threadLocked} onPublished={props.onRefresh} /></ArenaSheet> : null}
       <ArgumentHistorySheet
         visible={historyOpen}
         duel={duel}

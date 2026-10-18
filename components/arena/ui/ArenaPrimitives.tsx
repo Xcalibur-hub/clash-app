@@ -5,12 +5,12 @@ import { arena, arenaColors } from '../../../theme/arena';
 import { arenaSideTone, type ArenaSideKey } from '../../../theme/arenaSides';
 import { PressableScale } from '../../shared/PressableScale';
 
-export function ArenaButton({ label, onPress, variant = 'secondary', disabled = false, selected, style }: {
-  label: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'tertiary';
+export function ArenaButton({ label, onPress, variant = 'secondary', disabled = false, selected, style, accessibilityLabel }: {
+  accessibilityLabel?: string; label: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'tertiary';
   disabled?: boolean; selected?: boolean; style?: StyleProp<ViewStyle>;
 }): React.JSX.Element {
   const c = arenaColors(useThemeColors());
-  return <PressableScale accessibilityRole={selected === undefined ? 'button' : 'tab'} accessibilityLabel={label}
+  return <PressableScale accessibilityRole={selected === undefined ? 'button' : 'tab'} accessibilityLabel={accessibilityLabel ?? label}
     accessibilityState={{ disabled, selected }} aria-selected={selected} disabled={disabled} onPress={onPress}
     style={[styles.button, { backgroundColor: variant === 'primary' ? c.fill : variant === 'secondary' ? c.inset : 'transparent', opacity: disabled ? 0.45 : 1 }, style]}>
     <Text style={[arena.type.label, { color: variant === 'primary' ? c.onFill : c.ink, textAlign: 'center' }]}>{label}</Text>

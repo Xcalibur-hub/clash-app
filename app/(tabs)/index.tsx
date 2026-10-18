@@ -356,6 +356,7 @@ export default function ArenaScreen(): React.JSX.Element {
     if (arenaMode === 'clashes') {
       return (
         <ArenaClashes
+          bottomPadding={dockBottomPadding(insets.bottom)}
           topics={liveTopics}
           topicsLoading={liveTopicsLoading}
           topicsError={liveTopicsError}
@@ -440,6 +441,7 @@ export default function ArenaScreen(): React.JSX.Element {
     dispatch,
     freshItems,
     heroTopic,
+    insets.bottom,
     liveTopics,
     liveTopicsLoading,
     liveTopicsError,
@@ -542,7 +544,7 @@ export default function ArenaScreen(): React.JSX.Element {
       {arenaMode === 'community' ? <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} /> : null}
       <ArenaTopBar paddingTop={insets.top} contextLine="ARENA" />
       <ArenaSideRail mode={arenaMode} onChange={setArenaMode} />
-      <FlatList
+      {arenaMode === 'clashes' ? <View style={[{ flex: 1 }, styles.listLayer, entrance && styles.listDimmed]} pointerEvents={entrance ? 'none' : 'auto'}>{header}</View> : <FlatList
         key={arenaMode}
         data={listData}
         keyExtractor={(take) => take.id}
@@ -562,7 +564,7 @@ export default function ArenaScreen(): React.JSX.Element {
         windowSize={9}
         style={[styles.listLayer, entrance && styles.listDimmed]}
         pointerEvents={entrance ? 'none' : 'auto'}
-      />
+      />}
       <PostActionsSheet
         visible={menu !== null}
         target={menu?.target ?? null}

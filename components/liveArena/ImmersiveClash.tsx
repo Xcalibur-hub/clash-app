@@ -3,7 +3,7 @@
  * Stage (calm) + Crowd (live) blend through spacing/atmosphere, not card chrome.
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { arena } from '../../theme/arena';
 import { chipFill } from './liveArenaStyles';
 import { ReactionBurst } from './ReactionBurst';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
@@ -82,7 +83,8 @@ export function ImmersiveClash({
   reactionBurst = null,
 }: ImmersiveClashProps): React.JSX.Element {
   const t = useThemeColors();
-  const stageFlex = judgingFocus ? 0.72 : condensed ? 0.34 : 0.55;
+  const [crowdExpanded, setCrowdExpanded] = React.useState(false);
+  const stageFlex = judgingFocus ? 0.76 : condensed ? 0.3 : crowdExpanded ? 0.4 : 0.68;
   const reduced = useReducedMotion();
   const split = useSharedValue(stageFlex);
   React.useEffect(() => {
@@ -129,7 +131,6 @@ export function ImmersiveClash({
               accessibilityLabel={'Your role: ' + roleLabel}
             >
             <Text
-              allowFontScaling={false}
               style={[styles.role, { color: t.textMuted }]}
             >
               {roleLabel}
@@ -163,8 +164,9 @@ export function ImmersiveClash({
       </Animated.View>
 
       <Animated.View style={[styles.crowd, { borderTopColor: t.border }, crowdStyle]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={crowdExpanded ? 'Focus official Stage' : 'Expand Crowd conversation'} accessibilityState={{ expanded: crowdExpanded }} onPress={() => setCrowdExpanded(value => !value)} style={{ minHeight: 44, paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: t.surface }}><Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '600' }}>Crowd conversation</Text><Text style={{ color: t.textSecondary, fontSize: 12 }}>{crowdExpanded ? 'Focus Stage' : 'Expand chat'}</Text></Pressable>
         {reactionBurst ? (
-          <ReactionBurst emoji={reactionBurst.emoji} burstKey={reactionBurst.key} />
+          <ReactionBurst emoji={reactionBurst.emoji} burstKey={reactionBurst.key} count={2} />
         ) : null}
         <LiveCrowdLayer
           unavailableReason={crowdUnavailableReason}
@@ -197,7 +199,7 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingTop: space.xs,
   },
-  crowd: { minHeight: 0, borderTopWidth: StyleSheet.hairlineWidth },
+  crowd: { minHeight: 134, flexShrink: 0, borderTopWidth: StyleSheet.hairlineWidth },
   roleChip: {
     alignSelf: 'center',
     borderWidth: StyleSheet.hairlineWidth,
