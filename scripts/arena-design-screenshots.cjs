@@ -4,13 +4,14 @@ const fs = require('node:fs'), path = require('node:path'), assert = require('no
 const { spawn, spawnSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const root = path.resolve(__dirname, '..'), output = path.resolve(process.argv[2] || '');
+const demo = process.argv.includes('--demo');
 assert.ok(output.startsWith(path.join(root, '.expo') + path.sep), 'Use the generated ignored preview directory');
 const chrome = process.env.ARENA_PREVIEW_BROWSER || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 assert.ok(fs.existsSync(chrome), 'An existing Chromium browser is required; no download/install');
 const profile = path.join(output, 'capture-profile');
 assert.ok(!fs.existsSync(profile), 'Fresh isolated browser profile required');
 const files = fs.readdirSync(output).filter(f => f.endsWith('.html')).sort();
-assert.equal(files.length, 10, 'Generate all ten comparisons first');
+assert.equal(files.length, demo ? 12 : 10, 'Generate the complete preview set first');
 const log = fs.openSync(path.join(output, 'capture-browser.log'), 'w');
 const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-first-run', '--disable-background-networking', '--disable-sync', '--disable-extensions', '--disable-component-update', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], { stdio: ['ignore', log, log], windowsHide: true });
 const pause = ms => new Promise(r => setTimeout(r, ms));
@@ -32,11 +33,11 @@ async function connect(url) {
     const cdp = await connect(page.webSocketDebuggerUrl); const results = [];
     await cdp.send('Page.enable');
     for (const filename of files) {
-      const width = Number(filename.match(/-(320|360)\b/)[1]);
-      await cdp.send('Emulation.setDeviceMetricsOverride', { width: width * 2 + 52, height: 900, deviceScaleFactor: 1, mobile: false });
+      const width = demo ? 360 : Number(filename.match(/-(320|360)\b/)[1]);
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width: demo ? width : width * 2 + 52, height: 900, deviceScaleFactor: 1, mobile: false });
       await cdp.send('Page.navigate', { url: pathToFileURL(path.join(output, filename)).href });
       await pause(200);
-      const evaluated = await cdp.send('Runtime.evaluate', { awaitPromise: true, returnByValue: true, expression: `(async()=>{await document.fonts.ready;const after=[...document.querySelectorAll('section')][1];const scroll=after.querySelector('[data-testid="preview-scroll"]');const buttons=[...after.querySelectorAll('[role="button"],[role="tab"]')].map(e=>{const r=e.getBoundingClientRect();return{label:e.getAttribute('aria-label')||e.textContent,width:r.width,height:r.height}}).filter(b=>b.width&&b.height);return{preview_label:document.querySelector('h1').textContent,after_horizontal_overflow:scroll.scrollWidth>scroll.clientWidth+1,buttons,undersized_targets:buttons.filter(b=>b.width<43.9||b.height<43.9),font_faces_loaded:document.fonts.check('13px Inter_500Medium')}})()` });
+      const evaluated = await cdp.send('Runtime.evaluate', { awaitPromise: true, returnByValue: true, expression: `(async()=>{await document.fonts.ready;const after=[...document.querySelectorAll('section')][${demo ? 0 : 1}];const scroll=after.querySelector('[data-testid="preview-scroll"]')||after;const buttons=[...after.querySelectorAll('[role="button"],[role="tab"]')].map(e=>{const r=e.getBoundingClientRect();return{label:e.getAttribute('aria-label')||e.textContent,width:r.width,height:r.height}}).filter(b=>b.width&&b.height);return{preview_label:document.querySelector('h1').textContent,after_horizontal_overflow:scroll.scrollWidth>scroll.clientWidth+1,buttons,undersized_targets:buttons.filter(b=>b.width<43.9||b.height<43.9),font_faces_loaded:document.fonts.check('13px Inter_500Medium')}})()` });
       assert.ok(evaluated.result.value, 'Actual browser layout evidence required');
       const capture = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       fs.writeFileSync(path.join(output, filename.replace('.html', '.png')), Buffer.from(capture.data, 'base64'));

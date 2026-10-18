@@ -1,0 +1,30 @@
+{
+  "typecheck": {
+    "exit": 0
+  },
+  "configured_unit": {
+    "tests": 500,
+    "suites": 126,
+    "failed": 0,
+    "skipped": 0,
+    "exit": 0
+  },
+  "focused": {
+    "tests": 84,
+    "failed": 0,
+    "skipped": 0,
+    "exit": 0
+  },
+  "expo_doctor": {
+    "passed": 18,
+    "total": 18,
+    "exit": 0
+  },
+  "browser": {
+    "screenshots": 12,
+    "horizontal_overflow": 0,
+    "inherited_undersized_targets": 6
+  },
+  "database": "NOT RUN",
+  "physical_demo_controls": "BLOCKED"
+}

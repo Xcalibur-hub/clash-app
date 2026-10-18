@@ -59,7 +59,7 @@ Module._load = function (request, parent) {
     Text: props => { const style = RN.StyleSheet.flatten(props.style) || {}; return React.createElement(RN.Text, { ...props, style: [props.style, props.allowFontScaling === false ? null : { fontSize: (style.fontSize || 14) * scale, lineHeight: (style.lineHeight || 20) * scale }] }); },
     useWindowDimensions: () => ({ width, height: 800, scale: 1, fontScale: scale }),
     KeyboardAvoidingView: RN.View,
-    FlatList: ({ data, renderItem, ListHeaderComponent, ListFooterComponent, ListEmptyComponent, contentContainerStyle }) => React.createElement(RN.View, { style: { flex: 1, overflow: 'auto' }, testID: 'preview-scroll' }, React.createElement(RN.View, { style: contentContainerStyle }, ListHeaderComponent, data.map((item, index) => React.createElement(React.Fragment, { key: item.comment.id }, renderItem({ item, index }))), !data.length && ListEmptyComponent, ListFooterComponent)),
+    FlatList: ({ data, renderItem, ListHeaderComponent, ListFooterComponent, ListEmptyComponent, contentContainerStyle, keyExtractor }) => React.createElement(RN.View, { style: { flex: 1, overflow: 'auto' }, testID: 'preview-scroll' }, React.createElement(RN.View, { style: contentContainerStyle }, ListHeaderComponent, data.map((item, index) => React.createElement(React.Fragment, { key: keyExtractor ? keyExtractor(item) : item.id ?? index }, renderItem({ item, index }))), !data.length && ListEmptyComponent, ListFooterComponent)),
     Modal: ({ visible, children }) => visible ? React.createElement(RN.View, null, children) : null,
   };
   if (request === 'react-native-svg') return originalLoad.call(this, 'react-native-svg/lib/commonjs/ReactNativeSVG.web.js', parent);

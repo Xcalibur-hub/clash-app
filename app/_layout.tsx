@@ -1,5 +1,7 @@
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
+import Constants from 'expo-constants';
+import { arenaDemoAllowed } from '../utils/arenaDemoGate';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
@@ -99,8 +101,7 @@ function RootLayout(): React.JSX.Element {
                   <Stack.Screen name="world" options={{ animation: 'slide_from_right' }} />
                   <Stack.Screen name="explore" options={{ animation: 'slide_from_right' }} />
                 </ThemedChrome>
-                <InterestOnboardingGate />
-                <LocalSupabaseBadge />
+                <NormalArenaOverlays />
               </FontBootstrap>
             </ThemeProvider>
           </AccountScope>
@@ -108,6 +109,13 @@ function RootLayout(): React.JSX.Element {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** The offline visual route must not be covered by a failed interest read. */
+function NormalArenaOverlays(): React.JSX.Element | null {
+  const path = usePathname();
+  if (path === '/demo-arena' && arenaDemoAllowed(__DEV__, Constants.expoConfig?.extra?.appVariant)) return null;
+  return <><InterestOnboardingGate /><LocalSupabaseBadge /></>;
 }
 
 export default Sentry.wrap(RootLayout);

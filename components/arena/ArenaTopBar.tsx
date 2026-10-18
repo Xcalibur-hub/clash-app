@@ -1,4 +1,6 @@
 import React from 'react';
+import Constants from 'expo-constants';
+import { arenaDemoAllowed } from '../../utils/arenaDemoGate';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
@@ -50,6 +52,10 @@ export function ArenaTopBar({
         ) : null}
       </View>
       <View style={styles.actions}>
+        {arenaDemoAllowed(__DEV__, Constants.expoConfig?.extra?.appVariant) ? <Pressable accessibilityRole="button" accessibilityLabel="Enter Demo Arena"
+          onPress={() => router.push('/demo-arena')} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 }}>
+          <Text style={{ color: t.textSecondary, fontSize: 11, fontWeight: '600' }}>Demo Arena</Text>
+        </Pressable> : null}
         <Pressable
           onPress={() => {
             hapticTap();
