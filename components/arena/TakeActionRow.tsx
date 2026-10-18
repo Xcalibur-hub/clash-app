@@ -16,6 +16,7 @@ import { ArenaIcon, ArrowBigUpIcon, BookmarkIcon, CommentIcon, ShareIcon } from 
 import { PressableScale } from '../shared/PressableScale';
 
 export interface TakeActionRowProps {
+  readOnly?: boolean;
   reactions: number;
   commentCount: number;
   isSaved: boolean;
@@ -35,11 +36,13 @@ interface MetaActionProps {
   active?: boolean;
   accessibilityLabel: string;
   onPress: () => void;
+  disabled?: boolean;
   activeColor: string;
   idleColor: string;
 }
 
 function MetaAction({
+  disabled = false,
   icon: Icon,
   label,
   active = false,
@@ -66,10 +69,11 @@ function MetaAction({
         }
         onPress();
       }}
+      disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={active ? { selected: true } : undefined}
-      style={styles.metaAction}
+      accessibilityState={{ selected: active, disabled }}
+      style={[styles.metaAction, disabled && { opacity: 0.5 }]}
     >
       <Animated.View style={animated}>
         <Icon size={18} color={active ? activeColor : idleColor} strokeWidth={active ? 2.4 : 2.1} />
@@ -121,13 +125,13 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
         onClash();
       }}
       accessibilityRole="button"
-      accessibilityLabel="Clash on this take"
+      accessibilityLabel={conversation && props.readOnly ? 'View Clash history' : 'Clash on this take'}
       style={[styles.clash, conversation && styles.clashProminent, { backgroundColor: t.clashFill }]}
     >
       <Animated.View style={[styles.clashInner, clashAnim]}>
         <ArenaIcon size={conversation ? 14 : 13} color={t.clashText} strokeWidth={2.6} />
         <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
-          CLASH
+          {conversation && props.readOnly ? 'History' : 'CLASH'}
         </Text>
       </Animated.View>
     </PressableScale>
@@ -137,6 +141,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
     return (
       <View style={[styles.row, styles.rowConversation]}>
         <MetaAction
+          disabled={props.readOnly}
           icon={ArrowBigUpIcon}
           label={compact(reactions)}
           active={hasReacted}
@@ -179,6 +184,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
   return (
     <View style={styles.row}>
       <MetaAction
+        disabled={props.readOnly}
         icon={ArrowBigUpIcon}
         label={compact(reactions)}
         active={hasReacted}

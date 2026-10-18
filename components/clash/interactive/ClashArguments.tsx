@@ -19,10 +19,11 @@ export interface ClashArgumentItem {
 
 export interface ClashArgumentsProps {
   items: readonly ClashArgumentItem[];
+  actionLabel?: string;
   onMakeArgument?: () => void;
 }
 
-export function ClashArguments({ items, onMakeArgument }: ClashArgumentsProps): React.JSX.Element {
+export function ClashArguments({ items, onMakeArgument, actionLabel = 'Make an argument' }: ClashArgumentsProps): React.JSX.Element {
   const t = useThemeColors();
   const sideA = useDuelSurface('A');
   const sideB = useDuelSurface('B');
@@ -39,10 +40,10 @@ export function ClashArguments({ items, onMakeArgument }: ClashArgumentsProps): 
             No arguments yet
           </Text>
           <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
-            Be the first to make the case.
+            {actionLabel === 'Make an argument' ? 'Be the first to make the case.' : 'Read the original Take and its replies.'}
           </Text>
           {onMakeArgument ? (
-            <GlowButton label="Make an argument" onPress={onMakeArgument} compact tone="glass" />
+            <GlowButton label={actionLabel} onPress={onMakeArgument} compact tone="glass" />
           ) : null}
         </View>
       ) : (

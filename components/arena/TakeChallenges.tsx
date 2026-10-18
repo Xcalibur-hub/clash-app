@@ -35,7 +35,7 @@ export function ChallengeTakeButton({ takeId }: { takeId: string }): React.JSX.E
   );
 }
 
-export function TakeChallenges({ take, openComposer }: { take: Take; openComposer: boolean }): React.JSX.Element | null {
+export function TakeChallenges({ take, openComposer, readOnly = false }: { take: Take; openComposer: boolean; readOnly?: boolean }): React.JSX.Element | null {
   const t = useThemeColors();
   const router = useRouter();
   const requireAuth = useRequireAuth();
@@ -114,8 +114,10 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
   }, [take.id, viewerId]);
 
   React.useEffect(() => {
-    if (openComposer && !isAuthor && signedIn) setComposer(true);
-  }, [openComposer, isAuthor, signedIn, take.id]);
+    if (openComposer && !isAuthor && signedIn && !readOnly) setComposer(true);
+  }, [openComposer, isAuthor, signedIn, take.id, readOnly]);
+
+  React.useEffect(() => { if (readOnly) { setComposer(false); setDeckOpen(false); } }, [readOnly]);
 
   React.useEffect(() => {
     if (!confirmed) return undefined;
@@ -135,8 +137,8 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
     [items],
   );
   const history = React.useMemo(
-    () => items.filter((ch) => !challengeCanAct(ch)),
-    [items],
+    () => items.filter((ch) => readOnly || !challengeCanAct(ch)),
+    [items, readOnly],
   );
 
   const removeLocal = (id: string): void => {
@@ -262,7 +264,7 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
     </Pressable>
   );
 
-  if (!signedIn) return null;
+  if (!signedIn || (readOnly && loaded && items.length === 0)) return null;
 
   return (
     <View style={[styles.section, { borderColor: t.border }]}>
@@ -273,7 +275,7 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
       />
 
       <FullScreenChallengeDeck
-        visible={deckOpen && !confirmed}
+        visible={deckOpen && !confirmed && !readOnly}
         challenges={pending}
         takeText={take.text}
         busy={busy}
@@ -285,10 +287,10 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
 
       {isAuthor ? (
         <>
-          <Text style={[styles.heading, { color: t.textPrimary }]}>Incoming Challenges</Text>
+          <Text style={[styles.heading, { color: t.textPrimary }]}>{readOnly ? 'Challenge history' : 'Incoming Challenges'}</Text>
           {!loaded ? (
             button('Reload Challenges', () => void load())
-          ) : pending.length > 0 ? (
+          ) : pending.length > 0 && !readOnly ? (
             <View style={styles.reviewBlock}>
               <Text style={[styles.body, { color: t.textSecondary, paddingHorizontal: space.md }]}>
                 {pending.length} pending Challenge{pending.length === 1 ? '' : 's'} waiting for you.
@@ -305,11 +307,11 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
                 <Text style={[styles.reviewLabel, { color: t.textPrimary }]}>Review Challenges</Text>
               </PressableScale>
             </View>
-          ) : (
+          ) : !readOnly ? (
             <Text style={[styles.body, { color: t.textMuted, paddingHorizontal: space.md }]}>
               No pending Challenges.
             </Text>
-          )}
+          ) : null}
           {history.length > 0 ? (
             <View style={styles.history}>
               <Text style={[styles.subhead, { color: t.textMuted }]}>Earlier</Text>
@@ -333,7 +335,7 @@ export function TakeChallenges({ take, openComposer }: { take: Take; openCompose
       ) : (
         <>
           <Text style={[styles.label, { color: t.textPrimary }]}>Your Challenges</Text>
-          {!ownPending && button('⚔ CHALLENGE', () => setComposer(true), busy || !loaded)}
+          {!readOnly && !ownPending && button('⚔ CHALLENGE', () => setComposer(true), busy || !loaded)}
           {error ? (
             <Text accessibilityRole="alert" style={{ color: t.textSecondary }}>
               {error}

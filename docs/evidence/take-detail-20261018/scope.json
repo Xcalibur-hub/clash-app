@@ -1,0 +1,19 @@
+{
+  "base": "986365b71b8e53e0d183a5237e1ca55f4ff898f0",
+  "branch": "feat/take-detail-archive-navigation-20261018",
+  "files": [
+    "app/clash/[takeId].tsx",
+    "app/take/[takeId].tsx",
+    "components/arena/CommentThread.tsx",
+    "components/arena/RebuttalInput.tsx",
+    "components/arena/TakeActionRow.tsx",
+    "components/arena/TakeChallenges.tsx",
+    "components/arena/TakeDetailHero.tsx",
+    "components/clash/interactive/ClashArguments.tsx",
+    "docs/TAKE_DETAIL_ARCHIVE_NAVIGATION_20261018.md",
+    "scripts/take-detail-check.test.cjs",
+    "utils/takeDetail.test.ts",
+    "utils/takeDetail.ts"
+  ],
+  "protected_paths_changed": false
+}

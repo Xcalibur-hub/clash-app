@@ -1,0 +1,30 @@
+[
+  {
+    "name": "take-before.png",
+    "bytes": 195665,
+    "sha256": "92a45fa2067b4c50683f0e3861781fcb16076bfac5c97eb20a76c91bbe3053c2",
+    "location": "private ignored local capture",
+    "kind": "physical Samsung A50"
+  },
+  {
+    "name": "take-after-final.png",
+    "bytes": 224000,
+    "sha256": "f0275da1f491f14e8cab098c6a623df65535fb8ebc85c07a7b5a7fdfb7f6dfa6",
+    "location": "private ignored local capture",
+    "kind": "physical Samsung A50"
+  },
+  {
+    "name": "returned-fixed.png",
+    "bytes": 223618,
+    "sha256": "c6ef3fadfb745712582741f3df9bf8466a5f6e4313223808499b067ffd172edc",
+    "location": "private ignored local capture",
+    "kind": "physical Samsung A50"
+  },
+  {
+    "name": "fixed-back.png",
+    "bytes": 198311,
+    "sha256": "918af870ff8ded90df53490d63d0bcc64c00a4d952120ef73c25b6713799fe05",
+    "location": "private ignored local capture",
+    "kind": "physical Samsung A50"
+  }
+]

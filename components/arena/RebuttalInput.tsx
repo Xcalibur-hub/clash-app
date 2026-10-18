@@ -55,6 +55,7 @@ function mimeFor(media: PickedMedia): string {
 
 export interface RebuttalInputProps {
   takeId: string;
+  focusRequest?: number;
   parentId?: string;
   /** Nesting depth of the reply target (0 = top-level on the Take). */
   replyDepth?: number;
@@ -69,6 +70,7 @@ export interface RebuttalInputProps {
  */
 export function RebuttalInput({
   takeId,
+  focusRequest = 0,
   parentId,
   replyDepth = 0,
   replyingTo,
@@ -88,6 +90,7 @@ export function RebuttalInput({
   const [uploading, setUploading] = React.useState(false);
   const [sendError,setSendError]=React.useState<string|null>(null);
   const inputRef = React.useRef<TextInput>(null);
+  React.useEffect(() => { if (focusRequest > 0) inputRef.current?.focus(); }, [focusRequest]);
   const {user}=useAuth();
   const scope=`${user?.id??'guest'}:${takeId}:${parentId??''}`;
   const isCurrent=useOperationScope(scope),busy=React.useRef(false);
@@ -298,6 +301,7 @@ export function RebuttalInput({
         <View
           style={[
             styles.box,
+            !expanded && styles.boxCompact,
             {
               backgroundColor: t.inputBackground,
               borderColor: expanded ? t.borderStrong : t.border,
@@ -316,7 +320,7 @@ export function RebuttalInput({
             placeholderTextColor={t.textMuted}
             multiline={expanded}
             editable={!pending}
-            style={[styles.input, { color: t.textPrimary, minHeight: expanded ? 44 : 36 }]}
+            style={[styles.input, !expanded && { flex: 1 }, { color: t.textPrimary, minHeight: expanded ? 44 : 36 }]}
             accessibilityLabel={parentId ? 'Reply to rebuttal' : 'Add to the conversation'}
           />
 
@@ -438,15 +442,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
-    paddingTop: 6,
-    paddingBottom: 8,
+    paddingTop: 4,
+    paddingBottom: 4,
     gap: 8,
   },
+  boxCompact: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, gap: 4 },
   input: {
     ...typeScale.body,
     fontSize: 15,
     paddingVertical: 6,
-    maxHeight: 120,
+    maxHeight: 96,
   },
   preview: { borderRadius: radius.md, overflow: 'hidden' },
   gifPreview: {
@@ -482,8 +487,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   iconBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -496,8 +501,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendCompact: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',

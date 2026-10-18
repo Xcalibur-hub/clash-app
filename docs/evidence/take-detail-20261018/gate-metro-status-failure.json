@@ -1,0 +1,5 @@
+{
+  "pass": false,
+  "failure": "launch_gate_prerequisite_failed",
+  "stage": "metro_status"
+}

@@ -1,3 +1,4 @@
+import { openTakeDiscussion } from '../../utils/takeDetail';
 /**
  * Interactive Clash 2.1 — immersive judging stage.
  *
@@ -7,7 +8,7 @@
 import React from 'react';
 import { Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ClashArguments } from '../../components/clash/interactive/ClashArguments';
 import { ClashCountdown, countdownUrgency } from '../../components/clash/interactive/ClashCountdown';
@@ -89,6 +90,7 @@ export default function ClashScreen(): React.JSX.Element {
   const { state, dispatch } = useClash();
   const { signedIn } = useAuth();
   const router = useRouter();
+  const localNavigation = useNavigation();
   const insets = useSafeAreaInsets();
   const requireAuth = useRequireAuth();
   const t = useThemeColors();
@@ -458,9 +460,10 @@ export default function ClashScreen(): React.JSX.Element {
 
         <ClashArguments
           items={argumentItems}
+          actionLabel={view.status !== 'open' || view.closesAt <= now || (take && take.expiresAt <= now) ? 'View discussion' : 'Make an argument'}
           onMakeArgument={() => {
             hapticTap();
-            router.push(`/take/${id}`);
+            openTakeDiscussion(router, localNavigation, id);
           }}
         />
 

@@ -15,12 +15,14 @@ import { PlayIcon } from '../shared/icons';
 import { MediaViewer } from '../shared/MediaViewer';
 
 export interface TakeDetailHeroProps {
+  compact?: boolean;
   take: Take;
   author: User;
   isViewer?: boolean;
 }
 
 export function TakeDetailHero({
+  compact = false,
   take,
   author,
   isViewer = false,
@@ -59,8 +61,8 @@ export function TakeDetailHero({
           styles.card,
           {
             width: cardW,
-            height,
-            borderRadius: 28,
+            height: compact ? Math.min(240, cardW * 0.62) : height,
+            borderRadius: compact ? 14 : 28,
             shadowColor: t.shadowColor,
             backgroundColor: '#111113',
           },
@@ -95,7 +97,7 @@ export function TakeDetailHero({
           </View>
         ) : null}
 
-        <View
+        {compact ? null : <View
           style={styles.copy}
           onLayout={(event) => {
             const next = Math.ceil(event.nativeEvent.layout.height);
@@ -112,7 +114,7 @@ export function TakeDetailHero({
               {isViewer ? ' · You' : ''} · {hood}
             </Text>
           </View>
-        </View>
+        </View>}
       </Pressable>
 
       {playUrl ? (
