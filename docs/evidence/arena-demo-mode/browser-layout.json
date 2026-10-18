@@ -1,0 +1,118 @@
+[
+  {
+    "filename": "dark-discover.html",
+    "label": "DEMO ARENA · discover · dark · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "dark-groups.html",
+    "label": "DEMO ARENA · groups · dark · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "dark-home.html",
+    "label": "DEMO ARENA · home · dark · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "dark-live.html",
+    "label": "DEMO ARENA · live · dark · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "dark-room.html",
+    "label": "DEMO ARENA · room · dark · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": [
+      {
+        "label": "Back Alex Morgan. Support during the Clash, not a judgement.",
+        "width": 158,
+        "height": 40
+      },
+      {
+        "label": "Back Priya Shah. Support during the Clash, not a judgement.",
+        "width": 158,
+        "height": 40
+      },
+      {
+        "label": "Send public Crowd message",
+        "width": 62,
+        "height": 38
+      }
+    ]
+  },
+  {
+    "filename": "dark-take.html",
+    "label": "DEMO ARENA · take · dark · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "light-discover.html",
+    "label": "DEMO ARENA · discover · light · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "light-groups.html",
+    "label": "DEMO ARENA · groups · light · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "light-home.html",
+    "label": "DEMO ARENA · home · light · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "light-live.html",
+    "label": "DEMO ARENA · live · light · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  },
+  {
+    "filename": "light-room.html",
+    "label": "DEMO ARENA · room · light · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": [
+      {
+        "label": "Back Alex Morgan. Support during the Clash, not a judgement.",
+        "width": 158,
+        "height": 40
+      },
+      {
+        "label": "Back Priya Shah. Support during the Clash, not a judgement.",
+        "width": 158,
+        "height": 40
+      },
+      {
+        "label": "Send public Crowd message",
+        "width": 62,
+        "height": 38
+      }
+    ]
+  },
+  {
+    "filename": "light-take.html",
+    "label": "DEMO ARENA · take · light · browser, not native",
+    "horizontal_overflow": false,
+    "fonts_loaded": true,
+    "undersized_targets": []
+  }
+]

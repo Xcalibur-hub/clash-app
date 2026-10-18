@@ -1,0 +1,20 @@
+[
+  {
+    "kind": "android-export",
+    "bytes": 10660773,
+    "sha256": "c54ca63f86bd3163142832d8f4a407c4124cd01aac9a5c9ded17b82a64141438",
+    "export_exit": 0,
+    "fixture_canary": true,
+    "fixture_text": true,
+    "demo_label": true
+  },
+  {
+    "kind": "production-export",
+    "bytes": 8128034,
+    "sha256": "915b0cc95e448eae6118a2f2fd6fb8a3c8e1cdd60701e13ce566b611f7ab0bdb",
+    "export_exit": 0,
+    "fixture_canary": false,
+    "fixture_text": false,
+    "demo_label": false
+  }
+]

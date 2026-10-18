@@ -123,7 +123,9 @@ function harness(file, component, props = {}, signedIn = true, reduced = true) {
       return this;
     }
   };
-  const exports = load(path.join(root, file), name => {
+  const requireMock = name => {
+    if (name === "../../utils/topicConstellation") return load(path.join(root, "utils/topicConstellation.ts"), () => { throw Error("Unexpected graph dependency"); });
+    if (name === "./TakeFeedCard") return load(path.join(root, "components/arena/TakeFeedCard.tsx"), requireMock);
     if (name === '../../hooks/useClock') return { useClock: () => Date.now() };
     if (name === '../../utils/takeDetail') return load(path.join(root, 'utils/takeDetail.ts'), () => { throw Error('Unexpected Take helper dependency'); });
     if (name === 'react') return React;
@@ -243,13 +245,15 @@ function harness(file, component, props = {}, signedIn = true, reduced = true) {
       }
     };
     throw Error('Unexpected dependency: ' + name);
-  });
+  };
+  const exports = load(path.join(root, file), requireMock);
   let renderComponent = exports[component];
   const render = () => {
     si = 0;
     mi = 0;
     effects = [];
     tree = renderComponent(props);
+    if (typeof tree?.type === "function" && file.endsWith("TakeFeedItem.tsx")) tree = tree.type(tree.props);
     effects.forEach((effect, index) => {
       if (activeEffects.get(index)?.effect !== effect) {
         activeEffects.get(index)?.cleanup?.();

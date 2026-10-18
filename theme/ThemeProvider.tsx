@@ -58,3 +58,9 @@ export function useTheme(): ThemeContextValue {
 export function useThemeColors(): SemanticTheme {
   return useContext(ThemeContext).colors;
 }
+
+/** Nested visual sandbox: never writes Appearance, preferences or the app store. */
+export function PresentationThemeProvider({ scheme, children }: { scheme: ColorScheme; children: React.ReactNode }): React.JSX.Element {
+  const value = useMemo(() => ({ scheme, preference: scheme, colors: paletteFor(scheme) }), [scheme]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}

@@ -55,7 +55,7 @@ const nodes = v => !v || typeof v !== 'object' ? [] : [v, ...React.Children.toAr
 const node = (tree, type) => nodes(tree).find(n => n.type === type);
 const text = tree => nodes(tree).filter(n => n.type === 'Text').map(n => n.props.children).flat().join(' ');
 const button = (tree, label) => { const n = nodes(tree).find(n => n.props?.onPress && (n.props.accessibilityLabel === label || text(n).trim() === label)); assert.ok(n, 'Missing ' + label); return n; };
-const render = (component, props) => { index = 0; const tree = (typeof component === 'function' ? component : component.type)(props); const run = effects; effects = []; run.forEach(f => f()); return tree; };
+const render = (component, props) => { index = 0; let tree = (typeof component === 'function' ? component : component.type)(props); if (typeof tree?.type === 'function') tree = tree.type(tree.props); const run = effects; effects = []; run.forEach(f => f()); return tree; };
 const flush = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
 function reset() { for (const c of cells) c?.cleanup?.(); cells = []; effects = []; clock = 1000; uid = 'auth-viewer'; fresh = { ...base }; state.takes = [base]; clash = null; routes = []; notices = []; rpcCalls = []; startCalls = 0; history = []; rpcError = null; fetchImpl = null; listeners = []; }
 after(() => { reset(); Date.now = realNow; });

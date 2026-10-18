@@ -1,0 +1,26 @@
+{
+  "device": "Samsung A50 SM-A505F",
+  "adb_connected": true,
+  "initial_keyguard_locked": true,
+  "later_unlocked": true,
+  "development_host_temporary_port": 8083,
+  "bundle_requested_by_android": true,
+  "bundle_http_status": 200,
+  "bundle_execution_observed": "JavaScript analytics initialization and existing theme require-cycle warnings",
+  "usable_demo_accessibility_tree": false,
+  "actual_ui_review": "BLOCKED",
+  "blocking_state": "NotificationShade foreground / mAodShowing=true",
+  "native_screen_interactions": "NOT TESTED",
+  "keyboard_safe_areas_back_and_scroll": "NOT TESTED",
+  "raw_device_evidence": "Ignored .expo/native-demo, not uploaded",
+  "restore": {
+    "preferences_byte_equal": true,
+    "adb_reverses_exact": true,
+    "explicit_login_or_logout": false,
+    "app_data_cleared": false,
+    "backend_configuration_changed": false
+  },
+  "task_owned_metro_stopped": true,
+  "database_operations": false,
+  "app_data_cleared": false
+}
