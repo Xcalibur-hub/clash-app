@@ -1,0 +1,10 @@
+{
+  "expired_challenge_deep_link": "PASS",
+  "archive_read_only": "PASS",
+  "no_challenge_composer": "PASS",
+  "completed_clash_entry": "PASS",
+  "discussion_return": "PASS",
+  "sort_preserved": "PASS",
+  "near_30_minute_boundary": "CONTROLLED TEST ONLY",
+  "expiry_while_composing": "CONTROLLED TEST ONLY"
+}

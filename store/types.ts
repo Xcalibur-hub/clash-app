@@ -86,6 +86,9 @@ export interface TakeMedia {
 
 /** A Take is the atomic Arena post and expires after 24 hours. */
 export interface Take {
+  /** Optional for older cached Takes; populated by current server reads. */
+  status?: 'active' | 'expired' | 'removed';
+  isRuntimeFixture?: boolean;
   question?: import('../utils/arenaQuestions').QuestionChoices;
   id: string;
   authorId: string;

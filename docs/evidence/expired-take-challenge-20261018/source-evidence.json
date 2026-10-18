@@ -1,0 +1,14 @@
+{
+  "method": "read-only local public REST, exact ID and field whitelist",
+  "http_status": 200,
+  "server_date": "Sun, 18 Oct 2026 07:45:23 GMT",
+  "rows": [
+    {
+      "id": "devfx_take_settled",
+      "status": "expired",
+      "expiresAt": "2026-10-13T17:15:29.601715+00:00",
+      "isRuntimeFixture": false,
+      "expiredAtServerDate": true
+    }
+  ]
+}

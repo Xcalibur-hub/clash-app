@@ -2,6 +2,8 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
+import { useClock } from '../../hooks/useClock';
+import { takeIsArchived } from '../../utils/takeDetail';
 import { HOOD_LABEL } from '../../data/hoods';
 import type { ChallengerComment, Take, User } from '../../store';
 import { layout, useThemeColors } from '../../theme';
@@ -52,6 +54,8 @@ function TakeFeedItemBase({
   const t = useThemeColors(),
     router = useRouter(),
     reduced = useReducedMotion();
+  const now = useClock();
+  const archived = take.status === 'expired' || takeIsArchived(take.expiresAt, now);
   const pulse = takePulse(take),
     still = take.media ? resolveStillUrl(take.media) : null;
   const [failed, setFailed] = React.useState(false);
@@ -72,7 +76,7 @@ function TakeFeedItemBase({
             }]}>{author.name}{isViewer ? ' · You' : ''}</Text>
             <Text numberOfLines={1} style={[styles.meta, {
               color: t.textMuted
-            }]}>@{author.handle} · {timeAgo(take.createdAt)}</Text></View>
+            }]}>@{author.handle} · {archived ? 'Archived' : timeAgo(take.createdAt)}</Text></View>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="More take actions" onPress={() => {
           hapticTap();
@@ -110,6 +114,7 @@ function TakeFeedItemBase({
           Icon: ArrowBigUpIcon,
           label: compact(take.reactions),
           a11y: 'React to this take',
+          disabled: archived,
           onPress: onReact,
           selected: hasReacted
         }, {
@@ -140,12 +145,13 @@ function TakeFeedItemBase({
           a11y,
           onPress,
           selected,
-          primary
-        }) => <Pressable key={a11y} accessibilityRole="button" accessibilityLabel={a11y} accessibilityState={selected === undefined ? undefined : {
+          primary,
+          disabled
+        }) => <Pressable key={a11y} accessibilityRole="button" accessibilityLabel={a11y} disabled={disabled} accessibilityState={selected === undefined ? undefined : {
           selected
         }} onPress={() => {
           hapticTap();
-          onPress();
+          if (!disabled) onPress();
         }} style={({
           pressed
         }) => [styles.actionButton, {
@@ -159,7 +165,7 @@ function TakeFeedItemBase({
         </Pressable>)}
       </View>
       {take.question ? <QuestionVotePanel takeId={take.id} choices={take.question} /> : null}
-      {!isViewer ? <ChallengeTakeButton takeId={take.id} /> : null}
+      {!isViewer ? <ChallengeTakeButton takeId={take.id} take={take} /> : null}
     </View>
   </Animated.View>;
 }

@@ -1,0 +1,12 @@
+{
+  "preferences_byte_equal": true,
+  "adb_reverses_exact": true,
+  "test_counter_position_cleared": true,
+  "original_empty_draft_verified": true,
+  "normal_bundle_rejection_reproduced": true,
+  "duplicate_restore_remove_missing_reverse_failed": true,
+  "final_read_only_restoration_verification": true,
+  "app_data_cleared": false,
+  "explicit_login_or_logout": false,
+  "backend_configuration_changed": false
+}

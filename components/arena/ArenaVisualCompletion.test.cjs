@@ -124,6 +124,8 @@ function harness(file, component, props = {}, signedIn = true, reduced = true) {
     }
   };
   const exports = load(path.join(root, file), name => {
+    if (name === '../../hooks/useClock') return { useClock: () => Date.now() };
+    if (name === '../../utils/takeDetail') return load(path.join(root, 'utils/takeDetail.ts'), () => { throw Error('Unexpected Take helper dependency'); });
     if (name === 'react') return React;
     if (name === 'react-native') return rn;
     if (name === 'expo-router') return {
@@ -544,6 +546,7 @@ test('editorial feed retains actions, questions and challenge gate without claim
     take = {
       id: 't',
       text: 'Test Take',
+      expiresAt: Date.now() + 3600000,
       hood: 'tech',
       clashes: 2,
       reactions: 4,
