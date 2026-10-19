@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { currentViewerProfileId } from '../services/apiService';
 import { fetchUnreadCount } from '../services/notificationService';
 import { useAuth } from './AuthProvider';
+import { currentUserId } from '../services/supabaseClient';
 
 /**
  * One shared unread count for the Activity tab. The badge lives in the dock, so
@@ -20,29 +21,29 @@ const UnreadContext = createContext<UnreadContextValue>({
 });
 
 export function NotificationUnreadProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const { signedIn } = useAuth();
-  const [unread, setUnread] = useState(0);
+  const { user } = useAuth();
+  const owner = user?.id ?? null;
+  const [snapshot, setSnapshot] = useState<{owner:string;unread:number}|null>(null);
+  const generation = React.useRef(0);
+  const unread = snapshot?.owner === owner ? snapshot?.unread ?? 0 : 0;
 
   const refresh = useCallback(async (): Promise<void> => {
-    const profileId = await currentViewerProfileId();
-    if (!profileId) {
-      setUnread(0);
-      return;
-    }
+    const request = ++generation.current;
+    if (!owner) {setSnapshot(null);return;}
     try {
-      setUnread(await fetchUnreadCount(profileId));
+      const profileId = await currentViewerProfileId();
+      if (!profileId || request !== generation.current || await currentUserId() !== owner) return;
+      const count = await fetchUnreadCount(profileId);
+      if (request === generation.current && await currentUserId() === owner) setSnapshot({owner,unread:count});
     } catch {
       // Keep the last count; the next focus or mark-all reconciles it.
     }
-  }, []);
+  }, [owner]);
 
   useEffect(() => {
-    if (signedIn) {
-      void refresh();
-    } else {
-      setUnread(0);
-    }
-  }, [signedIn, refresh]);
+    void refresh();
+    return () => {generation.current++;};
+  }, [refresh]);
 
   const value = useMemo<UnreadContextValue>(() => ({ unread, refresh }), [unread, refresh]);
 

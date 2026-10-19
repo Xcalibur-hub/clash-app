@@ -8,6 +8,7 @@ export interface LiveDiscoveryDuel {
   phase?: string;
   fighters?: readonly ({ id: string; name: string; tint: string } | null)[];
   identityHidden: boolean;
+  verdictWinner?: 'A' | 'B' | 'DRAW' | null;
 }
 export interface LiveDiscoverySignals {
   /** Only explicitly selected catalogue hoods, never inferred from text. */

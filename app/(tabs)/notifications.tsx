@@ -1,17 +1,16 @@
-import React from 'react';
+﻿import React from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../store/AuthProvider';
 import { useNotificationUnread } from '../../store/NotificationUnreadProvider';
-import {
-  fetchNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  type AppNotification,
-} from '../../services/notificationService';
+import { fetchNotifications, markAllNotificationsRead, markNotificationRead, type AppNotification } from '../../services/notificationService';
 import { fetchProfilesByIds } from '../../services/apiService';
-import { fetchClashById } from '../../services/clashEngineService';
+import { currentUserId } from '../../services/supabaseClient';
+import { fetchRoom } from '../../services/liveArenaService';
+import { resolveArenaReturn } from '../../services/arenaReturnVisitService';
+import { ArenaReturnVisits } from '../../components/arena/ArenaReturnVisits';
+import { ArenaButton } from '../../components/arena/ui/ArenaPrimitives';
 import { NotificationRow } from '../../components/notifications/NotificationRow';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { BellIcon } from '../../components/shared/icons';
@@ -20,157 +19,70 @@ import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { tap as hapticTap } from '../../utils/haptics';
 
-/** Activity inbox — real `notifications` rows, actor avatars, read state. */
+/** Existing recipient-owned inbox; no new events, subscriptions or notification writers. */
 export default function NotificationsTab(): React.JSX.Element {
-  const { signedIn, loading } = useAuth();
-  const { refresh: refreshUnread } = useNotificationUnread();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const t = useThemeColors();
-
-  const [items, setItems] = React.useState<AppNotification[] | null>(null);
-  const [actors, setActors] = React.useState<Map<string, User>>(new Map());
-  const [refreshing, setRefreshing] = React.useState(false);
-
-  const load = React.useCallback(async (): Promise<void> => {
-    const rows = await fetchNotifications();
-    setItems(rows);
-    void refreshUnread();
-    const ids = [...new Set(rows.map((row) => row.actorId).filter((id): id is string => id !== null))];
-    if (ids.length > 0) {
-      const users = await fetchProfilesByIds(ids);
-      setActors(new Map(users.map((user) => [user.id, user])));
-    } else {
-      setActors(new Map());
-    }
-  }, [refreshUnread]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      if (!signedIn) return;
-      void load();
-    }, [signedIn, load]),
-  );
-
-  const open = async (item: AppNotification): Promise<void> => {
-    if (item.readAt === null) {
-      setItems((prev) => prev?.map((row) => (row.id === item.id ? { ...row, readAt: Date.now() } : row)) ?? prev);
-      void markNotificationRead(item.id).catch(() => undefined);
-    }
-
-    switch (item.kind) {
-      case 'challenge_received':
-        if (item.entityId) router.push(`/take/${item.entityId}`);
-        break;
-      case 'challenge_accepted':
-        if (item.entityId) router.push(`/arena/room/${item.entityId}`);
-        break;
-      case 'new_follower':
-        if (item.actorId) router.push(`/profile/${item.actorId}`);
-        break;
-      case 'comment':
-      case 'reply':
-        if (item.entityId) router.push(`/take/${item.entityId}`);
-        break;
-      case 'clash_started':
-      case 'clash_result':
-      case 'reputation': {
-        if (item.entityId) {
-          try {
-            const clash = await fetchClashById(item.entityId);
-            router.push(clash ? `/clash/${clash.takeId}` : '/(tabs)/profile');
-          } catch {
-            router.push('/(tabs)/profile');
-          }
-        } else {
-          router.push('/(tabs)/profile');
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  };
-
-  const markAll = async (): Promise<void> => {
-    setItems((prev) => prev?.map((row) => (row.readAt === null ? { ...row, readAt: Date.now() } : row)) ?? prev);
+  const { signedIn, loading, user } = useAuth(), owner = user?.id ?? null;
+  const { refresh: refreshUnread } = useNotificationUnread(), router = useRouter(), insets = useSafeAreaInsets(), t = useThemeColors();
+  const [snapshot,setSnapshot] = React.useState<{owner:string;items:AppNotification[];actors:Map<string,User>;error:boolean}|null>(null);
+  const [refreshing,setRefreshing] = React.useState(false),[retry,setRetry] = React.useState(0),[notice,setNotice] = React.useState('');
+  const generation = React.useRef(0), opening = React.useRef(false), marking = React.useRef(false);
+  useFocusEffect(React.useCallback(() => {
+    let active = true;
+    const request = ++generation.current;
+    setSnapshot(null);setNotice('');opening.current=false;marking.current=false;
+    if (owner) void (async()=>{
+      try {
+        const items = await fetchNotifications();
+        if (!active || request!==generation.current || await currentUserId()!==owner) return;
+        const ids = [...new Set(items.flatMap(row=>row.actorId?[row.actorId]:[]))];
+        let actors = new Map<string,User>();
+        try { if (ids.length) actors=new Map((await fetchProfilesByIds(ids)).map(actor=>[actor.id,actor])); } catch { /* Notification text remains available without actor enrichment. */ }
+        if (active && request===generation.current && await currentUserId()===owner) {setSnapshot({owner,items,actors,error:false});void refreshUnread();}
+      } catch { if (active && request===generation.current) setSnapshot({owner,items:[],actors:new Map(),error:true}); }
+      finally {if(active && request===generation.current)setRefreshing(false);}
+    })();
+    return()=>{active=false;generation.current++;};
+  },[owner,retry,refreshUnread]));
+  const current = snapshot?.owner===owner?snapshot:null;
+  const items = current?.items??[], actors = current?.actors??new Map<string,User>();
+  const currentRequest = async(request:number):Promise<boolean> => !!owner && request===generation.current && await currentUserId()===owner;
+  const open = async(item:AppNotification):Promise<void>=>{
+    if(!owner||opening.current)return;
+    opening.current=true;const request=generation.current;setNotice('');
     try {
-      await markAllNotificationsRead();
-      void refreshUnread();
-    } catch {
-      // Server read-state will reconcile on the next focus fetch.
-    }
+      if(!await currentRequest(request))return;
+      let destination:Parameters<typeof router.push>[0]|null=null;
+      switch(item.kind){
+        case 'challenge_received':case 'comment':case 'reply': if(item.entityId)destination=`/take/${item.entityId}`;break;
+        case 'challenge_accepted': if(item.entityId){const room=await fetchRoom(item.entityId);if(!room.clashId)throw Error('Unavailable');const resolved=await resolveArenaReturn(owner,room.clashId,()=>request===generation.current);destination=resolved.destination;}break;
+        case 'new_follower':if(item.actorId)destination=`/profile/${item.actorId}`;break;
+        case 'clash_started':case 'clash_result':case 'reputation':if(item.entityId){const resolved=await resolveArenaReturn(owner,item.entityId,()=>request===generation.current);destination=resolved.destination;}break;
+      }
+      if(!await currentRequest(request))return;
+      if(!destination){setNotice('This activity is unavailable or access has changed.');return;}
+      if(item.readAt===null){
+        try {await markNotificationRead(item.id);if(await currentRequest(request)){setSnapshot(previous=>previous?.owner===owner?{...previous,items:previous.items.map(row=>row.id===item.id?{...row,readAt:Date.now()}:row)}:previous);void refreshUnread();}}
+        catch {if(await currentRequest(request))setNotice('Read state could not be saved. It will refresh next visit.');}
+      }
+      if(await currentRequest(request))router.push(destination);
+    }catch{if(await currentRequest(request))setNotice('Couldn’t verify this activity. No navigation occurred.');}
+    finally{if(request===generation.current)opening.current=false;}
   };
-
-  const unreadCount = (items ?? []).filter((item) => item.readAt === null).length;
-  const bottomPad = dockBottomPadding(insets.bottom);
-
-  if (loading) {
-    return <View style={[styles.screen, { backgroundColor: t.background }]} />;
-  }
-
-  if (!signedIn) {
-    return (
-      <View
-        style={[
-          styles.screen,
-          {
-            backgroundColor: t.background,
-            paddingTop: insets.top,
-            paddingBottom: bottomPad,
-          },
-        ]}
-      >
-        <EmptyState
-          icon={BellIcon}
-          title="Your activity"
-          body="Sign in to see replies, Clash results and reputation."
-          actionLabel="Sign in"
-          onAction={() => router.push('/auth')}
-        />
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.screen, { backgroundColor: t.background }]}>
-      <FlatList
-        data={items ?? []}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <NotificationRow
-            notification={item}
-            actor={actors.get(item.actorId ?? '')}
-            onPress={() => void open(item)}
-          />
-        )}
-        ListHeaderComponent={<Header unreadCount={unreadCount} onMarkAll={() => void markAll()} />}
-        ListEmptyComponent={
-          items === null ? (
-            <View style={styles.spinner}>
-              <ActivityIndicator color={t.textPrimary} />
-            </View>
-          ) : (
-            <EmptyState
-              icon={BellIcon}
-              title="No notifications yet"
-              body="When you get replies, Clash results or followers, you'll see them here."
-            />
-          )
-        }
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + space.md, paddingBottom: bottomPad },
-        ]}
-        refreshing={refreshing}
-        onRefresh={() => {
-          setRefreshing(true);
-          void load().finally(() => setRefreshing(false));
-        }}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
-  );
+  const markAll=async():Promise<void>=>{
+    if(!owner||marking.current)return;marking.current=true;const request=generation.current;
+    try{if(!await currentRequest(request))return;await markAllNotificationsRead();if(await currentRequest(request)){setSnapshot(previous=>previous?.owner===owner?{...previous,items:previous.items.map(row=>row.readAt===null?{...row,readAt:Date.now()}:row)}:previous);void refreshUnread();}}
+    catch{if(await currentRequest(request))setNotice('Couldn’t mark notifications read. Try again.');}
+    finally{if(request===generation.current)marking.current=false;}
+  };
+  const bottomPad=dockBottomPadding(insets.bottom);
+  if(loading)return <View style={[styles.screen,{backgroundColor:t.background}]} />;
+  if(!signedIn||!owner)return <View style={[styles.screen,{backgroundColor:t.background,paddingTop:insets.top,paddingBottom:bottomPad}]}><EmptyState icon={BellIcon} title="Your activity" body="Sign in to see replies and your recent Clashes." actionLabel="Sign in" onAction={()=>router.push('/auth')} /></View>;
+  return <View style={[styles.screen,{backgroundColor:t.background}]}><FlatList data={items} keyExtractor={item=>item.id}
+    renderItem={({item})=><NotificationRow notification={item} actor={actors.get(item.actorId??'')} onPress={()=>void open(item)} />}
+    ListHeaderComponent={<View><ArenaReturnVisits refreshToken={retry}/><Header unreadCount={items.filter(item=>item.readAt===null).length} onMarkAll={()=>void markAll()}/>{notice?<Text accessibilityRole="alert" style={{color:t.textSecondary,paddingVertical:12}}>{notice}</Text>:null}</View>}
+    ListEmptyComponent={!current?<View style={styles.spinner}><ActivityIndicator color={t.textPrimary}/></View>:current.error?<View style={{gap:8}}><Text accessibilityRole="alert" style={{color:t.textSecondary}}>Couldn’t load notifications. These are not empty results.</Text><ArenaButton label="Retry notifications" onPress={()=>setRetry(n=>n+1)}/></View>:<EmptyState icon={BellIcon} title="No notifications in this window" body="The latest 50 recipient-owned notifications appear here. This is not complete activity history."/>}
+    contentContainerStyle={[styles.content,{paddingTop:insets.top+space.md,paddingBottom:bottomPad}]} refreshing={refreshing}
+    onRefresh={()=>{setRefreshing(true);setRetry(n=>n+1);}} showsVerticalScrollIndicator={false}/></View>;
 }
 
 function Header({ unreadCount, onMarkAll }: { unreadCount: number; onMarkAll: () => void }): React.JSX.Element {

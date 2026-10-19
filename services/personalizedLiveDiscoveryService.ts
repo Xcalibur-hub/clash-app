@@ -56,7 +56,8 @@ async function readSnapshot(expectedAccount: string, isCurrent: () => boolean): 
         rows.push({ entry: { ...entry, state, status, title: view.sideAText }, hood: hoods.get(entry.takeId) ?? null,
           opensAt: view.opensAt, phase: room?.phase,
           fighters: view.revealed ? [view.sideA, view.sideB] : undefined,
-          identityHidden: view.mode === 'BLIND' && !view.revealed });
+          identityHidden: view.mode === 'BLIND' && !view.revealed,
+          verdictWinner: room?.duel?.verdict?.winnerSide ?? view.verdict?.winnerSide ?? null });
       } catch { metadataError = true; /* Denied/failed detail reads never become visible cards. */ }
     }
   }));
