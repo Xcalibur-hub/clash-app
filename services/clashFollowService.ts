@@ -7,6 +7,7 @@
  * changed while the request was in flight.
  */
 import type { PostgrestError } from '@supabase/supabase-js';
+import { currentViewerProfileId } from './apiService';
 import { currentUserId, requireSupabase, requestError } from './supabaseClient';
 
 type RpcClient = {
@@ -44,15 +45,15 @@ export async function setClashFollow(
   following: boolean,
   active: () => boolean = () => true,
 ): Promise<void> {
-  // Validate the expected account and live session BEFORE dispatch, so a stale
-  // action from account A can never execute as account B after a session change.
+  // The server compares p_expected_profile with my_profile_id(), which is the
+  // viewer PROFILE id, not the auth user id. Resolve it before dispatch so the
+  // compare-and-set matches the identity the RPC will execute under.
+  const expectedProfile = await currentViewerProfileId();
   await guard(account, active);
+  if (!expectedProfile) throw new Error('profile_unavailable');
   const { error } = await callRpc(following ? 'follow_clash' : 'unfollow_clash', {
     p_clash_id: clashId,
-    // Compare-and-set on the server: if the session switches between this
-    // guard and token acquisition, the RPC sees a different my_profile_id()
-    // and refuses, so nothing is written for the wrong account.
-    p_expected_profile: account,
+    p_expected_profile: expectedProfile,
   });
   if (error) throw requestError(error);
   await guard(account, active);

@@ -21,6 +21,7 @@ function harness({ current = 'A', onRpc } = {}) {
   vm.runInNewContext(compile('services/clashFollowService.ts'), {
     module, exports: module.exports,
     require: (name) => {
+      if (name === './apiService') return { currentViewerProfileId: async () => 'profile-A' };
       if (name === './supabaseClient') return {
         currentUserId: async () => state.current,
         requireSupabase: () => ({
@@ -57,5 +58,5 @@ test('the expected account performs exactly one idempotent RPC each way', async 
   assert.equal(h.calls.length, 2);
   assert.equal(h.calls[0][0], 'follow_clash');
   assert.equal(h.calls[1][0], 'unfollow_clash');
-  assert.equal(JSON.stringify(h.calls[0][1]), JSON.stringify({ p_clash_id: 'c1', p_expected_profile: 'A' }));
+  assert.equal(JSON.stringify(h.calls[0][1]), JSON.stringify({ p_clash_id: 'c1', p_expected_profile: 'profile-A' }));
 });
