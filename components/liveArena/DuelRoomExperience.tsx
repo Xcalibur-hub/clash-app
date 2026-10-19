@@ -108,6 +108,10 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
     setFollowing(false);
     setFollowError(null);
     const request = ++followRequest.current;
+    // A new Clash/account scope must not inherit the previous busy state, and a
+    // completion from the previous scope is ignored by the token check below.
+    setFollowBusy(false);
+    followInFlight.current = false;
     if (!account || !duel.clashId) return () => { active = false; };
     void fetchClashFollowState(account, duel.clashId, () => active)
       .then((value) => { if (active && followRequest.current === request) setFollowing(value); })
@@ -371,7 +375,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           following={following}
           followBusy={followBusy}
           followError={followError}
-          onToggleFollow={toggleFollow}
+          onToggleFollow={duel.status === 'open' ? toggleFollow : undefined}
           crowdPaddingBottom={
             presentation.canPublish ? 0 : keyboardOpen ? space.xs : Math.max(bottomInset, space.sm)
           }

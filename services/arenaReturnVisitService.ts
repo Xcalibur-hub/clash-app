@@ -90,9 +90,13 @@ export async function fetchFollowedClashReturns(account: string, active: () => b
       try {
         const item = await resolveArenaReturn(account, id, active);
         results[index] = { ...item, basis: 'You follow this Clash' };
-      } catch {
+      } catch (error) {
         await guard(account, active);
-        results[index] = { id, title: null, state: 'UNAVAILABLE', destination: null, basis: 'Followed Clash' };
+        // Denied access is unavailable; anything else stays retryable.
+        const denied = ['42501','P0002','P0003'].includes(String((error as {code?:string})?.code));
+        results[index] = denied
+          ? { id, title: null, state: 'UNAVAILABLE', destination: null, basis: 'Followed Clash' }
+          : { id, title: null, state: 'ERROR', destination: null, basis: 'Couldn’t verify this Clash' };
       }
     }
   }));

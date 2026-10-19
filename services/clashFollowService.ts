@@ -44,6 +44,9 @@ export async function setClashFollow(
   following: boolean,
   active: () => boolean = () => true,
 ): Promise<void> {
+  // Validate the expected account and live session BEFORE dispatch, so a stale
+  // action from account A can never execute as account B after a session change.
+  await guard(account, active);
   const { error } = await callRpc(following ? 'follow_clash' : 'unfollow_clash', {
     p_clash_id: clashId,
   });
