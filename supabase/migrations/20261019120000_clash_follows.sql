@@ -29,6 +29,13 @@ create table if not exists public.clash_follows (
 create index if not exists clash_follows_follower_idx
   on public.clash_follows (follower_id, created_at desc);
 
+-- Structural dedup for verdict delivery. Verified against the local stack: no
+-- existing (recipient, clash) duplicates for clash_result, so this partial index
+-- cannot fail on historical data and constrains only follower verdict delivery.
+create unique index if not exists notifications_clash_result_unique
+  on public.notifications (recipient_id, entity_id)
+  where kind = 'clash_result' and entity_type = 'clash';
+
 alter table public.clash_follows enable row level security;
 
 -- A follower may read only their own relationships. Writes go through the RPCs.
@@ -130,33 +137,45 @@ begin
     return new;
   end if;
 
-  for f in
-    select cf.follower_id
-      from public.clash_follows cf
-     where cf.clash_id = new.clash_id
-       -- The two debaters already receive their own clash_result.
-       and cf.follower_id <> coalesce(v_author, '')
-       and cf.follower_id <> coalesce(v_challenger, '')
-       -- Access can be revoked between following and settlement.
-       and not exists (
-         select 1 from public.blocks b
-          where (b.blocker_id = v_author and b.blocked_id = f.follower_id)
-             or (b.blocker_id = f.follower_id and b.blocked_id = v_author))
-       and not exists (
-         select 1 from public.mutes m
-          where m.muter_id = f.follower_id and m.muted_id = v_author)
-  loop
-    -- Retry-safe: one clash_result per follower per finalized verdict.
-    if not exists (
-      select 1 from public.notifications n
-       where n.recipient_id = f.follower_id
-         and n.kind = 'clash_result'
-         and n.entity_type = 'clash'
-         and n.entity_id = new.clash_id
-    ) then
-      perform public.clash_notify(f.follower_id, null, 'clash_result', new.clash_id);
-    end if;
-  end loop;
+  -- Delivery is best-effort: a notification failure must never roll back a
+  -- finalized verdict, its rewards or the settlement transaction.
+  begin
+    for f in
+      select cf.follower_id
+        from public.clash_follows cf
+       where cf.clash_id = new.clash_id
+         -- The two debaters already receive their own clash_result.
+         and cf.follower_id <> coalesce(v_author, '')
+         and cf.follower_id <> coalesce(v_challenger, '')
+    loop
+      -- Access can be revoked between following and settlement. This is checked
+      -- outside the driving query: PL/pgSQL cannot reference the loop record
+      -- inside the SELECT that assigns it.
+      if exists (
+        select 1 from public.blocks b
+         where (b.blocker_id = v_author and b.blocked_id = f.follower_id)
+            or (b.blocker_id = f.follower_id and b.blocked_id = v_author)
+      ) or exists (
+        select 1 from public.mutes m
+         where m.muter_id = f.follower_id and m.muted_id = v_author
+      ) then
+        continue;
+      end if;
+
+      -- Structural, retry-safe delivery: the partial unique index turns a second
+      -- insert for the same verdict into a no-op instead of an error.
+      insert into public.notifications (id, recipient_id, actor_id, kind, entity_type, entity_id)
+      values (
+        'n_' || lower(substr(md5(random()::text || clock_timestamp()::text), 1, 16)),
+        f.follower_id, null, 'clash_result', 'clash', new.clash_id
+      )
+      on conflict (recipient_id, entity_id)
+        where kind = 'clash_result' and entity_type = 'clash'
+        do nothing;
+    end loop;
+  exception when others then
+    raise warning 'clash follower notification failed for %: %', new.clash_id, sqlerrm;
+  end;
 
   return new;
 end;

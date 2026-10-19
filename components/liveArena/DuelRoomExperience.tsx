@@ -99,15 +99,19 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const [following, setFollowing] = React.useState(false);
   const [followBusy, setFollowBusy] = React.useState(false);
   const [followError, setFollowError] = React.useState<string | null>(null);
+  // Generation token: a slow mount read must never overwrite a newer toggle.
+  const followRequest = React.useRef(0);
+  const followInFlight = React.useRef(false);
 
   React.useEffect(() => {
     let active = true;
     setFollowing(false);
     setFollowError(null);
+    const request = ++followRequest.current;
     if (!account || !duel.clashId) return () => { active = false; };
     void fetchClashFollowState(account, duel.clashId, () => active)
-      .then((value) => { if (active) setFollowing(value); })
-      .catch(() => { if (active) setFollowing(false); });
+      .then((value) => { if (active && followRequest.current === request) setFollowing(value); })
+      .catch(() => { if (active && followRequest.current === request) setFollowing(false); });
     return () => { active = false; };
   }, [account, duel.clashId]);
 
@@ -115,18 +119,20 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const toggleFollow = (): void => {
     if (!duel.clashId) return;
     if (!account) { props.onRequireAuth?.(); return; }
-    if (followBusy) return;
+    if (followBusy || followInFlight.current) return;
+    const request = ++followRequest.current;
+    followInFlight.current = true;
     const next = !following;
     setFollowing(next);
     setFollowBusy(true);
     setFollowError(null);
-    hapticTap();
+        hapticTap();
     void setClashFollow(account, duel.clashId, next)
       .catch(() => {
-        setFollowing(!next);
-        setFollowError('Could not save your follow. Try again.');
+        if (followRequest.current === request) setFollowing(!next);
+        if (followRequest.current === request) setFollowError('Could not save your follow. Try again.');
       })
-      .finally(() => setFollowBusy(false));
+      .finally(() => { followInFlight.current = false; if (followRequest.current === request) setFollowBusy(false); });
   };
   const cancelled = duel.status === 'cancelled';
   const crowd = useArenaCrowd(props.threadLocked || cancelled ? null : room.roomId);
