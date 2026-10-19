@@ -57,7 +57,12 @@ async function metroReady() {
 if (await metroReady()) {
   console.log('Reusing current repository Metro on 8081.');
 } else {
-  const args = [cli, 'start', '--dev-client', '--localhost', '--port', '8081'];
+  // Metro sizes its jest-worker pool to the CPU count by default. Each fork
+  // opens its own console window on Windows when Metro has no inherited console
+  // (background/detached launch), which produced a burst of black windows.
+  // Cap it: a single worker keeps transforms in-band and forks nothing.
+  const workers = process.env.CLASH_METRO_WORKERS ?? '1';
+  const args = [cli, 'start', '--dev-client', '--localhost', '--port', '8081', '--max-workers', workers];
   const options = { cwd: root, env: { ...process.env, APP_VARIANT: variant } };
   if (background) {
     mkdirSync(join(root, '.expo'), { recursive: true });
