@@ -22,11 +22,11 @@ export function ChallengeInvitation({ challenge, takeText, remaining, busy, elig
   return <View style={{ flex: 1, minHeight: 0 }} accessibilityLabel="Challenge invitation">
     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={[arena.type.eyebrow, { color: c.muted }]}>A DIFFERENT PERSPECTIVE</Text>
-      <Text accessibilityRole="header" style={[arena.type.statement, { color: c.ink }]}>{challenge ? 'Your Take started a conversation.' : 'You’re all caught up.'}</Text>
+      <Text accessibilityRole="header" style={[arena.type.heading, { color: c.ink, fontSize: 20, lineHeight: 26 }]}>{challenge ? 'Your Take started a conversation.' : 'You’re all caught up.'}</Text>
       {challenge ? <>
-        <View style={[styles.identity, { borderColor: c.line }]}><Avatar name={challenge.challenger.name} tint="#73849A" size={44} /><View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={2} style={[arena.type.heading, { color: c.ink }]}>{challenge.challenger.name}</Text><Text numberOfLines={1} style={[arena.type.meta, { color: c.secondary }]}>@{challenge.challenger.handle}</Text></View><ArenaBadge>{challenge.status}</ArenaBadge></View>
+        <View style={[styles.identity, { borderColor: c.line }]}><Avatar name={challenge.challenger.name} tint="#73849A" size={44} /><View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={2} style={[arena.type.heading, { color: c.ink, fontSize: 16 }]}>{challenge.challenger.name}</Text><Text numberOfLines={1} style={[arena.type.meta, { color: c.secondary }]}>@{challenge.challenger.handle}</Text></View><ArenaBadge>{challenge.status}</ArenaBadge></View>
         <View style={[styles.source, { borderColor: c.line }]}><Text style={[arena.type.eyebrow, { color: c.muted }]}>YOUR TAKE</Text><Text style={[arena.type.body, { color: c.secondary }]}>{takeText}</Text></View>
-        <Text style={[arena.type.eyebrow, { color: '#A95F57' }]}>THE COUNTERPOSITION</Text><Text selectable style={[arena.type.statement, { color: c.ink }]}>{challenge.counterPosition}</Text>
+        <Text style={[arena.type.eyebrow, { color: '#A95F57' }]}>THE COUNTERPOSITION</Text><Text selectable style={[arena.type.body, { color: c.ink, fontSize: 17, lineHeight: 25 }]}>{challenge.counterPosition}</Text>
         <Text style={[arena.type.meta, { color: c.muted }]}>{eligible ? 'Accept to enter a live 1v1. Only you two can publish official arguments.' : 'This invitation is no longer actionable. Discussion and history remain available.'}</Text>
       </> : <Text style={[arena.type.body, { color: c.secondary }]}>New invitations will appear here. Nothing has been accepted.</Text>}
     </ScrollView>
@@ -38,4 +38,4 @@ export function ChallengeInvitation({ challenge, takeText, remaining, busy, elig
     </View>
   </View>;
 }
-const styles = StyleSheet.create({ content: { padding: 20, gap: 20, maxWidth: 680, width: '100%', alignSelf: 'center', paddingBottom: 24 }, identity: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth }, source: { borderLeftWidth: 2, paddingLeft: 14, gap: 8 }, actions: { borderTopWidth: StyleSheet.hairlineWidth, padding: 16, gap: 10 } });
+const styles = StyleSheet.create({ content: { padding: 16, gap: 12, maxWidth: 680, width: '100%', alignSelf: 'center', paddingBottom: 24 }, identity: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth }, source: { borderLeftWidth: 2, paddingLeft: 14, gap: 8 }, actions: { borderTopWidth: StyleSheet.hairlineWidth, padding: 12, gap: 6 } });

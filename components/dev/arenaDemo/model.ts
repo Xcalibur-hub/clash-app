@@ -121,7 +121,9 @@ export function demoReducer(s: DemoState, a: DemoAction): DemoState {
   }
 }
 export function demoDuel(s: DemoState): ArenaDuel {
-  return { clashId: 'demo-clash', status: terminal(s) ? s.phase === 'CANCELLED' ? 'cancelled' : 'settled' : 'open', fighterA: { ...s.data.authors[0], tint: '#6489AC' }, fighterB: { ...s.data.authors[1], tint: '#AA7575' }, viewerRelationship: s.role, mayJudge: s.phase === 'JUDGING' && s.role === 'spectator', hasJudged: false, sourceText: s.data.takes.find(t => t.take.id === s.page.id)?.take.text ?? s.data.takes[0].take.text, counterPosition: 'We should measure intention and access, not simply minimise screen time.', verdict: s.phase === 'SETTLED' || s.phase === 'DRAW' ? { winnerSide: s.phase === 'DRAW' ? 'DRAW' : 'A', jurySize: 6, sideAScore: s.phase === 'DRAW' ? 3 : 4, sideBScore: s.phase === 'DRAW' ? 3 : 2, verdictLabel: 'SCRIPTED DEMO RESULT' } : null };
+  const index = Math.max(0, s.data.takes.findIndex(t => t.take.id === s.page.id));
+  const fighterA = s.data.authors[index === 0 ? 0 : (index + 2) % s.data.authors.length], fighterB = s.data.authors[index === 0 ? 1 : (index + 3) % s.data.authors.length];
+  return { clashId: 'demo-clash', status: terminal(s) ? s.phase === 'CANCELLED' ? 'cancelled' : 'settled' : 'open', fighterA: { ...fighterA, tint: '#6489AC' }, fighterB: { ...fighterB, tint: '#AA7575' }, viewerRelationship: s.role, mayJudge: s.phase === 'JUDGING' && s.role === 'spectator', hasJudged: false, sourceText: s.data.takes.find(t => t.take.id === s.page.id)?.take.text ?? s.data.takes[0].take.text, counterPosition: 'We should measure intention and access, not simply minimise screen time.', verdict: s.phase === 'SETTLED' || s.phase === 'DRAW' ? { winnerSide: s.phase === 'DRAW' ? 'DRAW' : 'A', jurySize: 6, sideAScore: s.phase === 'DRAW' ? 3 : 4, sideBScore: s.phase === 'DRAW' ? 3 : 2, verdictLabel: 'SCRIPTED DEMO RESULT' } : null };
 }
 export function visibleDemoAssists(s: DemoState): DemoAssist[] {
   return s.role === 'spectator' ? s.assists.filter(a => a.isOwn) : s.assists.filter(a => a.target === sideFor(s));

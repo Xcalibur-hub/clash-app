@@ -107,18 +107,17 @@ export function CurrentArgumentStage({
 
 const styles = StyleSheet.create({
   wrap: {
-    flexGrow: 1,
-    flexShrink: 1,
+    flexShrink: 0,
     minHeight: 64,
     justifyContent: 'flex-start',
-    paddingTop: 12,
+    paddingTop: 6,
     paddingHorizontal: layout.screenX,
     gap: space.sm,
   },
   argument: {
     ...arena.type.statement,
-    fontSize: 22,
-    lineHeight: 30,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: '600',
     letterSpacing: -0.25,
     textAlign: 'left',

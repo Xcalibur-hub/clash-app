@@ -5,10 +5,6 @@ import React from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
-  FadeInDown,
-  SlideInLeft,
-  SlideInRight,
-  ZoomIn,
   useReducedMotion,
 } from 'react-native-reanimated';
 import { space, typeScale, useThemeColors } from '../../theme';
@@ -40,26 +36,19 @@ export function ClashConfirmedOverlay({
     <Modal visible transparent animationType={reduced ? 'none' : 'fade'} statusBarTranslucent>
       <View style={[styles.root, { backgroundColor: t.background }]} accessibilityViewIsModal>
 
-        <View style={styles.content}>
-          <Animated.Text
-            entering={reduced ? undefined : FadeIn.duration(200)}
-            style={[styles.kicker, { color: t.textMuted }]}
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.content}>
+          <Text style={[styles.kicker, { color: t.textMuted }]}
           >
             CLASH CONFIRMED
-          </Animated.Text>
-          <Animated.Text
-            entering={reduced ? undefined : FadeInDown.delay(40).springify().damping(16)}
-            style={[styles.title, { color: t.textPrimary }]}
+          </Text>
+          <Text style={[styles.title, { color: t.textPrimary }]}
             accessibilityRole="header"
           >
             You're in.
-          </Animated.Text>
+          </Text>
 
-          <View style={styles.row}>
-            <Animated.View
-              entering={reduced ? undefined : SlideInLeft.delay(80).springify().damping(15)}
-              style={styles.col}
-            >
+          <View testID="confirmation-fighters" style={styles.row}>
+            <View testID="confirmation-fighter-a" style={styles.col}>
               <Avatar name={fighterA.name} tint={fighterA.tint ?? t.textMuted} size={56} />
               <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
                 {fighterA.name}
@@ -67,34 +56,27 @@ export function ClashConfirmedOverlay({
               <Text numberOfLines={1} style={[styles.handle, { color: t.textMuted }]}>
                 @{fighterA.handle}
               </Text>
-            </Animated.View>
-            <Animated.Text
-              entering={reduced ? undefined : ZoomIn.delay(140).springify().damping(13)}
-              style={[styles.vs, { color: t.textSecondary }]}
+            </View>
+            <Text style={[styles.vs, { color: t.textSecondary }]}
             >
               VS
-            </Animated.Text>
-            <Animated.View
-              entering={reduced ? undefined : SlideInRight.delay(100).springify().damping(15)}
-              style={styles.col}
-            >
-              <Avatar name={fighterB.name} tint={fighterB.tint ?? t.textMuted} size={80} />
+            </Text>
+            <View testID="confirmation-fighter-b" style={styles.col}>
+              <Avatar name={fighterB.name} tint={fighterB.tint ?? t.textMuted} size={56} />
               <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
                 {fighterB.name}
               </Text>
               <Text numberOfLines={1} style={[styles.handle, { color: t.textMuted }]}>
                 @{fighterB.handle}
               </Text>
-            </Animated.View>
+            </View>
           </View>
 
-          <Animated.Text
-            entering={reduced ? undefined : FadeIn.delay(280).duration(240)}
-            style={[styles.enter, { color: t.textSecondary }]}
+          <Text style={[styles.enter, { color: t.textSecondary }]}
           >
             Opening your Live Room
-          </Animated.Text>
-        </View>
+          </Text>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -104,8 +86,9 @@ const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'center' },
   content: {
     zIndex: 1,
-    paddingHorizontal: space.lg,
-    gap: space.lg,
+    paddingHorizontal: 20,
+    width: '100%', maxWidth: 440, alignSelf: 'center',
+    gap: 24,
     alignItems: 'center',
   },
   kicker: {
@@ -120,15 +103,15 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontWeight: '800',
     letterSpacing: -0.8,
-    marginTop: -12,
+    marginTop: 0,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
+    gap: 12,
     width: '100%',
   },
-  col: { flex: 1, alignItems: 'center', gap: 6, minWidth: 0 },
+  col: { width: '40%', flexGrow: 1, flexBasis: 0, alignItems: 'center', gap: 6, minWidth: 0 },
   name: { ...typeScale.label, fontSize: 17, fontWeight: '700', textAlign: 'center', width: '100%' },
   handle: { ...typeScale.caption, fontSize: 13, textAlign: 'center', width: '100%' },
   vs: {

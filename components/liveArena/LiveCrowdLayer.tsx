@@ -60,9 +60,8 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
         onPress={() => { atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loading…' : 'Load earlier chat'}</Text></Pressable> : null}
       ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{unavailableReason ?? (crowd?.loading ? 'Loading Crowd…' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.')}</Text>}
       renderItem={({item}) => <View style={[styles.row,{borderBottomColor:t.border}]} accessibilityRole="text" accessibilityLabel={crowdRowLabel(item.author.handle, item.body)}>
-        <Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>
-          <Text style={[styles.name, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>@{item.author.handle}</Text>{'  '}{item.body}
-        </Text>
+        <View style={[styles.avatar,{backgroundColor:t.surfaceElevated}]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Text style={{color:t.textSecondary,fontSize:11,fontWeight:'600'}}>{item.author.handle.slice(0,1).toUpperCase()}</Text></View>
+        <View style={{flex:1,minWidth:0,gap:3}}><Text numberOfLines={1} style={[styles.name,{color:t.textSecondary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>@{item.author.handle}</Text><Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>{item.body}</Text></View>
         {onReport ? <Pressable onPress={() => onReport(item)} accessibilityRole="button" accessibilityLabel={`Report or block @${item.author.handle}`} style={styles.menu}><Text style={{color:t.textMuted}}>···</Text></Pressable> : null}
       </View>}/>
     {unseen ? <Pressable accessibilityRole="button" accessibilityHint="Scrolls the crowd chat to the newest message" style={[styles.latestButton,{borderColor:t.border,backgroundColor:t.surfaceElevated}]} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>Latest chat ↓</Text></Pressable> : null}
@@ -80,8 +79,8 @@ const styles = StyleSheet.create({
   heading:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
   label:{...typeScale.caption,fontSize:11,fontWeight:'700'},state:{...typeScale.caption,fontSize:11},
   stream:{flex:1,minHeight:0},content:{paddingVertical:8,gap:4,flexGrow:1},
-  row:{flexDirection:'row',alignItems:'flex-start',borderBottomWidth:StyleSheet.hairlineWidth},line:{...typeScale.body,fontSize:13,lineHeight:19,flex:1,minWidth:0,paddingVertical:8},
-  name:{fontWeight:'700',fontSize:13},menu:{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'},
+  avatar:{width:24,height:24,borderRadius:12,alignItems:'center',justifyContent:'center'},row:{flexDirection:'row',alignItems:'flex-start',gap:8,paddingVertical:8},line:{...typeScale.body,fontSize:13,lineHeight:19,minWidth:0},
+  name:{fontWeight:'600',fontSize:11},menu:{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'},
   empty:{...typeScale.caption,paddingVertical:12},notice:{gap:4},hit:{minHeight:44,minWidth:44,justifyContent:'center',paddingHorizontal:8},
   latestButton:{alignSelf:'center',borderRadius:18,borderWidth:StyleSheet.hairlineWidth,minHeight:44,paddingHorizontal:14,justifyContent:'center'},
   sendButton:{minHeight:44,minWidth:62,alignItems:'center',justifyContent:'center',borderRadius:12,borderWidth:StyleSheet.hairlineWidth},

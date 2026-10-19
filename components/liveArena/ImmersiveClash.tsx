@@ -84,7 +84,7 @@ export function ImmersiveClash({
 }: ImmersiveClashProps): React.JSX.Element {
   const t = useThemeColors();
   const [crowdExpanded, setCrowdExpanded] = React.useState(false);
-  const stageFlex = judgingFocus ? 0.76 : condensed ? 0.3 : crowdExpanded ? 0.4 : 0.68;
+  const stageFlex = judgingFocus ? 0.76 : condensed ? 0.3 : crowdExpanded ? 0.38 : 0.72;
   const reduced = useReducedMotion();
   const split = useSharedValue(stageFlex);
   React.useEffect(() => {
@@ -93,16 +93,17 @@ export function ImmersiveClash({
       ? stageFlex
       : withTiming(stageFlex, { duration: 280, easing: Easing.out(Easing.cubic) });
   }, [stageFlex, reduced, split]);
+  const compactSummary = !judgingFocus && (condensed || crowdExpanded);
   const stageStyle = useAnimatedStyle(() => ({
-    flexGrow: split.value,
-    flexBasis: 0,
+    flexGrow: compactSummary ? 0 : split.value,
+    flexBasis: compactSummary ? 'auto' : 0,
   }));
   const crowdStyle = useAnimatedStyle(() => ({
-    flexGrow: 1 - split.value,
+    flexGrow: compactSummary ? 1 : 1 - split.value,
     flexBasis: 0,
   }));
   // The Crowd takes the remaining share of the same animated split.
-  const compact = condensed || judgingFocus;
+  const compact = condensed || judgingFocus || crowdExpanded;
 
   return (
     <View style={styles.root} accessibilityLabel="Live Clash">
@@ -116,9 +117,10 @@ export function ImmersiveClash({
         onMore={onMore}
       />
 
-      <Animated.View style={[styles.stage, stageStyle]}>
-        <ScrollView style={styles.stageScroll}
-          contentContainerStyle={styles.stageContent} showsVerticalScrollIndicator={false}
+      <Animated.View style={[styles.stage, stageStyle, compactSummary ? {height:110,minHeight:110,flexShrink:0} : null]}>
+        {compact && latestMessage && !judgingFocus ? <Pressable accessibilityRole="button" accessibilityLabel="Read full current official argument" onPress={onViewHistory} style={{minHeight:44,paddingHorizontal:16,justifyContent:'center'}}><Text style={{color:t.textPrimary,fontSize:13,fontWeight:'600'}}>Official argument · Read full →</Text></Pressable> : null}
+        {compact && !judgingFocus ? <View style={{paddingBottom:8,minHeight:56,flexShrink:0}}><ClashFighterRail duel={duel} focusSide={focusSide} condensed onOpenProfile={onOpenProfile} /></View> : <ScrollView style={styles.stageScroll}
+          contentContainerStyle={styles.stageContent} showsVerticalScrollIndicator
           keyboardShouldPersistTaps="handled"
           accessibilityLabel="Clash stage and official arguments">
           <ClashProposition text={proposition} condensed={compact} />
@@ -140,7 +142,7 @@ export function ImmersiveClash({
           <ClashFighterRail
             duel={duel}
             focusSide={judgingFocus ? null : focusSide}
-            condensed={compact}
+            condensed
             onOpenProfile={onOpenProfile}
           />
           {!judgingFocus ? (
@@ -160,7 +162,7 @@ export function ImmersiveClash({
             />
           ) : null}
           {stageFooter}
-        </ScrollView>
+        </ScrollView>}
       </Animated.View>
 
       <Animated.View style={[styles.crowd, { borderTopColor: t.border }, crowdStyle]}>
@@ -195,8 +197,8 @@ const styles = StyleSheet.create({
   },
   stageScroll: { flex: 1 },
   stageContent: {
-    flexGrow: 1,
-    gap: space.sm,
+    gap: 8,
+    paddingBottom: 12,
     paddingTop: space.xs,
   },
   crowd: { minHeight: 134, flexShrink: 0, borderTopWidth: StyleSheet.hairlineWidth },

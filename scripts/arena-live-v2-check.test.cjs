@@ -33,4 +33,24 @@ test('busy parent and nonpending status prevent decisions; pass never invokes ac
 test('source eligibility and linked-room confirmation gates remain in connected parent',()=>{const s=fs.readFileSync('components/arena/TakeChallenges.tsx','utf8');assert.match(s,/takeChallengeIneligibility\(take\).*takeChallengeIneligibility\(source\)/);assert.match(s,/await resolveArenaChallenge\(ch.id, 'ACCEPT'\)/);assert.match(s,/linkedRoomAfterAccept\(result\)/);assert.match(s,/router.replace\(`\/arena\/room\/\$\{roomId\}`\)/);});
 test('discovery uses one vertical virtualized owner; private assists leave official Stage',()=>{const discovery=fs.readFileSync('components/arena/ArenaClashes.tsx','utf8');assert.match(discovery,/entry.kind === 'CLASH' && entry.state === section/);assert.match(discovery,/initialNumToRender=\{4\}/);assert.match(fs.readFileSync('app/(tabs)/index.tsx','utf8'),/arenaMode === 'clashes' \? <View[\s\S]*?\{header\}<\/View> : <FlatList/);const room=fs.readFileSync('components/liveArena/DuelRoomExperience.tsx','utf8');assert.ok(room.indexOf('stageFooter={')<room.indexOf('assistOpen ? <ArenaSheet'));assert.doesNotMatch(room.slice(room.indexOf('stageFooter={'),room.indexOf('fighterComposer={')),/PrivateAssistPanel/);assert.match(room,/assistOpen \? <ArenaSheet/);});
 
-test('demo keyboard avoids stale Android offsets, reserves composer room and hides scenario chrome',()=>{const demo=fs.readFileSync('components/dev/arenaDemo/DemoArena.tsx','utf8'),room=fs.readFileSync('components/liveArena/ImmersiveClash.tsx','utf8');assert.match(demo,/enabled=\{Platform.OS === 'ios' \|\| keyboardOpen\}/);assert.match(demo,/condensed=\{keyboardOpen\}/);assert.match(demo,/!keyboardOpen \? <>/);assert.match(room,/minHeight: 134, flexShrink: 0/);});
+test('demo keyboard avoids stale Android offsets, reserves composer room and hides scenario chrome',()=>{const demo=fs.readFileSync('components/dev/arenaDemo/DemoArena.tsx','utf8'),room=fs.readFileSync('components/liveArena/ImmersiveClash.tsx','utf8');assert.match(demo,/enabled=\{Platform.OS === 'ios' \|\| keyboardOpen\}/);assert.match(demo,/condensed=\{keyboardOpen\}/);assert.match(demo,/developerOpen \? <DemoSheet/);assert.match(demo,/onMore=\{\(\) => setDeveloperOpen\(true\)\}/);assert.match(room,/minHeight: 134, flexShrink: 0/);});
+
+test('compact Stage gives all free space to Crowd and keeps a working full-argument action',()=>{
+  const React={createElement:(type,props,...children)=>({type,props:{...props,children}}),useState:()=>[false,()=>{}],useEffect(){}};
+  const module={exports:{}};const noop=()=>{};let history=0;
+  vm.runInNewContext(compile('components/liveArena/ImmersiveClash.tsx'),{module,exports:module.exports,require(name){
+    if(name==='react')return React;
+    if(name==='react-native')return {Pressable:'Pressable',ScrollView:'ScrollView',Text:'Text',View:'View',StyleSheet:{create:x=>x,hairlineWidth:1}};
+    if(name==='react-native-reanimated')return {__esModule:true,default:{View:'AnimatedView'},useReducedMotion:()=>true,useSharedValue:value=>({value}),useAnimatedStyle:f=>f(),withTiming:x=>x,Easing:{out:x=>x,cubic:{}}};
+    if(name.endsWith('/theme'))return {useThemeColors:()=>({border:'#333',textPrimary:'#fff'}),space:{xs:4,sm:8},typeScale:{caption:{}}};
+    if(name.endsWith('/theme/arena'))return {arena:{}};
+    if(name==='./liveArenaStyles')return {chipFill:()=>''};
+    return new Proxy({},{get:(_,key)=>String(key)});
+  }});
+  const props={duel:{},proposition:'Real source',live:true,statusLabel:'OPEN',spectatorCount:null,focusSide:'A',latestMessage:{id:'real',body:'Argument'},paddingTop:0,backingSide:null,onBackSide:noop,canBack:false,onBack:noop,onViewHistory:()=>history++,onMore:noop};
+  const normal=module.exports.ImmersiveClash(props).props.children,compact=module.exports.ImmersiveClash({...props,condensed:true}).props.children;
+  assert.equal(normal[1].props.style[1].flexGrow+normal[2].props.style[2].flexGrow,1);
+  assert.equal(compact[1].props.style[1].flexGrow,0);assert.equal(compact[2].props.style[2].flexGrow,1,'No unallocated flex space after keyboard dismissal');
+  const read=compact[1].props.children[0];assert.equal(read.props.accessibilityLabel,'Read full current official argument');read.props.onPress();assert.equal(history,1);
+  assert.equal(compact[1].props.children[1].type,'View','Compact Stage must not show a clipped argument fragment');
+});

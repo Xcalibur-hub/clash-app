@@ -35,16 +35,16 @@ export function ClashProposition({
 const styles = StyleSheet.create({
   text: {
     ...typeScale.title,
-    fontSize: 18,
-    lineHeight: 25,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: '600',
     letterSpacing: -0.55,
     textAlign: 'left',
     paddingHorizontal: layout.screenX + 4,
   },
   condensed: {
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     letterSpacing: -0.3,
   },
 });
