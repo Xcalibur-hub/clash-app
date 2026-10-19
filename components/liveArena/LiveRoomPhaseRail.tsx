@@ -35,7 +35,34 @@ export interface LiveRoomPhaseRailProps {
 export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX.Element | null {
   const t = useThemeColors();
   const active = stepIndex(status);
-  if (active < 0) return null;
+
+  // A cancelled room is terminal: it never reaches a verdict, so it gets one
+  // explicit closed step instead of an empty rail.
+  if (active < 0) {
+    return (
+      <View
+        style={styles.wrap}
+        accessibilityLiveRegion="polite"
+        accessibilityLabel="Clash phase: room closed, no verdict"
+      >
+        <Text allowFontScaling={false} style={[styles.caption, { color: t.textMuted }]}>
+          Room closed — no verdict
+        </Text>
+        <View style={styles.railRow} accessibilityRole="text" accessibilityLabel="Phase: Closed">
+          <View style={styles.step}>
+            <View style={[styles.dot, { backgroundColor: 'transparent', borderColor: t.borderStrong }]} />
+            <Text
+              allowFontScaling={false}
+              style={[styles.label, { color: t.textMuted, fontWeight: '600' }]}
+            >
+              Closed
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   const urgent = status === 'FINAL_ARGUMENTS' || status === 'JUDGING';
 
   return (

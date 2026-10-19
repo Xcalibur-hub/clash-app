@@ -3,7 +3,7 @@
  * Typography-led; collapses long text without scrolling the whole canvas.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   FadeIn,
   useReducedMotion,
@@ -11,6 +11,7 @@ import Animated, {
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import type { ArenaMessage } from '../../services/liveArenaService';
 import { duelArgumentPreview, duelTimestamp } from '../../utils/duelPresentation';
+import { duelStageType } from '../../utils/duelStageLayout';
 import { arena } from '../../theme/arena';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -34,6 +35,8 @@ export function CurrentArgumentStage({
 }: CurrentArgumentStageProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
+  const { width, fontScale } = useWindowDimensions();
+  const type = duelStageType({ width, fontScale });
   const speaker =
     focusSide === 'A'
       ? duel.fighterA
@@ -58,7 +61,7 @@ export function CurrentArgumentStage({
         style={[
           styles.argument,
           condensed && styles.argumentCondensed,
-          { color: t.textPrimary },
+          { color: t.textPrimary, fontSize: type.argumentSize, lineHeight: type.argumentLineHeight },
         ]}
       >
         {preview}

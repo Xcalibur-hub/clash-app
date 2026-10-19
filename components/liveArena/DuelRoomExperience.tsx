@@ -1,5 +1,5 @@
-/**
- * Canonical Duel — immersive full-screen Clash event.
+﻿/**
+ * Canonical Duel â€” immersive full-screen Clash event.
  * Official arguments on Stage; Crowd is a separate live layer.
  * No permanent Arguments | Crowd | Evidence tab bar.
  */
@@ -175,7 +175,17 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const live =
     duel.status === 'open' &&
     (room.phase === 'open' || room.phase === 'final_arguments');
-  const statusLabel = live ? 'LIVE' : presentation.stage.toUpperCase();
+  // Terminal states must never read as live: RESULT for settled, CLOSED for
+  // cancelled. Live phases keep their explicit labels.
+  const terminal: 'settled' | 'cancelled' | null =
+    duel.status === 'settled' ? 'settled' : duel.status === 'cancelled' ? 'cancelled' : null;
+  const statusLabel = live
+    ? 'LIVE'
+    : terminal === 'settled'
+      ? 'RESULT'
+      : terminal === 'cancelled'
+        ? 'CLOSED'
+        : presentation.stage.toUpperCase();
   // Phase must stay readable while the Clash is live: OPEN and FINAL are both
   // "LIVE", so the header carries a short phase chip alongside it.
   const phaseLabel = live
@@ -263,7 +273,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
               }}
             >
               <Text style={[styles.primaryActionText, { color: t.textPrimary }]}>
-                {watching ? 'Entering…' : 'Watch Clash'}
+                {watching ? 'Enteringâ€¦' : 'Watch Clash'}
               </Text>
             </PressableScale>
           ) : null}
@@ -274,12 +284,6 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           ) : null}
           {retry}
         </View>
-        <DuelEntrance
-          duel={duel}
-          proposition={proposition}
-          active={entrance}
-          onDone={() => setEntrance(false)}
-        />
       </View>
     );
   }
@@ -347,6 +351,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           duel={duel}
           proposition={proposition}
           live={live}
+          terminal={terminal}
           statusLabel={statusLabel}
           phaseLabel={phaseLabel}
           viewerScope={viewerScope}
@@ -425,7 +430,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         onArgumentHistory={() => setHistoryOpen(true)}
         onShare={() => {
           void Share.share({
-            message: `CLASH — ${proposition}\n${duel.fighterA.name} vs ${duel.fighterB.name}`,
+            message: `CLASH â€” ${proposition}\n${duel.fighterA.name} vs ${duel.fighterB.name}`,
           }).catch(() => undefined);
         }}
         onReport={

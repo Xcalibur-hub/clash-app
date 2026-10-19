@@ -115,4 +115,30 @@ describe('immersive Clash rules', () => {
     assert.match(src, /crowd\?\.messages/);
     assert.match(src, /LIVE CROWD/);
   });
+
+  it('never renders a fabricated reaction total on the Stage', () => {
+    const src = fs.readFileSync(
+      path.join(here, '../components/liveArena/ImmersiveClash.tsx'),
+      'utf8',
+    );
+    assert.doesNotMatch(src, /count=\{2\}/);
+  });
+
+  it('presents terminal phases as RESULT and CLOSED, not live chrome', () => {
+    const src = fs.readFileSync(
+      path.join(here, '../components/liveArena/DuelRoomExperience.tsx'),
+      'utf8',
+    );
+    assert.match(src, /'RESULT'/);
+    assert.match(src, /'CLOSED'/);
+    assert.match(src, /terminal=\{terminal\}/);
+  });
+
+  it('mounts one entrance overlay per entry state', () => {
+    const src = fs.readFileSync(
+      path.join(here, '../components/liveArena/DuelRoomExperience.tsx'),
+      'utf8',
+    );
+    assert.equal((src.match(/<DuelEntrance/g) ?? []).length, 1);
+  });
 });

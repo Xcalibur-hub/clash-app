@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Full-screen live Clash canvas — one event, not stacked dashboard cards.
  * Stage (calm) + Crowd (live) blend through spacing/atmosphere, not card chrome.
  */
@@ -25,6 +25,11 @@ import { CurrentArgumentStage } from './CurrentArgumentStage';
 import { ClashBackingActions } from './ClashBackingActions';
 import { LiveCrowdLayer, type LiveCrowdLayerProps } from './LiveCrowdLayer';
 import { space, typeScale, useThemeColors } from '../../theme';
+import {
+  DUEL_COMPACT_STAGE_HEIGHT,
+  duelStageMode,
+  duelStageShare,
+} from '../../utils/duelStageLayout';
 
 export interface ImmersiveClashProps {
   duel: ArenaDuel;
@@ -62,6 +67,8 @@ export interface ImmersiveClashProps {
   onToggleFollow?: () => void;
   /** Real reaction burst on the newest Stage message, or null. */
   reactionBurst?: { emoji: string; key: string } | null;
+  /** Terminal states drop live chrome: RESULT for settled, CLOSED for cancelled. */
+  terminal?: 'settled' | 'cancelled' | null;
 }
 
 export function ImmersiveClash({
@@ -94,6 +101,7 @@ export function ImmersiveClash({
   crowdUnavailableReason,
   onReportCrowd,
   reactionBurst = null,
+  terminal = null,
   following = false,
   followBusy = false,
   followError = null,
@@ -101,7 +109,11 @@ export function ImmersiveClash({
 }: ImmersiveClashProps): React.JSX.Element {
   const t = useThemeColors();
   const [crowdExpanded, setCrowdExpanded] = React.useState(false);
-  const stageFlex = judgingFocus ? 0.76 : condensed ? 0.3 : crowdExpanded ? 0.38 : 0.72;
+  const stageMode = duelStageMode({ judging: judgingFocus, condensed, crowdExpanded });
+  // A cancelled Clash has no Crowd, so the Stage takes the whole canvas.
+  const crowdAvailable = terminal !== 'cancelled';
+  const stageFlex = crowdAvailable ? duelStageShare(stageMode) : 1;
+  const summaryMode = crowdAvailable && (stageMode === 'condensed' || stageMode === 'crowdExpanded');
   const reduced = useReducedMotion();
   const cursor = latestMessage ? {id:latestMessage.id,createdAt:latestMessage.createdAt,preciseCreatedAt:latestMessage.preciseCreatedAt,kind:latestMessage.kind} : null;
   const moment = React.useRef({ scope: viewerScope, message: cursor });
@@ -128,7 +140,7 @@ export function ImmersiveClash({
       ? stageFlex
       : withTiming(stageFlex, { duration: 280, easing: Easing.out(Easing.cubic) });
   }, [stageFlex, reduced, split]);
-  const compactSummary = !judgingFocus && (condensed || crowdExpanded);
+  const compactSummary = summaryMode;
   const stageStyle = useAnimatedStyle(() => ({
     flexGrow: compactSummary ? 0 : split.value,
     flexBasis: compactSummary ? 'auto' : 0,
@@ -143,7 +155,7 @@ export function ImmersiveClash({
   return (
     <View style={styles.root} accessibilityLabel="Live Clash">
       <ClashEventHeader
-        live={live}
+        live={live && !terminal}
         statusLabel={statusLabel}
         phaseLabel={phaseLabel}
         spectatorCount={spectatorCount}
@@ -152,10 +164,32 @@ export function ImmersiveClash({
         onMore={onMore}
       />
 
-      {eventHint ? onViewResult ? <Pressable accessibilityRole="button" accessibilityLabel="View official result" onPress={onViewResult} style={{minHeight:44,paddingHorizontal:16,justifyContent:'center'}}><Text style={{color:t.textPrimary,fontSize:13}}>{eventHint} View result →</Text></Pressable> : <Text accessibilityLiveRegion="polite" style={{color:t.textSecondary,fontSize:12,lineHeight:17,paddingHorizontal:16,paddingBottom:6}}>{eventHint}</Text> : null}
-      <Animated.View style={[styles.stage, stageStyle, compactSummary ? {height:110,minHeight:110,flexShrink:0} : null]}>
+      {terminal === 'settled' ? (
+        onViewResult ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View official result"
+            onPress={onViewResult}
+            style={styles.terminalRow}
+          >
+            <Text style={[styles.terminalText, { color: t.textPrimary }]}>Official result · View verdict →</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.terminalRow}>
+            <Text style={[styles.terminalText, { color: t.textPrimary }]}>Official result.</Text>
+          </View>
+        )
+      ) : terminal === 'cancelled' ? (
+        <View style={styles.terminalRow} accessibilityLiveRegion="polite">
+          <Text style={[styles.terminalText, { color: t.textPrimary }]}>Room closed — no verdict.</Text>
+          <Text style={[styles.terminalNote, { color: t.textSecondary }]}>
+            {crowdUnavailableReason ?? 'Crowd chat is unavailable for this Clash.'}
+          </Text>
+        </View>
+      ) : eventHint ? onViewResult ? <Pressable accessibilityRole="button" accessibilityLabel="View official result" onPress={onViewResult} style={{minHeight:44,paddingHorizontal:16,justifyContent:'center'}}><Text style={{color:t.textPrimary,fontSize:13}}>{eventHint} View result →</Text></Pressable> : <Text accessibilityLiveRegion="polite" style={{color:t.textSecondary,fontSize:12,lineHeight:17,paddingHorizontal:16,paddingBottom:6}}>{eventHint}</Text> : null}
+      <Animated.View style={[styles.stage, stageStyle, compactSummary ? { height: DUEL_COMPACT_STAGE_HEIGHT, minHeight: DUEL_COMPACT_STAGE_HEIGHT, flexShrink: 0 } : null]}>
         {compact && latestMessage && !judgingFocus ? <Pressable accessibilityRole="button" accessibilityLabel="Read full current official argument" onPress={onViewHistory} style={{minHeight:44,paddingHorizontal:16,justifyContent:'center'}}><Text style={{color:t.textPrimary,fontSize:13,fontWeight:'600'}}>Official argument · Read full →</Text></Pressable> : null}
-        {compact && !judgingFocus ? <View style={{paddingBottom:8,minHeight:56,flexShrink:0}}><ClashFighterRail duel={duel} focusSide={focusSide} condensed onOpenProfile={onOpenProfile} /></View> : <ScrollView style={styles.stageScroll}
+        {compact && !judgingFocus ? <View style={{paddingBottom:8,minHeight:56,flexShrink:0}}><ClashFighterRail duel={duel} focusSide={focusSide} condensed showPositions={false} onOpenProfile={onOpenProfile} /></View> : <ScrollView style={styles.stageScroll}
           contentContainerStyle={styles.stageContent} showsVerticalScrollIndicator
           keyboardShouldPersistTaps="handled"
           accessibilityLabel="Clash stage and official arguments">
@@ -231,10 +265,13 @@ export function ImmersiveClash({
         </ScrollView>}
       </Animated.View>
 
+      {crowdAvailable ? (
       <Animated.View style={[styles.crowd, { borderTopColor: t.border }, crowdStyle]}>
         <Pressable accessibilityRole="button" accessibilityLabel={crowdExpanded ? 'Focus official Stage' : 'Expand Crowd conversation'} accessibilityState={{ expanded: crowdExpanded }} onPress={() => setCrowdExpanded(value => !value)} style={{ minHeight: 44, paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: t.surface }}><Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '600' }}>Crowd conversation</Text><Text style={{ color: t.textSecondary, fontSize: 12 }}>{crowdExpanded ? 'Focus Stage' : 'Expand chat'}</Text></Pressable>
-        {reactionBurst ? (
-          <ReactionBurst emoji={reactionBurst.emoji} burstKey={reactionBurst.key} count={2} />
+        {reactionBurst && !terminal ? (
+          // One visual per authoritative count increase; the payload never
+          // exposes a tally, so no numeral is rendered.
+          <ReactionBurst emoji={reactionBurst.emoji} burstKey={reactionBurst.key} count={1} />
         ) : null}
         <LiveCrowdLayer
           unavailableReason={crowdUnavailableReason}
@@ -245,6 +282,7 @@ export function ImmersiveClash({
           paddingBottom={crowdPaddingBottom}
         />
       </Animated.View>
+      ) : null}
 
       {fighterComposer ? (
         <View style={[styles.composer, { borderTopColor: t.border }]}>
@@ -294,5 +332,20 @@ const styles = StyleSheet.create({
   },
   composer: {
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  terminalRow: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  terminalText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  terminalNote: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '400',
   },
 });
