@@ -9,6 +9,7 @@ import {
   matchupMetrics,
   phaseAnnouncement,
   sidePlateBorder,
+  verdictMetrics,
 } from './liveArenaStyles.ts';
 
 describe('live arena stage metrics', () => {
@@ -102,5 +103,36 @@ describe('side plates and reaction bursts', () => {
   it('returns only an emoji and a replay key, never a tally', () => {
     const signal = reactionBurstFor([{ emoji: 'X', count: 4 }], [{ emoji: 'X', count: 7 }], 'm9');
     assert.deepEqual(Object.keys(signal ?? {}).sort(), ['emoji', 'key']);
+  });
+});
+describe('verdict sheet metrics', () => {
+  it('keeps the larger sheet on a 430dp screen', () => {
+    const m = verdictMetrics({ width: 430, fontScale: 1 });
+    assert.equal(m.compact, false);
+    assert.equal(m.titleSize, 24);
+    assert.equal(m.pctSize, 24);
+    assert.equal(m.pctMinWidth, 56);
+    assert.equal(m.nameLines, 1);
+  });
+
+  it('tightens at 360dp and 320dp so the sheet never crowds its copy', () => {
+    for (const width of [360, 320]) {
+      const m = verdictMetrics({ width, fontScale: 1 });
+      assert.equal(m.compact, true);
+      assert.equal(m.titleSize, 21);
+      assert.equal(m.titleLineHeight, 26);
+      assert.equal(m.pctSize, 20);
+      assert.equal(m.pctMinWidth, 48);
+      assert.equal(m.nameLines, 2, 'long fighter names wrap instead of truncating');
+    }
+  });
+
+  it('treats an enlarged system font as compact and survives bad input', () => {
+    assert.equal(verdictMetrics({ width: 430, fontScale: 1.3 }).compact, true);
+    assert.equal(verdictMetrics({ width: 430, fontScale: 1.24 }).compact, false);
+    const fallback = verdictMetrics({ width: Number.NaN, fontScale: Number.NaN });
+    assert.equal(fallback.compact, true);
+    assert.equal(Number.isFinite(fallback.titleSize), true);
+    assert.equal(Number.isFinite(fallback.pctMinWidth), true);
   });
 });

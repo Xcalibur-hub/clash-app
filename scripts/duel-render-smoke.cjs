@@ -138,7 +138,14 @@ for (const [name, overrides] of Object.entries(scenarios)) {
     assert.match(html, /Fighter composer/);
   }
   if (name === 'judging') assert.match(html, /Judge Kevin, Fighter A, made the stronger case/);
-  if (name === 'draw') { assert.match(html, /Draw|VERDICT/); assert.match(html, /50%/); assert.match(html, /4 judgment/); }
+  if (name === 'draw') {
+    assert.match(html, /Draw|VERDICT/); assert.match(html, /50%/); assert.match(html, /4 judgment/);
+    // Step 3.1: the gold decoration is a short in-flow rule, never a 200px disc
+    // behind the headline and percentages.
+    assert.doesNotMatch(html, /border-radius:\s*100px/, 'no circular gold bloom');
+    assert.match(html, /rgba\(245,\s*215,\s*110/, 'restrained gold accent remains');
+    assert.ok(html.indexOf('VERDICT') < html.indexOf('50%'), 'headline precedes percentages');
+  }
   if (name === 'cancelled') {
     assert.match(html, /Clash cancelled/);
     assert.match(html, /Crowd chat is unavailable because this Clash was cancelled/);

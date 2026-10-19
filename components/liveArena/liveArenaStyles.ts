@@ -185,3 +185,33 @@ export function reactionBurstFor(
   const total = next.find((row) => row.emoji === best.emoji)?.count ?? 0;
   return { emoji: best.emoji, key: `${messageId}:${best.emoji}:${total}` };
 }
+export interface VerdictMetrics {
+  /** Narrow screen or enlarged system font: tighten the result sheet. */
+  compact: boolean;
+  titleSize: number;
+  titleLineHeight: number;
+  pctSize: number;
+  pctMinWidth: number;
+  /** Lines a fighter name may use before truncating. */
+  nameLines: number;
+}
+
+/**
+ * Responsive rule for the verdict sheet. On a 320dp screen, or with an enlarged
+ * system font, the headline and percentages shrink slightly and a fighter name
+ * may wrap to two lines instead of truncating. 430dp and above keep the larger
+ * type. Nothing here is decorative: the sheet has no overlay to reserve space for.
+ */
+export function verdictMetrics({ width, fontScale }: { width: number; fontScale: number }): VerdictMetrics {
+  const safeWidth = Number.isFinite(width) && width > 0 ? width : 360;
+  const safeScale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  const compact = safeWidth < 380 || safeScale >= 1.25;
+  return {
+    compact,
+    titleSize: compact ? 21 : 24,
+    titleLineHeight: compact ? 26 : 30,
+    pctSize: compact ? 20 : 24,
+    pctMinWidth: compact ? 48 : 56,
+    nameLines: compact ? 2 : 1,
+  };
+}

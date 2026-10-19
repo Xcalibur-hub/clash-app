@@ -15,10 +15,10 @@ export function DemoReturnVisits({state:s,onOpen,onClose}: {state:DemoState;onOp
     item(2,'DRAW','Scripted fighter history'),item(3,'CANCELLED','Scripted fighter history'),
     {id:'demo-unavailable-return',title:null,state:'UNAVAILABLE',destination:null,basis:'DEMO · No hidden title or identity'},
   ];
-  return <View style={{padding:16,gap:12}}>
+  return <View style={{padding:14,gap:10}}>
     <Text accessibilityRole="header" style={[arena.type.heading,{color:t.textPrimary}]}>DEMO · Return visits</Text>
     <Text style={[arena.type.body,{color:t.textSecondary}]}>Fictional local history and outcomes. Nothing is saved to a server.</Text>
-    <View style={{flexDirection:'row',flexWrap:'wrap'}}><ArenaButton label="Back to demo discovery" onPress={onClose}/><ArenaButton label={followed?'Show demo fighter history':'Show demo followed activity'} variant="tertiary" onPress={()=>setFollowed(v=>!v)}/>{!followed?<ArenaButton label={settled?'Replay demo live state':'Simulate result arrival'} onPress={()=>setSettled(v=>!v)}/>:null}</View>
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}><ArenaButton label="Back to demo discovery" onPress={onClose}/><ArenaButton label={followed?'Show demo fighter history':'Show demo followed activity'} variant="tertiary" onPress={()=>setFollowed(v=>!v)}/>{!followed?<ArenaButton label={settled?'Replay demo live state':'Simulate result arrival'} onPress={()=>setSettled(v=>!v)}/>:null}</View>
     <ArenaReturnList items={items} coverage={followed?'DEMO · Bounded followed-fighter snapshot, not complete history.':'DEMO · Own fighter history, not a watched-duel subscription.'}
       onRefresh={()=>{setSettled(false);setFollowed(false);}} onOpen={row=>onOpen(row.id,row.state==='SETTLED'?'SETTLED':row.state==='DRAW'?'DRAW':row.state==='CANCELLED'?'CANCELLED':row.state==='FINAL'?'FINAL':'OPEN')}/>
     <Text style={[arena.type.meta,{color:t.textSecondary}]}>Watched-duel subscriptions, community-linked duels and sender-owned assist recognition are unavailable in the production contracts. No demo community rivalry or public credit is invented.</Text>

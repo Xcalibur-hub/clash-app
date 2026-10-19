@@ -3,7 +3,7 @@
  * Uses only canonical ballot values — no fabricated stats.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -17,6 +17,7 @@ import Animated, {
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { duelResultTitle } from '../../utils/duelPresentation';
+import { hexWithAlpha, verdictMetrics } from './liveArenaStyles';
 import { notify as hapticNotify } from '../../utils/haptics';
 
 function ballotShare(score: number, jurySize: number): number | null {
@@ -28,7 +29,7 @@ export interface VerdictRevealProps {
   duel: ArenaDuel;
 }
 
-function AnimatedPercent({ value }: { value: number }): React.JSX.Element {
+function AnimatedPercent({ value, size, minWidth }: { value: number; size: number; minWidth: number }): React.JSX.Element {
   const reduced = useReducedMotion();
   const t = useThemeColors();
   const progress = useSharedValue(reduced ? 1 : 0);
@@ -46,7 +47,10 @@ function AnimatedPercent({ value }: { value: number }): React.JSX.Element {
 
   // Display target percent; animation is visual emphasis only (not a counting fake).
   return (
-    <Animated.Text allowFontScaling style={[styles.pct, { color: t.textPrimary }, style]}>
+    <Animated.Text
+      allowFontScaling
+      style={[styles.pct, { fontSize: size, minWidth, color: t.textPrimary }, style]}
+    >
       {value}%
     </Animated.Text>
   );
@@ -57,8 +61,8 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
   const reduced = useReducedMotion();
   const verdict = duel.verdict;
   const title = duelResultTitle(duel) ?? 'Verdict';
-  const dim = useSharedValue(reduced ? 1 : 0);
-  const bloom = useSharedValue(0);
+  const { width, fontScale } = useWindowDimensions();
+  const metrics = verdictMetrics({ width, fontScale });
   const notified = React.useRef(false);
 
   React.useEffect(() => {
@@ -66,33 +70,39 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
       notified.current = true;
       hapticNotify(duel.status === 'cancelled' ? 'warning' : 'success');
     }
-    if (reduced) {
-      dim.value = 1;
-      bloom.value = 0;
-      return;
-    }
-    dim.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.quad) });
-    bloom.value = withDelay(
-      200,
-      withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) }, () => {
-        bloom.value = withTiming(0.35, { duration: 400 });
-      }),
-    );
-  }, [bloom, dim, duel.status, reduced, verdict]);
+    // The decorative wash/veil is gone: nothing is animated behind the copy.
+  }, [duel.status, verdict]);
 
-  const veil = useAnimatedStyle(() => ({
-    opacity: dim.value * 0.22,
-  }));
-  const bloomStyle = useAnimatedStyle(() => ({
-    opacity: bloom.value * 0.4,
-    transform: [{ scale: 0.9 + bloom.value * 0.2 }],
-  }));
+  // No decorative absolutely-positioned layer is drawn behind the result copy.
+
+  // Restrained, in-flow verdict cue: a short gold rule before the eyebrow.
+  // It cannot overlap the headline, fighters or percentages because it shares
+  // the sheet's layout flow instead of being absolutely positioned.
+  const accent = (
+    <View style={styles.eyebrowRow}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.accentRule,
+          { backgroundColor: hexWithAlpha('#F5D76E', t.scheme === 'light' ? 0.95 : 0.85) },
+        ]}
+      />
+      <Text style={[styles.eyebrow, { color: t.textMuted }]}>VERDICT</Text>
+    </View>
+  );
 
   if (!verdict) {
     return (
       <View style={styles.wrap}>
-        <Text style={[styles.eyebrow, { color: t.textMuted }]}>VERDICT</Text>
-        <Text accessibilityRole="header" style={[styles.title, { color: t.textPrimary }]}>
+        {accent}
+        <Text
+          accessibilityRole="header"
+          style={[
+            styles.title,
+            { fontSize: metrics.titleSize, lineHeight: metrics.titleLineHeight, color: t.textPrimary },
+          ]}
+        >
           {title}
         </Text>
       </View>
@@ -110,27 +120,20 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
 
   return (
     <View style={styles.wrap}>
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, styles.veil, { backgroundColor: t.background }, veil]}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.bloom, { backgroundColor: '#F5D76E' }, bloomStyle]}
-      />
-
-      <Animated.Text
-        entering={reduced ? undefined : FadeIn.duration(280)}
-        style={[styles.eyebrow, { color: t.textMuted }]}
-      >
-        VERDICT
-      </Animated.Text>
+      <Animated.View entering={reduced ? undefined : FadeIn.duration(280)}>{accent}</Animated.View>
 
       <Animated.Text
         entering={reduced ? undefined : FadeInDown.delay(80).springify().damping(16)}
         accessibilityRole="header"
         accessibilityLiveRegion="polite"
-        style={[styles.title, { color: t.textPrimary }]}
+        style={[
+          styles.title,
+          {
+            fontSize: metrics.titleSize,
+            lineHeight: metrics.titleLineHeight,
+            color: t.textPrimary,
+          },
+        ]}
       >
         {title}
       </Animated.Text>
@@ -145,12 +148,14 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
         ]).map(({ fighter, side, pct }) => (
           <View key={side} style={styles.scoreRow}>
             <View style={styles.identity}>
-              <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
+              <Text numberOfLines={metrics.nameLines} style={[styles.name, { color: t.textPrimary }]}>
                 {fighter.name}
               </Text>
               <Text style={[styles.side, { color: t.textMuted }]}>Fighter {side}</Text>
             </View>
-            {pct !== null ? <AnimatedPercent value={pct} /> : null}
+            {pct !== null ? (
+              <AnimatedPercent value={pct} size={metrics.pctSize} minWidth={metrics.pctMinWidth} />
+            ) : null}
           </View>
         ))}
         <Text style={[styles.jury, { color: t.textMuted }]}>
@@ -166,16 +171,16 @@ const styles = StyleSheet.create({
   wrap: {
     gap: space.md,
     paddingVertical: space.md,
-    overflow: 'hidden',
   },
-  veil: { borderRadius: 12 },
-  bloom: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    top: -20,
-    alignSelf: 'center',
+  eyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  accentRule: {
+    width: 24,
+    height: 2,
+    borderRadius: 1,
   },
   eyebrow: {
     ...typeScale.caption,
@@ -185,8 +190,6 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typeScale.title,
-    fontSize: 24,
-    lineHeight: 30,
     fontWeight: '700',
   },
   scoreBlock: { gap: space.sm },
@@ -206,9 +209,7 @@ const styles = StyleSheet.create({
   },
   pct: {
     ...typeScale.data,
-    fontSize: 24,
     fontWeight: '700',
-    minWidth: 56,
     textAlign: 'right',
   },
   jury: {
