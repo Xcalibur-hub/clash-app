@@ -12,15 +12,18 @@ export interface LiveDuelCardProps {
   identityHidden?: boolean;
   audience?: number | null;
   audienceLabel?: string;
+  reason?: string;
+  phase?: string;
   onOpen: () => void;
 }
 /** Pure presentation: identity/counts must come from an authorized caller or labeled demo. */
-export const LiveDuelCard = React.memo(function LiveDuelCard({ title, state, featured, fighters, identityHidden, audience, audienceLabel = 'spectators joined', onOpen }: LiveDuelCardProps): React.JSX.Element {
+export const LiveDuelCard = React.memo(function LiveDuelCard({ title, state, featured, fighters, identityHidden, audience, audienceLabel = 'spectators joined', reason, phase, onOpen }: LiveDuelCardProps): React.JSX.Element {
   const c = arenaColors(useThemeColors()), live = state === 'LIVE';
   return <Pressable accessibilityRole="button" accessibilityLabel={`${live ? 'Watch Duel' : 'View Clash'}. ${state}. ${title}`} onPress={onOpen}
     style={({ pressed }) => [styles.card, { backgroundColor: c.surface, borderColor: c.line, opacity: pressed ? 0.8 : 1 }, featured && styles.featured]}>
     <View style={styles.meta}><Text style={[arena.type.eyebrow, { color: live ? '#B84D46' : c.muted }]}>{live ? '● LIVE · 1v1' : state.replaceAll('_', ' ')}</Text>{featured ? <Text style={[arena.type.meta, { color: c.muted }]}>On the stage</Text> : null}</View>
     <Text numberOfLines={featured ? 4 : 3} style={[arena.type.heading, { color: c.ink, fontSize: featured ? 20 : 16, lineHeight: featured ? 27 : 22 }]}>{title}</Text>
+    {phase || reason ? <Text style={[arena.type.meta, { color: c.secondary }]}>{phase ? phase.replaceAll('_',' ').toUpperCase() + (reason ? ' · ' : '') : ''}{reason ? 'Why this duel: ' + reason : ''}</Text> : null}
     <View style={styles.fighters}>{(['A', 'B'] as const).map((side, i) => <React.Fragment key={side}>{i === 1 ? <Text style={[arena.type.meta, { color: c.muted }]}>vs</Text> : null}<View style={[styles.fighter, { borderLeftColor: i ? '#6384AF' : '#B76B64' }]}>
       {fighters?.[i] ? <Avatar name={fighters[i]!.name} tint={fighters[i]!.tint} size={featured ? 26 : 22} /> : null}<View style={{ flex: 1, minWidth: 0 }}><Text style={[arena.type.eyebrow, { color: c.muted }]}>FIGHTER {side}</Text><Text numberOfLines={2} style={[arena.type.label, { color: c.ink, fontSize: 12 }]}>{fighters?.[i]?.name ?? (identityHidden ? 'Identity hidden' : 'View in room')}</Text></View>
     </View></React.Fragment>)}</View>

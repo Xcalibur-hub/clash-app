@@ -85,5 +85,6 @@ for (const kind of ['home', 'take', 'groups', 'discover', 'live', 'room']) test(
 test('each varied discovery pair matches the actual Room opened by its local adapter',()=>{
   const state=createDemoState(now),html=renderDemo('live').html,indices=[0,1,2,3,5,6];
   const cards=[...html.matchAll(/aria-label="Watch Duel[^"]*"/g)];assert.equal(cards.length,indices.length);
-  const pairs=new Set();indices.forEach((index,i)=>{const duel=demoDuel({...state,page:{kind:'room',id:state.data.takes[index].take.id}}),card=html.slice(cards[i].index,cards[i+1]?.index??html.length);for(const fighter of [duel.fighterA,duel.fighterB])assert.ok(card.includes(fighter.name),'Card and Room identity mismatch: '+fighter.name);pairs.add(duel.fighterA.id+duel.fighterB.id);});assert.ok(pairs.size>=3,'Demo must show varied pairs');
+  const escape=text=>text.replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll("'",'&#x27;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+  const pairs=new Set();indices.forEach(index=>{const i=cards.findIndex(match=>match[0].includes(escape(state.data.takes[index].take.text)));assert.ok(i>=0,'Ranked discovery must retain its source Take');const duel=demoDuel({...state,page:{kind:'room',id:state.data.takes[index].take.id}}),card=html.slice(cards[i].index,cards[i+1]?.index??html.length);for(const fighter of [duel.fighterA,duel.fighterB])assert.ok(card.includes(fighter.name),'Card and Room identity mismatch: '+fighter.name);pairs.add(duel.fighterA.id+duel.fighterB.id);});assert.ok(pairs.size>=3,'Demo must show varied pairs');
 });
