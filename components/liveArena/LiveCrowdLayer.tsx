@@ -26,9 +26,11 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
   const list = React.useRef<FlatList<CrowdMessage>>(null); const atLatest = React.useRef(true);
   const userScrolled = React.useRef(false);
   const latest = crowd?.messages.at(-1)?.id;
+  const observedLatest = React.useRef(latest);
   const canSend = Boolean(crowd?.context?.canSend);
   React.useEffect(() => {
-    if (!atLatest.current) { setUnseen(true); return; }
+    const changed = observedLatest.current !== latest; observedLatest.current = latest;
+    if (!atLatest.current) { if (changed && latest) setUnseen(true); return; }
     // Virtualized rows need a layout pass before scrollToEnd can find their size.
     const timer = setTimeout(() => { if (atLatest.current) list.current?.scrollToEnd({animated:false}); },100);
     return () => clearTimeout(timer);
@@ -64,7 +66,7 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
         <View style={{flex:1,minWidth:0,gap:3}}><Text numberOfLines={1} style={[styles.name,{color:t.textSecondary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>@{item.author.handle}</Text><Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>{item.body}</Text></View>
         {onReport ? <Pressable onPress={() => onReport(item)} accessibilityRole="button" accessibilityLabel={`Report or block @${item.author.handle}`} style={styles.menu}><Text style={{color:t.textMuted}}>···</Text></Pressable> : null}
       </View>}/>
-    {unseen ? <Pressable accessibilityRole="button" accessibilityHint="Scrolls the crowd chat to the newest message" style={[styles.latestButton,{borderColor:t.border,backgroundColor:t.surfaceElevated}]} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>Latest chat ↓</Text></Pressable> : null}
+    {unseen ? <Pressable accessibilityRole="button" accessibilityHint="New Crowd messages are available. Scrolls to the newest message" style={[styles.latestButton,{borderColor:t.border,backgroundColor:t.surfaceElevated}]} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>Latest chat ↓</Text></Pressable> : null}
     {crowd?.context ? canSend ? <View style={[styles.composer,{borderColor:t.border}]}>
       <TextInput value={draft} onChangeText={setDraft} placeholder="Message the Crowd" placeholderTextColor={t.textMuted}
         accessibilityLabel="Public Crowd message" accessibilityHint="Public chat, visible to everyone in this Clash" multiline maxLength={500} editable={!crowd.sending} blurOnSubmit={false} returnKeyType="default"

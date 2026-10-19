@@ -36,7 +36,7 @@ test('discovery uses one vertical virtualized owner; private assists leave offic
 test('demo keyboard avoids stale Android offsets, reserves composer room and hides scenario chrome',()=>{const demo=fs.readFileSync('components/dev/arenaDemo/DemoArena.tsx','utf8'),room=fs.readFileSync('components/liveArena/ImmersiveClash.tsx','utf8');assert.match(demo,/enabled=\{Platform.OS === 'ios' \|\| keyboardOpen\}/);assert.match(demo,/condensed=\{keyboardOpen\}/);assert.match(demo,/developerOpen \? <DemoSheet/);assert.match(demo,/onMore=\{\(\) => setDeveloperOpen\(true\)\}/);assert.match(room,/minHeight: 134, flexShrink: 0/);});
 
 test('compact Stage gives all free space to Crowd and keeps a working full-argument action',()=>{
-  const React={createElement:(type,props,...children)=>({type,props:{...props,children}}),useState:()=>[false,()=>{}],useEffect(){}};
+  const React={createElement:(type,props,...children)=>({type,props:{...props,children}}),useState:()=>[false,()=>{}],useRef:current=>({current}),useEffect(){}};
   const module={exports:{}};const noop=()=>{};let history=0;
   vm.runInNewContext(compile('components/liveArena/ImmersiveClash.tsx'),{module,exports:module.exports,require(name){
     if(name==='react')return React;
@@ -48,9 +48,9 @@ test('compact Stage gives all free space to Crowd and keeps a working full-argum
     return new Proxy({},{get:(_,key)=>String(key)});
   }});
   const props={duel:{},proposition:'Real source',live:true,statusLabel:'OPEN',spectatorCount:null,focusSide:'A',latestMessage:{id:'real',body:'Argument'},paddingTop:0,backingSide:null,onBackSide:noop,canBack:false,onBack:noop,onViewHistory:()=>history++,onMore:noop};
-  const normal=module.exports.ImmersiveClash(props).props.children,compact=module.exports.ImmersiveClash({...props,condensed:true}).props.children;
-  assert.equal(normal[1].props.style[1].flexGrow+normal[2].props.style[2].flexGrow,1);
-  assert.equal(compact[1].props.style[1].flexGrow,0);assert.equal(compact[2].props.style[2].flexGrow,1,'No unallocated flex space after keyboard dismissal');
-  const read=compact[1].props.children[0];assert.equal(read.props.accessibilityLabel,'Read full current official argument');read.props.onPress();assert.equal(history,1);
-  assert.equal(compact[1].props.children[1].type,'View','Compact Stage must not show a clipped argument fragment');
+  const normal=module.exports.ImmersiveClash(props).props.children.filter(n=>n?.type==='AnimatedView'),compact=module.exports.ImmersiveClash({...props,condensed:true}).props.children.filter(n=>n?.type==='AnimatedView');
+  assert.equal(normal[0].props.style[1].flexGrow+normal[1].props.style[2].flexGrow,1);
+  assert.equal(compact[0].props.style[1].flexGrow,0);assert.equal(compact[1].props.style[2].flexGrow,1,'No unallocated flex space after keyboard dismissal');
+  const read=compact[0].props.children[0];assert.equal(read.props.accessibilityLabel,'Read full current official argument');read.props.onPress();assert.equal(history,1);
+  assert.equal(compact[0].props.children[1].type,'View','Compact Stage must not show a clipped argument fragment');
 });

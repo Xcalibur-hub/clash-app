@@ -24,7 +24,7 @@ export function ClashBackingActions({
   const [fighterA, fighterB] = duelActiveSpeakers(duel);
 
   return (
-    <View><Text style={{ color: t.textMuted, fontSize: 11, paddingHorizontal: layout.screenX, paddingBottom: 8 }}>SOCIAL SUPPORT / NOT A JUDGEMENT</Text><View style={styles.row} accessibilityLabel="Back a fighter">
+    <View><Text style={{ color: t.textMuted, fontSize: 11, paddingHorizontal: layout.screenX, paddingBottom: 8 }}>SUPPORT FOR THIS VISIT · NOT A JUDGEMENT</Text><View style={styles.row} accessibilityLabel="Back a fighter">
       {([
         { side: 'A' as const, name: fighterA.name },
         { side: 'B' as const, name: fighterB.name },

@@ -120,3 +120,9 @@ export function duelArgumentPreview(
   const preview = (soft > limit * 0.55 ? cut.slice(0, soft) : cut).trimEnd();
   return { preview: `${preview}…`, truncated: true };
 }
+
+/** Presentation event gate: retries, older recovery rows and edited rows are not arrivals. */
+export function isNewOfficialMoment(previous: Pick<ArenaMessage, 'id'|'createdAt'|'preciseCreatedAt'|'kind'> | null, next: typeof previous): boolean {
+  if (!previous || !next || previous.id === next.id || next.kind === 'system' || !Number.isFinite(previous.createdAt) || !Number.isFinite(next.createdAt)) return false;
+  try { return compareOfficial(next, previous) > 0; } catch { return false; }
+}

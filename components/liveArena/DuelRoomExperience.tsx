@@ -98,15 +98,18 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const presentation = duelPresentation(duel, room.phase);
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [moreOpen, setMoreOpen] = React.useState(false);
-  const [backingSide, setBackingSide] = React.useState<'A' | 'B' | null>(null);
+  const viewerScope = room.roomId + ':' + crowd.identityVersion;
+  const [backing, setBacking] = React.useState<{scope:string;side:'A'|'B'|null}|null>(null);
+  const backingSide = backing?.scope === viewerScope ? backing.side : null;
+  const [resultOpen, setResultOpen] = React.useState(false);
   const [watching, setWatching] = React.useState(false);
   const [watchError, setWatchError] = React.useState(false);
   const [entrance, setEntrance] = React.useState(true);
   const [assistOpen, setAssistOpen] = React.useState(false);
-  React.useEffect(() => { setAssistOpen(false); }, [room.roomId, duel.viewerRelationship]);
+  React.useEffect(() => { setAssistOpen(false); setResultOpen(false); }, [room.roomId, duel.viewerRelationship, crowd.identityVersion]);
   const [keyboardOpen, setKeyboardOpen] = React.useState(false);
   const joining = React.useRef(false);
-  const lastMomentId = React.useRef<string | null>(null);
+
   // Android keeps a stale navigation-bar inset while the keyboard is up, so the
   // bottom inset collapses instead of double-padding the composer.
   const bottomInset = keyboardOpen ? 0 : props.paddingBottom;
@@ -150,16 +153,9 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
     };
   }, []);
 
-  React.useEffect(() => {
-    const id = moment.message?.id ?? null;
-    if (id && lastMomentId.current && lastMomentId.current !== id && live) {
-      hapticTap();
-    }
-    lastMomentId.current = id;
-  }, [live, moment.message?.id]);
 
   const canBack =
-    !presentation.side &&
+    duel.viewerRelationship === 'spectator' &&
     duel.status === 'open' &&
     (room.phase === 'open' || room.phase === 'final_arguments');
 
@@ -306,6 +302,9 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           live={live}
           statusLabel={statusLabel}
           phaseLabel={phaseLabel}
+          viewerScope={viewerScope}
+          eventHint={presentation.hint}
+          onViewResult={duel.status !== 'open' || room.phase === 'closed' ? () => setResultOpen(true) : undefined}
           spectatorCount={crowd.context?.spectatorCount ?? props.spectatorCount}
           reactionBurst={reactionBurst}
           crowd={crowd}
@@ -318,7 +317,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           condensed={keyboardOpen}
           backingSide={backingSide}
           onBackSide={(side) =>
-            setBackingSide((prev) => (prev === side ? null : side))
+            setBacking(prev => ({scope:viewerScope,side:prev?.scope === viewerScope && prev.side === side ? null : side}))
           }
           canBack={canBack}
           onBack={props.onBack}
@@ -361,7 +360,8 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         />
       </KeyboardAvoidingView>
 
-      {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen roomId={room.roomId} duel={duel} disabled={duel.status !== 'open' || !['open', 'final_arguments'].includes(room.phase) || props.threadLocked} onPublished={props.onRefresh} /></ArenaSheet> : null}
+      {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen initialSide={backingSide ?? 'A'} roomId={room.roomId} duel={duel} disabled={duel.status !== 'open' || !['open', 'final_arguments'].includes(room.phase) || props.threadLocked} onPublished={props.onRefresh} /></ArenaSheet> : null}
+      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}><DuelRoomOutcome duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn}/></ArenaSheet> : null}
       <ArgumentHistorySheet
         visible={historyOpen}
         duel={duel}

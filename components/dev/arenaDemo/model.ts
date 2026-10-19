@@ -13,7 +13,7 @@ export type DemoMediaKind = 'image' | 'video' | 'gif';
 export interface DemoTake { take: Take; replies: number; media?: DemoMediaKind }
 export interface DemoReply { id: string; parentId?: string; author: number; text: string; votes: number; voted?: boolean; media?: DemoMediaKind }
 export interface DemoAssist { id: string; target: 'A' | 'B'; text: string; media?: DemoMediaKind; status: 'pending' | 'accepted' | 'rejected'; published: boolean; isOwn?: boolean }
-export interface DemoOfficial { id: string; side: 'A' | 'B'; text: string }
+export interface DemoOfficial { id: string; side: 'A' | 'B'; text: string; createdAt?: number }
 export interface DemoTopic { id: string; label: string; hoods: string[]; description: string; activity: number }
 export interface DemoData { takes: DemoTake[]; authors: User[]; groups: ArenaCrew[]; topics: DemoTopic[] }
 export interface DemoState {
@@ -67,9 +67,10 @@ function initialReplies(count: number): DemoReply[] {
 }
 export function createDemoState(now = Date.now()): DemoState {
   const data = createDemoData(now);
-  return { data, now, page: { kind: 'home' }, history: [], theme: 'dark', reacted: [], saved: [], replies: Object.fromEntries(data.takes.map(t => [t.take.id, initialReplies(t.replies)])), stances: {}, challenges: {}, joined: 'demo-group-0', phase: 'OPEN', role: 'spectator', backing: null, crowd: Array.from({ length: 18 }, (_, i) => ({ id: `demo-chat-${i}`, roomId: 'demo-room', body: ['That distinction between convenience and attention is important.', 'I’d like to hear the counter-example.', 'Both sides are making a thoughtful case.', 'The community library example is a good one.', 'Less certainty, more evidence.'][i % 5], createdAt: new Date(now - (18 - i) * 15000).toISOString(), isOwn: false, author: { id: data.authors[i % 12].id, name: data.authors[i % 12].name, handle: data.authors[i % 12].handle, avatarTint: data.authors[i % 12].tint } })), assists: [{ id: 'demo-assist-a', target: 'A', text: 'A useful example: notification digests instead of constant interruptions.', status: 'pending', published: false }, { id: 'demo-assist-b', target: 'B', text: 'Consider accessibility: some real-time notifications are essential.', media: 'image', status: 'pending', published: false }], official: [{ id: 'demo-argument-a', side: 'A', text: 'A tool should help us finish the task, then give us our attention back. More time in the app is not necessarily more value.' }, { id: 'demo-argument-b', side: 'B', text: 'Connection and creativity also happen on screens. We should measure intention and access, not simply minimise screen time.' }], notice: null, next: 100 };
+  return { data, now, page: { kind: 'home' }, history: [], theme: 'dark', reacted: [], saved: [], replies: Object.fromEntries(data.takes.map(t => [t.take.id, initialReplies(t.replies)])), stances: {}, challenges: {}, joined: 'demo-group-0', phase: 'OPEN', role: 'spectator', backing: null, crowd: Array.from({ length: 18 }, (_, i) => ({ id: `demo-chat-${i}`, roomId: 'demo-room', body: ['That distinction between convenience and attention is important.', 'I’d like to hear the counter-example.', 'Both sides are making a thoughtful case.', 'The community library example is a good one.', 'Less certainty, more evidence.'][i % 5], createdAt: new Date(now - (18 - i) * 15000).toISOString(), isOwn: false, author: { id: data.authors[i % 12].id, name: data.authors[i % 12].name, handle: data.authors[i % 12].handle, avatarTint: data.authors[i % 12].tint } })), assists: [{ id: 'demo-assist-a', target: 'A', text: 'A useful example: notification digests instead of constant interruptions.', status: 'pending', published: false }, { id: 'demo-assist-b', target: 'B', text: 'Consider accessibility: some real-time notifications are essential.', media: 'image', status: 'pending', published: false }], official: [{ id: 'demo-argument-a', side: 'A', createdAt: now - 60000, text: 'A tool should help us finish the task, then give us our attention back. More time in the app is not necessarily more value.' }, { id: 'demo-argument-b', side: 'B', createdAt: now - 30000, text: 'Connection and creativity also happen on screens. We should measure intention and access, not simply minimise screen time.' }], notice: null, next: 100 };
 }
 export type DemoAction =
+  | { type: 'receive-argument'; at: number }
   | { type: 'open-room'; id: string; phase: Phase }
   | { type: 'reply-vote'; takeId: string; id: string }
   | { type: 'navigate'; page: Page; tab?: boolean } | { type: 'back' } | { type: 'theme' } | { type: 'notice'; text: string | null }
@@ -103,6 +104,11 @@ export function demoReducer(s: DemoState, a: DemoAction): DemoState {
     case 'stance': return !take || take.status !== 'active' || take.expiresAt <= a.at ? notice('Archived demo voting is closed.') : { ...s, stances: { ...s.stances, [a.id]: a.stance }, notice: 'Demo stance saved in memory only.' };
     case 'challenge': return takeChallengeIneligibility(take, a.at) || a.text.trim().length < 20 ? notice('Demo challenge unavailable: use an active Take with more than 30 minutes remaining and at least 20 characters.') : { ...s, challenges: { ...s.challenges, [a.id]: a.text.slice(0, 500) }, notice: 'Demo challenge pending. No real challenge was created.' };
     case 'join': return s.data.groups.find(g => g.id === a.id)?.joinMode !== 'OPEN' ? notice('Join request simulated. No real membership changed.') : { ...s, joined: s.joined === a.id ? null : a.id, notice: 'Demo membership updated. Only one demo community can be joined.' };
+    case 'receive-argument': {
+      if (!['OPEN','FINAL'].includes(s.phase)) return notice('Demo arguments are closed in this phase.');
+      const last = s.official.at(-1), side = last?.side === 'A' ? 'B' : 'A';
+      return {...s,next:s.next+1,official:[...s.official,{id:'demo-incoming-'+s.next,side,text:side === 'A' ? 'A practical test is whether a tool helps someone finish what they came to do, then leave with more agency.' : 'Access matters too: the same tool can be a distraction for one person and an essential connection for another.',createdAt:a.at}],notice:null};
+    }
     case 'phase': return { ...s, phase: a.phase, notice: 'Scripted demo phase. No real clock or outcome was changed.' };
     case 'role': return { ...s, role: a.role, notice: null };
     case 'backing': return terminal(s) ? s : { ...s, backing: s.backing === a.side ? null : a.side };

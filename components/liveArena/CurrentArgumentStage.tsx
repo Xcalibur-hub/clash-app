@@ -5,12 +5,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  FadeInDown,
+  FadeIn,
   useReducedMotion,
 } from 'react-native-reanimated';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import type { ArenaMessage } from '../../services/liveArenaService';
-import { duelArgumentPreview } from '../../utils/duelPresentation';
+import { duelArgumentPreview, duelTimestamp } from '../../utils/duelPresentation';
 import { arena } from '../../theme/arena';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -20,6 +20,7 @@ export interface CurrentArgumentStageProps {
   focusSide: 'A' | 'B' | null;
   message: ArenaMessage | null;
   condensed?: boolean;
+  highlighted?: boolean;
   onOpenFull: () => void;
 }
 
@@ -28,6 +29,7 @@ export function CurrentArgumentStage({
   focusSide,
   message,
   condensed = false,
+  highlighted = false,
   onOpenFull,
 }: CurrentArgumentStageProps): React.JSX.Element {
   const t = useThemeColors();
@@ -50,7 +52,7 @@ export function CurrentArgumentStage({
     </Text>
   ) : (
     <>
-      <Text style={[styles.attr, { color: t.textSecondary }]}>OFFICIAL ARGUMENT</Text>
+      <Text style={[styles.attr, { color: t.textSecondary }]}>{highlighted ? 'LATEST OFFICIAL ARGUMENT' : 'OFFICIAL ARGUMENT'}</Text>
       <Text
         selectable
         style={[
@@ -61,7 +63,7 @@ export function CurrentArgumentStage({
       >
         {preview}
       </Text>
-      <Text style={[styles.attr, { color: t.textSecondary }]}>ARGUMENT BY {speaker.name}</Text>
+      <Text style={[styles.attr, { color: t.textSecondary }]}>ARGUMENT BY {speaker.name}{duelTimestamp(message.createdAt) ? ' · ' + duelTimestamp(message.createdAt) : ''}</Text>
       {truncated ? (
         <Pressable
           accessibilityRole="button"
@@ -90,13 +92,13 @@ export function CurrentArgumentStage({
   );
 
   return (
-    <View style={styles.wrap} accessibilityLabel="Current argument">
-      {reduced || !message ? (
+    <View style={[styles.wrap, highlighted ? {borderLeftWidth:2,borderLeftColor:t.borderStrong} : null]} accessibilityLabel="Current argument">
+      {reduced || !message || !highlighted ? (
         content
       ) : (
         <Animated.View
           key={message.id}
-          entering={FadeInDown.duration(280).springify().damping(18)}
+          entering={FadeIn.duration(180)}
         >
           {content}
         </Animated.View>

@@ -3,7 +3,7 @@
  * Stage (calm) + Crowd (live) blend through spacing/atmosphere, not card chrome.
  */
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -11,6 +11,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { isNewOfficialMoment, duelTimestamp } from '../../utils/duelPresentation';
+import { tap as hapticTap } from '../../utils/haptics';
 import { arena } from '../../theme/arena';
 import { chipFill } from './liveArenaStyles';
 import { ReactionBurst } from './ReactionBurst';
@@ -35,6 +37,9 @@ export interface ImmersiveClashProps {
   latestMessage: ArenaMessage | null;
   paddingTop: number;
   judgingFocus?: boolean;
+  viewerScope?: string;
+  eventHint?: string;
+  onViewResult?: () => void;
   condensed?: boolean;
   backingSide: 'A' | 'B' | null;
   onBackSide: (side: 'A' | 'B') => void;
@@ -65,6 +70,9 @@ export function ImmersiveClash({
   latestMessage,
   paddingTop,
   judgingFocus = false,
+  viewerScope = duel.clashId,
+  eventHint,
+  onViewResult,
   condensed = false,
   backingSide,
   onBackSide,
@@ -86,6 +94,24 @@ export function ImmersiveClash({
   const [crowdExpanded, setCrowdExpanded] = React.useState(false);
   const stageFlex = judgingFocus ? 0.76 : condensed ? 0.3 : crowdExpanded ? 0.38 : 0.72;
   const reduced = useReducedMotion();
+  const cursor = latestMessage ? {id:latestMessage.id,createdAt:latestMessage.createdAt,preciseCreatedAt:latestMessage.preciseCreatedAt,kind:latestMessage.kind} : null;
+  const moment = React.useRef({ scope: viewerScope, message: cursor });
+  const [arrivedId, setArrivedId] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (moment.current.scope !== viewerScope) { moment.current = {scope:viewerScope,message:cursor}; setArrivedId(null); return; }
+    if (!latestMessage) return;
+    if (isNewOfficialMoment(moment.current.message, latestMessage)) {
+      if (live) {
+        setArrivedId(latestMessage.id);
+        if (AppState?.currentState === 'active') {
+          if (!reduced) hapticTap();
+          const speaker = focusSide === 'A' ? duel.fighterA : duel.fighterB;
+          AccessibilityInfo?.announceForAccessibility?.('New official argument from ' + speaker.name + (duelTimestamp(latestMessage.createdAt) ? ' at ' + duelTimestamp(latestMessage.createdAt) : ''));
+        }
+      }
+      moment.current.message = cursor;
+    } else if (!moment.current.message) moment.current.message = cursor;
+  }, [viewerScope, latestMessage, live, reduced, focusSide, duel]);
   const split = useSharedValue(stageFlex);
   React.useEffect(() => {
     // Phase changes (OPEN -> FINAL -> JUDGING) move the split instead of snapping.
@@ -117,6 +143,7 @@ export function ImmersiveClash({
         onMore={onMore}
       />
 
+      {eventHint ? onViewResult ? <Pressable accessibilityRole="button" accessibilityLabel="View official result" onPress={onViewResult} style={{minHeight:44,paddingHorizontal:16,justifyContent:'center'}}><Text style={{color:t.textPrimary,fontSize:13}}>{eventHint} View result →</Text></Pressable> : <Text accessibilityLiveRegion="polite" style={{color:t.textSecondary,fontSize:12,lineHeight:17,paddingHorizontal:16,paddingBottom:6}}>{eventHint}</Text> : null}
       <Animated.View style={[styles.stage, stageStyle, compactSummary ? {height:110,minHeight:110,flexShrink:0} : null]}>
         {compact && latestMessage && !judgingFocus ? <Pressable accessibilityRole="button" accessibilityLabel="Read full current official argument" onPress={onViewHistory} style={{minHeight:44,paddingHorizontal:16,justifyContent:'center'}}><Text style={{color:t.textPrimary,fontSize:13,fontWeight:'600'}}>Official argument · Read full →</Text></Pressable> : null}
         {compact && !judgingFocus ? <View style={{paddingBottom:8,minHeight:56,flexShrink:0}}><ClashFighterRail duel={duel} focusSide={focusSide} condensed onOpenProfile={onOpenProfile} /></View> : <ScrollView style={styles.stageScroll}
@@ -151,6 +178,7 @@ export function ImmersiveClash({
               focusSide={focusSide}
               message={latestMessage}
               condensed={compact}
+              highlighted={arrivedId === latestMessage?.id}
               onOpenFull={onViewHistory}
             />
           ) : null}
