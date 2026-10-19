@@ -4,6 +4,7 @@ import { fetchProfileClashes } from './profileService';
 import { fetchClashView } from './clashEngineService';
 import { fetchRoom } from './liveArenaService';
 import { fetchPersonalizedLiveDiscovery } from './personalizedLiveDiscoveryService';
+import { fetchFollowedClashIds } from './clashFollowService';
 import { returnState, uniqueReturnItems, type ArenaReturnItem } from '../utils/arenaReturnVisits';
 
 async function guard(account: string, active: () => boolean): Promise<void> {
@@ -71,4 +72,30 @@ export async function fetchFollowedArenaReturns(account: string, active: () => b
       destination:state === 'UNAVAILABLE'?null:row.entry.roomId ? `/arena/room/${row.entry.roomId}` : `/clash/${row.entry.takeId}`,
       basis:'You follow a public fighter'};
   })),partial:snapshot.metadataError};
+}
+
+/**
+ * Followed Clashes (Step 4A). Relationships come from the server; each card is
+ * resolved through the same access-checked path as return history, so a Clash
+ * whose access was revoked resolves to UNAVAILABLE with no title or route.
+ */
+export async function fetchFollowedClashReturns(account: string, active: () => boolean): Promise<ArenaReturnItem[]> {
+  await guard(account, active);
+  const ids = await fetchFollowedClashIds(account, active);
+  const results: ArenaReturnItem[] = new Array(ids.length);
+  let next = 0;
+  await Promise.all(Array.from({length:Math.min(4,ids.length)}, async () => {
+    while (next < ids.length) {
+      const index = next++, id = ids[index];
+      try {
+        const item = await resolveArenaReturn(account, id, active);
+        results[index] = { ...item, basis: 'You follow this Clash' };
+      } catch {
+        await guard(account, active);
+        results[index] = { id, title: null, state: 'UNAVAILABLE', destination: null, basis: 'Followed Clash' };
+      }
+    }
+  }));
+  await guard(account, active);
+  return uniqueReturnItems(results);
 }

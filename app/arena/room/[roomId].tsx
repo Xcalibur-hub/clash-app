@@ -743,6 +743,7 @@ function RoomScope(): React.JSX.Element {
       paddingTop={insets.top} paddingBottom={insets.bottom} spectatorCount={backup.load?.spectatorCount ?? null}
       loading={loading} refreshing={refreshing} loadingOlder={loadingOlder} hasOlder={hasOlder} threadLocked={threadLocked} error={error}
       composer={bottom} onRefresh={refresh} onLoadOlder={loadOlder}
+      onRequireAuth={() => { requireAuth(); }}
       onWatch={async () => { if (!requireAuth()) return; await watchRoom(room.roomId); await refresh(); }}
       onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
       onReturn={() => router.replace('/(tabs)')}

@@ -55,6 +55,11 @@ export interface ImmersiveClashProps {
   crowd?: LiveCrowdLayerProps['crowd'];
   crowdUnavailableReason?: string;
   onReportCrowd?: LiveCrowdLayerProps['onReport'];
+  /** Step 4A: Follow control. Omitted when following is unavailable. */
+  following?: boolean;
+  followBusy?: boolean;
+  followError?: string | null;
+  onToggleFollow?: () => void;
   /** Real reaction burst on the newest Stage message, or null. */
   reactionBurst?: { emoji: string; key: string } | null;
 }
@@ -89,6 +94,10 @@ export function ImmersiveClash({
   crowdUnavailableReason,
   onReportCrowd,
   reactionBurst = null,
+  following = false,
+  followBusy = false,
+  followError = null,
+  onToggleFollow,
 }: ImmersiveClashProps): React.JSX.Element {
   const t = useThemeColors();
   const [crowdExpanded, setCrowdExpanded] = React.useState(false);
@@ -166,6 +175,35 @@ export function ImmersiveClash({
             </Text>
             </View>
           ) : null}
+          {onToggleFollow ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={following ? 'Following this Clash. Stop following' : 'Follow this Clash'}
+              accessibilityState={{ selected: following, busy: followBusy }}
+              disabled={followBusy}
+              onPress={onToggleFollow}
+              style={[
+                styles.follow,
+                {
+                  borderColor: following ? t.borderStrong : t.border,
+                  backgroundColor: following ? chipFill(t) : 'transparent',
+                  opacity: followBusy ? 0.55 : 1,
+                },
+              ]}
+            >
+              <Text
+                allowFontScaling={false}
+                style={[styles.followText, { color: following ? t.textPrimary : t.textSecondary }]}
+              >
+                {followBusy ? 'SAVING…' : following ? 'FOLLOWING' : 'FOLLOW'}
+              </Text>
+            </Pressable>
+          ) : null}
+          {followError ? (
+            <Text accessibilityRole="alert" style={[styles.followError, { color: t.textSecondary }]}>
+              {followError}
+            </Text>
+          ) : null}
           <ClashFighterRail
             duel={duel}
             focusSide={judgingFocus ? null : focusSide}
@@ -230,6 +268,16 @@ const styles = StyleSheet.create({
     paddingTop: space.xs,
   },
   crowd: { minHeight: 134, flexShrink: 0, borderTopWidth: StyleSheet.hairlineWidth },
+  follow: {
+    alignSelf: 'flex-end',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+  },
+  followText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  followError: { alignSelf: 'flex-end', fontSize: 12, lineHeight: 16 },
   roleChip: {
     alignSelf: 'center',
     borderWidth: StyleSheet.hairlineWidth,

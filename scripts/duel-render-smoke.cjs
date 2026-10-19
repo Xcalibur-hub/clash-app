@@ -66,6 +66,11 @@ Module._load = function(request, parent, isMain) {
   if (resolved.endsWith('/store/AuthProvider.tsx')) return { useAuth: () => ({ user: { id: 'render-account' } }) };
   if (resolved.endsWith('/hooks/useMediaPicker.ts')) return { useMediaPicker: () => ({ pickImage: async () => null, pickVideo: async () => null }) };
   if (resolved.endsWith('/services/arenaAssistService.ts')) return {};
+  // Step 4A: follow state is fetched in effects, which never run in this render check.
+  if (resolved.endsWith('/services/clashFollowService.ts')) return {
+    fetchClashFollowState: async () => false,
+    setClashFollow: async () => {},
+  };
   if (resolved.endsWith('/components/shared/MediaViewer.tsx')) return { MediaViewer: () => null };
   if (resolved.endsWith('/hooks/useArenaCrowd.ts')) return { useArenaCrowd: () => ({ messages: [],context: null,loading: true,error: null,connected: false,sending: false,hasOlder: false,olderBusy: false,refresh: async () => {},loadOlder: async () => {},send: async () => false }) };
   if (theme && resolved === `${root.replaceAll('\\','/')}/theme/index.ts`) return theme;

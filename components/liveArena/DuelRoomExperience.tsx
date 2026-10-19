@@ -40,6 +40,8 @@ import { ArenaSheet } from '../arena/ui/ArenaSheet';
 import { ArenaButton } from '../arena/ui/ArenaPrimitives';
 import { useDuelReactionBurst } from './useDuelReactionBurst';
 import type { CrowdMessage } from '../../utils/arenaCrowd';
+import { useAuth } from '../../store/AuthProvider';
+import { fetchClashFollowState, setClashFollow } from '../../services/clashFollowService';
 
 type Actions = Pick<
   LiveRoomMessageProps,
@@ -66,6 +68,8 @@ interface Props extends Actions {
   threadLocked: boolean;
   error: string | null;
   composer: React.ReactNode;
+  /** Opens the existing auth flow when a signed-out viewer tries to follow. */
+  onRequireAuth?: () => void;
   onBack: () => void;
   onReturn: () => void;
   onRefresh: () => Promise<void>;
@@ -91,6 +95,39 @@ function DuelLoadingBones(): React.JSX.Element {
 export function DuelRoomExperience(props: Props): React.JSX.Element {
   const { room, messages } = props;
   const duel = room.duel!;
+  const account = useAuth().user?.id ?? null;
+  const [following, setFollowing] = React.useState(false);
+  const [followBusy, setFollowBusy] = React.useState(false);
+  const [followError, setFollowError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    setFollowing(false);
+    setFollowError(null);
+    if (!account || !duel.clashId) return () => { active = false; };
+    void fetchClashFollowState(account, duel.clashId, () => active)
+      .then((value) => { if (active) setFollowing(value); })
+      .catch(() => { if (active) setFollowing(false); });
+    return () => { active = false; };
+  }, [account, duel.clashId]);
+
+  /** Optimistic only because the rollback restores the last server-known value. */
+  const toggleFollow = (): void => {
+    if (!duel.clashId) return;
+    if (!account) { props.onRequireAuth?.(); return; }
+    if (followBusy) return;
+    const next = !following;
+    setFollowing(next);
+    setFollowBusy(true);
+    setFollowError(null);
+    hapticTap();
+    void setClashFollow(account, duel.clashId, next)
+      .catch(() => {
+        setFollowing(!next);
+        setFollowError('Could not save your follow. Try again.');
+      })
+      .finally(() => setFollowBusy(false));
+  };
   const cancelled = duel.status === 'cancelled';
   const crowd = useArenaCrowd(props.threadLocked || cancelled ? null : room.roomId);
   React.useEffect(() => { if (props.refreshing) void crowd.refresh(); },[props.refreshing,crowd.refresh]);
@@ -325,6 +362,10 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           onViewHistory={() => setHistoryOpen(true)}
           onMore={() => setMoreOpen(true)}
           roleLabel={presentation.role}
+          following={following}
+          followBusy={followBusy}
+          followError={followError}
+          onToggleFollow={toggleFollow}
           crowdPaddingBottom={
             presentation.canPublish ? 0 : keyboardOpen ? space.xs : Math.max(bottomInset, space.sm)
           }

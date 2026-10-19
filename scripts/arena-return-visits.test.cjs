@@ -16,6 +16,7 @@ function service(options={}){
   if(name==='./profileService')return{fetchProfileClashes:async profile=>{assert.equal(profile,'own-profile');calls.push(['history',profile]);return ids.map(id=>({clash:{id,takeId:'t-'+id}}))}};
   if(name==='./clashEngineService')return{fetchClashView:async id=>{calls.push(['view',id]);inFlight++;max=Math.max(max,inFlight);await Promise.resolve();inFlight--;if(options.accountChange)account='other';if(options.blur)active=false;if(options.denied)return null;return{clashId:options.mismatch?'wrong':id,takeId:'t-'+id,roomId:options.legacy?null:'r-'+id,isParticipant:options.notFighter?false:true,status:options.status??'open',sideAText:'Authorized source',verdict:options.winner?{winnerSide:options.winner}:null}}};
   if(name==='./liveArenaService')return{fetchRoom:async roomId=>{calls.push(['room',roomId]);if(options.roomDenied)throw Object.assign(Error('denied'),{code:'42501'});if(options.network)throw Error('offline');return{roomId,clashId:roomId.slice(2),roomMode:'DUEL',phase:options.phase??'open',duel:{viewerRelationship:options.spectator?'spectator':'fighter_a',status:options.status??'open',verdict:options.winner?{winnerSide:options.winner}:null}}}};
+ if(name.endsWith('/clashFollowService'))return{fetchFollowedClashIds:async()=>[]};
   if(name==='./personalizedLiveDiscoveryService')return{fetchPersonalizedLiveDiscovery:async()=>options.snapshot};
   throw Error(name);
  });
