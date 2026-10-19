@@ -1,14 +1,20 @@
 /**
- * Subtle LOCAL badge — only when the JS bundle points at local Supabase
- * AND this is a development app variant / __DEV__ session.
+ * Dev-only local-Supabase marker.
+ *
+ * Rendered as an 8dp dot in the left gutter. The previous text chip was pinned
+ * at `insets.top + 6` inside the content safe area and therefore sat on top of
+ * the first line of any screen without its own top bar (Activity's return
+ * history heading, which starts `insets.top + space.md` down). A dot in the
+ * 16dp gutter cannot overlap a title, an action or a status-bar icon on any
+ * width, and stays visible in both schemes.
+ *
  * Never shown in preview/production store builds (those never ship local URLs).
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isLocalSupabase } from '../../services/supabaseClient';
-import { typeScale } from '../../theme';
 
 function isDevVariant(): boolean {
   const variant = (Constants.expoConfig?.extra as { appVariant?: string } | undefined)?.appVariant;
@@ -24,31 +30,25 @@ export function LocalSupabaseBadge(): React.JSX.Element | null {
   return (
     <View
       pointerEvents="none"
-      style={[styles.wrap, { top: insets.top + 6 }]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-    >
-      <Text allowFontScaling={false} style={styles.label}>
-        LOCAL
-      </Text>
-    </View>
+      accessibilityLabel="Local Supabase session"
+      style={[styles.dot, { top: insets.top + 4 }]}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
+  dot: {
     position: 'absolute',
-    left: 12,
+    left: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(250, 250, 248, 0.55)',
+    backgroundColor: 'rgba(120, 120, 128, 0.95)',
     zIndex: 50,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(20, 20, 24, 0.72)',
-  },
-  label: {
-    ...typeScale.caption,
-    color: 'rgba(250, 250, 248, 0.85)',
-    fontWeight: '700',
-    letterSpacing: 1,
   },
 });
+

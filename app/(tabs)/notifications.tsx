@@ -77,11 +77,11 @@ export default function NotificationsTab(): React.JSX.Element {
   const bottomPad=dockBottomPadding(insets.bottom);
   if(loading)return <View style={[styles.screen,{backgroundColor:t.background}]} />;
   if(!signedIn||!owner)return <View style={[styles.screen,{backgroundColor:t.background,paddingTop:insets.top,paddingBottom:bottomPad}]}><EmptyState icon={BellIcon} title="Your activity" body="Sign in to see replies and your recent Clashes." actionLabel="Sign in" onAction={()=>router.push('/auth')} /></View>;
-  return <View style={[styles.screen,{backgroundColor:t.background}]}><FlatList data={items} keyExtractor={item=>item.id}
+  return <View style={[styles.screen,{backgroundColor:t.background,paddingTop:insets.top}]}><FlatList data={items} keyExtractor={item=>item.id}
     renderItem={({item})=><NotificationRow notification={item} actor={actors.get(item.actorId??'')} onPress={()=>void open(item)} />}
     ListHeaderComponent={<View><ArenaReturnVisits refreshToken={retry}/><Header unreadCount={items.filter(item=>item.readAt===null).length} onMarkAll={()=>void markAll()}/>{notice?<Text accessibilityRole="alert" style={{color:t.textSecondary,paddingVertical:12}}>{notice}</Text>:null}</View>}
     ListEmptyComponent={!current?<View style={styles.spinner}><ActivityIndicator color={t.textPrimary}/></View>:current.error?<View style={{gap:8}}><Text accessibilityRole="alert" style={{color:t.textSecondary}}>Couldn’t load notifications. These are not empty results.</Text><ArenaButton label="Retry notifications" onPress={()=>setRetry(n=>n+1)}/></View>:<EmptyState icon={BellIcon} title="No notifications in this window" body="The latest 50 recipient-owned notifications appear here. This is not complete activity history."/>}
-    contentContainerStyle={[styles.content,{paddingTop:insets.top+space.md,paddingBottom:bottomPad}]} refreshing={refreshing}
+    contentContainerStyle={[styles.content,{paddingTop:space.md,paddingBottom:bottomPad}]} refreshing={refreshing}
     onRefresh={()=>{setRefreshing(true);setRetry(n=>n+1);}} showsVerticalScrollIndicator={false}/></View>;
 }
 

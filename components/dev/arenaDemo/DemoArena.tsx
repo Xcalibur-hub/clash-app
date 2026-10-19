@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar as RNStatusBar, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PresentationThemeProvider } from '../../../theme/ThemeProvider';
@@ -38,6 +38,11 @@ export function DemoArena({ onExit, initialPage, initialTheme }: DemoArenaProps)
 
 function DemoSurface({ state: s, dispatch, onExit }: { state: DemoState; dispatch: Dispatch; onExit: () => void }): React.JSX.Element {
   const c = arenaColors(useThemeColors()), insets = useSafeAreaInsets();
+  // The fixed header owns the top of the content area. Fall back to the status
+  // bar height when the provider reports a zero/stale inset during the first
+  // layout (edge-to-edge), so Back / Light / Exit can never sit under the
+  // status bar or a window-level overlay.
+  const topInset = Math.max(insets.top, RNStatusBar.currentHeight ?? 0);
   const keyboardOpen = useKeyboardVisible();
   const [sheet, setSheet] = React.useState<Sheet>(), [status, setStatus] = React.useState<'populated' | 'empty' | 'loading' | 'error'>('populated');
   const back = React.useCallback(() => { setSheet(undefined); if (s.history.length || s.page.kind !== 'home') dispatch({ type: 'back' }); else onExit(); }, [dispatch, onExit, s.history.length, s.page.kind]);
@@ -49,7 +54,7 @@ function DemoSurface({ state: s, dispatch, onExit }: { state: DemoState; dispatc
   const showTabs = tabs.some(tab => tab === s.page.kind);
   return <View style={{ flex: 1, backgroundColor: c.page }} accessibilityLabel="Demo Arena. Fictional content and local interactions only.">
     <StatusBar style={s.theme === 'dark' ? 'light' : 'dark'} />
-    <View style={{ paddingTop: insets.top, paddingHorizontal: 12, borderBottomWidth: 1, borderColor: c.strongLine, backgroundColor: c.surface }}>
+    <View style={{ paddingTop: topInset, paddingHorizontal: 12, borderBottomWidth: 1, borderColor: c.strongLine, backgroundColor: c.surface }}>
       <View style={styles.row}>
         {s.history.length || !showTabs ? <ArenaButton label="Back" variant="tertiary" onPress={back} /> : null}
         <Text numberOfLines={1} accessibilityRole="header" style={[arena.type.label, { color: c.ink, flex: 1, minWidth: 40, marginHorizontal: 8 }]}>{showTabs ? 'Demo Arena' : 'Demo'}</Text>
