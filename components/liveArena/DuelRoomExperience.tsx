@@ -375,7 +375,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           following={following}
           followBusy={followBusy}
           followError={followError}
-          onToggleFollow={duel.status === 'open' ? toggleFollow : undefined}
+          onToggleFollow={duel.status === 'open' || following ? toggleFollow : undefined}
           crowdPaddingBottom={
             presentation.canPublish ? 0 : keyboardOpen ? space.xs : Math.max(bottomInset, space.sm)
           }

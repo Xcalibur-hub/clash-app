@@ -49,6 +49,10 @@ export async function setClashFollow(
   await guard(account, active);
   const { error } = await callRpc(following ? 'follow_clash' : 'unfollow_clash', {
     p_clash_id: clashId,
+    // Compare-and-set on the server: if the session switches between this
+    // guard and token acquisition, the RPC sees a different my_profile_id()
+    // and refuses, so nothing is written for the wrong account.
+    p_expected_profile: account,
   });
   if (error) throw requestError(error);
   await guard(account, active);
