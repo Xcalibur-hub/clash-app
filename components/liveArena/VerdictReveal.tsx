@@ -18,6 +18,7 @@ import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { duelResultTitle } from '../../utils/duelPresentation';
 import { hexWithAlpha, verdictMetrics } from './liveArenaStyles';
+import { hasPlayed, markPlayed, shouldPlayOnce } from '../../utils/motionOnce';
 import { notify as hapticNotify } from '../../utils/haptics';
 
 function ballotShare(score: number, jurySize: number): number | null {
@@ -29,16 +30,16 @@ export interface VerdictRevealProps {
   duel: ArenaDuel;
 }
 
-function AnimatedPercent({ value, size, minWidth }: { value: number; size: number; minWidth: number }): React.JSX.Element {
+function AnimatedPercent({ value, size, minWidth, animate }: { value: number; size: number; minWidth: number; animate: boolean }): React.JSX.Element {
   const reduced = useReducedMotion();
   const t = useThemeColors();
-  const progress = useSharedValue(reduced ? 1 : 0);
+  const progress = useSharedValue(reduced || !animate ? 1 : 0);
 
   React.useEffect(() => {
-    progress.value = reduced
+    progress.value = reduced || !animate
       ? 1
-      : withDelay(280, withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) }));
-  }, [progress, reduced, value]);
+      : withDelay(180, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) }));
+  }, [animate, progress, reduced, value]);
 
   const style = useAnimatedStyle(() => ({
     opacity: 0.35 + progress.value * 0.65,
@@ -63,15 +64,22 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
   const title = duelResultTitle(duel) ?? 'Verdict';
   const { width, fontScale } = useWindowDimensions();
   const metrics = verdictMetrics({ width, fontScale });
-  const notified = React.useRef(false);
+  // One reveal per canonical verdict per session: reopening a settled room must
+  // not replay the sequence or its haptic.
+  const momentKey = verdict ? `verdict:${duel.clashId}:${duel.status}:${verdict.verdictLabel}` : '';
+  const animateRef = React.useRef<boolean | null>(null);
+  if (animateRef.current === null) animateRef.current = momentKey ? !hasPlayed(momentKey) : false;
+  const animate = animateRef.current === true;
 
   React.useEffect(() => {
-    if (!notified.current && verdict) {
-      notified.current = true;
-      hapticNotify(duel.status === 'cancelled' ? 'warning' : 'success');
-    }
-    // The decorative wash/veil is gone: nothing is animated behind the copy.
-  }, [duel.status, verdict]);
+    if (momentKey && animate) markPlayed(momentKey);
+  }, [animate, momentKey]);
+
+  React.useEffect(() => {
+    if (!verdict) return;
+    if (!shouldPlayOnce(`haptic:${duel.clashId}:${duel.status}:${verdict.verdictLabel}`)) return;
+    hapticNotify(duel.status === 'cancelled' ? 'warning' : 'success');
+  }, [duel.clashId, duel.status, verdict]);
 
   // No decorative absolutely-positioned layer is drawn behind the result copy.
 
@@ -120,10 +128,10 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
 
   return (
     <View style={styles.wrap}>
-      <Animated.View entering={reduced ? undefined : FadeIn.duration(280)}>{accent}</Animated.View>
+      <Animated.View entering={reduced || !animate ? undefined : FadeIn.duration(220)}>{accent}</Animated.View>
 
       <Animated.Text
-        entering={reduced ? undefined : FadeInDown.delay(80).springify().damping(16)}
+        entering={reduced || !animate ? undefined : FadeInDown.delay(60).duration(220)}
         accessibilityRole="header"
         accessibilityLiveRegion="polite"
         style={[
@@ -139,7 +147,7 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
       </Animated.Text>
 
       <Animated.View
-        entering={reduced ? undefined : FadeInDown.delay(180).springify().damping(18)}
+        entering={reduced || !animate ? undefined : FadeInDown.delay(140).duration(220)}
         style={styles.scoreBlock}
       >
         {([
@@ -154,7 +162,7 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
               <Text style={[styles.side, { color: t.textMuted }]}>Fighter {side}</Text>
             </View>
             {pct !== null ? (
-              <AnimatedPercent value={pct} size={metrics.pctSize} minWidth={metrics.pctMinWidth} />
+              <AnimatedPercent value={pct} size={metrics.pctSize} minWidth={metrics.pctMinWidth} animate={animate} />
             ) : null}
           </View>
         ))}

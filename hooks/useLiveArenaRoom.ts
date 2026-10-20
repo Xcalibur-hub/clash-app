@@ -1,6 +1,7 @@
 ﻿import { currentUserId } from '../services/supabaseClient';
 import { acquireOfficialRequest, confirmOfficialRequest } from '../services/officialRequestStore';
 import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils/officialRecovery';
+import { applyOptimisticReaction, mergeReactionResult, reactionSequenceAccepted, restoreReactions } from '../utils/reactionOptimism';
 import { useFocusEffect } from 'expo-router';
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
@@ -529,48 +530,37 @@ export function useLiveArenaRoom(
     async (messageId: string, emoji = 'ðŸ”¥'): Promise<void> => {
       const sequence = (reactionSequence.current.get(messageId) ?? 0) + 1;
       reactionSequence.current.set(messageId, sequence);
-      const rollback: { rows: readonly { emoji: string; count: number; viewerReacted: boolean }[] | null } = { rows: null };
-      // Local feedback only: the viewer's own chip flips immediately, while the
-      // displayed total stays server-owned until the RPC returns.
-      if (mounted.current) {
+      // Snapshot synchronously: React may not have run an updater yet, and a
+      // rejection must restore the rows captured here rather than inside one.
+      const prior = messagesRef.current.find((message) => message.id === messageId)?.reactions ?? null;
+      if (mounted.current && prior) {
         setMessages((current) =>
-          current.map((message) => {
-            if (message.id !== messageId) return message;
-            rollback.rows = message.reactions;
-            const existing = message.reactions.find((row) => row.emoji === emoji);
-            const reactions = existing
-              ? message.reactions.map((row) => (row.emoji === emoji ? { ...row, viewerReacted: !row.viewerReacted } : row))
-              : [...message.reactions, { emoji, count: 0, viewerReacted: true }];
-            return { ...message, reactions };
-          }),
+          current.map((message) =>
+            message.id === messageId
+              ? { ...message, reactions: applyOptimisticReaction(message.reactions, emoji) }
+              : message,
+          ),
         );
       }
       try {
         const result = await reactMessage(messageId, emoji);
         // A slower response for an older tap must never overwrite a newer one.
-        if (!mounted.current || reactionSequence.current.get(messageId) !== sequence) return;
+        if (!mounted.current || !reactionSequenceAccepted(reactionSequence.current.get(messageId), sequence)) return;
         setMessages((current) =>
-          current.map((message) => {
-            if (message.id !== result.messageId) return message;
-            const others = message.reactions.filter((r) => r.emoji !== result.emoji);
-            const next = result.count
-              ? [
-                  ...others,
-                  { emoji: result.emoji, count: result.count, viewerReacted: result.reacted },
-                ]
-              : others;
-            return {
-              ...message,
-              reactions: next.sort((a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji)),
-            };
-          }),
+          current.map((message) =>
+            message.id === result.messageId
+              ? { ...message, reactions: mergeReactionResult(message.reactions, result) }
+              : message,
+          ),
         );
       } catch (caught) {
-        if (mounted.current && reactionSequence.current.get(messageId) === sequence && rollback.rows) {
-          const rows = rollback.rows;
-          setMessages((current) =>
-            current.map((message) => (message.id === messageId ? { ...message, reactions: [...rows] } : message)),
-          );
+        if (mounted.current && reactionSequenceAccepted(reactionSequence.current.get(messageId), sequence)) {
+          const restored = restoreReactions(prior);
+          if (restored) {
+            setMessages((current) =>
+              current.map((message) => (message.id === messageId ? { ...message, reactions: restored } : message)),
+            );
+          }
         }
         notify(caught);
       }

@@ -2,7 +2,7 @@
  * Short fighter-intro when entering a canonical Duel Room (~500–900ms).
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -36,7 +36,7 @@ export function DuelEntrance({
   React.useEffect(() => {
     if (!active) return undefined;
     doneRef.current = false;
-    const ms = reduced ? 180 : 720;
+    const ms = reduced ? 120 : 620;
     const id = setTimeout(() => {
       if (doneRef.current) return;
       doneRef.current = true;
@@ -48,7 +48,17 @@ export function DuelEntrance({
   if (!active) return null;
 
   return (
-    <View style={[styles.root, { backgroundColor: t.background }]} pointerEvents="auto">
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Skip Clash intro"
+      accessibilityHint="Dismisses the intro and enters the Stage"
+      onPress={() => {
+        if (doneRef.current) return;
+        doneRef.current = true;
+        onDone();
+      }}
+      style={[styles.root, { backgroundColor: t.background }]}
+    >
       <ArenaAtmosphere mood="live" energy={0.4} />
       <View style={styles.content}>
         <Animated.Text
@@ -91,7 +101,7 @@ export function DuelEntrance({
           ENTERING ARENA
         </Animated.Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

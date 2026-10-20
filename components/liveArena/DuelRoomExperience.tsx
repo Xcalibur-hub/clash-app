@@ -17,6 +17,7 @@ import {
 import type { ArenaEvidence, ArenaMessage, ArenaRoom } from '../../services/liveArenaService';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { duelAtmosphereMood } from '../../utils/arenaAtmosphere';
+import { shouldPlayOnce } from '../../utils/motionOnce';
 import { assistAvailability } from '../../utils/arenaAssist';
 import { duelArgumentPreview, duelLatestMoment, duelPresentation, duelTranscript } from '../../utils/duelPresentation';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
@@ -148,7 +149,15 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const [resultOpen, setResultOpen] = React.useState(false);
   const [watching, setWatching] = React.useState(false);
   const [watchError, setWatchError] = React.useState(false);
-  const [entrance, setEntrance] = React.useState(true);
+  const [entrance, setEntrance] = React.useState(false);
+  // One intro per Clash per session. Entering through the gate consumes the
+  // same key, so the Stage never plays a second overlay after consent.
+  const entranceKey = `entrance:${room.clashId ?? room.roomId}`;
+  React.useEffect(() => {
+    if (props.threadLocked) return;
+    if (!shouldPlayOnce(entranceKey)) return;
+    setEntrance(true);
+  }, [entranceKey, props.threadLocked]);
   const [assistOpen, setAssistOpen] = React.useState(false);
   React.useEffect(() => { setAssistOpen(false); setResultOpen(false); }, [room.roomId, duel.viewerRelationship, crowd.identityVersion]);
   const [keyboardOpen, setKeyboardOpen] = React.useState(false);

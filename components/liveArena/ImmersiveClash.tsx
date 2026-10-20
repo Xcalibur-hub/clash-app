@@ -6,6 +6,7 @@ import React from 'react';
 import { AccessibilityInfo, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
+  FadeIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -189,7 +190,7 @@ export function ImmersiveClash({
       ) : eventHint ? onViewResult ? <Pressable accessibilityRole="button" accessibilityLabel="View official result" onPress={onViewResult} style={{minHeight:44,paddingHorizontal:16,justifyContent:'center'}}><Text style={{color:t.textPrimary,fontSize:13}}>{eventHint} View result →</Text></Pressable> : <Text accessibilityLiveRegion="polite" style={{color:t.textSecondary,fontSize:12,lineHeight:17,paddingHorizontal:16,paddingBottom:6}}>{eventHint}</Text> : null}
       <Animated.View style={[styles.stage, stageStyle, compactSummary ? { height: DUEL_COMPACT_STAGE_HEIGHT, minHeight: DUEL_COMPACT_STAGE_HEIGHT, flexShrink: 0 } : null]}>
         {compact && latestMessage && !judgingFocus ? <Pressable accessibilityRole="button" accessibilityLabel="Read full current official argument" onPress={onViewHistory} style={{minHeight:44,paddingHorizontal:16,justifyContent:'center'}}><Text style={{color:t.textPrimary,fontSize:13,fontWeight:'600'}}>Official argument · Read full →</Text></Pressable> : null}
-        {compact && !judgingFocus ? <View style={{paddingBottom:8,minHeight:56,flexShrink:0}}><ClashFighterRail duel={duel} focusSide={focusSide} condensed showPositions={false} onOpenProfile={onOpenProfile} /></View> : <ScrollView style={styles.stageScroll}
+        {compact && !judgingFocus ? <Animated.View entering={reduced ? undefined : FadeIn.duration(140)} style={{paddingBottom:8,minHeight:56,flexShrink:0}}><ClashFighterRail duel={duel} focusSide={focusSide} condensed showPositions={false} onOpenProfile={onOpenProfile} /></Animated.View> : <ScrollView style={styles.stageScroll}
           contentContainerStyle={styles.stageContent} showsVerticalScrollIndicator
           keyboardShouldPersistTaps="handled"
           accessibilityLabel="Clash stage and official arguments">
