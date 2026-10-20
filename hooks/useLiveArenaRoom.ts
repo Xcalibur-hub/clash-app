@@ -2,6 +2,7 @@ import { currentUserId } from '../services/supabaseClient';
 import { acquireOfficialRequest, confirmOfficialRequest } from '../services/officialRequestStore';
 import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils/officialRecovery';
 import { createReactionQueue } from '../utils/reactionOptimism';
+import { createRoomReactionBridge } from '../utils/roomReactionBridge';
 import { createReactionSnapshots } from '../utils/reactionSnapshots';
 import { useFocusEffect } from 'expo-router';
 import React from 'react';
@@ -173,8 +174,9 @@ export function useLiveArenaRoom(
   }, []);
 
   const reactionSnapshots = React.useRef(createReactionSnapshots());
-  const reactionQueue = React.useRef<ReturnType<typeof createReactionQueue> | null>(null);
-  if (!reactionQueue.current) reactionQueue.current = createReactionQueue({
+  const reactionQueue = React.useRef<ReturnType<typeof createRoomReactionBridge> | null>(null);
+  if (!reactionQueue.current) reactionQueue.current = createRoomReactionBridge({
+    snapshots: reactionSnapshots.current,
     read: async id => (await fetchMessage(id))?.reactions ?? null,
     toggle: reactMessage,
     write: (id, reactions) => setMessages(current => reactions
@@ -216,6 +218,10 @@ export function useLiveArenaRoom(
     const generation=accessGeneration.current;
     try {
       await reactionQueue.current?.reconcile();
+      // A dropped repair target requests a broader authoritative refresh; the
+      // newest-page read below satisfies it. Rows outside the loaded window are
+      // repaired only when they are fetched again (documented limitation).
+      reactionQueue.current?.consumeOverflowRequest();
       if (messageCursor.current) await drainOfficialGap(messageCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
         (rows,cursor) => { setThreadLocked(false); setMessages(old=>reactionSnapshots.current.merge(old,rows,snapshot)); messageCursor.current=cursor; },

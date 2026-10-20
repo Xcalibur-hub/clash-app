@@ -2,6 +2,7 @@
  * Reaction state transitions and serialized mutations.
  * Ambiguous failures are repaired by authoritative reads only; a toggle is
  * never retried, and unresolved repairs survive offline time until a read lands.
+ * Overflow is explicit: dropped targets stay unresolved and request a refresh.
  */
 import type { ArenaReaction } from '../services/liveArenaService';
 
@@ -30,18 +31,28 @@ export function createReactionQueue(io: {
   toggle: (id: string, emoji: string) => Promise<ReactionResult>;
   write: (id: string, rows: ArenaReaction[] | null) => void;
   onError: (error: unknown) => void;
+  /** A committed mutation or an authoritative repair read for this message. */
   onCommitted?: (id: string) => void;
 }) {
   const tails = new Map<string, Promise<void>>();
-  /** Retained until a successful authoritative read; capped and scope-cleared. */
+  /** Retained until two completed authoritative reads; capped and scope-cleared. */
   const dirty = new Map<string, { active: () => boolean; reads: number }>();
   const MAX_RETAINED = 100;
   const MAX_REPAIR_BATCH = 20;
+  let dropped = 0;
+  let refreshRequested = false;
   const retain = (id: string, active: () => boolean): void => {
     if (dirty.has(id)) return;
     dirty.set(id, { active, reads: 0 });
     if (dirty.size > MAX_RETAINED) {
-      for (const key of dirty.keys()) { if (key !== id) { dirty.delete(key); break; } }
+      /* Overflow contract: a dropped target is unresolved, never "repaired". */
+      for (const key of dirty.keys()) {
+        if (key === id) continue;
+        dirty.delete(key);
+        dropped += 1;
+        refreshRequested = true;
+        break;
+      }
     }
   };
   const repair = async (id: string, active: () => boolean): Promise<boolean> => {
@@ -71,8 +82,6 @@ export function createReactionQueue(io: {
           retain(id, active);
           if (baseline) io.write(id, [...baseline]);
           // A lost response may have committed. Read; never toggle again.
-          // One confirmation now, and one final read on a later reconcile cycle;
-          // offline reads never consume the obligation.
           await repair(id, active).then((ok) => {
             if (!ok) return;
             const entry = dirty.get(id);
@@ -101,11 +110,16 @@ export function createReactionQueue(io: {
       }
     },
     pendingRepairs(): number { return dirty.size; },
-    reset(): void { dirty.clear(); },
+    overflow(): { dropped: number; requested: boolean } { return { dropped, requested: refreshRequested }; },
+    consumeOverflowRequest(): boolean {
+      const requested = refreshRequested;
+      refreshRequested = false;
+      return requested;
+    },
+    reset(): void { dirty.clear(); dropped = 0; refreshRequested = false; },
   };
 }
 
 function sortReactions(rows: readonly ArenaReaction[]): ArenaReaction[] {
   return [...rows].sort((a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji));
 }
-
