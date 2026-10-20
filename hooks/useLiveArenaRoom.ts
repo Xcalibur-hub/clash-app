@@ -37,6 +37,7 @@ import {
 } from '../services/liveArenaService';
 import { errorText, SupabaseError } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
+import { createVisibilityBarrier, mergeInitialPage, mergePostedRow } from '../utils/transcriptOrdering.ts';
 import { mergeMessagesById, removeUnavailableMessages } from '../utils/liveRoomThread';
 
 /** How many arguments one page of the thread carries. */
@@ -175,6 +176,7 @@ export function useLiveArenaRoom(
   }, []);
 
   const reactionSnapshots = React.useRef(createReactionSnapshots());
+  const visibilityBarrier = React.useRef(createVisibilityBarrier()).current;
   const reactionQueue = React.useRef<ReturnType<typeof createRoomReactionBridge> | null>(null);
   if (!reactionQueue.current) reactionQueue.current = createRoomReactionBridge({
     snapshots: reactionSnapshots.current,
@@ -193,6 +195,7 @@ export function useLiveArenaRoom(
   const hydrateInserted = React.useCallback(async (ids: string[]): Promise<void> => {
     if (ids.length === 0) return;
     const generation=accessGeneration.current;
+    const visibilityEpoch = visibilityBarrier.epoch();
     const snapshot = reactionSnapshots.current.beginSnapshot();
     try {
       const unique = [...new Set(ids)].slice(0, 12);
@@ -203,7 +206,9 @@ export function useLiveArenaRoom(
       const next = rows.filter((row): row is ArenaMessage => row != null);
       if (next.length === 0) return;
       setThreadLocked(false);
-      setMessages((current) => reactionSnapshots.current.merge(current, next, snapshot));
+      const authorized = visibilityBarrier.filter(next, visibilityEpoch);
+      if (authorized.length === 0) return;
+      setMessages((current) => reactionSnapshots.current.merge(current, authorized, snapshot));
     } catch (caught) {
       if (!mounted.current) return;
       if (isMembershipRefusal(caught)) clearPrivateThread();
@@ -302,6 +307,7 @@ export function useLiveArenaRoom(
     try {
       const visible = await fetchVisibleMessageIds(roomId, checked);
       if (!mounted.current) return;
+      visibilityBarrier.mark(checked.filter((id) => !visible.includes(id)));
       setMessages((current) => removeUnavailableMessages(current, checked, visible));
     } catch (caught) {
       if (mounted.current && isMembershipRefusal(caught)) clearPrivateThread();
@@ -343,7 +349,9 @@ export function useLiveArenaRoom(
           setHasOlder(messageHasOlder.current);
           if (!messageCursor.current) messageCursor.current=thread[0]?.preciseCreatedAt ? thread[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
           setMessages((current) =>
-            mode === 'initial' ? thread : reactionSnapshots.current.merge(current, thread, snapshot),
+            mode === 'initial'
+              ? mergeInitialPage(current, thread, snapshot, reactionSnapshots.current)
+              : reactionSnapshots.current.merge(current, thread, snapshot),
           );
         }
         setEvidence(old=> mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
@@ -516,6 +524,7 @@ export function useLiveArenaRoom(
         pending: true,
       };
       setSending(true);
+      const snapshot = reactionSnapshots.current.beginSnapshot();
       setMessages((current) => mergeMessages(current, [placeholder]));
       try {
         const posted = input.reshareSourceMessageId
@@ -529,12 +538,7 @@ export function useLiveArenaRoom(
           : await postMessage({ ...input, roomId, requestKey, expectedAccountId:account }, authorRef.current);
         if (requestKey) await confirmOfficialRequest(account,roomId,'message',requestKey).catch(()=>{});
         if (!mounted.current) return false;
-        setMessages((current) => [
-          ...mergeMessages(
-            current.filter((message) => message.id !== temporaryId),
-            [posted],
-          ),
-        ]);
+        setMessages((current) => mergePostedRow(current, posted, temporaryId, snapshot, reactionSnapshots.current));
         return true;
       } catch (caught) {
         if (mounted.current) {
@@ -727,6 +731,7 @@ export function useLiveArenaRoom(
     upgradeToDebater,
   };
 }
+
 
 
 

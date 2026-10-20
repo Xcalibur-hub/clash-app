@@ -158,7 +158,10 @@ describe('6. every reaction-bearing transcript path uses the coordinator', () =>
     assert.match(hydrate, /reactionSnapshots\.current\.merge\(/, 'hydrate merges through the coordinator');
     assert.doesNotMatch(hydrate, /mergeMessages\(current, next\)/, 'no unguarded merge');
     assert.match(src, /setMessages\(old=>reactionSnapshots\.current\.merge\(old,rows,snapshot\)\)/);
-    assert.match(src, /mode === 'initial' \? thread : reactionSnapshots\.current\.merge\(current, thread, snapshot\)/);
+    assert.match(src, /mergeInitialPage\(current, thread, snapshot, reactionSnapshots\.current\)/);
+    assert.match(src, /mergePostedRow\(current, posted, temporaryId, snapshot, reactionSnapshots\.current\)/);
+    assert.match(hydrate, /visibilityBarrier\.filter\(next, visibilityEpoch\)/);
+    assert.match(src, /visibilityBarrier\.mark\(checked\.filter/);
     assert.match(src, /setMessages\(current=>reactionSnapshots\.current\.merge\(current,page,snapshot\)\)/);
   });
 });
@@ -177,5 +180,6 @@ describe('7. reaction-only reads cannot resurrect a deleted message', () => {
     assert.equal(c.rows.some((r) => r.id === 'stay'), true);
   });
 });
+
 
 
