@@ -6,9 +6,9 @@ const vm = require('node:vm');
 const babel = require('@babel/core');
 const t = require('@babel/types');
 
-// Execute the real callback bodies with deferred transport and synchronous state
-// setters. This is not a React renderer or a native/backend integration test.
-function harness(transform = (source) => source) {
+// Execute the real callback bodies with deferred transport and optional queued
+// state updaters. This is not a React renderer or native/backend integration test.
+function harness(transform = (source) => source, { queued = false } = {}) {
   const modules = new Map();
   const context = vm.createContext({ Date, Math, Symbol });
   function load(file) {
@@ -58,6 +58,8 @@ function harness(transform = (source) => source) {
   const { mergeMessagesById, removeUnavailableMessages } = load('utils/liveRoomThread.ts');
   const { drainOfficialGap } = load('utils/officialRecovery.ts');
   let rows = [row('base', 0)], sending = false, writes = 0, notices = 0;
+  const updates = [];
+  const apply = (update) => { rows = typeof update === 'function' ? update(rows) : update; writes++; };
   const noop = () => {};
   const scope = {
     ...ordering, roomId: 'room', PAGE: 40, mounted: { current: true }, accessGeneration: { current: 0 },
@@ -69,7 +71,7 @@ function harness(transform = (source) => source) {
     reactionQueue: { current: { reconcile: async () => {} } }, drainOfficialGap,
     // The unchanged overflow scheduler is deliberately outside these tests.
     recoverOverflowAfterRefresh: async () => false,
-    setMessages(update) { rows = typeof update === 'function' ? update(rows) : update; writes++; },
+    setMessages(update) { if (queued) updates.push(update); else apply(update); },
     setSending(value) { sending = value; }, notify() { notices++; },
     setEvidence: noop, setStats: noop, setHasOlder: noop, setThreadLocked: noop, setError: noop,
     fetchVisibleMessageIds: async () => ['base'], removeUnavailableMessages, mergeMessages: mergeMessagesById,
@@ -82,6 +84,9 @@ function harness(transform = (source) => source) {
     scope, callback: (name) => callback(name, scope), load,
     get rows() { return rows; }, set rows(value) { rows = value; },
     get sending() { return sending; }, get writes() { return writes; }, get notices() { return notices; },
+    get queuedUpdates() { return updates.length; },
+    flushNext() { assert.ok(updates.length, 'queued updater available'); apply(updates.shift()); },
+    flushAll() { while (updates.length) apply(updates.shift()); },
   };
 }
 function row(id, n) {
@@ -289,6 +294,134 @@ test('a duplicate send cannot steal ownership from the active request', async ()
   operation.request.resolve(row('posted', 1));
   assert.equal(await operation.pending, true);
   assert.equal(h.sending, false);
+});
+
+function queuedRecovery() {
+  const h = harness(undefined, { queued: true });
+  const all = Array.from({ length: 50 }, (_, i) => row('gap' + (i + 1), i + 1));
+  const first = deferred(), second = deferred(), firstStarted = deferred(), secondStarted = deferred();
+  let reads = 0, holdSecond = true;
+  h.scope.fetchOfficialPage = async (_room, _kind, cursor, direction) => {
+    if (direction !== 'newer') return all.slice(-40).reverse();
+    reads++;
+    if (cursor.id === 'base') { firstStarted.resolve(); await first.promise; return all.slice(0, 40); }
+    if (cursor.id === 'gap40' && holdSecond) {
+      holdSecond = false; secondStarted.resolve(); await second.promise;
+    }
+    return all.filter((item) => item.createdAt > cursor.createdAt).slice(0, 40);
+  };
+  const refresh = h.callback('refreshThread');
+  return { h, all, first, second, firstStarted, secondStarted, refresh, get reads() { return reads; } };
+}
+
+test('accepted queued page survives a later pruning floor and all 50 messages remain recoverable', async () => {
+  const q = queuedRecovery(), { h } = q;
+  h.rows.push({ ...row('pending', 51), pending: true });
+  h.rows.push(...Array.from({ length: 501 }, (_, i) => row('hidden' + i, -i - 1)));
+  const pending = q.refresh();
+  await q.firstStarted.promise;
+  q.first.resolve();
+  await q.secondStarted.promise;
+  assert.equal(h.scope.messageCursor.current.id, 'gap40');
+  assert.equal(h.rows.some((item) => item.id.startsWith('gap')), false);
+  const visibility = h.callback('reconcileVisibility');
+  for (let pass = 0; pass < 6; pass++) await visibility();
+  assert.equal(h.scope.visibilityBarrier.allows(0), false);
+  h.flushAll();
+  assert.equal(h.rows.filter((item) => item.id.startsWith('gap')).length, 40,
+    'already accepted coverage must survive deferred application');
+  q.second.resolve();
+  await pending;
+  h.flushAll();
+  await q.refresh();
+  h.flushAll();
+  for (const item of q.all) assert.ok(h.rows.some((loaded) => loaded.id === item.id), item.id);
+  assert.equal(h.rows.some((item) => item.id === 'pending' && item.pending), true);
+  assert.equal(h.rows.length, 52);
+  assert.equal(new Set(h.rows.map((item) => item.id)).size, 52);
+});
+
+test('queued merge followed by authoritative removal does not resurrect the removed row', async () => {
+  const q = queuedRecovery(), { h } = q;
+  h.rows.push(q.all[0]);
+  const pending = q.refresh();
+  await q.firstStarted.promise;
+  q.first.resolve();
+  await q.secondStarted.promise;
+  await h.callback('reconcileVisibility')();
+  h.flushAll();
+  assert.equal(h.rows.some((item) => item.id === 'gap1'), false);
+  assert.equal(h.rows.some((item) => item.id === 'gap2'), true);
+  q.second.resolve();
+  await pending;
+  h.flushAll();
+  assert.equal(h.rows.some((item) => item.id === 'gap1'), false);
+});
+
+for (const ending of ['generation', 'unmount']) test(`${ending} before queued page execution prevents stale insertion`, async () => {
+  const q = queuedRecovery(), { h } = q, pending = q.refresh();
+  await q.firstStarted.promise;
+  q.first.resolve();
+  await q.secondStarted.promise;
+  if (ending === 'generation') h.scope.clearPrivateThread(); else h.scope.mounted.current = false;
+  h.flushNext();
+  assert.equal(h.rows.some((item) => item.id.startsWith('gap')), false);
+  h.flushAll();
+  q.second.resolve();
+  await pending;
+  h.flushAll();
+  assert.equal(h.rows.some((item) => item.id.startsWith('gap')), false);
+});
+
+test('queued page uses current reaction barriers when its updater executes', async () => {
+  const q = queuedRecovery(), { h } = q;
+  h.rows.push({ ...q.all[0], reactions: [{ emoji: 'fire', count: 0, viewerReacted: false }] });
+  q.all[0].reactions = [{ emoji: 'fire', count: 0, viewerReacted: false }];
+  const pending = q.refresh();
+  await q.firstStarted.promise;
+  q.first.resolve();
+  await q.secondStarted.promise;
+  // A newer authoritative reaction has committed before this lower-priority
+  // transcript updater. Transport/mutation semantics are covered separately.
+  h.rows = h.rows.map((item) => item.id === 'gap1'
+    ? { ...item, reactions: [{ emoji: 'fire', count: 1, viewerReacted: true }] } : item);
+  const guard = h.scope.reactionSnapshots.current;
+  guard.beginMutation('gap1'); guard.markAuthoritativeReactionWrite('gap1'); guard.finishMutation('gap1');
+  h.flushNext();
+  const reaction = h.rows.find((item) => item.id === 'gap1').reactions[0];
+  assert.equal(reaction.count, 1);
+  assert.equal(reaction.viewerReacted, true);
+  q.second.resolve(); await pending; h.flushAll();
+  assert.equal(h.rows.find((item) => item.id === 'gap1').reactions[0].count, 1);
+});
+
+test('concurrent refresh cannot overlap a drain with a queued page', async () => {
+  const q = queuedRecovery(), { h } = q, pending = q.refresh();
+  await q.firstStarted.promise;
+  q.first.resolve();
+  await q.secondStarted.promise;
+  await q.refresh();
+  assert.equal(q.reads, 2);
+  assert.equal(h.scope.messageCursor.current.id, 'gap40');
+  q.second.resolve(); await pending; h.flushAll();
+  assert.equal(q.reads, 2);
+  assert.equal(h.rows.length, 51);
+});
+
+test('whole-request rejection before acceptance remains unacknowledged with queued setters', async () => {
+  const q = queuedRecovery(), { h } = q;
+  h.rows.push(...Array.from({ length: 501 }, (_, i) => row('hidden' + i, -i - 1)));
+  const pending = q.refresh();
+  await q.firstStarted.promise;
+  const visibility = h.callback('reconcileVisibility');
+  for (let pass = 0; pass < 6; pass++) await visibility();
+  h.flushAll();
+  q.first.resolve();
+  await pending;
+  h.flushAll();
+  assert.equal(h.scope.messageCursor.current.id, 'base');
+  assert.equal(q.reads, 1);
+  assert.equal(h.rows.filter((item) => item.id.startsWith('gap')).length, 40);
 });
 
 module.exports = { harness, sendingHarness };

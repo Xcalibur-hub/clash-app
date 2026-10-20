@@ -232,8 +232,14 @@ export function useLiveArenaRoom(
         async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
         (rows,cursor) => {
           if (!visibilityBarrier.allows(threadEpoch)) return false;
+          // Admission and cursor coverage are one synchronous decision. React
+          // may run this updater after the visibility watermark has advanced.
+          const admittedRows = visibilityBarrier.admit(rows,threadEpoch);
           setThreadLocked(false);
-          setMessages(old=>reactionSnapshots.current.merge(old,visibilityBarrier.admit(rows,threadEpoch),snapshot));
+          setMessages(old => {
+            if (!mounted.current || generation !== accessGeneration.current) return old;
+            return reactionSnapshots.current.merge(old,admittedRows,snapshot);
+          });
           messageCursor.current=cursor;
           return true;
         },
