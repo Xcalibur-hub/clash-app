@@ -1,4 +1,4 @@
-﻿/** Public Crowd presentation. Only server-authorized rows; no layout fixtures. */
+/** Public Crowd presentation. Only server-authorized rows; no layout fixtures. */
 import React from 'react';
 import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import type { useArenaCrowd } from '../../hooks/useArenaCrowd';

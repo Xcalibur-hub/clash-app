@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Full-screen live Clash canvas — one event, not stacked dashboard cards.
  * Stage (calm) + Crowd (live) blend through spacing/atmosphere, not card chrome.
  */

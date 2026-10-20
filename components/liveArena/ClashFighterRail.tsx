@@ -1,4 +1,4 @@
-﻿/** Exactly two canonical speakers; latest argument attribution is never a turn timer. */
+/** Exactly two canonical speakers; latest argument attribution is never a turn timer. */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Avatar } from '../shared/Avatar';
