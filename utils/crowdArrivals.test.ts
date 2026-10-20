@@ -30,10 +30,26 @@ describe('crowd arrivals', () => {
 
   it('never alerts for paginated history', () => {
     const tracker = createCrowdArrivalTracker();
-    tracker.observe(['m5'], { source: 'hydrate', atLiveEdge: false });
-    assert.equal(tracker.observe(['m3', 'm4', 'm5'], { source: 'history', atLiveEdge: false }), false);
+    tracker.observe(['m5'], { atLiveEdge: false });
+    assert.equal(tracker.observe(['m3', 'm4', 'm5'], { atLiveEdge: false }), true,
+      'plain ids remain live by contract');
+    tracker.reset();
+    tracker.observe(['m5'], { atLiveEdge: false });
+    assert.equal(
+      tracker.observe([{ id: 'm3', origin: 'history' }, { id: 'm4', origin: 'history' }, 'm5'], { atLiveEdge: false }),
+      false,
+    );
     // The older rows are now known and cannot alert later.
-    assert.equal(tracker.observe(['m3', 'm4', 'm5'], { source: 'live', atLiveEdge: false }), false);
+    assert.equal(tracker.observe(['m3', 'm4', 'm5'], { atLiveEdge: false }), false);
+  });
+
+  it('alerts for a live row that sorts before the window', () => {
+    const tracker = createCrowdArrivalTracker();
+    tracker.observe(['m2', 'm3'], { atLiveEdge: false });
+    assert.equal(
+      tracker.observe([{ id: 'm1', origin: 'live' }, 'm2', 'm3'], { atLiveEdge: false }),
+      true,
+    );
   });
 
   it('ignores moderation removals and reconciliation replays', () => {

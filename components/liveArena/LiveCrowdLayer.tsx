@@ -32,16 +32,11 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
   // Arrival detection is ID-based so a late row with an older timestamp still
   // raises the affordance; pagination and hydration never do.
   const arrivals = React.useRef(createCrowdArrivalTracker());
-  const historyPending = React.useRef(false);
   const crowdScope = crowd?.context?.roomId ?? null;
   React.useEffect(() => { arrivals.current.reset(); }, [crowdScope]);
   React.useEffect(() => {
     const ids = (crowd?.messages ?? []).map(message => message.id);
-    const alert = arrivals.current.observe(ids, {
-      source: historyPending.current ? 'history' : 'live',
-      atLiveEdge: atLatest.current,
-    });
-    historyPending.current = false;
+    const alert = arrivals.current.observe(crowd?.messages ?? [], { atLiveEdge: atLatest.current });
     if (alert) setUnseen(true);
     else if (atLatest.current) setUnseen(false);
     if (!atLatest.current) return;
@@ -73,7 +68,7 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
       scrollEventThrottle={100}
       onContentSizeChange={() => { if(atLatest.current) list.current?.scrollToEnd({animated:false}); }}
       ListHeaderComponent={crowd?.hasOlder ? <Pressable disabled={crowd.olderBusy} accessibilityRole="button" style={styles.hit}
-        onPress={() => { historyPending.current = true; atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loadingâ€¦' : 'Load earlier chat'}</Text></Pressable> : null}
+        onPress={() => { atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loadingâ€¦' : 'Load earlier chat'}</Text></Pressable> : null}
       ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{unavailableReason ?? (crowd?.loading ? 'Loading Crowdâ€¦' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.')}</Text>}
       renderItem={({item}) => <View style={[styles.row,{borderBottomColor:t.border}]} accessibilityRole="text" accessibilityLabel={crowdRowLabel(item.author.handle, item.body)}>
         <View style={[styles.avatar,{backgroundColor:t.surfaceElevated}]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Text style={{color:t.textSecondary,fontSize:11,fontWeight:'600'}}>{item.author.handle.slice(0,1).toUpperCase()}</Text></View>

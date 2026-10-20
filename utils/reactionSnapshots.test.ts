@@ -61,6 +61,34 @@ describe('reaction snapshot ordering', () => {
     assert.equal(merged.find((m) => m.id === 'm2')?.body, 'edited');
   });
 
+  it('never lets an older snapshot overwrite a newer applied snapshot (CASE B)', () => {
+    const guard = createReactionSnapshots();
+    const older = guard.beginSnapshot();
+    const newer = guard.beginSnapshot();
+    guard.merge([row('m1', 5, 'local', true)], [row('m1', 7, 'newer', true)], newer);
+    const afterOlder = guard.merge([row('m1', 7, 'newer', true)], [row('m1', 3, 'older')], older);
+    assert.equal(afterOlder[0].reactions[0].count, 7, 'older snapshot cannot roll back a newer one');
+  });
+
+  it('does not treat a snapshot begun during a pending mutation as authoritative', () => {
+    const guard = createReactionSnapshots();
+    guard.beginMutation('m1');
+    const during = guard.beginSnapshot();
+    const merged = guard.merge([row('m1', 5, 'local', true)], [row('m1', 1, 'stale')], during);
+    assert.equal(merged[0].reactions[0].count, 5);
+    guard.commitMutation('m1');
+    assert.deepEqual(guard.protectedIds(), []);
+  });
+
+  it('applies a snapshot that begins after the mutation settles', () => {
+    const guard = createReactionSnapshots();
+    guard.beginMutation('m1');
+    guard.commitMutation('m1');
+    const after = guard.beginSnapshot();
+    const merged = guard.merge([row('m1', 5, 'local', true)], [row('m1', 6, 'server', true)], after);
+    assert.equal(merged[0].reactions[0].count, 6);
+  });
+
   it('drops protection on reset (room or account change)', () => {
     const guard = createReactionSnapshots();
     guard.noteMutation('m1');

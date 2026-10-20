@@ -542,11 +542,13 @@ export function useLiveArenaRoom(
     (messageId: string, emoji = '🔥'): Promise<void> => {
       const generation = accessGeneration.current;
       const viewer = authorRef.current?.id;
-      // Protect this message the moment the tap happens: any transcript snapshot
-      // that began earlier must not overwrite its reaction fields.
-      reactionSnapshots.current.noteMutation(messageId);
-      return reactionQueue.current!.enqueue(messageId, emoji,
-        () => mounted.current && generation === accessGeneration.current && authorRef.current?.id === viewer);
+      // Protect this message the moment the tap happens, and release the guard
+      // only when the mutation actually settles (success or repaired failure).
+      reactionSnapshots.current.beginMutation(messageId);
+      const active = () => mounted.current && generation === accessGeneration.current && authorRef.current?.id === viewer;
+      return reactionQueue.current!.enqueue(messageId, emoji, active).finally(() => {
+        reactionSnapshots.current.commitMutation(messageId);
+      });
     },
     [],
   );

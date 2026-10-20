@@ -3,6 +3,10 @@ import { AppState } from 'react-native';
 import { fetchCrowdContext, fetchCrowdIds, fetchCrowdPage, postCrowd, subscribeCrowd, subscribeCrowdIdentity } from '../services/arenaCrowdService';
 import { mergeCrowd, reconcileCrowd, type CrowdContext, type CrowdMessage } from '../utils/arenaCrowd';
 
+/** Provenance is client-side only; the server rows are never rewritten. */
+const tagRows = (rows: readonly CrowdMessage[], origin: NonNullable<CrowdMessage['origin']>): CrowdMessage[] =>
+  rows.map((row) => ({ ...row, origin }));
+
 export function useArenaCrowd(roomId: string | null) {
   const [messages,setMessages] = React.useState<CrowdMessage[]>([]);
   const [context,setContext] = React.useState<CrowdContext | null>(null);
@@ -41,7 +45,7 @@ export function useArenaCrowd(roomId: string | null) {
       for (let page = 0; page < 5; page++) {
         const next = await fetchCrowdPage(roomId,cursor,cursor ? 'newer' : 'older');
         if (gen !== generation.current) return;
-        setMessages(old => mergeCrowd(old,next));
+        setMessages(old => mergeCrowd(old, tagRows(next, cursor ? 'live' : 'hydrate')));
         if (next.length) syncCursor.current = next.at(-1);
         if (!cursor) { setHasOlder(next.length === 40); break; }
         if (next.length < 40) break;
@@ -76,7 +80,7 @@ export function useArenaCrowd(roomId: string | null) {
         timer = undefined;
         const ids = [...pending].slice(0,100); pending.clear();
         void fetchCrowdIds(roomId,ids).then(visible => {
-          if (generation.current === gen) setMessages(old => reconcileCrowd(old,ids,visible));
+          if (generation.current === gen) setMessages(old => reconcileCrowd(old,ids,tagRows(visible,'live')));
         }).catch(caught => { if (generation.current === gen) failure(caught); });
       },120);
     },online => { if (generation.current === gen) { setConnected(online); if (online) void refresh(); } });
@@ -91,7 +95,7 @@ export function useArenaCrowd(roomId: string | null) {
       const next = await fetchCrowdPage(roomId,rows.current[0]);
       if (gen !== generation.current) return;
       // Loading history preserves the older rows; live arrivals maintain a 200-row window.
-      setMessages(old => mergeCrowd(old,next,200)); setHasOlder(next.length === 40 && rows.current.length+next.length<200);
+      setMessages(old => mergeCrowd(old,tagRows(next,'history'),200)); setHasOlder(next.length === 40 && rows.current.length+next.length<200);
     } catch (caught) { if (gen === generation.current) failure(caught); }
     finally { if (gen === generation.current) { olderRef.current = false; setOlderBusy(false); } }
   },[failure,roomId]);
@@ -101,7 +105,7 @@ export function useArenaCrowd(roomId: string | null) {
     try {
       const sent = await postCrowd(roomId,body,key);
       if (gen !== generation.current) return false;
-      setMessages(old => mergeCrowd(old,[sent])); setError(null); return true;
+      setMessages(old => mergeCrowd(old,tagRows([sent],'live'))); setError(null); return true;
     } catch (caught) {
       if (gen === generation.current) {
         failure(caught);

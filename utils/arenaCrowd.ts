@@ -1,5 +1,7 @@
 export interface CrowdMessage {
   id: string; roomId: string; body: string; createdAt: string; isOwn: boolean;
+  /** Client-side provenance: hydration, live delivery or a history page. */
+  origin?: 'hydrate' | 'live' | 'history';
   author: { id: string; name: string; handle: string; avatarTint: string };
 }
 export interface CrowdContext { roomId: string; canSend: boolean; spectatorCount: number; serverNow: string; closesAt: string }

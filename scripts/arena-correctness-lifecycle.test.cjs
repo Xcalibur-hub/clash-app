@@ -1,4 +1,4 @@
-const test = require('node:test'), assert = require('node:assert/strict');
+﻿const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm'), babel = require('@babel/core');
 function load(file, requireMock) {
   const code = babel.transformSync(fs.readFileSync(file, 'utf8'), { filename: file, babelrc: false, configFile: false,
@@ -28,6 +28,7 @@ function harness(file, name, reduced = false, sharedRegistry) {
       useReducedMotion: () => reduced, useSharedValue: value => React.useRef(value).current, useAnimatedStyle: () => ({}) };
     if (dep.endsWith('/motionOnce')) return registry;
     if (dep.endsWith('/crowdPresentation')) return load('utils/crowdPresentation.ts', () => { throw Error('Unexpected dependency'); });
+    if (dep.endsWith('/crowdArrivals')) return load('utils/crowdArrivals.ts', () => { throw Error('Unexpected dependency'); });
     if (dep.endsWith('/arenaCrowd')) return { validCrowdText: text => !!text.trim() };
     if (dep.endsWith('/haptics')) return { notify: () => { haptics++; } };
     if (dep.endsWith('/verdictView')) return { verdictView: () => ({ title: 'Official result', aPct: 50, bPct: 50 }) };
@@ -110,7 +111,8 @@ test('Crowd history reader sees arrivals but not removal, replay or pagination',
   let tree = h.render(props([row(2), row(3)]));
   const list = tree.props.children.find(node => node?.type === 'List');
   list.props.onScrollBeginDrag(); list.props.onScroll({ nativeEvent: { contentOffset: { y: 0 }, layoutMeasurement: { height: 100 }, contentSize: { height: 800 } } });
-  h.render(props([row(1), row(2), row(3)])); assert.doesNotMatch(JSON.stringify(h.render(props([row(1), row(2)]))), /New messages ↓/);
-  h.render(props([row(1), row(2), row(3)])); assert.doesNotMatch(JSON.stringify(h.render(props([row(1), row(2), row(3)]))), /New messages ↓/);
-  h.render(props([row(1), row(2), row(3), row(4)])); assert.match(JSON.stringify(h.render(props([row(1), row(2), row(3), row(4)]))), /New messages ↓/);
+  h.render(props([row(1), row(2), row(3)])); assert.doesNotMatch(JSON.stringify(h.render(props([row(1), row(2)]))), /New messages/);
+  h.render(props([row(1), row(2), row(3)])); assert.doesNotMatch(JSON.stringify(h.render(props([row(1), row(2), row(3)]))), /New messages/);
+  h.render(props([row(1), row(2), row(3), row(4)])); assert.match(JSON.stringify(h.render(props([row(1), row(2), row(3), row(4)]))), /New messages/);
 });
+

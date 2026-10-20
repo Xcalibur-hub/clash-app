@@ -321,11 +321,6 @@ function RoomScope(): React.JSX.Element {
 
   // One bounded discovery read per settled Clash; the route owns navigation.
   const navigation = React.useRef(createNavigationGuard());
-  useFocusEffect(React.useCallback(() => () => navigation.current.invalidate(), []));
-  React.useEffect(() => {
-    navigation.current.invalidate();
-    return () => navigation.current.invalidate();
-  }, [room?.roomId, state.viewer.id]);
   const [nextClash, setNextClash] = React.useState<{ entry: ClashDiscoveryEntry; roomId: string } | null>(null);
   const [nextBusy, setNextBusy] = React.useState(false);
   const [nextNotice, setNextNotice] = React.useState<string | null>(null);
@@ -374,6 +369,19 @@ function RoomScope(): React.JSX.Element {
         : 'That Clash could not be opened. Return to the Arena to pick another.');
     })();
   }, [nextBusy, nextClash, router]);
+
+  // Any lifecycle invalidation clears the busy state so Watch is usable again
+  // after blur/refocus, even when a stale request resolves while blurred.
+  const cancelNextClash = React.useCallback((): void => {
+    navigation.current.invalidate();
+    setNextBusy(false);
+  }, []);
+  useFocusEffect(React.useCallback(() => () => cancelNextClash(), [cancelNextClash]));
+  React.useEffect(() => {
+    navigation.current.invalidate();
+    setNextBusy(false);
+    return cancelNextClash;
+  }, [cancelNextClash, room?.roomId, state.viewer.id]);
 
   const loadPresence = React.useCallback(async () => {
     if (!roomId) return;
