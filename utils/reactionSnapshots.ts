@@ -12,6 +12,8 @@
 import { mergeMessagesById } from './liveRoomThread.ts';
 
 export interface SnapshotGuard {
+  /** Synchronous owner boundary; restore application metadata on failure. */
+  transaction<T>(run: () => T): T;
   beginSnapshot(): number;
   beginMutation(messageId: string): void;
   finishMutation(messageId: string): void;
@@ -38,6 +40,7 @@ export function createReactionSnapshots(): SnapshotGuard {
   // latest write per id for updater replay until a newer snapshot or scope
   // reset releases it, without completing any user mutation.
   const writes = new Map<string, { at: number; current: boolean }>();
+  let transactionDepth = 0;
   const resetWrites = (): void => {
     for (const ticket of writes.values()) ticket.current = false;
     writes.clear();
@@ -78,6 +81,23 @@ export function createReactionSnapshots(): SnapshotGuard {
     entry.pending = Math.max(0, entry.pending - 1);
   };
   return {
+    transaction<T>(run: () => T): T {
+      const entries = new Map([...tracked].map(([id, entry]) => [id, { ...entry }]));
+      const tickets = new Map([...writes].map(([id, ticket]) => [id, { ticket, current: ticket.current }]));
+      const floor = evictedSince;
+      transactionDepth++;
+      try { return run(); }
+      catch (error) {
+        tracked.clear();
+        for (const [id, entry] of entries) tracked.set(id, entry);
+        for (const ticket of writes.values()) ticket.current = false;
+        writes.clear();
+        for (const [id, saved] of tickets) { saved.ticket.current = saved.current; writes.set(id, saved.ticket); }
+        evictedSince = floor;
+        // Allocated tokens are never recycled, even when their transition fails.
+        throw error;
+      } finally { transactionDepth--; }
+    },
     beginSnapshot(): number { seq += 1; return seq; },
     beginMutation(messageId: string): void { if (messageId) entryFor(messageId).pending += 1; },
     finishMutation: finish,
@@ -131,7 +151,7 @@ export function createReactionSnapshots(): SnapshotGuard {
       return mergeMessagesById(current as never, safe as never) as unknown as T[];
     },
     protectedIds(): string[] { return [...tracked.entries()].filter(([, entry]) => entry.pending > 0).map(([id]) => id); },
-    reset(): void { resetWrites(); tracked.clear(); seq = 0; evictedSince = 0; },
+    reset(): void { resetWrites(); tracked.clear(); if (!transactionDepth) seq = 0; evictedSince = 0; },
   };
 }
 

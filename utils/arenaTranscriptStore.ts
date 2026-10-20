@@ -3,6 +3,7 @@ import { createVisibilityBarrier } from './transcriptOrdering.ts';
 import type { ArenaMessage } from '../services/liveArenaService';
 
 type Update = ArenaMessage[] | ((current: ArenaMessage[]) => ArenaMessage[]);
+const MAX_TRANSITIONS = 64;
 
 /**
  * The authoritative message cache. Transitions run once, outside React render.
@@ -20,21 +21,26 @@ export function createArenaTranscriptStore() {
   let depth = 0;
   const queued: Update[] = [];
 
-  const publish = (next: ArenaMessage[]): void => {
+  let accepted = 0;
+  const run = (update: Update, errors: unknown[]): void => {
+    const next = visibility.transaction(() => reactions.transaction(() => {
+      const candidate = typeof update === 'function' ? update(messages) : update;
+      if (candidate === messages) return messages;
+      for (const row of candidate) {
+        for (const reaction of row.reactions) Object.freeze(reaction);
+        Object.freeze(row.reactions);
+        Object.freeze(row);
+      }
+      const snapshot = [...candidate];
+      Object.freeze(snapshot);
+      return snapshot;
+    }));
     if (next === messages) return;
-    for (const row of next) {
-      for (const reaction of row.reactions) Object.freeze(reaction);
-      Object.freeze(row.reactions);
-      Object.freeze(row);
+    messages = next;
+    // Publication has committed. Listener failure cannot undo it or suppress peers.
+    for (const listener of [...listeners]) {
+      try { listener(); } catch (error) { errors.push(error); }
     }
-    messages = [...next];
-    Object.freeze(messages);
-    for (const listener of listeners) listener();
-  };
-
-  const run = (update: Update): void => {
-    const next = typeof update === 'function' ? update(messages) : update;
-    publish(next);
   };
 
   return {
@@ -49,17 +55,25 @@ export function createArenaTranscriptStore() {
       // No await or React setter here. Ordering effects and rows are completed
       // before publication; replaying a React read cannot repeat the transition.
       if (depth > 0) {
+        if (accepted >= MAX_TRANSITIONS) throw Error('Transcript transition limit exceeded; nested write rejected');
+        accepted++;
         queued.push(update);
         return;
       }
       depth = 1;
+      accepted = 1;
+      const errors: unknown[] = [];
+      queued.push(update);
       try {
-        run(update);
-        while (queued.length) run(queued.shift()!);
+        while (queued.length) {
+          try { run(queued.shift()!, errors); } catch (error) { errors.push(error); }
+        }
       } finally {
         depth = 0;
+        accepted = 0;
         queued.length = 0;
       }
+      if (errors.length) throw new AggregateError(errors, 'Transcript transition or notification failed');
     },
   };
 }

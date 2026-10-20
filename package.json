@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:unit && node --test scripts/arena-correctness-lifecycle.test.cjs scripts/arena-recovery-lifecycle.test.cjs scripts/arena-transcript-state.test.cjs",
+    "test": "npm run test:unit && node --test scripts/arena-correctness-lifecycle.test.cjs scripts/arena-recovery-lifecycle.test.cjs scripts/arena-transcript-state.test.cjs scripts/arena-session-stability.test.cjs",
     "test:duel": "node --experimental-strip-types --test utils/arenaDuelPayload.test.ts utils/duelPresentation.test.ts",
     "test:official:service": "node scripts/official-service-check.cjs",
     "test:settlement:history": "node scripts/settlement-history-check.cjs",

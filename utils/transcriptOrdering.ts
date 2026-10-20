@@ -49,6 +49,8 @@ export function createTranscriptUpdater<T extends Row>(
 }
 
 export interface VisibilityBarrier {
+  /** Synchronous owner boundary; aborted admissions and removals have no authority. */
+  transaction<T>(run: () => T): T;
   epoch(): number;
   /** Establish removal now; apply it only while no later admission supersedes it. */
   mark(ids: readonly string[]): <T extends { id: string; pending?: boolean }>(current: readonly T[]) => T[];
@@ -74,7 +76,30 @@ export function createVisibilityBarrier(max = MAX_EVICTED): VisibilityBarrier {
   // so deferred application/replay remains safe after tombstone pruning.
   const eligibleIds = new Map<string, Eligibility>();
   const batches = new WeakMap<object, Eligibility[]>();
+  let addedBatches: object[] | null = null;
   return {
+    transaction<T>(run: () => T): T {
+      const evictions = new Map(evictedAt), eligible = new Map(eligibleIds);
+      const flags = new Map([...eligible.values()].map(ticket => [ticket, ticket.eligible]));
+      const savedFloor = floor, parent = addedBatches, added: object[] = [];
+      addedBatches = added;
+      try {
+        const result = run();
+        if (parent) for (const batch of added) parent.push(batch);
+        return result;
+      } catch (error) {
+        for (const ticket of eligibleIds.values()) ticket.eligible = false;
+        eligibleIds.clear();
+        for (const [ticket, value] of flags) ticket.eligible = value;
+        for (const [id, ticket] of eligible) eligibleIds.set(id, ticket);
+        evictedAt.clear();
+        for (const [id, at] of evictions) evictedAt.set(id, at);
+        for (const batch of added) batches.delete(batch);
+        floor = savedFloor;
+        // Keep revision monotonic so aborted epochs cannot collide with a later eviction.
+        throw error;
+      } finally { addedBatches = parent; }
+    },
     epoch(): number { return revision; },
     mark(ids: readonly string[]) {
       revision += 1;
@@ -111,6 +136,7 @@ export function createVisibilityBarrier(max = MAX_EVICTED): VisibilityBarrier {
         if (!ticket) { ticket = { eligible: true }; eligibleIds.set(row.id, ticket); }
         return ticket;
       }));
+      addedBatches?.push(accepted);
       return accepted;
     },
     filterAccepted<T extends { id: string }>(rows: readonly T[]): T[] {

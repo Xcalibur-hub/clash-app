@@ -81,6 +81,7 @@ function harness(transform = (source) => source, { queued = false } = {}) {
     ...ordering, roomId: 'room', PAGE: 40, mounted: { current: true }, accessGeneration, sessionRef,
     liveSession: (session) => ordering.isLiveRoomSession(scope.mounted.current, session, sessionRef.current),
     sendBusy: { current: null }, reactionSnapshots: { current: createReactionSnapshots() },
+    olderBusy: { current: null }, refreshBusy: { current: null }, loadCounts: { current: { initial: 0, refresh: 0 } },
     visibilityBarrier: ordering.createVisibilityBarrier(), messageCursor: { current: row('base', 0) },
     initialCoverage: { current: null },
     evidenceCursor: { current: null }, evidenceRef: { current: [] }, evidenceVisibilityCursor: { current: 0 },
@@ -95,7 +96,7 @@ function harness(transform = (source) => source, { queued = false } = {}) {
       if (queued) evidenceUpdates.push(applyEvidence); else applyEvidence();
     },
     setSending(value) { sending = value; }, notify() { notices++; },
-    setStats: noop, setHasOlder: noop, setThreadLocked: noop, setError: noop,
+    setStats: noop, setHasOlder: noop, setThreadLocked: noop, setError: noop, errorText: String,
     setRoom: noop, setLoading: noop, setRefreshing: noop, setLoadingOlder: noop,
     fetchRoom: async () => ({ roomMode: 'DUEL', status: 'LIVE' }), fetchEvidence: async () => [],
     fetchMessage: async id => row(id, 1), loadingOlder: false, hasOlder: true, threadLocked: false,
