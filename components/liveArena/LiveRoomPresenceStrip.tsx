@@ -8,6 +8,7 @@ import type { ArenaRoomPresence, Stance } from '../../services/liveArenaService'
 import { space, typeScale, useThemeColors } from '../../theme';
 import { Avatar } from '../shared/Avatar';
 import { STANCE_LABEL } from './liveArenaStyles';
+import { crowdAudienceLabel } from '../../utils/crowdPresentation';
 
 export interface LiveRoomPresenceStripProps {
   people: readonly ArenaRoomPresence[];
@@ -47,6 +48,9 @@ export function LiveRoomPresenceStrip({
           </Text>
         ) : null}
       </View>
+      <Text allowFontScaling={false} style={[styles.you, { color: t.textMuted }]}>
+        {crowdAudienceLabel({ participantCount }) ?? `${participantCount} joined`}
+      </Text>
       {viewerRole === 'debater' && viewerStance ? (
         <Text allowFontScaling={false} style={[styles.you, { color: t.textMuted }]}>
           You · {STANCE_LABEL[viewerStance]}

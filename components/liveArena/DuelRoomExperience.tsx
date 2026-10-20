@@ -17,11 +17,8 @@ import {
 import type { ArenaEvidence, ArenaMessage, ArenaRoom } from '../../services/liveArenaService';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { duelAtmosphereMood } from '../../utils/arenaAtmosphere';
-import {
-  duelLatestMoment,
-  duelPresentation,
-  duelTranscript,
-} from '../../utils/duelPresentation';
+import { assistAvailability } from '../../utils/arenaAssist';
+import { duelArgumentPreview, duelLatestMoment, duelPresentation, duelTranscript } from '../../utils/duelPresentation';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { BackIcon } from '../shared/icons';
 import { PressableScale } from '../shared/PressableScale';
@@ -216,6 +213,14 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
     duel.status === 'open' &&
     (room.phase === 'open' || room.phase === 'final_arguments');
 
+  // Assists stay private to one fighter; the UI only mirrors the server rules.
+  const assist = assistAvailability({
+    viewerRelationship: duel.viewerRelationship,
+    status: duel.status,
+    phase: room.phase,
+    threadLocked: props.threadLocked,
+  });
+
   const retry = (
     <Pressable
       disabled={props.refreshing}
@@ -251,6 +256,16 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                 : 'Enter as a spectator to follow the Clash. Watching does not make you a fighter.'
               : 'This Clash is available to members.'}
           </Text>
+          {moment.message && presentation.canWatch && (moment.message.body ?? '').trim() ? (
+            <View style={styles.gatePreview}>
+              <Text style={[styles.gatePreviewMeta, { color: t.textMuted }]}>
+                LATEST ARGUMENT · {moment.side === 'A' ? 'FIGHTER A' : moment.side === 'B' ? 'FIGHTER B' : 'STAGE'}
+              </Text>
+              <Text numberOfLines={3} style={[styles.gatePreviewBody, { color: t.textPrimary }]}>
+                {duelArgumentPreview(moment.message.body ?? '', 180).preview}
+              </Text>
+            </View>
+          ) : null}
           {presentation.canWatch ? (
             <PressableScale
               accessibilityRole="button"
@@ -386,7 +401,8 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           }
           stageFooter={
             <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 }}><ArenaButton label="Transcript" variant="tertiary" onPress={() => setHistoryOpen(true)} />{duel.viewerRelationship !== 'staff' ? <ArenaButton label={presentation.canPublish ? 'Assist inbox' : 'Private assist'} variant="tertiary" onPress={() => setAssistOpen(true)} /> : null}</View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 }}><ArenaButton label="Transcript" variant="tertiary" onPress={() => setHistoryOpen(true)} />{assist !== 'hidden' ? <ArenaButton label={assist === 'inbox' ? 'Assist inbox' : 'Private assist'} variant="tertiary" disabled={assist === 'closed'} onPress={() => setAssistOpen(true)} /> : null}</View>
+            {assist !== 'hidden' ? <Text style={[styles.assistNote, { color: t.textMuted }]}>{assist === 'closed' ? 'Assists are closed for this Clash.' : 'Private assists go to one fighter only — never posted in the Crowd.'}</Text> : null}
             {showOutcome ? (
               <View style={styles.outcome}>
                 <DuelRoomOutcome
@@ -416,7 +432,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         />
       </KeyboardAvoidingView>
 
-      {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen initialSide={backingSide ?? 'A'} roomId={room.roomId} duel={duel} disabled={duel.status !== 'open' || !['open', 'final_arguments'].includes(room.phase) || props.threadLocked} onPublished={props.onRefresh} /></ArenaSheet> : null}
+      {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen initialSide={backingSide ?? 'A'} roomId={room.roomId} duel={duel} disabled={assist === 'closed'} onPublished={props.onRefresh} /></ArenaSheet> : null}
       {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}><DuelRoomOutcome duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn}/></ArenaSheet> : null}
       <ArgumentHistorySheet
         visible={historyOpen}
@@ -505,6 +521,21 @@ const styles = StyleSheet.create({
     paddingRight: space.sm,
   },
   retryText: { ...typeScale.label, fontSize: 14, fontWeight: '600' },
+  gatePreview: { borderLeftWidth: 2, paddingLeft: 10, gap: 4 },
+  gatePreviewMeta: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  gatePreviewBody: { ...typeScale.body, fontSize: 14, lineHeight: 20 },
+  assistNote: {
+    ...typeScale.caption,
+    fontSize: 11,
+    lineHeight: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
   bones: { gap: space.sm, width: '100%', paddingTop: space.md },
   boneLine: { height: 14, borderRadius: 6 },
   boneBlock: { height: 72, borderRadius: 8, marginVertical: space.xs },

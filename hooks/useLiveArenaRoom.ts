@@ -1,4 +1,4 @@
-import { currentUserId } from '../services/supabaseClient';
+﻿import { currentUserId } from '../services/supabaseClient';
 import { acquireOfficialRequest, confirmOfficialRequest } from '../services/officialRequestStore';
 import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils/officialRecovery';
 import { useFocusEffect } from 'expo-router';
@@ -46,7 +46,7 @@ const VISIBILITY_BATCH = 100;
 
 export interface LiveArenaRoomController {
   room: ArenaRoom | null;
-  /** Newest first — render in an inverted list. */
+  /** Newest first â€” render in an inverted list. */
   messages: ArenaMessage[];
   evidence: ArenaEvidence[];
   stats: ArenaMindshiftStats | null;
@@ -59,7 +59,7 @@ export interface LiveArenaRoomController {
   sending: boolean;
   loadingOlder: boolean;
   hasOlder: boolean;
-  /** True after a capacity rejection on upgrade — user stays spectator. */
+  /** True after a capacity rejection on upgrade â€” user stays spectator. */
   roomFullOnUpgrade: boolean;
   refresh: () => Promise<void>;
   loadOlder: () => Promise<void>;
@@ -71,11 +71,11 @@ export interface LiveArenaRoomController {
   voteSide: (side: 'AGREE' | 'DISAGREE') => Promise<boolean>;
   voteArgument: (messageId: string) => Promise<boolean>;
   recordFinal: (stance: Stance) => Promise<boolean>;
-  /** Spectator → debater in-place. Refreshes room state on success. */
+  /** Spectator â†’ debater in-place. Refreshes room state on success. */
   upgradeToDebater: (stance: Stance) => Promise<boolean>;
 }
 
-/** Newest-first merge that keeps one row per id — an optimistic echo never doubles. */
+/** Newest-first merge that keeps one row per id â€” an optimistic echo never doubles. */
 function mergeMessages(
   current: readonly ArenaMessage[],
   incoming: readonly ArenaMessage[],
@@ -100,7 +100,7 @@ function isMembershipRefusal(error: unknown): boolean {
  * The thread is deliberately refreshed rather than patched when realtime fires.
  * A `postgres_changes` row carries no author card and no reaction rollup, and
  * synthesising one on the client would mean the app inventing content the server
- * never sent — so an INSERT is treated as a hint to re-read the newest page.
+ * never sent â€” so an INSERT is treated as a hint to re-read the newest page.
  *
  * A non-member can still load a SETTLED room (the result is public), so a
  * refused message read marks the thread locked instead of failing the screen.
@@ -172,7 +172,7 @@ export function useLiveArenaRoom(
 
   /**
    * Lightweight INSERT hydrate: fetch only the new message id(s).
-   * Full newest-page reconcile runs on a slow timer / reconnect — not every post.
+   * Full newest-page reconcile runs on a slow timer / reconnect â€” not every post.
    */
   const hydrateInserted = React.useCallback(async (ids: string[]): Promise<void> => {
     if (ids.length === 0) return;
@@ -521,11 +521,34 @@ export function useLiveArenaRoom(
     [notify, roomId, sending],
   );
 
+  // Optimistic reactions are per message: a stale response never overwrites a
+  // newer tap, and a failure restores exactly the rows that were replaced.
+  const reactionSequence = React.useRef(new Map<string, number>());
+
   const react = React.useCallback(
-    async (messageId: string, emoji = '🔥'): Promise<void> => {
+    async (messageId: string, emoji = 'ðŸ”¥'): Promise<void> => {
+      const sequence = (reactionSequence.current.get(messageId) ?? 0) + 1;
+      reactionSequence.current.set(messageId, sequence);
+      const rollback: { rows: readonly { emoji: string; count: number; viewerReacted: boolean }[] | null } = { rows: null };
+      // Local feedback only: the viewer's own chip flips immediately, while the
+      // displayed total stays server-owned until the RPC returns.
+      if (mounted.current) {
+        setMessages((current) =>
+          current.map((message) => {
+            if (message.id !== messageId) return message;
+            rollback.rows = message.reactions;
+            const existing = message.reactions.find((row) => row.emoji === emoji);
+            const reactions = existing
+              ? message.reactions.map((row) => (row.emoji === emoji ? { ...row, viewerReacted: !row.viewerReacted } : row))
+              : [...message.reactions, { emoji, count: 0, viewerReacted: true }];
+            return { ...message, reactions };
+          }),
+        );
+      }
       try {
         const result = await reactMessage(messageId, emoji);
-        if (!mounted.current) return;
+        // A slower response for an older tap must never overwrite a newer one.
+        if (!mounted.current || reactionSequence.current.get(messageId) !== sequence) return;
         setMessages((current) =>
           current.map((message) => {
             if (message.id !== result.messageId) return message;
@@ -543,6 +566,12 @@ export function useLiveArenaRoom(
           }),
         );
       } catch (caught) {
+        if (mounted.current && reactionSequence.current.get(messageId) === sequence && rollback.rows) {
+          const rows = rollback.rows;
+          setMessages((current) =>
+            current.map((message) => (message.id === messageId ? { ...message, reactions: [...rows] } : message)),
+          );
+        }
         notify(caught);
       }
     },

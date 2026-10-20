@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -88,6 +89,8 @@ import type { ExpressiveMainTab } from '../../../components/arena/ExpressiveMedi
 const REPLY_PREVIEW_LIMIT = 3;
 const PULSE_REFRESH_MS_DEBATER = 20_000;
 const PULSE_REFRESH_MS_SPECTATOR = 45_000;
+/** Presence is a server snapshot; it is never advanced locally between reads. */
+const PRESENCE_REFRESH_MS = 20_000;
 
 interface SafetyTarget {
   user: User;
@@ -324,7 +327,11 @@ function RoomScope(): React.JSX.Element {
   React.useEffect(() => {
     if (!room) return;
     void loadPresence();
-    const id = setInterval(() => void loadPresence(), 20_000);
+    // A backgrounded app does not need a presence refresh; the next foreground
+    // read is authoritative because nothing is inferred from elapsed time.
+    const id = setInterval(() => {
+      if (AppState.currentState === 'active') void loadPresence();
+    }, PRESENCE_REFRESH_MS);
     return () => clearInterval(id);
   }, [loadPresence, room?.roomId, room?.participantCount]);
 

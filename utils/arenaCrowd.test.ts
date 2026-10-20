@@ -15,4 +15,13 @@ describe('public Crowd contracts',() => {
   it('keeps deterministic ID ties and bounds the live window',() => assert.deepEqual(mergeCrowd([row(3),row(1)],[row(2)],2).map(r=>r.id),[row(2).id,row(3).id]));
   it('evicts checked moderated/blocked rows but retains unchecked history',() => assert.deepEqual(reconcileCrowd([row(1),row(2)],[row(1).id],[]).map(r=>r.id),[row(2).id]));
   it('updates permitted rows during reconciliation',() => assert.equal(reconcileCrowd([row(1)],[row(1).id],[{...row(1),body:'Visible'}])[0].body,'Visible'));
+it('keeps one row when Realtime delivery is followed by reconciliation',() => {
+  const live = mergeCrowd([row(1)],[row(2)]);
+  const reconciled = reconcileCrowd(live,[row(2).id],[row(2)]);
+  assert.deepEqual(reconciled.map(r=>r.id),[row(1).id,row(2).id]);
+});
+it('drops a row that reconciliation no longer authorizes',() => {
+  const live = mergeCrowd([row(1)],[row(2)]);
+  assert.deepEqual(reconcileCrowd(live,[row(2).id],[]).map(r=>r.id),[row(1).id]);
+});
 });

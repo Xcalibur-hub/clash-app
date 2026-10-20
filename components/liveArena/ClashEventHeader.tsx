@@ -6,6 +6,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { crowdAudienceLabel } from '../../utils/crowdPresentation';
 import { BackIcon } from '../shared/icons';
 import { LivePulse } from './LivePulse';
 import { chipFill } from './liveArenaStyles';
@@ -32,6 +33,9 @@ export function ClashEventHeader({
 }: ClashEventHeaderProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
+  // Spectators are only claimed when the server supplied a spectator count;
+  // the header never upgrades a membership number into a viewer number.
+  const audienceLabel = spectatorCount !== null ? crowdAudienceLabel({ spectatorCount }) : null;
   return (
     <View style={[styles.wrap, { paddingTop }]}>
       <Pressable
@@ -47,8 +51,8 @@ export function ClashEventHeader({
         style={styles.center}
         accessibilityLiveRegion="polite"
         accessibilityLabel={
-          spectatorCount !== null
-            ? `${statusLabel}${phaseLabel ? ` ${phaseLabel}` : ''}. ${spectatorCount} spectators joined`
+          audienceLabel
+            ? `${statusLabel}${phaseLabel ? ` ${phaseLabel}` : ''}. ${audienceLabel}`
             : `${statusLabel}${phaseLabel ? ` ${phaseLabel}` : ''}`
         }
       >
@@ -81,13 +85,13 @@ export function ClashEventHeader({
             </View>
           </Animated.View>
         ) : null}
-        {spectatorCount !== null ? (
+        {audienceLabel !== null ? (
           <>
             <Text allowFontScaling={false} style={[styles.sep, { color: t.textMuted }]}>
               ·
             </Text>
             <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
-              {spectatorCount} joined
+              {audienceLabel}
             </Text>
           </>
         ) : null}
