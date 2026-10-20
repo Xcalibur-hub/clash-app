@@ -1,8 +1,8 @@
 ﻿/**
- * Reaction state transitions and serialized mutations.
- * Ambiguous failures are repaired by authoritative reads only; a toggle is
- * never retried, and unresolved repairs survive offline time until a read lands.
- * Overflow is explicit: dropped targets stay unresolved and request a refresh.
+ * Reaction mutations and bounded ambiguous recovery.
+ * A toggle is never retried. Overflow is explicit: dropped targets remain
+ * unresolved, are tracked in a bounded list, and are recovered by targeted
+ * authoritative reads for messages still in loaded scope.
  */
 import type { ArenaReaction } from '../services/liveArenaService';
 
@@ -26,31 +26,38 @@ export function mergeReactionResult(rows: readonly ArenaReaction[], result: Pick
 export function reactionSequenceAccepted(latest: number | undefined, mine: number): boolean { return latest === mine; }
 export function restoreReactions(prior: readonly ArenaReaction[] | null): ArenaReaction[] | null { return prior ? [...prior] : null; }
 
+export interface OverflowState { dropped: number; requested: boolean; tracked: number }
+export interface RecoveryResult { attempted: number; remainingLoaded: number; parked: number }
+
 export function createReactionQueue(io: {
   read: (id: string) => Promise<readonly ArenaReaction[] | null>;
   toggle: (id: string, emoji: string) => Promise<ReactionResult>;
   write: (id: string, rows: ArenaReaction[] | null) => void;
   onError: (error: unknown) => void;
-  /** A committed mutation or an authoritative repair read for this message. */
   onCommitted?: (id: string) => void;
 }) {
   const tails = new Map<string, Promise<void>>();
-  /** Retained until two completed authoritative reads; capped and scope-cleared. */
   const dirty = new Map<string, { active: () => boolean; reads: number }>();
   const MAX_RETAINED = 100;
   const MAX_REPAIR_BATCH = 20;
+  const MAX_DROPPED_IDS = 50;
+  const droppedIds: string[] = [];
   let dropped = 0;
   let refreshRequested = false;
+
   const retain = (id: string, active: () => boolean): void => {
     if (dirty.has(id)) return;
     dirty.set(id, { active, reads: 0 });
     if (dirty.size > MAX_RETAINED) {
-      /* Overflow contract: a dropped target is unresolved, never "repaired". */
       for (const key of dirty.keys()) {
         if (key === id) continue;
         dirty.delete(key);
         dropped += 1;
         refreshRequested = true;
+        if (!droppedIds.includes(key)) {
+          droppedIds.push(key);
+          if (droppedIds.length > MAX_DROPPED_IDS) droppedIds.shift();
+        }
         break;
       }
     }
@@ -62,6 +69,7 @@ export function createReactionQueue(io: {
     io.onCommitted?.(id);
     return true;
   };
+
   return {
     enqueue(id: string, emoji: string, active: () => boolean): Promise<void> {
       const run = async () => {
@@ -81,7 +89,6 @@ export function createReactionQueue(io: {
           if (!active()) return;
           retain(id, active);
           if (baseline) io.write(id, [...baseline]);
-          // A lost response may have committed. Read; never toggle again.
           await repair(id, active).then((ok) => {
             if (!ok) return;
             const entry = dirty.get(id);
@@ -109,14 +116,31 @@ export function createReactionQueue(io: {
         await task.finally(() => { if (tails.get(id) === task) tails.delete(id); });
       }
     },
+    /** Targeted recovery for overflow-dropped targets still in loaded scope. */
+    async recoverDropped(isLoaded: (id: string) => boolean, limit = 20): Promise<RecoveryResult> {
+      const parked = droppedIds.filter((id) => !isLoaded(id));
+      const loaded = droppedIds.filter(isLoaded);
+      let attempted = 0;
+      for (const id of loaded.slice(0, Math.max(0, limit))) {
+        attempted += 1;
+        try {
+          const rows = await io.read(id);
+          io.write(id, rows ? [...rows] : null);
+          io.onCommitted?.(id);
+          const index = droppedIds.indexOf(id);
+          if (index >= 0) droppedIds.splice(index, 1);
+        } catch { /* keep for a later pass */ }
+      }
+      return { attempted, remainingLoaded: droppedIds.filter(isLoaded).length, parked: parked.length };
+    },
     pendingRepairs(): number { return dirty.size; },
-    overflow(): { dropped: number; requested: boolean } { return { dropped, requested: refreshRequested }; },
+    overflow(): OverflowState { return { dropped, requested: refreshRequested, tracked: droppedIds.length }; },
     consumeOverflowRequest(): boolean {
       const requested = refreshRequested;
       refreshRequested = false;
       return requested;
     },
-    reset(): void { dirty.clear(); dropped = 0; refreshRequested = false; },
+    reset(): void { dirty.clear(); droppedIds.length = 0; dropped = 0; refreshRequested = false; },
   };
 }
 

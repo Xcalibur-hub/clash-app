@@ -1,8 +1,9 @@
-import { currentUserId } from '../services/supabaseClient';
+﻿import { currentUserId } from '../services/supabaseClient';
 import { acquireOfficialRequest, confirmOfficialRequest } from '../services/officialRequestStore';
 import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils/officialRecovery';
 import { createReactionQueue } from '../utils/reactionOptimism';
 import { createRoomReactionBridge } from '../utils/roomReactionBridge';
+import { recoverOverflowAfterRefresh } from '../utils/overflowRecovery';
 import { createReactionSnapshots } from '../utils/reactionSnapshots';
 import { useFocusEffect } from 'expo-router';
 import React from 'react';
@@ -49,7 +50,7 @@ const VISIBILITY_BATCH = 100;
 
 export interface LiveArenaRoomController {
   room: ArenaRoom | null;
-  /** Newest first — render in an inverted list. */
+  /** Newest first â€” render in an inverted list. */
   messages: ArenaMessage[];
   evidence: ArenaEvidence[];
   stats: ArenaMindshiftStats | null;
@@ -62,7 +63,7 @@ export interface LiveArenaRoomController {
   sending: boolean;
   loadingOlder: boolean;
   hasOlder: boolean;
-  /** True after a capacity rejection on upgrade — user stays spectator. */
+  /** True after a capacity rejection on upgrade â€” user stays spectator. */
   roomFullOnUpgrade: boolean;
   refresh: () => Promise<void>;
   loadOlder: () => Promise<void>;
@@ -74,11 +75,11 @@ export interface LiveArenaRoomController {
   voteSide: (side: 'AGREE' | 'DISAGREE') => Promise<boolean>;
   voteArgument: (messageId: string) => Promise<boolean>;
   recordFinal: (stance: Stance) => Promise<boolean>;
-  /** Spectator → debater in-place. Refreshes room state on success. */
+  /** Spectator â†’ debater in-place. Refreshes room state on success. */
   upgradeToDebater: (stance: Stance) => Promise<boolean>;
 }
 
-/** Newest-first merge that keeps one row per id — an optimistic echo never doubles. */
+/** Newest-first merge that keeps one row per id â€” an optimistic echo never doubles. */
 function mergeMessages(
   current: readonly ArenaMessage[],
   incoming: readonly ArenaMessage[],
@@ -103,7 +104,7 @@ function isMembershipRefusal(error: unknown): boolean {
  * The thread is deliberately refreshed rather than patched when realtime fires.
  * A `postgres_changes` row carries no author card and no reaction rollup, and
  * synthesising one on the client would mean the app inventing content the server
- * never sent — so an INSERT is treated as a hint to re-read the newest page.
+ * never sent â€” so an INSERT is treated as a hint to re-read the newest page.
  *
  * A non-member can still load a SETTLED room (the result is public), so a
  * refused message read marks the thread locked instead of failing the screen.
@@ -187,7 +188,7 @@ export function useLiveArenaRoom(
 
   /**
    * Lightweight INSERT hydrate: fetch only the new message id(s).
-   * Full newest-page reconcile runs on a slow timer / reconnect — not every post.
+   * Full newest-page reconcile runs on a slow timer / reconnect â€” not every post.
    */
   const hydrateInserted = React.useCallback(async (ids: string[]): Promise<void> => {
     if (ids.length === 0) return;
@@ -218,10 +219,6 @@ export function useLiveArenaRoom(
     const generation=accessGeneration.current;
     try {
       await reactionQueue.current?.reconcile();
-      // A dropped repair target requests a broader authoritative refresh; the
-      // newest-page read below satisfies it. Rows outside the loaded window are
-      // repaired only when they are fetched again (documented limitation).
-      reactionQueue.current?.consumeOverflowRequest();
       if (messageCursor.current) await drainOfficialGap(messageCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
         (rows,cursor) => { setThreadLocked(false); setMessages(old=>reactionSnapshots.current.merge(old,rows,snapshot)); messageCursor.current=cursor; },
@@ -235,6 +232,11 @@ export function useLiveArenaRoom(
         const fresh=await fetchOfficialPage(roomId,'message');
         if(!mounted.current || generation!==accessGeneration.current) return;
         setMessages(old=>reactionSnapshots.current.merge(old,fresh,snapshot));
+        await recoverOverflowAfterRefresh({
+          queue: reactionQueue.current!,
+          isLoaded: (id) => messagesRef.current.some((row) => row.id === id),
+          active: () => mounted.current && generation === accessGeneration.current,
+        });
       }
       if(roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) {
         const fresh=await fetchOfficialPage(roomId,'evidence');
@@ -545,7 +547,7 @@ export function useLiveArenaRoom(
   );
 
   const react = React.useCallback(
-    (messageId: string, emoji = '🔥'): Promise<void> => {
+    (messageId: string, emoji = 'ðŸ”¥'): Promise<void> => {
       const generation = accessGeneration.current;
       const viewer = authorRef.current?.id;
       // Protect this message the moment the tap happens, and release the guard
@@ -553,7 +555,7 @@ export function useLiveArenaRoom(
       reactionSnapshots.current.beginMutation(messageId);
       const active = () => mounted.current && generation === accessGeneration.current && authorRef.current?.id === viewer;
       return reactionQueue.current!.enqueue(messageId, emoji, active).finally(() => {
-        reactionSnapshots.current.commitMutation(messageId);
+        reactionSnapshots.current.finishMutation(messageId);
       });
     },
     [],
@@ -721,3 +723,4 @@ export function useLiveArenaRoom(
     upgradeToDebater,
   };
 }
+

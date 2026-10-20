@@ -1,21 +1,22 @@
 ﻿/**
- * Per-message coordination between transcript snapshots and reaction mutations.
+ * Per-message coordination between transcript snapshots and reaction writes.
  *
- * Invariants:
- * 1. Snapshots and commits share one monotonic clock.
- * 2. Only a snapshot newer than the last applied one may supply reactions.
- * 3. A snapshot begun while a mutation is pending is never authoritative.
- * 4. A snapshot begun before a commit never supplies reactions.
- * 5. Body, edits and moderation always merge; only reactions are guarded.
- * 6. Retention is bounded and cleared on account/room disposal.
+ * Mutation ownership is explicit:
+ *  - beginMutation / finishMutation bracket ONE user toggle each.
+ *  - markAuthoritativeReactionWrite advances the ordering barrier (toggle
+ *    success or authoritative repair) without completing a pending toggle.
+ * Eviction is safe: a global watermark rejects snapshots that began before the
+ * most recent eviction, so an evicted message cannot accept stale reactions.
  */
 import { mergeMessagesById } from './liveRoomThread.ts';
 
 export interface SnapshotGuard {
   beginSnapshot(): number;
   beginMutation(messageId: string): void;
+  finishMutation(messageId: string): void;
+  markAuthoritativeReactionWrite(messageId: string): void;
+  /** Back-compat: mark authoritative and finish one mutation. */
   commitMutation(messageId: string): void;
-  /** Back-compat alias used by earlier callers and tests. */
   noteMutation(messageId: string): void;
   merge<T extends { id: string; reactions: unknown }>(current: readonly T[], incoming: readonly T[], snapshot: number): T[];
   protectedIds(): string[];
@@ -27,6 +28,7 @@ interface Entry { lastApplied: number; pending: number; committedAt: number }
 
 export function createReactionSnapshots(): SnapshotGuard {
   let seq = 0;
+  let evictedSince = 0;
   const tracked = new Map<string, Entry>();
   const entryFor = (id: string): Entry => {
     const existing = tracked.get(id);
@@ -37,29 +39,44 @@ export function createReactionSnapshots(): SnapshotGuard {
       for (const [key, value] of tracked) {
         if (value.pending > 0 || key === id) continue;
         tracked.delete(key);
+        evictedSince = seq;
         if (tracked.size <= MAX_TRACKED) break;
       }
     }
     return created;
   };
-  const commit = (messageId: string): void => {
+  const mark = (messageId: string): void => {
+    if (!messageId) return;
+    const entry = entryFor(messageId);
+    seq += 1;
+    entry.committedAt = seq;
+  };
+  const finish = (messageId: string): void => {
     if (!messageId) return;
     const entry = entryFor(messageId);
     entry.pending = Math.max(0, entry.pending - 1);
-    seq += 1;
-    entry.committedAt = seq;
   };
   return {
     beginSnapshot(): number { seq += 1; return seq; },
     beginMutation(messageId: string): void { if (messageId) entryFor(messageId).pending += 1; },
-    commitMutation: commit,
-    noteMutation: commit,
+    finishMutation: finish,
+    markAuthoritativeReactionWrite: mark,
+    commitMutation(messageId: string): void { mark(messageId); finish(messageId); },
+    noteMutation(messageId: string): void { mark(messageId); finish(messageId); },
     merge<T extends { id: string; reactions: unknown }>(current: readonly T[], incoming: readonly T[], snapshot: number): T[] {
       const byId = new Map(current.map((row) => [row.id, row]));
       const safe = incoming.map((row) => {
         const existing = byId.get(row.id);
         if (!existing) return row;
-        const entry = tracked.get(row.id) ?? entryFor(row.id);
+        const entry = tracked.get(row.id);
+        if (!entry) {
+          // No live entry: it was never tracked or was evicted. Reject any
+          // snapshot that began at or before the last eviction; adopt newer ones.
+          if (evictedSince > 0 && snapshot <= evictedSince) return { ...row, reactions: existing.reactions };
+          const created = entryFor(row.id);
+          created.lastApplied = snapshot;
+          return row;
+        }
         const authoritative = entry.pending === 0 && snapshot >= entry.committedAt && snapshot > entry.lastApplied;
         if (!authoritative) return { ...row, reactions: existing.reactions };
         entry.lastApplied = snapshot;
@@ -68,7 +85,6 @@ export function createReactionSnapshots(): SnapshotGuard {
       return mergeMessagesById(current as never, safe as never) as unknown as T[];
     },
     protectedIds(): string[] { return [...tracked.entries()].filter(([, entry]) => entry.pending > 0).map(([id]) => id); },
-    reset(): void { tracked.clear(); seq = 0; },
+    reset(): void { tracked.clear(); seq = 0; evictedSince = 0; },
   };
 }
-

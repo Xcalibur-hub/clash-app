@@ -1,9 +1,4 @@
-/**
- * Connects the reaction queue to snapshot ordering.
- *
- * Every authoritative repair write advances the snapshot clock, so a transcript
- * response that began before the repair can never roll its reaction fields back.
- */
+﻿/** Bridges the reaction queue to snapshot ordering. */
 import { createReactionQueue, type ReactionResult } from './reactionOptimism.ts';
 import type { SnapshotGuard } from './reactionSnapshots.ts';
 import type { ArenaReaction } from '../services/liveArenaService';
@@ -20,6 +15,7 @@ export function createRoomReactionBridge(input: {
     toggle: input.toggle,
     write: input.write,
     onError: input.onError,
-    onCommitted: (id) => input.snapshots.commitMutation(id),
+    // Advances ordering only; pending ownership stays with the user mutation.
+    onCommitted: (id) => input.snapshots.markAuthoritativeReactionWrite(id),
   });
 }

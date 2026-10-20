@@ -1,41 +1,37 @@
-/** Post-eviction replay must not re-raise the New messages alert. */
+﻿/** Sliding-window eviction: bounds hold, replays stay silent, live still alerts. */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createCrowdArrivalTracker } from './crowdArrivals.ts';
+import { createCrowdArrivalTracker, CROWD_MAX_SEEN } from './crowdArrivals.ts';
 
-describe('crowd seen-id eviction', () => {
-  it('suppresses a replayed evicted id while keeping genuine live arrivals', () => {
+describe('crowd sliding windows', () => {
+  it('keeps bounds after replay-only updates and stays silent on tombstoned replays', () => {
     const tracker = createCrowdArrivalTracker();
-    const base = Array.from({ length: 1100 }, (_, i) => `id-${i}`);
-    tracker.observe(base, { atLiveEdge: false });
+    let all: string[] = [];
+    for (let window = 0; window < 6; window += 1) {
+      const page = Array.from({ length: 200 }, (_, i) => `w${window}-${i}`);
+      all = [...all, ...page];
+      tracker.observe(all, { atLiveEdge: false });
+    }
+    const retained = tracker.retention();
+    assert.ok(retained.evicted >= 1, 'tombstones populated');
+    assert.ok(retained.seen <= CROWD_MAX_SEEN, 'seen bounded');
+    assert.ok(retained.evicted <= 500, 'tombstones bounded');
 
-    const extra = Array.from({ length: 101 }, (_, i) => `id-${1100 + i}`);
-    // A genuine appended batch alerts and forces eviction of the oldest ids.
-    assert.equal(tracker.observe([...base, ...extra], { atLiveEdge: false }), true);
+    // Replay-only update: silent, and bounds still hold.
+    assert.equal(tracker.observe(all, { atLiveEdge: false }), false);
+    assert.ok(tracker.retention().seen <= CROWD_MAX_SEEN);
 
-    // Replaying an evicted id through the live path stays silent.
-    assert.equal(
-      tracker.observe([{ id: 'id-0', origin: 'live' }, ...base.slice(1), ...extra], { atLiveEdge: false }),
-      false,
-    );
+    // A tombstoned id replayed through the live path stays silent.
+    assert.equal(tracker.observe([{ id: 'w0-0', origin: 'live' }, ...all], { atLiveEdge: false }), false);
+    assert.ok(tracker.retention().seen <= CROWD_MAX_SEEN);
 
-    // An evicted id replayed without provenance is also silent.
-    assert.equal(tracker.observe([...base, ...extra], { atLiveEdge: false }), false);
+    // A genuinely new live row alerts.
+    assert.equal(tracker.observe([...all, { id: 'brand-new', origin: 'live' }], { atLiveEdge: false }), true);
 
-    // A genuinely new live id still alerts.
-    assert.equal(
-      tracker.observe([...base, ...extra, { id: 'brand-new', origin: 'live' }], { atLiveEdge: false }),
-      true,
-    );
-  });
-
-  it('keeps history paging silent after eviction', () => {
-    const tracker = createCrowdArrivalTracker();
-    const base = Array.from({ length: 1100 }, (_, i) => `id-${i}`);
-    tracker.observe(base, { atLiveEdge: false });
-    assert.equal(
-      tracker.observe([{ id: 'id-0', origin: 'history' }, ...base], { atLiveEdge: false }),
-      false,
-    );
+    // Reset clears both sets.
+    tracker.reset();
+    assert.deepEqual(tracker.retention(), { seen: 0, evicted: 0 });
+    tracker.observe(['a'], { atLiveEdge: false });
+    assert.equal(tracker.observe(['a', 'b'], { atLiveEdge: false }), true);
   });
 });
