@@ -140,6 +140,23 @@ export function isCurrentScope(
   return mounted && sentGeneration === currentGeneration;
 }
 
+/** Immutable identity for one mounted room occupancy. */
+export interface RoomSession {
+  roomId: string;
+  generation: number;
+}
+
+/** True only while this occupancy still owns the hook. */
+export function isLiveRoomSession(
+  mounted: boolean,
+  session: RoomSession,
+  current: RoomSession,
+): boolean {
+  return mounted
+    && session.generation === current.generation
+    && session.roomId === current.roomId;
+}
+
 export function resolveSendResolution(input: {
   mounted: boolean;
   sentGeneration: number;

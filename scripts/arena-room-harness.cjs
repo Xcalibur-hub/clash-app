@@ -67,8 +67,19 @@ function harness(transform = (source) => source, { queued = false } = {}) {
   const updates = [];
   const apply = (update) => { rows = typeof update === 'function' ? update(rows) : update; writes++; };
   const noop = () => {};
+  const sessionRef = { current: { roomId: 'room', generation: 0 } };
+  // Keep generation and session identity aligned when tests bump the counter.
+  const accessGeneration = {
+    _n: 0,
+    get current() { return this._n; },
+    set current(value) {
+      this._n = value;
+      sessionRef.current = { roomId: sessionRef.current.roomId, generation: value };
+    },
+  };
   const scope = {
-    ...ordering, roomId: 'room', PAGE: 40, mounted: { current: true }, accessGeneration: { current: 0 },
+    ...ordering, roomId: 'room', PAGE: 40, mounted: { current: true }, accessGeneration, sessionRef,
+    liveSession: (session) => ordering.isLiveRoomSession(scope.mounted.current, session, sessionRef.current),
     sendBusy: { current: null }, reactionSnapshots: { current: createReactionSnapshots() },
     visibilityBarrier: ordering.createVisibilityBarrier(), messageCursor: { current: row('base', 0) },
     initialCoverage: { current: null },
@@ -89,6 +100,7 @@ function harness(transform = (source) => source, { queued = false } = {}) {
     fetchRoom: async () => ({ roomMode: 'DUEL', status: 'LIVE' }), fetchEvidence: async () => [],
     fetchMessage: async id => row(id, 1), loadingOlder: false, hasOlder: true, threadLocked: false,
     messageHasOlder: { current: true }, evidenceHasOlder: { current: false }, olderEvidence: { current: null },
+    messageOlderAnchor: { current: null },
     get messages() { return rows; }, evidenceBusy: { current: false },
     fetchVisibleMessageIds: async () => ['base'], removeUnavailableMessages, mergeMessages: mergeMessagesById,
     isMembershipRefusal: (error) => error?.code === '42501',

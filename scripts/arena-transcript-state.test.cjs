@@ -20,14 +20,16 @@ const { flushSync } = require('react-dom');
 const message = (id, n, count = 0, body = 'old') => ({ ...row(id, n), body,
   reactions: [{ emoji: 'fire', count, viewerReacted: count > 0 }] });
 
-function mountedRoom({ strict = false, suspend = false } = {}) {
+function mountedRoom({ strict = false, suspend = false, roomId: initialRoomId = 'room' } = {}) {
   const modules = new Map(), observations = [], owners = [];
   let toggles = 0, completions = 0, suspensions = 0;
   let rendering = false, insert, flushHydration, controller, committed, forceRender, shouldSuspend = false;
+  let activeRoomId = initialRoomId;
+  const renderViews = [];
   const never = new Promise(() => {});
   const server = new Map();
   const services = {
-    fetchRoom: async () => ({ id: 'room', roomMode: 'GROUP', status: 'LIVE' }),
+    fetchRoom: async (id) => ({ id: id ?? activeRoomId, roomMode: 'GROUP', status: 'LIVE' }),
     fetchOfficialPage: async () => [], fetchEvidence: async () => [],
     fetchMessage: async id => server.get(id) ?? null,
     reactMessage: async id => {
@@ -89,9 +91,11 @@ function mountedRoom({ strict = false, suspend = false } = {}) {
     rendering = true;
     try {
       const [, tick] = React.useState(0); forceRender = () => tick(value => value + 1);
-      controller = useLiveArenaRoom('room');
+      controller = useLiveArenaRoom(activeRoomId);
     } finally { rendering = false; }
     const current = controller;
+    // Capture pre-paint message identities for room-switch isolation checks.
+    renderViews.push({ roomId: activeRoomId, ids: current.messages.map((item) => item.id) });
     React.useLayoutEffect(() => { committed = current; });
     return React.createElement(MaySuspend, { messages: current.messages });
   }
@@ -99,7 +103,7 @@ function mountedRoom({ strict = false, suspend = false } = {}) {
     namespaceURI: 'http://www.w3.org/1999/xhtml', ownerDocument: documentStub,
     addEventListener() {}, removeEventListener() {}, textContent: '' });
   return {
-    server, observations, services,
+    server, observations, services, renderViews,
     get committed() { return committed; },
     get owner() { return owners.find(owner => owner.getSnapshot().some(item => item.id === 'm')) ?? owners[0]; },
     get toggles() { return toggles; }, get completions() { return completions; },
@@ -110,6 +114,10 @@ function mountedRoom({ strict = false, suspend = false } = {}) {
         if (strict) app = React.createElement(React.StrictMode, null, app);
         flushSync(() => root.render(React.createElement(React.Suspense, { fallback: null }, app)));
       });
+    },
+    async switchRoom(nextId) {
+      activeRoomId = nextId;
+      await React.act(async () => flushSync(forceRender));
     },
     async resume() {
       shouldSuspend = false;
@@ -348,4 +356,285 @@ test('R3 an empty rejected initial response requires a fresh accepted bootstrap 
   assert.equal(h.scope.messageHasOlder.current, false);
   assert.equal(reads, 3, 'one bootstrap read plus the existing rollup');
   assert.ok(h.rows.some(item => item.id === 'later'));
+});
+
+// --- Step 6G.5C.2: room-session isolation, pagination anchors, nested store ---
+
+test('6G.5C.2 R1 room switch during refresh never publishes Room A into Room B', async () => {
+  const h = harness(), gate = deferred(), started = deferred();
+  h.scope.accessGeneration.current = 1;
+  h.scope.sessionRef.current = { roomId: 'A', generation: 1 };
+  h.scope.messageCursor.current = row('a0', 0);
+  h.rows = [row('a0', 0)];
+  let fetchedRoom = null;
+  h.scope.fetchOfficialPage = async (roomId, kind, cursor, direction) => {
+    if (kind === 'evidence') return [];
+    if (direction === 'newer' || !cursor) {
+      fetchedRoom = roomId;
+      started.resolve();
+      await gate.promise;
+      return [{ ...row('a-stale', 2), roomId: 'A' }];
+    }
+    return [];
+  };
+  const pending = h.callback('refreshThread')();
+  await started.promise;
+  assert.equal(fetchedRoom, 'A');
+  h.scope.accessGeneration.current = 2;
+  h.scope.sessionRef.current = { roomId: 'B', generation: 2 };
+  h.scope.recovering.current = false;
+  h.rows = [row('b0', 0)];
+  const before = h.rows.map((item) => item.id);
+  gate.resolve();
+  await pending;
+  assert.deepEqual(h.rows.map((item) => item.id), before);
+  assert.equal(h.rows.some((item) => item.id === 'a-stale'), false);
+  assert.equal(h.scope.recovering.current, false);
+});
+
+test('6G.5C.2 R1 unmount during refresh cannot publish after remount generation', async () => {
+  const h = harness(), gate = deferred(), started = deferred();
+  h.scope.accessGeneration.current = 1;
+  h.scope.sessionRef.current = { roomId: 'A', generation: 1 };
+  h.scope.messageCursor.current = row('a0', 0);
+  h.scope.fetchOfficialPage = async (roomId, kind, cursor, direction) => {
+    if (kind === 'evidence') return [];
+    if (direction === 'newer' || !cursor) {
+      started.resolve();
+      await gate.promise;
+      return [row('a-stale', 2)];
+    }
+    return [];
+  };
+  const pending = h.callback('refreshThread')();
+  await started.promise;
+  h.scope.mounted.current = false;
+  const rowsBefore = h.rows;
+  gate.resolve();
+  await pending;
+  assert.equal(h.rows, rowsBefore);
+  h.scope.mounted.current = true;
+  h.scope.accessGeneration.current = 2;
+  h.scope.sessionRef.current = { roomId: 'B', generation: 2 };
+  h.scope.recovering.current = false;
+  h.rows = [row('b0', 0)];
+  assert.equal(h.rows.some((item) => item.id === 'a-stale'), false);
+});
+
+test('6G.5C.2 R1 mounted room switch never exposes Room A rows as Room B', async () => {
+  const room = mountedRoom({ roomId: 'A' });
+  const gate = deferred(), started = deferred();
+  let serveA = true;
+  room.services.fetchOfficialPage = async (id) => {
+    if (id === 'A' && serveA) {
+      started.resolve();
+      await gate.promise;
+      return [{ ...row('a1', 1), roomId: 'A' }];
+    }
+    return id === 'B' ? [{ ...row('b1', 1), roomId: 'B' }] : [];
+  };
+  await room.mount();
+  await started.promise;
+  await room.switchRoom('B');
+  serveA = false;
+  gate.resolve();
+  for (let turn = 0; turn < 20; turn++) await Promise.resolve();
+  assert.equal(room.committed.messages.some((item) => item.id === 'a1'), false);
+  assert.equal(room.renderViews.some((view) => view.roomId === 'B' && view.ids.includes('a1')), false);
+  await room.unmount();
+});
+
+test('6G.5C.2 R2 rejected older page does not falsely exhaust pagination', async () => {
+  const h = harness(), gate = deferred(), started = deferred();
+  h.scope.messageCursor.current = row('base', 10);
+  h.scope.messageOlderAnchor.current = row('base', 10);
+  h.rows = [row('base', 10)];
+  let olderReads = 0;
+  h.scope.fetchOfficialPage = async (_room, kind, cursor) => {
+    if (kind === 'evidence') return [];
+    if (!cursor) return [row('base', 10)];
+    olderReads++;
+    started.resolve();
+    await gate.promise;
+    return Array.from({ length: 40 }, (_, n) => row('old' + n, n));
+  };
+  const pending = h.callback('loadOlder')();
+  await started.promise;
+  await pruneDuringRead(h);
+  gate.resolve();
+  await pending;
+  assert.equal(h.scope.messageHasOlder.current, true, 'rejected coverage must not exhaust');
+  assert.ok(h.scope.messageOlderAnchor.current, 'anchor remains recoverable');
+  h.scope.fetchOfficialPage = async (_room, kind, cursor) => {
+    if (kind === 'evidence' || !cursor) return [];
+    olderReads++;
+    return [row('history', -1)];
+  };
+  await h.callback('loadOlder')();
+  assert.ok(olderReads >= 2);
+  assert.ok(h.rows.some((item) => item.id === 'history'));
+  assert.equal(new Set(h.rows.map((item) => item.id)).size, h.rows.length);
+});
+
+test('6G.5C.2 R3 fully excluded accepted page keeps raw backward anchor', async () => {
+  const h = harness();
+  h.scope.messageCursor.current = null;
+  h.rows = [];
+  const hidden = Array.from({ length: 40 }, (_, n) => row('hidden' + n, n + 1));
+  let olderReads = 0;
+  h.scope.fetchOfficialPage = async (_room, kind, cursor) => {
+    if (kind === 'evidence') return [];
+    if (!cursor) return [...hidden].reverse();
+    olderReads++;
+    return [row('history', -1)];
+  };
+  await h.callback('load')('initial');
+  // Individually exclude every admitted row while coverage remains accepted.
+  const remove = h.scope.visibilityBarrier.mark(hidden.map((item) => item.id));
+  h.scope.updateMessages((current) => remove(current));
+  assert.equal(h.rows.length, 0);
+  assert.equal(h.scope.messageHasOlder.current, true);
+  assert.ok(h.scope.messageOlderAnchor.current?.preciseCreatedAt);
+  assert.equal(h.scope.messageCursor.current.id, 'hidden39');
+  await h.callback('loadOlder')();
+  assert.equal(olderReads, 1);
+  assert.ok(h.rows.some((item) => item.id === 'history'));
+  assert.equal(h.rows.some((item) => String(item.id).startsWith('hidden')), false);
+});
+
+test('6G.5C.2 R4 nested store transitions preserve newer inner commit', () => {
+  const h = harness();
+  const { createArenaTranscriptStore } = h.load('utils/arenaTranscriptStore.ts');
+  const store = createArenaTranscriptStore();
+  store.update([row('m', 1)]);
+  const snapshots = [];
+  store.subscribe(() => snapshots.push(store.getSnapshot().find((item) => item.id === 'm').reactions[0]?.count ?? 0));
+  snapshots.length = 0;
+  store.update((current) => {
+    store.update(current.map((item) => (
+      item.id === 'm' ? { ...item, reactions: [{ emoji: 'fire', count: 7, viewerReacted: true }] } : item
+    )));
+    // Nested write is queued; outer still sees the pre-inner base while it runs.
+    assert.equal(store.getSnapshot().find((item) => item.id === 'm').reactions.length, 0);
+    return current.map((item) => (
+      item.id === 'm' ? { ...item, reactions: [{ emoji: 'fire', count: 1, viewerReacted: true }] } : item
+    ));
+  });
+  // Serialize: outer publishes, then queued inner. Final value is the newer inner commit.
+  assert.deepEqual(snapshots, [1, 7]);
+  assert.equal(store.getSnapshot().find((item) => item.id === 'm').reactions[0].count, 7);
+});
+
+test('6G.5C.2 fault: removing room-session gates leaks Room A into Room B', async () => {
+  const h = harness((source, file) => {
+    if (!file.includes('useLiveArenaRoom')) return source;
+    return source
+      .replace(/const stillHere = \(\): boolean => liveSession\(session\);/, 'const stillHere = (): boolean => true;')
+      .replace(/if \(!liveSession\(session\)\) return;/g, '/* fault: no session gate */');
+  });
+  const gate = deferred(), started = deferred();
+  h.scope.accessGeneration.current = 1;
+  h.scope.sessionRef.current = { roomId: 'A', generation: 1 };
+  h.scope.messageCursor.current = row('a0', 0);
+  h.rows = [row('a0', 0)];
+  h.scope.fetchOfficialPage = async (_room, kind, cursor, direction) => {
+    if (kind === 'evidence') return [];
+    if (direction === 'newer' || !cursor) {
+      started.resolve();
+      await gate.promise;
+      return [row('a-stale', 2)];
+    }
+    return [];
+  };
+  const pending = h.callback('refreshThread')();
+  await started.promise;
+  h.scope.accessGeneration.current = 2;
+  h.scope.sessionRef.current = { roomId: 'B', generation: 2 };
+  h.rows = [row('b0', 0)];
+  gate.resolve();
+  await pending;
+  assert.equal(h.rows.some((item) => item.id === 'a-stale'), true, 'fault must make R1 fail');
+});
+
+test('6G.5C.2 fault: false pagination exhaustion is detectable', async () => {
+  const h = harness((source, file) => {
+    if (!file.includes('useLiveArenaRoom')) return source;
+    return source.replace(
+      /if \(visibilityBarrier\.allows\(pageEpoch\)\) \{\r?\n\s*messageHasOlder\.current = page\.length >= PAGE;/,
+      'messageHasOlder.current = page.length >= PAGE; if (false) {\n        messageHasOlder.current = page.length >= PAGE;',
+    );
+  });
+  const gate = deferred(), started = deferred();
+  h.scope.messageOlderAnchor.current = row('base', 10);
+  h.rows = [row('base', 10)];
+  h.scope.fetchOfficialPage = async (_room, kind, cursor) => {
+    if (kind === 'evidence' || !cursor) return [];
+    started.resolve();
+    await gate.promise;
+    return Array.from({ length: 10 }, (_, n) => row('old' + n, n));
+  };
+  const pending = h.callback('loadOlder')();
+  await started.promise;
+  await pruneDuringRead(h);
+  gate.resolve();
+  await pending;
+  assert.equal(h.scope.messageHasOlder.current, false, 'fault must falsely exhaust');
+});
+
+test('6G.5C.2 fault: losing raw backward anchor blocks loadOlder', async () => {
+  const h = harness((source, file) => {
+    if (!file.includes('useLiveArenaRoom')) return source;
+    return source
+      .replace(
+        /if \(page\.at\(-1\)\?\.preciseCreatedAt\) messageOlderAnchor\.current = page\.at\(-1\) as OfficialCursor;/g,
+        'messageOlderAnchor.current = null;',
+      )
+      .replace(
+        /if \(thread\.at\(-1\)\?\.preciseCreatedAt\) messageOlderAnchor\.current = thread\.at\(-1\) as OfficialCursor;/g,
+        'messageOlderAnchor.current = null;',
+      )
+      .replace(
+        /\(oldestVisible\?\.preciseCreatedAt\r?\n\s*\? oldestVisible as OfficialCursor\r?\n\s*: null\) \?\? messageOlderAnchor\.current/,
+        'oldestVisible?.preciseCreatedAt ? oldestVisible as OfficialCursor : null',
+      );
+  });
+  h.scope.messageCursor.current = null;
+  h.rows = [];
+  const hidden = Array.from({ length: 40 }, (_, n) => row('hidden' + n, n + 1));
+  let olderReads = 0;
+  h.scope.fetchOfficialPage = async (_room, kind, cursor) => {
+    if (kind === 'evidence') return [];
+    if (!cursor) return [...hidden].reverse();
+    olderReads++;
+    return [row('history', -1)];
+  };
+  await h.callback('load')('initial');
+  const remove = h.scope.visibilityBarrier.mark(hidden.map((item) => item.id));
+  h.scope.updateMessages((current) => remove(current));
+  assert.equal(h.rows.length, 0);
+  await h.callback('loadOlder')();
+  assert.equal(olderReads, 0, 'fault must lose the usable anchor');
+});
+
+test('6G.5C.2 fault: unsafe nested publication overwrites newer inner commit', () => {
+  const h = harness((source, file) => {
+    if (!file.includes('arenaTranscriptStore')) return source;
+    return source.replace(
+      /if \(depth > 0\) \{\r?\n\s*queued\.push\(update\);\r?\n\s*return;\r?\n\s*\}/,
+      'if (depth > 0) { /* fault: run nested immediately */ run(update); return; }',
+    );
+  });
+  const { createArenaTranscriptStore } = h.load('utils/arenaTranscriptStore.ts');
+  const store = createArenaTranscriptStore();
+  store.update([row('m', 1)]);
+  store.update((current) => {
+    store.update(current.map((item) => (
+      item.id === 'm' ? { ...item, reactions: [{ emoji: 'fire', count: 7, viewerReacted: true }] } : item
+    )));
+    return current.map((item) => (
+      item.id === 'm' ? { ...item, reactions: [{ emoji: 'fire', count: 1, viewerReacted: true }] } : item
+    ));
+  });
+  assert.equal(store.getSnapshot().find((item) => item.id === 'm').reactions[0].count, 1,
+    'fault allows outer to clobber the already-published inner value');
 });
