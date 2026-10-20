@@ -18,13 +18,14 @@ import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { verdictView } from '../../utils/verdictView';
 import { hexWithAlpha, verdictMetrics } from './liveArenaStyles';
-import { hasPlayed, markPlayed, shouldPlayOnce } from '../../utils/motionOnce';
+import { hasPlayed, shouldPlayOnce } from '../../utils/motionOnce';
 import { notify as hapticNotify } from '../../utils/haptics';
 
 /* Percentages come from utils/verdictView, which requires both canonical scores. */
 
 export interface VerdictRevealProps {
   duel: ArenaDuel;
+  visible?: boolean;
 }
 
 function AnimatedPercent({ value, size, minWidth, animate }: { value: number; size: number; minWidth: number; animate: boolean }): React.JSX.Element {
@@ -54,7 +55,7 @@ function AnimatedPercent({ value, size, minWidth, animate }: { value: number; si
   );
 }
 
-export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
+export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
   const verdict = duel.verdict;
@@ -66,18 +67,18 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
   // not replay the sequence or its haptic.
   const momentKey = verdict ? `verdict:${duel.clashId}:${duel.status}:${verdict.verdictLabel}` : '';
   const animateRef = React.useRef<boolean | null>(null);
-  if (animateRef.current === null) animateRef.current = momentKey ? !hasPlayed(momentKey) : false;
+  if (animateRef.current === null) animateRef.current = visible && momentKey ? !hasPlayed(momentKey) : false;
   const animate = animateRef.current === true;
 
   React.useEffect(() => {
-    if (momentKey && animate) markPlayed(momentKey);
-  }, [animate, momentKey]);
+    if (visible && momentKey && animate) shouldPlayOnce(momentKey);
+  }, [animate, momentKey, visible]);
 
   React.useEffect(() => {
-    if (!verdict) return;
+    if (!visible || !verdict) return;
     if (!shouldPlayOnce(`haptic:${duel.clashId}:${duel.status}:${verdict.verdictLabel}`)) return;
     hapticNotify(duel.status === 'cancelled' ? 'warning' : 'success');
-  }, [duel.clashId, duel.status, verdict]);
+  }, [duel.clashId, duel.status, verdict, visible]);
 
   // No decorative absolutely-positioned layer is drawn behind the result copy.
 

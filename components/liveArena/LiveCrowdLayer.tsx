@@ -3,7 +3,7 @@ import React from 'react';
 import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import type { useArenaCrowd } from '../../hooks/useArenaCrowd';
 import { validCrowdText, type CrowdMessage } from '../../utils/arenaCrowd';
-import { crowdAtLiveEdge, crowdTimeLabel, crowdUnseenAfterArrival } from '../../utils/crowdPresentation';
+import { crowdAtLiveEdge, crowdTimeLabel, crowdUnseenAfterArrival, newerCrowdMessage } from '../../utils/crowdPresentation';
 import { crowdRowLabel } from './liveArenaStyles';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 
@@ -12,6 +12,7 @@ export interface LiveCrowdLayerProps {
   subdued?: boolean; paddingBottom?: number; crowd?: CrowdModel;
   unavailableReason?: string;
   onReport?: (message: CrowdMessage) => void;
+  readOnly?: boolean;
 }
 // This UUID is an idempotency nonce, never an identity or authorization token.
 function requestKey(): string {
@@ -20,23 +21,25 @@ function requestKey(): string {
     const n = Math.floor(Math.random()*16); return (c==='x' ? n : (n&3)|8).toString(16);
   });
 }
-export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,unavailableReason }: LiveCrowdLayerProps): React.JSX.Element {
+export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,unavailableReason,readOnly=false }: LiveCrowdLayerProps): React.JSX.Element {
   const t = useThemeColors(); const [draft,setDraft] = React.useState('');
   const [unseen,setUnseen] = React.useState(false);
   const pending = React.useRef<{ body: string; key: string } | null>(null);
   const list = React.useRef<FlatList<CrowdMessage>>(null); const atLatest = React.useRef(true);
   const userScrolled = React.useRef(false);
-  const latest = crowd?.messages.at(-1)?.id;
+  const latest = crowd?.messages.at(-1);
   const observedLatest = React.useRef(latest);
-  const canSend = Boolean(crowd?.context?.canSend);
+  const canSend = !readOnly && Boolean(crowd?.context?.canSend);
   React.useEffect(() => {
-    const changed = observedLatest.current !== latest; observedLatest.current = latest;
-    setUnseen(previous => crowdUnseenAfterArrival({ atLiveEdge: atLatest.current, latestChanged: changed && Boolean(latest), unseen: previous }));
+    const arrived = newerCrowdMessage(observedLatest.current, latest);
+    // Retain the high-water mark when moderation removes the newest row.
+    if (latest && (!observedLatest.current || arrived)) observedLatest.current = latest;
+    setUnseen(previous => crowdUnseenAfterArrival({ atLiveEdge: atLatest.current, latestChanged: arrived, unseen: previous }));
     if (!atLatest.current) return;
     // Virtualized rows need a layout pass before scrollToEnd can find their size.
     const timer = setTimeout(() => { if (atLatest.current) list.current?.scrollToEnd({animated:false}); },100);
     return () => clearTimeout(timer);
-  },[latest]);
+  },[latest?.id, latest?.createdAt]);
   const send = async () => {
     const body = draft.trim(); if (!crowd || !canSend || !validCrowdText(body) || crowd.sending) return;
     if (!pending.current || pending.current.body!==body) pending.current = { body,key:requestKey() };

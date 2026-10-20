@@ -11,8 +11,11 @@ const read = (relative: string): string => fs.readFileSync(path.join(here, '..',
 describe('motion wiring', () => {
   it('gates the entrance once per Clash instead of per mount', () => {
     const room = read('components/liveArena/DuelRoomExperience.tsx');
-    assert.match(room, /const \[entrance, setEntrance\] = React\.useState\(false\)/);
-    assert.match(room, /shouldPlayOnce\(entranceKey\)/);
+    assert.match(room, /const \[entrance, setEntrance\] = React\.useState\(true\)/);
+    assert.match(room, /momentKey=\{entranceKey\}/);
+    const entrance = read('components/liveArena/DuelEntrance.tsx');
+    assert.match(entrance, /shouldPlayOnce\(momentKey\)/);
+    assert.doesNotMatch(room, /shouldPlayOnce/);
   });
 
   it('offers an immediate skip so the Stage is never blocked for an animation', () => {
@@ -25,7 +28,8 @@ describe('motion wiring', () => {
   it('keeps the verdict reveal one-shot and reduced-motion aware', () => {
     const verdict = read('components/liveArena/VerdictReveal.tsx');
     assert.match(verdict, /hasPlayed\(momentKey\)/);
-    assert.match(verdict, /markPlayed\(momentKey\)/);
+    assert.match(verdict, /visible && momentKey && animate/);
+    assert.match(verdict, /shouldPlayOnce\(momentKey\)/);
     assert.match(verdict, /shouldPlayOnce\(`haptic:/);
     assert.match(verdict, /useReducedMotion/);
     assert.match(verdict, /reduced \|\| !animate/);

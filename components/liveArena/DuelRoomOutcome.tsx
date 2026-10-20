@@ -11,9 +11,10 @@ import { VerdictReveal } from './VerdictReveal';
 import { NextClashAction, type NextClashSuggestion } from './NextClashAction';
 
 /** Uses the canonical Clash ballot and verdict; no group Room tally. */
-export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, nextClash = null, nextBusy = false, nextNotice = null, onOpenNext }: {
+export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, nextClash = null, nextBusy = false, nextNotice = null, onOpenNext, revealMotion = false }: {
   duel: ArenaDuel; phase: ArenaPhase; onJudge: (side: 'A' | 'B') => Promise<void>;
   onReview?: () => void; onReturn?: () => void;
+  revealMotion?: boolean;
   /** One live Clash from existing discovery, or null when none is eligible. */
   nextClash?: NextClashSuggestion | null; nextBusy?: boolean; nextNotice?: string | null; onOpenNext?: () => void;
 }): React.JSX.Element {
@@ -32,7 +33,7 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
   if (verdict || duel.status === 'cancelled') {
     return (
       <View style={[styles.wrap, { borderTopColor: t.border }]}>
-        <VerdictReveal duel={duel} />
+        <VerdictReveal duel={duel} visible={revealMotion} />
         {verdict && onOpenNext ? (
           <NextClashAction clash={nextClash} busy={nextBusy} notice={nextNotice} onOpen={onOpenNext} />
         ) : null}

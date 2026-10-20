@@ -1,7 +1,7 @@
-﻿import { currentUserId } from '../services/supabaseClient';
+import { currentUserId } from '../services/supabaseClient';
 import { acquireOfficialRequest, confirmOfficialRequest } from '../services/officialRequestStore';
 import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils/officialRecovery';
-import { applyOptimisticReaction, mergeReactionResult, reactionSequenceAccepted, restoreReactions } from '../utils/reactionOptimism';
+import { createReactionQueue } from '../utils/reactionOptimism';
 import { useFocusEffect } from 'expo-router';
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
@@ -47,7 +47,7 @@ const VISIBILITY_BATCH = 100;
 
 export interface LiveArenaRoomController {
   room: ArenaRoom | null;
-  /** Newest first â€” render in an inverted list. */
+  /** Newest first — render in an inverted list. */
   messages: ArenaMessage[];
   evidence: ArenaEvidence[];
   stats: ArenaMindshiftStats | null;
@@ -60,7 +60,7 @@ export interface LiveArenaRoomController {
   sending: boolean;
   loadingOlder: boolean;
   hasOlder: boolean;
-  /** True after a capacity rejection on upgrade â€” user stays spectator. */
+  /** True after a capacity rejection on upgrade — user stays spectator. */
   roomFullOnUpgrade: boolean;
   refresh: () => Promise<void>;
   loadOlder: () => Promise<void>;
@@ -72,11 +72,11 @@ export interface LiveArenaRoomController {
   voteSide: (side: 'AGREE' | 'DISAGREE') => Promise<boolean>;
   voteArgument: (messageId: string) => Promise<boolean>;
   recordFinal: (stance: Stance) => Promise<boolean>;
-  /** Spectator â†’ debater in-place. Refreshes room state on success. */
+  /** Spectator → debater in-place. Refreshes room state on success. */
   upgradeToDebater: (stance: Stance) => Promise<boolean>;
 }
 
-/** Newest-first merge that keeps one row per id â€” an optimistic echo never doubles. */
+/** Newest-first merge that keeps one row per id — an optimistic echo never doubles. */
 function mergeMessages(
   current: readonly ArenaMessage[],
   incoming: readonly ArenaMessage[],
@@ -101,7 +101,7 @@ function isMembershipRefusal(error: unknown): boolean {
  * The thread is deliberately refreshed rather than patched when realtime fires.
  * A `postgres_changes` row carries no author card and no reaction rollup, and
  * synthesising one on the client would mean the app inventing content the server
- * never sent â€” so an INSERT is treated as a hint to re-read the newest page.
+ * never sent — so an INSERT is treated as a hint to re-read the newest page.
  *
  * A non-member can still load a SETTLED room (the result is public), so a
  * refused message read marks the thread locked instead of failing the screen.
@@ -171,9 +171,19 @@ export function useLiveArenaRoom(
     setHasOlder(false);
   }, []);
 
+  const reactionQueue = React.useRef<ReturnType<typeof createReactionQueue> | null>(null);
+  if (!reactionQueue.current) reactionQueue.current = createReactionQueue({
+    read: async id => (await fetchMessage(id))?.reactions ?? null,
+    toggle: reactMessage,
+    write: (id, reactions) => setMessages(current => reactions
+      ? current.map(row => row.id === id ? { ...row, reactions } : row)
+      : current.filter(row => row.id !== id)),
+    onError: notify,
+  });
+
   /**
    * Lightweight INSERT hydrate: fetch only the new message id(s).
-   * Full newest-page reconcile runs on a slow timer / reconnect â€” not every post.
+   * Full newest-page reconcile runs on a slow timer / reconnect — not every post.
    */
   const hydrateInserted = React.useCallback(async (ids: string[]): Promise<void> => {
     if (ids.length === 0) return;
@@ -202,6 +212,7 @@ export function useLiveArenaRoom(
     recovering.current = true;
     const generation=accessGeneration.current;
     try {
+      await reactionQueue.current?.reconcile();
       if (messageCursor.current) await drainOfficialGap(messageCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
         (rows,cursor) => { setThreadLocked(false); setMessages(old=>mergeMessages(old,rows)); messageCursor.current=cursor; },
@@ -522,50 +533,14 @@ export function useLiveArenaRoom(
     [notify, roomId, sending],
   );
 
-  // Optimistic reactions are per message: a stale response never overwrites a
-  // newer tap, and a failure restores exactly the rows that were replaced.
-  const reactionSequence = React.useRef(new Map<string, number>());
-
   const react = React.useCallback(
-    async (messageId: string, emoji = 'ðŸ”¥'): Promise<void> => {
-      const sequence = (reactionSequence.current.get(messageId) ?? 0) + 1;
-      reactionSequence.current.set(messageId, sequence);
-      // Snapshot synchronously: React may not have run an updater yet, and a
-      // rejection must restore the rows captured here rather than inside one.
-      const prior = messagesRef.current.find((message) => message.id === messageId)?.reactions ?? null;
-      if (mounted.current && prior) {
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === messageId
-              ? { ...message, reactions: applyOptimisticReaction(message.reactions, emoji) }
-              : message,
-          ),
-        );
-      }
-      try {
-        const result = await reactMessage(messageId, emoji);
-        // A slower response for an older tap must never overwrite a newer one.
-        if (!mounted.current || !reactionSequenceAccepted(reactionSequence.current.get(messageId), sequence)) return;
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === result.messageId
-              ? { ...message, reactions: mergeReactionResult(message.reactions, result) }
-              : message,
-          ),
-        );
-      } catch (caught) {
-        if (mounted.current && reactionSequenceAccepted(reactionSequence.current.get(messageId), sequence)) {
-          const restored = restoreReactions(prior);
-          if (restored) {
-            setMessages((current) =>
-              current.map((message) => (message.id === messageId ? { ...message, reactions: restored } : message)),
-            );
-          }
-        }
-        notify(caught);
-      }
+    (messageId: string, emoji = '🔥'): Promise<void> => {
+      const generation = accessGeneration.current;
+      const viewer = authorRef.current?.id;
+      return reactionQueue.current!.enqueue(messageId, emoji,
+        () => mounted.current && generation === accessGeneration.current && authorRef.current?.id === viewer);
     },
-    [notify],
+    [],
   );
 
   const addEvidence = React.useCallback(

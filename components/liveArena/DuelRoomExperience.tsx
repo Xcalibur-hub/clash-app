@@ -1,5 +1,5 @@
-﻿/**
- * Canonical Duel â€” immersive full-screen Clash event.
+/**
+ * Canonical Duel — immersive full-screen Clash event.
  * Official arguments on Stage; Crowd is a separate live layer.
  * No permanent Arguments | Crowd | Evidence tab bar.
  */
@@ -17,7 +17,6 @@ import {
 import type { ArenaEvidence, ArenaMessage, ArenaRoom } from '../../services/liveArenaService';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { duelAtmosphereMood } from '../../utils/arenaAtmosphere';
-import { shouldPlayOnce } from '../../utils/motionOnce';
 import { assistAvailability } from '../../utils/arenaAssist';
 import { duelArgumentPreview, duelLatestMoment, duelPresentation, duelTranscript } from '../../utils/duelPresentation';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
@@ -154,15 +153,9 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   const [resultOpen, setResultOpen] = React.useState(false);
   const [watching, setWatching] = React.useState(false);
   const [watchError, setWatchError] = React.useState(false);
-  const [entrance, setEntrance] = React.useState(false);
-  // One intro per Clash per session. Entering through the gate consumes the
-  // same key, so the Stage never plays a second overlay after consent.
+  const [entrance, setEntrance] = React.useState(true);
   const entranceKey = `entrance:${room.clashId ?? room.roomId}`;
-  React.useEffect(() => {
-    if (props.threadLocked) return;
-    if (!shouldPlayOnce(entranceKey)) return;
-    setEntrance(true);
-  }, [entranceKey, props.threadLocked]);
+  const finishEntrance = React.useCallback(() => setEntrance(false), []);
   const [assistOpen, setAssistOpen] = React.useState(false);
   React.useEffect(() => { setAssistOpen(false); setResultOpen(false); }, [room.roomId, duel.viewerRelationship, crowd.identityVersion]);
   const [keyboardOpen, setKeyboardOpen] = React.useState(false);
@@ -302,7 +295,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
               }}
             >
               <Text style={[styles.primaryActionText, { color: t.textPrimary }]}>
-                {watching ? 'Enteringâ€¦' : 'Watch Clash'}
+                {watching ? 'Entering…' : 'Watch Clash'}
               </Text>
             </PressableScale>
           ) : null}
@@ -451,7 +444,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       </KeyboardAvoidingView>
 
       {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen initialSide={backingSide ?? 'A'} roomId={room.roomId} duel={duel} disabled={assist === 'closed'} onPublished={props.onRefresh} /></ArenaSheet> : null}
-      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}><DuelRoomOutcome duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn} nextClash={props.nextClash ?? null} nextBusy={props.nextBusy ?? false} nextNotice={props.nextNotice ?? null} onOpenNext={props.onOpenNext} /></ArenaSheet> : null}
+      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}><DuelRoomOutcome revealMotion duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn} nextClash={props.nextClash ?? null} nextBusy={props.nextBusy ?? false} nextNotice={props.nextNotice ?? null} onOpenNext={props.onOpenNext} /></ArenaSheet> : null}
       <ArgumentHistorySheet
         visible={historyOpen}
         duel={duel}
@@ -464,7 +457,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
         onArgumentHistory={() => setHistoryOpen(true)}
         onShare={() => {
           void Share.share({
-            message: `CLASH â€” ${proposition}\n${duel.fighterA.name} vs ${duel.fighterB.name}`,
+            message: `CLASH — ${proposition}\n${duel.fighterA.name} vs ${duel.fighterB.name}`,
           }).catch(() => undefined);
         }}
         onReport={
@@ -481,8 +474,9 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       <DuelEntrance
         duel={duel}
         proposition={proposition}
+        momentKey={entranceKey}
         active={entrance}
-        onDone={() => setEntrance(false)}
+        onDone={finishEntrance}
       />
     </View>
   );

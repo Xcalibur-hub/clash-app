@@ -50,6 +50,16 @@ export interface CrowdScrollInput {
   threshold?: number;
 }
 
+/** Compare precise server cursors; deletion, pagination and replay are not arrivals. */
+export function newerCrowdMessage(
+  previous: { id: string; createdAt: string } | null | undefined,
+  next: { id: string; createdAt: string } | null | undefined,
+): boolean {
+  if (!previous || !next || previous.id === next.id) return false;
+  return next.createdAt > previous.createdAt ||
+    (next.createdAt === previous.createdAt && next.id > previous.id);
+}
+
 /** True when the reader is at (or within the threshold of) the newest row. */
 export function crowdAtLiveEdge({
   offsetY,

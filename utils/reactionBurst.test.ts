@@ -49,6 +49,8 @@ describe('reaction burst replay', () => {
     const src = fs.readFileSync(path.join(here, '../hooks/useLiveArenaRoom.ts'), 'utf8');
     // The optimistic step flips only viewerReacted; the count stays server-owned.
     assert.doesNotMatch(src, /count\s*\+\s*1/);
-    assert.match(src, /reactionSequence/);
+    assert.match(src, /createReactionQueue/);
+    const queue = fs.readFileSync(path.join(here, '../utils/reactionOptimism.ts'), 'utf8');
+    assert.doesNotMatch(queue, /count\s*\+\s*1/);
   });
 });

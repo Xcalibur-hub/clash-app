@@ -275,6 +275,7 @@ export function ImmersiveClash({
           <ReactionBurst emoji={reactionBurst.emoji} burstKey={reactionBurst.key} count={1} />
         ) : null}
         <LiveCrowdLayer
+          readOnly={Boolean(terminal) || duel.status !== 'open'}
           unavailableReason={crowdUnavailableReason}
           key={crowd?.identityVersion ?? 0}
           crowd={crowd}

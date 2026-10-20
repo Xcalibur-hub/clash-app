@@ -15,11 +15,13 @@ import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { Avatar } from '../shared/Avatar';
 import { ArenaAtmosphere } from './ArenaAtmosphere';
+import { hasPlayed, shouldPlayOnce } from '../../utils/motionOnce';
 
 export interface DuelEntranceProps {
   duel: ArenaDuel;
   proposition: string;
   active: boolean;
+  momentKey: string;
   onDone: () => void;
 }
 
@@ -27,25 +29,35 @@ export function DuelEntrance({
   duel,
   proposition,
   active,
+  momentKey,
   onDone,
 }: DuelEntranceProps): React.JSX.Element | null {
   const t = useThemeColors();
   const reduced = useReducedMotion();
   const doneRef = React.useRef(false);
+  const callback = React.useRef(onDone);
+  callback.current = onDone;
+  const claimed = React.useRef(false);
+  const visible = active && (claimed.current || !hasPlayed(momentKey));
 
   React.useEffect(() => {
-    if (!active) return undefined;
-    doneRef.current = false;
+    if (!visible) return undefined;
+    // This effect runs only after the visible overlay has committed, never in
+    // the parent's loading/error/gate branches.
+    if (!claimed.current) {
+      if (!shouldPlayOnce(momentKey)) return undefined;
+      claimed.current = true;
+    }
     const ms = reduced ? 120 : 620;
     const id = setTimeout(() => {
       if (doneRef.current) return;
       doneRef.current = true;
-      onDone();
+      callback.current();
     }, ms);
     return () => clearTimeout(id);
-  }, [active, onDone, reduced]);
+  }, [visible, momentKey, reduced]);
 
-  if (!active) return null;
+  if (!visible) return null;
 
   return (
     <Pressable
@@ -55,7 +67,7 @@ export function DuelEntrance({
       onPress={() => {
         if (doneRef.current) return;
         doneRef.current = true;
-        onDone();
+        callback.current();
       }}
       style={[styles.root, { backgroundColor: t.background }]}
     >
