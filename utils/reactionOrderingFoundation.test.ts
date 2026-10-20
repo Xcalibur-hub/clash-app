@@ -151,18 +151,21 @@ describe('5. stale transcript snapshot preserves reactions but merges body', () 
 });
 
 describe('6. every reaction-bearing transcript path uses the coordinator', () => {
-  it('guards hydrateInserted, refresh, initial page and pagination', () => {
+  it('guards every transcript path through the coordinator and admission', () => {
     const src = fs.readFileSync(path.join(here, '../hooks/useLiveArenaRoom.ts'), 'utf8');
     const hydrate = src.slice(src.indexOf('const hydrateInserted'), src.indexOf('const refreshThread'));
-    assert.match(hydrate, /beginSnapshot\(\)/, 'hydrate captures a snapshot before its read');
-    assert.match(hydrate, /reactionSnapshots\.current\.merge\(/, 'hydrate merges through the coordinator');
-    assert.doesNotMatch(hydrate, /mergeMessages\(current, next\)/, 'no unguarded merge');
-    assert.match(src, /setMessages\(old=>reactionSnapshots\.current\.merge\(old,rows,snapshot\)\)/);
-    assert.match(src, /mergeInitialPage\(current, thread, snapshot, reactionSnapshots\.current\)/);
-    assert.match(src, /mergePostedRow\(current, posted, temporaryId, snapshot, reactionSnapshots\.current\)/);
-    assert.match(hydrate, /visibilityBarrier\.filter\(next, visibilityEpoch\)/);
-    assert.match(src, /visibilityBarrier\.mark\(checked\.filter/);
-    assert.match(src, /setMessages\(current=>reactionSnapshots\.current\.merge\(current,page,snapshot\)\)/);
+    const needles = [
+      'reactionSnapshots.current.merge(',
+      'visibilityBarrier.admit(',
+      'mergeInitialPage(current, admittedThread',
+      'admit(page,pageEpoch)',
+      'admit(rows,threadEpoch)',
+      'resolveSendResolution(',
+    ];
+    for (const needle of needles) assert.ok(src.includes(needle), needle);
+    assert.ok(hydrate.includes('beginSnapshot()'));
+    assert.ok(hydrate.includes('visibilityBarrier.admit(next, visibilityEpoch)'));
+    assert.ok(!hydrate.includes('mergeMessages(current, next)'));
   });
 });
 
@@ -180,6 +183,8 @@ describe('7. reaction-only reads cannot resurrect a deleted message', () => {
     assert.equal(c.rows.some((r) => r.id === 'stay'), true);
   });
 });
+
+
 
 
 

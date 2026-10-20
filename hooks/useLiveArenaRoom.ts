@@ -37,7 +37,7 @@ import {
 } from '../services/liveArenaService';
 import { errorText, SupabaseError } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
-import { createVisibilityBarrier, mergeInitialPage, mergePostedRow } from '../utils/transcriptOrdering.ts';
+import { createVisibilityBarrier, isCurrentScope, mergeInitialPage, mergePostedRow, resolveSendResolution } from '../utils/transcriptOrdering.ts';
 import { mergeMessagesById, removeUnavailableMessages } from '../utils/liveRoomThread';
 
 /** How many arguments one page of the thread carries. */
@@ -206,7 +206,7 @@ export function useLiveArenaRoom(
       const next = rows.filter((row): row is ArenaMessage => row != null);
       if (next.length === 0) return;
       setThreadLocked(false);
-      const authorized = visibilityBarrier.filter(next, visibilityEpoch);
+      const authorized = visibilityBarrier.admit(next, visibilityEpoch);
       if (authorized.length === 0) return;
       setMessages((current) => reactionSnapshots.current.merge(current, authorized, snapshot));
     } catch (caught) {
@@ -222,12 +222,13 @@ export function useLiveArenaRoom(
     if (recovering.current) return;
     recovering.current = true;
     const snapshot = reactionSnapshots.current.beginSnapshot();
+    const threadEpoch = visibilityBarrier.epoch();
     const generation=accessGeneration.current;
     try {
       await reactionQueue.current?.reconcile();
       if (messageCursor.current) await drainOfficialGap(messageCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
-        (rows,cursor) => { setThreadLocked(false); setMessages(old=>reactionSnapshots.current.merge(old,rows,snapshot)); messageCursor.current=cursor; },
+        (rows,cursor) => { setThreadLocked(false); setMessages(old=>reactionSnapshots.current.merge(old,visibilityBarrier.admit(rows,threadEpoch),snapshot)); messageCursor.current=cursor; },
         ()=>mounted.current && generation===accessGeneration.current);
       if (roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) await drainOfficialGap(evidenceCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'evidence',cursor,'newer')) as (ArenaEvidence & OfficialCursor)[],
@@ -235,9 +236,10 @@ export function useLiveArenaRoom(
         ()=>mounted.current && generation===accessGeneration.current);
       // Rollup refresh never advances the gap cursor past unseen rows.
       if(messageCursor.current) {
+        const freshEpoch = visibilityBarrier.epoch();
         const fresh=await fetchOfficialPage(roomId,'message');
         if(!mounted.current || generation!==accessGeneration.current) return;
-        setMessages(old=>reactionSnapshots.current.merge(old,fresh,snapshot));
+        setMessages(old=>reactionSnapshots.current.merge(old,visibilityBarrier.admit(fresh,freshEpoch),snapshot));
         await recoverOverflowAfterRefresh({
           queue: reactionQueue.current!,
           isLoaded: (id) => messagesRef.current.some((row) => row.id === id),
@@ -320,6 +322,7 @@ export function useLiveArenaRoom(
       else setRefreshing(true);
       const generation=accessGeneration.current;
       const snapshot = reactionSnapshots.current.beginSnapshot();
+      const visibilityEpoch = visibilityBarrier.epoch();
       try {
         const next = await fetchRoom(roomId);
         if (!mounted.current || generation!==accessGeneration.current) return;
@@ -348,10 +351,11 @@ export function useLiveArenaRoom(
           messageHasOlder.current=thread.length>=PAGE;
           setHasOlder(messageHasOlder.current);
           if (!messageCursor.current) messageCursor.current=thread[0]?.preciseCreatedAt ? thread[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
+          const admittedThread = visibilityBarrier.admit(thread, visibilityEpoch);
           setMessages((current) =>
             mode === 'initial'
-              ? mergeInitialPage(current, thread, snapshot, reactionSnapshots.current)
-              : reactionSnapshots.current.merge(current, thread, snapshot),
+              ? mergeInitialPage(current, admittedThread, snapshot, reactionSnapshots.current)
+              : reactionSnapshots.current.merge(current, admittedThread, snapshot),
           );
         }
         setEvidence(old=> mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
@@ -470,10 +474,11 @@ export function useLiveArenaRoom(
       const oldest = messages.filter(m=>!m.pending).at(-1);
       if(messageHasOlder.current && oldest?.preciseCreatedAt) {
         const snapshot = reactionSnapshots.current.beginSnapshot();
+      const pageEpoch = visibilityBarrier.epoch();
       const page = await fetchOfficialPage(roomId,'message',oldest as OfficialCursor);
         if (!mounted.current || generation!==accessGeneration.current) return;
         messageHasOlder.current=page.length>=PAGE;
-        setMessages(current=>reactionSnapshots.current.merge(current,page,snapshot));
+        setMessages(current=>reactionSnapshots.current.merge(current,visibilityBarrier.admit(page,pageEpoch),snapshot));
       }
       if(evidenceHasOlder.current && olderEvidence.current) {
         const page=await fetchOfficialPage(roomId,'evidence',olderEvidence.current);
@@ -525,6 +530,8 @@ export function useLiveArenaRoom(
       };
       setSending(true);
       const snapshot = reactionSnapshots.current.beginSnapshot();
+      const sendGeneration = accessGeneration.current;
+      const sendVisibilityEpoch = visibilityBarrier.epoch();
       setMessages((current) => mergeMessages(current, [placeholder]));
       try {
         const posted = input.reshareSourceMessageId
@@ -537,18 +544,24 @@ export function useLiveArenaRoom(
             )
           : await postMessage({ ...input, roomId, requestKey, expectedAccountId:account }, authorRef.current);
         if (requestKey) await confirmOfficialRequest(account,roomId,'message',requestKey).catch(()=>{});
-        if (!mounted.current) return false;
-        setMessages((current) => mergePostedRow(current, posted, temporaryId, snapshot, reactionSnapshots.current));
+        const resolution = resolveSendResolution({ mounted: mounted.current, sentGeneration: sendGeneration, currentGeneration: accessGeneration.current });
+        if (!resolution.applyRow) return false;
+        const admittedPost = visibilityBarrier.admit([posted], sendVisibilityEpoch);
+        if (admittedPost.length === 0) {
+          setMessages((current) => current.filter((message) => message.id !== temporaryId));
+        } else {
+          setMessages((current) => mergePostedRow(current, admittedPost[0], temporaryId, snapshot, reactionSnapshots.current));
+        }
         return true;
       } catch (caught) {
-        if (mounted.current) {
+        if (isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)) {
           setMessages((current) => current.filter((message) => message.id !== temporaryId));
           notify(caught);
         }
         return false;
       } finally {
         sendBusy.current=false;
-        if (mounted.current) setSending(false);
+        if (isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)) setSending(false);
       }
     },
     [notify, roomId, sending],
@@ -731,6 +744,7 @@ export function useLiveArenaRoom(
     upgradeToDebater,
   };
 }
+
 
 
 
