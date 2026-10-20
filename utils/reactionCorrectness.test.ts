@@ -59,8 +59,15 @@ describe('snapshot guard eviction', () => {
     }
     const merged = guard.merge([row('old', 9)], [row('old', 2, 'server body', false)], stale);
     assert.equal(merged[0].reactions[0].count, 9, 'stale rejected after eviction');
-    assert.equal(merged[0].body, 'server body');
+    assert.equal(merged[0].body, 'local', 'after metadata eviction an old read cannot establish body freshness');
     const fresh = guard.merge([row('old', 9)], [row('old', 3, 'fresh', true)], guard.beginSnapshot());
     assert.equal(fresh[0].reactions[0].count, 3, 'fresh snapshot can update reactions');
+    assert.equal(fresh[0].body, 'fresh', 'a fresh local read still updates body after eviction');
+    const atFloor = guard.beginSnapshot();
+    for (let i = 0; i < 256; i++) guard.merge([], [row('floor-' + i, 0)], atFloor);
+    guard.beginMutation('old'); guard.finishMutation('old');
+    const atEviction = guard.merge([row('old', 9)], [row('old', 0, 'unproven')], atFloor);
+    assert.equal(atEviction[0].reactions[0].count, 9, 'equal inherited eviction floor is not replay permission');
+    assert.equal(atEviction[0].body, 'local', 'body also respects the inherited eviction floor');
   });
 });

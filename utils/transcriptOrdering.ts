@@ -35,6 +35,19 @@ export function mergePostedRow<T extends Row>(
   return guard.merge(cleared, [posted], snapshot) as T[];
 }
 
+/** One application gate for every deferred server-message batch. */
+export function createTranscriptUpdater<T extends Row>(
+  accepted: readonly T[], snapshot: number, guard: SnapshotGuard,
+  visibility: VisibilityBarrier, active: () => boolean, placeholderId?: string,
+): (current: T[]) => T[] {
+  return current => {
+    if (!active()) return current;
+    const rows = visibility.filterAccepted(accepted);
+    const retained = placeholderId ? current.filter(row => row.id !== placeholderId) : current;
+    return guard.merge(retained, rows, snapshot);
+  };
+}
+
 export interface VisibilityBarrier {
   epoch(): number;
   mark(ids: readonly string[]): void;
@@ -42,6 +55,9 @@ export interface VisibilityBarrier {
   admit<T extends { id: string }>(rows: readonly T[], fetchEpoch: number): T[];
   /** True when a request that started at `fetchEpoch` may still be applied. */
   allows(fetchEpoch: number): boolean;
+  /** Row-only recheck of a stable admitted batch; never rechecks the floor. */
+  filterAccepted<T extends { id: string }>(rows: readonly T[]): T[];
+  reset(): void;
 }
 
 const MAX_EVICTED = 500;
@@ -51,12 +67,21 @@ export function createVisibilityBarrier(max = MAX_EVICTED): VisibilityBarrier {
   let revision = 0;
   let floor = 0;
   const evictedAt = new Map<string, number>();
+  type Eligibility = { eligible: boolean };
+  // ponytail: one ticket per admitted visible id in this scope, like the loaded
+  // transcript. Eviction/reset releases it; batches retain invalidated tickets
+  // so deferred application/replay remains safe after tombstone pruning.
+  const eligibleIds = new Map<string, Eligibility>();
+  const batches = new WeakMap<object, Eligibility[]>();
   return {
     epoch(): number { return revision; },
     mark(ids: readonly string[]): void {
       revision += 1;
       for (const id of ids) {
         if (!id) continue;
+        const ticket = eligibleIds.get(id);
+        if (ticket) ticket.eligible = false;
+        eligibleIds.delete(id);
         evictedAt.delete(id);
         evictedAt.set(id, revision);
       }
@@ -71,10 +96,25 @@ export function createVisibilityBarrier(max = MAX_EVICTED): VisibilityBarrier {
     allows(fetchEpoch: number): boolean { return fetchEpoch >= floor; },
     admit<T extends { id: string }>(rows: readonly T[], fetchEpoch: number): T[] {
       if (fetchEpoch < floor) return [];
-      return rows.filter((row) => {
+      const accepted = rows.filter((row) => {
         const at = evictedAt.get(row.id);
         return at === undefined || at <= fetchEpoch;
       });
+      batches.set(accepted, accepted.map(row => {
+        let ticket = eligibleIds.get(row.id);
+        if (!ticket) { ticket = { eligible: true }; eligibleIds.set(row.id, ticket); }
+        return ticket;
+      }));
+      return accepted;
+    },
+    filterAccepted<T extends { id: string }>(rows: readonly T[]): T[] {
+      const tickets = batches.get(rows);
+      return rows.filter((_row, index) => tickets?.[index].eligible === true);
+    },
+    reset(): void {
+      for (const ticket of eligibleIds.values()) ticket.eligible = false;
+      eligibleIds.clear(); evictedAt.clear();
+      revision += 1; floor = revision;
     },
   };
 }

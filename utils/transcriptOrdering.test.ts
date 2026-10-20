@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import { createReactionSnapshots } from './reactionSnapshots.ts';
 import {
   createVisibilityBarrier,
+  createTranscriptUpdater,
   isCurrentScope,
   mergeInitialPage,
   mergePostedRow,
@@ -98,5 +99,34 @@ describe('F4 send generation', () => {
       : [];
     assert.equal(fire(out, 's1'), 1);
     assert.equal(out.some((r) => r.id === 'temp'), false);
+  });
+});
+
+describe('accepted batch eligibility', () => {
+  it('retains row invalidation after pruning and fresh readmission, including replay', () => {
+    const visibility = createVisibilityBarrier(2), guard = createReactionSnapshots();
+    const accepted = visibility.admit([row('m', 0), row('stay', 0)], visibility.epoch());
+    const updater = createTranscriptUpdater(accepted, guard.beginSnapshot(), guard, visibility, () => true);
+    updater([]); // Evaluated once before removal; it may be replayed later.
+    visibility.mark(['m']);
+    visibility.mark(['x', 'y', 'z']);
+    const fresh = visibility.admit([row('m', 1)], visibility.epoch());
+    assert.equal(visibility.filterAccepted(fresh).length, 1);
+    const afterReplay = updater([]);
+    assert.deepEqual(afterReplay.map(item => item.id), ['stay']);
+    visibility.reset();
+    assert.deepEqual(visibility.filterAccepted(fresh), []);
+  });
+
+  it('reapplies the latest body when the same updater is evaluated against its original base', () => {
+    const visibility = createVisibilityBarrier(), guard = createReactionSnapshots();
+    const accepted = visibility.admit([row('m', 1, true, 'new body')], visibility.epoch());
+    const updater = createTranscriptUpdater(accepted, guard.beginSnapshot(), guard, visibility, () => true);
+    const base = [row('m', 0, false, 'old body')];
+    assert.equal(updater(base)[0].body, 'new body');
+    const replayed = updater(base)[0];
+    assert.equal(replayed.body, 'new body');
+    assert.equal(replayed.reactions[0].count, 1);
+    assert.equal(replayed.reactions[0].viewerReacted, true);
   });
 });

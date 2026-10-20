@@ -37,7 +37,7 @@ import {
 } from '../services/liveArenaService';
 import { errorText, SupabaseError } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
-import { createVisibilityBarrier, isCurrentScope, mergeInitialPage, mergePostedRow, resolveSendResolution } from '../utils/transcriptOrdering.ts';
+import { createTranscriptUpdater, createVisibilityBarrier, isCurrentScope, resolveSendResolution } from '../utils/transcriptOrdering.ts';
 import { mergeMessagesById, removeUnavailableMessages } from '../utils/liveRoomThread';
 
 /** How many arguments one page of the thread carries. */
@@ -154,6 +154,7 @@ export function useLiveArenaRoom(
     mounted.current = true;
     return () => {
       mounted.current = false;
+      visibilityBarrier.reset();
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
     };
   }, []);
@@ -168,10 +169,12 @@ export function useLiveArenaRoom(
 
   const clearPrivateThread = React.useCallback(() => {
     accessGeneration.current++;
+    const generation = accessGeneration.current;
+    visibilityBarrier.reset();
     sendBusy.current = null;
     setSending(false);
-    setMessages([]);
-    setEvidence([]);
+    setMessages(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
+    setEvidence(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
     setStats(null);
     setThreadLocked(true);
     setHasOlder(false);
@@ -184,9 +187,15 @@ export function useLiveArenaRoom(
     snapshots: reactionSnapshots.current,
     read: async id => (await fetchMessage(id))?.reactions ?? null,
     toggle: reactMessage,
-    write: (id, reactions) => setMessages(current => reactions
-      ? current.map(row => row.id === id ? { ...row, reactions } : row)
-      : current.filter(row => row.id !== id)),
+    write: (id, reactions) => {
+      const generation = accessGeneration.current;
+      if (!reactions) visibilityBarrier.mark([id]);
+      setMessages(current => {
+        if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return current;
+        return reactions ? current.map(row => row.id === id ? { ...row, reactions } : row)
+          : current.filter(row => row.id !== id);
+      });
+    },
     onError: notify,
   });
 
@@ -210,9 +219,10 @@ export function useLiveArenaRoom(
       setThreadLocked(false);
       const authorized = visibilityBarrier.admit(next, visibilityEpoch);
       if (authorized.length === 0) return;
-      setMessages((current) => reactionSnapshots.current.merge(current, authorized, snapshot));
+      setMessages(createTranscriptUpdater(authorized, snapshot, reactionSnapshots.current, visibilityBarrier,
+        () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
     } catch (caught) {
-      if (!mounted.current) return;
+      if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
       if (isMembershipRefusal(caught)) clearPrivateThread();
     }
   }, []);
@@ -223,37 +233,45 @@ export function useLiveArenaRoom(
   const refreshThread = React.useCallback(async (): Promise<void> => {
     if (recovering.current) return;
     recovering.current = true;
-    const snapshot = reactionSnapshots.current.beginSnapshot();
+    let snapshot = 0;
     const threadEpoch = visibilityBarrier.epoch();
     const generation=accessGeneration.current;
     try {
       await reactionQueue.current?.reconcile();
       if (messageCursor.current) await drainOfficialGap(messageCursor.current,
-        async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
+        async cursor => {
+          snapshot = reactionSnapshots.current.beginSnapshot();
+          return (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[];
+        },
         (rows,cursor) => {
           if (!visibilityBarrier.allows(threadEpoch)) return false;
           // Admission and cursor coverage are one synchronous decision. React
           // may run this updater after the visibility watermark has advanced.
           const admittedRows = visibilityBarrier.admit(rows,threadEpoch);
           setThreadLocked(false);
-          setMessages(old => {
-            if (!mounted.current || generation !== accessGeneration.current) return old;
-            return reactionSnapshots.current.merge(old,admittedRows,snapshot);
-          });
+          setMessages(createTranscriptUpdater<ArenaMessage>(admittedRows, snapshot, reactionSnapshots.current, visibilityBarrier,
+            () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
           messageCursor.current=cursor;
           return true;
         },
         ()=>mounted.current && generation===accessGeneration.current);
       if (roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) await drainOfficialGap(evidenceCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'evidence',cursor,'newer')) as (ArenaEvidence & OfficialCursor)[],
-        (rows,cursor) => { setEvidence(old=>[...new Map([...old,...rows].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a))); evidenceCursor.current=cursor; },
+        (rows,cursor) => {
+          setEvidence(old => isCurrentScope(mounted.current, generation, accessGeneration.current)
+            ? [...new Map([...old,...rows].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)) : old);
+          evidenceCursor.current=cursor;
+        },
         ()=>mounted.current && generation===accessGeneration.current);
       // Rollup refresh never advances the gap cursor past unseen rows.
       if(messageCursor.current) {
         const freshEpoch = visibilityBarrier.epoch();
+        const freshSnapshot = reactionSnapshots.current.beginSnapshot();
         const fresh=await fetchOfficialPage(roomId,'message');
         if(!mounted.current || generation!==accessGeneration.current) return;
-        setMessages(old=>reactionSnapshots.current.merge(old,visibilityBarrier.admit(fresh,freshEpoch),snapshot));
+        const admittedFresh = visibilityBarrier.admit(fresh,freshEpoch);
+        setMessages(createTranscriptUpdater(admittedFresh, freshSnapshot, reactionSnapshots.current, visibilityBarrier,
+          () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
         await recoverOverflowAfterRefresh({
           queue: reactionQueue.current!,
           isLoaded: (id) => messagesRef.current.some((row) => row.id === id),
@@ -266,10 +284,11 @@ export function useLiveArenaRoom(
       if(roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) {
         const fresh=await fetchOfficialPage(roomId,'evidence');
         if(!mounted.current || generation!==accessGeneration.current) return;
-        setEvidence(old=>[...new Map([...old,...fresh].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+        setEvidence(old => isCurrentScope(mounted.current, generation, accessGeneration.current)
+          ? [...new Map([...old,...fresh].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)) : old);
       }
     } catch (caught) {
-      if (!mounted.current) return;
+      if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
       if (isMembershipRefusal(caught) || (caught as {code?:string})?.code==='account_changed') clearPrivateThread();
       else setError('Transcript could not update. Try again.');
     } finally { recovering.current=false; }
@@ -301,6 +320,7 @@ export function useLiveArenaRoom(
 
   /** Eventually evict messages hidden by moderation or a new block/mute. */
   const reconcileVisibility = React.useCallback(async (): Promise<void> => {
+    const generation = accessGeneration.current;
     const evidenceIds=evidenceRef.current.map(row=>row.id);
     const startEvidence=evidenceIds.length ? evidenceVisibilityCursor.current % evidenceIds.length : 0;
     const checkedEvidence=[...evidenceIds.slice(startEvidence),...evidenceIds.slice(0,startEvidence)].slice(0,100);
@@ -308,11 +328,12 @@ export function useLiveArenaRoom(
     try {
       if(checkedEvidence.length && roomRef.current?.roomMode==='DUEL') {
         const visible=new Set(await fetchEvidenceVisibility(roomId,checkedEvidence));
-        if(!mounted.current) return;
+        if(!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
         const checked=new Set(checkedEvidence);
-        setEvidence(old=>old.filter(row=>!checked.has(row.id)||visible.has(row.id)));
+        setEvidence(old => isCurrentScope(mounted.current, generation, accessGeneration.current)
+          ? old.filter(row=>!checked.has(row.id)||visible.has(row.id)) : old);
       }
-    } catch(caught) { if(mounted.current && isMembershipRefusal(caught)) clearPrivateThread(); return; }
+    } catch(caught) { if(isCurrentScope(mounted.current, generation, accessGeneration.current) && isMembershipRefusal(caught)) clearPrivateThread(); return; }
     const ids = messagesRef.current
       .filter((message) => !message.pending)
       .map((message) => message.id);
@@ -322,11 +343,12 @@ export function useLiveArenaRoom(
     visibilityCursor.current = (start + checked.length) % ids.length;
     try {
       const visible = await fetchVisibleMessageIds(roomId, checked);
-      if (!mounted.current) return;
+      if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
       visibilityBarrier.mark(checked.filter((id) => !visible.includes(id)));
-      setMessages((current) => removeUnavailableMessages(current, checked, visible));
+      setMessages((current) => isCurrentScope(mounted.current, generation, accessGeneration.current)
+        ? removeUnavailableMessages(current, checked, visible) : current);
     } catch (caught) {
-      if (mounted.current && isMembershipRefusal(caught)) clearPrivateThread();
+      if (isCurrentScope(mounted.current, generation, accessGeneration.current) && isMembershipRefusal(caught)) clearPrivateThread();
     }
   }, [roomId]);
 
@@ -366,13 +388,11 @@ export function useLiveArenaRoom(
           setHasOlder(messageHasOlder.current);
           if (!messageCursor.current) messageCursor.current=thread[0]?.preciseCreatedAt ? thread[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
           const admittedThread = visibilityBarrier.admit(thread, visibilityEpoch);
-          setMessages((current) =>
-            mode === 'initial'
-              ? mergeInitialPage(current, admittedThread, snapshot, reactionSnapshots.current)
-              : reactionSnapshots.current.merge(current, admittedThread, snapshot),
-          );
+          setMessages(createTranscriptUpdater(admittedThread, snapshot, reactionSnapshots.current, visibilityBarrier,
+            () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
         }
-        setEvidence(old=> mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+        setEvidence(old => !isCurrentScope(mounted.current, generation, accessGeneration.current) ? old
+          : mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
         if(next.roomMode==='DUEL') {
           if (!evidenceCursor.current) evidenceCursor.current=rail[0]?.preciseCreatedAt ? rail[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
           if(mode==='initial' || !olderEvidence.current) {
@@ -414,9 +434,14 @@ export function useLiveArenaRoom(
   useFocusEffect(React.useCallback(()=>{ void refreshThread(); return undefined; },[refreshThread]));
 
   React.useEffect(() => {
+    accessGeneration.current++;
+    const generation = accessGeneration.current;
+    visibilityBarrier.reset();
+    sendBusy.current = null;
+    setSending(false);
     setRoom(null);
-    setMessages([]);
-    setEvidence([]);
+    setMessages(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
+    setEvidence(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
     setStats(null);
     setThreadLocked(false);
     setHasOlder(true);
@@ -492,23 +517,26 @@ export function useLiveArenaRoom(
       const page = await fetchOfficialPage(roomId,'message',oldest as OfficialCursor);
         if (!mounted.current || generation!==accessGeneration.current) return;
         messageHasOlder.current=page.length>=PAGE;
-        setMessages(current=>reactionSnapshots.current.merge(current,visibilityBarrier.admit(page,pageEpoch),snapshot));
+        const admittedPage = visibilityBarrier.admit(page,pageEpoch);
+        setMessages(createTranscriptUpdater(admittedPage, snapshot, reactionSnapshots.current, visibilityBarrier,
+          () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
       }
       if(evidenceHasOlder.current && olderEvidence.current) {
         const page=await fetchOfficialPage(roomId,'evidence',olderEvidence.current);
         if(!mounted.current || generation!==accessGeneration.current) return;
         evidenceHasOlder.current=page.length>=PAGE;
         if(page.length) olderEvidence.current=page.at(-1) as OfficialCursor;
-        setEvidence(old=>[...new Map([...old,...page].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+        setEvidence(old => isCurrentScope(mounted.current, generation, accessGeneration.current)
+          ? [...new Map([...old,...page].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)) : old);
       }
       setHasOlder(messageHasOlder.current || evidenceHasOlder.current);
     } catch(caught) {
-      if (mounted.current) {
+      if (isCurrentScope(mounted.current, generation, accessGeneration.current)) {
         if(isMembershipRefusal(caught)) clearPrivateThread();
         else setError('Earlier transcript could not load. Try again.');
       }
     } finally {
-      if (mounted.current) setLoadingOlder(false);
+      if (isCurrentScope(mounted.current, generation, accessGeneration.current)) setLoadingOlder(false);
     }
   }, [hasOlder, loadingOlder, messages, roomId, threadLocked]);
 
@@ -551,7 +579,7 @@ export function useLiveArenaRoom(
         setSending(true);
         const snapshot = reactionSnapshots.current.beginSnapshot();
         const sendVisibilityEpoch = visibilityBarrier.epoch();
-        setMessages((current) => mergeMessages(current, [placeholder]));
+        setMessages((current) => active() ? mergeMessages(current, [placeholder]) : current);
         const posted = input.reshareSourceMessageId
           ? await postClashMediaReshare(
               roomId,
@@ -565,15 +593,13 @@ export function useLiveArenaRoom(
         const resolution = resolveSendResolution({ mounted: mounted.current, sentGeneration: sendGeneration, currentGeneration: accessGeneration.current });
         if (!ownsSend() || !resolution.applyRow) return false;
         const admittedPost = visibilityBarrier.admit([posted], sendVisibilityEpoch);
-        if (admittedPost.length === 0) {
-          setMessages((current) => current.filter((message) => message.id !== temporaryId));
-        } else {
-          setMessages((current) => mergePostedRow(current, admittedPost[0], temporaryId, snapshot, reactionSnapshots.current));
-        }
+        setMessages(createTranscriptUpdater(admittedPost, snapshot, reactionSnapshots.current, visibilityBarrier,
+          () => isCurrentScope(mounted.current, sendGeneration, accessGeneration.current), temporaryId));
         return true;
       } catch (caught) {
         if (active()) {
-          if (placeholderId) setMessages((current) => current.filter((message) => message.id !== placeholderId));
+          if (placeholderId) setMessages((current) => isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)
+            ? current.filter((message) => message.id !== placeholderId) : current);
           notify(caught);
         }
         return false;
@@ -606,17 +632,19 @@ export function useLiveArenaRoom(
     async (input: Omit<SubmitArenaEvidenceInput, 'roomId'>): Promise<boolean> => {
       if(evidenceBusy.current) return false;
       evidenceBusy.current=true;
+      const generation = accessGeneration.current;
       try {
         const account=await currentUserId();
-        if(!account || !mounted.current) return false;
+        if(!account || !isCurrentScope(mounted.current, generation, accessGeneration.current)) return false;
         const requestKey=roomRef.current?.roomMode==='DUEL' ? await acquireOfficialRequest(account,roomId,'evidence',input) : undefined;
-        if(!mounted.current) return false;
+        if(!isCurrentScope(mounted.current, generation, accessGeneration.current)) return false;
         const created=await submitEvidence({...input,roomId,requestKey,expectedAccountId:account});
         if(requestKey) await confirmOfficialRequest(account,roomId,'evidence',requestKey).catch(()=>{});
-        if(!mounted.current) return false;
-        setEvidence(old=>[...new Map([...old,created].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+        if(!isCurrentScope(mounted.current, generation, accessGeneration.current)) return false;
+        setEvidence(old => isCurrentScope(mounted.current, generation, accessGeneration.current)
+          ? [...new Map([...old,created].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)) : old);
         return true;
-      } catch(caught) { if(mounted.current) notify(caught); return false; }
+      } catch(caught) { if(isCurrentScope(mounted.current, generation, accessGeneration.current)) notify(caught); return false; }
       finally {evidenceBusy.current=false;}
     },
     [notify, roomId],
@@ -624,18 +652,19 @@ export function useLiveArenaRoom(
 
   const markUseful = React.useCallback(
     async (evidenceId: string): Promise<void> => {
+      const generation = accessGeneration.current;
       try {
         const result = await markEvidenceUseful(evidenceId);
-        if (!mounted.current) return;
+        if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
         setEvidence((current) =>
-          current.map((item) =>
+          !isCurrentScope(mounted.current, generation, accessGeneration.current) ? current : current.map((item) =>
             item.id === result.evidenceId
               ? { ...item, usefulCount: result.usefulCount, viewerMarkedUseful: result.marked }
               : item,
           ),
         );
       } catch (caught) {
-        notify(caught);
+        if (isCurrentScope(mounted.current, generation, accessGeneration.current)) notify(caught);
       }
     },
     [notify],

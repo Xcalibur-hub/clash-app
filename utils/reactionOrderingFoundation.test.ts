@@ -155,9 +155,9 @@ describe('6. every reaction-bearing transcript path uses the coordinator', () =>
     const src = fs.readFileSync(path.join(here, '../hooks/useLiveArenaRoom.ts'), 'utf8');
     const hydrate = src.slice(src.indexOf('const hydrateInserted'), src.indexOf('const refreshThread'));
     const needles = [
-      'reactionSnapshots.current.merge(',
+      'createTranscriptUpdater(',
       'visibilityBarrier.admit(',
-      'mergeInitialPage(current, admittedThread',
+      'createTranscriptUpdater(admittedThread',
       'admit(page,pageEpoch)',
       'admit(rows,threadEpoch)',
       'resolveSendResolution(',
@@ -166,6 +166,9 @@ describe('6. every reaction-bearing transcript path uses the coordinator', () =>
     assert.ok(hydrate.includes('beginSnapshot()'));
     assert.ok(hydrate.includes('visibilityBarrier.admit(next, visibilityEpoch)'));
     assert.ok(!hydrate.includes('mergeMessages(current, next)'));
+    const ordering = fs.readFileSync(path.join(here, 'transcriptOrdering.ts'), 'utf8');
+    assert.ok(ordering.includes('guard.merge(retained, rows, snapshot)'));
+    assert.ok(ordering.includes('visibility.filterAccepted(accepted)'));
   });
 });
 

@@ -1,5 +1,6 @@
 ﻿/**
  * Per-message coordination between transcript snapshots and reaction writes.
+ * Full-row fields use a separate local read-start order, not a server revision.
  *
  * Mutation ownership is explicit:
  *  - beginMutation / finishMutation bracket ONE user toggle each.
@@ -24,7 +25,7 @@ export interface SnapshotGuard {
 }
 
 const MAX_TRACKED = 256;
-interface Entry { lastApplied: number; pending: number; committedAt: number }
+interface Entry { lastApplied: number; lastBodyApplied: number; pending: number; committedAt: number }
 
 export function createReactionSnapshots(): SnapshotGuard {
   let seq = 0;
@@ -35,7 +36,7 @@ export function createReactionSnapshots(): SnapshotGuard {
     if (existing) return existing;
     // Recreation inherits the eviction floor so protection survives eviction.
     const floor = evictedSince > 0 ? evictedSince : -1;
-    const created: Entry = { lastApplied: floor, pending: 0, committedAt: evictedSince };
+    const created: Entry = { lastApplied: floor, lastBodyApplied: floor, pending: 0, committedAt: evictedSince };
     tracked.set(id, created);
     if (tracked.size > MAX_TRACKED) {
       for (const [key, value] of tracked) {
@@ -69,20 +70,34 @@ export function createReactionSnapshots(): SnapshotGuard {
       const byId = new Map(current.map((row) => [row.id, row]));
       const safe = incoming.map((row) => {
         const existing = byId.get(row.id);
-        if (!existing) return row;
+        if (!existing) {
+          const inserted = entryFor(row.id);
+          inserted.lastApplied = Math.max(inserted.lastApplied, snapshot);
+          inserted.lastBodyApplied = Math.max(inserted.lastBodyApplied, snapshot);
+          return row;
+        }
         const entry = tracked.get(row.id);
         if (!entry) {
           // No live entry: it was never tracked or was evicted. Reject any
           // snapshot that began at or before the last eviction; adopt newer ones.
-          if (evictedSince > 0 && snapshot <= evictedSince) return { ...row, reactions: existing.reactions };
+          if (evictedSince > 0 && snapshot <= evictedSince) return existing;
           const created = entryFor(row.id);
           created.lastApplied = snapshot;
+          created.lastBodyApplied = snapshot;
           return row;
         }
-        const authoritative = entry.pending === 0 && snapshot >= entry.committedAt && snapshot > entry.lastApplied;
-        if (!authoritative) return { ...row, reactions: existing.reactions };
+        // No server edit revision is exposed. Conservatively order full-row
+        // fields by local read start, independently of reaction mutations.
+        const afterEviction = evictedSince === 0 || snapshot > evictedSince;
+        const body = snapshot >= entry.lastBodyApplied && afterEviction ? row : existing;
+        entry.lastBodyApplied = Math.max(entry.lastBodyApplied, snapshot);
+        // Equal tokens allow reevaluation of this read against an earlier React
+        // base; an inherited eviction floor is still strictly excluded.
+        const authoritative = entry.pending === 0 && snapshot >= entry.committedAt
+          && snapshot >= entry.lastApplied && afterEviction;
+        if (!authoritative) return { ...body, reactions: existing.reactions };
         entry.lastApplied = snapshot;
-        return row;
+        return { ...body, reactions: row.reactions };
       });
       return mergeMessagesById(current as never, safe as never) as unknown as T[];
     },

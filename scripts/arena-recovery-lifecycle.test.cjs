@@ -37,6 +37,10 @@ function harness(transform = (source) => source, { queued = false } = {}) {
     if (node.type === 'VariableDeclarator' && node.init?.callee?.property?.name === 'useCallback') {
       callbacks.set(node.id.name, node.init.arguments[0]);
     }
+    if (node.type === 'CallExpression' && node.callee?.name === 'createRoomReactionBridge') {
+      const write = node.arguments[0].properties.find(property => property.key?.name === 'write');
+      callbacks.set('writeReaction', write.value);
+    }
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) value.forEach(walk);
       else if (value && typeof value === 'object') walk(value);
@@ -58,6 +62,8 @@ function harness(transform = (source) => source, { queued = false } = {}) {
   const { mergeMessagesById, removeUnavailableMessages } = load('utils/liveRoomThread.ts');
   const { drainOfficialGap } = load('utils/officialRecovery.ts');
   let rows = [row('base', 0)], sending = false, writes = 0, notices = 0;
+  let evidence = [];
+  const evidenceUpdates = [];
   const updates = [];
   const apply = (update) => { rows = typeof update === 'function' ? update(rows) : update; writes++; };
   const noop = () => {};
@@ -72,8 +78,17 @@ function harness(transform = (source) => source, { queued = false } = {}) {
     // The unchanged overflow scheduler is deliberately outside these tests.
     recoverOverflowAfterRefresh: async () => false,
     setMessages(update) { if (queued) updates.push(update); else apply(update); },
+    setEvidence(update) {
+      const applyEvidence = () => { evidence = typeof update === 'function' ? update(evidence) : update; };
+      if (queued) evidenceUpdates.push(applyEvidence); else applyEvidence();
+    },
     setSending(value) { sending = value; }, notify() { notices++; },
-    setEvidence: noop, setStats: noop, setHasOlder: noop, setThreadLocked: noop, setError: noop,
+    setStats: noop, setHasOlder: noop, setThreadLocked: noop, setError: noop,
+    setRoom: noop, setLoading: noop, setRefreshing: noop, setLoadingOlder: noop,
+    fetchRoom: async () => ({ roomMode: 'DUEL', status: 'LIVE' }), fetchEvidence: async () => [],
+    fetchMessage: async id => row(id, 1), loadingOlder: false, hasOlder: true, threadLocked: false,
+    messageHasOlder: { current: true }, evidenceHasOlder: { current: false }, olderEvidence: { current: null },
+    get messages() { return rows; }, evidenceBusy: { current: false },
     fetchVisibleMessageIds: async () => ['base'], removeUnavailableMessages, mergeMessages: mergeMessagesById,
     isMembershipRefusal: (error) => error?.code === '42501',
     currentUserId: async () => 'account', acquireOfficialRequest: async () => 'request',
@@ -85,7 +100,11 @@ function harness(transform = (source) => source, { queued = false } = {}) {
     get rows() { return rows; }, set rows(value) { rows = value; },
     get sending() { return sending; }, get writes() { return writes; }, get notices() { return notices; },
     get queuedUpdates() { return updates.length; },
+    get evidence() { return evidence; },
+    set evidence(value) { evidence = value; },
+    flushEvidenceAll() { while (evidenceUpdates.length) evidenceUpdates.shift()(); },
     flushNext() { assert.ok(updates.length, 'queued updater available'); apply(updates.shift()); },
+    flushLast() { assert.ok(updates.length, 'queued updater available'); apply(updates.pop()); },
     flushAll() { while (updates.length) apply(updates.shift()); },
   };
 }
@@ -422,6 +441,145 @@ test('whole-request rejection before acceptance remains unacknowledged with queu
   assert.equal(h.scope.messageCursor.current.id, 'base');
   assert.equal(q.reads, 1);
   assert.equal(h.rows.filter((item) => item.id.startsWith('gap')).length, 40);
+});
+
+test('R1 reversed visibility removal invalidates only the evicted accepted row, even after pruning', async () => {
+  const q = queuedRecovery(), { h } = q;
+  h.rows.push(q.all[0], { ...row('pending', 60), pending: true });
+  const pending = q.refresh();
+  await q.firstStarted.promise; q.first.resolve(); await q.secondStarted.promise;
+  assert.equal(h.scope.messageCursor.current.id, 'gap40');
+  await h.callback('reconcileVisibility')();
+  h.flushLast(); // Apply the later authoritative removal before the accepted page.
+  assert.equal(h.rows.some(item => item.id === 'gap1'), false);
+  // Prune the individual tombstone before applying the accepted batch.
+  h.scope.visibilityBarrier.mark(Array.from({ length: 501 }, (_, i) => 'pruned' + i));
+  h.flushNext();
+  const removed = h.rows.some(item => item.id === 'gap1');
+  const unrelated = h.rows.filter(item => item.id.startsWith('gap')).length;
+  q.second.resolve(); await pending; h.flushAll();
+  assert.equal(removed, false, 'a later eviction survives reversed updater execution and pruning');
+  assert.equal(unrelated, 39, 'unrelated accepted coverage survives');
+  assert.equal(h.rows.some(item => item.id === 'pending' && item.pending), true);
+  assert.equal(new Set(h.rows.map(item => item.id)).size, h.rows.length);
+});
+
+for (const loaded of [false, true]) for (const reverse of [false, true]) {
+  test(`R2 recovery/rollup snapshots preserve newer reactions: loaded=${loaded}, reverse=${reverse}`, async () => {
+    const h = harness(undefined, { queued: true }), gate = deferred(), started = deferred();
+    const older = { ...row('m', 1), reactions: [{ emoji: 'fire', count: 0, viewerReacted: false }] };
+    const newer = { ...older, reactions: [{ emoji: 'fire', count: 1, viewerReacted: true }] };
+    if (loaded) h.rows.push(older);
+    h.scope.fetchOfficialPage = async (_room, _kind, _cursor, direction) => {
+      if (direction !== 'newer') return [newer];
+      started.resolve(); await gate.promise; return [older];
+    };
+    const pending = h.callback('refreshThread')();
+    await started.promise; gate.resolve(); await pending;
+    if (reverse) { h.flushLast(); h.flushNext(); } else h.flushAll();
+    const message = h.rows.find(item => item.id === 'm');
+    assert.equal(message.reactions[0].count, 1);
+    assert.equal(message.reactions[0].viewerReacted, true);
+    assert.equal(h.scope.messageCursor.current.id, 'm');
+    assert.equal(new Set(h.rows.map(item => item.id)).size, h.rows.length);
+  });
+}
+
+for (const ending of ['generation', 'unmount']) test(`R3 deferred rollup rejects ${ending} at application`, async () => {
+  const h = harness(undefined, { queued: true });
+  h.scope.fetchOfficialPage = async (_room, _kind, _cursor, direction) => direction === 'newer' ? [] : [row('late', 1)];
+  await h.callback('refreshThread')();
+  if (ending === 'generation') { h.scope.clearPrivateThread(); h.flushLast(); }
+  else h.scope.mounted.current = false;
+  h.flushAll();
+  assert.equal(h.rows.some(item => item.id === 'late'), false);
+});
+
+test('R4 reversed refresh batches preserve newer locally ordered body and moderation fields', async () => {
+  const h = harness(undefined, { queued: true });
+  h.rows.push({ ...row('pending', 2), pending: true });
+  let pass = 0;
+  h.scope.fetchOfficialPage = async (_room, _kind, cursor, direction) => {
+    if (direction === 'newer') return cursor.id === 'base' ? [row('m', 1)] : [];
+    return [{ ...row('m', 1), body: pass ? '[redacted]' : 'older body', mediaUrl: pass ? null : 'old-url' }];
+  };
+  const refresh = h.callback('refreshThread');
+  await refresh(); pass++; await refresh();
+  const cursor = h.scope.messageCursor.current.id;
+  h.flushLast(); // Newer server response commits first.
+  assert.equal(h.rows.find(item => item.id === 'm').body, '[redacted]');
+  while (h.queuedUpdates) h.flushLast();
+  const message = h.rows.find(item => item.id === 'm');
+  assert.equal(message.body, '[redacted]');
+  assert.equal(message.mediaUrl, null);
+  assert.equal(h.scope.messageCursor.current.id, cursor);
+  assert.equal(h.rows.some(item => item.id === 'pending' && item.pending), true);
+  assert.equal(new Set(h.rows.map(item => item.id)).size, h.rows.length);
+});
+
+test('rollup scope gate is effective independently of visibility invalidation', async () => {
+  const h = harness(undefined, { queued: true });
+  h.scope.fetchOfficialPage = async (_r, _k, _c, direction) => direction === 'newer' ? [] : [row('late', 1)];
+  await h.callback('refreshThread')();
+  h.scope.accessGeneration.current++;
+  h.flushAll();
+  assert.equal(h.rows.some(item => item.id === 'late'), false);
+});
+
+for (const path of ['hydrateInserted', 'load', 'loadOlder', 'send']) {
+  test(`${path} deferred server rows reject generation invalidation`, async () => {
+    const h = harness(undefined, { queued: true });
+    h.scope.fetchOfficialPage = async () => [row('late', -1)];
+    h.scope.postMessage = async () => row('late', 1);
+    const callback = h.callback(path);
+    await callback(path === 'hydrateInserted' ? ['late'] : path === 'load' ? 'initial' : { body: 'argument' });
+    assert.ok(h.queuedUpdates > 0, 'production callback queued a message updater');
+    h.scope.accessGeneration.current++;
+    h.flushAll(); h.flushEvidenceAll();
+    assert.equal(h.rows.some(item => item.id === 'late' || item.pending), false);
+    assert.equal(h.evidence.length, 0);
+  });
+}
+
+test('authoritative reaction-only null removal invalidates an already accepted batch', async () => {
+  const q = queuedRecovery(), { h } = q;
+  h.rows.push(q.all[0]);
+  const pending = q.refresh();
+  await q.firstStarted.promise; q.first.resolve(); await q.secondStarted.promise;
+  h.callback('writeReaction')('gap1', null);
+  h.flushLast(); h.flushNext();
+  const resurrected = h.rows.some(item => item.id === 'gap1');
+  q.second.resolve(); await pending; h.flushAll();
+  assert.equal(resurrected, false);
+});
+
+test('deferred reaction-only write rejects a later access generation', () => {
+  const h = harness(undefined, { queued: true });
+  h.scope.reactionSnapshots.current.beginMutation('base');
+  h.callback('writeReaction')('base', [{ emoji: 'fire', count: 9, viewerReacted: true }]);
+  h.scope.accessGeneration.current++;
+  h.flushAll();
+  assert.equal(h.rows[0].reactions.length, 0);
+  assert.equal(h.scope.reactionSnapshots.current.protectedIds().length, 1, 'application does not finish a toggle');
+});
+
+test('stale thread-clear updater cannot erase a newer scope', () => {
+  const h = harness(undefined, { queued: true });
+  h.scope.clearPrivateThread();
+  h.scope.accessGeneration.current++;
+  h.rows = [row('new-scope', 1)];
+  h.flushAll();
+  assert.equal(h.rows[0].id, 'new-scope');
+});
+
+test('reversed successful send cannot leave its queued placeholder behind', async () => {
+  const h = harness(undefined, { queued: true });
+  h.scope.postMessage = async () => row('posted', 1);
+  assert.equal(await h.callback('send')({ body: 'argument' }), true);
+  assert.equal(h.queuedUpdates, 2);
+  h.flushLast(); h.flushNext();
+  assert.equal(h.rows.some(item => item.pending), false);
+  assert.equal(h.rows.filter(item => item.id === 'posted').length, 1);
 });
 
 module.exports = { harness, sendingHarness };
