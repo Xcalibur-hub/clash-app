@@ -235,7 +235,10 @@ export function useLiveArenaRoom(
         await recoverOverflowAfterRefresh({
           queue: reactionQueue.current!,
           isLoaded: (id) => messagesRef.current.some((row) => row.id === id),
-          active: () => mounted.current && generation === accessGeneration.current,
+          loadedIds: messagesRef.current.map((row) => row.id),
+          active: () => mounted.current,
+          generation,
+          currentGeneration: () => accessGeneration.current,
         });
       }
       if(roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) {
@@ -723,4 +726,5 @@ export function useLiveArenaRoom(
     upgradeToDebater,
   };
 }
+
 

@@ -1,12 +1,9 @@
-﻿/**
- * Reaction mutations and bounded ambiguous recovery.
- * A toggle is never retried. Overflow is explicit: dropped targets remain
- * unresolved, are tracked in a bounded list, and are recovered by targeted
- * authoritative reads for messages still in loaded scope.
- */
+﻿/** Reaction mutations with bounded, scope-safe ambiguous recovery. */
 import type { ArenaReaction } from '../services/liveArenaService';
 
 export interface ReactionResult { messageId: string; emoji: string; reacted: boolean; count: number }
+export interface OverflowState { dropped: number; requested: boolean; tracked: number; deficit: number }
+export interface RecoveryResult { attempted: number; remainingLoaded: number; parked: number; deficit: number }
 
 export function applyOptimisticReaction(rows: readonly ArenaReaction[], emoji: string): ArenaReaction[] {
   if (!emoji) return [...rows];
@@ -16,18 +13,13 @@ export function applyOptimisticReaction(rows: readonly ArenaReaction[], emoji: s
     : [...rows, { emoji, count: 0, viewerReacted: true }];
   return sortReactions(next);
 }
-
 export function mergeReactionResult(rows: readonly ArenaReaction[], result: Pick<ReactionResult, 'emoji' | 'count' | 'reacted'>): ArenaReaction[] {
   const others = rows.filter((row) => row.emoji !== result.emoji);
   const next = result.count > 0 ? [...others, { emoji: result.emoji, count: result.count, viewerReacted: result.reacted }] : others;
   return sortReactions(next);
 }
-
 export function reactionSequenceAccepted(latest: number | undefined, mine: number): boolean { return latest === mine; }
 export function restoreReactions(prior: readonly ArenaReaction[] | null): ArenaReaction[] | null { return prior ? [...prior] : null; }
-
-export interface OverflowState { dropped: number; requested: boolean; tracked: number }
-export interface RecoveryResult { attempted: number; remainingLoaded: number; parked: number }
 
 export function createReactionQueue(io: {
   read: (id: string) => Promise<readonly ArenaReaction[] | null>;
@@ -42,9 +34,14 @@ export function createReactionQueue(io: {
   const MAX_REPAIR_BATCH = 20;
   const MAX_DROPPED_IDS = 50;
   const droppedIds: string[] = [];
+  const committed = new Map<string, number>();
+  let commitSeq = 0;
   let dropped = 0;
+  let deficit = 0;
   let refreshRequested = false;
+  let sweepCursor = 0;
 
+  const bump = (id: string): void => { commitSeq += 1; committed.set(id, commitSeq); };
   const retain = (id: string, active: () => boolean): void => {
     if (dirty.has(id)) return;
     dirty.set(id, { active, reads: 0 });
@@ -54,9 +51,12 @@ export function createReactionQueue(io: {
         dirty.delete(key);
         dropped += 1;
         refreshRequested = true;
-        if (!droppedIds.includes(key)) {
-          droppedIds.push(key);
-          if (droppedIds.length > MAX_DROPPED_IDS) droppedIds.shift();
+        if (droppedIds.length < MAX_DROPPED_IDS) {
+          if (!droppedIds.includes(key)) droppedIds.push(key);
+        } else {
+          // Unknown-coverage deficit: a forgotten target still needs loaded-scope
+          // reconciliation before recovery can be acknowledged.
+          deficit += 1;
         }
         break;
       }
@@ -67,8 +67,10 @@ export function createReactionQueue(io: {
     if (!active()) return false;
     io.write(id, rows ? [...rows] : null);
     io.onCommitted?.(id);
+    bump(id);
     return true;
   };
+  const applyAuthoritative = (id: string): void => { io.onCommitted?.(id); bump(id); };
 
   return {
     enqueue(id: string, emoji: string, active: () => boolean): Promise<void> {
@@ -83,7 +85,7 @@ export function createReactionQueue(io: {
           const result = await io.toggle(id, emoji);
           if (!active()) return;
           io.write(id, mergeReactionResult(baseline, result));
-          io.onCommitted?.(id);
+          applyAuthoritative(id);
           dirty.delete(id);
         } catch (error) {
           if (!active()) return;
@@ -116,31 +118,74 @@ export function createReactionQueue(io: {
         await task.finally(() => { if (tails.get(id) === task) tails.delete(id); });
       }
     },
-    /** Targeted recovery for overflow-dropped targets still in loaded scope. */
-    async recoverDropped(isLoaded: (id: string) => boolean, limit = 20): Promise<RecoveryResult> {
-      const parked = droppedIds.filter((id) => !isLoaded(id));
-      const loaded = droppedIds.filter(isLoaded);
+    async recoverDropped(input: {
+      isLoaded: (id: string) => boolean;
+      loadedIds: readonly string[];
+      active: () => boolean;
+      generation: number;
+      currentGeneration: () => number;
+      limit?: number;
+    }): Promise<RecoveryResult> {
+      const valid = (): boolean => input.active() && input.generation === input.currentGeneration();
+      const remainingLoaded = (): number => droppedIds.filter(input.isLoaded).length;
+      const parked = (): number => droppedIds.filter((id) => !input.isLoaded(id)).length;
+      const limit = Math.max(0, input.limit ?? 20);
+      if (!valid()) return { attempted: 0, remainingLoaded: remainingLoaded(), parked: parked(), deficit };
       let attempted = 0;
-      for (const id of loaded.slice(0, Math.max(0, limit))) {
+
+      for (const id of droppedIds.filter(input.isLoaded).slice(0, limit)) {
+        if (!valid()) return { attempted, remainingLoaded: remainingLoaded(), parked: parked(), deficit };
+        const startCommit = committed.get(id) ?? 0;
         attempted += 1;
         try {
           const rows = await io.read(id);
+          // Scope and ordering checks happen immediately after the await.
+          if (!valid()) return { attempted, remainingLoaded: remainingLoaded(), parked: parked(), deficit };
+          if ((committed.get(id) ?? 0) !== startCommit) {
+            // A newer authoritative write landed while this read was in flight.
+            const index = droppedIds.indexOf(id);
+            if (index >= 0) droppedIds.splice(index, 1);
+            continue;
+          }
+          if (tails.has(id)) continue; // a mutation is still pending; keep the obligation
           io.write(id, rows ? [...rows] : null);
-          io.onCommitted?.(id);
+          applyAuthoritative(id);
           const index = droppedIds.indexOf(id);
           if (index >= 0) droppedIds.splice(index, 1);
         } catch { /* keep for a later pass */ }
       }
-      return { attempted, remainingLoaded: droppedIds.filter(isLoaded).length, parked: parked.length };
+
+      // Bounded loaded-scope sweep when individual ids were forgotten.
+      if (deficit > 0 && attempted < limit) {
+        let failures = 0;
+        while (attempted < limit && sweepCursor < input.loadedIds.length) {
+          if (!valid()) return { attempted, remainingLoaded: remainingLoaded(), parked: parked(), deficit };
+          const id = input.loadedIds[sweepCursor];
+          sweepCursor += 1;
+          attempted += 1;
+          try {
+            const rows = await io.read(id);
+            if (!valid()) return { attempted, remainingLoaded: remainingLoaded(), parked: parked(), deficit };
+            io.write(id, rows ? [...rows] : null);
+            applyAuthoritative(id);
+          } catch { failures += 1; }
+        }
+        if (sweepCursor >= input.loadedIds.length) {
+          sweepCursor = 0;
+          if (failures === 0) deficit = 0;
+        }
+      }
+
+      return { attempted, remainingLoaded: remainingLoaded(), parked: parked(), deficit };
     },
     pendingRepairs(): number { return dirty.size; },
-    overflow(): OverflowState { return { dropped, requested: refreshRequested, tracked: droppedIds.length }; },
+    overflow(): OverflowState { return { dropped, requested: refreshRequested, tracked: droppedIds.length, deficit }; },
     consumeOverflowRequest(): boolean {
       const requested = refreshRequested;
       refreshRequested = false;
       return requested;
     },
-    reset(): void { dirty.clear(); droppedIds.length = 0; dropped = 0; refreshRequested = false; },
+    reset(): void { dirty.clear(); droppedIds.length = 0; dropped = 0; deficit = 0; refreshRequested = false; sweepCursor = 0; committed.clear(); },
   };
 }
 

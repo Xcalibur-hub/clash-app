@@ -33,7 +33,9 @@ export function createReactionSnapshots(): SnapshotGuard {
   const entryFor = (id: string): Entry => {
     const existing = tracked.get(id);
     if (existing) return existing;
-    const created: Entry = { lastApplied: -1, pending: 0, committedAt: 0 };
+    // Recreation inherits the eviction floor so protection survives eviction.
+    const floor = evictedSince > 0 ? evictedSince : -1;
+    const created: Entry = { lastApplied: floor, pending: 0, committedAt: evictedSince };
     tracked.set(id, created);
     if (tracked.size > MAX_TRACKED) {
       for (const [key, value] of tracked) {
@@ -88,3 +90,4 @@ export function createReactionSnapshots(): SnapshotGuard {
     reset(): void { tracked.clear(); seq = 0; evictedSince = 0; },
   };
 }
+
