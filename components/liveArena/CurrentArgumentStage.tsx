@@ -12,6 +12,7 @@ import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import type { ArenaMessage } from '../../services/liveArenaService';
 import { duelArgumentPreview, duelTimestamp } from '../../utils/duelPresentation';
 import { duelStageType } from '../../utils/duelStageLayout';
+import { sidePlateBorder } from './liveArenaStyles';
 import { arena } from '../../theme/arena';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -43,6 +44,7 @@ export function CurrentArgumentStage({
       : focusSide === 'B'
         ? duel.fighterB
         : null;
+  const accent = speaker?.tint ?? t.borderStrong;
   const body = message?.body?.trim() ?? '';
   const { preview, truncated } = duelArgumentPreview(
     body,
@@ -50,23 +52,35 @@ export function CurrentArgumentStage({
   );
 
   const content = !message || !speaker ? (
-    <Text style={[styles.empty, { color: t.textMuted }]}>
-      Awaiting the opening argument.
-    </Text>
+    <View style={styles.emptyWrap}>
+      <Text style={[styles.emptyEyebrow, { color: t.textMuted }]}>STAGE</Text>
+      <Text style={[styles.empty, { color: t.textSecondary }]}>
+        Waiting for the opening official argument.
+      </Text>
+    </View>
   ) : (
     <>
-      <Text style={[styles.attr, { color: t.textSecondary }]}>{highlighted ? 'LATEST OFFICIAL ARGUMENT' : 'OFFICIAL ARGUMENT'}</Text>
+      <Text style={[styles.attr, { color: t.textSecondary }]}>
+        {highlighted ? 'LATEST OFFICIAL ARGUMENT' : 'OFFICIAL ARGUMENT'}
+      </Text>
       <Text
         selectable
         style={[
           styles.argument,
           condensed && styles.argumentCondensed,
-          { color: t.textPrimary, fontSize: type.argumentSize, lineHeight: type.argumentLineHeight },
+          {
+            color: t.textPrimary,
+            fontSize: type.argumentSize,
+            lineHeight: type.argumentLineHeight,
+          },
         ]}
       >
         {preview}
       </Text>
-      <Text style={[styles.attr, { color: t.textSecondary }]}>ARGUMENT BY {speaker.name}{duelTimestamp(message.createdAt) ? ' · ' + duelTimestamp(message.createdAt) : ''}</Text>
+      <Text style={[styles.byline, { color: t.textSecondary }]}>
+        {speaker.name}
+        {duelTimestamp(message.createdAt) ? ` · ${duelTimestamp(message.createdAt)}` : ''}
+      </Text>
       {truncated ? (
         <Pressable
           accessibilityRole="button"
@@ -88,21 +102,28 @@ export function CurrentArgumentStage({
           onPress={onOpenFull}
           style={styles.readMoreHit}
         >
-          <Text style={[styles.historyCue, { color: t.textSecondary }]}>View argument history  →</Text>
+          <Text style={[styles.historyCue, { color: t.textSecondary }]}>
+            View argument history →
+          </Text>
         </Pressable>
       )}
     </>
   );
 
   return (
-    <View style={[styles.wrap, highlighted ? {borderLeftWidth:2,borderLeftColor:t.borderStrong} : null]} accessibilityLabel="Current argument">
+    <View
+      style={[
+        styles.wrap,
+        highlighted
+          ? { borderLeftWidth: 2, borderLeftColor: sidePlateBorder(accent, t.scheme) }
+          : null,
+      ]}
+      accessibilityLabel="Current argument"
+    >
       {reduced || !message || !highlighted ? (
         content
       ) : (
-        <Animated.View
-          key={message.id}
-          entering={FadeIn.duration(180)}
-        >
+        <Animated.View key={message.id} entering={FadeIn.duration(180)}>
           {content}
         </Animated.View>
       )}
@@ -115,7 +136,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     minHeight: 64,
     justifyContent: 'flex-start',
-    paddingTop: 6,
+    paddingTop: space.sm,
+    paddingBottom: space.xs,
     paddingHorizontal: layout.screenX,
     gap: space.sm,
   },
@@ -124,7 +146,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '600',
-    letterSpacing: -0.25,
+    letterSpacing: -0.35,
     textAlign: 'left',
   },
   argumentCondensed: {
@@ -133,28 +155,46 @@ const styles = StyleSheet.create({
   },
   attr: {
     ...typeScale.caption,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 1.1,
     textAlign: 'left',
+  },
+  byline: {
+    ...typeScale.caption,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textAlign: 'left',
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: space.md,
+  },
+  emptyEyebrow: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   empty: {
     ...typeScale.body,
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
+    maxWidth: 280,
   },
   readMoreHit: {
     alignSelf: 'flex-start',
     minHeight: 44,
-    justifyContent: 'flex-start',
-    paddingTop: 12,
-    paddingHorizontal: space.sm,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
   },
   readMore: {
     ...typeScale.label,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   historyCue: {
     ...typeScale.caption,

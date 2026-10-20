@@ -62,39 +62,39 @@ export function ClashEventHeader({
           entering={reduced ? undefined : FadeIn.duration(180)}
           style={styles.statusGroup}
         >
-        <Text
-          allowFontScaling={false}
-          style={[styles.status, { color: live ? t.textPrimary : t.textSecondary }]}
-        >
-          {statusLabel}
-        </Text>
-        {phaseLabel ? (
-          <Animated.View
-            key={phaseLabel}
-            entering={reduced ? undefined : FadeIn.duration(180)}
+          <Text
+            allowFontScaling={false}
+            style={[styles.status, { color: live ? t.textPrimary : t.textSecondary }]}
           >
-            <View
-              style={[styles.phaseChip, { backgroundColor: chipFill(t), borderColor: t.border }]}
+            {statusLabel}
+          </Text>
+          {phaseLabel ? (
+            <Animated.View
+              key={phaseLabel}
+              entering={reduced ? undefined : FadeIn.duration(180)}
             >
-              <Text
-                allowFontScaling={false}
-                style={[styles.phaseChipText, { color: t.textSecondary }]}
+              <View
+                style={[styles.phaseChip, { backgroundColor: chipFill(t), borderColor: t.border }]}
               >
-                {phaseLabel}
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.phaseChipText, { color: t.textSecondary }]}
+                >
+                  {phaseLabel}
+                </Text>
+              </View>
+            </Animated.View>
+          ) : null}
+          {audienceLabel !== null ? (
+            <>
+              <Text allowFontScaling={false} style={[styles.sep, { color: t.textMuted }]}>
+                ·
               </Text>
-            </View>
-          </Animated.View>
-        ) : null}
-        {audienceLabel !== null ? (
-          <>
-            <Text allowFontScaling={false} style={[styles.sep, { color: t.textMuted }]}>
-              ·
-            </Text>
-            <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
-              {audienceLabel}
-            </Text>
-          </>
-        ) : null}
+              <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
+                {audienceLabel}
+              </Text>
+            </>
+          ) : null}
         </Animated.View>
       </View>
 
@@ -117,8 +117,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: layout.screenX,
-    paddingBottom: space.xs,
-    minHeight: 44,
+    paddingBottom: space.sm,
+    minHeight: 48,
   },
   hit: {
     minWidth: 44,
@@ -147,13 +147,13 @@ const styles = StyleSheet.create({
     ...typeScale.label,
     fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 1.1,
   },
   phaseChip: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 999,
     paddingHorizontal: 7,
-    paddingVertical: 1,
+    paddingVertical: 2,
   },
   phaseChipText: {
     ...typeScale.label,

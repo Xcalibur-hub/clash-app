@@ -223,9 +223,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: space.sm,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.md,
+    borderRadius: 14,
     paddingVertical: space.sm,
-    paddingHorizontal: space.xs,
+    paddingHorizontal: space.sm,
   },
   fighterHit: {
     minHeight: 44,

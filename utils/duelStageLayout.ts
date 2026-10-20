@@ -26,7 +26,7 @@ export const DUEL_STAGE_SHARE: Record<DuelStageMode, number> = {
 export const DUEL_STAGE_MIN_SHARE = 0.55;
 
 /** Fixed Stage height while the Crowd is expanded or the keyboard is open. */
-export const DUEL_COMPACT_STAGE_HEIGHT = 110;
+export const DUEL_COMPACT_STAGE_HEIGHT = 124;
 
 /** The Crowd never collapses below its heading, stream and composer. */
 export const DUEL_CROWD_MIN_HEIGHT = 134;
