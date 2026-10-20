@@ -16,6 +16,9 @@ export interface SnapshotGuard {
   beginMutation(messageId: string): void;
   finishMutation(messageId: string): void;
   markAuthoritativeReactionWrite(messageId: string): void;
+  /** Accept a reaction-only write; returned predicate is checked on application. */
+  beginReactionWrite(messageId: string): () => boolean;
+  resetReactionWrites(): void;
   /** Back-compat: mark authoritative and finish one mutation. */
   commitMutation(messageId: string): void;
   noteMutation(messageId: string): void;
@@ -31,6 +34,21 @@ export function createReactionSnapshots(): SnapshotGuard {
   let seq = 0;
   let evictedSince = 0;
   const tracked = new Map<string, Entry>();
+  // Application tickets outlive bounded snapshot-entry eviction. Retain the
+  // latest write per id for updater replay until a newer snapshot or scope
+  // reset releases it, without completing any user mutation.
+  const writes = new Map<string, { at: number; current: boolean }>();
+  const resetWrites = (): void => {
+    for (const ticket of writes.values()) ticket.current = false;
+    writes.clear();
+  };
+  const appliedSnapshot = (id: string, snapshot: number): void => {
+    const ticket = writes.get(id);
+    if (ticket && snapshot > ticket.at) {
+      ticket.current = false;
+      writes.delete(id);
+    }
+  };
   const entryFor = (id: string): Entry => {
     const existing = tracked.get(id);
     if (existing) return existing;
@@ -64,6 +82,14 @@ export function createReactionSnapshots(): SnapshotGuard {
     beginMutation(messageId: string): void { if (messageId) entryFor(messageId).pending += 1; },
     finishMutation: finish,
     markAuthoritativeReactionWrite: mark,
+    beginReactionWrite(messageId: string): () => boolean {
+      const previous = writes.get(messageId);
+      if (previous) previous.current = false;
+      const ticket = { at: ++seq, current: true };
+      writes.set(messageId, ticket);
+      return () => ticket.current;
+    },
+    resetReactionWrites: resetWrites,
     commitMutation(messageId: string): void { mark(messageId); finish(messageId); },
     noteMutation(messageId: string): void { mark(messageId); finish(messageId); },
     merge<T extends { id: string; reactions: unknown }>(current: readonly T[], incoming: readonly T[], snapshot: number): T[] {
@@ -74,6 +100,7 @@ export function createReactionSnapshots(): SnapshotGuard {
           const inserted = entryFor(row.id);
           inserted.lastApplied = Math.max(inserted.lastApplied, snapshot);
           inserted.lastBodyApplied = Math.max(inserted.lastBodyApplied, snapshot);
+          appliedSnapshot(row.id, snapshot);
           return row;
         }
         const entry = tracked.get(row.id);
@@ -84,6 +111,7 @@ export function createReactionSnapshots(): SnapshotGuard {
           const created = entryFor(row.id);
           created.lastApplied = snapshot;
           created.lastBodyApplied = snapshot;
+          appliedSnapshot(row.id, snapshot);
           return row;
         }
         // No server edit revision is exposed. Conservatively order full-row
@@ -97,12 +125,13 @@ export function createReactionSnapshots(): SnapshotGuard {
           && snapshot >= entry.lastApplied && afterEviction;
         if (!authoritative) return { ...body, reactions: existing.reactions };
         entry.lastApplied = snapshot;
+        appliedSnapshot(row.id, snapshot);
         return { ...body, reactions: row.reactions };
       });
       return mergeMessagesById(current as never, safe as never) as unknown as T[];
     },
     protectedIds(): string[] { return [...tracked.entries()].filter(([, entry]) => entry.pending > 0).map(([id]) => id); },
-    reset(): void { tracked.clear(); seq = 0; evictedSince = 0; },
+    reset(): void { resetWrites(); tracked.clear(); seq = 0; evictedSince = 0; },
   };
 }
 

@@ -13,6 +13,17 @@ const row = (id: string, count: number, body = 'server body', reacted = false): 
 });
 
 describe('reaction snapshot ordering', () => {
+  it('scope ticket reset cancels writes without completing a user mutation', () => {
+    const guard = createReactionSnapshots();
+    guard.beginMutation('m1');
+    const current = guard.beginReactionWrite('m1');
+    guard.resetReactionWrites();
+    assert.equal(current(), false);
+    assert.deepEqual(guard.protectedIds(), ['m1']);
+    guard.finishMutation('m1');
+    assert.deepEqual(guard.protectedIds(), []);
+  });
+
   it('keeps the post-mutation reaction when an earlier snapshot resolves later', () => {
     const guard = createReactionSnapshots();
     const current = [row('m1', 5, 'local body', true)];

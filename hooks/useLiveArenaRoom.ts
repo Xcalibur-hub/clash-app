@@ -38,7 +38,7 @@ import {
 import { errorText, SupabaseError } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
 import { createTranscriptUpdater, createVisibilityBarrier, isCurrentScope, resolveSendResolution } from '../utils/transcriptOrdering.ts';
-import { mergeMessagesById, removeUnavailableMessages } from '../utils/liveRoomThread';
+import { mergeMessagesById } from '../utils/liveRoomThread';
 
 /** How many arguments one page of the thread carries. */
 const PAGE = 40;
@@ -155,6 +155,7 @@ export function useLiveArenaRoom(
     return () => {
       mounted.current = false;
       visibilityBarrier.reset();
+      reactionSnapshots.current.resetReactionWrites();
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
     };
   }, []);
@@ -171,6 +172,7 @@ export function useLiveArenaRoom(
     accessGeneration.current++;
     const generation = accessGeneration.current;
     visibilityBarrier.reset();
+    reactionSnapshots.current.resetReactionWrites();
     sendBusy.current = null;
     setSending(false);
     setMessages(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
@@ -189,11 +191,14 @@ export function useLiveArenaRoom(
     toggle: reactMessage,
     write: (id, reactions) => {
       const generation = accessGeneration.current;
-      if (!reactions) visibilityBarrier.mark([id]);
+      const currentWrite = reactionSnapshots.current.beginReactionWrite(id);
+      const remove = reactions === null ? visibilityBarrier.mark([id]) : null;
       setMessages(current => {
         if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return current;
-        return reactions ? current.map(row => row.id === id ? { ...row, reactions } : row)
-          : current.filter(row => row.id !== id);
+        if (remove) return remove(current);
+        if (!currentWrite()) return current;
+        return reactions === null ? current
+          : current.map(row => row.id === id ? { ...row, reactions } : row);
       });
     },
     onError: notify,
@@ -344,9 +349,9 @@ export function useLiveArenaRoom(
     try {
       const visible = await fetchVisibleMessageIds(roomId, checked);
       if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
-      visibilityBarrier.mark(checked.filter((id) => !visible.includes(id)));
+      const remove = visibilityBarrier.mark(checked.filter((id) => !visible.includes(id)));
       setMessages((current) => isCurrentScope(mounted.current, generation, accessGeneration.current)
-        ? removeUnavailableMessages(current, checked, visible) : current);
+        ? remove(current) : current);
     } catch (caught) {
       if (isCurrentScope(mounted.current, generation, accessGeneration.current) && isMembershipRefusal(caught)) clearPrivateThread();
     }
@@ -437,6 +442,7 @@ export function useLiveArenaRoom(
     accessGeneration.current++;
     const generation = accessGeneration.current;
     visibilityBarrier.reset();
+    reactionSnapshots.current.resetReactionWrites();
     sendBusy.current = null;
     setSending(false);
     setRoom(null);

@@ -50,7 +50,8 @@ export function createTranscriptUpdater<T extends Row>(
 
 export interface VisibilityBarrier {
   epoch(): number;
-  mark(ids: readonly string[]): void;
+  /** Establish removal now; apply it only while no later admission supersedes it. */
+  mark(ids: readonly string[]): <T extends { id: string; pending?: boolean }>(current: readonly T[]) => T[];
   /** Conservative admission; empty when the request predates pruned evictions. */
   admit<T extends { id: string }>(rows: readonly T[], fetchEpoch: number): T[];
   /** True when a request that started at `fetchEpoch` may still be applied. */
@@ -75,7 +76,7 @@ export function createVisibilityBarrier(max = MAX_EVICTED): VisibilityBarrier {
   const batches = new WeakMap<object, Eligibility[]>();
   return {
     epoch(): number { return revision; },
-    mark(ids: readonly string[]): void {
+    mark(ids: readonly string[]) {
       revision += 1;
       for (const id of ids) {
         if (!id) continue;
@@ -92,6 +93,11 @@ export function createVisibilityBarrier(max = MAX_EVICTED): VisibilityBarrier {
         evictedAt.delete(id);
         if (at > floor) floor = at;
       }
+      const removed = new Set(ids);
+      // mark() removed every prior ticket for these ids. Any live ticket now
+      // belongs to a later authorized admission; a later mark removes it again.
+      return <T extends { id: string; pending?: boolean }>(current: readonly T[]): T[] => current.filter(row =>
+        row.pending || !removed.has(row.id) || eligibleIds.has(row.id));
     },
     allows(fetchEpoch: number): boolean { return fetchEpoch >= floor; },
     admit<T extends { id: string }>(rows: readonly T[], fetchEpoch: number): T[] {

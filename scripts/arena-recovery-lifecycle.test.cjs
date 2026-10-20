@@ -582,4 +582,191 @@ test('reversed successful send cannot leave its queued placeholder behind', asyn
   assert.equal(h.rows.filter(item => item.id === 'posted').length, 1);
 });
 
+test('6G.5A.6 R1 fresh admission survives an older visibility removal through complete recovery', async () => {
+  const q = queuedRecovery(), { h } = q;
+  h.rows.push(q.all[0], { ...row('pending', 60), pending: true });
+  const pending = q.refresh();
+  await q.firstStarted.promise; q.first.resolve(); await q.secondStarted.promise;
+  assert.equal(h.scope.messageCursor.current.id, 'gap40');
+  await h.callback('reconcileVisibility')();
+  h.scope.fetchMessage = async () => ({ ...q.all[0], body: 'authorized again' });
+  await h.callback('hydrateInserted')(['gap1']);
+  h.flushLast(); // New authorized insertion applies before the old removal.
+  assert.equal(h.rows.find(item => item.id === 'gap1').body, 'authorized again');
+  h.flushLast(); h.flushNext();
+  q.second.resolve(); await pending; h.flushAll();
+  await q.refresh(); h.flushAll();
+  for (const item of q.all) assert.ok(h.rows.some(loaded => loaded.id === item.id), item.id);
+  assert.equal(h.scope.messageCursor.current.id, 'gap50');
+  assert.equal(h.rows.some(item => item.id === 'pending' && item.pending), true);
+  assert.equal(new Set(h.rows.map(item => item.id)).size, h.rows.length);
+});
+
+for (const reintroduce of [false, true]) test(`6G.5A.6 R2 null removal with later admission=${reintroduce}`, async () => {
+  const h = harness(undefined, { queued: true });
+  h.rows.push(row('m', 1));
+  const { createRoomReactionBridge } = h.load('utils/roomReactionBridge.ts');
+  let toggles = 0;
+  h.scope.reactionQueue.current = createRoomReactionBridge({
+    snapshots: h.scope.reactionSnapshots.current, read: async () => null,
+    toggle: async () => { toggles++; throw Error('null row must not toggle'); },
+    write: h.callback('writeReaction'), onError: () => {},
+  });
+  await h.callback('react')('m', 'fire');
+  if (reintroduce) {
+    h.scope.fetchMessage = async () => ({ ...row('m', 1), body: 'authorized again' });
+    await h.callback('hydrateInserted')(['m']); h.flushLast();
+  }
+  h.flushAll();
+  assert.equal(h.rows.some(item => item.id === 'm'), reintroduce);
+  assert.equal(toggles, 0);
+  assert.equal(h.scope.reactionSnapshots.current.protectedIds().length, 0);
+});
+
+function reactionApplicationHarness() {
+  const h = harness(undefined, { queued: true });
+  const reactions = (count, viewerReacted) => [{ emoji: 'fire', count, viewerReacted }];
+  h.rows.push({ ...row('m', 1), reactions: reactions(0, false) });
+  let state = reactions(0, false), toggles = 0, completions = 0, offline = false;
+  const original = h.scope.reactionSnapshots.current;
+  h.scope.reactionSnapshots.current = { ...original, finishMutation(id) {
+    completions++; original.finishMutation(id);
+  } };
+  const { createRoomReactionBridge } = h.load('utils/roomReactionBridge.ts');
+  h.scope.reactionQueue.current = createRoomReactionBridge({
+    snapshots: h.scope.reactionSnapshots.current,
+    read: async () => { if (offline) throw Error('offline'); return state; },
+    toggle: async () => {
+      toggles++;
+      if (offline) throw Error('ambiguous');
+      const selected = !state[0].viewerReacted;
+      state = reactions(selected ? 1 : 0, selected);
+      return { messageId: 'm', emoji: 'fire', count: state[0].count, reacted: selected };
+    },
+    write: h.callback('writeReaction'), onError: () => {},
+  });
+  return {
+    h, react: h.callback('react'), reactions,
+    get toggles() { return toggles; }, get completions() { return completions; },
+    set state(value) { state = value; }, set offline(value) { offline = value; },
+  };
+}
+
+test('6G.5A.6 R3 two serialized actual toggles retain the latest result under reversed application', async () => {
+  const q = reactionApplicationHarness(), { h } = q;
+  await q.react('m', 'fire'); h.flushNext(); // First optimistic write already ran.
+  await q.react('m', 'fire');
+  assert.equal(h.queuedUpdates, 3);
+  while (h.queuedUpdates) h.flushLast();
+  const fire = h.rows.find(item => item.id === 'm').reactions.find(item => item.emoji === 'fire');
+  assert.equal(fire?.count ?? 0, 0);
+  assert.equal(fire?.viewerReacted ?? false, false);
+  assert.equal(q.toggles, 2);
+  assert.equal(q.completions, 2);
+  assert.equal(h.scope.reactionSnapshots.current.protectedIds().length, 0);
+});
+
+test('6G.5A.6 R4 authoritative reconciliation supersedes queued mutation writes', async () => {
+  const q = reactionApplicationHarness(), { h } = q;
+  // Retain a failed baseline read for the real queue to reconcile.
+  q.offline = true; await q.react('m', 'fire'); q.offline = false;
+  await q.react('m', 'fire');
+  // Keep a dirty obligation without a toggle RPC by failing its baseline read.
+  q.offline = true; await q.react('m', 'fire'); q.offline = false;
+  q.state = q.reactions(7, false);
+  await h.scope.reactionQueue.current.reconcile();
+  while (h.queuedUpdates) h.flushLast();
+  const fire = h.rows.find(item => item.id === 'm').reactions[0];
+  assert.equal(fire.count, 7); assert.equal(fire.viewerReacted, false);
+  assert.equal(q.toggles, 1, 'ambiguous/baseline failures do not replay toggles');
+  assert.equal(q.completions, 3);
+});
+
+test('6G.5A.6 R4 queued authoritative reconciliation cannot overwrite a later mutation', async () => {
+  const q = reactionApplicationHarness(), { h } = q;
+  q.offline = true; await q.react('m', 'fire'); q.offline = false;
+  await h.scope.reactionQueue.current.reconcile();
+  await q.react('m', 'fire');
+  while (h.queuedUpdates) h.flushLast();
+  const fire = h.rows.find(item => item.id === 'm').reactions[0];
+  assert.equal(fire.count, 1); assert.equal(fire.viewerReacted, true);
+  assert.equal(q.toggles, 1); assert.equal(q.completions, 2);
+});
+
+for (const ending of ['generation', 'unmount']) test(`6G.5A.6 R4 queued reaction/removal writes reject ${ending}`, async () => {
+  const q = reactionApplicationHarness(), { h } = q;
+  await q.react('m', 'fire'); await h.callback('reconcileVisibility')();
+  if (ending === 'generation') h.scope.accessGeneration.current++;
+  else h.scope.mounted.current = false;
+  while (h.queuedUpdates) h.flushLast();
+  const fire = h.rows.find(item => item.id === 'm').reactions[0];
+  assert.equal(fire.count, 0); assert.equal(fire.viewerReacted, false);
+  assert.equal(q.toggles, 1); assert.equal(q.completions, 1);
+});
+
+test('6G.5A.6 R4 later authoritative eviction still beats a fresh reintroduction', async () => {
+  const h = harness(undefined, { queued: true });
+  h.rows.push(row('m', 1));
+  await h.callback('reconcileVisibility')();
+  await h.callback('hydrateInserted')(['m']); h.flushLast();
+  await h.callback('reconcileVisibility')();
+  while (h.queuedUpdates) h.flushLast();
+  assert.equal(h.rows.some(item => item.id === 'm'), false);
+});
+
+test('6G.5A.6 R4 a newer full-row snapshot supersedes queued reaction-only writes', async () => {
+  const q = reactionApplicationHarness(), { h } = q;
+  await q.react('m', 'fire');
+  h.scope.fetchMessage = async () => ({ ...row('m', 1), body: 'new body', reactions: q.reactions(7, false) });
+  await h.callback('hydrateInserted')(['m']);
+  while (h.queuedUpdates) h.flushLast();
+  const message = h.rows.find(item => item.id === 'm');
+  assert.equal(message.body, 'new body');
+  assert.equal(message.reactions[0].count, 7);
+  assert.equal(message.reactions[0].viewerReacted, false);
+  assert.equal(q.toggles, 1); assert.equal(q.completions, 1);
+});
+
+test('6G.5A.6 R4 a newer mutation supersedes a queued full-row snapshot', async () => {
+  const q = reactionApplicationHarness(), { h } = q;
+  h.scope.fetchMessage = async () => ({ ...row('m', 1), reactions: q.reactions(7, false) });
+  await h.callback('hydrateInserted')(['m']);
+  await q.react('m', 'fire');
+  while (h.queuedUpdates) h.flushLast();
+  const fire = h.rows.find(item => item.id === 'm').reactions[0];
+  assert.equal(fire.count, 1); assert.equal(fire.viewerReacted, true);
+  assert.equal(q.toggles, 1); assert.equal(q.completions, 1);
+});
+
+test('6G.5A.6 R4 latest accepted reaction write survives snapshot entry eviction', async () => {
+  const q = reactionApplicationHarness(), { h } = q;
+  h.rows.push({ ...row('pending', 9), pending: true });
+  await q.react('m', 'fire');
+  h.scope.fetchMessage = async id => row(id, -1);
+  const hydrate = h.callback('hydrateInserted');
+  for (let i = 0; i < 264; i += 12) {
+    await hydrate(Array.from({ length: 12 }, (_, n) => 'churn-' + (i + n)));
+    h.flushLast();
+  }
+  h.flushLast(); h.flushNext();
+  const fire = h.rows.find(item => item.id === 'm').reactions[0];
+  assert.equal(fire.count, 1); assert.equal(fire.viewerReacted, true);
+  assert.equal(h.rows.some(item => item.id === 'pending' && item.pending), true);
+  assert.equal(new Set(h.rows.map(item => item.id)).size, h.rows.length);
+  assert.equal(q.completions, 1);
+});
+
+test('6G.5A.6 R4 stale removal preserves only the readmitted id after watermark pruning', async () => {
+  const h = harness(undefined, { queued: true });
+  h.rows.push(row('m', 1), row('hidden', 2), { ...row('pending', 3), pending: true });
+  await h.callback('reconcileVisibility')();
+  h.scope.visibilityBarrier.mark(Array.from({ length: 501 }, (_, n) => 'pruned-' + n));
+  await h.callback('hydrateInserted')(['m']);
+  h.flushLast(); h.flushNext();
+  assert.equal(h.rows.some(item => item.id === 'm'), true);
+  assert.equal(h.rows.some(item => item.id === 'hidden'), false);
+  assert.equal(h.rows.some(item => item.id === 'pending' && item.pending), true);
+  assert.equal(new Set(h.rows.map(item => item.id)).size, h.rows.length);
+});
+
 module.exports = { harness, sendingHarness };
