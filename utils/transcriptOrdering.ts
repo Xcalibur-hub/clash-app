@@ -35,7 +35,7 @@ export function mergePostedRow<T extends Row>(
   return guard.merge(cleared, [posted], snapshot) as T[];
 }
 
-/** One application gate for every deferred server-message batch. */
+/** A scope-gated owner transition. Never evaluate it in a React state updater. */
 export function createTranscriptUpdater<T extends Row>(
   accepted: readonly T[], snapshot: number, guard: SnapshotGuard,
   visibility: VisibilityBarrier, active: () => boolean, placeholderId?: string,

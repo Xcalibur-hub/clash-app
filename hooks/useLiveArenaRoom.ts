@@ -4,7 +4,7 @@ import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils
 import { createReactionQueue } from '../utils/reactionOptimism';
 import { createRoomReactionBridge } from '../utils/roomReactionBridge';
 import { recoverOverflowAfterRefresh } from '../utils/overflowRecovery';
-import { createReactionSnapshots } from '../utils/reactionSnapshots';
+import { createArenaTranscriptStore } from '../utils/arenaTranscriptStore';
 import { useFocusEffect } from 'expo-router';
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
@@ -37,7 +37,7 @@ import {
 } from '../services/liveArenaService';
 import { errorText, SupabaseError } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
-import { createTranscriptUpdater, createVisibilityBarrier, isCurrentScope, resolveSendResolution } from '../utils/transcriptOrdering.ts';
+import { createTranscriptUpdater, isCurrentScope, resolveSendResolution } from '../utils/transcriptOrdering.ts';
 import { mergeMessagesById } from '../utils/liveRoomThread';
 
 /** How many arguments one page of the thread carries. */
@@ -116,7 +116,10 @@ export function useLiveArenaRoom(
 ): LiveArenaRoomController {
   const { dispatch } = useClash();
   const [room, setRoom] = React.useState<ArenaRoom | null>(null);
-  const [messages, setMessages] = React.useState<ArenaMessage[]>([]);
+  const [transcript] = React.useState(createArenaTranscriptStore);
+  const messages = React.useSyncExternalStore(transcript.subscribe, transcript.getSnapshot, transcript.getSnapshot);
+  // Imperative owner transition, not a functional React state setter.
+  const updateMessages = transcript.update;
   const [evidence, setEvidence] = React.useState<ArenaEvidence[]>([]);
   const [stats, setStats] = React.useState<ArenaMindshiftStats | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -132,13 +135,14 @@ export function useLiveArenaRoom(
   const accessGeneration = React.useRef(0);
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const authorRef = React.useRef<ArenaAuthor | null>(viewerAuthor);
-  const messagesRef = React.useRef<ArenaMessage[]>([]);
+  const messagesRef = transcript.messagesRef;
   const evidenceRef = React.useRef<ArenaEvidence[]>([]);
   evidenceRef.current=evidence;
   const evidenceVisibilityCursor=React.useRef(0);
   const roomRef = React.useRef<ArenaRoom | null>(room);
   const visibilityCursor = React.useRef(0);
   const messageCursor = React.useRef<OfficialCursor | null>(null);
+  const initialCoverage = React.useRef<{ cursor: OfficialCursor | null; ids: string[] } | null>(null);
   const evidenceCursor = React.useRef<OfficialCursor | null>(null);
   const olderEvidence = React.useRef<OfficialCursor | null>(null);
   const evidenceHasOlder = React.useRef(false);
@@ -147,7 +151,6 @@ export function useLiveArenaRoom(
   const sendBusy = React.useRef<symbol | null>(null);
   const evidenceBusy = React.useRef(false);
   authorRef.current = viewerAuthor;
-  messagesRef.current = messages;
   roomRef.current = room;
 
   React.useEffect(() => {
@@ -156,6 +159,7 @@ export function useLiveArenaRoom(
       mounted.current = false;
       visibilityBarrier.reset();
       reactionSnapshots.current.resetReactionWrites();
+      initialCoverage.current = null;
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
     };
   }, []);
@@ -173,17 +177,18 @@ export function useLiveArenaRoom(
     const generation = accessGeneration.current;
     visibilityBarrier.reset();
     reactionSnapshots.current.resetReactionWrites();
+    initialCoverage.current = null;
     sendBusy.current = null;
     setSending(false);
-    setMessages(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
+    updateMessages(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
     setEvidence(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
     setStats(null);
     setThreadLocked(true);
     setHasOlder(false);
   }, []);
 
-  const reactionSnapshots = React.useRef(createReactionSnapshots());
-  const visibilityBarrier = React.useRef(createVisibilityBarrier()).current;
+  const reactionSnapshots = React.useRef(transcript.reactions);
+  const visibilityBarrier = transcript.visibility;
   const reactionQueue = React.useRef<ReturnType<typeof createRoomReactionBridge> | null>(null);
   if (!reactionQueue.current) reactionQueue.current = createRoomReactionBridge({
     snapshots: reactionSnapshots.current,
@@ -193,7 +198,7 @@ export function useLiveArenaRoom(
       const generation = accessGeneration.current;
       const currentWrite = reactionSnapshots.current.beginReactionWrite(id);
       const remove = reactions === null ? visibilityBarrier.mark([id]) : null;
-      setMessages(current => {
+      updateMessages(current => {
         if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return current;
         if (remove) return remove(current);
         if (!currentWrite()) return current;
@@ -224,7 +229,7 @@ export function useLiveArenaRoom(
       setThreadLocked(false);
       const authorized = visibilityBarrier.admit(next, visibilityEpoch);
       if (authorized.length === 0) return;
-      setMessages(createTranscriptUpdater(authorized, snapshot, reactionSnapshots.current, visibilityBarrier,
+      updateMessages(createTranscriptUpdater(authorized, snapshot, reactionSnapshots.current, visibilityBarrier,
         () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
     } catch (caught) {
       if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
@@ -243,6 +248,49 @@ export function useLiveArenaRoom(
     const generation=accessGeneration.current;
     try {
       await reactionQueue.current?.reconcile();
+      const initial = initialCoverage.current;
+      if (initial && !messageCursor.current) {
+        // A rejected initial window must be re-read even after it falls outside
+        // the newest page. At most one retained page, in batches of 12 existing
+        // per-message reads; rejection/failure leaves the obligation for later.
+        for (let batch = 0; initial.ids.length && batch < 4; batch++) {
+          const ids = initial.ids.slice(0, 12);
+          const epoch = visibilityBarrier.epoch();
+          const readSnapshot = reactionSnapshots.current.beginSnapshot();
+          const rows = await Promise.all(ids.map(id => fetchMessage(id)));
+          if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
+          if (!visibilityBarrier.allows(epoch)) return;
+          const admitted = visibilityBarrier.admit(rows.filter((row): row is ArenaMessage => row !== null), epoch);
+          const missing = ids.filter((_id, index) => rows[index] === null);
+          const remove = missing.length ? visibilityBarrier.mark(missing) : null;
+          const apply = createTranscriptUpdater(admitted, readSnapshot, reactionSnapshots.current, visibilityBarrier,
+            () => isCurrentScope(mounted.current, generation, accessGeneration.current));
+          updateMessages(current => {
+            if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return current;
+            const next = apply(current);
+            return remove ? remove(next) : next;
+          });
+          initial.ids.splice(0, ids.length);
+        }
+        if (initial.ids.length) return;
+        if (!initial.cursor) {
+          // An initially empty rejected response still needs a fresh accepted
+          // page before the empty bootstrap boundary can be acknowledged.
+          const epoch = visibilityBarrier.epoch();
+          const readSnapshot = reactionSnapshots.current.beginSnapshot();
+          const page = await fetchOfficialPage(roomId, 'message');
+          if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
+          if (!visibilityBarrier.allows(epoch)) return;
+          const admitted = visibilityBarrier.admit(page, epoch);
+          updateMessages(createTranscriptUpdater(admitted, readSnapshot, reactionSnapshots.current, visibilityBarrier,
+            () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
+          messageHasOlder.current = page.length >= PAGE;
+          setHasOlder(messageHasOlder.current || evidenceHasOlder.current);
+          initial.cursor = page[0] as OfficialCursor ?? { id: '', preciseCreatedAt: '1970-01-01T00:00:00.000000Z' };
+        }
+        messageCursor.current = initial.cursor;
+        initialCoverage.current = null;
+      }
       if (messageCursor.current) await drainOfficialGap(messageCursor.current,
         async cursor => {
           snapshot = reactionSnapshots.current.beginSnapshot();
@@ -250,11 +298,11 @@ export function useLiveArenaRoom(
         },
         (rows,cursor) => {
           if (!visibilityBarrier.allows(threadEpoch)) return false;
-          // Admission and cursor coverage are one synchronous decision. React
-          // may run this updater after the visibility watermark has advanced.
+          // Admission, owner publication and cursor coverage are synchronous.
+          // React only reads the resulting immutable owner snapshot.
           const admittedRows = visibilityBarrier.admit(rows,threadEpoch);
           setThreadLocked(false);
-          setMessages(createTranscriptUpdater<ArenaMessage>(admittedRows, snapshot, reactionSnapshots.current, visibilityBarrier,
+          updateMessages(createTranscriptUpdater<ArenaMessage>(admittedRows, snapshot, reactionSnapshots.current, visibilityBarrier,
             () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
           messageCursor.current=cursor;
           return true;
@@ -275,7 +323,7 @@ export function useLiveArenaRoom(
         const fresh=await fetchOfficialPage(roomId,'message');
         if(!mounted.current || generation!==accessGeneration.current) return;
         const admittedFresh = visibilityBarrier.admit(fresh,freshEpoch);
-        setMessages(createTranscriptUpdater(admittedFresh, freshSnapshot, reactionSnapshots.current, visibilityBarrier,
+        updateMessages(createTranscriptUpdater(admittedFresh, freshSnapshot, reactionSnapshots.current, visibilityBarrier,
           () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
         await recoverOverflowAfterRefresh({
           queue: reactionQueue.current!,
@@ -350,7 +398,7 @@ export function useLiveArenaRoom(
       const visible = await fetchVisibleMessageIds(roomId, checked);
       if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return;
       const remove = visibilityBarrier.mark(checked.filter((id) => !visible.includes(id)));
-      setMessages((current) => isCurrentScope(mounted.current, generation, accessGeneration.current)
+      updateMessages((current) => isCurrentScope(mounted.current, generation, accessGeneration.current)
         ? remove(current) : current);
     } catch (caught) {
       if (isCurrentScope(mounted.current, generation, accessGeneration.current) && isMembershipRefusal(caught)) clearPrivateThread();
@@ -391,9 +439,14 @@ export function useLiveArenaRoom(
           setThreadLocked(false);
           messageHasOlder.current=thread.length>=PAGE;
           setHasOlder(messageHasOlder.current);
-          if (!messageCursor.current) messageCursor.current=thread[0]?.preciseCreatedAt ? thread[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
+          const accepted = visibilityBarrier.allows(visibilityEpoch);
+          if (!messageCursor.current && !initialCoverage.current) {
+            if (accepted) messageCursor.current=thread[0]?.preciseCreatedAt ? thread[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
+            else initialCoverage.current = { cursor: thread[0] as OfficialCursor ?? null,
+              ids: [...new Set(thread.slice(0, PAGE).map(row => row.id))] };
+          }
           const admittedThread = visibilityBarrier.admit(thread, visibilityEpoch);
-          setMessages(createTranscriptUpdater(admittedThread, snapshot, reactionSnapshots.current, visibilityBarrier,
+          updateMessages(createTranscriptUpdater(admittedThread, snapshot, reactionSnapshots.current, visibilityBarrier,
             () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
         }
         setEvidence(old => !isCurrentScope(mounted.current, generation, accessGeneration.current) ? old
@@ -443,10 +496,11 @@ export function useLiveArenaRoom(
     const generation = accessGeneration.current;
     visibilityBarrier.reset();
     reactionSnapshots.current.resetReactionWrites();
+    initialCoverage.current = null;
     sendBusy.current = null;
     setSending(false);
     setRoom(null);
-    setMessages(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
+    updateMessages(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
     setEvidence(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
     setStats(null);
     setThreadLocked(false);
@@ -516,7 +570,7 @@ export function useLiveArenaRoom(
     setLoadingOlder(true);
     const generation=accessGeneration.current;
     try {
-      const oldest = messages.filter(m=>!m.pending).at(-1);
+      const oldest = messagesRef.current.filter(m=>!m.pending).at(-1);
       if(messageHasOlder.current && oldest?.preciseCreatedAt) {
         const snapshot = reactionSnapshots.current.beginSnapshot();
       const pageEpoch = visibilityBarrier.epoch();
@@ -524,7 +578,7 @@ export function useLiveArenaRoom(
         if (!mounted.current || generation!==accessGeneration.current) return;
         messageHasOlder.current=page.length>=PAGE;
         const admittedPage = visibilityBarrier.admit(page,pageEpoch);
-        setMessages(createTranscriptUpdater(admittedPage, snapshot, reactionSnapshots.current, visibilityBarrier,
+        updateMessages(createTranscriptUpdater(admittedPage, snapshot, reactionSnapshots.current, visibilityBarrier,
           () => isCurrentScope(mounted.current, generation, accessGeneration.current)));
       }
       if(evidenceHasOlder.current && olderEvidence.current) {
@@ -585,7 +639,7 @@ export function useLiveArenaRoom(
         setSending(true);
         const snapshot = reactionSnapshots.current.beginSnapshot();
         const sendVisibilityEpoch = visibilityBarrier.epoch();
-        setMessages((current) => active() ? mergeMessages(current, [placeholder]) : current);
+        updateMessages((current) => active() ? mergeMessages(current, [placeholder]) : current);
         const posted = input.reshareSourceMessageId
           ? await postClashMediaReshare(
               roomId,
@@ -599,12 +653,12 @@ export function useLiveArenaRoom(
         const resolution = resolveSendResolution({ mounted: mounted.current, sentGeneration: sendGeneration, currentGeneration: accessGeneration.current });
         if (!ownsSend() || !resolution.applyRow) return false;
         const admittedPost = visibilityBarrier.admit([posted], sendVisibilityEpoch);
-        setMessages(createTranscriptUpdater(admittedPost, snapshot, reactionSnapshots.current, visibilityBarrier,
+        updateMessages(createTranscriptUpdater(admittedPost, snapshot, reactionSnapshots.current, visibilityBarrier,
           () => isCurrentScope(mounted.current, sendGeneration, accessGeneration.current), temporaryId));
         return true;
       } catch (caught) {
         if (active()) {
-          if (placeholderId) setMessages((current) => isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)
+          if (placeholderId) updateMessages((current) => isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)
             ? current.filter((message) => message.id !== placeholderId) : current);
           notify(caught);
         }
