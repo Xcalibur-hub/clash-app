@@ -75,6 +75,11 @@ interface Props extends Actions {
   onJudge: (side: 'A' | 'B') => Promise<void>;
   onWatch: () => Promise<void>;
   onReportCrowd?: (message: CrowdMessage) => void;
+  /** One eligible live Clash from the route's existing discovery read. */
+  nextClash?: { clashId: string; title: string } | null;
+  nextBusy?: boolean;
+  nextNotice?: string | null;
+  onOpenNext?: () => void;
 }
 
 function DuelLoadingBones(): React.JSX.Element {
@@ -421,6 +426,10 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                   onJudge={props.onJudge}
                   onReview={() => setHistoryOpen(true)}
                   onReturn={props.onReturn}
+                  nextClash={props.nextClash ?? null}
+                  nextBusy={props.nextBusy ?? false}
+                  nextNotice={props.nextNotice ?? null}
+                  onOpenNext={props.onOpenNext}
                 />
               </View>
             ) : null}
@@ -442,7 +451,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       </KeyboardAvoidingView>
 
       {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen initialSide={backingSide ?? 'A'} roomId={room.roomId} duel={duel} disabled={assist === 'closed'} onPublished={props.onRefresh} /></ArenaSheet> : null}
-      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}><DuelRoomOutcome duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn}/></ArenaSheet> : null}
+      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}><DuelRoomOutcome duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn} nextClash={props.nextClash ?? null} nextBusy={props.nextBusy ?? false} nextNotice={props.nextNotice ?? null} onOpenNext={props.onOpenNext} /></ArenaSheet> : null}
       <ArgumentHistorySheet
         visible={historyOpen}
         duel={duel}

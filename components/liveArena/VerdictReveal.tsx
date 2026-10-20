@@ -16,15 +16,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { space, typeScale, useThemeColors } from '../../theme';
-import { duelResultTitle } from '../../utils/duelPresentation';
+import { verdictView } from '../../utils/verdictView';
 import { hexWithAlpha, verdictMetrics } from './liveArenaStyles';
 import { hasPlayed, markPlayed, shouldPlayOnce } from '../../utils/motionOnce';
 import { notify as hapticNotify } from '../../utils/haptics';
 
-function ballotShare(score: number, jurySize: number): number | null {
-  if (!Number.isFinite(score) || !Number.isFinite(jurySize) || jurySize <= 0) return null;
-  return Math.round((score / jurySize) * 100);
-}
+/* Percentages come from utils/verdictView, which requires both canonical scores. */
 
 export interface VerdictRevealProps {
   duel: ArenaDuel;
@@ -61,7 +58,8 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
   const verdict = duel.verdict;
-  const title = duelResultTitle(duel) ?? 'Verdict';
+  const view = verdictView(duel);
+  const title = view.title ?? 'Verdict';
   const { width, fontScale } = useWindowDimensions();
   const metrics = verdictMetrics({ width, fontScale });
   // One reveal per canonical verdict per session: reopening a settled room must
@@ -113,18 +111,15 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
         >
           {title}
         </Text>
+        {view.support ? (
+          <Text style={[styles.support, { color: t.textSecondary }]}>{view.support}</Text>
+        ) : null}
       </View>
     );
   }
 
-  const aPct =
-    verdict.sideAScore !== undefined && verdict.sideBScore !== undefined
-      ? ballotShare(verdict.sideAScore, verdict.jurySize)
-      : null;
-  const bPct =
-    verdict.sideAScore !== undefined && verdict.sideBScore !== undefined
-      ? ballotShare(verdict.sideBScore, verdict.jurySize)
-      : null;
+  const aPct = view.aPct;
+  const bPct = view.bPct;
 
   return (
     <View style={styles.wrap}>
@@ -146,30 +141,60 @@ export function VerdictReveal({ duel }: VerdictRevealProps): React.JSX.Element {
         {title}
       </Animated.Text>
 
+      {view.winnerLabel ? (
+        <Animated.View
+          entering={reduced || !animate ? undefined : FadeInDown.delay(100).duration(180)}
+          style={styles.winnerRow}
+        >
+          <View
+            accessible
+            accessibilityLabel={`Official winner: ${view.winnerLabel}`}
+            style={[styles.winnerChip, { borderColor: t.borderStrong }]}
+          >
+            <Text allowFontScaling={false} style={[styles.winnerText, { color: t.textPrimary }]}>
+              {view.winnerLabel}
+            </Text>
+          </View>
+        </Animated.View>
+      ) : null}
+
       <Animated.View
         entering={reduced || !animate ? undefined : FadeInDown.delay(140).duration(220)}
         style={styles.scoreBlock}
       >
         {([
-          { fighter: duel.fighterA, side: 'A' as const, pct: aPct },
-          { fighter: duel.fighterB, side: 'B' as const, pct: bPct },
-        ]).map(({ fighter, side, pct }) => (
-          <View key={side} style={styles.scoreRow}>
+          { fighter: duel.fighterA, side: 'A' as const, pct: aPct, position: view.aPosition },
+          { fighter: duel.fighterB, side: 'B' as const, pct: bPct, position: view.bPosition },
+        ]).map(({ fighter, side, pct, position }) => (
+          <View
+            key={side}
+            style={styles.scoreRow}
+            accessible
+            accessibilityLabel={
+              pct !== null
+                ? `${fighter.name}, Fighter ${side}, ${pct}% of the panel`
+                : `${fighter.name}, Fighter ${side}`
+            }
+          >
             <View style={styles.identity}>
               <Text numberOfLines={metrics.nameLines} style={[styles.name, { color: t.textPrimary }]}>
                 {fighter.name}
               </Text>
               <Text style={[styles.side, { color: t.textMuted }]}>Fighter {side}</Text>
+              {position ? (
+                <Text numberOfLines={2} style={[styles.position, { color: t.textSecondary }]}>
+                  {position}
+                </Text>
+              ) : null}
             </View>
             {pct !== null ? (
               <AnimatedPercent value={pct} size={metrics.pctSize} minWidth={metrics.pctMinWidth} animate={animate} />
             ) : null}
           </View>
         ))}
-        <Text style={[styles.jury, { color: t.textMuted }]}>
-          {verdict.jurySize} judgment{verdict.jurySize === 1 ? '' : 's'}
-          {verdict.verdictLabel ? ` · ${verdict.verdictLabel}` : ''}
-        </Text>
+        {view.juryLabel ? (
+          <Text style={[styles.jury, { color: t.textMuted }]}>{view.juryLabel}</Text>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -214,6 +239,30 @@ const styles = StyleSheet.create({
     ...typeScale.caption,
     fontSize: 11,
     fontWeight: '500',
+  },
+  position: {
+    ...typeScale.caption,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  support: {
+    ...typeScale.body,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  winnerRow: { flexDirection: 'row' },
+  winnerChip: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  winnerText: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.9,
   },
   pct: {
     ...typeScale.data,

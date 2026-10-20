@@ -8,11 +8,14 @@ import type { ArenaPhase } from '../../services/liveArenaService';
 import { judge as hapticJudge } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
 import { VerdictReveal } from './VerdictReveal';
+import { NextClashAction, type NextClashSuggestion } from './NextClashAction';
 
 /** Uses the canonical Clash ballot and verdict; no group Room tally. */
-export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn }: {
+export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, nextClash = null, nextBusy = false, nextNotice = null, onOpenNext }: {
   duel: ArenaDuel; phase: ArenaPhase; onJudge: (side: 'A' | 'B') => Promise<void>;
   onReview?: () => void; onReturn?: () => void;
+  /** One live Clash from existing discovery, or null when none is eligible. */
+  nextClash?: NextClashSuggestion | null; nextBusy?: boolean; nextNotice?: string | null; onOpenNext?: () => void;
 }): React.JSX.Element {
   const t = useThemeColors();
   const reduceMotion = useReducedMotion();
@@ -30,6 +33,9 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn }: {
     return (
       <View style={[styles.wrap, { borderTopColor: t.border }]}>
         <VerdictReveal duel={duel} />
+        {verdict && onOpenNext ? (
+          <NextClashAction clash={nextClash} busy={nextBusy} notice={nextNotice} onOpen={onOpenNext} />
+        ) : null}
         {(resultTitle || duel.status === 'cancelled') && (onReview || onReturn) ? (
           <View style={styles.row}>
             {onReview ? (
