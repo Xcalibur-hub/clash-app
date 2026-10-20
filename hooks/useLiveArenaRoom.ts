@@ -193,6 +193,7 @@ export function useLiveArenaRoom(
   const hydrateInserted = React.useCallback(async (ids: string[]): Promise<void> => {
     if (ids.length === 0) return;
     const generation=accessGeneration.current;
+    const snapshot = reactionSnapshots.current.beginSnapshot();
     try {
       const unique = [...new Set(ids)].slice(0, 12);
       const rows = await Promise.all(
@@ -202,7 +203,7 @@ export function useLiveArenaRoom(
       const next = rows.filter((row): row is ArenaMessage => row != null);
       if (next.length === 0) return;
       setThreadLocked(false);
-      setMessages((current) => mergeMessages(current, next));
+      setMessages((current) => reactionSnapshots.current.merge(current, next, snapshot));
     } catch (caught) {
       if (!mounted.current) return;
       if (isMembershipRefusal(caught)) clearPrivateThread();
@@ -726,5 +727,6 @@ export function useLiveArenaRoom(
     upgradeToDebater,
   };
 }
+
 
 
