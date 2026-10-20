@@ -1,5 +1,5 @@
 /**
- * Step 6G.5B.1 — session-safe authoritative reaction-state read primitive.
+ * Step 6G.5B.1 / 6G.5B.1A — session-safe authoritative reaction-state read.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -8,7 +8,12 @@ import {
   type AuthoritativeReactionReadOutcome,
 } from './reactionOptimism.ts';
 import { createReactionSnapshots } from './reactionSnapshots.ts';
-import { isLiveRoomSession, type RoomSession } from './transcriptOrdering.ts';
+import {
+  createVisibilityBarrier,
+  isLiveRoomSession,
+  type RoomSession,
+} from './transcriptOrdering.ts';
+import { createMergeReactionPublisher } from './roomReactionBridge.ts';
 import type { ArenaReaction } from '../services/liveArenaService.ts';
 
 type Row = { id: string; body: string; reactions: ArenaReaction[] };
@@ -24,12 +29,14 @@ function deferred<T = void>() {
   return { promise, resolve, reject };
 }
 
-function harness(opts?: { fault?: 'no-session' | 'no-membership' | 'no-commit' }) {
+function harness(opts?: { fault?: 'no-session' | 'no-membership' | 'no-commit' | 'no-snapshot' | 'no-covers' }) {
   const fault = opts?.fault;
   let rows: Row[] = [{ id: 'm1', body: 'a', reactions: fire(0) }];
   let meta = { hasOlder: true, roomTag: 'A', obligation: 1 };
   const writes: { id: string; reactions: ArenaReaction[] | null }[] = [];
   const snapshots = createReactionSnapshots();
+  const visibility = createVisibilityBarrier();
+  visibility.admit([{ id: 'm1' }], visibility.epoch());
   let live: RoomSession = { roomId: 'A', generation: 1 };
   const mounted = { current: true };
   const server = new Map<string, ArenaReaction[]>([['m1', fire(3, true)]]);
@@ -57,6 +64,23 @@ function harness(opts?: { fault?: 'no-session' | 'no-membership' | 'no-commit' }
     rows = rows.map((row) => (row.id === id ? { ...row, reactions } : row));
   };
 
+  const mergePublish = createMergeReactionPublisher({
+    snapshots,
+    update: (fn) => { rows = fn(rows); },
+  });
+
+  const applyRead = (messageId: string, next: ArenaReaction[] | null, snapshot: number): boolean => {
+    if (fault === 'no-snapshot' || fault === 'no-membership') {
+      applyWrite(messageId, next);
+      return true;
+    }
+    const accepted = mergePublish(messageId, next, snapshot);
+    if (accepted) {
+      writes.push({ id: messageId, reactions: next ? next.map((r) => ({ ...r })) : null });
+    }
+    return accepted;
+  };
+
   const queue = createReactionQueue({
     read: async (id) => {
       const gate = gates.get(id);
@@ -65,7 +89,6 @@ function harness(opts?: { fault?: 'no-session' | 'no-membership' | 'no-commit' }
       return server.get(id)!;
     },
     toggle: async (id, emoji) => {
-      // Use the pre-optimistic server vector so harness toggles do not double-flip.
       const prior = server.get(id)?.find((r) => r.emoji === emoji);
       const reacted = !prior?.viewerReacted;
       const count = reacted ? (prior?.count ?? 0) + 1 : Math.max(0, (prior?.count ?? 1) - 1);
@@ -84,18 +107,35 @@ function harness(opts?: { fault?: 'no-session' | 'no-membership' | 'no-commit' }
     return { status: 'applied', messageId };
   };
 
+  const readInput = (session: RoomSession, messageId = 'm1') => ({
+    messageId,
+    session,
+    isLiveSession,
+    isLoaded,
+    snapshots: fault === 'no-snapshot'
+      ? { beginSnapshot: () => 0, merge: () => rows, beginMutation: () => {}, finishMutation: () => {}, markAuthoritativeReactionWrite: () => {}, beginReactionWrite: () => () => true } as ReturnType<typeof createReactionSnapshots>
+      : snapshots,
+    visibility: fault === 'no-covers'
+      ? { epoch: () => visibility.epoch(), covers: () => true }
+      : visibility,
+    applyRead: fault === 'no-commit'
+      ? (id: string, next: ArenaReaction[] | null) => { applyWrite(id, next); return true; }
+      : applyRead,
+  });
+
   return {
     get rows() { return rows; },
     set rows(next: Row[]) { rows = next; },
-    meta, writes, snapshots, queue, server, gates, mounted,
+    meta, writes, snapshots, visibility, queue, server, gates, mounted,
     setLive(next: RoomSession) { live = next; },
     isLoaded,
     session: (): RoomSession => ({ ...live }),
     read: (session: RoomSession, messageId = 'm1') => (
       fault === 'no-commit'
         ? rawApply(session, messageId)
-        : queue.readAuthoritative({ messageId, session, isLiveSession, isLoaded })
+        : queue.readAuthoritative(readInput(session, messageId))
     ),
+    readInput,
     count: () => rows.find((row) => row.id === 'm1')?.reactions[0]?.count ?? null,
   };
 }
@@ -159,6 +199,12 @@ describe('6G.5B.1 authoritative reaction read', () => {
     const toggleGate = deferred<void>();
     const readGate = deferred<readonly ArenaReaction[] | null>();
     const snapshots = createReactionSnapshots();
+    const visibility = createVisibilityBarrier();
+    visibility.admit([{ id: 'm1' }], visibility.epoch());
+    const applyRead = createMergeReactionPublisher({
+      snapshots,
+      update: (fn) => { rows = fn(rows); },
+    });
     const q = createReactionQueue({
       read: async () => {
         if (order.includes('toggle-start') && !order.includes('toggle-end')) {
@@ -189,6 +235,9 @@ describe('6G.5B.1 authoritative reaction read', () => {
       session: { roomId: 'A', generation: 1 },
       isLiveSession: () => true,
       isLoaded: () => true,
+      snapshots,
+      visibility,
+      applyRead,
     });
     await Promise.resolve();
     toggleGate.resolve();
@@ -199,40 +248,57 @@ describe('6G.5B.1 authoritative reaction read', () => {
     assert.ok(!order.includes('read-write') || order.indexOf('toggle-end') < order.indexOf('read-write'));
   });
 
-  it('R6 duplicate reads for the same message cannot publish out of order', async () => {
-    const writes: number[] = [];
+  it('R6 later read-start wins; older completion cannot overwrite', async () => {
     let rows: Row[] = [{ id: 'm1', body: 'a', reactions: fire(0) }];
     const first = deferred<readonly ArenaReaction[] | null>();
     const second = deferred<readonly ArenaReaction[] | null>();
     let calls = 0;
+    const snapshots = createReactionSnapshots();
+    const visibility = createVisibilityBarrier();
+    visibility.admit([{ id: 'm1' }], visibility.epoch());
+    const applyRead = createMergeReactionPublisher({
+      snapshots,
+      update: (fn) => { rows = fn(rows); },
+    });
     const q = createReactionQueue({
       read: async () => {
         calls += 1;
         return calls === 1 ? first.promise : second.promise;
       },
       toggle: async () => ({ messageId: 'm1', emoji: 'fire', reacted: true, count: 1 }),
-      write: (_id, reactions) => {
-        if (!reactions) return;
-        writes.push(reactions[0]?.count ?? -1);
-        rows = rows.map((row) => (row.id === _id ? { ...row, reactions } : row));
-      },
+      write: () => {},
       onError: () => {},
       onCommitted: () => {},
     });
     const session = { roomId: 'A', generation: 1 };
-    const a = q.readAuthoritative({ messageId: 'm1', session, isLiveSession: () => true, isLoaded: () => true });
+    const opts = {
+      messageId: 'm1',
+      session,
+      isLiveSession: () => true,
+      isLoaded: () => true,
+      snapshots,
+      visibility,
+      applyRead,
+    };
+    const a = q.readAuthoritative(opts);
     await Promise.resolve();
-    const b = q.readAuthoritative({ messageId: 'm1', session, isLiveSession: () => true, isLoaded: () => true });
+    const b = q.readAuthoritative(opts);
     second.resolve(fire(2, true));
-    await Promise.resolve();
+    const ob = await b;
+    assert.equal(ob.status, 'applied');
+    assert.equal(rows[0].reactions[0].count, 2);
     first.resolve(fire(8, true));
-    await Promise.all([a, b]);
-    if (writes.length >= 2) assert.deepEqual(writes, [8, 2]);
-    assert.equal(rows[0].reactions[0].count, writes.at(-1) ?? 0);
+    const oa = await a;
+    assert.equal(oa.status, 'skipped');
+    assert.equal((oa as { reason: string }).reason, 'superseded');
+    assert.equal(rows[0].reactions[0].count, 2);
   });
 
   it('R7 failed server read leaves existing state intact and returns retryable failure', async () => {
     const h = harness();
+    const snapshots = createReactionSnapshots();
+    const visibility = createVisibilityBarrier();
+    visibility.admit([{ id: 'm1' }], visibility.epoch());
     const q = createReactionQueue({
       read: async () => { throw new Error('network'); },
       toggle: async () => ({ messageId: 'm1', emoji: 'fire', reacted: true, count: 1 }),
@@ -244,6 +310,9 @@ describe('6G.5B.1 authoritative reaction read', () => {
       session: h.session(),
       isLiveSession: () => true,
       isLoaded: () => true,
+      snapshots,
+      visibility,
+      applyRead: () => true,
     });
     assert.equal(outcome.status, 'failed');
     assert.equal(outcome.retryable, true);
@@ -343,12 +412,7 @@ describe('6G.5B.1 fault sensitivity', () => {
     const h = harness();
     const guard = h.snapshots;
     const snapOld = guard.beginSnapshot();
-    await h.queue.readAuthoritative({
-      messageId: 'm1',
-      session: h.session(),
-      isLiveSession: () => true,
-      isLoaded: () => true,
-    });
+    await h.queue.readAuthoritative(h.readInput(h.session()));
     assert.equal(h.count(), 3);
     const protectedMerge = guard.merge(h.rows, [{ id: 'm1', body: 'a', reactions: fire(0, false) }], snapOld);
     assert.equal(protectedMerge.find((row) => row.id === 'm1')?.reactions[0]?.count, 3);
@@ -359,5 +423,163 @@ describe('6G.5B.1 fault sensitivity', () => {
       1,
     );
     assert.equal(bad.find((row) => row.id === 'm1')?.reactions[0]?.count, 0);
+  });
+});
+
+describe('6G.5B.1A fault sensitivity', () => {
+  it('fault: missing read-start authority lets older read overwrite newer snapshot', async () => {
+    const h = harness({ fault: 'no-snapshot' });
+    const gate = deferred<readonly ArenaReaction[] | null>();
+    h.gates.set('m1', gate);
+    const pending = h.read(h.session());
+    await Promise.resolve();
+    h.rows = [{ id: 'm1', body: 'a', reactions: fire(9, true) }];
+    gate.resolve(fire(0, false));
+    assert.equal((await pending).status, 'applied');
+    assert.equal(h.count(), 0, 'older read overwrote newer snapshot without read-start');
+  });
+
+  it('fault: missing visibility covers lets eviction-era deletion wipe a recreated row', async () => {
+    const h = harness({ fault: 'no-covers' });
+    const gate = deferred<readonly ArenaReaction[] | null>();
+    h.gates.set('m1', gate);
+    const pending = h.read(h.session());
+    await Promise.resolve();
+    h.visibility.mark(['m1']);
+    h.rows = [];
+    const epoch = h.visibility.epoch();
+    h.visibility.admit([{ id: 'm1' }], epoch);
+    h.rows = [{ id: 'm1', body: 'recreated', reactions: fire(9, true) }];
+    gate.resolve(null);
+    const outcome = await pending;
+    assert.equal(outcome.status, 'applied');
+    assert.equal(h.rows.some((row) => row.id === 'm1'), false, 'stale deletion removed recreated row');
+  });
+
+  it('fault: missing settlement leaves a permanently occupied mutation tail', async () => {
+    const snapshots = createReactionSnapshots();
+    const visibility = createVisibilityBarrier();
+    visibility.admit([{ id: 'm1' }], visibility.epoch());
+    let rows: Row[] = [{ id: 'm1', body: 'a', reactions: fire(0) }];
+    const q = createReactionQueue({
+      read: async () => fire(1, true),
+      toggle: async () => ({ messageId: 'm1', emoji: 'fire', reacted: true, count: 1 }),
+      write: () => {},
+      onError: () => {},
+    });
+    // Broken publisher that throws after "commit" — production settles; this probe
+    // shows an unhandled path would hang a naive await without finish().
+    const brokenApply = (): boolean => {
+      throw new Error('listener boom');
+    };
+    const outcome = await q.readAuthoritative({
+      messageId: 'm1',
+      session: { roomId: 'A', generation: 1 },
+      isLiveSession: () => true,
+      isLoaded: () => true,
+      snapshots,
+      visibility,
+      applyRead: brokenApply,
+    });
+    assert.equal(outcome.status, 'failed');
+    assert.equal(outcome.retryable, false);
+    // Tail released: a subsequent read must still complete.
+    const next = await q.readAuthoritative({
+      messageId: 'm1',
+      session: { roomId: 'A', generation: 1 },
+      isLiveSession: () => true,
+      isLoaded: () => true,
+      snapshots,
+      visibility,
+      applyRead: (id, nextRows) => {
+        rows = rows.map((row) => (row.id === id ? { ...row, reactions: nextRows ?? [] } : row));
+        return true;
+      },
+    });
+    assert.equal(next.status, 'applied');
+    assert.equal(rows[0].reactions[0].count, 1);
+  });
+
+  it('fault: missing stale-error reclassification marks room-switch rejection retryable', async () => {
+    // Production rechecks isLiveSession in the catch path. A naive catch that
+    // always returns failed/retryable would misclassify stale sessions.
+    const snapshots = createReactionSnapshots();
+    const visibility = createVisibilityBarrier();
+    visibility.admit([{ id: 'm1' }], visibility.epoch());
+    let live: RoomSession = { roomId: 'A', generation: 1 };
+    const gate = deferred<readonly ArenaReaction[] | null>();
+    const q = createReactionQueue({
+      read: async () => gate.promise,
+      toggle: async () => ({ messageId: 'm1', emoji: 'fire', reacted: true, count: 1 }),
+      write: () => {},
+      onError: () => {},
+    });
+    const pending = q.readAuthoritative({
+      messageId: 'm1',
+      session: { roomId: 'A', generation: 1 },
+      isLiveSession: (s) => s.roomId === live.roomId && s.generation === live.generation,
+      isLoaded: () => true,
+      snapshots,
+      visibility,
+      applyRead: () => true,
+    });
+    await Promise.resolve();
+    live = { roomId: 'B', generation: 2 };
+    gate.reject(new Error('network after switch'));
+    const outcome = await pending;
+    assert.equal(outcome.status, 'skipped');
+    assert.equal((outcome as { reason: string }).reason, 'stale_session');
+    // Contrast: same rejection while still live is retryable failed.
+    const liveFail = await q.readAuthoritative({
+      messageId: 'm1',
+      session: live,
+      isLiveSession: () => true,
+      isLoaded: () => true,
+      snapshots,
+      visibility,
+      applyRead: () => true,
+      // force by using a throwing read via a fresh queue below
+    }).catch(() => null);
+    void liveFail;
+    const q2 = createReactionQueue({
+      read: async () => { throw new Error('network'); },
+      toggle: async () => ({ messageId: 'm1', emoji: 'fire', reacted: true, count: 1 }),
+      write: () => {},
+      onError: () => {},
+    });
+    const failed = await q2.readAuthoritative({
+      messageId: 'm1',
+      session: live,
+      isLiveSession: () => true,
+      isLoaded: () => true,
+      snapshots,
+      visibility,
+      applyRead: () => true,
+    });
+    assert.equal(failed.status, 'failed');
+    assert.equal((failed as { retryable: boolean }).retryable, true);
+  });
+
+  it('fault: missing toggle supersession lets delayed read clobber a local toggle', async () => {
+    const h = harness();
+    h.server.set('m1', fire(0, false));
+    const gate = deferred<readonly ArenaReaction[] | null>();
+    h.gates.set('m1', gate);
+    const pending = h.queue.readAuthoritative({
+      ...h.readInput(h.session()),
+      applyRead: (id, next) => {
+        h.rows = next === null
+          ? h.rows.filter((row) => row.id !== id)
+          : h.rows.map((row) => (row.id === id ? { ...row, reactions: next } : row));
+        return true;
+      },
+    });
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    h.gates.delete('m1');
+    await h.queue.enqueue('m1', 'fire', () => true);
+    assert.equal(h.count(), 1);
+    gate.resolve(fire(0, false));
+    assert.equal((await pending).status, 'applied');
+    assert.equal(h.count(), 0, 'toggle supersession missing: read clobbered toggle');
   });
 });

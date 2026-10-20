@@ -58,6 +58,11 @@ export interface VisibilityBarrier {
   admit<T extends { id: string }>(rows: readonly T[], fetchEpoch: number): T[];
   /** True when a request that started at `fetchEpoch` may still be applied. */
   allows(fetchEpoch: number): boolean;
+  /**
+   * True when `id` was not authoritatively evicted after `fetchEpoch`.
+   * Membership alone is insufficient after eviction/recreation of the same id.
+   */
+  covers(id: string, fetchEpoch: number): boolean;
   /** Row-only recheck of a stable admitted batch; never rechecks the floor. */
   filterAccepted<T extends { id: string }>(rows: readonly T[]): T[];
   reset(): void;
@@ -125,6 +130,11 @@ export function createVisibilityBarrier(max = MAX_EVICTED): VisibilityBarrier {
         row.pending || !removed.has(row.id) || eligibleIds.has(row.id));
     },
     allows(fetchEpoch: number): boolean { return fetchEpoch >= floor; },
+    covers(id: string, fetchEpoch: number): boolean {
+      if (!id || fetchEpoch < floor) return false;
+      const at = evictedAt.get(id);
+      return at === undefined || at <= fetchEpoch;
+    },
     admit<T extends { id: string }>(rows: readonly T[], fetchEpoch: number): T[] {
       if (fetchEpoch < floor) return [];
       const accepted = rows.filter((row) => {

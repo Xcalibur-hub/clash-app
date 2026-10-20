@@ -1,6 +1,7 @@
 ﻿/** Reaction mutations with bounded, scope-safe ambiguous recovery. */
 import type { ArenaReaction } from '../services/liveArenaService';
-import type { RoomSession } from './transcriptOrdering.ts';
+import type { SnapshotGuard } from './reactionSnapshots.ts';
+import type { RoomSession, VisibilityBarrier } from './transcriptOrdering.ts';
 
 export interface ReactionResult { messageId: string; emoji: string; reacted: boolean; count: number }
 export interface OverflowState { dropped: number; requested: boolean; tracked: number; deficit: number }
@@ -14,7 +15,7 @@ export type AuthoritativeReactionReadOutcome =
       messageId: string;
       reason: 'stale_session' | 'not_loaded' | 'superseded';
     }
-  | { status: 'failed'; messageId: string; error: unknown; retryable: true };
+  | { status: 'failed'; messageId: string; error: unknown; retryable: boolean };
 
 export interface AuthoritativeReactionReadInput {
   messageId: string;
@@ -23,6 +24,20 @@ export interface AuthoritativeReactionReadInput {
   isLiveSession: (session: RoomSession) => boolean;
   /** True only while this id is present in the loaded transcript. */
   isLoaded: (messageId: string) => boolean;
+  /** Existing SnapshotGuard — beginSnapshot before transport; merge at publish. */
+  snapshots: SnapshotGuard;
+  /** Existing visibility barrier — epoch before transport; covers() at publish. */
+  visibility: Pick<VisibilityBarrier, 'epoch' | 'covers'>;
+  /**
+   * Publish through SnapshotGuard.merge with the captured read-start token.
+   * Must not mint beginReactionWrite for this response (that bypasses older reads).
+   * Returns false when the coordinator rejected the reactions as superseded.
+   */
+  applyRead: (
+    messageId: string,
+    rows: ArenaReaction[] | null,
+    snapshot: number,
+  ) => boolean;
 }
 
 export function applyOptimisticReaction(rows: readonly ArenaReaction[], emoji: string): ArenaReaction[] {
@@ -95,67 +110,121 @@ export function createReactionQueue(io: {
   /**
    * Session-safe authoritative reaction-state read for one already-loaded row.
    *
-   * Waits for any in-flight mutation/read on the id, then performs the server
-   * read without holding the tail so a newer toggle can commit and supersede
-   * this snapshot. Publication re-enters the per-message tail so duplicate
-   * reads cannot apply out of order. Never toggles; never inserts rows.
+   * Acquires SnapshotGuard beginSnapshot + visibility epoch BEFORE transport.
+   * Applies through merge with that read-start token (never beginReactionWrite).
+   * Toggle supersession still uses the per-message committed watermark.
+   * The returned promise always settles; the mutation tail is always released.
    */
-  const readAuthoritative = async (
+  const readAuthoritative = (
     input: AuthoritativeReactionReadInput,
   ): Promise<AuthoritativeReactionReadOutcome> => {
-    const { messageId, session, isLiveSession, isLoaded } = input;
-    await (tails.get(messageId) ?? Promise.resolve()).catch(() => {});
-    if (!isLiveSession(session)) {
-      return { status: 'skipped', messageId, reason: 'stale_session' };
-    }
-    if (!isLoaded(messageId)) {
-      return { status: 'skipped', messageId, reason: 'not_loaded' };
-    }
-    const startCommit = committed.get(messageId) ?? 0;
-    let rows: readonly ArenaReaction[] | null;
-    try {
-      rows = await io.read(messageId);
-    } catch (error) {
-      return { status: 'failed', messageId, error, retryable: true };
-    }
-    // Re-check the captured lease — never reacquire the current session.
-    if (!isLiveSession(session)) {
-      return { status: 'skipped', messageId, reason: 'stale_session' };
-    }
-    if (!isLoaded(messageId)) {
-      // Reaction-only reads must not resurrect or tombstone unloaded rows.
-      return { status: 'skipped', messageId, reason: 'not_loaded' };
-    }
-    if ((committed.get(messageId) ?? 0) !== startCommit) {
-      return { status: 'skipped', messageId, reason: 'superseded' };
-    }
-    if (tails.has(messageId)) {
-      return { status: 'skipped', messageId, reason: 'superseded' };
-    }
+    const {
+      messageId, session, isLiveSession, isLoaded, snapshots, visibility, applyRead,
+    } = input;
 
-    let settle!: (outcome: AuthoritativeReactionReadOutcome) => void;
-    const result = new Promise<AuthoritativeReactionReadOutcome>((resolve) => { settle = resolve; });
-    const publish = async (): Promise<void> => {
-      if (!isLiveSession(session)) {
-        settle({ status: 'skipped', messageId, reason: 'stale_session' });
-        return;
-      }
-      if (!isLoaded(messageId)) {
-        settle({ status: 'skipped', messageId, reason: 'not_loaded' });
-        return;
-      }
-      if ((committed.get(messageId) ?? 0) !== startCommit) {
-        settle({ status: 'skipped', messageId, reason: 'superseded' });
-        return;
-      }
-      io.write(messageId, rows ? [...rows] : null);
-      applyAuthoritative(messageId);
-      settle({ status: 'applied', messageId });
-    };
-    const task = (tails.get(messageId) ?? Promise.resolve()).then(publish, publish);
-    tails.set(messageId, task);
-    void task.finally(() => { if (tails.get(messageId) === task) tails.delete(messageId); });
-    return result;
+    return new Promise<AuthoritativeReactionReadOutcome>((resolve) => {
+      let settled = false;
+      const finish = (outcome: AuthoritativeReactionReadOutcome): void => {
+        if (settled) return;
+        settled = true;
+        resolve(outcome);
+      };
+
+      const staleOrFailed = (error: unknown): void => {
+        if (!isLiveSession(session)) {
+          finish({ status: 'skipped', messageId, reason: 'stale_session' });
+          return;
+        }
+        finish({ status: 'failed', messageId, error, retryable: false });
+      };
+
+      void (async () => {
+        try {
+          await (tails.get(messageId) ?? Promise.resolve()).catch(() => {});
+          if (!isLiveSession(session)) {
+            finish({ status: 'skipped', messageId, reason: 'stale_session' });
+            return;
+          }
+          if (!isLoaded(messageId)) {
+            finish({ status: 'skipped', messageId, reason: 'not_loaded' });
+            return;
+          }
+
+          // Read-start token + visibility epoch must precede transport.
+          const snapshot = snapshots.beginSnapshot();
+          const visibilityEpoch = visibility.epoch();
+
+          let rows: readonly ArenaReaction[] | null;
+          try {
+            rows = await io.read(messageId);
+          } catch (error) {
+            if (!isLiveSession(session)) {
+              finish({ status: 'skipped', messageId, reason: 'stale_session' });
+              return;
+            }
+            finish({ status: 'failed', messageId, error, retryable: true });
+            return;
+          }
+
+          if (!isLiveSession(session)) {
+            finish({ status: 'skipped', messageId, reason: 'stale_session' });
+            return;
+          }
+          if (!isLoaded(messageId)) {
+            finish({ status: 'skipped', messageId, reason: 'not_loaded' });
+            return;
+          }
+          if (!visibility.covers(messageId, visibilityEpoch)) {
+            finish({ status: 'skipped', messageId, reason: 'superseded' });
+            return;
+          }
+
+          let release!: () => void;
+          const slot = new Promise<void>((r) => { release = r; });
+          const prior = tails.get(messageId) ?? Promise.resolve();
+          const held = prior.catch(() => {}).then(() => slot);
+          tails.set(messageId, held);
+          try {
+            await prior.catch(() => {});
+            if (!isLiveSession(session)) {
+              finish({ status: 'skipped', messageId, reason: 'stale_session' });
+              return;
+            }
+            if (!isLoaded(messageId)) {
+              finish({ status: 'skipped', messageId, reason: 'not_loaded' });
+              return;
+            }
+            if (!visibility.covers(messageId, visibilityEpoch)) {
+              finish({ status: 'skipped', messageId, reason: 'superseded' });
+              return;
+            }
+            // SnapshotGuard.merge enforces read-start vs newer snapshots/toggles.
+            // Do not markAuthoritativeReactionWrite here — that would advance
+            // committedAt past later read-start tokens already issued.
+            let accepted = false;
+            try {
+              accepted = applyRead(messageId, rows ? [...rows] : null, snapshot);
+            } catch (error) {
+              // Store commits rows before listener notification; do not auto-retry.
+              staleOrFailed(error);
+              return;
+            }
+            if (!accepted) {
+              finish({ status: 'skipped', messageId, reason: 'superseded' });
+              return;
+            }
+            finish({ status: 'applied', messageId });
+          } catch (error) {
+            staleOrFailed(error);
+          } finally {
+            release();
+            if (tails.get(messageId) === held) tails.delete(messageId);
+          }
+        } catch (error) {
+          staleOrFailed(error);
+        }
+      })();
+    });
   };
 
   return {

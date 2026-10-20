@@ -22,3 +22,32 @@ export function createRoomReactionBridge(input: {
     onCommitted: (id) => input.snapshots.markAuthoritativeReactionWrite(id),
   });
 }
+
+/**
+ * Merge-based publisher for readAuthoritative. Uses the captured read-start
+ * snapshot token; never mints beginReactionWrite (which would bypass older reads).
+ */
+export function createMergeReactionPublisher<T extends { id: string; reactions: ArenaReaction[] }>(input: {
+  snapshots: SnapshotGuard;
+  update: (fn: (current: T[]) => T[]) => void;
+}): (messageId: string, rows: ArenaReaction[] | null, snapshot: number) => boolean {
+  return (messageId, rows, snapshot) => {
+    let accepted = false;
+    input.update((current) => {
+      const existing = current.find((item) => item.id === messageId);
+      if (!existing) return current;
+      if (rows === null) {
+        accepted = true;
+        return current.filter((item) => item.id !== messageId);
+      }
+      const next = input.snapshots.merge(
+        current,
+        [{ ...existing, reactions: rows }],
+        snapshot,
+      );
+      accepted = next.find((item) => item.id === messageId)?.reactions !== existing.reactions;
+      return next;
+    });
+    return accepted;
+  };
+}
