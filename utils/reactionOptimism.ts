@@ -1,9 +1,29 @@
 ﻿/** Reaction mutations with bounded, scope-safe ambiguous recovery. */
 import type { ArenaReaction } from '../services/liveArenaService';
+import type { RoomSession } from './transcriptOrdering.ts';
 
 export interface ReactionResult { messageId: string; emoji: string; reacted: boolean; count: number }
 export interface OverflowState { dropped: number; requested: boolean; tracked: number; deficit: number }
 export interface RecoveryResult { attempted: number; remainingLoaded: number; parked: number; deficit: number }
+
+/** Outcome of one session-safe authoritative reaction-state read. */
+export type AuthoritativeReactionReadOutcome =
+  | { status: 'applied'; messageId: string }
+  | {
+      status: 'skipped';
+      messageId: string;
+      reason: 'stale_session' | 'not_loaded' | 'superseded';
+    }
+  | { status: 'failed'; messageId: string; error: unknown; retryable: true };
+
+export interface AuthoritativeReactionReadInput {
+  messageId: string;
+  /** Captured occupancy lease; never reacquire the live session after resume. */
+  session: RoomSession;
+  isLiveSession: (session: RoomSession) => boolean;
+  /** True only while this id is present in the loaded transcript. */
+  isLoaded: (messageId: string) => boolean;
+}
 
 export function applyOptimisticReaction(rows: readonly ArenaReaction[], emoji: string): ArenaReaction[] {
   if (!emoji) return [...rows];
@@ -72,7 +92,74 @@ export function createReactionQueue(io: {
   };
   const applyAuthoritative = (id: string): void => { io.onCommitted?.(id); bump(id); };
 
+  /**
+   * Session-safe authoritative reaction-state read for one already-loaded row.
+   *
+   * Waits for any in-flight mutation/read on the id, then performs the server
+   * read without holding the tail so a newer toggle can commit and supersede
+   * this snapshot. Publication re-enters the per-message tail so duplicate
+   * reads cannot apply out of order. Never toggles; never inserts rows.
+   */
+  const readAuthoritative = async (
+    input: AuthoritativeReactionReadInput,
+  ): Promise<AuthoritativeReactionReadOutcome> => {
+    const { messageId, session, isLiveSession, isLoaded } = input;
+    await (tails.get(messageId) ?? Promise.resolve()).catch(() => {});
+    if (!isLiveSession(session)) {
+      return { status: 'skipped', messageId, reason: 'stale_session' };
+    }
+    if (!isLoaded(messageId)) {
+      return { status: 'skipped', messageId, reason: 'not_loaded' };
+    }
+    const startCommit = committed.get(messageId) ?? 0;
+    let rows: readonly ArenaReaction[] | null;
+    try {
+      rows = await io.read(messageId);
+    } catch (error) {
+      return { status: 'failed', messageId, error, retryable: true };
+    }
+    // Re-check the captured lease — never reacquire the current session.
+    if (!isLiveSession(session)) {
+      return { status: 'skipped', messageId, reason: 'stale_session' };
+    }
+    if (!isLoaded(messageId)) {
+      // Reaction-only reads must not resurrect or tombstone unloaded rows.
+      return { status: 'skipped', messageId, reason: 'not_loaded' };
+    }
+    if ((committed.get(messageId) ?? 0) !== startCommit) {
+      return { status: 'skipped', messageId, reason: 'superseded' };
+    }
+    if (tails.has(messageId)) {
+      return { status: 'skipped', messageId, reason: 'superseded' };
+    }
+
+    let settle!: (outcome: AuthoritativeReactionReadOutcome) => void;
+    const result = new Promise<AuthoritativeReactionReadOutcome>((resolve) => { settle = resolve; });
+    const publish = async (): Promise<void> => {
+      if (!isLiveSession(session)) {
+        settle({ status: 'skipped', messageId, reason: 'stale_session' });
+        return;
+      }
+      if (!isLoaded(messageId)) {
+        settle({ status: 'skipped', messageId, reason: 'not_loaded' });
+        return;
+      }
+      if ((committed.get(messageId) ?? 0) !== startCommit) {
+        settle({ status: 'skipped', messageId, reason: 'superseded' });
+        return;
+      }
+      io.write(messageId, rows ? [...rows] : null);
+      applyAuthoritative(messageId);
+      settle({ status: 'applied', messageId });
+    };
+    const task = (tails.get(messageId) ?? Promise.resolve()).then(publish, publish);
+    tails.set(messageId, task);
+    void task.finally(() => { if (tails.get(messageId) === task) tails.delete(messageId); });
+    return result;
+  };
+
   return {
+    readAuthoritative,
     enqueue(id: string, emoji: string, active: () => boolean): Promise<void> {
       const run = async () => {
         if (!active()) return;

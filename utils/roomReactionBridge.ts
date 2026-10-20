@@ -1,4 +1,7 @@
-﻿/** Bridges the reaction queue to snapshot ordering. */
+﻿/**
+ * Bridges the reaction queue to snapshot ordering.
+ * Exposes enqueue toggles plus readAuthoritative for session-safe repairs.
+ */
 import { createReactionQueue, type ReactionResult } from './reactionOptimism.ts';
 import type { SnapshotGuard } from './reactionSnapshots.ts';
 import type { ArenaReaction } from '../services/liveArenaService';
