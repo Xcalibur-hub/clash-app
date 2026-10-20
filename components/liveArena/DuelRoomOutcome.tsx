@@ -9,6 +9,7 @@ import { judge as hapticJudge } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
 import { VerdictReveal } from './VerdictReveal';
 import { NextClashAction, type NextClashSuggestion } from './NextClashAction';
+import { nextClashActionVisible } from '../../utils/nextClashNotice';
 
 /** Uses the canonical Clash ballot and verdict; no group Room tally. */
 export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, nextClash = null, nextBusy = false, nextNotice = null, onOpenNext, revealMotion = false }: {
@@ -34,8 +35,8 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
     return (
       <View style={[styles.wrap, { borderTopColor: t.border }]}>
         <VerdictReveal duel={duel} visible={revealMotion} />
-        {verdict && onOpenNext ? (
-          <NextClashAction clash={nextClash} busy={nextBusy} notice={nextNotice} onOpen={onOpenNext} />
+        {nextClashActionVisible({ hasVerdict: Boolean(verdict), hasSuggestion: Boolean(nextClash), notice: nextNotice }) ? (
+          <NextClashAction clash={nextClash} busy={nextBusy} notice={nextNotice} onOpen={onOpenNext ?? (() => undefined)} />
         ) : null}
         {(resultTitle || duel.status === 'cancelled') && (onReview || onReturn) ? (
           <View style={styles.row}>

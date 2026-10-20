@@ -59,15 +59,24 @@ export function createReactionQueue(io: {
   toggle: (id: string, emoji: string) => Promise<ReactionResult>;
   write: (id: string, rows: ArenaReaction[] | null) => void;
   onError: (error: unknown) => void;
+  /** A committed mutation or an authoritative repair read for this message. */
+  onCommitted?: (id: string) => void;
 }) {
   const tails = new Map<string, Promise<void>>();
-  const dirty = new Map<string, () => boolean>();
-  const repair = async (id: string, active: () => boolean): Promise<void> => {
+  /** Ambiguous targets only: bounded attempts, explicit expiry, no retries. */
+  const dirty = new Map<string, { active: () => boolean; attempts: number; expiresAt: number }>();
+  const MAX_REPAIR_ATTEMPTS = 2;
+  const REPAIR_TTL_MS = 30_000;
+  const MAX_REPAIR_BATCH = 20;
+
+  const repair = async (id: string, active: () => boolean): Promise<boolean> => {
     const rows = await io.read(id);
-    if (!active()) return;
+    if (!active()) return false;
     io.write(id, rows ? [...rows] : null);
-    if (!rows) dirty.delete(id);
+    io.onCommitted?.(id);
+    return true;
   };
+
   return {
     enqueue(id: string, emoji: string, active: () => boolean): Promise<void> {
       const run = async () => {
@@ -81,9 +90,13 @@ export function createReactionQueue(io: {
           const result = await io.toggle(id, emoji);
           if (!active()) return;
           io.write(id, mergeReactionResult(baseline, result));
+          io.onCommitted?.(id);
+          dirty.delete(id);
         } catch (error) {
           if (!active()) return;
-          dirty.set(id, active);
+          if (!dirty.has(id)) {
+            dirty.set(id, { active, attempts: 0, expiresAt: Date.now() + REPAIR_TTL_MS });
+          }
           if (baseline) io.write(id, [...baseline]);
           // A lost response can mean the toggle committed. Read; never toggle again.
           await repair(id, active).catch(() => {});
@@ -95,16 +108,29 @@ export function createReactionQueue(io: {
       return task.finally(() => { if (tails.get(id) === task) tails.delete(id); });
     },
     async reconcile(): Promise<void> {
-      for (const [id, active] of [...dirty].slice(0, 20)) {
-        if (!active()) { dirty.delete(id); continue; }
+      const now = Date.now();
+      let processed = 0;
+      for (const [id, entry] of [...dirty]) {
+        if (processed >= MAX_REPAIR_BATCH) break;
+        if (!entry.active()) { dirty.delete(id); continue; }
         if (tails.has(id)) continue;
-        // Rotate retained ambiguous targets so a long history cannot starve.
-        // Even a successful immediate read may precede a timed-out RPC's commit.
-        dirty.delete(id); dirty.set(id, active);
-        const task = repair(id, active).catch(() => {});
+        if (entry.expiresAt <= now || entry.attempts >= MAX_REPAIR_ATTEMPTS) { dirty.delete(id); continue; }
+        entry.attempts += 1;
+        processed += 1;
+        const task = repair(id, entry.active)
+          .then((confirmed) => { if (confirmed) dirty.delete(id); })
+          .catch(() => {});
         tails.set(id, task);
         await task.finally(() => { if (tails.get(id) === task) tails.delete(id); });
       }
+    },
+    /** Retained ambiguous targets; bounded by the repair policy. */
+    pendingRepairs(): number {
+      return dirty.size;
+    },
+    /** Account or room scope changed: drop every retained target. */
+    reset(): void {
+      dirty.clear();
     },
   };
 }

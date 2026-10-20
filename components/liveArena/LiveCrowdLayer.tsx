@@ -1,9 +1,10 @@
-/** Public Crowd presentation. Only server-authorized rows; no layout fixtures. */
+﻿/** Public Crowd presentation. Only server-authorized rows; no layout fixtures. */
 import React from 'react';
 import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import type { useArenaCrowd } from '../../hooks/useArenaCrowd';
 import { validCrowdText, type CrowdMessage } from '../../utils/arenaCrowd';
-import { crowdAtLiveEdge, crowdTimeLabel, crowdUnseenAfterArrival, newerCrowdMessage } from '../../utils/crowdPresentation';
+import { crowdAtLiveEdge, crowdTimeLabel } from '../../utils/crowdPresentation';
+import { createCrowdArrivalTracker } from '../../utils/crowdArrivals';
 import { crowdRowLabel } from './liveArenaStyles';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 
@@ -27,19 +28,27 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
   const pending = React.useRef<{ body: string; key: string } | null>(null);
   const list = React.useRef<FlatList<CrowdMessage>>(null); const atLatest = React.useRef(true);
   const userScrolled = React.useRef(false);
-  const latest = crowd?.messages.at(-1);
-  const observedLatest = React.useRef(latest);
   const canSend = !readOnly && Boolean(crowd?.context?.canSend);
+  // Arrival detection is ID-based so a late row with an older timestamp still
+  // raises the affordance; pagination and hydration never do.
+  const arrivals = React.useRef(createCrowdArrivalTracker());
+  const historyPending = React.useRef(false);
+  const crowdScope = crowd?.context?.roomId ?? null;
+  React.useEffect(() => { arrivals.current.reset(); }, [crowdScope]);
   React.useEffect(() => {
-    const arrived = newerCrowdMessage(observedLatest.current, latest);
-    // Retain the high-water mark when moderation removes the newest row.
-    if (latest && (!observedLatest.current || arrived)) observedLatest.current = latest;
-    setUnseen(previous => crowdUnseenAfterArrival({ atLiveEdge: atLatest.current, latestChanged: arrived, unseen: previous }));
+    const ids = (crowd?.messages ?? []).map(message => message.id);
+    const alert = arrivals.current.observe(ids, {
+      source: historyPending.current ? 'history' : 'live',
+      atLiveEdge: atLatest.current,
+    });
+    historyPending.current = false;
+    if (alert) setUnseen(true);
+    else if (atLatest.current) setUnseen(false);
     if (!atLatest.current) return;
     // Virtualized rows need a layout pass before scrollToEnd can find their size.
     const timer = setTimeout(() => { if (atLatest.current) list.current?.scrollToEnd({animated:false}); },100);
     return () => clearTimeout(timer);
-  },[latest?.id, latest?.createdAt]);
+  },[crowd?.messages]);
   const send = async () => {
     const body = draft.trim(); if (!crowd || !canSend || !validCrowdText(body) || crowd.sending) return;
     if (!pending.current || pending.current.body!==body) pending.current = { body,key:requestKey() };
@@ -49,7 +58,7 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
     <View style={styles.heading}>
       <Text style={[styles.label,{color:t.textSecondary}]}>LIVE CROWD</Text>
       <Text accessibilityLiveRegion="polite" style={[styles.state,{color:t.textMuted}]}>
-        {crowd?.connected ? 'Live' : crowd?.context ? 'Reconnecting…' : ''}
+        {crowd?.connected ? 'Live' : crowd?.context ? 'Reconnectingâ€¦' : ''}
       </Text>
     </View>
     {crowd?.error ? <View style={styles.notice}><Text accessibilityRole="alert" style={{color:t.textSecondary}}>{crowd.error}</Text>
@@ -64,20 +73,20 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
       scrollEventThrottle={100}
       onContentSizeChange={() => { if(atLatest.current) list.current?.scrollToEnd({animated:false}); }}
       ListHeaderComponent={crowd?.hasOlder ? <Pressable disabled={crowd.olderBusy} accessibilityRole="button" style={styles.hit}
-        onPress={() => { atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loading…' : 'Load earlier chat'}</Text></Pressable> : null}
-      ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{unavailableReason ?? (crowd?.loading ? 'Loading Crowd…' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.')}</Text>}
+        onPress={() => { historyPending.current = true; atLatest.current=false; void crowd.loadOlder(); }}><Text style={{color:t.textMuted}}>{crowd.olderBusy ? 'Loadingâ€¦' : 'Load earlier chat'}</Text></Pressable> : null}
+      ListEmptyComponent={<Text style={[styles.empty,{color:t.textMuted}]}>{unavailableReason ?? (crowd?.loading ? 'Loading Crowdâ€¦' : !crowd?.context ? (crowd ? 'Crowd chat is unavailable.' : 'Enter the Clash to read Crowd chat.') : 'No Crowd messages yet.')}</Text>}
       renderItem={({item}) => <View style={[styles.row,{borderBottomColor:t.border}]} accessibilityRole="text" accessibilityLabel={crowdRowLabel(item.author.handle, item.body)}>
         <View style={[styles.avatar,{backgroundColor:t.surfaceElevated}]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Text style={{color:t.textSecondary,fontSize:11,fontWeight:'600'}}>{item.author.handle.slice(0,1).toUpperCase()}</Text></View>
-        <View style={{flex:1,minWidth:0,gap:3}}><Text numberOfLines={1} style={[styles.name,{color:t.textSecondary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>@{item.author.handle}<Text style={{ color: t.textMuted }}> · {crowdTimeLabel(item.createdAt, Date.now())}</Text></Text><Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>{item.body}</Text></View>
-        {onReport ? <Pressable onPress={() => onReport(item)} accessibilityRole="button" accessibilityLabel={`Report or block @${item.author.handle}`} style={styles.menu}><Text style={{color:t.textMuted}}>···</Text></Pressable> : null}
+        <View style={{flex:1,minWidth:0,gap:3}}><Text numberOfLines={1} style={[styles.name,{color:t.textSecondary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>@{item.author.handle}<Text style={{ color: t.textMuted }}> Â· {crowdTimeLabel(item.createdAt, Date.now())}</Text></Text><Text style={[styles.line,{color:subdued ? t.textSecondary : t.textPrimary}, Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as TextStyle : null]}>{item.body}</Text></View>
+        {onReport ? <Pressable onPress={() => onReport(item)} accessibilityRole="button" accessibilityLabel={`Report or block @${item.author.handle}`} style={styles.menu}><Text style={{color:t.textMuted}}>Â·Â·Â·</Text></Pressable> : null}
       </View>}/>
-    {unseen ? <Pressable accessibilityRole="button" accessibilityHint="New Crowd messages are available. Scrolls to the newest message" style={[styles.latestButton,{borderColor:t.border,backgroundColor:t.surfaceElevated}]} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>New messages ↓</Text></Pressable> : null}
+    {unseen ? <Pressable accessibilityRole="button" accessibilityHint="New Crowd messages are available. Scrolls to the newest message" style={[styles.latestButton,{borderColor:t.border,backgroundColor:t.surfaceElevated}]} onPress={() => { atLatest.current=true; setUnseen(false); list.current?.scrollToEnd({animated:false}); }}><Text style={{color:t.textPrimary}}>New messages â†“</Text></Pressable> : null}
     {crowd?.context ? canSend ? <View style={[styles.composer,{borderColor:t.border}]}>
       <TextInput value={draft} onChangeText={setDraft} placeholder="Message the Crowd" placeholderTextColor={t.textMuted}
         accessibilityLabel="Public Crowd message" accessibilityHint="Public message, visible to everyone in this Clash" multiline maxLength={500} editable={!crowd.sending} blurOnSubmit={false} returnKeyType="default"
         style={[styles.input,{color:t.textPrimary}]} />
       <Pressable disabled={crowd.sending || !validCrowdText(draft.trim())} accessibilityRole="button" accessibilityLabel="Send public Crowd message"
-        onPress={() => void send()} style={[styles.sendButton,{backgroundColor:t.surfaceElevated,borderColor:t.border}]}><Text style={{color:t.textPrimary,opacity:validCrowdText(draft.trim()) ? 1 : 0.4}}>{crowd.sending ? 'Sending…' : 'Send'}</Text></Pressable>
+        onPress={() => void send()} style={[styles.sendButton,{backgroundColor:t.surfaceElevated,borderColor:t.border}]}><Text style={{color:t.textPrimary,opacity:validCrowdText(draft.trim()) ? 1 : 0.4}}>{crowd.sending ? 'Sendingâ€¦' : 'Send'}</Text></Pressable>
     </View> : <Text style={[styles.empty,{color:t.textMuted}]}>Crowd chat is read-only.</Text> : null}
   </View>;
 }

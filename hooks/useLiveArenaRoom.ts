@@ -2,6 +2,7 @@ import { currentUserId } from '../services/supabaseClient';
 import { acquireOfficialRequest, confirmOfficialRequest } from '../services/officialRequestStore';
 import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils/officialRecovery';
 import { createReactionQueue } from '../utils/reactionOptimism';
+import { createReactionSnapshots } from '../utils/reactionSnapshots';
 import { useFocusEffect } from 'expo-router';
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
@@ -171,6 +172,7 @@ export function useLiveArenaRoom(
     setHasOlder(false);
   }, []);
 
+  const reactionSnapshots = React.useRef(createReactionSnapshots());
   const reactionQueue = React.useRef<ReturnType<typeof createReactionQueue> | null>(null);
   if (!reactionQueue.current) reactionQueue.current = createReactionQueue({
     read: async id => (await fetchMessage(id))?.reactions ?? null,
@@ -210,12 +212,13 @@ export function useLiveArenaRoom(
   const refreshThread = React.useCallback(async (): Promise<void> => {
     if (recovering.current) return;
     recovering.current = true;
+    const snapshot = reactionSnapshots.current.beginSnapshot();
     const generation=accessGeneration.current;
     try {
       await reactionQueue.current?.reconcile();
       if (messageCursor.current) await drainOfficialGap(messageCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
-        (rows,cursor) => { setThreadLocked(false); setMessages(old=>mergeMessages(old,rows)); messageCursor.current=cursor; },
+        (rows,cursor) => { setThreadLocked(false); setMessages(old=>reactionSnapshots.current.merge(old,rows,snapshot)); messageCursor.current=cursor; },
         ()=>mounted.current && generation===accessGeneration.current);
       if (roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) await drainOfficialGap(evidenceCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'evidence',cursor,'newer')) as (ArenaEvidence & OfficialCursor)[],
@@ -225,7 +228,7 @@ export function useLiveArenaRoom(
       if(messageCursor.current) {
         const fresh=await fetchOfficialPage(roomId,'message');
         if(!mounted.current || generation!==accessGeneration.current) return;
-        setMessages(old=>mergeMessages(old,fresh));
+        setMessages(old=>reactionSnapshots.current.merge(old,fresh,snapshot));
       }
       if(roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) {
         const fresh=await fetchOfficialPage(roomId,'evidence');
@@ -298,6 +301,7 @@ export function useLiveArenaRoom(
       if (mode === 'initial') setLoading(true);
       else setRefreshing(true);
       const generation=accessGeneration.current;
+      const snapshot = reactionSnapshots.current.beginSnapshot();
       try {
         const next = await fetchRoom(roomId);
         if (!mounted.current || generation!==accessGeneration.current) return;
@@ -327,7 +331,7 @@ export function useLiveArenaRoom(
           setHasOlder(messageHasOlder.current);
           if (!messageCursor.current) messageCursor.current=thread[0]?.preciseCreatedAt ? thread[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
           setMessages((current) =>
-            mode === 'initial' ? thread : mergeMessages(current, thread),
+            mode === 'initial' ? thread : reactionSnapshots.current.merge(current, thread, snapshot),
           );
         }
         setEvidence(old=> mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
@@ -445,10 +449,11 @@ export function useLiveArenaRoom(
     try {
       const oldest = messages.filter(m=>!m.pending).at(-1);
       if(messageHasOlder.current && oldest?.preciseCreatedAt) {
-        const page = await fetchOfficialPage(roomId,'message',oldest as OfficialCursor);
+        const snapshot = reactionSnapshots.current.beginSnapshot();
+      const page = await fetchOfficialPage(roomId,'message',oldest as OfficialCursor);
         if (!mounted.current || generation!==accessGeneration.current) return;
         messageHasOlder.current=page.length>=PAGE;
-        setMessages(current=>mergeMessages(current,page));
+        setMessages(current=>reactionSnapshots.current.merge(current,page,snapshot));
       }
       if(evidenceHasOlder.current && olderEvidence.current) {
         const page=await fetchOfficialPage(roomId,'evidence',olderEvidence.current);
@@ -537,6 +542,9 @@ export function useLiveArenaRoom(
     (messageId: string, emoji = '🔥'): Promise<void> => {
       const generation = accessGeneration.current;
       const viewer = authorRef.current?.id;
+      // Protect this message the moment the tap happens: any transcript snapshot
+      // that began earlier must not overwrite its reaction fields.
+      reactionSnapshots.current.noteMutation(messageId);
       return reactionQueue.current!.enqueue(messageId, emoji,
         () => mounted.current && generation === accessGeneration.current && authorRef.current?.id === viewer);
     },

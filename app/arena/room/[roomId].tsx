@@ -11,7 +11,7 @@ import {
   View,
   type ListRenderItemInfo,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedValue } from 'react-native-reanimated';
 import { EvidenceComposerSheet } from '../../../components/liveArena/EvidenceComposerSheet';
@@ -71,6 +71,7 @@ import { fetchRoom } from '../../../services/liveArenaService';
 import { fetchClashDiscovery } from '../../../services/arenaClashDiscoveryService';
 import { clashDiscoveryDestination, type ClashDiscoveryEntry } from '../../../utils/arenaClashDiscovery';
 import { nextClashStillAvailable, selectNextClash } from '../../../utils/nextClash';
+import { createNavigationGuard, resolveNextClashTarget } from '../../../utils/nextClashNavigation';
 import { showNotice, useClash, type User } from '../../../store';
 import type { ReportTarget } from '../../../supabase/types';
 import { layout, space, typeScale, useThemeColors } from '../../../theme';
@@ -319,6 +320,12 @@ function RoomScope(): React.JSX.Element {
   }, [room?.roomId, room?.topicId]);
 
   // One bounded discovery read per settled Clash; the route owns navigation.
+  const navigation = React.useRef(createNavigationGuard());
+  useFocusEffect(React.useCallback(() => () => navigation.current.invalidate(), []));
+  React.useEffect(() => {
+    navigation.current.invalidate();
+    return () => navigation.current.invalidate();
+  }, [room?.roomId, state.viewer.id]);
   const [nextClash, setNextClash] = React.useState<{ entry: ClashDiscoveryEntry; roomId: string } | null>(null);
   const [nextBusy, setNextBusy] = React.useState(false);
   const [nextNotice, setNextNotice] = React.useState<string | null>(null);
@@ -340,27 +347,31 @@ function RoomScope(): React.JSX.Element {
     return () => { active = false; };
   }, [settledClashId]);
 
-  /** Re-check the room before entering; stale suggestions are refused. */
+  /** Re-check the room before entering; stale or invalidated responses never navigate. */
   const openNextClash = React.useCallback((): void => {
     const pick = nextClash;
     if (!pick || nextBusy) return;
+    const token = navigation.current.begin();
     setNextBusy(true);
     setNextNotice(null);
     void (async () => {
-      try {
-        const fresh = await fetchRoom(pick.roomId);
-        if (!nextClashStillAvailable(pick.entry, fresh)) {
-          setNextClash(null);
-          setNextNotice('That Clash is no longer live. Return to the Arena to pick another.');
-          return;
-        }
+      const outcome = await resolveNextClashTarget({
+        token,
+        isCurrent: (value) => navigation.current.isCurrent(value),
+        fetchRoom: () => fetchRoom(pick.roomId),
+        accept: (fresh) => nextClashStillAvailable(pick.entry, fresh),
+      });
+      // A blurred/unmounted route or a changed room/account owns no state now.
+      if (!navigation.current.isCurrent(token)) return;
+      setNextBusy(false);
+      if (outcome === 'accepted') {
         router.push(clashDiscoveryDestination(pick.entry));
-      } catch {
-        setNextClash(null);
-        setNextNotice('That Clash could not be opened. Return to the Arena to pick another.');
-      } finally {
-        setNextBusy(false);
+        return;
       }
+      setNextClash(null);
+      setNextNotice(outcome === 'unavailable'
+        ? 'That Clash is no longer live. Return to the Arena to pick another.'
+        : 'That Clash could not be opened. Return to the Arena to pick another.');
     })();
   }, [nextBusy, nextClash, router]);
 
