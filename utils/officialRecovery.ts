@@ -18,7 +18,7 @@ export function compareOfficial(a: { id: string; createdAt: number; preciseCreat
 /** One bounded pass; callers retain the returned cursor for the next pass. */
 export async function drainOfficialGap<T extends OfficialCursor>(
   cursor: OfficialCursor, fetchPage: (cursor: OfficialCursor) => Promise<T[]>,
-  accept: (rows: T[], cursor: OfficialCursor) => void, alive: () => boolean,
+  accept: (rows: T[], cursor: OfficialCursor) => void | boolean, alive: () => boolean,
   pageSize = 40, maxPages = 5,
 ): Promise<void> {
   for (let page = 0; page < maxPages && alive(); page++) {
@@ -27,7 +27,10 @@ export async function drainOfficialGap<T extends OfficialCursor>(
     const next = rows.at(-1)!;
     if (preciseTime(next.preciseCreatedAt) < preciseTime(cursor.preciseCreatedAt)
       || (preciseTime(next.preciseCreatedAt) === preciseTime(cursor.preciseCreatedAt) && next.id <= cursor.id)) throw new Error('Recovery cursor did not advance');
-    accept(rows, next); cursor = next;
+    // A rejected response has not covered these rows. Leave the cursor for a
+    // later fresh read instead of advancing over conservatively excluded data.
+    if (accept(rows, next) === false) return;
+    cursor = next;
     if (rows.length < pageSize) return;
   }
 }

@@ -144,7 +144,7 @@ export function useLiveArenaRoom(
   const evidenceHasOlder = React.useRef(false);
   const messageHasOlder = React.useRef(true);
   const recovering = React.useRef(false);
-  const sendBusy = React.useRef(false);
+  const sendBusy = React.useRef<symbol | null>(null);
   const evidenceBusy = React.useRef(false);
   authorRef.current = viewerAuthor;
   messagesRef.current = messages;
@@ -168,6 +168,8 @@ export function useLiveArenaRoom(
 
   const clearPrivateThread = React.useCallback(() => {
     accessGeneration.current++;
+    sendBusy.current = null;
+    setSending(false);
     setMessages([]);
     setEvidence([]);
     setStats(null);
@@ -228,7 +230,13 @@ export function useLiveArenaRoom(
       await reactionQueue.current?.reconcile();
       if (messageCursor.current) await drainOfficialGap(messageCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[],
-        (rows,cursor) => { setThreadLocked(false); setMessages(old=>reactionSnapshots.current.merge(old,visibilityBarrier.admit(rows,threadEpoch),snapshot)); messageCursor.current=cursor; },
+        (rows,cursor) => {
+          if (!visibilityBarrier.allows(threadEpoch)) return false;
+          setThreadLocked(false);
+          setMessages(old=>reactionSnapshots.current.merge(old,visibilityBarrier.admit(rows,threadEpoch),snapshot));
+          messageCursor.current=cursor;
+          return true;
+        },
         ()=>mounted.current && generation===accessGeneration.current);
       if (roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) await drainOfficialGap(evidenceCursor.current,
         async cursor => (await fetchOfficialPage(roomId,'evidence',cursor,'newer')) as (ArenaEvidence & OfficialCursor)[],
@@ -501,39 +509,43 @@ export function useLiveArenaRoom(
   const send = React.useCallback(
     async (input: Omit<PostArenaMessageInput, 'roomId'>): Promise<boolean> => {
       if (sendBusy.current) return false;
-      sendBusy.current=true;
-      const account=await currentUserId();
-      if(!account || !mounted.current) {sendBusy.current=false;return false;}
-      let requestKey: string | undefined;
-      try { if(roomRef.current?.roomMode==='DUEL') requestKey=await acquireOfficialRequest(account,roomId,'message',input); }
-      catch(caught) { sendBusy.current=false; if(mounted.current) notify(caught); return false; }
-      if(!mounted.current) {sendBusy.current=false;return false;}
-      const temporaryId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const isReshare = Boolean(input.reshareSourceMessageId);
-      const placeholder: ArenaMessage = {
-        id: temporaryId,
-        roomId,
-        kind: isReshare || input.gif ? 'gif' : input.media ? 'media' : 'text',
-        body: input.body,
-        parentMessageId: input.parentMessageId ?? null,
-        createdAt: Date.now(),
-        mediaUrl: input.gif?.url ?? input.media?.url ?? null,
-        mediaKind: isReshare || input.gif ? 'gif' : (input.media?.kind ?? null),
-        gifProvider: input.gif?.provider ?? null,
-        gifExternalId: input.gif?.externalId ?? null,
-        isOwn: true,
-        author: authorRef.current,
-        reactions: [],
-        replyCount: 0,
-        argumentVotes: null,
-        pending: true,
-      };
-      setSending(true);
-      const snapshot = reactionSnapshots.current.beginSnapshot();
+      const owner = Symbol('arena-send');
+      sendBusy.current = owner;
       const sendGeneration = accessGeneration.current;
-      const sendVisibilityEpoch = visibilityBarrier.epoch();
-      setMessages((current) => mergeMessages(current, [placeholder]));
+      const ownsSend = (): boolean => sendBusy.current === owner;
+      const active = (): boolean => ownsSend() && isCurrentScope(mounted.current, sendGeneration, accessGeneration.current);
+      let placeholderId: string | undefined;
       try {
+        const account=await currentUserId();
+        if(!account || !active()) return false;
+        const requestKey = roomRef.current?.roomMode==='DUEL'
+          ? await acquireOfficialRequest(account,roomId,'message',input) : undefined;
+        if(!active()) return false;
+        const temporaryId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        placeholderId = temporaryId;
+        const isReshare = Boolean(input.reshareSourceMessageId);
+        const placeholder: ArenaMessage = {
+          id: temporaryId,
+          roomId,
+          kind: isReshare || input.gif ? 'gif' : input.media ? 'media' : 'text',
+          body: input.body,
+          parentMessageId: input.parentMessageId ?? null,
+          createdAt: Date.now(),
+          mediaUrl: input.gif?.url ?? input.media?.url ?? null,
+          mediaKind: isReshare || input.gif ? 'gif' : (input.media?.kind ?? null),
+          gifProvider: input.gif?.provider ?? null,
+          gifExternalId: input.gif?.externalId ?? null,
+          isOwn: true,
+          author: authorRef.current,
+          reactions: [],
+          replyCount: 0,
+          argumentVotes: null,
+          pending: true,
+        };
+        setSending(true);
+        const snapshot = reactionSnapshots.current.beginSnapshot();
+        const sendVisibilityEpoch = visibilityBarrier.epoch();
+        setMessages((current) => mergeMessages(current, [placeholder]));
         const posted = input.reshareSourceMessageId
           ? await postClashMediaReshare(
               roomId,
@@ -545,7 +557,7 @@ export function useLiveArenaRoom(
           : await postMessage({ ...input, roomId, requestKey, expectedAccountId:account }, authorRef.current);
         if (requestKey) await confirmOfficialRequest(account,roomId,'message',requestKey).catch(()=>{});
         const resolution = resolveSendResolution({ mounted: mounted.current, sentGeneration: sendGeneration, currentGeneration: accessGeneration.current });
-        if (!resolution.applyRow) return false;
+        if (!ownsSend() || !resolution.applyRow) return false;
         const admittedPost = visibilityBarrier.admit([posted], sendVisibilityEpoch);
         if (admittedPost.length === 0) {
           setMessages((current) => current.filter((message) => message.id !== temporaryId));
@@ -554,14 +566,16 @@ export function useLiveArenaRoom(
         }
         return true;
       } catch (caught) {
-        if (isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)) {
-          setMessages((current) => current.filter((message) => message.id !== temporaryId));
+        if (active()) {
+          if (placeholderId) setMessages((current) => current.filter((message) => message.id !== placeholderId));
           notify(caught);
         }
         return false;
       } finally {
-        sendBusy.current=false;
-        if (isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)) setSending(false);
+        if (ownsSend()) {
+          sendBusy.current = null;
+          if (isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)) setSending(false);
+        }
       }
     },
     [notify, roomId, sending],
