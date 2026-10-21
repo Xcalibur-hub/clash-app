@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { AccessibilityInfo, Modal, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -30,10 +30,46 @@ export function FullScreenChallengeDeck({ visible, challenges, takeText, busy = 
     catch { if (alive.current) setFailure('Could not confirm this decision. No success has been assumed. Check the status and retry.'); }
     finally { working.current = false; if (alive.current) setSubmitting(false); }
   };
-  return <Modal visible={visible} animationType={reduced ? 'none' : 'fade'} presentationStyle="fullScreen" statusBarTranslucent onRequestClose={() => { if (!locked) onClose(); }}>
-    <View accessibilityViewIsModal style={{ flex: 1, backgroundColor: t.background, paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 8) }}>
-      <View style={{ paddingHorizontal: 12, alignItems: 'flex-start' }}><ArenaButton label="Close" accessibilityLabel="Close challenges" variant="tertiary" disabled={locked} onPress={onClose} /></View>
-      <ChallengeInvitation challenge={current} takeText={takeText} remaining={challenges.length} busy={locked} eligible={eligible} error={error || failure} onAccept={() => void commit('accept')} onPass={() => void commit('pass')} />
-    </View>
-  </Modal>;
+  return (
+    <Modal
+      visible={visible}
+      animationType={reduced ? 'none' : 'fade'}
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      onRequestClose={() => {
+        if (!locked) onClose();
+      }}
+    >
+      <View
+        accessibilityViewIsModal
+        accessibilityLabel="Full screen challenge deck"
+        style={{
+          flex: 1,
+          backgroundColor: t.background,
+          paddingTop: insets.top,
+          paddingBottom: Math.max(insets.bottom, 12),
+        }}
+      >
+        <View style={{ paddingHorizontal: 12, alignItems: 'flex-start' }}>
+          <ArenaButton
+            label="Close"
+            accessibilityLabel="Close challenges"
+            variant="tertiary"
+            disabled={locked}
+            onPress={onClose}
+          />
+        </View>
+        <ChallengeInvitation
+          challenge={current}
+          takeText={takeText}
+          remaining={challenges.length}
+          busy={locked}
+          eligible={eligible}
+          error={error || failure}
+          onAccept={() => void commit('accept')}
+          onPass={() => void commit('pass')}
+        />
+      </View>
+    </Modal>
+  );
 }

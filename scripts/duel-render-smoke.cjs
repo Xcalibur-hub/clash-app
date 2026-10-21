@@ -216,9 +216,9 @@ for (const [name, element] of Object.entries(challengeCases)) {
     assert.match(html, /Pass/);
     assert.match(html, /Challenge invitation|CHALLENGE/);
     assert.match(html, /THEIR TAKE|YOUR TAKE/);
-    assert.match(html, /2 PENDING|PENDING/);
+    assert.match(html, /2 invitations|Pending|PENDING/);
   }
-  if (name === 'challenge-confirmed') assert.match(html, /CONFIRMED|ENTERING ARENA/);
+  if (name === 'challenge-confirmed') assert.match(html, /CHALLENGE ACCEPTED|CONFIRMED|ENTERING ARENA/);
   if (name === 'crowd-shell') {
     assert.match(html, /Crowd|CROWD/);
     assert.doesNotMatch(html, /Send|Post a message|Compose/);

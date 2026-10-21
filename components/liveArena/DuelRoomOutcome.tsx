@@ -10,6 +10,7 @@ import { PressableScale } from '../shared/PressableScale';
 import { VerdictReveal } from './VerdictReveal';
 import { NextClashAction, type NextClashSuggestion } from './NextClashAction';
 import { nextClashActionVisible } from '../../utils/nextClashNotice';
+import { VERDICT_IS_NOT_SUPPORT } from '../../utils/verdictPresentation';
 
 /** Uses the canonical Clash ballot and verdict; no group Room tally. */
 export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, nextClash = null, nextBusy = false, nextNotice = null, onOpenNext, revealMotion = false }: {
@@ -93,7 +94,7 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
           ? 'Your judgement was submitted. Results appear after voting closes.'
           : presentation.side
             ? 'Fighters cannot judge their own Clash.'
-            : 'Official judgements decide the verdict. Reactions do not count as ballots.'}
+            : VERDICT_IS_NOT_SUPPORT}
       </Text>
 
       {judgingOpen ? (

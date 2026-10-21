@@ -37,13 +37,10 @@ export function ClashConfirmedOverlay({
       <View style={[styles.root, { backgroundColor: t.background }]} accessibilityViewIsModal>
 
         <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.content}>
-          <Text style={[styles.kicker, { color: t.textMuted }]}
-          >
-            CLASH CONFIRMED
+          <Text style={[styles.kicker, { color: t.textMuted }]}>
+            CHALLENGE ACCEPTED
           </Text>
-          <Text style={[styles.title, { color: t.textPrimary }]}
-            accessibilityRole="header"
-          >
+          <Text style={[styles.title, { color: t.textPrimary }]} accessibilityRole="header">
             You're in.
           </Text>
 
@@ -72,9 +69,8 @@ export function ClashConfirmedOverlay({
             </View>
           </View>
 
-          <Text style={[styles.enter, { color: t.textSecondary }]}
-          >
-            Opening your Live Room
+          <Text style={[styles.enter, { color: t.textSecondary }]}>
+            ENTERING ARENA
           </Text>
         </Animated.View>
       </View>

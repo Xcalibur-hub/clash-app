@@ -1,6 +1,7 @@
 /**
  * Short premium verdict sequence (~1.2s) then settles static.
  * Uses only canonical ballot values — no fabricated stats.
+ * Announcement, explanation, and scores stay visually separate.
  */
 import React from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -17,6 +18,7 @@ import Animated, {
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { verdictView } from '../../utils/verdictView';
+import { verdictEyebrow, verdictSheetSections } from '../../utils/verdictPresentation';
 import { hexWithAlpha, verdictMetrics } from './liveArenaStyles';
 import { hasPlayed, shouldPlayOnce } from '../../utils/motionOnce';
 import { notify as hapticNotify } from '../../utils/haptics';
@@ -28,15 +30,26 @@ export interface VerdictRevealProps {
   visible?: boolean;
 }
 
-function AnimatedPercent({ value, size, minWidth, animate }: { value: number; size: number; minWidth: number; animate: boolean }): React.JSX.Element {
+function AnimatedPercent({
+  value,
+  size,
+  minWidth,
+  animate,
+}: {
+  value: number;
+  size: number;
+  minWidth: number;
+  animate: boolean;
+}): React.JSX.Element {
   const reduced = useReducedMotion();
   const t = useThemeColors();
   const progress = useSharedValue(reduced || !animate ? 1 : 0);
 
   React.useEffect(() => {
-    progress.value = reduced || !animate
-      ? 1
-      : withDelay(180, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) }));
+    progress.value =
+      reduced || !animate
+        ? 1
+        : withDelay(180, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) }));
   }, [animate, progress, reduced, value]);
 
   const style = useAnimatedStyle(() => ({
@@ -60,14 +73,20 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
   const reduced = useReducedMotion();
   const verdict = duel.verdict;
   const view = verdictView(duel);
+  const sections = verdictSheetSections(view);
   const title = view.title ?? 'Verdict';
+  const eyebrow = verdictEyebrow(view, duel.status);
   const { width, fontScale } = useWindowDimensions();
   const metrics = verdictMetrics({ width, fontScale });
   // One reveal per canonical verdict per session: reopening a settled room must
   // not replay the sequence or its haptic.
-  const momentKey = verdict ? `verdict:${duel.clashId}:${duel.status}:${verdict.verdictLabel}` : '';
+  const momentKey = verdict
+    ? `verdict:${duel.clashId}:${duel.status}:${verdict.verdictLabel}`
+    : '';
   const animateRef = React.useRef<boolean | null>(null);
-  if (animateRef.current === null) animateRef.current = visible && momentKey ? !hasPlayed(momentKey) : false;
+  if (animateRef.current === null) {
+    animateRef.current = visible && momentKey ? !hasPlayed(momentKey) : false;
+  }
   const animate = animateRef.current === true;
 
   React.useEffect(() => {
@@ -80,13 +99,6 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
     hapticNotify(duel.status === 'cancelled' ? 'warning' : 'success');
   }, [duel.clashId, duel.status, verdict, visible]);
 
-  // No decorative absolutely-positioned layer is drawn behind the result copy.
-
-  // Restrained, in-flow verdict cue: a short gold rule before the eyebrow.
-  // It cannot overlap the headline, fighters or percentages because it shares
-  // the sheet's layout flow instead of being absolutely positioned.
-  const eyebrow =
-    duel.status === 'cancelled' ? 'CANCELLED' : view.kind === 'settled' ? 'VERDICT' : 'OUTCOME';
   const accent = (
     <View style={styles.eyebrowRow}>
       <View
@@ -103,19 +115,27 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
 
   if (!verdict) {
     return (
-      <View style={styles.wrap}>
+      <View style={styles.wrap} accessibilityLabel="Verdict pending">
         {accent}
-        <Text
-          accessibilityRole="header"
-          style={[
-            styles.title,
-            { fontSize: metrics.titleSize, lineHeight: metrics.titleLineHeight, color: t.textPrimary },
-          ]}
-        >
-          {title}
-        </Text>
-        {view.support ? (
-          <Text style={[styles.support, { color: t.textSecondary }]}>{view.support}</Text>
+        {sections.announcement ? (
+          <Text
+            accessibilityRole="header"
+            style={[
+              styles.title,
+              {
+                fontSize: metrics.titleSize,
+                lineHeight: metrics.titleLineHeight,
+                color: t.textPrimary,
+              },
+            ]}
+          >
+            {title}
+          </Text>
+        ) : null}
+        {sections.explanation ? (
+          <Text style={[styles.explanation, { color: t.textSecondary }]}>
+            {sections.explanation}
+          </Text>
         ) : null}
       </View>
     );
@@ -125,8 +145,11 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
   const bPct = view.bPct;
 
   return (
-    <View style={styles.wrap}>
-      <Animated.View entering={reduced || !animate ? undefined : FadeIn.duration(220)}>{accent}</Animated.View>
+    <View style={styles.wrap} accessibilityLabel="Official verdict">
+      {/* 1 — Announcement */}
+      <Animated.View entering={reduced || !animate ? undefined : FadeIn.duration(220)}>
+        {accent}
+      </Animated.View>
 
       <Animated.Text
         entering={reduced || !animate ? undefined : FadeInDown.delay(60).duration(220)}
@@ -144,7 +167,8 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
         {title}
       </Animated.Text>
 
-      {view.winnerLabel ? (
+      {/* 2 — Winner (canonical only; never SUPPORT) */}
+      {sections.winner && view.winnerLabel ? (
         <Animated.View
           entering={reduced || !animate ? undefined : FadeInDown.delay(100).duration(180)}
           style={styles.winnerRow}
@@ -161,44 +185,64 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
         </Animated.View>
       ) : null}
 
-      <Animated.View
-        entering={reduced || !animate ? undefined : FadeInDown.delay(140).duration(220)}
-        style={styles.scoreBlock}
-      >
-        {([
-          { fighter: duel.fighterA, side: 'A' as const, pct: aPct, position: view.aPosition },
-          { fighter: duel.fighterB, side: 'B' as const, pct: bPct, position: view.bPosition },
-        ]).map(({ fighter, side, pct, position }) => (
-          <View
-            key={side}
-            style={styles.scoreRow}
-            accessible
-            accessibilityLabel={
-              pct !== null
-                ? `${fighter.name}, Fighter ${side}, ${pct}% of the panel`
-                : `${fighter.name}, Fighter ${side}`
-            }
-          >
-            <View style={styles.identity}>
-              <Text numberOfLines={metrics.nameLines} style={[styles.name, { color: t.textPrimary }]}>
-                {fighter.name}
-              </Text>
-              <Text style={[styles.side, { color: t.textMuted }]}>Fighter {side}</Text>
-              {position ? (
-                <Text numberOfLines={2} style={[styles.position, { color: t.textSecondary }]}>
-                  {position}
+      {/* 3 — Explanation (jury / cancelled / pending) */}
+      {sections.explanation ? (
+        <Animated.Text
+          entering={reduced || !animate ? undefined : FadeInDown.delay(120).duration(180)}
+          style={[styles.explanation, { color: t.textMuted }]}
+        >
+          {sections.explanation}
+        </Animated.Text>
+      ) : null}
+
+      {/* 4 — Panel shares when both scores exist */}
+      {sections.scores ? (
+        <Animated.View
+          entering={reduced || !animate ? undefined : FadeInDown.delay(140).duration(220)}
+          style={styles.scoreBlock}
+        >
+          {(
+            [
+              { fighter: duel.fighterA, side: 'A' as const, pct: aPct, position: view.aPosition },
+              { fighter: duel.fighterB, side: 'B' as const, pct: bPct, position: view.bPosition },
+            ] as const
+          ).map(({ fighter, side, pct, position }) => (
+            <View
+              key={side}
+              style={styles.scoreRow}
+              accessible
+              accessibilityLabel={
+                pct !== null
+                  ? `${fighter.name}, Fighter ${side}, ${pct}% of the panel`
+                  : `${fighter.name}, Fighter ${side}`
+              }
+            >
+              <View style={styles.identity}>
+                <Text
+                  numberOfLines={metrics.nameLines}
+                  style={[styles.name, { color: t.textPrimary }]}
+                >
+                  {fighter.name}
                 </Text>
+                <Text style={[styles.side, { color: t.textMuted }]}>Fighter {side}</Text>
+                {position ? (
+                  <Text numberOfLines={2} style={[styles.position, { color: t.textSecondary }]}>
+                    {position}
+                  </Text>
+                ) : null}
+              </View>
+              {pct !== null ? (
+                <AnimatedPercent
+                  value={pct}
+                  size={metrics.pctSize}
+                  minWidth={metrics.pctMinWidth}
+                  animate={animate}
+                />
               ) : null}
             </View>
-            {pct !== null ? (
-              <AnimatedPercent value={pct} size={metrics.pctSize} minWidth={metrics.pctMinWidth} animate={animate} />
-            ) : null}
-          </View>
-        ))}
-        {view.juryLabel ? (
-          <Text style={[styles.jury, { color: t.textMuted }]}>{view.juryLabel}</Text>
-        ) : null}
-      </Animated.View>
+          ))}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -228,6 +272,11 @@ const styles = StyleSheet.create({
     ...typeScale.title,
     fontWeight: '700',
   },
+  explanation: {
+    ...typeScale.body,
+    fontSize: 13,
+    lineHeight: 19,
+  },
   scoreBlock: { gap: space.sm },
   scoreRow: {
     flexDirection: 'row',
@@ -249,11 +298,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 2,
   },
-  support: {
-    ...typeScale.body,
-    fontSize: 13,
-    lineHeight: 19,
-  },
   winnerRow: { flexDirection: 'row' },
   winnerChip: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -271,10 +315,5 @@ const styles = StyleSheet.create({
     ...typeScale.data,
     fontWeight: '700',
     textAlign: 'right',
-  },
-  jury: {
-    ...typeScale.caption,
-    fontSize: 12,
-    marginTop: space.xs,
   },
 });

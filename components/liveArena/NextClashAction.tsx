@@ -2,6 +2,7 @@
  * One live Clash from the existing bounded discovery snapshot.
  * Renders nothing (or an honest notice) when no eligible Clash exists; the
  * surrounding outcome always offers Return to Arena as the fallback.
+ * Visually separated from the verdict announcement above.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -34,9 +35,15 @@ export function NextClashAction({
     ) : null;
   }
   return (
-    <View style={styles.wrap}>
+    <View
+      style={[styles.wrap, { borderTopColor: t.border }]}
+      accessibilityLabel="Next Clash"
+    >
       <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
         NEXT CLASH
+      </Text>
+      <Text style={[styles.lead, { color: t.textSecondary }]}>
+        Continue with another live discussion — separate from this verdict.
       </Text>
       <Pressable
         accessibilityRole="button"
@@ -63,10 +70,16 @@ export function NextClashAction({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6, paddingTop: space.xs },
+  wrap: {
+    gap: 8,
+    paddingTop: space.md,
+    marginTop: space.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   eyebrow: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  lead: { ...typeScale.caption, fontSize: 12, lineHeight: 17 },
   row: {
-    minHeight: 44,
+    minHeight: 48,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
     paddingHorizontal: 12,

@@ -1,8 +1,10 @@
 /**
- * Short fighter-intro when entering a canonical Duel Room (~500–900ms).
+ * Short fighter-intro when entering a canonical Duel Room.
+ * Event-driven, one-shot — never replays on hydration, keyboard, or transcript.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -12,6 +14,7 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
+import { duelEntranceDurationMs } from '../../utils/challengePresentation';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { Avatar } from '../shared/Avatar';
 import { ArenaAtmosphere } from './ArenaAtmosphere';
@@ -33,6 +36,7 @@ export function DuelEntrance({
   onDone,
 }: DuelEntranceProps): React.JSX.Element | null {
   const t = useThemeColors();
+  const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const doneRef = React.useRef(false);
   const callback = React.useRef(onDone);
@@ -42,13 +46,12 @@ export function DuelEntrance({
 
   React.useEffect(() => {
     if (!visible) return undefined;
-    // This effect runs only after the visible overlay has committed, never in
-    // the parent's loading/error/gate branches.
+    // Runs only after the visible overlay has committed — not in loading/error gates.
     if (!claimed.current) {
       if (!shouldPlayOnce(momentKey)) return undefined;
       claimed.current = true;
     }
-    const ms = reduced ? 120 : 620;
+    const ms = duelEntranceDurationMs(Boolean(reduced));
     const id = setTimeout(() => {
       if (doneRef.current) return;
       doneRef.current = true;
@@ -59,20 +62,35 @@ export function DuelEntrance({
 
   if (!visible) return null;
 
+  const finish = (): void => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    callback.current();
+  };
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Skip Clash intro"
       accessibilityHint="Dismisses the intro and enters the Stage"
-      onPress={() => {
-        if (doneRef.current) return;
-        doneRef.current = true;
-        callback.current();
-      }}
-      style={[styles.root, { backgroundColor: t.background }]}
+      onPress={finish}
+      style={[
+        styles.root,
+        {
+          backgroundColor: t.background,
+          paddingTop: Math.max(insets.top, space.md),
+          paddingBottom: Math.max(insets.bottom, space.md),
+        },
+      ]}
     >
-      <ArenaAtmosphere mood="live" energy={0.4} />
+      <ArenaAtmosphere mood="live" energy={0.35} />
       <View style={styles.content}>
+        <Animated.Text
+          entering={reduced ? undefined : FadeIn.duration(180)}
+          style={[styles.kicker, { color: t.textMuted }]}
+        >
+          LIVE DUEL
+        </Animated.Text>
         <Animated.Text
           entering={reduced ? undefined : FadeIn.duration(200)}
           numberOfLines={3}
@@ -89,6 +107,9 @@ export function DuelEntrance({
             <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
               {duel.fighterA.name}
             </Text>
+            <Text numberOfLines={1} style={[styles.handle, { color: t.textMuted }]}>
+              @{duel.fighterA.handle}
+            </Text>
           </Animated.View>
           <Animated.Text
             entering={reduced ? undefined : ZoomIn.delay(80).springify().damping(14)}
@@ -104,6 +125,9 @@ export function DuelEntrance({
             <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
               {duel.fighterB.name}
             </Text>
+            <Text numberOfLines={1} style={[styles.handle, { color: t.textMuted }]}>
+              @{duel.fighterB.handle}
+            </Text>
           </Animated.View>
         </View>
         <Animated.Text
@@ -112,6 +136,7 @@ export function DuelEntrance({
         >
           ENTERING ARENA
         </Animated.Text>
+        <Text style={[styles.skip, { color: t.textMuted }]}>Tap anywhere to skip</Text>
       </View>
     </Pressable>
   );
@@ -126,24 +151,41 @@ const styles = StyleSheet.create({
   content: {
     zIndex: 1,
     paddingHorizontal: space.lg,
-    gap: space.xl,
+    gap: space.lg,
     alignItems: 'center',
+  },
+  kicker: {
+    ...typeScale.caption,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.6,
   },
   prop: {
     ...typeScale.title,
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: '700',
     textAlign: 'center',
   },
   row: { flexDirection: 'row', alignItems: 'center', width: '100%', gap: space.md },
-  col: { flex: 1, alignItems: 'center', gap: 8, minWidth: 0 },
+  col: { flex: 1, alignItems: 'center', gap: 6, minWidth: 0 },
   name: { ...typeScale.label, fontSize: 15, fontWeight: '700', textAlign: 'center', width: '100%' },
+  handle: {
+    ...typeScale.caption,
+    fontSize: 12,
+    textAlign: 'center',
+    width: '100%',
+  },
   vs: { ...typeScale.caption, fontSize: 13, fontWeight: '700', letterSpacing: 1.4 },
   live: {
     ...typeScale.caption,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1.4,
+  },
+  skip: {
+    ...typeScale.caption,
+    fontSize: 12,
+    marginTop: space.xs,
   },
 });

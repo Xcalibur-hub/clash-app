@@ -125,8 +125,10 @@ describe('UI Phase 2 live-event motion and terminal polish', () => {
     const verdict = read('components/liveArena/VerdictReveal.tsx');
     assert.match(verdict, /shouldPlayOnce\(momentKey\)/);
     assert.match(verdict, /useReducedMotion/);
-    assert.match(verdict, /CANCELLED/);
-    assert.match(verdict, /VERDICT/);
+    assert.match(verdict, /verdictEyebrow/);
+    const presentation = read('utils/verdictPresentation.ts');
+    assert.match(presentation, /CANCELLED/);
+    assert.match(presentation, /VERDICT/);
   });
 
   it('offers accessible full argument access in compact and truncated modes', () => {
