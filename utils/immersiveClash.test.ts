@@ -113,7 +113,11 @@ describe('immersive Clash rules', () => {
     );
     assert.doesNotMatch(src, /DEV_LAYOUT_ROWS|showDevLayout|FloatingReaction/);
     assert.match(src, /crowd\?\.messages/);
-    assert.match(src, /LIVE CROWD/);
+    assert.match(src, /duelCrowdChrome/);
+    assert.match(
+      fs.readFileSync(path.join(here, '../utils/duelStageMotion.ts'), 'utf8'),
+      /LIVE CROWD/,
+    );
   });
 
   it('never renders a fabricated reaction total on the Stage', () => {

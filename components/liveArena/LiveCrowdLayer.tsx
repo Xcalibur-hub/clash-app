@@ -5,6 +5,7 @@ import type { useArenaCrowd } from '../../hooks/useArenaCrowd';
 import { validCrowdText, type CrowdMessage } from '../../utils/arenaCrowd';
 import { crowdAtLiveEdge, crowdTimeLabel } from '../../utils/crowdPresentation';
 import { createCrowdArrivalTracker } from '../../utils/crowdArrivals';
+import { duelCrowdChrome } from '../../utils/duelStageMotion';
 import { crowdRowLabel } from './liveArenaStyles';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 
@@ -29,6 +30,7 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
   const list = React.useRef<FlatList<CrowdMessage>>(null); const atLatest = React.useRef(true);
   const userScrolled = React.useRef(false);
   const canSend = !readOnly && Boolean(crowd?.context?.canSend);
+  const chrome = duelCrowdChrome(readOnly);
   // Arrival detection is ID-based so a late row with an older timestamp still
   // raises the affordance; pagination and hydration never do.
   const arrivals = React.useRef(createCrowdArrivalTracker());
@@ -48,11 +50,18 @@ export function LiveCrowdLayer({ subdued=false,paddingBottom=0,crowd,onReport,un
     if (!pending.current || pending.current.body!==body) pending.current = { body,key:requestKey() };
     if (await crowd.send(body,pending.current.key)) { setDraft(''); pending.current = null; atLatest.current = true; }
   };
-  return <View style={[styles.wrap,{ paddingBottom }]} accessibilityLabel="Live crowd">
+  const connectionState = readOnly
+    ? chrome.idleState
+    : crowd?.connected
+      ? chrome.idleState
+      : crowd?.context
+        ? 'Reconnecting…'
+        : '';
+  return <View style={[styles.wrap,{ paddingBottom }]} accessibilityLabel={readOnly ? 'Crowd' : 'Live crowd'}>
     <View style={styles.heading}>
-      <Text style={[styles.label,{color:t.textSecondary}]}>LIVE CROWD</Text>
+      <Text style={[styles.label,{color:t.textSecondary}]}>{chrome.label}</Text>
       <Text accessibilityLiveRegion="polite" style={[styles.state,{color:t.textMuted}]}>
-        {crowd?.connected ? 'Live' : crowd?.context ? 'Reconnecting…' : ''}
+        {connectionState}
       </Text>
     </View>
     {crowd?.error ? <View style={styles.notice}><Text accessibilityRole="alert" style={{color:t.textSecondary}}>{crowd.error}</Text>

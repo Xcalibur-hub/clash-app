@@ -85,6 +85,8 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
   // Restrained, in-flow verdict cue: a short gold rule before the eyebrow.
   // It cannot overlap the headline, fighters or percentages because it shares
   // the sheet's layout flow instead of being absolutely positioned.
+  const eyebrow =
+    duel.status === 'cancelled' ? 'CANCELLED' : view.kind === 'settled' ? 'VERDICT' : 'OUTCOME';
   const accent = (
     <View style={styles.eyebrowRow}>
       <View
@@ -95,7 +97,7 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
           { backgroundColor: hexWithAlpha('#F5D76E', t.scheme === 'light' ? 0.95 : 0.85) },
         ]}
       />
-      <Text style={[styles.eyebrow, { color: t.textMuted }]}>VERDICT</Text>
+      <Text style={[styles.eyebrow, { color: t.textMuted }]}>{eyebrow}</Text>
     </View>
   );
 

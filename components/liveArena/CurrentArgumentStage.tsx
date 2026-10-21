@@ -5,7 +5,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
-  FadeIn,
+  FadeInDown,
   useReducedMotion,
 } from 'react-native-reanimated';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
@@ -15,6 +15,7 @@ import { duelStageType } from '../../utils/duelStageLayout';
 import { sidePlateBorder } from './liveArenaStyles';
 import { arena } from '../../theme/arena';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { duration } from '../../theme/motion';
 import { tap as hapticTap } from '../../utils/haptics';
 
 export interface CurrentArgumentStageProps {
@@ -46,10 +47,12 @@ export function CurrentArgumentStage({
         : null;
   const accent = speaker?.tint ?? t.borderStrong;
   const body = message?.body?.trim() ?? '';
-  const { preview, truncated } = duelArgumentPreview(
-    body,
-    condensed ? 120 : 220,
-  );
+  const previewLimit = condensed ? 110 : type.compact ? 160 : 220;
+  const { preview, truncated } = duelArgumentPreview(body, previewLimit);
+  const lineCap = condensed ? 3 : type.compact ? 5 : 6;
+  // Layout clipping can hide a mid-sentence ending even when the preview fits —
+  // keep an accessible route to the full argument whenever the body is long.
+  const needsFullAccess = truncated || body.length > previewLimit * 0.7;
 
   const content = !message || !speaker ? (
     <View style={styles.emptyWrap}>
@@ -65,6 +68,8 @@ export function CurrentArgumentStage({
       </Text>
       <Text
         selectable
+        numberOfLines={lineCap}
+        ellipsizeMode="tail"
         style={[
           styles.argument,
           condensed && styles.argumentCondensed,
@@ -81,12 +86,13 @@ export function CurrentArgumentStage({
         {speaker.name}
         {duelTimestamp(message.createdAt) ? ` · ${duelTimestamp(message.createdAt)}` : ''}
       </Text>
-      {truncated ? (
+      {needsFullAccess ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Read full argument"
+          accessibilityHint="Opens the full official argument history"
           onPress={() => {
-            hapticTap();
+            if (highlighted && !reduced) hapticTap();
             onOpenFull();
           }}
           style={styles.readMoreHit}
@@ -123,7 +129,10 @@ export function CurrentArgumentStage({
       {reduced || !message || !highlighted ? (
         content
       ) : (
-        <Animated.View key={message.id} entering={FadeIn.duration(180)}>
+        <Animated.View
+          key={message.id}
+          entering={FadeInDown.duration(duration.base)}
+        >
           {content}
         </Animated.View>
       )}

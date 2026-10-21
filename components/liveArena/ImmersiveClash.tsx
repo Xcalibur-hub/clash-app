@@ -30,6 +30,7 @@ import {
   duelStageMode,
   duelStageShare,
 } from '../../utils/duelStageLayout';
+import { stageEntranceKey } from '../../utils/duelStageMotion';
 
 export interface ImmersiveClashProps {
   duel: ArenaDuel;
@@ -118,11 +119,15 @@ export function ImmersiveClash({
   const cursor = latestMessage ? {id:latestMessage.id,createdAt:latestMessage.createdAt,preciseCreatedAt:latestMessage.preciseCreatedAt,kind:latestMessage.kind} : null;
   const moment = React.useRef({ scope: viewerScope, message: cursor });
   const [arrivedId, setArrivedId] = React.useState<string | null>(null);
+  const liveStage = live && !terminal;
+  const entranceKey = stageEntranceKey(duel.clashId, viewerScope);
   React.useEffect(() => {
     if (moment.current.scope !== viewerScope) { moment.current = {scope:viewerScope,message:cursor}; setArrivedId(null); return; }
     if (!latestMessage) return;
     if (isNewOfficialMoment(moment.current.message, latestMessage)) {
-      if (live) {
+      // Hydration sets the baseline without an arrival flash; only a newer live
+      // official moment after that baseline earns emphasis + haptic.
+      if (liveStage) {
         setArrivedId(latestMessage.id);
         if (AppState?.currentState === 'active') {
           if (!reduced) hapticTap();
@@ -132,7 +137,14 @@ export function ImmersiveClash({
       }
       moment.current.message = cursor;
     } else if (!moment.current.message) moment.current.message = cursor;
-  }, [viewerScope, latestMessage, live, reduced, focusSide, duel]);
+  }, [viewerScope, latestMessage, liveStage, reduced, focusSide, duel]);
+  React.useEffect(() => {
+    if (!arrivedId) return undefined;
+    const clear = setTimeout(() => setArrivedId(current => (current === arrivedId ? null : current)), 1600);
+    return () => clearTimeout(clear);
+  }, [arrivedId]);
+  const arrivalSide =
+    arrivedId && latestMessage?.id === arrivedId && liveStage ? focusSide : null;
   const split = useSharedValue(stageFlex);
   React.useEffect(() => {
     // Phase changes (OPEN -> FINAL -> JUDGING) move the split instead of snapping.
@@ -155,9 +167,9 @@ export function ImmersiveClash({
   return (
     <View style={styles.root} accessibilityLabel="Live Clash">
       <ClashEventHeader
-        live={live && !terminal}
+        live={liveStage}
         statusLabel={statusLabel}
-        phaseLabel={phaseLabel}
+        phaseLabel={liveStage ? phaseLabel : undefined}
         spectatorCount={spectatorCount}
         paddingTop={paddingTop}
         onBack={onBack}
@@ -221,6 +233,10 @@ export function ImmersiveClash({
               showPositions={false}
               backingSide={backingSide}
               onOpenProfile={onOpenProfile}
+              live={liveStage}
+              terminal={terminal}
+              entranceKey={entranceKey}
+              arrivalSide={arrivalSide}
             />
           </Animated.View>
         ) : (
@@ -233,7 +249,7 @@ export function ImmersiveClash({
           >
             <ClashProposition text={proposition} condensed={compact} />
 
-            {(roleLabel || onToggleFollow) ? (
+            {(roleLabel || onToggleFollow) && !terminal ? (
               <View style={styles.metaRow}>
                 {roleLabel ? (
                   <View
@@ -284,6 +300,10 @@ export function ImmersiveClash({
               condensed={false}
               backingSide={backingSide}
               onOpenProfile={onOpenProfile}
+              live={liveStage}
+              terminal={terminal}
+              entranceKey={entranceKey}
+              arrivalSide={arrivalSide}
             />
             {!judgingFocus ? (
               <CurrentArgumentStage
@@ -291,7 +311,7 @@ export function ImmersiveClash({
                 focusSide={focusSide}
                 message={latestMessage}
                 condensed={compact}
-                highlighted={arrivedId === latestMessage?.id}
+                highlighted={arrivedId === latestMessage?.id && liveStage}
                 onOpenFull={onViewHistory}
               />
             ) : null}

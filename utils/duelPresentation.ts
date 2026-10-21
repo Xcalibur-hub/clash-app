@@ -116,8 +116,12 @@ export function duelArgumentPreview(
   const text = body.trim();
   if (text.length <= limit) return { preview: text, truncated: false };
   const cut = text.slice(0, limit);
-  const soft = cut.lastIndexOf(' ');
-  const preview = (soft > limit * 0.55 ? cut.slice(0, soft) : cut).trimEnd();
+  // Prefer a word boundary; fall back to sentence punctuation before a hard cut.
+  const soft = Math.max(cut.lastIndexOf(' '), cut.lastIndexOf('\n'));
+  const punct = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '));
+  const breakAt =
+    soft > limit * 0.55 ? soft : punct > limit * 0.4 ? punct + 1 : -1;
+  const preview = (breakAt > 0 ? cut.slice(0, breakAt) : cut).trimEnd();
   return { preview: `${preview}…`, truncated: true };
 }
 

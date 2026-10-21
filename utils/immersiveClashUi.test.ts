@@ -1,5 +1,5 @@
 /**
- * UI Phase 1 — Immersive Live Duel presentation regressions.
+ * UI Phase 1 + Phase 2 — Immersive Live Duel presentation and motion regressions.
  * Source/contract guards only; no device rendering.
  */
 import assert from 'node:assert/strict';
@@ -13,6 +13,7 @@ import {
   duelStageMode,
   duelStageType,
 } from './duelStageLayout.ts';
+import { duelCrowdChrome, duelSpeakingCue, stageEntranceKey } from './duelStageMotion.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (relative: string): string =>
@@ -50,6 +51,9 @@ describe('UI Phase 1 immersive duel presentation', () => {
     assert.match(rail, /YOUR SIDE/);
     assert.match(rail, /SPEAKING/);
     assert.match(rail, /duelActiveSpeakers/);
+    assert.match(rail, /duelSpeakingCue/);
+    assert.match(rail, /shouldPlayOnce/);
+    assert.match(rail, /useReducedMotion/);
   });
 
   it('keeps argument stage reduced-motion aware and long-text collapse', () => {
@@ -58,13 +62,18 @@ describe('UI Phase 1 immersive duel presentation', () => {
     assert.match(stage, /duelArgumentPreview/);
     assert.match(stage, /Read full argument/);
     assert.match(stage, /Awaiting the opening|Waiting for the opening/);
+    assert.match(stage, /FadeInDown/);
+    assert.match(stage, /numberOfLines/);
   });
 
   it('separates Crowd from Stage without production fixtures', () => {
     const crowd = read('components/liveArena/LiveCrowdLayer.tsx');
     const shell = read('components/liveArena/ImmersiveClash.tsx');
-    assert.match(crowd, /LIVE CROWD/);
+    assert.match(crowd, /duelCrowdChrome/);
+    assert.match(crowd, /chrome\.label/);
     assert.match(crowd, /crowd\?\.messages/);
+    assert.match(read('utils/duelStageMotion.ts'), /LIVE CROWD/);
+    assert.match(read('utils/duelStageMotion.ts'), /'CROWD'/);
     assert.doesNotMatch(crowd, /DEV_LAYOUT_ROWS|showDevLayout|FloatingReaction/);
     assert.doesNotMatch(crowd, /withRepeat|Animated\.loop/);
     assert.match(shell, /Spectator conversation/);
@@ -86,5 +95,44 @@ describe('UI Phase 1 immersive duel presentation', () => {
     assert.match(src, /terminal === 'cancelled'/);
     assert.match(src, /canBack && !judgingFocus && !condensed/);
     assert.match(src, /ClashBackingActions/);
+  });
+});
+
+describe('UI Phase 2 live-event motion and terminal polish', () => {
+  it('gates Stage entrance once and wires arrival without hydration replay', () => {
+    const shell = read('components/liveArena/ImmersiveClash.tsx');
+    assert.match(shell, /stageEntranceKey/);
+    assert.match(shell, /isNewOfficialMoment/);
+    assert.match(shell, /liveStage/);
+    assert.match(shell, /arrivalSide/);
+    assert.match(shell, /setTimeout\(\(\) => setArrivedId/);
+    assert.equal(stageEntranceKey('c1', 'scope'), 'stage-entrance:c1:scope');
+  });
+
+  it('stops SPEAKING and Live chrome after the duel ends', () => {
+    assert.equal(duelSpeakingCue({ live: true, terminal: 'settled', focusSide: 'A', side: 'A' }), false);
+    assert.deepEqual(duelCrowdChrome(true), { label: 'CROWD', idleState: 'Closed' });
+    const shell = read('components/liveArena/ImmersiveClash.tsx');
+    assert.match(shell, /live=\{liveStage\}/);
+    assert.match(shell, /terminal=\{terminal\}/);
+    const demo = read('components/dev/arenaDemo/DemoArena.tsx');
+    assert.match(demo, /terminal=\{closed \?/);
+  });
+
+  it('keeps verdict reveal one-shot with cancelled distinction', () => {
+    const verdict = read('components/liveArena/VerdictReveal.tsx');
+    assert.match(verdict, /shouldPlayOnce\(momentKey\)/);
+    assert.match(verdict, /useReducedMotion/);
+    assert.match(verdict, /CANCELLED/);
+    assert.match(verdict, /VERDICT/);
+  });
+
+  it('offers accessible full argument access in compact and truncated modes', () => {
+    const stage = read('components/liveArena/CurrentArgumentStage.tsx');
+    assert.match(stage, /needsFullAccess/);
+    assert.match(stage, /Read full argument/);
+    assert.match(stage, /accessibilityHint/);
+    const shell = read('components/liveArena/ImmersiveClash.tsx');
+    assert.match(shell, /Official argument · Read full/);
   });
 });

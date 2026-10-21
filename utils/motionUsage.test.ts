@@ -39,6 +39,17 @@ describe('motion wiring', () => {
     const stage = read('components/liveArena/ImmersiveClash.tsx');
     assert.match(stage, /FadeIn\.duration\(140\)/);
     assert.match(stage, /reduced \? undefined : FadeIn/);
+    assert.match(stage, /stageEntranceKey/);
+    assert.match(stage, /arrivalSide/);
+  });
+
+  it('animates new official arguments with reduced-motion fallback', () => {
+    const argument = read('components/liveArena/CurrentArgumentStage.tsx');
+    assert.match(argument, /FadeInDown/);
+    assert.match(argument, /reduced \|\| !message \|\| !highlighted/);
+    const rail = read('components/liveArena/ClashFighterRail.tsx');
+    assert.match(rail, /shouldPlayOnce\(`\$\{entranceKey\}:\$\{side\}`\)/);
+    assert.match(rail, /useReducedMotion/);
   });
 
   it('does not add continuous loops to the crowd layer', () => {
