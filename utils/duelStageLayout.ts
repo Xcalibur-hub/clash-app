@@ -28,8 +28,17 @@ export const DUEL_STAGE_MIN_SHARE = 0.55;
 /** Fixed Stage height while the Crowd is expanded or the keyboard is open. */
 export const DUEL_COMPACT_STAGE_HEIGHT = 132;
 
-/** The Crowd never collapses below its heading, stream and composer. */
+/**
+ * Expanded / keyboard Crowd floor — heading, stream peek and composer.
+ * Collapsed Crowd uses DUEL_CROWD_COLLAPSED_HEADER_HEIGHT instead.
+ */
 export const DUEL_CROWD_MIN_HEIGHT = 134;
+
+/**
+ * Header-only collapsed Crowd (toggle row). Keeps Stage first-screen room for
+ * SUPPORT / reactions / assist on A50-class heights without a message preview.
+ */
+export const DUEL_CROWD_COLLAPSED_HEADER_HEIGHT = 56;
 
 export interface DuelStageInput {
   judging: boolean;
@@ -55,6 +64,50 @@ export function duelStageShare(mode: DuelStageMode): number {
 /** Modes that pin the Stage to DUEL_COMPACT_STAGE_HEIGHT instead of a split. */
 export function duelStageIsSummary(mode: DuelStageMode): boolean {
   return mode === 'condensed' || mode === 'crowdExpanded';
+}
+
+/**
+ * Collapsed Crowd is header-only (no flex share, no message preview) so Stage
+ * spectator actions stay above the fold on compact Android heights.
+ * Expanded and keyboard modes keep the full Crowd stream — including when
+ * judging is active (judging still owns Stage share via duelStageMode).
+ */
+export function duelCrowdHeaderOnly(input: DuelStageInput): boolean {
+  return !input.condensed && !input.crowdExpanded;
+}
+
+export interface LayoutRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Axis-aligned overlap — used to guard Expand vs SUPPORT hit regions. */
+export function layoutRectsOverlap(a: LayoutRect, b: LayoutRect): boolean {
+  if (a.width <= 0 || a.height <= 0 || b.width <= 0 || b.height <= 0) return false;
+  return !(
+    a.x + a.width <= b.x ||
+    b.x + b.width <= a.x ||
+    a.y + a.height <= b.y ||
+    b.y + b.height <= a.y
+  );
+}
+
+/**
+ * On an A50-class canvas, header-only Crowd + pinned Stage actions must leave
+ * SUPPORT (and peers) fully above the Expand toggle.
+ */
+export function duelSpectatorActionsFitAboveCrowd(input: {
+  viewportHeight: number;
+  chromeHeight: number;
+  stageActionsHeight: number;
+  crowdHeaderHeight?: number;
+}): boolean {
+  const crowdHeader = input.crowdHeaderHeight ?? DUEL_CROWD_COLLAPSED_HEADER_HEIGHT;
+  const stageBudget =
+    input.viewportHeight - input.chromeHeight - crowdHeader;
+  return stageBudget >= input.stageActionsHeight && input.stageActionsHeight > 0;
 }
 
 export interface DuelStageType {

@@ -128,9 +128,13 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   if (name === 'spectator') {
     assert.match(html, /LIVE|Live Clash/);
     const css = html + renderToStaticMarkup(getStyleElement());
-    assert.match(css, /flex-grow:0\.72/, 'Official Stage must retain its primary share in the web render bridge');
-    assert.match(css, /flex-grow:0\.28/, 'Crowd must retain the complementary animated share');
-    assert.match(html, /CROWD|Live crowd|Crowd/);
+    // Phase 3.6: collapsed Crowd is header-only — Stage claims remaining canvas (flex-grow:1),
+    // Crowd toggle does not take a 28% empty flex share that buried SUPPORT on A50.
+    assert.match(css, /flex-grow:1/, 'Collapsed Stage claims remaining canvas above header-only Crowd');
+    assert.match(css, /flex-grow:0/, 'Collapsed Crowd does not steal Stage flex for a message preview');
+    assert.match(html, /CROWD|Live crowd|Crowd|SPECTATORS/);
+    assert.match(html, /Expand Crowd conversation|Expand/);
+    assert.match(html, /Spectator stage actions|SUPPORT KEVIN|Support Kevin|SUPPORTING|BACK KEVIN|BACKING/i);
     assert.match(html, /SUPPORT KEVIN|Support Kevin|SUPPORTING|BACK KEVIN|BACKING/i);
     assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat|52%|48%/);
     assert.doesNotMatch(html, /Backing supports a side during the Clash/);

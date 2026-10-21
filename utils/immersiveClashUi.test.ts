@@ -36,7 +36,8 @@ describe('UI Phase 1 immersive duel presentation', () => {
     ]) {
       assert.match(src, new RegExp(key));
     }
-    assert.match(src, /minHeight: 134/);
+    assert.match(src, /DUEL_CROWD_MIN_HEIGHT|minHeight: 134/);
+    assert.match(src, /DUEL_CROWD_COLLAPSED_HEADER_HEIGHT/);
     assert.match(src, /FadeIn\.duration\(140\)/);
     assert.match(src, /reduced \? undefined : FadeIn/);
     assert.match(src, /Read full current official argument/);

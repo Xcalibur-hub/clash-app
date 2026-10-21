@@ -7,9 +7,11 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  DUEL_CROWD_COLLAPSED_HEADER_HEIGHT,
   DUEL_CROWD_MIN_HEIGHT,
   DUEL_STAGE_MIN_SHARE,
   DUEL_STAGE_SHARE,
+  duelCrowdHeaderOnly,
   duelStageIsSummary,
   duelStageMode,
   duelStageShare,
@@ -42,6 +44,8 @@ describe('duel stage layout', () => {
 
   it('reserves a real minimum height for the Crowd', () => {
     assert.ok(DUEL_CROWD_MIN_HEIGHT >= 120);
+    assert.ok(DUEL_CROWD_COLLAPSED_HEADER_HEIGHT < DUEL_CROWD_MIN_HEIGHT);
+    assert.equal(duelCrowdHeaderOnly({ judging: false, condensed: false, crowdExpanded: false }), true);
   });
 
   it('tightens the ramp on an A50 at default font scale', () => {
