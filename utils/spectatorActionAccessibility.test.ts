@@ -128,7 +128,7 @@ describe('UI Phase 3.6 spectator action accessibility', () => {
     );
     const shell = read('components/liveArena/ImmersiveClash.tsx');
     assert.match(shell, /crowdHeaderOnly/);
-    assert.match(shell, /!crowdHeaderOnly \? \(/);
+    assert.match(shell, /Expand Crowd conversation|LiveCrowdLayer/);
     assert.match(shell, /LiveCrowdLayer/);
     assert.match(shell, /DUEL_COMPACT_STAGE_HEIGHT/);
   });
@@ -137,8 +137,9 @@ describe('UI Phase 3.6 spectator action accessibility', () => {
     const shell = read('components/liveArena/ImmersiveClash.tsx');
     assert.match(shell, /stageActions/);
     assert.match(shell, /showPinnedSpectatorActions/);
-    assert.match(shell, /crowdToggleCollapsed/);
-    assert.match(shell, /DUEL_CROWD_COLLAPSED_HEADER_HEIGHT/);
+    assert.match(shell, /stageActions/);
+    assert.match(shell, /Expand Crowd conversation/);
+    assert.match(shell, /Math\.max\(80,\s*DUEL_CROWD_COLLAPSED_HEADER_HEIGHT\)|height: 80/);
     assert.match(shell, /Live · tap Expand to read|History · tap Expand/);
     // Expand Pressable must not declare expanding hitSlop.
     assert.doesNotMatch(shell, /hitSlop=\{?\{[^}]*bottom:\s*[1-9]/);

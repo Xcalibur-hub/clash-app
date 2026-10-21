@@ -37,8 +37,9 @@ export const DUEL_CROWD_MIN_HEIGHT = 134;
 /**
  * Header-only collapsed Crowd (toggle row). Keeps Stage first-screen room for
  * SUPPORT / reactions / assist on A50-class heights without a message preview.
+ * Floor is ≥44dp accessible hit; 48dp preferred on compact Android (Phase 6.6).
  */
-export const DUEL_CROWD_COLLAPSED_HEADER_HEIGHT = 56;
+export const DUEL_CROWD_COLLAPSED_HEADER_HEIGHT = 48;
 
 export interface DuelStageInput {
   judging: boolean;

@@ -80,6 +80,7 @@ function ScopeChip({
 
   return (
     <Pressable
+      collapsable={false}
       onPress={() => {
         hapticTap();
         onPress();
@@ -120,9 +121,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pill: {
-    minHeight: 36,
+    // 48dp avoids 420dpi rounding of 44→43.8dp on A50 (Phase 6.6).
+    minHeight: 48,
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 12,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
@@ -134,9 +136,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   hoodChip: {
-    minHeight: 36,
+    minHeight: 48,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 12,
     justifyContent: 'center',
   },
   hoodLabel: { ...typeScale.label, fontSize: 13, fontWeight: '500', letterSpacing: -0.1 },

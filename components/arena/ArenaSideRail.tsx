@@ -37,6 +37,7 @@ export function ArenaSideRail({
         return (
           <Pressable
             key={item.id}
+            collapsable={false}
             onPress={() => {
               if (!selected) {
                 tap();
@@ -75,12 +76,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   item: {
-    minHeight: 40,
+    // 48dp avoids 420dpi rounding of 44→43.8dp on A50 (Phase 6.6).
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 10,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
   },

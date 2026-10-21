@@ -47,6 +47,24 @@ describe('arena UI consistency', () => {
     assert.match(assist, /paddingBottom: space\.lg/);
   });
 
+  it('Phase 6.6: Home rail, scope chips and Expand Crowd keep ≥44dp hits', () => {
+    const rail = read('components/arena/ArenaSideRail.tsx');
+    assert.match(rail, /minHeight: 48/);
+    assert.match(rail, /collapsable=\{false\}/);
+    const scopes = read('components/arena/ArenaDiscoveryRail.tsx');
+    assert.match(scopes, /minHeight: 48/);
+    assert.match(scopes, /collapsable=\{false\}/);
+    const clash = read('components/liveArena/ImmersiveClash.tsx');
+    assert.match(clash, /stageWithCollapsedCrowd/);
+    assert.match(clash, /Expand Crowd conversation/);
+    assert.match(clash, /Math\.max\(80,\s*DUEL_CROWD_COLLAPSED_HEADER_HEIGHT\)|height: 80/);
+    assert.match(clash, /paddingBottom: 96/);
+    assert.match(clash, /collapsable=\{false\}/);
+    assert.doesNotMatch(clash, /hitSlop=\{?\{[^}]*bottom:\s*[1-9]/);
+    const layout = read('utils/duelStageLayout.ts');
+    assert.match(layout, /DUEL_CROWD_COLLAPSED_HEADER_HEIGHT = 48/);
+  });
+
   it('exposes declined, cancelled, fighter-B and next-clash demo coverage', () => {
     const challenge = read('components/dev/arenaDemo/DemoChallenge.tsx');
     assert.match(challenge, /Declined/);

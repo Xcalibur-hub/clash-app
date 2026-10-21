@@ -175,6 +175,8 @@ export function ImmersiveClash({
   const compact = condensed || judgingFocus || crowdExpanded;
   const showPinnedSpectatorActions = !compactSummary;
   const showBackingActions = canBack && !judgingFocus && !condensed;
+  // Plain View when Crowd is collapsed — Reanimated host dropped absolute height:48 on A50.
+  const StageShell = crowdHeaderOnly ? View : Animated.View;
 
   return (
     <View style={styles.root} accessibilityLabel="Live Clash">
@@ -235,7 +237,15 @@ export function ImmersiveClash({
         </Text>
       ) : null}
 
-      <Animated.View style={[styles.stage, stageStyle, compactSummary ? { height: DUEL_COMPACT_STAGE_HEIGHT, minHeight: DUEL_COMPACT_STAGE_HEIGHT, flexShrink: 0 } : null]}>
+      <StageShell
+        style={[
+          styles.stage,
+          crowdHeaderOnly ? styles.stageWithCollapsedCrowd : stageStyle,
+          compactSummary
+            ? { height: DUEL_COMPACT_STAGE_HEIGHT, minHeight: DUEL_COMPACT_STAGE_HEIGHT, flexShrink: 0 }
+            : null,
+        ]}
+      >
         {compact && latestMessage && !judgingFocus ? (
           <Pressable
             accessibilityRole="button"
@@ -350,7 +360,11 @@ export function ImmersiveClash({
             </ScrollView>
             {showPinnedSpectatorActions ? (
               <View
-                style={styles.stageActions}
+                style={[
+                  styles.stageActions,
+                  // Clear absolute Expand strip (style height below → ≥44dp a11y on A50).
+                  crowdHeaderOnly ? { paddingBottom: 96 } : null,
+                ]}
                 accessibilityLabel={judgingFocus ? 'Official judging actions' : 'Spectator stage actions'}
               >
                 {showBackingActions ? (
@@ -363,61 +377,103 @@ export function ImmersiveClash({
                 {stageFooter}
               </View>
             ) : null}
+            {crowdHeaderOnly ? (
+              // Wrapper View owns the 48dp frame; Pressable fills it (ArenaButton/host pattern).
+              <View
+                collapsable={false}
+                pointerEvents="box-none"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  // Style 80 → ≥44dp a11y on A50 (literal 48 ≈ content ~16dp under Stage flex).
+                  // Target measured height ≈ DUEL_CROWD_COLLAPSED_HEADER_HEIGHT (48dp).
+                  height: Math.max(80, DUEL_CROWD_COLLAPSED_HEADER_HEIGHT),
+                  zIndex: 2,
+                }}
+              >
+                <Pressable
+                  collapsable={false}
+                  accessibilityRole="button"
+                  accessibilityLabel="Expand Crowd conversation"
+                  accessibilityHint={
+                    terminal
+                      ? 'Gives the spectator Crowd more space. Conversation history.'
+                      : 'Gives the spectator Crowd more space. Live conversation — tap Expand to read.'
+                  }
+                  accessibilityState={{ expanded: false }}
+                  onPress={() => setCrowdExpanded(true)}
+                  style={{
+                    flex: 1,
+                    minHeight: 48,
+                    paddingHorizontal: 20,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: t.surface,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: t.border,
+                  }}
+                >
+                  <View style={styles.crowdToggleCopy} pointerEvents="none">
+                    <Text style={[styles.crowdToggleEyebrow, { color: t.textMuted }]}>SPECTATORS</Text>
+                    <Text style={[styles.crowdToggleTitle, { color: t.textPrimary }]}>Crowd</Text>
+                    <Text style={[styles.crowdToggleSub, { color: t.textMuted }]} numberOfLines={1}>
+                      {terminal ? 'History · tap Expand' : 'Live · tap Expand to read'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.crowdToggleAction, { color: t.textSecondary }]} pointerEvents="none">
+                    Expand
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
           </>
         )}
-      </Animated.View>
+      </StageShell>
 
-      {crowdAvailable ? (
-        <Animated.View
-          style={[
-            styles.crowd,
-            {
-              borderTopColor: t.border,
-              backgroundColor: t.background,
-              minHeight: crowdHeaderOnly ? DUEL_CROWD_COLLAPSED_HEADER_HEIGHT : DUEL_CROWD_MIN_HEIGHT,
-            },
-            crowdStyle,
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={crowdExpanded ? 'Focus official Stage' : 'Expand Crowd conversation'}
-            accessibilityState={{ expanded: crowdExpanded }}
-            accessibilityHint={
-              crowdExpanded
-                ? 'Returns focus to the official Stage'
-                : 'Gives the spectator Crowd more space'
-            }
-            onPress={() => setCrowdExpanded(value => !value)}
+      {crowdAvailable && !crowdHeaderOnly ? (
+          <Animated.View
+            collapsable={false}
             style={[
-              styles.crowdToggle,
-              crowdHeaderOnly ? styles.crowdToggleCollapsed : null,
-              { backgroundColor: t.surface, borderBottomColor: crowdHeaderOnly ? 'transparent' : t.border },
+              styles.crowd,
+              {
+                borderTopColor: t.border,
+                backgroundColor: t.background,
+                minHeight: DUEL_CROWD_MIN_HEIGHT,
+              },
+              crowdStyle,
             ]}
           >
-            <View style={styles.crowdToggleCopy} pointerEvents="none">
-              <Text style={[styles.crowdToggleEyebrow, { color: t.textMuted }]}>SPECTATORS</Text>
-              <Text style={[styles.crowdToggleTitle, { color: t.textPrimary }]}>Crowd</Text>
-              {crowdHeaderOnly ? (
-                <Text style={[styles.crowdToggleSub, { color: t.textMuted }]} numberOfLines={1}>
-                  {terminal ? 'History · tap Expand' : 'Live · tap Expand to read'}
-                </Text>
-              ) : (
+            <Pressable
+              collapsable={false}
+              accessibilityRole="button"
+              accessibilityLabel="Focus official Stage"
+              accessibilityState={{ expanded: true }}
+              accessibilityHint="Returns focus to the official Stage"
+              onPress={() => setCrowdExpanded(false)}
+              style={[
+                styles.crowdToggle,
+                { backgroundColor: t.surface, borderBottomColor: t.border },
+              ]}
+            >
+              <View style={styles.crowdToggleCopy} pointerEvents="none">
+                <Text style={[styles.crowdToggleEyebrow, { color: t.textMuted }]}>SPECTATORS</Text>
+                <Text style={[styles.crowdToggleTitle, { color: t.textPrimary }]}>Crowd</Text>
                 <Text style={[styles.crowdToggleSub, { color: t.textMuted }]}>
                   {terminal ? 'Conversation history' : 'Live conversation · separate from Stage'}
                 </Text>
-              )}
-            </View>
-            <Text style={[styles.crowdToggleAction, { color: t.textSecondary }]} pointerEvents="none">
-              {crowdExpanded ? 'Focus Stage' : 'Expand'}
-            </Text>
-          </Pressable>
-          {reactionBurst && !terminal ? (
-            // One visual per authoritative count increase; the payload never
-            // exposes a tally, so no numeral is rendered.
-            <ReactionBurst emoji={reactionBurst.emoji} burstKey={reactionBurst.key} count={1} />
-          ) : null}
-          {!crowdHeaderOnly ? (
+              </View>
+              <Text style={[styles.crowdToggleAction, { color: t.textSecondary }]} pointerEvents="none">
+                Focus Stage
+              </Text>
+            </Pressable>
+            {reactionBurst && !terminal ? (
+              // One visual per authoritative count increase; the payload never
+              // exposes a tally, so no numeral is rendered.
+              <ReactionBurst emoji={reactionBurst.emoji} burstKey={reactionBurst.key} count={1} />
+            ) : null}
             <LiveCrowdLayer
               readOnly={Boolean(terminal) || duel.status !== 'open'}
               unavailableReason={crowdUnavailableReason}
@@ -427,8 +483,7 @@ export function ImmersiveClash({
               subdued={judgingFocus}
               paddingBottom={crowdPaddingBottom}
             />
-          ) : null}
-        </Animated.View>
+          </Animated.View>
       ) : null}
 
       {fighterComposer ? (
@@ -444,7 +499,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 0 },
   stage: {
     minHeight: 0,
-    overflow: 'hidden',
+    // visible so absolute Expand (48dp) is not clipped at the Stage edge on Android.
+    overflow: 'visible',
+  },
+  /** Static flex when Crowd is header-only — guarantees dock keeps 48dp on Android. */
+  stageWithCollapsedCrowd: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minHeight: 0,
   },
   stageScroll: { flex: 1, minHeight: 0 },
   stageContent: {
@@ -472,15 +535,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 12,
   },
-  crowdToggleCollapsed: {
-    minHeight: DUEL_CROWD_COLLAPSED_HEADER_HEIGHT,
-    maxHeight: DUEL_CROWD_COLLAPSED_HEADER_HEIGHT,
-    paddingVertical: 6,
-  },
-  crowdToggleCopy: { flex: 1, minWidth: 0, gap: 1 },
-  crowdToggleEyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
-  crowdToggleTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 0.15 },
-  crowdToggleSub: { fontSize: 11, fontWeight: '500' },
+  crowdToggleCopy: { flex: 1, minWidth: 0, gap: 0 },
+  crowdToggleEyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.1, lineHeight: 11 },
+  crowdToggleTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 0.15, lineHeight: 17 },
+  crowdToggleSub: { fontSize: 11, fontWeight: '500', lineHeight: 14 },
   crowdToggleAction: { fontSize: 12, fontWeight: '700', flexShrink: 0 },
   metaRow: {
     flexDirection: 'row',

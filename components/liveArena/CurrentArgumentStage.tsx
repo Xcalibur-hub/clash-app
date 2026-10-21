@@ -103,12 +103,13 @@ export function CurrentArgumentStage({
         </Pressable>
       ) : (
         <Pressable
+          collapsable={false}
           accessibilityRole="button"
           accessibilityLabel="Open argument history"
           onPress={onOpenFull}
           style={styles.readMoreHit}
         >
-          <Text style={[styles.historyCue, { color: t.textSecondary }]}>
+          <Text style={[styles.historyCue, { color: t.textSecondary }]} pointerEvents="none">
             View argument history →
           </Text>
         </Pressable>
