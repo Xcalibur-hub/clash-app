@@ -12,6 +12,7 @@ import {
   WORLD_ACTIVITY_LIMIT,
   type WorldCountryActivity,
 } from '../../utils/exploreWorldModel';
+import { worldPanelRailInset } from '../../utils/exploreWorldLayout';
 import { WorldActiveRail } from './WorldActiveRail';
 import { WorldCountryPanel } from './WorldCountryPanel';
 import { WorldSurpriseCard } from './WorldSurpriseCard';
@@ -66,16 +67,18 @@ export function WorldExperience({
           No public activity to map yet. Pick any country to look around.
         </Text>
       ) : selectedCode ? (
-        <WorldCountryPanel
-          code={selectedCode}
-          name={name}
-          activityCount={activityCount}
-          content={worldCountryContent(challenges, treasures, selectedCode)}
-          onOpenCountry={onOpenCountry}
-          onOpenChallenge={onOpenChallenge}
-          onOpenTreasure={onOpenTreasure}
-          onClear={onClear}
-        />
+        <View style={styles.panelShell}>
+          <WorldCountryPanel
+            code={selectedCode}
+            name={name}
+            activityCount={activityCount}
+            content={worldCountryContent(challenges, treasures, selectedCode)}
+            onOpenCountry={onOpenCountry}
+            onOpenChallenge={onOpenChallenge}
+            onOpenTreasure={onOpenTreasure}
+            onClear={onClear}
+          />
+        </View>
       ) : (
         <WorldSurpriseCard onPress={onSurprise} />
       )}
@@ -86,4 +89,6 @@ export function WorldExperience({
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
   empty: { ...typeScale.caption, fontSize: 12, paddingVertical: space.xs },
+  /** Reserves the floating modes-rail footprint so dismiss + CTA stay reachable. */
+  panelShell: { marginRight: worldPanelRailInset() },
 });

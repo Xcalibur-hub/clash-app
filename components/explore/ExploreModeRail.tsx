@@ -23,13 +23,19 @@ import {
   EXPLORE_MODES,
   type ExploreMode,
 } from '../../utils/exploreForYouRank';
+import {
+  EXPLORE_RAIL_COLLAPSED_W,
+  EXPLORE_RAIL_EXPANDED_W,
+  EXPLORE_RAIL_ITEM,
+  EXPLORE_RAIL_RIGHT,
+} from '../../utils/exploreWorldLayout';
 import { exploreModeAccessibilityLabel } from '../../utils/exploreNav';
 import { tap as hapticTap } from '../../utils/haptics';
 
-const ITEM = 44;
-const COLLAPSED_W = 52;
-const EXPANDED_W = 128;
-const RAIL_RIGHT = 16;
+const ITEM = EXPLORE_RAIL_ITEM;
+const COLLAPSED_W = EXPLORE_RAIL_COLLAPSED_W;
+const EXPANDED_W = EXPLORE_RAIL_EXPANDED_W;
+const RAIL_RIGHT = EXPLORE_RAIL_RIGHT;
 const SPRING = { damping: 18, stiffness: 240, mass: 0.7 };
 
 const ICONS: Record<
@@ -47,10 +53,17 @@ export function ExploreModeRail({
   mode,
   onChange,
   bottomOffset = 120,
+  expandable = true,
 }: {
   mode: ExploreMode;
   onChange: (mode: ExploreMode) => void;
   bottomOffset?: number;
+  /**
+   * Label expansion is suspended while the country panel is open: the widened
+   * rail would otherwise paint over the panel's dismiss control and CTA.
+   * Mode navigation (every row) is always available.
+   */
+  expandable?: boolean;
 }): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
@@ -82,6 +95,13 @@ export function ExploreModeRail({
       if (collapseTimer.current) clearTimeout(collapseTimer.current);
     };
   }, []);
+
+  /** A panel opening under the rail must never leave an expanded label band behind. */
+  React.useEffect(() => {
+    if (expandable) return;
+    if (collapseTimer.current) clearTimeout(collapseTimer.current);
+    setExpanded(false);
+  }, [expandable]);
 
   const scheduleCollapse = () => {
     if (collapseTimer.current) clearTimeout(collapseTimer.current);
@@ -132,11 +152,16 @@ export function ExploreModeRail({
             key={item.id}
             onPress={() => {
               hapticTap();
+              if (!expandable) {
+                onChange(item.id);
+                return;
+              }
               if (!expanded) setExpanded(true);
               onChange(item.id);
               scheduleCollapse();
             }}
             onLongPress={() => {
+              if (!expandable) return;
               setExpanded(true);
               scheduleCollapse();
             }}

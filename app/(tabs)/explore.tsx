@@ -73,6 +73,7 @@ import {
   packExploreMosaicRows,
   type ForYouFilterId,
 } from '../../utils/exploreNav';
+import { exploreRailExpandable, EXPLORE_WORLD_CONTENT_RIGHT } from '../../utils/exploreWorldLayout';
 import { worldActivityCountries } from '../../utils/exploreWorldModel';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -310,6 +311,9 @@ function ExploreScreen(): React.JSX.Element {
 
   const mosaicRows = React.useMemo(() => packExploreMosaicRows(feedTiles), [feedTiles]);
 
+  /** The country panel sits under the floating rail — labels must not expand over it. */
+  const countryPanelOpen = mode === 'world' && selectedCountry !== null;
+
   const headerAnim = useAnimatedStyle(() => ({
     opacity: 1 - headerCollapse.value * 0.15,
     transform: [{ translateY: -headerCollapse.value * 6 }],
@@ -425,7 +429,7 @@ function ExploreScreen(): React.JSX.Element {
               paddingBottom: dockBottomPadding(insets.bottom),
               gap: space.md,
               paddingTop: space.xs,
-              paddingRight: layout.screenX + 8,
+              paddingRight: EXPLORE_WORLD_CONTENT_RIGHT,
             }}
             showsVerticalScrollIndicator={false}
             onScroll={(e) => onFeedScroll(e.nativeEvent.contentOffset.y)}
@@ -616,6 +620,7 @@ function ExploreScreen(): React.JSX.Element {
         mode={mode}
         onChange={changeMode}
         bottomOffset={dockBottomPadding(insets.bottom) - 24}
+        expandable={exploreRailExpandable(countryPanelOpen)}
       />
 
       <CountryPickerSheet
@@ -932,4 +937,11 @@ const styles = StyleSheet.create({
   },
 });
 
-export default withExploreAccount(ExploreScreen);
+/**
+ * World keeps its discovery context across navigation: `retainAcrossPaths` scopes
+ * the boundary by account only, so pushing a country page (or switching tabs)
+ * returns to the same mode, map/globe and selected country instead of remounting
+ * at For You. Identity changes still reset it.
+ */
+export default withExploreAccount(ExploreScreen, { retainAcrossPaths: true });
+
