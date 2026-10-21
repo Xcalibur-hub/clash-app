@@ -7,7 +7,7 @@ import { takeChallengeIneligibility } from '../../../utils/takeChallengeEligibil
 
 export const DEMO_CANARY = 'CLASH_DEMO_ARENA_FIXTURES_V1_NOT_FOR_RELEASE';
 export type Page = { kind: 'challenge' | 'home' | 'take' | 'live' | 'room' | 'groups' | 'group' | 'discover' | 'topic'; id?: string };
-export type Phase = 'OPEN' | 'FINAL' | 'JUDGING' | 'SETTLED' | 'DRAW' | 'CANCELLED';
+export type Phase = 'OPEN' | 'FINAL' | 'JUDGING' | 'SETTLED' | 'SETTLED_B' | 'DRAW' | 'CANCELLED';
 export type Role = 'spectator' | 'fighter_a' | 'fighter_b';
 export type DemoMediaKind = 'image' | 'video' | 'gif';
 export interface DemoTake { take: Take; replies: number; media?: DemoMediaKind }
@@ -81,7 +81,8 @@ export type DemoAction =
   | { type: 'crowd'; text: string; key: string } | { type: 'official'; text: string }
   | { type: 'assist'; text: string; target: 'A' | 'B'; media?: DemoMediaKind }
   | { type: 'assist-decision'; id: string; decision: 'accepted' | 'rejected' } | { type: 'assist-publish'; id: string };
-const terminal = (s: DemoState) => ['SETTLED', 'DRAW', 'CANCELLED'].includes(s.phase);
+const terminal = (s: DemoState) =>
+  ['SETTLED', 'SETTLED_B', 'DRAW', 'CANCELLED'].includes(s.phase);
 const sideFor = (s: DemoState) => s.role === 'fighter_a' ? 'A' : s.role === 'fighter_b' ? 'B' : null;
 export function demoReducer(s: DemoState, a: DemoAction): DemoState {
   const notice = (text: string) => ({ ...s, notice: text });
@@ -127,9 +128,50 @@ export function demoReducer(s: DemoState, a: DemoAction): DemoState {
   }
 }
 export function demoDuel(s: DemoState): ArenaDuel {
-  const index = Math.max(0, s.data.takes.findIndex(t => t.take.id === s.page.id));
-  const fighterA = s.data.authors[index === 0 ? 0 : (index + 2) % s.data.authors.length], fighterB = s.data.authors[index === 0 ? 1 : (index + 3) % s.data.authors.length];
-  return { clashId: 'demo-clash', status: terminal(s) ? s.phase === 'CANCELLED' ? 'cancelled' : 'settled' : 'open', fighterA: { ...fighterA, tint: '#6489AC' }, fighterB: { ...fighterB, tint: '#AA7575' }, viewerRelationship: s.role, mayJudge: s.phase === 'JUDGING' && s.role === 'spectator', hasJudged: false, sourceText: s.data.takes.find(t => t.take.id === s.page.id)?.take.text ?? s.data.takes[0].take.text, counterPosition: 'We should measure intention and access, not simply minimise screen time.', verdict: s.phase === 'SETTLED' || s.phase === 'DRAW' ? { winnerSide: s.phase === 'DRAW' ? 'DRAW' : 'A', jurySize: 6, sideAScore: s.phase === 'DRAW' ? 3 : 4, sideBScore: s.phase === 'DRAW' ? 3 : 2, verdictLabel: 'SCRIPTED DEMO RESULT' } : null };
+  const index = Math.max(0, s.data.takes.findIndex((t) => t.take.id === s.page.id));
+  const fighterA =
+    s.data.authors[index === 0 ? 0 : (index + 2) % s.data.authors.length];
+  const fighterB =
+    s.data.authors[index === 0 ? 1 : (index + 3) % s.data.authors.length];
+  const settledVerdict =
+    s.phase === 'DRAW'
+      ? {
+          winnerSide: 'DRAW' as const,
+          jurySize: 6,
+          sideAScore: 3,
+          sideBScore: 3,
+          verdictLabel: 'SCRIPTED DEMO RESULT',
+        }
+      : s.phase === 'SETTLED_B'
+        ? {
+            winnerSide: 'B' as const,
+            jurySize: 6,
+            sideAScore: 2,
+            sideBScore: 4,
+            verdictLabel: 'SCRIPTED DEMO RESULT',
+          }
+        : s.phase === 'SETTLED'
+          ? {
+              winnerSide: 'A' as const,
+              jurySize: 6,
+              sideAScore: 4,
+              sideBScore: 2,
+              verdictLabel: 'SCRIPTED DEMO RESULT',
+            }
+          : null;
+  return {
+    clashId: 'demo-clash',
+    status: terminal(s) ? (s.phase === 'CANCELLED' ? 'cancelled' : 'settled') : 'open',
+    fighterA: { ...fighterA, tint: '#6489AC' },
+    fighterB: { ...fighterB, tint: '#AA7575' },
+    viewerRelationship: s.role,
+    mayJudge: s.phase === 'JUDGING' && s.role === 'spectator',
+    hasJudged: false,
+    sourceText:
+      s.data.takes.find((t) => t.take.id === s.page.id)?.take.text ?? s.data.takes[0].take.text,
+    counterPosition: 'We should measure intention and access, not simply minimise screen time.',
+    verdict: settledVerdict,
+  };
 }
 export function visibleDemoAssists(s: DemoState): DemoAssist[] {
   return s.role === 'spectator' ? s.assists.filter(a => a.isOwn) : s.assists.filter(a => a.target === sideFor(s));

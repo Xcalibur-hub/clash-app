@@ -181,7 +181,17 @@ export function ImmersiveClash({
       <ClashEventHeader
         live={liveStage}
         statusLabel={statusLabel}
-        phaseLabel={liveStage ? phaseLabel : undefined}
+        phaseLabel={
+          liveStage
+            ? judgingFocus
+              ? 'JUDGING'
+              : phaseLabel
+            : terminal === 'cancelled'
+              ? 'CANCELLED'
+              : terminal === 'settled'
+                ? 'SETTLED'
+                : undefined
+        }
         spectatorCount={spectatorCount}
         paddingTop={paddingTop}
         onBack={onBack}

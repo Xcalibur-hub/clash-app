@@ -219,6 +219,10 @@ for (const [name, element] of Object.entries(challengeCases)) {
     assert.match(html, /2 invitations|Pending|PENDING/);
   }
   if (name === 'challenge-confirmed') assert.match(html, /CHALLENGE ACCEPTED|CONFIRMED|ENTERING ARENA/);
+  // Comfort hit targets for Stage history cue (Phase 6).
+  if (name === 'spectator' || name === 'fighter') {
+    assert.match(html, /View argument history|Read full argument|OFFICIAL ARGUMENT|Current argument/i);
+  }
   if (name === 'crowd-shell') {
     assert.match(html, /Crowd|CROWD/);
     assert.doesNotMatch(html, /Send|Post a message|Compose/);

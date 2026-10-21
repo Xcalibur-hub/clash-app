@@ -66,7 +66,15 @@ export function ArenaDivider(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  button: { minHeight: arena.hit, minWidth: arena.hit, paddingHorizontal: 14, paddingVertical: 10, borderRadius: arena.radius.md, justifyContent: 'center', alignItems: 'center' },
+  button: {
+    minHeight: arena.hit,
+    minWidth: arena.hit,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: arena.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   badge: { alignSelf: 'flex-start', borderRadius: arena.radius.pill, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
   surface: { borderRadius: arena.radius.lg, borderWidth: 1, padding: 14 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },

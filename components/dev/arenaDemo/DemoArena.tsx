@@ -22,11 +22,15 @@ import { DemoMedia } from './DemoMedia';
 import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
 import { DemoLiveDiscovery } from './DemoLiveDiscovery';
 import { DemoChallenge } from './DemoChallenge';
+import { DemoFreshTakesPreview } from './DemoFreshTakesPreview';
 import { DemoConstellation, DemoForm, DemoSheet, DemoText, DemoThread } from './DemoParts';
 import { createDemoState, demoDuel, demoReducer, visibleDemoAssists, type DemoAction, type DemoMediaKind, type DemoState, type DemoTake, type Page, type Phase, type Role } from './model';
 
 type Dispatch = React.Dispatch<DemoAction>;
-type Sheet = { kind: 'reply' | 'challenge' | 'history'; id: string; parentId?: string } | { kind: 'assists' | 'arguments' | 'scenarios' } | { kind: 'media'; media: DemoMediaKind };
+type Sheet =
+  | { kind: 'reply' | 'challenge' | 'history'; id: string; parentId?: string }
+  | { kind: 'assists' | 'arguments' | 'scenarios' | 'fresh' }
+  | { kind: 'media'; media: DemoMediaKind };
 const tabs = ['home', 'live', 'groups', 'discover'] as const;
 const titles = { home: 'Home', live: 'Live', groups: 'Groups', discover: 'Discover' };
 export interface DemoArenaProps { onExit: () => void; initialPage?: Page; initialTheme?: 'dark' | 'light' }
@@ -86,14 +90,15 @@ function DemoSurface({ state: s, dispatch, onExit }: { state: DemoState; dispatc
     </KeyboardAvoidingView>
     {s.notice ? <View style={[styles.notice, { backgroundColor: c.inset }]}><Text accessibilityLiveRegion="polite" style={[arena.type.meta, { color: c.ink, flex: 1 }]}>DEMO · {s.notice}</Text><ArenaButton label="Dismiss" variant="tertiary" onPress={() => notice('')} /></View> : null}
     {showTabs && !keyboardOpen ? <View style={[styles.tabs, { paddingBottom: Math.max(insets.bottom, 8), borderTopColor: c.line }]} accessibilityRole="tablist">{tabs.map(tab => <ArenaButton key={tab} label={titles[tab]} selected={s.page.kind === tab} variant={s.page.kind === tab ? 'secondary' : 'tertiary'} onPress={() => navigate({ kind: tab }, true)} style={{ flex: 1, paddingHorizontal: 3 }} />)}</View> : <View style={{ height: keyboardOpen ? 0 : insets.bottom }} />}
-    {sheet ? <DemoSheet title={sheet.kind === 'assists' ? 'Private assists' : sheet.kind} onClose={() => setSheet(undefined)}>
+    {sheet ? <DemoSheet title={sheet.kind === 'assists' ? 'Private assists' : sheet.kind === 'fresh' ? 'Fresh Takes preview' : sheet.kind} onClose={() => setSheet(undefined)}>
       {sheet.kind === 'reply' ? <DemoForm label="Write a demo reply" onSend={(text, media) => { dispatch({ type: 'reply', id: sheet.id, parentId: sheet.parentId, text, media, at: Date.now() }); setSheet(undefined); }} /> : null}
       {sheet.kind === 'challenge' ? <><DemoText>A local counter-position. The normal 30-minute eligibility rule is retained for this simulation.</DemoText><DemoForm label="Demo counter-position (20–500 characters)" attachments={false} max={500} onSend={text => { dispatch({ type: 'challenge', id: sheet.id, text, at: Date.now() }); setSheet(undefined); }} /></> : null}
       {sheet.kind === 'history' ? <><DemoText>DEMO · Historical challenges and scripted outcomes</DemoText><ArenaSurface><DemoText heading>Accepted · completed discussion</DemoText><DemoText>A thoughtful counter-position from Priya.</DemoText><ArenaButton label="View settled demo duel" onPress={() => openRoom(sheet.id, 'SETTLED')} /></ArenaSurface><ArenaSurface><DemoText>Cancelled · no verdict</DemoText><ArenaButton label="View cancelled demo duel" onPress={() => openRoom(sheet.id, 'CANCELLED')} /></ArenaSurface>{s.challenges[sheet.id] ? <ArenaSurface><DemoText>Pending · {s.challenges[sheet.id]}</DemoText><ArenaButton label="Simulate acceptance" onPress={() => openRoom(sheet.id)} /></ArenaSurface> : null}</> : null}
       {sheet.kind === 'assists' ? <DemoAssists state={s} dispatch={dispatch} /> : null}
       {sheet.kind === 'arguments' ? s.official.map(message => <ArenaSurface key={message.id}><DemoText heading>Fighter {message.side} · DEMO argument</DemoText><DemoText>{message.text}</DemoText></ArenaSurface>) : null}
       {sheet.kind === 'media' ? <><DemoMedia kind={sheet.media} /><DemoText>Local illustration / animation. Native video playback, uploads and device pickers are not used in Demo Arena.</DemoText></> : null}
-      {sheet.kind === 'scenarios' ? <><DemoText>Preview empty, loading and error states without changing connectivity.</DemoText>{(['populated', 'empty', 'loading', 'error'] as const).map(value => <ArenaButton key={value} label={`Show ${value} demo`} onPress={() => { setStatus(value); setSheet(undefined); }} />)}<ArenaButton label="Reset demo content" onPress={() => { dispatch({ type: 'reset', now: Date.now() }); setSheet(undefined); }} /><DemoText>Reset affects only this in-memory demo session.</DemoText></> : null}
+      {sheet.kind === 'scenarios' ? <><DemoText>Preview empty, loading and error states without changing connectivity.</DemoText>{(['populated', 'empty', 'loading', 'error'] as const).map(value => <ArenaButton key={value} label={`Show ${value} demo`} onPress={() => { setStatus(value); setSheet(undefined); }} />)}<ArenaButton label="Preview Fresh Takes cards" onPress={() => setSheet({ kind: 'fresh' })} /><ArenaButton label="Reset demo content" onPress={() => { dispatch({ type: 'reset', now: Date.now() }); setSheet(undefined); }} /><DemoText>Reset affects only this in-memory demo session.</DemoText></> : null}
+      {sheet.kind === 'fresh' ? <DemoFreshTakesPreview state={s} /> : null}
     </DemoSheet> : null}
   </View>;
 }
@@ -160,14 +165,199 @@ function DemoRoom({ state: s, dispatch, onBack, onAssists, onHistory }: { state:
   const presentation = duelPresentation(duel, phase);
   const latest: ArenaMessage = { id: last.id, roomId: 'demo-room', kind: 'text', body: last.text, parentMessageId: null, createdAt: last.createdAt ?? s.now, mediaUrl: null, mediaKind: null, gifProvider: null, gifExternalId: null, isOwn: s.role === `fighter_${last.side.toLowerCase()}`, author: { ...s.data.authors.find(author => author.id === (last.side === 'A' ? duel.fighterA.id : duel.fighterB.id))!, avatarTint: s.data.authors[0].tint }, reactions: [], replyCount: 0, argumentVotes: null };
   const crowd: CrowdModel = { messages: s.crowd, context: { roomId: 'demo-room', canSend: !closed, spectatorCount: 42, serverNow: new Date(s.now).toISOString(), closesAt: new Date(s.now + 1800000).toISOString() }, loading: false, error: null, connected: true, sending: false, hasOlder: false, olderBusy: false, identityVersion: ['spectator', 'fighter_a', 'fighter_b'].indexOf(s.role), refresh: async () => {}, loadOlder: async () => {}, send: async (text, key) => { if (closed || !validCrowdText(text)) return false; dispatch({ type: 'crowd', text, key }); return true; } };
-  return <View style={{ flex: 1 }}>{developerOpen ? <DemoSheet title="Developer controls" onClose={() => setDeveloperOpen(false)}><ArenaButton label="Simulate next official argument" disabled={!['OPEN','FINAL'].includes(s.phase)} onPress={() => {dispatch({type:'receive-argument',at:Date.now()});setDeveloperOpen(false);}} /><ArenaButton label="Advance demo phase" disabled={closed} onPress={() => {dispatch({type:'phase',phase:s.phase === 'OPEN' ? 'FINAL' : s.phase === 'FINAL' ? 'JUDGING' : 'SETTLED'});setDeveloperOpen(false);}} /><View style={styles.row}>{(['OPEN', 'FINAL', 'JUDGING', 'SETTLED', 'DRAW', 'CANCELLED'] as Phase[]).map(phase => <ArenaButton key={phase} label={phase} selected={s.phase === phase} variant="tertiary" onPress={() => { setBallot(undefined); dispatch({ type: 'phase', phase }); }} />)}</View>
-    <View style={styles.row}>{(['spectator', 'fighter_a', 'fighter_b'] as Role[]).map(role => <ArenaButton key={role} label={role === 'spectator' ? 'Spectator' : role === 'fighter_a' ? 'Fighter A' : 'Fighter B'} selected={s.role === role} variant="tertiary" onPress={() => dispatch({ type: 'role', role })} />)}<ArenaButton label="Private assists" onPress={onAssists} /></View>
-    </DemoSheet> : null}
-    {resultOpen ? <DemoSheet title="Scripted demo result" onClose={() => setResultOpen(false)}><DuelRoomOutcome revealMotion duel={duel} phase={phase} onJudge={async () => {}} onReview={() => {setResultOpen(false);onHistory();}} /></DemoSheet> : null}
-    <ImmersiveClash viewerScope={duel.clashId + s.role} eventHint={'DEMO · ' + presentation.hint} onViewResult={closed ? () => setResultOpen(true) : undefined} condensed={keyboardOpen} judgingFocus={s.phase === 'JUDGING'} duel={duel} proposition={duel.sourceText!} live={!closed} terminal={closed ? (s.phase === 'CANCELLED' ? 'cancelled' : 'settled') : null} statusLabel={closed ? 'DEMO HISTORY' : 'DEMO LIVE'} phaseLabel={closed ? undefined : s.phase} spectatorCount={42} focusSide={last.side} latestMessage={latest} paddingTop={4} backingSide={s.backing} onBackSide={side => dispatch({ type: 'backing', side })} canBack={!closed && s.role === 'spectator'} onBack={onBack} onOpenProfile={() => dispatch({ type: 'notice', text: 'Fictional fighter profile. No real profile was opened.' })} onViewHistory={onHistory} onMore={() => setDeveloperOpen(true)} roleLabel={closed ? undefined : `DEMO · ${s.role}`} crowd={crowd} reactionBurst={closed ? null : reaction}
-      stageFooter={<View style={{ paddingHorizontal: 16, gap: 8 }}>{duel.verdict ? <DemoText heading>{s.phase === 'DRAW' ? 'DRAW · 3–3' : 'Fighter A · 4–2'} · SCRIPTED DEMO RESULT</DemoText> : s.phase === 'CANCELLED' ? <DemoText>Cancelled · no verdict · DEMO</DemoText> : s.phase === 'JUDGING' ? <><DemoText>Demo judgement · no rewards or real verdict</DemoText><View style={styles.row}>{s.role === 'spectator' ? ['A', 'B'].map(side => <ArenaButton key={side} label={ballot === side ? `Voted ${side} · demo` : `Demo vote ${side}`} disabled={!!ballot} onPress={() => setBallot(side)} />) : <DemoText>Demo fighters cannot judge.</DemoText>}</View></> : <View style={styles.row}>{['👏', '🔥', '🤔'].map(emoji => <ArenaButton key={emoji} label={emoji} onPress={() => { setReaction({ emoji, key: String(Date.now()) }); dispatch({ type: 'notice', text: 'Reaction simulated locally.' }); }} />)}<ArenaButton label="Argument history" onPress={onHistory} /><ArenaButton label={s.role === 'spectator' ? 'Private assist' : 'Assist inbox'} onPress={onAssists} /></View>}</View>}
-      fighterComposer={s.role !== 'spectator' && ['OPEN', 'FINAL'].includes(s.phase) ? <View style={{ padding: 12 }}><DemoForm label="Official demo argument" attachments={false} max={1200} onSend={text => dispatch({ type: 'official', text })} /></View> : undefined} />
-  </View>;
+  const statusLabel =
+    closed
+      ? s.phase === 'CANCELLED'
+        ? 'DEMO CANCELLED'
+        : 'DEMO SETTLED'
+      : s.phase === 'JUDGING'
+        ? 'DEMO JUDGING'
+        : 'DEMO LIVE';
+  const verdictFoot =
+    s.phase === 'DRAW'
+      ? 'DRAW · 3–3 · SCRIPTED DEMO RESULT'
+      : s.phase === 'SETTLED_B'
+        ? 'Fighter B · 4–2 · SCRIPTED DEMO RESULT'
+        : 'Fighter A · 4–2 · SCRIPTED DEMO RESULT';
+  return (
+    <View style={{ flex: 1 }}>
+      {developerOpen ? (
+        <DemoSheet title="Developer controls" onClose={() => setDeveloperOpen(false)}>
+          <ArenaButton
+            label="Simulate next official argument"
+            disabled={!['OPEN', 'FINAL'].includes(s.phase)}
+            onPress={() => {
+              dispatch({ type: 'receive-argument', at: Date.now() });
+              setDeveloperOpen(false);
+            }}
+          />
+          <ArenaButton
+            label="Advance demo phase"
+            disabled={closed}
+            onPress={() => {
+              dispatch({
+                type: 'phase',
+                phase:
+                  s.phase === 'OPEN'
+                    ? 'FINAL'
+                    : s.phase === 'FINAL'
+                      ? 'JUDGING'
+                      : 'SETTLED',
+              });
+              setDeveloperOpen(false);
+            }}
+          />
+          <View style={styles.row}>
+            {(
+              [
+                'OPEN',
+                'FINAL',
+                'JUDGING',
+                'SETTLED',
+                'SETTLED_B',
+                'DRAW',
+                'CANCELLED',
+              ] as Phase[]
+            ).map((phase) => (
+              <ArenaButton
+                key={phase}
+                label={phase === 'SETTLED_B' ? 'SETTLED B' : phase}
+                selected={s.phase === phase}
+                variant="tertiary"
+                onPress={() => {
+                  setBallot(undefined);
+                  dispatch({ type: 'phase', phase });
+                }}
+              />
+            ))}
+          </View>
+          <View style={styles.row}>
+            {(['spectator', 'fighter_a', 'fighter_b'] as Role[]).map((role) => (
+              <ArenaButton
+                key={role}
+                label={
+                  role === 'spectator' ? 'Spectator' : role === 'fighter_a' ? 'Fighter A' : 'Fighter B'
+                }
+                selected={s.role === role}
+                variant="tertiary"
+                onPress={() => dispatch({ type: 'role', role })}
+              />
+            ))}
+            <ArenaButton label="Private assists" onPress={onAssists} />
+          </View>
+        </DemoSheet>
+      ) : null}
+      {resultOpen ? (
+        <DemoSheet title="Scripted demo result" onClose={() => setResultOpen(false)}>
+          <DuelRoomOutcome
+            revealMotion
+            duel={duel}
+            phase={phase}
+            onJudge={async () => {}}
+            onReview={() => {
+              setResultOpen(false);
+              onHistory();
+            }}
+            nextClash={{ clashId: 'demo-next-clash', title: 'DEMO · Next scripted Clash' }}
+            onOpenNext={() => {
+              setResultOpen(false);
+              dispatch({
+                type: 'notice',
+                text: 'Next Clash preview only — no live navigation.',
+              });
+            }}
+          />
+        </DemoSheet>
+      ) : null}
+      <ImmersiveClash
+        viewerScope={duel.clashId + s.role}
+        eventHint={'DEMO · ' + presentation.hint}
+        onViewResult={closed ? () => setResultOpen(true) : undefined}
+        condensed={keyboardOpen}
+        judgingFocus={s.phase === 'JUDGING'}
+        duel={duel}
+        proposition={duel.sourceText!}
+        live={!closed}
+        terminal={closed ? (s.phase === 'CANCELLED' ? 'cancelled' : 'settled') : null}
+        statusLabel={statusLabel}
+        phaseLabel={closed ? undefined : s.phase === 'SETTLED_B' ? 'SETTLED' : s.phase}
+        spectatorCount={42}
+        focusSide={last.side}
+        latestMessage={latest}
+        paddingTop={4}
+        backingSide={s.backing}
+        onBackSide={(side) => dispatch({ type: 'backing', side })}
+        canBack={!closed && s.role === 'spectator'}
+        onBack={onBack}
+        onOpenProfile={() =>
+          dispatch({ type: 'notice', text: 'Fictional fighter profile. No real profile was opened.' })
+        }
+        onViewHistory={onHistory}
+        onMore={() => setDeveloperOpen(true)}
+        roleLabel={closed ? undefined : `DEMO · ${s.role}`}
+        crowd={crowd}
+        reactionBurst={closed ? null : reaction}
+        stageFooter={
+          <View style={{ paddingHorizontal: 16, gap: 8 }}>
+            {duel.verdict ? (
+              <DemoText heading>{verdictFoot}</DemoText>
+            ) : s.phase === 'CANCELLED' ? (
+              <DemoText>Cancelled · no verdict · DEMO</DemoText>
+            ) : s.phase === 'JUDGING' ? (
+              <>
+                <DemoText>Demo judgement · no rewards or real verdict</DemoText>
+                <View style={styles.row}>
+                  {s.role === 'spectator' ? (
+                    ['A', 'B'].map((side) => (
+                      <ArenaButton
+                        key={side}
+                        label={ballot === side ? `Voted ${side} · demo` : `Demo vote ${side}`}
+                        disabled={!!ballot}
+                        onPress={() => setBallot(side)}
+                      />
+                    ))
+                  ) : (
+                    <DemoText>Demo fighters cannot judge.</DemoText>
+                  )}
+                </View>
+              </>
+            ) : (
+              <View style={styles.row}>
+                {['👏', '🔥', '🤔'].map((emoji) => (
+                  <ArenaButton
+                    key={emoji}
+                    label={emoji}
+                    onPress={() => {
+                      setReaction({ emoji, key: String(Date.now()) });
+                      dispatch({ type: 'notice', text: 'Reaction simulated locally.' });
+                    }}
+                  />
+                ))}
+                <ArenaButton label="Argument history" onPress={onHistory} style={{ minHeight: 48 }} />
+                <ArenaButton
+                  label={s.role === 'spectator' ? 'Private assist' : 'Assist inbox'}
+                  onPress={onAssists}
+                  style={{ minHeight: 48 }}
+                />
+              </View>
+            )}
+          </View>
+        }
+        fighterComposer={
+          s.role !== 'spectator' && ['OPEN', 'FINAL'].includes(s.phase) ? (
+            <View style={{ padding: 12 }}>
+              <DemoForm
+                label="Official demo argument"
+                attachments={false}
+                max={1200}
+                onSend={(text) => dispatch({ type: 'official', text })}
+              />
+            </View>
+          ) : undefined
+        }
+      />
+    </View>
+  );
 }
 
 function DemoAssists({ state: s, dispatch }: { state: DemoState; dispatch: Dispatch }): React.JSX.Element {

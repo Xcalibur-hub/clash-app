@@ -196,9 +196,11 @@ const styles = StyleSheet.create({
   },
   readMoreHit: {
     alignSelf: 'flex-start',
-    minHeight: 44,
+    minHeight: 48,
+    minWidth: 48,
     justifyContent: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
   },
   readMore: {
     ...typeScale.label,
@@ -206,8 +208,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   historyCue: {
-    ...typeScale.caption,
-    fontSize: 12,
+    ...typeScale.label,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

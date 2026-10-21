@@ -103,7 +103,16 @@ function AssistAttachment({account,assist}:{account:string;assist:PrivateAssist}
 }
 
 const styles = StyleSheet.create({
-  panel: { marginHorizontal: space.sm, marginVertical: space.xs, padding: space.md, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, gap: space.sm },
+  panel: {
+    marginHorizontal: space.sm,
+    marginVertical: space.xs,
+    marginBottom: space.md,
+    padding: space.md,
+    paddingBottom: space.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    gap: space.sm,
+  },
   header: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   headerCopy: { flex: 1, gap: 3 },
   eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
