@@ -1,11 +1,12 @@
 /**
  * Compact live-event backing — support during Clash, never judgement.
- * Explanation lives in accessibility / first-time tooltip elsewhere.
+ * Visually distinct from official judging and private assists.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { duelActiveSpeakers } from '../../utils/duelPresentation';
+import { spectatorSupportHint } from '../../utils/spectatorPresentation';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -26,9 +27,10 @@ export function ClashBackingActions({
   const [fighterA, fighterB] = duelActiveSpeakers(duel);
 
   return (
-    <View style={styles.wrap}>
-      <Text style={[styles.hint, { color: t.textMuted }]}>
-        SUPPORT FOR THIS VISIT · NOT A JUDGEMENT
+    <View style={styles.wrap} accessibilityLabel="Support a fighter during this visit">
+      <Text style={[styles.hint, { color: t.textMuted }]}>{spectatorSupportHint()}</Text>
+      <Text style={[styles.clarify, { color: t.textSecondary }]}>
+        Shows who you are with. Not an official vote.
       </Text>
       <View style={styles.row} accessibilityLabel="Back a fighter">
         {([
@@ -44,9 +46,10 @@ export function ClashBackingActions({
               accessibilityState={{ selected: on }}
               accessibilityLabel={
                 on
-                  ? `Backing ${name}. Support during the Clash, not a judgement.`
-                  : `Back ${name}. Support during the Clash, not a judgement.`
+                  ? `Supporting ${name}. Support during the Clash, not a judgement.`
+                  : `Support ${name}. Support during the Clash, not a judgement.`
               }
+              accessibilityHint="Does not cast an official judgement"
               onPress={() => {
                 hapticTap();
                 onBackSide(side);
@@ -63,7 +66,7 @@ export function ClashBackingActions({
                 numberOfLines={1}
                 style={[styles.label, { color: on ? t.background : t.textPrimary }]}
               >
-                {on ? `BACKING ${short.toUpperCase()}` : `BACK ${short.toUpperCase()}`}
+                {on ? `SUPPORTING ${short.toUpperCase()}` : `SUPPORT ${short.toUpperCase()}`}
               </Text>
             </Pressable>
           );
@@ -74,12 +77,19 @@ export function ClashBackingActions({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6, paddingBottom: space.xs },
+  wrap: { gap: 4, paddingBottom: space.xs },
   hint: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.9,
     paddingHorizontal: layout.screenX,
+  },
+  clarify: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '500',
+    paddingHorizontal: layout.screenX,
+    paddingBottom: 2,
   },
   row: {
     flexDirection: 'row',
@@ -99,6 +109,6 @@ const styles = StyleSheet.create({
     ...typeScale.label,
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: 0.35,
   },
 });

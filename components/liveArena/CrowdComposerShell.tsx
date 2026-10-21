@@ -14,14 +14,15 @@ export function CrowdComposerShell(): React.JSX.Element {
       accessibilityLabel="Crowd composer unavailable"
       accessibilityState={{ disabled: true }}
     >
+      <Text style={[styles.eyebrow, { color: t.textMuted }]}>PUBLIC CROWD</Text>
       <View style={[styles.field, { backgroundColor: t.surfaceMuted }]}>
-        <Text style={[styles.placeholder, { color: t.textMuted }]}>Say something…</Text>
+        <Text style={[styles.placeholder, { color: t.textMuted }]}>Message the Crowd…</Text>
       </View>
       <View style={styles.tools}>
         <Text style={[styles.tool, { color: t.textMuted }]}>GIF</Text>
         <Text style={[styles.tool, { color: t.textMuted }]}>Meme</Text>
       </View>
-      <Text style={[styles.note, { color: t.textMuted }]}>Coming soon · read-only</Text>
+      <Text style={[styles.note, { color: t.textMuted }]}>Coming soon · read-only · never a vote</Text>
     </View>
   );
 }
@@ -32,8 +33,15 @@ const styles = StyleSheet.create({
     paddingTop: space.sm,
     gap: 6,
   },
+  eyebrow: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+    paddingHorizontal: 2,
+  },
   field: {
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: radius.lg,
     paddingHorizontal: space.md,
     justifyContent: 'center',

@@ -45,7 +45,8 @@ export function FloatingReaction({
       });
       return;
     }
-    progress.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) }, (finished) => {
+    // Keep bursts short on A50-class devices so Stage stays readable.
+    progress.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) }, (finished) => {
       if (finished && onDone) runOnJS(onDone)();
     });
   }, [burstKey, onDone, progress, reduced]);

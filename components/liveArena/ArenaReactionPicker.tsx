@@ -4,9 +4,12 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 import { QuickReactionRow } from '../arena/QuickReactionRow';
 import { ARENA_REACTIONS } from '../../utils/arenaGameState';
+import { spectatorReactionHint } from '../../utils/spectatorPresentation';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { duration } from '../../theme/motion';
 import { tap as hapticTap } from '../../utils/haptics';
 
 export interface ArenaReactionPickerProps {
@@ -24,75 +27,81 @@ export function ArenaReactionPicker({
   onPick,
 }: ArenaReactionPickerProps): React.JSX.Element {
   const t = useThemeColors();
+  const reduced = useReducedMotion();
   const active = new Set(activeEmojis);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={onClose}>
       <Pressable
         style={styles.backdrop}
         onPress={onClose}
         accessibilityRole="button"
         accessibilityLabel="Dismiss reactions"
       >
-        <Pressable
-          onPress={(e) => e.stopPropagation?.()}
-          style={[
-            styles.tray,
-            {
-              backgroundColor: t.surfaceElevated,
-              borderColor: t.borderStrong,
-              shadowColor: t.shadowColor,
-            },
-          ]}
-          accessibilityRole="menu"
-          accessibilityLabel="React to this argument"
+        <Animated.View
+          entering={reduced ? undefined : FadeIn.duration(duration.fast)}
+          exiting={reduced ? undefined : FadeOut.duration(duration.instant)}
         >
-          <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
-            React · not a vote
-          </Text>
-          <QuickReactionRow
-            onPick={(emoji) => {
-              onPick(emoji);
-              onClose();
-            }}
-          />
-          <View style={styles.row}>
-            {ARENA_REACTIONS.map((reaction) => {
-              const selected = active.has(reaction.emoji);
-              return (
-                <Pressable
-                  key={reaction.emoji}
-                  onPress={() => {
-                    hapticTap();
-                    onPick(reaction.emoji);
-                    onClose();
-                  }}
-                  accessibilityRole="menuitem"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={reaction.label}
-                  style={[
-                    styles.cell,
-                    {
-                      backgroundColor: selected ? t.surfaceMuted : 'transparent',
-                      borderColor: selected ? t.borderStrong : 'transparent',
-                    },
-                  ]}
-                >
-                  <Text allowFontScaling={false} style={styles.emoji}>
-                    {reaction.emoji}
-                  </Text>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.label, { color: t.textMuted }]}
-                    numberOfLines={1}
+          <Pressable
+            onPress={(e) => e.stopPropagation?.()}
+            style={[
+              styles.tray,
+              {
+                backgroundColor: t.surfaceElevated,
+                borderColor: t.borderStrong,
+                shadowColor: t.shadowColor,
+              },
+            ]}
+            accessibilityRole="menu"
+            accessibilityLabel="React to this argument"
+          >
+            <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              {spectatorReactionHint()}
+            </Text>
+            <QuickReactionRow
+              onPick={(emoji) => {
+                onPick(emoji);
+                onClose();
+              }}
+            />
+            <View style={styles.row}>
+              {ARENA_REACTIONS.map((reaction) => {
+                const selected = active.has(reaction.emoji);
+                return (
+                  <Pressable
+                    key={reaction.emoji}
+                    onPress={() => {
+                      hapticTap();
+                      onPick(reaction.emoji);
+                      onClose();
+                    }}
+                    accessibilityRole="menuitem"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${reaction.label}${selected ? ', selected' : ''}`}
+                    style={[
+                      styles.cell,
+                      {
+                        backgroundColor: selected ? t.surfaceMuted : 'transparent',
+                        borderColor: selected ? t.textPrimary : 'transparent',
+                      },
+                    ]}
                   >
-                    {reaction.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Pressable>
+                    <Text allowFontScaling={false} style={styles.emoji}>
+                      {reaction.emoji}
+                    </Text>
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.label, { color: selected ? t.textPrimary : t.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      {selected ? 'On' : reaction.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
@@ -132,10 +141,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   cell: {
-    width: 72,
+    minWidth: 72,
+    minHeight: 56,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 2,
     paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
   },

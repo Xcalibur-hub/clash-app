@@ -47,8 +47,10 @@ const styles = StyleSheet.create({
   hint: { ...typeScale.caption, fontSize: 10, paddingHorizontal: 2 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
-    width: 40,
-    height: 40,
+    minWidth: 44,
+    minHeight: 44,
+    width: 44,
+    height: 44,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',

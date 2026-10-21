@@ -76,8 +76,9 @@ describe('UI Phase 1 immersive duel presentation', () => {
     assert.match(read('utils/duelStageMotion.ts'), /'CROWD'/);
     assert.doesNotMatch(crowd, /DEV_LAYOUT_ROWS|showDevLayout|FloatingReaction/);
     assert.doesNotMatch(crowd, /withRepeat|Animated\.loop/);
-    assert.match(shell, /Spectator conversation/);
+    assert.match(shell, /Live conversation · separate from Stage|Spectator conversation/);
     assert.match(shell, /Focus Stage/);
+    assert.match(crowd, /Spectator conversation/);
   });
 
   it('supports condensed/keyboard and A50-class type ramp', () => {
@@ -134,5 +135,63 @@ describe('UI Phase 2 live-event motion and terminal polish', () => {
     assert.match(stage, /accessibilityHint/);
     const shell = read('components/liveArena/ImmersiveClash.tsx');
     assert.match(shell, /Official argument · Read full/);
+  });
+});
+
+describe('UI Phase 3 spectator experience', () => {
+  it('separates Stage, Crowd, reactions and composer hierarchy', () => {
+    const shell = read('components/liveArena/ImmersiveClash.tsx');
+    assert.match(shell, /SPECTATORS/);
+    assert.match(shell, /Live conversation · separate from Stage/);
+    assert.match(shell, /ReactionBurst/);
+    assert.match(shell, /count=\{1\}/);
+    const crowd = read('components/liveArena/LiveCrowdLayer.tsx');
+    assert.match(crowd, /spectatorCrowdEmptyCopy/);
+    assert.match(crowd, /Message the Crowd/);
+    assert.match(crowd, /New messages ↓/);
+  });
+
+  it('keeps backing distinct from judging and private assists', () => {
+    const backing = read('components/liveArena/ClashBackingActions.tsx');
+    assert.match(backing, /spectatorSupportHint/);
+    assert.match(backing, /Not an official vote/);
+    assert.match(backing, /SUPPORT /);
+    assert.doesNotMatch(backing, /Judge|Vote A|Vote B/);
+    assert.match(read('utils/spectatorPresentation.ts'), /NOT A JUDGEMENT/);
+    const assist = read('components/liveArena/PrivateAssistPanel.tsx');
+    assert.match(assist, /PRIVATE ASSIST · NOT A VOTE/);
+    assert.match(assist, /privateAssistPrivacyLabel/);
+    assert.match(assist, /never posted in the Crowd/);
+  });
+
+  it('wires reaction picker selection and reduced-motion tray', () => {
+    const picker = read('components/liveArena/ArenaReactionPicker.tsx');
+    assert.match(picker, /spectatorReactionHint/);
+    assert.match(picker, /useReducedMotion/);
+    assert.match(picker, /accessibilityState=\{\{ selected \}\}/);
+    assert.match(picker, /minHeight: 56/);
+    const burst = read('components/liveArena/ReactionBurst.tsx');
+    assert.match(burst, /useReducedMotion/);
+    assert.match(burst, /duration: 900/);
+  });
+
+  it('preserves spectator vs fighter assist surfaces and terminal crowd', () => {
+    const shell = read('components/liveArena/ImmersiveClash.tsx');
+    assert.match(shell, /canBack && !judgingFocus && !condensed/);
+    assert.match(shell, /readOnly=\{Boolean\(terminal\) \|\| duel\.status !== 'open'\}/);
+    assert.match(shell, /terminal !== 'cancelled'/);
+    const assist = read('components/liveArena/PrivateAssistPanel.tsx');
+    assert.match(assist, /Your private inbox/);
+    assert.match(assist, /Send a private assist/);
+    assert.match(assist, /Pending · private/);
+  });
+
+  it('keeps compact keyboard crowd path and reduced-motion burst safe', () => {
+    assert.equal(duelStageMode({ judging: false, condensed: true, crowdExpanded: false }), 'condensed');
+    const shell = read('components/liveArena/ImmersiveClash.tsx');
+    assert.match(shell, /condensed=\{keyboardOpen\}|condensed/);
+    assert.match(shell, /reduced \? undefined : FadeIn/);
+    const burst = read('components/liveArena/ReactionBurst.tsx');
+    assert.match(burst, /if \(reduced\)/);
   });
 });

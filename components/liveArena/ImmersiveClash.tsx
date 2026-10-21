@@ -333,12 +333,20 @@ export function ImmersiveClash({
             accessibilityRole="button"
             accessibilityLabel={crowdExpanded ? 'Focus official Stage' : 'Expand Crowd conversation'}
             accessibilityState={{ expanded: crowdExpanded }}
+            accessibilityHint={
+              crowdExpanded
+                ? 'Returns focus to the official Stage'
+                : 'Gives the spectator Crowd more space'
+            }
             onPress={() => setCrowdExpanded(value => !value)}
             style={[styles.crowdToggle, { backgroundColor: t.surface, borderBottomColor: t.border }]}
           >
-            <View>
+            <View style={styles.crowdToggleCopy}>
+              <Text style={[styles.crowdToggleEyebrow, { color: t.textMuted }]}>SPECTATORS</Text>
               <Text style={[styles.crowdToggleTitle, { color: t.textPrimary }]}>Crowd</Text>
-              <Text style={[styles.crowdToggleSub, { color: t.textMuted }]}>Spectator conversation</Text>
+              <Text style={[styles.crowdToggleSub, { color: t.textMuted }]}>
+                {terminal ? 'Conversation history' : 'Live conversation · separate from Stage'}
+              </Text>
             </View>
             <Text style={[styles.crowdToggleAction, { color: t.textSecondary }]}>
               {crowdExpanded ? 'Focus Stage' : 'Expand'}
@@ -384,16 +392,20 @@ const styles = StyleSheet.create({
   },
   crowd: { minHeight: 134, flexShrink: 0, borderTopWidth: StyleSheet.hairlineWidth },
   crowdToggle: {
-    minHeight: 48,
+    minHeight: 52,
     paddingHorizontal: 20,
+    paddingVertical: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
   },
-  crowdToggleTitle: { fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
-  crowdToggleSub: { fontSize: 11, fontWeight: '500', marginTop: 1 },
-  crowdToggleAction: { fontSize: 12, fontWeight: '600' },
+  crowdToggleCopy: { flex: 1, minWidth: 0, gap: 1 },
+  crowdToggleEyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
+  crowdToggleTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 0.15 },
+  crowdToggleSub: { fontSize: 11, fontWeight: '500' },
+  crowdToggleAction: { fontSize: 12, fontWeight: '700', flexShrink: 0 },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',

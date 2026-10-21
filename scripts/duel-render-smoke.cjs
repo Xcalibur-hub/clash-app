@@ -131,7 +131,7 @@ for (const [name, overrides] of Object.entries(scenarios)) {
     assert.match(css, /flex-grow:0\.72/, 'Official Stage must retain its primary share in the web render bridge');
     assert.match(css, /flex-grow:0\.28/, 'Crowd must retain the complementary animated share');
     assert.match(html, /CROWD|Live crowd|Crowd/);
-    assert.match(html, /BACK KEVIN|Back Kevin|BACKING/i);
+    assert.match(html, /SUPPORT KEVIN|Support Kevin|SUPPORTING|BACK KEVIN|BACKING/i);
     assert.doesNotMatch(html, /Reply to this argument|Fighter composer|Live Chat|52%|48%/);
     assert.doesNotMatch(html, /Backing supports a side during the Clash/);
     // Newest moment owns the Stage (Alex/Rohan posted last in fixture).
