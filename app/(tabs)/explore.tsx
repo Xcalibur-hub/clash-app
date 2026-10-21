@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { CountryPickerSheet } from '../../components/explore/CountryPickerSheet';
 import { ExploreDiscoveryCard } from '../../components/explore/ExploreDiscoveryCard';
+import { ExploreDiscoverShelves } from '../../components/explore/ExploreDiscoverShelves';
 import { ExploreFilterWheel } from '../../components/explore/ExploreFilterWheel';
 import { ExploreMediaTile } from '../../components/explore/ExploreMediaTile';
 import {
@@ -357,6 +358,13 @@ function ExploreScreen(): React.JSX.Element {
               paddingRight: layout.screenX + 8,
             }}
             renderItem={({ item }) => <ExploreMosaicRowView row={item} />}
+            ListHeaderComponent={
+              // Cross-surface shelves only on the unfiltered feed: a filtered
+              // mosaic should read as one surface, not a mixed header.
+              forYouFilter === 'all' && !loading ? (
+                <ExploreDiscoverShelves live={live} onSeeAllLive={() => changeMode('live')} />
+              ) : null
+            }
             onScroll={(e) => onFeedScroll(e.nativeEvent.contentOffset.y)}
             scrollEventThrottle={16}
             onEndReached={() => void loadMoreForYou()}
