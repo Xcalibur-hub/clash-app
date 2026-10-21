@@ -33,8 +33,7 @@ export function ArenaSideRail({
       {ARENA_MODES.map((item) => {
         const selected = item.id === mode;
         const Icon = ICONS[item.id];
-        const fill = selected ? t.textPrimary : t.surface;
-        const textColor = selected ? t.background : t.textSecondary;
+        const textColor = selected ? t.textPrimary : t.textSecondary;
         return (
           <Pressable
             key={item.id}
@@ -49,7 +48,11 @@ export function ArenaSideRail({
             accessibilityLabel={arenaModeAccessibilityLabel(item.label, selected)}
             style={({ pressed }) => [
               styles.item,
-              { backgroundColor: fill, opacity: pressed ? 0.78 : 1 },
+              {
+                backgroundColor: selected ? t.surfaceElevated : 'transparent',
+                borderColor: selected ? t.borderStrong : 'transparent',
+                opacity: pressed ? 0.78 : 1,
+              },
             ]}
           >
             <Icon size={15} color={textColor} />
@@ -65,24 +68,25 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 0 },
   shell: {
     paddingHorizontal: layout.screenX,
-    paddingTop: 7,
-    paddingBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   item: {
-    minHeight: 44,
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 14,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   label: {
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 });

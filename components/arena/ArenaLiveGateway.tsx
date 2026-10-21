@@ -2,6 +2,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { layout, useThemeColors } from '../../theme';
+import { arenaLiveGatewayCopy } from '../../utils/arenaHomePresentation';
 import { tap } from '../../utils/haptics';
 
 export function ArenaLiveGateway({ liveCount, onOpen }: {
@@ -10,41 +11,58 @@ export function ArenaLiveGateway({ liveCount, onOpen }: {
   onOpen: () => void;
 }): React.JSX.Element {
   const t = useThemeColors();
+  const copy = arenaLiveGatewayCopy(liveCount);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Explore live Clashes and debates"
+      accessibilityLabel={
+        copy.live
+          ? `Explore live Clashes. ${copy.subtitle}`
+          : 'Explore live Clashes and debates'
+      }
       onPress={() => { tap(); onOpen(); }}
       style={({ pressed }) => [styles.card, {
-        backgroundColor: t.surface, borderColor: t.border,
+        backgroundColor: t.surface,
+        borderColor: copy.live ? (t.scheme === 'dark' ? 'rgba(215,92,77,0.45)' : 'rgba(183,77,70,0.35)') : t.border,
         opacity: pressed ? 0.76 : 1,
       }]}
     >
-      <View style={[styles.dot, { backgroundColor: liveCount !== null && liveCount > 0 ? '#D75C4D' : t.textMuted }]} />
+      <View style={styles.lead}>
+        <View style={[styles.dot, { backgroundColor: copy.live ? '#D75C4D' : t.textMuted }]} />
+        {copy.live ? (
+          <Text allowFontScaling={false} style={[styles.liveChip, { color: '#D75C4D' }]}>
+            LIVE
+          </Text>
+        ) : null}
+      </View>
       <View style={styles.copy}>
-        <Text style={[styles.title, { color: t.textPrimary }]}>
-          {liveCount !== null && liveCount > 0 ? 'Conversations are happening' : 'Find your next debate'}
-        </Text>
+        <Text style={[styles.title, { color: t.textPrimary }]}>{copy.title}</Text>
         <Text style={[styles.sub, { color: t.textSecondary }]} numberOfLines={1}>
-          {liveCount !== null && liveCount > 0
-            ? `${liveCount} live ${liveCount === 1 ? 'discussion' : 'discussions'} to explore`
-            : 'Two perspectives. Find a duel to watch.'}
+          {copy.subtitle}
         </Text>
       </View>
-      <Text style={[styles.arrow, { color: t.textPrimary }]}>↗</Text>
+      <Text style={[styles.cta, { color: t.textPrimary }]}>{copy.live ? 'Watch' : 'Browse'}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: layout.screenX, borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
-    minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: layout.screenX,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  dot: { width: 9, height: 9, borderRadius: 5 },
-  copy: { flex: 1, gap: 3, minWidth: 0 },
-  title: { fontSize: 16, lineHeight: 21, fontWeight: '800', letterSpacing: -0.3 },
+  lead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  liveChip: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
+  copy: { flex: 1, gap: 2, minWidth: 0 },
+  title: { fontSize: 15, lineHeight: 20, fontWeight: '700', letterSpacing: -0.25 },
   sub: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
-  arrow: { fontSize: 23, fontWeight: '500' },
+  cta: { fontSize: 13, fontWeight: '700', letterSpacing: -0.1 },
 });

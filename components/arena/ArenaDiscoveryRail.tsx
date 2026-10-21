@@ -1,16 +1,10 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSequence,
-  withSpring,
-} from 'react-native-reanimated';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { HOODS } from '../../data/hoods';
 import type { FeedScope } from '../../store';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 
 const SCOPES: readonly { key: FeedScope; label: string }[] = [
@@ -26,8 +20,8 @@ export interface ArenaDiscoveryRailProps {
 }
 
 /**
- * Quiet discovery rail — high-contrast selected, minimal inactive.
- * Scopes + Hoods share one scroll; a hairline separates purpose.
+ * Quiet discovery rail — scopes first, then topic Hoods.
+ * Selection is high-contrast; inactive chips stay calm for A50 density.
  */
 export function ArenaDiscoveryRail({ scope, onScopeChange }: ArenaDiscoveryRailProps): React.JSX.Element {
   const t = useThemeColors();
@@ -83,72 +77,67 @@ function ScopeChip({
 }): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
-  const scale = useSharedValue(1);
-  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
     <Pressable
       onPress={() => {
         hapticTap();
-        if (!reduced) {
-          scale.value = withSequence(
-            withSpring(0.94, { damping: 16, stiffness: 400 }),
-            withSpring(1, { damping: 14, stiffness: 280 }),
-          );
-        }
         onPress();
       }}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
+      style={({ pressed }) => [
+        styles.pill,
+        {
+          backgroundColor: active ? t.pill : 'transparent',
+          borderColor: active ? t.pill : t.border,
+          opacity: pressed && !reduced ? 0.82 : 1,
+        },
+      ]}
     >
-      <Animated.View
+      <Text
+        allowFontScaling={false}
         style={[
-          styles.pill,
-          anim,
+          styles.label,
           {
-            backgroundColor: active ? t.pill : 'transparent',
+            color: active ? t.pillText : t.textSecondary,
+            fontWeight: active ? '700' : '500',
           },
         ]}
       >
-        <Text
-          allowFontScaling={false}
-          style={[
-            styles.label,
-            {
-              color: active ? t.pillText : t.textMuted,
-              fontWeight: active ? '700' : '500',
-            },
-          ]}
-        >
-          {label}
-        </Text>
-      </Animated.View>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingBottom: 4 },
+  wrap: { paddingBottom: 2 },
   row: {
     paddingHorizontal: layout.screenX,
-    gap: 4,
+    gap: 6,
     flexDirection: 'row',
     alignItems: 'center',
   },
   pill: {
+    minHeight: 36,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'center',
   },
   label: { ...typeScale.label, fontSize: 13, letterSpacing: -0.15 },
   divider: {
     width: StyleSheet.hairlineWidth,
-    height: 14,
-    marginHorizontal: 6,
+    height: 16,
+    marginHorizontal: 4,
   },
   hoodChip: {
+    minHeight: 36,
     paddingHorizontal: 10,
     paddingVertical: 7,
+    justifyContent: 'center',
   },
   hoodLabel: { ...typeScale.label, fontSize: 13, fontWeight: '500', letterSpacing: -0.1 },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, Platform, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
+import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,7 +45,7 @@ import {
   type User,
 } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
-import { layout, space, typeScale, useTheme, useThemeColors } from '../../theme';
+import { layout, space, useThemeColors } from '../../theme';
 import { DEFAULT_ARENA_MODE, type ArenaMode } from '../../utils/arenaNav';
 import {
   arenaFlatListData,
@@ -76,7 +76,6 @@ export default function ArenaScreen(): React.JSX.Element {
   const now = useClock(30_000);
   const requireAuth = useRequireAuth();
   const theme = useThemeColors();
-  const { scheme } = useTheme();
 
   const [arenaMode, setArenaMode] = React.useState<ArenaMode>(DEFAULT_ARENA_MODE);
   const [scope, setScope] = React.useState<FeedScope>('for-you');
@@ -390,9 +389,14 @@ export default function ArenaScreen(): React.JSX.Element {
       return <View style={styles.hero} />;
     }
 
+    // Phase 4 first viewport: Live entry → Fresh Takes → quiet scopes → feed.
+    // Feed remains the primary list; chrome stays thin so Takes stay readable on A50.
     return (
       <View style={styles.hero}>
-
+        <ArenaLiveGateway
+          liveCount={liveTopicsLoading || liveTopicsError ? null : liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
+          onOpen={() => setArenaMode('clashes')}
+        />
 
         <FreshTakesSection
           items={freshItems}
@@ -413,25 +417,8 @@ export default function ArenaScreen(): React.JSX.Element {
           }}
         />
 
-        <ArenaLiveGateway
-          liveCount={liveTopicsLoading || liveTopicsError ? null : liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
-          onOpen={() => setArenaMode('clashes')}
-        />
-
         <View style={styles.feedHead}>
-          <View style={styles.feedKickerRow}>
-            <View style={[styles.feedKickerDot, { backgroundColor: scheme === 'dark' ? '#F0AD96' : '#D98569' }]} />
-            <Text style={[styles.feedKicker, { color: theme.textSecondary }]}>
-              THE CONVERSATION
-            </Text>
-            <Text style={[styles.feedIssue, { color: theme.textMuted }]}>24H TAKES</Text>
-          </View>
-          <Text allowFontScaling style={[styles.feedTitle, { color: theme.textPrimary }]}>
-            A fresh perspective.
-          </Text>
-          <Text style={[styles.feedSub, { color: theme.textSecondary }]}>
-            Your feed. Room for a different point of view.
-          </Text>
+          <Text style={[styles.feedKicker, { color: theme.textMuted }]}>YOUR FEED · 24H</Text>
           <ArenaDiscoveryRail scope={scope} onScopeChange={setScope} />
         </View>
       </View>
@@ -456,10 +443,7 @@ export default function ArenaScreen(): React.JSX.Element {
     scope,
     shareTake,
     state.arenaStatus,
-    theme.textPrimary,
     theme.textMuted,
-    theme.textSecondary,
-    scheme,
     toggleReaction,
   ]);
 
@@ -603,24 +587,13 @@ const styles = StyleSheet.create({
   listLayer: { zIndex: 1 },
   listDimmed: { opacity: 0.35 },
   list: { flexGrow: 1 },
-  hero: { paddingBottom: space.xs, gap: space.sm },
-  feedHead: { paddingTop: 24, paddingBottom: 14, gap: 10 },
-  feedKickerRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+  hero: { paddingTop: space.sm, paddingBottom: space.xs, gap: space.md },
+  feedHead: { paddingTop: space.md, paddingBottom: space.sm, gap: 8 },
+  feedKicker: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
     paddingHorizontal: layout.screenX,
-  },
-  feedKickerDot: { width: 9, height: 9, borderRadius: 3, transform: [{ rotate: '-15deg' }] },
-  feedKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
-  feedIssue: { fontSize: 10, fontWeight: '700', marginLeft: 'auto', letterSpacing: 0.6 },
-  feedTitle: {
-    ...typeScale.label,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 28, lineHeight: 36, fontWeight: '800', letterSpacing: -1.1,
-    paddingHorizontal: layout.screenX,
-  },
-  feedSub: {
-    ...typeScale.meta, fontSize: 13, lineHeight: 19,
-    fontWeight: '500', paddingHorizontal: layout.screenX, marginBottom: space.sm,
   },
 });
 

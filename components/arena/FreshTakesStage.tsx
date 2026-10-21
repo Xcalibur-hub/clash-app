@@ -34,6 +34,7 @@ import {
   typeScale,
   useThemeColors,
 } from '../../theme';
+import { arenaFreshStageHeight } from '../../utils/arenaHomePresentation';
 import { compact } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { resolveStillUrl } from '../../utils/mediaStill';
@@ -52,10 +53,9 @@ export interface FreshTakeEntry {
 /** Editorial horizontal stage — distinct from Today's Arena physical stack. */
 const ACTIVE_W = 0.9;
 const PEEK_W = 0.7;
-const STAGE_H = 440;
 const SWIPE_RATIO = 0.2;
 const VELOCITY = 620;
-const MAX_ROTATE = 2.8;
+const MAX_ROTATE = 2.2;
 
 export interface FreshTakesStageProps {
   items: FreshTakeEntry[];
@@ -86,6 +86,7 @@ export function FreshTakesStage({
   const activeW = Math.round(windowWidth * ACTIVE_W);
   const peekW = Math.round(windowWidth * PEEK_W);
   const stageWidth = windowWidth;
+  const stageH = arenaFreshStageHeight(windowWidth);
   const reduced = useReducedMotion();
   const t = useThemeColors();
 
@@ -222,7 +223,7 @@ export function FreshTakesStage({
       }}
     >
       <GestureDetector gesture={pan}>
-        <View style={[styles.stage, { width: stageWidth, height: STAGE_H }]}>
+        <View style={[styles.stage, { width: stageWidth, height: stageH }]}>
           {paintOrder.map((slotIndex) => {
             const offset = slotIndex - index;
             const entry = items[slotIndex];
@@ -237,6 +238,7 @@ export function FreshTakesStage({
                 activeW={activeW}
                 peekW={peekW}
                 stageWidth={stageWidth}
+                stageH={stageH}
                 single={single}
               >
                 {active ? (
@@ -318,6 +320,7 @@ function StageLayer({
   activeW,
   peekW,
   stageWidth,
+  stageH,
   single,
 }: {
   children: React.ReactNode;
@@ -327,6 +330,7 @@ function StageLayer({
   activeW: number;
   peekW: number;
   stageWidth: number;
+  stageH: number;
   single: boolean;
 }): React.JSX.Element {
   const idle = useSharedValue(0);
@@ -356,9 +360,9 @@ function StageLayer({
     // Next peeks from the right; previous peeks from the left.
     const nextLeft = stageWidth - peekW * 0.55;
     const prevLeft = -peekW * 0.45;
-    const peekH = STAGE_H * 0.78;
-    const activeH = STAGE_H;
-    const peekTop = (STAGE_H - peekH) / 2;
+    const peekH = stageH * 0.78;
+    const activeH = stageH;
+    const peekTop = (stageH - peekH) / 2;
 
     if (single || offset === 0) {
       const rotate = reduced ? 0 : (dragX.value / activeW) * MAX_ROTATE;

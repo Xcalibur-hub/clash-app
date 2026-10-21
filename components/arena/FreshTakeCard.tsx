@@ -30,7 +30,6 @@ import { tap as hapticTap } from '../../utils/haptics';
 import { pulseLabel, takePulse, type TakePulse } from '../../utils/takePulse';
 import { resolveStillUrl } from '../../utils/mediaStill';
 import { Avatar } from '../shared/Avatar';
-import { Squiggle } from '../shared/Doodles';
 import {
   ArenaIcon,
   BookmarkIcon,
@@ -392,11 +391,13 @@ export function FreshTakeCard({
               </>
             ) : (
               <View style={[styles.leadTextOnly, embedded && styles.leadTextFill]}>
-                <View style={[styles.textAccentPanel, { backgroundColor: hoodAccent.soft }]} />
-                <View style={[styles.leadAccentBlobLarge, { backgroundColor: hoodAccent.deep }]} />
                 <View style={[styles.textAccentEdge, { backgroundColor: hoodAccent.ink }]} />
                 <View style={styles.leadTextTop}>
+                  <Text allowFontScaling={false} style={[styles.topicChip, { color: hoodAccent.ink, backgroundColor: hoodAccent.soft }]} numberOfLines={1}>
+                    {hood}
+                  </Text>
                   <PulseChip pulse={pulse} />
+                  <View style={{ flex: 1 }} />
                   <IconAction label="More take actions" onPress={onMore}>
                     <MoreIcon size={18} color={t.textMuted} strokeWidth={2.2} />
                   </IconAction>
@@ -408,7 +409,6 @@ export function FreshTakeCard({
                 >
                   {take.text}
                 </Text>
-                <Squiggle size={96} color={hoodAccent.ink} opacity={0.35} style={styles.leadSquiggle} />
                 <View style={styles.metaRow}>
                   <Avatar name={author.name} tint={author.tint} size={22} />
                   <Text
@@ -416,7 +416,7 @@ export function FreshTakeCard({
                     style={[styles.metaMuted, { color: t.textMuted }]}
                     numberOfLines={1}
                   >
-                    @{author.handle} · {hood} · {timeAgo(take.createdAt)}
+                    @{author.handle} · {timeAgo(take.createdAt)}
                   </Text>
                 </View>
               </View>
@@ -695,9 +695,6 @@ export function FreshTakeCard({
           >
             {take.text}
           </Text>
-          {variant === 'text' ? (
-            <Squiggle size={72} color={hoodAccent.ink} opacity={0.22} style={styles.textSquiggle} />
-          ) : null}
           {variant === 'media' && hasMedia && mediaUrl ? (
             <FreshHeroMedia url={mediaUrl} isVideo={isVideo} height={embedded ? 140 : 180} radiusPx={radius.lg} />
           ) : null}
@@ -877,13 +874,24 @@ const styles = StyleSheet.create({
   embeddedWrap: { flex: 1 },
   embeddedPress: { flex: 1 },
   lead: {
-    borderRadius: 28,
+    borderRadius: 20,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  topicChip: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+    maxWidth: 140,
   },
   leadFill: { flex: 1 },
   leadTextFill: { flex: 1, minHeight: 0 },

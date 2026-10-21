@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Take } from '../../store';
-import { layout, space, useThemeColors } from '../../theme';
+import { family, layout, space, useThemeColors } from '../../theme';
 import { FreshTakesStage, type FreshTakeEntry } from './FreshTakesStage';
 
 export type { FreshTakeEntry };
@@ -18,8 +18,8 @@ export interface FreshTakesSectionProps {
 }
 
 /**
- * Fresh Takes — editorial horizontal browse stage.
- * Distinct from Today's Arena asymmetric live deck; same accent system.
+ * Fresh Takes — content-first discovery stage above the main feed.
+ * One quiet header; the cards carry the visual weight.
  */
 export function FreshTakesSection({
   items,
@@ -33,28 +33,16 @@ export function FreshTakesSection({
 }: FreshTakesSectionProps): React.JSX.Element | null {
   const t = useThemeColors();
   if (items.length === 0) return null;
-  const dark = t.scheme === 'dark';
 
   return (
-    <View style={styles.section}>
+    <View style={styles.section} accessibilityLabel="Fresh Takes">
       <View style={styles.head}>
-        <View style={styles.kickerRow}>
-          <View style={[styles.kickerMark, { backgroundColor: dark ? '#E8A5AC' : '#CF6F81' }]} />
-          <Text style={[styles.kicker, { color: t.textSecondary }]}>FRESH FROM THE ARENA</Text>
-          <Text style={[styles.issue, { color: t.textMuted }]}>TODAY</Text>
-        </View>
-        <View style={styles.titleRow}>
-          <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>
-            Fresh Takes<Text style={{ color: dark ? '#D6B9FA' : '#9968B5' }}>✳</Text>
-          </Text>
-          <View style={[styles.count, { backgroundColor: dark ? '#4C3A60' : '#EDDBFF' }]}>
-            <Text style={[styles.countText, { color: dark ? '#FFF6FF' : '#603C7A' }]}>
-              {String(items.length).padStart(2, '0')}
-            </Text>
-          </View>
-        </View>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>FRESH TAKES</Text>
+        <Text allowFontScaling style={[styles.title, { color: t.textPrimary }]}>
+          What people are saying
+        </Text>
         <Text style={[styles.sub, { color: t.textSecondary }]}>
-          The latest opinions, before the debate begins.
+          Opinions worth a closer look — swipe to browse, tap to open.
         </Text>
       </View>
 
@@ -73,17 +61,26 @@ export function FreshTakesSection({
 }
 
 const styles = StyleSheet.create({
-  section: { paddingTop: space.md, paddingBottom: space.sm, gap: space.sm },
-  head: { paddingHorizontal: layout.screenX, paddingBottom: 2, gap: 5 },
-  kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  kickerMark: { width: 9, height: 9, borderRadius: 3, transform: [{ rotate: '18deg' }] },
-  kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  issue: { fontSize: 10, fontWeight: '700', marginLeft: 'auto', letterSpacing: 0.6 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: {
-    flexShrink: 1, fontSize: 27, lineHeight: 34, fontWeight: '800', letterSpacing: -1.1,
+  section: { paddingTop: space.sm, paddingBottom: space.xs, gap: space.sm },
+  head: { paddingHorizontal: layout.screenX, gap: 4 },
+  kicker: {
+    fontFamily: family.semibold,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.3,
   },
-  count: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
-  countText: { fontSize: 12, fontWeight: '800', letterSpacing: 0 },
-  sub: { fontSize: 13, fontWeight: '500', lineHeight: 19 },
+  title: {
+    fontFamily: family.bold,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '700',
+    letterSpacing: -0.7,
+  },
+  sub: {
+    fontFamily: family.regular,
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 18,
+    maxWidth: 340,
+  },
 });
