@@ -1,6 +1,9 @@
 /**
- * Explore WORLD canvas — MAP (default) or GLOBE (optional).
+ * Explore WORLD canvas — GLOBE (discovery) or MAP (tap-to-find).
  * Renders exactly one visualization. Geometry: Natural Earth 110m ISO A2.
+ * Motion is JS-state driven (not Reanimated) so the SVG path cache stays valid;
+ * ambient drift, focus tween, and drag inertia share one loop and all stop for
+ * reduced-motion users.
  */
 import React from 'react';
 import {
@@ -19,7 +22,6 @@ import type { ExploreCountrySummary } from '../../services/exploreService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import {
   countryCodeFromMapPoint,
-  focusCountryByCentroid,
   globePathForCountry,
   mapPathForCountry,
   rotationToward,
@@ -47,6 +49,12 @@ function quantizeRotation(deg: number, step = 3): number {
   return Math.round(wrapRotation(deg) / step) * step;
 }
 
+/** One shared rotation loop: focus tween, teleport tween, or drag inertia. */
+type GlobeMotion =
+  | { kind: 'idle' }
+  | { kind: 'tween'; from: number; delta: number; startedAt: number; duration: number }
+  | { kind: 'coast'; velocity: number };
+
 export function ExploreWorldCanvas({
   activity,
   selectedCode = null,
@@ -63,7 +71,10 @@ export function ExploreWorldCanvas({
   const [rotation, setRotation] = React.useState(20);
   const rotationRef = React.useRef(20);
   const dragOrigin = React.useRef(20);
-  const coastRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const dragging = React.useRef(false);
+  const motion = React.useRef<GlobeMotion>({ kind: 'idle' });
+  const motionTimer = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const driftTimer = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const rafRef = React.useRef<number | null>(null);
   const pendingRotation = React.useRef<number | null>(null);
   const pathCache = React.useRef(new Map<string, string>());
@@ -81,55 +92,117 @@ export function ExploreWorldCanvas({
     rotationRef.current = rotation;
   }, [rotation]);
 
-  const clearCoast = React.useCallback(() => {
-    if (coastRef.current) {
-      clearInterval(coastRef.current);
-      coastRef.current = null;
+  const stopMotion = React.useCallback(() => {
+    if (motionTimer.current) {
+      clearInterval(motionTimer.current);
+      motionTimer.current = null;
     }
+    motion.current = { kind: 'idle' };
   }, []);
+
+  const startMotion = React.useCallback(
+    (next: GlobeMotion) => {
+      motion.current = next;
+      if (motionTimer.current) return;
+      motionTimer.current = setInterval(() => {
+        const active = motion.current;
+        if (active.kind === 'tween') {
+          const p = Math.min(1, (Date.now() - active.startedAt) / active.duration);
+          const eased = 1 - (1 - p) ** 3;
+          setRotation(wrapRotation(active.from + active.delta * eased));
+          if (p >= 1) stopMotion();
+          return;
+        }
+        if (active.kind === 'coast') {
+          const velocity = active.velocity * 0.9;
+          setRotation((prev) => wrapRotation(prev + velocity));
+          if (Math.abs(velocity) < 0.15) stopMotion();
+          else motion.current = { kind: 'coast', velocity };
+        }
+      }, 32);
+    },
+    [stopMotion],
+  );
 
   React.useEffect(
     () => () => {
-      clearCoast();
+      stopMotion();
+      if (driftTimer.current) clearInterval(driftTimer.current);
+      driftTimer.current = null;
+      dragging.current = false;
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     },
-    [clearCoast],
+    [stopMotion],
   );
 
-  // Clear globe path cache when leaving globe mode.
+  // Clear globe rotation state when leaving globe mode.
   React.useEffect(() => {
-    if (!isGlobe) {
-      clearCoast();
-      pathCache.current.clear();
+    if (isGlobe) return;
+    stopMotion();
+    dragging.current = false;
+    if (driftTimer.current) {
+      clearInterval(driftTimer.current);
+      driftTimer.current = null;
     }
-  }, [clearCoast, isGlobe]);
+    pathCache.current.clear();
+  }, [isGlobe, stopMotion]);
 
   React.useEffect(() => {
     if (!isGlobe || spinToken <= 0) return;
-    clearCoast();
-    const target = spinTargetLng ?? Math.random() * 360 - 180;
+    stopMotion();
+    const target = wrapRotation(rotationToward(spinTargetLng ?? Math.random() * 360 - 180));
     if (reduced) {
-      setRotation(wrapRotation(rotationToward(target)));
+      setRotation(target);
       return;
     }
-    let frames = 0;
-    const start = rotationRef.current;
-    const delta = wrapRotation(rotationToward(target) - start) + 360;
-    coastRef.current = setInterval(() => {
-      frames += 1;
-      const p = Math.min(1, frames / 14);
-      const eased = 1 - (1 - p) ** 3;
-      setRotation(wrapRotation(start + delta * eased));
-      if (p >= 1) clearCoast();
-    }, 32);
-  }, [clearCoast, isGlobe, reduced, spinTargetLng, spinToken]);
+    const from = rotationRef.current;
+    startMotion({
+      kind: 'tween',
+      from,
+      delta: wrapRotation(target - from),
+      startedAt: Date.now(),
+      duration: 720,
+    });
+  }, [isGlobe, reduced, spinTargetLng, spinToken, startMotion, stopMotion]);
 
+  // Bring the chosen country to the front along the shortest arc.
   React.useEffect(() => {
     if (!isGlobe || !selectedCode || spinning) return;
-    const c = countryByCode(selectedCode);
-    if (!c) return;
-    setRotation(wrapRotation(rotationToward(c.lng)));
-  }, [isGlobe, selectedCode, spinning]);
+    const country = countryByCode(selectedCode);
+    if (!country) return;
+    stopMotion();
+    const target = wrapRotation(rotationToward(country.lng));
+    const from = rotationRef.current;
+    const delta = wrapRotation(target - from);
+    if (reduced || Math.abs(delta) < 0.75) {
+      setRotation(target);
+      return;
+    }
+    startMotion({
+      kind: 'tween',
+      from,
+      delta,
+      startedAt: Date.now(),
+      duration: 560,
+    });
+  }, [isGlobe, reduced, selectedCode, spinning, startMotion, stopMotion]);
+
+  // Slow ambient drift, only while the globe is genuinely idle and unselected.
+  React.useEffect(() => {
+    if (!isGlobe || reduced || spinning || selectedCode) return;
+    driftTimer.current = setInterval(() => {
+      if (dragging.current || motion.current.kind !== 'idle' || pendingRotation.current != null) {
+        return;
+      }
+      setRotation((prev) => wrapRotation(prev + 1.2));
+    }, 900);
+    return () => {
+      if (driftTimer.current) {
+        clearInterval(driftTimer.current);
+        driftTimer.current = null;
+      }
+    };
+  }, [isGlobe, reduced, selectedCode, spinning]);
 
   const scheduleRotation = React.useCallback((next: number) => {
     pendingRotation.current = next;
@@ -142,11 +215,7 @@ export function ExploreWorldCanvas({
     });
   }, []);
 
-  const focus = React.useMemo(() => {
-    if (selectedCode) return selectedCode;
-    if (!isGlobe) return null;
-    return focusCountryByCentroid(rotation, countries);
-  }, [countries, isGlobe, rotation, selectedCode]);
+  const focus = isGlobe ? selectedCode : null;
 
   const activitySet = React.useMemo(() => {
     const s = new Set<string>();
@@ -190,7 +259,8 @@ export function ExploreWorldCanvas({
     .enabled(isGlobe)
     .runOnJS(true)
     .onBegin(() => {
-      clearCoast();
+      stopMotion();
+      dragging.current = true;
       dragOrigin.current = rotationRef.current;
     })
     .onUpdate((e) => {
@@ -198,13 +268,12 @@ export function ExploreWorldCanvas({
     })
     .onEnd((e) => {
       if (reduced) return;
-      clearCoast();
-      let velocity = -e.velocityX * 0.014;
-      coastRef.current = setInterval(() => {
-        velocity *= 0.88;
-        setRotation((prev) => wrapRotation(prev + velocity));
-        if (Math.abs(velocity) < 0.2) clearCoast();
-      }, 32);
+      const velocity = -e.velocityX * 0.014;
+      if (Math.abs(velocity) < 0.2) return;
+      startMotion({ kind: 'coast', velocity });
+    })
+    .onFinalize(() => {
+      dragging.current = false;
     });
 
   const oceanDeep = light ? '#1B4F72' : '#0B2438';
@@ -314,7 +383,7 @@ export function ExploreWorldCanvas({
       )}
 
       <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
-        {spinning ? 'Teleporting…' : isGlobe ? 'Drag to explore' : 'Tap a country'}
+        {spinning ? 'Choosing a country…' : isGlobe ? 'Drag to explore' : 'Tap a country'}
       </Text>
     </View>
   );

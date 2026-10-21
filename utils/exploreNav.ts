@@ -4,6 +4,19 @@
 
 import type { ExploreMode } from './exploreForYouRank';
 
+/** Canonical Explore deep links — World discovery never hand-builds paths. */
+export function exploreCountryHref(code: string): string {
+  return `/explore/country/${encodeURIComponent(code.trim().toUpperCase())}`;
+}
+
+export function exploreChallengeHref(id: string): string {
+  return `/explore/challenge/${encodeURIComponent(id.trim())}`;
+}
+
+export function exploreTreasureHref(id: string): string {
+  return `/explore/treasure/${encodeURIComponent(id.trim())}`;
+}
+
 export type ForYouFilterId =
   | 'all'
   | 'trending'

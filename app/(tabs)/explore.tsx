@@ -14,7 +14,6 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   FadeIn,
-  FadeInDown,
   FadeOut,
   interpolate,
   useAnimatedStyle,
@@ -34,6 +33,7 @@ import {
 import { ExploreModeRail } from '../../components/explore/ExploreModeRail';
 import { ExploreSearch } from '../../components/explore/ExploreSearch';
 import { ExploreWorldCanvas, type WorldVisualMode } from '../../components/explore/ExploreWorldCanvas';
+import { WorldExperience } from '../../components/explore/WorldExperience';
 import { Avatar } from '../../components/shared/Avatar';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { Notice } from '../../components/shared/Notice';
@@ -67,9 +67,13 @@ import {
 } from '../../utils/exploreForYouRank';
 import {
   DEFAULT_FOR_YOU_FILTER,
+  exploreChallengeHref,
+  exploreCountryHref,
+  exploreTreasureHref,
   packExploreMosaicRows,
   type ForYouFilterId,
 } from '../../utils/exploreNav';
+import { worldActivityCountries } from '../../utils/exploreWorldModel';
 import { tap as hapticTap } from '../../utils/haptics';
 
 /**
@@ -173,10 +177,36 @@ function ExploreScreen(): React.JSX.Element {
   const goCountryPage = React.useCallback(
     (code: string) => {
       setRecent((prev) => [code, ...prev.filter((c) => c !== code)].slice(0, 8));
-      router.push(`/explore/country/${code}`);
+      router.push(exploreCountryHref(code) as never);
     },
     [router],
   );
+
+  /** Server-ordered activity countries — also powers the picker's "Happening now". */
+  const worldCountries = React.useMemo(
+    () => worldActivityCountries(summary?.countries, 64),
+    [summary],
+  );
+
+  /**
+   * Surprise Me focuses a country the viewer has not opened yet, then reveals the
+   * same content Teleport lands on. No new RPC, no extra ranking.
+   */
+  const surprise = React.useCallback(() => {
+    hapticTap();
+    if (worldCountries.length === 0) return;
+    const untouched = worldCountries.filter((country) => country.code !== selectedCountry);
+    const pool = untouched.length > 0 ? untouched : worldCountries;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (!pick) return;
+    setSelectedCountry(pick.code);
+    setSpinLng(countryByCode(pick.code)?.lng ?? null);
+    setSpinToken((n) => n + 1);
+    analytics.track('explore_country_selected', {
+      realm: 'arena',
+      source: 'explore_surprise',
+    });
+  }, [selectedCountry, worldCountries]);
 
   const changeMode = React.useCallback((next: ExploreMode) => {
     hapticTap();
@@ -448,6 +478,10 @@ function ExploreScreen(): React.JSX.Element {
                   </View>
                 </View>
 
+                <Text allowFontScaling={false} style={[styles.worldHint, { color: t.textMuted }]}>
+                  Tap a country to open its challenges, hunts, and takes.
+                </Text>
+
                 <ExploreWorldCanvas
                   activity={summary?.countries ?? []}
                   selectedCode={selectedCountry}
@@ -464,40 +498,6 @@ function ExploreScreen(): React.JSX.Element {
                   spinning={teleporting}
                 />
 
-                {selectedCountry ? (
-                  <Animated.View
-                    entering={reduced ? undefined : FadeInDown.duration(320)}
-                    style={[
-                      styles.countryCard,
-                      {
-                        backgroundColor: t.scheme === 'light' ? '#111113' : t.textPrimary,
-                      },
-                    ]}
-                  >
-                    <Text allowFontScaling={false} style={styles.countryCardTitle}>
-                      {countryByCode(selectedCountry)?.name ?? selectedCountry}
-                    </Text>
-                    <Text allowFontScaling={false} style={styles.countryCardMeta}>
-                      {summary?.countries.find((c) => c.countryCode === selectedCountry)
-                        ?.activityCount != null
-                        ? `${summary.countries
-                            .find((c) => c.countryCode === selectedCountry)!
-                            .activityCount!.toLocaleString()} public profiles`
-                        : 'Activity not shown'}
-                    </Text>
-                    <Pressable
-                      onPress={() => goCountryPage(selectedCountry)}
-                      style={styles.countryCardCta}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Explore ${countryByCode(selectedCountry)?.name ?? selectedCountry}`}
-                    >
-                      <Text allowFontScaling={false} style={styles.countryCardCtaText}>
-                        Explore →
-                      </Text>
-                    </Pressable>
-                  </Animated.View>
-                ) : null}
-
                 <View style={styles.worldControls}>
                   <RoundControl
                     label="Search"
@@ -512,6 +512,24 @@ function ExploreScreen(): React.JSX.Element {
                     emphasis
                   />
                 </View>
+
+                <WorldExperience
+                  countries={worldCountries}
+                  challenges={summary?.challenges ?? []}
+                  treasures={summary?.treasures ?? []}
+                  selectedCode={selectedCountry}
+                  onSelectCountry={(code) => {
+                    hapticTap();
+                    setSelectedCountry(code);
+                    setSpinLng(countryByCode(code)?.lng ?? null);
+                    setSpinToken((n) => n + 1);
+                  }}
+                  onOpenCountry={goCountryPage}
+                  onOpenChallenge={(id) => router.push(exploreChallengeHref(id) as never)}
+                  onOpenTreasure={(id) => router.push(exploreTreasureHref(id) as never)}
+                  onSurprise={surprise}
+                  onClear={() => setSelectedCountry(null)}
+                />
 
                 {teleportReveal ? (
                   <View style={{ gap: space.xs }}>
@@ -603,6 +621,7 @@ function ExploreScreen(): React.JSX.Element {
       <CountryPickerSheet
         visible={pickerOpen}
         recentCodes={recent}
+        active={worldCountries}
         onClose={() => setPickerOpen(false)}
         onSelect={(code) => {
           setPickerOpen(false);
@@ -852,6 +871,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   worldBlock: { gap: space.sm },
+  worldHint: { ...typeScale.caption, fontSize: 12, marginTop: -space.xxs },
   worldTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -887,36 +907,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   roundText: { ...typeScale.label, fontSize: 12, fontWeight: '800' },
-  countryCard: {
-    borderRadius: radius.xxl,
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-    gap: 4,
-    marginTop: -8,
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
-  countryCardTitle: {
-    ...typeScale.editorial,
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FAFAF8',
-  },
-  countryCardMeta: { ...typeScale.meta, fontSize: 13, color: 'rgba(255,255,255,0.7)' },
-  countryCardCta: {
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    minHeight: 34,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FAFAF8',
-  },
-  countryCardCtaText: { ...typeScale.label, fontSize: 12, fontWeight: '800', color: '#111113' },
   rail: { gap: space.xs, paddingRight: layout.screenX },
   countryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
   countryCardSmall: {

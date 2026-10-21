@@ -1,5 +1,9 @@
 /**
- * Accessible country selector — globe is never the only path.
+ * Accessible country selector — the globe is never the only path.
+ *
+ * Countries with real eligible engagement lead (server order), then the curated
+ * catalogue order. Search always spans every country, so a quiet place is still
+ * one tap away.
  */
 import React from 'react';
 import {
@@ -13,30 +17,105 @@ import {
 } from 'react-native';
 import { EXPLORE_COUNTRIES, searchCountries } from '../../data/exploreCountries';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
+import {
+  orderCountriesByEngagement,
+  type WorldCountryActivity,
+} from '../../utils/exploreWorldModel';
 import { tap as hapticTap } from '../../utils/haptics';
+import { CloseIcon } from '../shared/icons';
+
+const MAX_RESULTS = 40;
+const MAX_ACTIVE = 6;
 
 export interface CountryPickerSheetProps {
   visible: boolean;
   recentCodes?: readonly string[];
+  active?: readonly WorldCountryActivity[];
   onClose: () => void;
   onSelect: (code: string) => void;
+}
+
+function PickerRow({
+  name,
+  meta,
+  onPress,
+  accessibilityLabel,
+}: {
+  name: string;
+  meta: string | null;
+  onPress: () => void;
+  accessibilityLabel: string;
+}): React.JSX.Element {
+  const t = useThemeColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={styles.row}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
+        {name}
+      </Text>
+      {meta ? (
+        <Text allowFontScaling={false} style={[styles.code, { color: t.textMuted }]}>
+          {meta}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
 }
 
 export function CountryPickerSheet({
   visible,
   recentCodes = [],
+  active = [],
   onClose,
   onSelect,
 }: CountryPickerSheetProps): React.JSX.Element {
   const t = useThemeColors();
   const [query, setQuery] = React.useState('');
-  const results = React.useMemo(() => searchCountries(query, 40), [query]);
+  const searching = query.trim().length > 0;
+  const activeList = React.useMemo(() => active.slice(0, MAX_ACTIVE), [active]);
+  const activeCodes = React.useMemo(
+    () => activeList.map((country) => country.code),
+    [activeList],
+  );
+  const counts = React.useMemo(
+    () => new Map(activeList.map((country) => [country.code, country.activityCount])),
+    [activeList],
+  );
+
+  const results = React.useMemo(() => {
+    const found = searchCountries(query, 60);
+    const pool = searching ? found : found.filter((country) => !counts.has(country.code));
+    return orderCountriesByEngagement(pool, activeCodes).slice(0, MAX_RESULTS);
+  }, [activeCodes, counts, query, searching]);
+
   const recent = React.useMemo(
     () =>
       recentCodes
         .map((code) => EXPLORE_COUNTRIES.find((c) => c.code === code))
         .filter((c): c is (typeof EXPLORE_COUNTRIES)[number] => Boolean(c)),
     [recentCodes],
+  );
+
+  const pick = (code: string): void => {
+    hapticTap();
+    onSelect(code);
+  };
+
+  const section = (label: string, hint: string | null): React.JSX.Element => (
+    <View style={styles.sectionHead}>
+      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+        {label}
+      </Text>
+      {hint ? (
+        <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+          {hint}
+        </Text>
+      ) : null}
+    </View>
   );
 
   return (
@@ -46,11 +125,21 @@ export function CountryPickerSheet({
           style={[styles.sheet, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}
           onPress={() => undefined}
           accessibilityViewIsModal
-          accessibilityLabel="Search countries"
+          accessibilityLabel="Choose a country"
         >
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-            Search countries
-          </Text>
+          <View style={styles.head}>
+            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+              Countries
+            </Text>
+            <Pressable
+              onPress={onClose}
+              style={styles.close}
+              accessibilityRole="button"
+              accessibilityLabel="Close country picker"
+            >
+              <CloseIcon size={18} color={t.textPrimary} />
+            </Pressable>
+          </View>
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -63,55 +152,69 @@ export function CountryPickerSheet({
             autoFocus
             accessibilityLabel="Search countries"
           />
-          {recent.length > 0 && query.trim().length === 0 ? (
-            <View style={styles.recent}>
-              <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
-                Recent
-              </Text>
-              {recent.map((country) => (
-                <Pressable
-                  key={`r-${country.code}`}
-                  onPress={() => {
-                    hapticTap();
-                    onSelect(country.code);
-                  }}
-                  style={styles.row}
-                  accessibilityRole="button"
-                  accessibilityLabel={country.name}
-                >
-                  <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
-                    {country.name}
-                  </Text>
-                  <Text allowFontScaling={false} style={[styles.code, { color: t.textMuted }]}>
-                    {country.code}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
           <FlatList
             data={results}
             keyExtractor={(item) => item.code}
             keyboardShouldPersistTaps="handled"
             style={styles.list}
+            ListHeaderComponent={
+              searching ? null : (
+                <View style={styles.headerBlock}>
+                  {recent.length > 0 ? (
+                    <View>
+                      {section('Recent', null)}
+                      {recent.map((country) => (
+                        <PickerRow
+                          key={`r-${country.code}`}
+                          name={country.name}
+                          meta={country.code}
+                          onPress={() => pick(country.code)}
+                          accessibilityLabel={country.name}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                  {activeList.length > 0 ? (
+                    <View>
+                      {section('Happening now', 'Public profiles')}
+                      {activeList.map((country) => (
+                        <PickerRow
+                          key={`a-${country.code}`}
+                          name={country.name}
+                          meta={
+                            country.activityCount == null
+                              ? null
+                              : country.activityCount.toLocaleString()
+                          }
+                          onPress={() => pick(country.code)}
+                          accessibilityLabel={
+                            country.activityCount == null
+                              ? `${country.name}, quiet right now`
+                              : `${country.name}, ${country.activityCount.toLocaleString()} public profiles`
+                          }
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                  {section('All countries', null)}
+                </View>
+              )
+            }
             renderItem={({ item }) => (
-              <Pressable
-                onPress={() => {
-                  hapticTap();
-                  onSelect(item.code);
-                }}
-                style={styles.row}
-                accessibilityRole="button"
+              <PickerRow
+                name={item.name}
+                meta={item.code}
+                onPress={() => pick(item.code)}
                 accessibilityLabel={item.name}
-              >
-                <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
-                  {item.name}
-                </Text>
-                <Text allowFontScaling={false} style={[styles.code, { color: t.textMuted }]}>
-                  {item.code}
-                </Text>
-              </Pressable>
+              />
             )}
+            ListEmptyComponent={
+              searching ? (
+                <Text style={[styles.empty, { color: t.textMuted }]}>
+                  {`No country matches “${query.trim()}”.`}
+                </Text>
+              ) : null
+            }
           />
         </Pressable>
       </Pressable>
@@ -135,7 +238,14 @@ const styles = StyleSheet.create({
     paddingBottom: space.xxl,
     gap: space.sm,
   },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { ...typeScale.section, fontSize: 20, fontWeight: '800' },
+  close: {
+    width: layout.hit,
+    height: layout.hit,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   input: {
     minHeight: 48,
     borderRadius: radius.pill,
@@ -144,7 +254,13 @@ const styles = StyleSheet.create({
     ...typeScale.body,
     fontSize: 16,
   },
-  recent: { gap: 2 },
+  headerBlock: { gap: space.xs },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: space.xs,
+  },
   section: {
     ...typeScale.caption,
     fontSize: 11,
@@ -160,6 +276,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  name: { ...typeScale.label, fontSize: 16, fontWeight: '700' },
+  name: { ...typeScale.label, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   code: { ...typeScale.caption, fontSize: 12, fontWeight: '700' },
+  empty: { ...typeScale.caption, fontSize: 13, paddingVertical: space.md },
 });

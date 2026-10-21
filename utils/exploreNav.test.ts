@@ -3,7 +3,10 @@ import { describe, it } from 'node:test';
 import { EXPLORE_MODES } from './exploreForYouRank.ts';
 import {
   DEFAULT_FOR_YOU_FILTER,
+  exploreChallengeHref,
+  exploreCountryHref,
   exploreModeAccessibilityLabel,
+  exploreTreasureHref,
   FOR_YOU_FILTERS,
   forYouFilterAccessibilityLabel,
   isDuplicateForYouFilterLabel,
@@ -43,6 +46,19 @@ describe('For You secondary filters', () => {
   it('builds filter accessibility labels', () => {
     assert.equal(forYouFilterAccessibilityLabel('ALL', true), 'Filter ALL, selected');
     assert.equal(forYouFilterAccessibilityLabel('TRENDING', false), 'Filter TRENDING');
+  });
+});
+
+describe('Explore deep links', () => {
+  it('builds canonical country, challenge, and treasure paths', () => {
+    assert.equal(exploreCountryHref('ng'), '/explore/country/NG');
+    assert.equal(exploreCountryHref(' gb '), '/explore/country/GB');
+    assert.equal(exploreChallengeHref(' abc '), '/explore/challenge/abc');
+    assert.equal(exploreTreasureHref('t1'), '/explore/treasure/t1');
+  });
+
+  it('encodes ids so a single path segment is always produced', () => {
+    assert.equal(exploreChallengeHref('a/b c'), '/explore/challenge/a%2Fb%20c');
   });
 });
 
