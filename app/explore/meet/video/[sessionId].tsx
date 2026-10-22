@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MeetButton } from '../../../../components/meet/MeetButton';
+import { MeetReportSheet } from '../../../../components/meet/MeetReportSheet';
 import { useMeetVideoSession } from '../../../../hooks/useMeetVideoSession';
 import { analytics } from '../../../../services/analytics';
 import {
@@ -13,8 +14,10 @@ import {
   leaveMeetSession,
   nextMeet,
   reportMeetSession,
+  type MeetReportReason,
 } from '../../../../services/meetService';
 import { peekMeetVideoPrefs } from '../../../../services/meetVideoPrefs';
+import { SupabaseError } from '../../../../services/supabaseClient';
 import { radius, space } from '../../../../theme';
 import { tap as hapticTap } from '../../../../utils/haptics';
 
@@ -42,6 +45,9 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
   const video = useMeetVideoSession(sessionId);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [reportOpen, setReportOpen] = React.useState(false);
+  /** Report failures must surface: a safety report silently dropped reads as sent. */
+  const [reportError, setReportError] = React.useState<string | null>(null);
   const prefs = peekMeetVideoPrefs();
   const connectedTracked = React.useRef(false);
   const leftRef = React.useRef(false);
@@ -134,13 +140,22 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
     }
   };
 
-  const onReport = async (reason: 'harassment' | 'sexual' | 'hate' | 'violence' | 'spam' | 'other') => {
+  // One reason list for text and video (utils/meetSafety), so a video report can
+  // finally say "child safety" instead of folding it into "other" (E3.2).
+  const onReport = async (reason: MeetReportReason): Promise<void> => {
+    setReportOpen(false);
+    setReportError(null);
     try {
       await reportMeetSession(sessionId, reason);
       analytics.track('meet_video_reported', { realm: 'explore', source: 'explore' });
       setMenuOpen(false);
-    } catch {
-      /* keep call up */
+    } catch (e) {
+      // Say it failed, not why: the error text can name server internals.
+      setReportError(
+        e instanceof SupabaseError && e.code === 'P0001'
+          ? 'Too many reports. Try again later.'
+          : 'Report not sent. Check your connection and try again.',
+      );
     }
   };
 
@@ -237,18 +252,30 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
 
         {menuOpen ? (
           <View style={styles.menu}>
-            <MeetButton label="Report harassment" onPress={() => void onReport('harassment')} tone="glass" compact />
-            <MeetButton label="Report sexual content" onPress={() => void onReport('sexual')} tone="glass" compact />
-            <MeetButton label="Report hate/abuse" onPress={() => void onReport('hate')} tone="glass" compact />
-            <MeetButton label="Report violence" onPress={() => void onReport('violence')} tone="glass" compact />
-            <MeetButton label="Report spam/scam" onPress={() => void onReport('spam')} tone="glass" compact />
-            <MeetButton label="Report other / underage concern" onPress={() => void onReport('other')} tone="glass" compact />
+            <MeetButton
+              label="Report"
+              onPress={() => {
+                setMenuOpen(false);
+                setReportOpen(true);
+              }}
+              tone="glass"
+              compact
+            />
             <MeetButton label="Block" onPress={() => void onBlock()} tone="ink" compact />
             <MeetButton label="Leave" onPress={() => void onLeave()} tone="glass" compact />
           </View>
         ) : null}
 
+        <MeetReportSheet
+          visible={reportOpen}
+          title="Report this call"
+          subtitle="Only the reason is sent. Moderators can read this conversation; the stranger is not told."
+          onPick={(reason) => void onReport(reason)}
+          onCancel={() => setReportOpen(false)}
+        />
+
         {video.error ? <Text style={styles.err}>{video.error}</Text> : null}
+        {reportError ? <Text style={styles.err}>{reportError}</Text> : null}
       </View>
     </View>
   );

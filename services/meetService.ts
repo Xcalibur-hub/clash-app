@@ -25,6 +25,8 @@ export interface MeetSession {
   peerConnected: boolean;
   isOfferer: boolean;
   createdAt: number;
+  /** Server lease; the session is ended once this passes (E3.2). */
+  expiresAt: number | null;
   endedAt: number | null;
   endReason: string | null;
 }
@@ -49,6 +51,26 @@ export interface MeetQueueState {
 }
 
 export type MeetSignalKind = 'offer' | 'answer' | 'ice';
+
+/** Every value the server `report_reason` enum accepts. */
+export type MeetReportReason =
+  | 'spam'
+  | 'harassment'
+  | 'hate'
+  | 'sexual'
+  | 'violence'
+  | 'misinformation'
+  | 'impersonation'
+  | 'copyright'
+  | 'other'
+  | 'child_safety';
+
+/** Result of one lease refresh (`touch_meet_session`). */
+export interface MeetTouchResult {
+  active: boolean;
+  expiresAt: number | null;
+  endReason: string | null;
+}
 
 export interface MeetSignal {
   id: string;
@@ -131,6 +153,7 @@ function toSession(value: unknown): MeetSession | null {
     peerConnected: bool(r.peerConnected),
     isOfferer: bool(r.isOfferer),
     createdAt: millis(r.createdAt) ?? Date.now(),
+    expiresAt: millis(r.expiresAt),
     endedAt: millis(r.endedAt),
     endReason: str(r.endReason),
   };
@@ -281,7 +304,7 @@ export async function blockMeetPeer(sessionId: string): Promise<void> {
 
 export async function reportMeetSession(
   sessionId: string,
-  reason: 'spam' | 'harassment' | 'hate' | 'sexual' | 'violence' | 'other',
+  reason: MeetReportReason,
   detail?: string,
 ): Promise<void> {
   const { error } = await client().rpc('report_meet_session', {
@@ -290,6 +313,42 @@ export async function reportMeetSession(
     p_detail: detail ?? undefined,
   });
   if (error) throw requestError(error);
+}
+
+/**
+ * Report one message instead of the whole session. The server verifies that the
+ * message belongs to the session and was not sent by the reporter.
+ */
+export async function reportMeetMessage(
+  sessionId: string,
+  messageId: string,
+  reason: MeetReportReason,
+  detail?: string,
+): Promise<void> {
+  const { error } = await client().rpc('report_meet_message', {
+    p_session_id: sessionId,
+    p_message_id: messageId,
+    p_reason: reason,
+    p_detail: detail ?? undefined,
+  });
+  if (error) throw requestError(error);
+}
+
+/**
+ * Refresh the server lease. The client never sends a duration: the server owns
+ * the 90-second window, so this can only keep an existing session alive.
+ */
+export async function touchMeetSession(sessionId: string): Promise<MeetTouchResult> {
+  const { data, error } = await client().rpc('touch_meet_session', {
+    p_session_id: sessionId,
+  });
+  if (error) throw requestError(error);
+  const r = asRecord(data);
+  return {
+    active: bool(r?.active),
+    expiresAt: millis(r?.expiresAt),
+    endReason: str(r?.endReason),
+  };
 }
 
 export async function ackMeetVideoSafety(): Promise<void> {

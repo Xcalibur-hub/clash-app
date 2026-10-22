@@ -22,6 +22,13 @@ export const MEET_MAX_POLL_MS = 20_000;
 /** Server sweeps waiting rows after 30 minutes; the client gives up there too. */
 export const MEET_QUEUE_TTL_MS = 30 * 60_000;
 
+/**
+ * Lease-refresh cadence while the screen is focused. The server lease is 90 s
+ * and only a beat keeps it alive, so a backgrounded or killed app releases the
+ * session instead of pinning the peer (E3.2).
+ */
+export const MEET_HEARTBEAT_MS = 15_000;
+
 export type MeetChatStatus = 'connected' | 'disconnected' | 'ended' | 'expired';
 
 /** Structural slice of a session payload — keeps this module dependency-free. */
@@ -109,6 +116,17 @@ export function meetPollDelay(
   const cap = Math.max(base, Math.round(maxMs));
   const exponent = Math.min(Math.floor(failures), 6);
   return Math.min(cap, base * 2 ** exponent);
+}
+
+/**
+ * True when the server lease should be refreshed. The first beat is always due;
+ * a backwards clock jump (device time changed) beats instead of idling.
+ */
+export function meetHeartbeatDue(lastBeatAt: number | null, now: number): boolean {
+  if (lastBeatAt == null || !Number.isFinite(lastBeatAt)) return true;
+  if (!Number.isFinite(now)) return false;
+  const elapsed = now - lastBeatAt;
+  return elapsed < 0 || elapsed >= MEET_HEARTBEAT_MS;
 }
 
 /** Monotonic request token. Only the newest response may commit. */

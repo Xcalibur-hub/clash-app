@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  meetVideoCallIsLive,
   reduceMeetVideoState,
   shouldApplySignal,
   type MeetVideoConnState,
@@ -42,5 +43,16 @@ describe('meet video state machine', () => {
     assert.equal(s, 'reconnecting');
     s = reduceMeetVideoState(s, 'ice_connected');
     assert.equal(s, 'connected');
+  });
+
+  it('renews the lease only while a call is live', () => {
+    assert.equal(meetVideoCallIsLive('preparing'), true);
+    assert.equal(meetVideoCallIsLive('signaling'), true);
+    assert.equal(meetVideoCallIsLive('connecting'), true);
+    assert.equal(meetVideoCallIsLive('connected'), true);
+    assert.equal(meetVideoCallIsLive('reconnecting'), true);
+    assert.equal(meetVideoCallIsLive('idle'), false);
+    assert.equal(meetVideoCallIsLive('failed'), false);
+    assert.equal(meetVideoCallIsLive('ended'), false);
   });
 });

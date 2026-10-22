@@ -59,6 +59,20 @@ export function signalDedupeKey(id: string): string {
   return id.trim();
 }
 
+/**
+ * States where a lease is still worth renewing (E3.2). `idle` has no session yet,
+ * `failed`/`ended` must not keep a stranger's seat occupied.
+ */
+export function meetVideoCallIsLive(state: MeetVideoConnState): boolean {
+  return (
+    state === 'preparing' ||
+    state === 'signaling' ||
+    state === 'connecting' ||
+    state === 'connected' ||
+    state === 'reconnecting'
+  );
+}
+
 export function shouldApplySignal(
   seen: ReadonlySet<string>,
   signalId: string,

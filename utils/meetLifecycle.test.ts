@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   createMeetRequestGuard,
+  MEET_HEARTBEAT_MS,
   MEET_MAX_POLL_MS,
   MEET_QUEUE_TTL_MS,
   meetActiveSessionChannel,
   meetCanSend,
   meetCancelVsMatch,
   meetChatStatus,
+  meetHeartbeatDue,
   meetIsTerminalError,
   meetPollDelay,
   meetQueueOutcome,
@@ -202,6 +204,28 @@ describe('meetIsTerminalError', () => {
     assert.equal(meetIsTerminalError(''), false);
     assert.equal(meetIsTerminalError('P0001'), false);
     assert.equal(meetIsTerminalError('23505'), false);
+  });
+});
+
+describe('meetHeartbeatDue', () => {
+  it('beats immediately when the screen has never beaten', () => {
+    assert.equal(meetHeartbeatDue(null, 1_000), true);
+  });
+
+  it('does not stack beats inside the cadence', () => {
+    assert.equal(meetHeartbeatDue(1_000, 1_000 + MEET_HEARTBEAT_MS - 1), false);
+  });
+
+  it('beats once the cadence has elapsed', () => {
+    assert.equal(meetHeartbeatDue(1_000, 1_000 + MEET_HEARTBEAT_MS), true);
+  });
+
+  it('beats after a backwards clock jump instead of idling forever', () => {
+    assert.equal(meetHeartbeatDue(50_000, 1_000), true);
+  });
+
+  it('ignores a non-finite clock reading', () => {
+    assert.equal(meetHeartbeatDue(1_000, Number.NaN), false);
   });
 });
 

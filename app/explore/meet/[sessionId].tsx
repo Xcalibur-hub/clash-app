@@ -18,18 +18,22 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MeetButton } from '../../../components/meet/MeetButton';
+import { MeetReportSheet } from '../../../components/meet/MeetReportSheet';
 import { useMeetChat } from '../../../hooks/useMeetChat';
 import { analytics } from '../../../services/analytics';
 import {
   blockMeetPeer,
   leaveMeetQueue,
   nextMeet,
+  reportMeetMessage,
   reportMeetSession,
   type MeetMessage,
+  type MeetReportReason,
 } from '../../../services/meetService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../../theme';
 import { tap as hapticTap } from '../../../utils/haptics';
 import { meetQueueOutcome } from '../../../utils/meetLifecycle';
+import { meetReportNotice } from '../../../utils/meetSafety';
 
 export default function MeetChatScreen(): React.JSX.Element {
   const { sessionId: raw } = useLocalSearchParams<{ sessionId: string }>();
@@ -44,6 +48,9 @@ export default function MeetChatScreen(): React.JSX.Element {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
+  const [reportOpen, setReportOpen] = React.useState(false);
+  /** null = report the whole conversation; a message id = report that bubble. */
+  const [reportMessage, setReportMessage] = React.useState<string | null>(null);
 
   const statusLine = React.useMemo(() => {
     if (chat.status === 'expired') return 'Conversation expired';
@@ -120,16 +127,29 @@ export default function MeetChatScreen(): React.JSX.Element {
     }
   };
 
-  const onReport = async (): Promise<void> => {
-    if (!session) return;
+  // Reporting is two steps: pick a reason here, then one RPC in submitReport.
+  // A reason-less report is what E3.2 replaces, so no default is pre-selected.
+  const openReport = (messageId: string | null): void => {
     setMenuOpen(false);
     setActionError(null);
     setNotice(null);
+    setReportMessage(messageId);
+    setReportOpen(true);
     hapticTap();
+  };
+
+  const submitReport = async (reason: MeetReportReason): Promise<void> => {
+    if (!session) return;
+    const messageId = reportMessage;
+    setReportOpen(false);
+    setReportMessage(null);
+    setActionError(null);
+    setNotice(null);
     try {
       analytics.track('meet_reported', { realm: 'explore', source: 'explore' });
-      await reportMeetSession(session.sessionId, 'other', 'Reported from Meet chat');
-      setNotice('Report received. Thanks for flagging it.');
+      if (messageId) await reportMeetMessage(session.sessionId, messageId, reason);
+      else await reportMeetSession(session.sessionId, reason);
+      setNotice(meetReportNotice(reason, messageId ? 'message' : 'session'));
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Report failed.');
     }
@@ -201,7 +221,7 @@ export default function MeetChatScreen(): React.JSX.Element {
       {menuOpen ? (
         <View style={[styles.menu, { backgroundColor: t.surface, borderColor: t.border }]}>
           <MeetButton label="Find someone else" tone="glass" onPress={() => void onNext()} />
-          <MeetButton label="Report stranger" tone="glass" onPress={() => void onReport()} />
+          <MeetButton label="Report stranger" tone="glass" onPress={() => openReport(null)} />
           <MeetButton label="Block stranger" tone="glass" onPress={() => void onBlock()} />
           <MeetButton label="Leave chat" tone="glass" onPress={() => void onLeave()} />
         </View>
@@ -214,7 +234,12 @@ export default function MeetChatScreen(): React.JSX.Element {
         contentContainerStyle={styles.list}
         renderItem={({ item }: { item: MeetMessage }) => (
           <View style={[styles.bubbleRow, item.mine ? styles.bubbleRowMine : null]}>
-            <View
+            <Pressable
+              // Long-press on a peer bubble reports that message (E3.2). Own
+              // messages are not reportable server-side, so the gesture is off.
+              onLongPress={item.mine ? undefined : () => openReport(item.id)}
+              delayLongPress={400}
+              accessibilityHint={item.mine ? undefined : 'Long press to report this message'}
               style={[
                 styles.bubble,
                 item.mine
@@ -225,7 +250,7 @@ export default function MeetChatScreen(): React.JSX.Element {
               <Text style={[styles.bubbleText, { color: item.mine ? t.textInverse : t.textPrimary }]}>
                 {item.body}
               </Text>
-            </View>
+            </Pressable>
           </View>
         )}
         ListEmptyComponent={
@@ -307,6 +332,17 @@ export default function MeetChatScreen(): React.JSX.Element {
           <MeetButton label="Leave" tone="glass" onPress={() => void onLeave()} />
         </View>
       )}
+
+      <MeetReportSheet
+        visible={reportOpen}
+        title={reportMessage ? 'Report this message' : `Report ${session.peerAlias}`}
+        subtitle="Only the reason is sent. Moderators can read this conversation; the stranger is not told."
+        onPick={(reason) => void submitReport(reason)}
+        onCancel={() => {
+          setReportOpen(false);
+          setReportMessage(null);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

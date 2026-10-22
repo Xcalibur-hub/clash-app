@@ -9,13 +9,16 @@ import {
   fetchMeetSession,
   listMeetSignals,
   publishMeetSignal,
+  touchMeetSession,
   type MeetSession,
 } from '../services/meetService';
 import {
+  meetVideoCallIsLive,
   reduceMeetVideoState,
   shouldApplySignal,
   type MeetVideoConnState,
 } from '../utils/meetVideoSession';
+import { MEET_HEARTBEAT_MS } from '../utils/meetLifecycle';
 
 type WebRTC = typeof import('react-native-webrtc');
 
@@ -67,6 +70,7 @@ export function useMeetVideoSession(sessionId: string): MeetVideoSessionApi {
   const afterRef = React.useRef<number | null>(null);
   const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionPollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const cleanedRef = React.useRef(false);
   const makingOfferRef = React.useRef(false);
 
@@ -75,6 +79,13 @@ export function useMeetVideoSession(sessionId: string): MeetVideoSessionApi {
     stateRef.current = next;
     setState(next);
     return next;
+  }, []);
+
+  const stopHeartbeat = React.useCallback((): void => {
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
   }, []);
 
   const stopPoll = React.useCallback(() => {
@@ -86,7 +97,8 @@ export function useMeetVideoSession(sessionId: string): MeetVideoSessionApi {
       clearInterval(sessionPollRef.current);
       sessionPollRef.current = null;
     }
-  }, []);
+    stopHeartbeat();
+  }, [stopHeartbeat]);
 
   const cleanup = React.useCallback(() => {
     if (cleanedRef.current) {
@@ -122,6 +134,36 @@ export function useMeetVideoSession(sessionId: string): MeetVideoSessionApi {
     setRemoteStreamUrl(null);
     transition('cleanup');
   }, [stopPoll, transition]);
+
+  /**
+   * One lease refresh. `active: false` means the server already swept or ended the
+   * session, so the call is over even though the media track may still be live.
+   */
+  const beat = React.useCallback(async (): Promise<void> => {
+    try {
+      const res = await touchMeetSession(sessionId);
+      if (res.active) return;
+      stopHeartbeat();
+      setSession((current) =>
+        current ? { ...current, status: 'ended', peerConnected: false } : current,
+      );
+      transition('peer_left');
+    } catch {
+      /* transient: the next tick retries, and the server sweep is the backstop */
+    }
+  }, [sessionId, stopHeartbeat, transition]);
+
+  /**
+   * Keeps the 90 s lease alive only while this call is genuinely attended. A call
+   * that is ending, failed, or already cleaned up does not renew.
+   */
+  const startHeartbeat = React.useCallback((): void => {
+    if (heartbeatRef.current || cleanedRef.current) return;
+    if (!meetVideoCallIsLive(stateRef.current)) return;
+    heartbeatRef.current = setInterval(() => {
+      void beat();
+    }, MEET_HEARTBEAT_MS);
+  }, [beat]);
 
   const applySignal = React.useCallback(
     async (signal: {
@@ -189,6 +231,11 @@ export function useMeetVideoSession(sessionId: string): MeetVideoSessionApi {
       if (sess.channel !== 'VIDEO' || sess.status !== 'active') {
         throw new Error('Video session unavailable');
       }
+
+      // Lease keeper, started before any media work: `getUserMedia` can block on
+      // a permission prompt, and a 90 s lease must not lapse while the camera is
+      // still being granted (E3.2).
+      startHeartbeat();
 
       const ice = await fetchMeetIceServers();
       setHasTurn(ice.hasTurn);
@@ -281,7 +328,7 @@ export function useMeetVideoSession(sessionId: string): MeetVideoSessionApi {
       cleanup();
       cleanedRef.current = false;
     }
-  }, [applySignal, cleanup, sessionId, transition]);
+  }, [applySignal, cleanup, sessionId, startHeartbeat, transition]);
 
   const toggleMic = React.useCallback(() => {
     const local = localRef.current;
@@ -308,20 +355,29 @@ export function useMeetVideoSession(sessionId: string): MeetVideoSessionApi {
     setFacing((f) => (f === 'user' ? 'environment' : 'user'));
   }, []);
 
+  // Backgrounding mutes the tracks, so an abandoned call must stop renewing its
+  // lease: otherwise a forgotten video call pins the stranger's seat until the
+  // 6 h server ceiling. Coming back beats at once instead of waiting a cadence.
   React.useEffect(() => {
     const onApp = (status: AppStateStatus) => {
+      if (status !== 'active') stopHeartbeat();
       const local = localRef.current;
-      if (!local) return;
-      if (status !== 'active') {
-        for (const track of local.getTracks()) track.enabled = false;
-      } else {
-        for (const track of local.getAudioTracks()) track.enabled = micOn;
-        for (const track of local.getVideoTracks()) track.enabled = cameraOn;
+      if (local) {
+        if (status !== 'active') {
+          for (const track of local.getTracks()) track.enabled = false;
+        } else {
+          for (const track of local.getAudioTracks()) track.enabled = micOn;
+          for (const track of local.getVideoTracks()) track.enabled = cameraOn;
+        }
+      }
+      if (status === 'active' && meetVideoCallIsLive(stateRef.current)) {
+        startHeartbeat();
+        void beat();
       }
     };
     const sub = AppState.addEventListener('change', onApp);
     return () => sub.remove();
-  }, [cameraOn, micOn]);
+  }, [beat, cameraOn, micOn, startHeartbeat, stopHeartbeat]);
 
   React.useEffect(
     () => () => {

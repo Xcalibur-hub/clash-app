@@ -7,6 +7,8 @@
  *    newer one (or revive a conversation that already ended);
  *  - `ended` / `expired` are terminal for the lifetime of the screen;
  *  - polling and presence stop in the background and resume on foreground;
+ *  - a 15 s heartbeat is the only thing that keeps the server lease alive, so a
+ *    backgrounded or killed app releases the session for the peer (E3.2);
  *  - sending is refused the moment the session is over;
  *  - leaving the screen ends the session server-side exactly once.
  */
@@ -19,6 +21,7 @@ import {
   listMeetMessages,
   sendMeetMessage,
   subscribeMeetTyping,
+  touchMeetSession,
   type MeetMessage,
   type MeetSession,
 } from '../services/meetService';
@@ -26,10 +29,12 @@ import {
   createMeetRequestGuard,
   meetCanSend,
   meetChatStatus,
+  meetHeartbeatDue,
   meetIsTerminalError,
   meetPollDelay,
   meetStatusIsTerminal,
   mergeMeetMessages,
+  MEET_HEARTBEAT_MS,
   MEET_MAX_POLL_MS,
   MEET_MESSAGE_POLL_MS,
   MEET_SESSION_POLL_MS,
@@ -76,6 +81,8 @@ export function useMeetChat(sessionId: string): MeetChatApi {
   const leftRef = React.useRef(false);
   const sendingRef = React.useRef(false);
   const typingRef = React.useRef<ReturnType<typeof subscribeMeetTyping> | null>(null);
+  /** When the lease was last refreshed; survives pause/resume of the heartbeat. */
+  const lastBeatRef = React.useRef<number | null>(null);
 
   const commitStatus = React.useCallback((next: MeetChatStatus): void => {
     // Terminal is absorbing: a stale "active" payload cannot reopen the chat.
@@ -122,6 +129,7 @@ export function useMeetChat(sessionId: string): MeetChatApi {
     setMessages([]);
     statusRef.current = 'connected';
     leftRef.current = false;
+    lastBeatRef.current = null;
 
     void (async () => {
       try {
@@ -233,6 +241,61 @@ export function useMeetChat(sessionId: string): MeetChatApi {
       if (sessionTimer) clearTimeout(sessionTimer);
     };
   }, [applySession, messageGuard, paused, ready, sessionGuard, sessionId, terminal]);
+
+  // Heartbeat: the only thing that keeps the server lease alive (E3.2). It stops
+  // in the background on purpose — that is exactly what lets an abandoned session
+  // expire for the peer instead of pinning them.
+  React.useEffect(() => {
+    if (!ready || terminal || paused || !sessionId) return undefined;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let strikes = 0;
+
+    const schedule = (delay: number): void => {
+      if (!alive) return;
+      timer = setTimeout(() => {
+        timer = null;
+        void beat();
+      }, delay);
+    };
+
+    const beat = async (): Promise<void> => {
+      if (!alive) return;
+      lastBeatRef.current = Date.now();
+      try {
+        const result = await touchMeetSession(sessionId);
+        if (!alive) return;
+        strikes = 0;
+        if (!result.active) {
+          // Swept, ended by the peer, or our own lease lapsed while we were away.
+          sessionGuard.invalidate();
+          commitStatus(result.endReason && result.endReason !== 'expired' ? 'ended' : 'expired');
+          return;
+        }
+        schedule(MEET_HEARTBEAT_MS);
+      } catch (e) {
+        if (!alive) return;
+        // "Not found" / "not a participant" will never succeed on retry.
+        if (e instanceof SupabaseError && meetIsTerminalError(e.code)) {
+          sessionGuard.invalidate();
+          commitStatus('ended');
+          return;
+        }
+        strikes += 1;
+        schedule(meetPollDelay(MEET_HEARTBEAT_MS, strikes, MEET_MAX_POLL_MS));
+      }
+    };
+
+    // Resuming within one cadence must not spend an extra round trip; resuming
+    // after a long background must beat at once, because the lease is likely gone.
+    if (meetHeartbeatDue(lastBeatRef.current, Date.now())) void beat();
+    else schedule(MEET_HEARTBEAT_MS);
+
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [commitStatus, paused, ready, sessionGuard, sessionId, terminal]);
 
   // Presence: one subscription per screen, torn down on unmount.
   React.useEffect(() => {

@@ -7136,6 +7136,15 @@ export type Database = {
         }
         Returns: string
       }
+      report_meet_message: {
+        Args: {
+          p_detail?: string
+          p_message_id: string
+          p_reason: Database["public"]["Enums"]["report_reason"]
+          p_session_id: string
+        }
+        Returns: Json
+      }
       report_meet_session: {
         Args: {
           p_detail?: string
@@ -7595,6 +7604,10 @@ export type Database = {
       touch_creator_live_viewer: {
         Args: { p_session_id: string }
         Returns: number
+      }
+      touch_meet_session: {
+        Args: { p_session_id: string }
+        Returns: Json
       }
       transition_due_arena_rooms: {
         Args: { p_limit?: number }
@@ -8161,6 +8174,7 @@ export type Database = {
         | "impersonation"
         | "copyright"
         | "other"
+        | "child_safety"
       report_status: "open" | "reviewing" | "resolved" | "dismissed"
       report_target:
         | "profile"
@@ -8571,6 +8585,7 @@ export const Constants = {
         "impersonation",
         "copyright",
         "other",
+        "child_safety",
       ],
       report_status: ["open", "reviewing", "resolved", "dismissed"],
       report_target: [
