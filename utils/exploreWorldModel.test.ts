@@ -8,6 +8,7 @@ import type {
 import {
   WORLD_ACTIVITY_FLOOR,
   orderCountriesByEngagement,
+  surpriseCountry,
   worldActivityCountries,
   worldActivityLabel,
   worldContentCount,
@@ -111,4 +112,34 @@ describe('exploreWorldModel', () => {
       ['JP', 'BR', 'IN'],
     );
   });
+
+describe('surpriseCountry (E2.9 automatic globe)', () => {
+  const pool = [{ code: 'JP' }, { code: 'BR' }, { code: 'IN' }];
+
+  it('never repeats the country that is already open', () => {
+    for (const random of [0, 0.4, 0.999]) {
+      const pick = surpriseCountry(pool, 'BR', () => random);
+      assert.ok(pick);
+      assert.notEqual(pick.code, 'BR');
+    }
+  });
+
+  it('still returns the open country when it is the only one left', () => {
+    const pick = surpriseCountry([{ code: 'BR' }], 'BR', () => 0.5);
+    assert.equal(pick?.code, 'BR');
+  });
+
+  it('maps the random source onto the pool without ever leaving it', () => {
+    assert.equal(surpriseCountry(pool, null, () => 0)?.code, 'JP');
+    assert.equal(surpriseCountry(pool, null, () => 0.99)?.code, 'IN');
+    // A hostile source cannot produce undefined.
+    assert.equal(surpriseCountry(pool, null, () => 1)?.code, 'IN');
+    assert.equal(surpriseCountry(pool, null, () => -3)?.code, 'JP');
+  });
+
+  it('returns null when the server reports no activity', () => {
+    assert.equal(surpriseCountry([], 'JP'), null);
+  });
+});
+
 });

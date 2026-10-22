@@ -48,6 +48,26 @@ export function worldActivityCountries(
 }
 
 /**
+ * Surprise me — picks from the server's activity order, avoiding the country
+ * already open. No new ranking and no new RPC: the pool is what the summary
+ * returned, only the starting point is randomised.
+ */
+export function surpriseCountry<T extends { code: string }>(
+  pool: readonly T[],
+  selectedCode: string | null,
+  random: () => number = Math.random,
+): T | null {
+  if (pool.length === 0) return null;
+  const fresh = pool.filter((country) => country.code !== selectedCode);
+  const candidates = fresh.length > 0 ? fresh : pool;
+  const index = Math.min(
+    candidates.length - 1,
+    Math.max(0, Math.floor(random() * candidates.length)),
+  );
+  return candidates[index] ?? null;
+}
+
+/**
  * Plain-language activity line. A hidden aggregate reads as "quiet" rather than
  * as a guess, so a country is never described with numbers the server withheld.
  */

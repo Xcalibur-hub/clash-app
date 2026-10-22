@@ -74,7 +74,7 @@ import {
   type ForYouFilterId,
 } from '../../utils/exploreNav';
 import { exploreRailExpandable, EXPLORE_WORLD_CONTENT_RIGHT } from '../../utils/exploreWorldLayout';
-import { worldActivityCountries } from '../../utils/exploreWorldModel';
+import { worldActivityCountries, surpriseCountry } from '../../utils/exploreWorldModel';
 import { tap as hapticTap } from '../../utils/haptics';
 
 /**
@@ -113,8 +113,6 @@ function ExploreScreen(): React.JSX.Element {
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [recent, setRecent] = React.useState<string[]>([]);
   const [worldVisual, setWorldVisual] = React.useState<WorldVisualMode>('map');
-  const [spinToken, setSpinToken] = React.useState(0);
-  const [spinLng, setSpinLng] = React.useState<number | null>(null);
   const [teleporting, setTeleporting] = React.useState(false);
   const [teleportReveal, setTeleportReveal] = React.useState<ExploreTeleportCandidate | null>(null);
   const [selectedCountry, setSelectedCountry] = React.useState<string | null>(null);
@@ -190,24 +188,26 @@ function ExploreScreen(): React.JSX.Element {
   );
 
   /**
+   * E2.9 — one way in. The picker, the activity rail, Surprise me and the map
+   * all land here, and the globe derives its rotation from the result: the
+   * canvas is a view of `selectedCountry`, never a controller of it.
+   */
+  const selectCountry = React.useCallback((code: string, source: string) => {
+    setSelectedCountry(code);
+    setMode('world');
+    analytics.track('explore_country_selected', { realm: 'arena', source });
+  }, []);
+
+  /**
    * Surprise Me focuses a country the viewer has not opened yet, then reveals the
    * same content Teleport lands on. No new RPC, no extra ranking.
    */
   const surprise = React.useCallback(() => {
     hapticTap();
-    if (worldCountries.length === 0) return;
-    const untouched = worldCountries.filter((country) => country.code !== selectedCountry);
-    const pool = untouched.length > 0 ? untouched : worldCountries;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const pick = surpriseCountry(worldCountries, selectedCountry);
     if (!pick) return;
-    setSelectedCountry(pick.code);
-    setSpinLng(countryByCode(pick.code)?.lng ?? null);
-    setSpinToken((n) => n + 1);
-    analytics.track('explore_country_selected', {
-      realm: 'arena',
-      source: 'explore_surprise',
-    });
-  }, [selectedCountry, worldCountries]);
+    selectCountry(pick.code, 'explore_surprise');
+  }, [selectCountry, selectedCountry, worldCountries]);
 
   const changeMode = React.useCallback((next: ExploreMode) => {
     hapticTap();
@@ -232,12 +232,9 @@ function ExploreScreen(): React.JSX.Element {
         return;
       }
       rememberTeleportId(candidate.id);
-      const lng = candidate.countryCode
-        ? countryByCode(candidate.countryCode)?.lng ?? null
-        : Math.random() * 360 - 180;
-      setSpinLng(lng);
-      setSpinToken((n) => n + 1);
-      if (candidate.countryCode) setSelectedCountry(candidate.countryCode);
+      // E2.9 — the globe rotates to the server's country. No random spin: with no
+      // country there is nothing to point at, so the current angle is kept.
+      if (candidate.countryCode) selectCountry(candidate.countryCode, 'explore_teleport');
       teleportTimer.current=setTimeout(() => {
         if(!isCurrent())return;
         teleportBusy.current=false;
@@ -250,7 +247,7 @@ function ExploreScreen(): React.JSX.Element {
       setError('Teleport unavailable. Try again.');
       setTeleporting(false);
     }
-  }, [reduced, isCurrent]);
+  }, [reduced, isCurrent, selectCountry]);
 
   const loadMoreForYou = React.useCallback(async () => {
     if (loading || paging.current || forYouCursor == null || !isCurrent()) return;
@@ -483,23 +480,15 @@ function ExploreScreen(): React.JSX.Element {
                 </View>
 
                 <Text allowFontScaling={false} style={[styles.worldHint, { color: t.textMuted }]}>
-                  Tap a country to open its challenges, hunts, and takes.
+                  Pick a country — the globe turns to it on its own.
                 </Text>
 
                 <ExploreWorldCanvas
                   activity={summary?.countries ?? []}
                   selectedCode={selectedCountry}
                   visualMode={worldVisual}
-                  onSelectCountry={(code) => {
-                    setSelectedCountry(code);
-                    analytics.track('explore_country_selected', {
-                      realm: 'arena',
-                      source: 'explore',
-                    });
-                  }}
-                  spinToken={spinToken}
-                  spinTargetLng={spinLng}
-                  spinning={teleporting}
+                  onSelectCountry={(code) => selectCountry(code, 'explore_map')}
+                  busy={teleporting}
                 />
 
                 <View style={styles.worldControls}>
@@ -524,9 +513,7 @@ function ExploreScreen(): React.JSX.Element {
                   selectedCode={selectedCountry}
                   onSelectCountry={(code) => {
                     hapticTap();
-                    setSelectedCountry(code);
-                    setSpinLng(countryByCode(code)?.lng ?? null);
-                    setSpinToken((n) => n + 1);
+                    selectCountry(code, 'explore_rail');
                   }}
                   onOpenCountry={goCountryPage}
                   onOpenChallenge={(id) => router.push(exploreChallengeHref(id) as never)}
@@ -630,8 +617,7 @@ function ExploreScreen(): React.JSX.Element {
         onClose={() => setPickerOpen(false)}
         onSelect={(code) => {
           setPickerOpen(false);
-          setSelectedCountry(code);
-          setMode('world');
+          selectCountry(code, 'explore_picker');
         }}
       />
       <Notice offset={0} />
