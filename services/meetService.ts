@@ -389,13 +389,19 @@ export function pollMeetMessages(
   intervalMs = 2200,
 ): () => void {
   let alive = true;
+  let inFlight = false;
   const tick = () => {
-    if (!alive) return;
+    // A slow response skips the next beat: intervals must never stack up.
+    if (!alive || inFlight) return;
+    inFlight = true;
     void listMeetMessages(sessionId, 40)
       .then((items) => {
         if (alive) onBatch(items);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        inFlight = false;
+      });
   };
   tick();
   const id = setInterval(tick, intervalMs);
@@ -417,14 +423,18 @@ export function subscribeMeetTyping(
     config: { presence: { key: 'typing' } },
   });
 
+  // Presence events can land after the screen unmounts; never call back then.
+  let closed = false;
+
   channel
     .on('presence', { event: 'sync' }, () => {
+      if (closed) return;
       const state = channel.presenceState();
       const keys = Object.keys(state);
       onPeers(keys.length > 1);
     })
     .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
+      if (status === 'SUBSCRIBED' && !closed) {
         await channel.track({ t: Date.now() });
       }
     });
@@ -432,15 +442,19 @@ export function subscribeMeetTyping(
   let last = 0;
   return {
     broadcast: () => {
+      if (closed) return;
       const now = Date.now();
       if (now - last < 2000) return;
       last = now;
       void channel.track({ t: now });
     },
     clear: () => {
+      if (closed) return;
       void channel.untrack();
     },
     unsubscribe: () => {
+      if (closed) return;
+      closed = true;
       void client().removeChannel(channel);
     },
   };

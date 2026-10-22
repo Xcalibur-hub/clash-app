@@ -44,6 +44,7 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
   const [busy, setBusy] = React.useState(false);
   const prefs = peekMeetVideoPrefs();
   const connectedTracked = React.useRef(false);
+  const leftRef = React.useRef(false);
 
   React.useEffect(() => {
     void video.start();
@@ -51,6 +52,18 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
     // intentionally once per session
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  // Back, swipe-back, or a tab switch must end the call. An orphaned session
+  // keeps `meet_has_active_session` true for both people, so neither can match
+  // again until someone explicitly leaves.
+  React.useEffect(
+    () => () => {
+      if (leftRef.current) return;
+      leftRef.current = true;
+      void leaveMeetSession(sessionId, 'leave').catch(() => undefined);
+    },
+    [sessionId],
+  );
 
   React.useEffect(() => {
     if (video.state === 'connected' && !connectedTracked.current) {
@@ -69,6 +82,7 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
 
   const onNext = async () => {
     setBusy(true);
+    leftRef.current = true;
     try {
       video.cleanup();
       analytics.track('meet_video_next', { realm: 'explore', source: 'explore' });
@@ -96,6 +110,7 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
 
   const onLeave = async () => {
     setBusy(true);
+    leftRef.current = true;
     try {
       video.cleanup();
       await leaveMeetSession(sessionId, 'leave');
@@ -108,6 +123,7 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
 
   const onBlock = async () => {
     setBusy(true);
+    leftRef.current = true;
     try {
       video.cleanup();
       await blockMeetPeer(sessionId);

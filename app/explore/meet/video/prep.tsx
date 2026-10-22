@@ -8,12 +8,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MeetButton } from '../../../../components/meet/MeetButton';
 import { analytics } from '../../../../services/analytics';
-import {
-  joinMeetQueue,
-  leaveMeetQueue,
-  pollMeetQueue,
-} from '../../../../services/meetService';
+import { useMeetSearch } from '../../../../hooks/useMeetSearch';
 import { peekMeetVideoPrefs } from '../../../../services/meetVideoPrefs';
+import { meetActiveSessionChannel } from '../../../../utils/meetLifecycle';
 import { radius, space, typeScale, useThemeColors } from '../../../../theme';
 
 export default function MeetVideoPrepScreen(): React.JSX.Element {
@@ -22,8 +19,8 @@ export default function MeetVideoPrepScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const [camPerm, requestCam] = useCameraPermissions();
   const [micPerm, requestMic] = useMicrophonePermissions();
+  const search = useMeetSearch();
   const [busy, setBusy] = React.useState(false);
-  const [searching, setSearching] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const prefs = peekMeetVideoPrefs();
 
@@ -34,21 +31,24 @@ export default function MeetVideoPrepScreen(): React.JSX.Element {
     analytics.track('meet_video_opened', { realm: 'explore', source: 'explore' });
   }, []);
 
+  // The hook owns the match; this screen only reacts to it — once.
+  const { dismiss, phase: searchPhase, session: matched } = search;
   React.useEffect(() => {
-    if (!searching) return;
-    const id = setInterval(() => {
-      void pollMeetQueue()
-        .then((state) => {
-          if (state.matched && state.session?.channel === 'VIDEO') {
-            setSearching(false);
-            analytics.track('meet_video_matched', { realm: 'explore', source: 'explore' });
-            router.replace(`/explore/meet/video/${state.session.sessionId}` as never);
-          }
-        })
-        .catch(() => undefined);
-    }, 2000);
-    return () => clearInterval(id);
-  }, [router, searching]);
+    if (searchPhase !== 'matched' || !matched) return;
+    if (meetActiveSessionChannel(matched.channel, 'VIDEO') === 'other-channel') {
+      // An existing TEXT Meet must not be hijacked (or ended) by the video flow.
+      setError('You are already in a text Meet. Leave it before starting a video call.');
+      dismiss();
+      return;
+    }
+    analytics.track('meet_video_matched', { realm: 'explore', source: 'explore' });
+    router.replace(`/explore/meet/video/${matched.sessionId}` as never);
+  }, [dismiss, matched, router, searchPhase]);
+
+  // A match that dies before the call opens must not strand the queue.
+  React.useEffect(() => {
+    if (search.notice) setError(search.notice);
+  }, [search.notice]);
 
   const ensurePerms = async (): Promise<boolean> => {
     let cam = camPerm;
@@ -74,31 +74,19 @@ export default function MeetVideoPrepScreen(): React.JSX.Element {
       const ok = await ensurePerms();
       if (!ok) return;
       analytics.track('meet_video_queue_joined', { realm: 'explore', source: 'explore' });
-      const state = await joinMeetQueue({
+      await search.start({
         mode: prefs.mode,
         channel: 'VIDEO',
         countryCode: prefs.countryCode,
         hood: prefs.hood,
         interests: prefs.interests,
       });
-      if (state.matched && state.session) {
-        analytics.track('meet_video_matched', { realm: 'explore', source: 'explore' });
-        router.replace(`/explore/meet/video/${state.session.sessionId}` as never);
-        return;
-      }
-      if (state.alreadyActive && state.session?.channel === 'VIDEO') {
-        router.replace(`/explore/meet/video/${state.session.sessionId}` as never);
-        return;
-      }
-      setSearching(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not start');
     } finally {
       setBusy(false);
     }
   };
 
-  if (searching) {
+  if (search.phase === 'searching') {
     return (
       <View style={[styles.root, { backgroundColor: '#0A0A0C', paddingTop: insets.top + 24 }]}>
         <Text allowFontScaling={false} style={styles.kicker}>
@@ -114,7 +102,7 @@ export default function MeetVideoPrepScreen(): React.JSX.Element {
           label="Cancel"
           tone="glass"
           onPress={() => {
-            void leaveMeetQueue().finally(() => setSearching(false));
+            void search.cancel();
           }}
         />
       </View>
@@ -164,6 +152,7 @@ export default function MeetVideoPrepScreen(): React.JSX.Element {
               : 'Anywhere'}
       </Text>
 
+      {search.error ? <Text style={{ color: '#FF8A80' }}>{search.error}</Text> : null}
       {error ? (
         <View style={{ gap: 8 }}>
           <Text style={{ color: '#FF8A80' }}>{error}</Text>
@@ -177,7 +166,7 @@ export default function MeetVideoPrepScreen(): React.JSX.Element {
         label={busy ? 'Starting…' : 'Start'}
         onPress={() => void onStart()}
         tone="light"
-        disabled={busy}
+        disabled={busy || search.busy}
       />
       <View style={{ height: insets.bottom + 8 }} />
     </View>

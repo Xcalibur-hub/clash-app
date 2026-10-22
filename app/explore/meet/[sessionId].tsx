@@ -1,3 +1,8 @@
+/**
+ * 1:1 pseudonymous text Meet chat.
+ * Lifecycle (terminal absorbing, request ordering, AppState pausing) lives in
+ * `useMeetChat`; this screen is presentation plus moderation actions.
+ */
 import React from 'react';
 import {
   ActivityIndicator,
@@ -13,22 +18,18 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MeetButton } from '../../../components/meet/MeetButton';
+import { useMeetChat } from '../../../hooks/useMeetChat';
 import { analytics } from '../../../services/analytics';
 import {
   blockMeetPeer,
-  fetchMeetSession,
-  leaveMeetSession,
-  listMeetMessages,
+  leaveMeetQueue,
   nextMeet,
-  pollMeetMessages,
   reportMeetSession,
-  sendMeetMessage,
-  subscribeMeetTyping,
   type MeetMessage,
-  type MeetSession,
 } from '../../../services/meetService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../../theme';
 import { tap as hapticTap } from '../../../utils/haptics';
+import { meetQueueOutcome } from '../../../utils/meetLifecycle';
 
 export default function MeetChatScreen(): React.JSX.Element {
   const { sessionId: raw } = useLocalSearchParams<{ sessionId: string }>();
@@ -37,319 +38,373 @@ export default function MeetChatScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [session, setSession] = React.useState<MeetSession | null>(null);
-  const [messages, setMessages] = React.useState<MeetMessage[]>([]);
+  const chat = useMeetChat(sessionId);
+  const session = chat.session;
   const [draft, setDraft] = React.useState('');
-  const [loading, setLoading] = React.useState(true);
-  const [sending, setSending] = React.useState(false);
-  const [peerTyping, setPeerTyping] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const seen = React.useRef(new Set<string>());
-  const typingRef = React.useRef<ReturnType<typeof subscribeMeetTyping> | null>(null);
+  const [actionError, setActionError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
 
-  const upsert = React.useCallback((msg: MeetMessage) => {
-    if (seen.current.has(msg.id)) return;
-    seen.current.add(msg.id);
-    setMessages((prev) => [...prev, msg].sort((a, b) => a.createdAt - b.createdAt));
-  }, []);
+  const statusLine = React.useMemo(() => {
+    if (chat.status === 'expired') return 'Conversation expired';
+    if (chat.status === 'ended') return 'Conversation ended';
+    if (chat.status === 'disconnected') return 'Stranger disconnected';
+    if (chat.peerTyping) return 'Typing...';
+    return session?.sharedInterest ? `Connected - ${session.sharedInterest}` : 'Connected';
+  }, [chat.peerTyping, chat.status, session?.sharedInterest]);
 
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [s, list] = await Promise.all([
-          fetchMeetSession(sessionId),
-          listMeetMessages(sessionId, 60),
-        ]);
-        if (!alive) return;
-        setSession(s);
-        for (const m of list) seen.current.add(m.id);
-        setMessages(list);
-      } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : 'Chat unavailable');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
+  const footerNote = React.useMemo(() => {
+    if (chat.status === 'expired') return 'This conversation expired. Nothing else can be sent.';
+    if (chat.status === 'ended') return 'This conversation has ended.';
+    if (chat.status === 'disconnected') return 'Stranger disconnected.';
+    return 'Reconnecting...';
+  }, [chat.status]);
 
-    const unsubMessages = pollMeetMessages(sessionId, (batch) => {
-      for (const m of batch) upsert(m);
-    });
+  const error = actionError ?? chat.error;
 
-    typingRef.current = subscribeMeetTyping(sessionId, setPeerTyping);
-
-    const poll = setInterval(() => {
-      void fetchMeetSession(sessionId)
-        .then((s) => {
-          if (alive) setSession(s);
-        })
-        .catch(() => undefined);
-    }, 4000);
-
-    return () => {
-      alive = false;
-      unsubMessages();
-      typingRef.current?.unsubscribe();
-      clearInterval(poll);
-    };
-  }, [sessionId, upsert]);
-
-  const onSend = async () => {
+  const onSend = async (): Promise<void> => {
     const body = draft.trim();
-    if (!body || sending) return;
-    setSending(true);
-    setError(null);
-    try {
-      const msg = await sendMeetMessage(sessionId, body);
-      upsert(msg);
-      setDraft('');
-      typingRef.current?.clear();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Send failed');
-    } finally {
-      setSending(false);
-    }
+    if (!body || chat.sending) return;
+    setDraft('');
+    const sent = await chat.send(body);
+    // Keep the words if the send failed, so a blip never eats a message.
+    if (!sent) setDraft((current) => (current.length > 0 ? current : body));
   };
 
-  const onLeave = async () => {
-    try {
-      await leaveMeetSession(sessionId, 'leave');
-      analytics.track('meet_left', { realm: 'explore', source: 'explore' });
-      router.replace('/(tabs)/explore' as never);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Leave failed');
-    }
+  const onLeave = async (): Promise<void> => {
+    analytics.track('meet_left', { realm: 'explore', source: 'explore' });
+    await chat.leave();
+    router.replace('/(tabs)/explore' as never);
   };
 
-  const onNext = async () => {
+  const onNext = async (): Promise<void> => {
     if (!session) return;
+    setActionError(null);
+    setNotice(null);
     try {
       analytics.track('meet_next', { realm: 'explore', source: 'explore' });
-      const state = await nextMeet(sessionId, {
+      const state = await nextMeet(session.sessionId, {
         mode: session.mode,
         channel: 'TEXT',
         countryCode: session.countryCode,
         hood: session.hood,
         interests: session.sharedInterest ? [session.sharedInterest] : [],
       });
-      if (state.matched && state.session) {
+      chat.markEnded();
+      if (state.matched && state.session && meetQueueOutcome(state, Date.now()) === 'matched') {
         router.replace(`/explore/meet/${state.session.sessionId}` as never);
-      } else {
-        router.replace('/(tabs)/explore' as never);
+        return;
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Next failed');
-    }
-  };
-
-  const onBlock = async () => {
-    try {
-      await blockMeetPeer(sessionId);
-      analytics.track('meet_blocked', { realm: 'explore', source: 'explore' });
+      // next_meet leaves us queued when nobody is waiting. Dropping the row
+      // avoids a phantom search the user is no longer looking at.
+      await leaveMeetQueue().catch(() => undefined);
       router.replace('/(tabs)/explore' as never);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Block failed');
+      setActionError(e instanceof Error ? e.message : 'Could not find someone else.');
     }
   };
 
-  const onReport = async () => {
+  const onBlock = async (): Promise<void> => {
+    if (!session) return;
+    setMenuOpen(false);
+    setActionError(null);
+    setNotice(null);
+    hapticTap();
     try {
-      await reportMeetSession(sessionId, 'harassment');
-      analytics.track('meet_reported', { realm: 'explore', source: 'explore' });
-      setMenuOpen(false);
+      analytics.track('meet_blocked', { realm: 'explore', source: 'explore' });
+      await blockMeetPeer(session.sessionId);
+      chat.markEnded();
+      router.replace('/(tabs)/explore' as never);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Report failed');
+      setActionError(e instanceof Error ? e.message : 'Block failed.');
     }
   };
 
-  if (loading) {
+  const onReport = async (): Promise<void> => {
+    if (!session) return;
+    setMenuOpen(false);
+    setActionError(null);
+    setNotice(null);
+    hapticTap();
+    try {
+      analytics.track('meet_reported', { realm: 'explore', source: 'explore' });
+      await reportMeetSession(session.sessionId, 'other', 'Reported from Meet chat');
+      setNotice('Report received. Thanks for flagging it.');
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Report failed.');
+    }
+  };
+
+
+  if (chat.loading) {
     return (
-      <View style={[styles.center, { backgroundColor: t.background, paddingTop: insets.top }]}>
-        <ActivityIndicator color={t.textPrimary} />
+      <View style={[styles.center, { backgroundColor: t.background }]}>
+        <ActivityIndicator color={t.textSecondary} />
+        <Text style={[styles.dim, { color: t.textSecondary }]}>Opening conversation...</Text>
       </View>
     );
   }
 
-  const disconnected = session?.status === 'ended' || session?.peerConnected === false;
+  if (!session) {
+    return (
+      <View style={[styles.center, { backgroundColor: t.background, gap: space.md }]}>
+        <Text style={[styles.unavailable, { color: t.textPrimary }]}>
+          {error ?? 'This conversation is no longer available.'}
+        </Text>
+        <MeetButton label="Try again" tone="light" onPress={() => void chat.refresh()} />
+        <MeetButton
+          label="Back to Explore"
+          tone="glass"
+          onPress={() => router.replace('/(tabs)/explore' as never)}
+        />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: t.background }]}
+      style={[styles.screen, { backgroundColor: t.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
     >
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderColor: t.border }]}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back">
-          <Text style={{ color: t.textPrimary, fontWeight: '700', fontSize: 18 }}>←</Text>
+      <View style={[styles.header, { borderBottomColor: t.border }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          hitSlop={12}
+          onPress={() => router.back()}
+          style={styles.backHit}
+        >
+          <Text style={styles.chevron}>Back</Text>
         </Pressable>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text allowFontScaling={false} style={[styles.peer, { color: t.textPrimary }]}>
-            {session?.peerAlias ?? 'Stranger'}
+        <View style={styles.headerMeta}>
+          <Text style={[styles.alias, { color: t.textPrimary }]} numberOfLines={1}>
+            {session.peerAlias}
           </Text>
-          <Text allowFontScaling={false} style={{ color: t.textMuted, fontSize: 12 }}>
-            {disconnected
-              ? 'Stranger disconnected'
-              : peerTyping
-                ? 'Typing…'
-                : `● Connected${session?.sharedInterest ? ` · ${session.sharedInterest}` : ''}`}
+          <Text style={[styles.status, { color: t.textSecondary }]} numberOfLines={1}>
+            {statusLine}
           </Text>
         </View>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Conversation actions"
+          hitSlop={12}
           onPress={() => {
             hapticTap();
-            setMenuOpen((v) => !v);
+            setMenuOpen((open) => !open);
           }}
-          accessibilityRole="button"
-          accessibilityLabel="Chat actions"
+          style={styles.backHit}
         >
-          <Text style={{ color: t.textPrimary, fontWeight: '800' }}>···</Text>
+          <Text style={[styles.chevron, { color: t.textPrimary }]}>...</Text>
         </Pressable>
       </View>
 
       {menuOpen ? (
-        <View style={[styles.menu, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-          <MeetButton label="Next" onPress={() => void onNext()} tone="light" compact />
-          <MeetButton label="Report" onPress={() => void onReport()} tone="glass" compact />
-          <MeetButton label="Block" onPress={() => void onBlock()} tone="glass" compact />
-          <MeetButton label="Leave" onPress={() => void onLeave()} tone="glass" compact />
+        <View style={[styles.menu, { backgroundColor: t.surface, borderColor: t.border }]}>
+          <MeetButton label="Find someone else" tone="glass" onPress={() => void onNext()} />
+          <MeetButton label="Report stranger" tone="glass" onPress={() => void onReport()} />
+          <MeetButton label="Block stranger" tone="glass" onPress={() => void onBlock()} />
+          <MeetButton label="Leave chat" tone="glass" onPress={() => void onLeave()} />
         </View>
       ) : null}
 
+
       <FlatList
-        data={messages}
-        keyExtractor={(m) => m.id}
-        contentContainerStyle={{
-          paddingHorizontal: layout.screenX,
-          paddingVertical: space.md,
-          gap: 8,
-          flexGrow: 1,
-        }}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.bubble,
-              item.mine
-                ? { alignSelf: 'flex-end', backgroundColor: t.textPrimary }
-                : { alignSelf: 'flex-start', backgroundColor: t.surfaceElevated, borderColor: t.border, borderWidth: StyleSheet.hairlineWidth },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={{ color: item.mine ? t.background : t.textPrimary, fontSize: 15, lineHeight: 21 }}
+        data={chat.messages}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        renderItem={({ item }: { item: MeetMessage }) => (
+          <View style={[styles.bubbleRow, item.mine ? styles.bubbleRowMine : null]}>
+            <View
+              style={[
+                styles.bubble,
+                item.mine
+                  ? { backgroundColor: t.accent }
+                  : { backgroundColor: t.surface, borderColor: t.border, borderWidth: 1 },
+              ]}
             >
-              {item.body}
-            </Text>
+              <Text style={[styles.bubbleText, { color: item.mine ? t.textInverse : t.textPrimary }]}>
+                {item.body}
+              </Text>
+            </View>
           </View>
         )}
         ListEmptyComponent={
-          <Text allowFontScaling={false} style={{ color: t.textMuted, textAlign: 'center' }}>
-            Say hello — keep it kind.
+          <Text style={[styles.dim, { color: t.textSecondary }]}>
+            Say hello, keep it kind. Nothing here lasts forever.
           </Text>
+        }
+        ListFooterComponent={
+          chat.peerTyping ? (
+            <Text style={[styles.dim, { color: t.textSecondary }]}>Typing...</Text>
+          ) : (
+            <View style={styles.spacer} />
+          )
         }
       />
 
-      {disconnected ? (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 12, borderColor: t.border }]}>
-          <Text allowFontScaling={false} style={{ color: t.textMuted, marginBottom: 8 }}>
-            Stranger disconnected.
-          </Text>
-          <MeetButton label="Find someone else" onPress={() => void onNext()} tone="light" />
+      {notice ? (
+        <Text style={[styles.error, { color: t.textSecondary }]} numberOfLines={3}>
+          {notice}
+        </Text>
+      ) : null}
+
+      {error ? (
+        <Text style={[styles.error, { color: t.danger }]} numberOfLines={3}>
+          {error}
+        </Text>
+      ) : null}
+
+      {chat.canSend ? (
+        <View
+          style={[
+            styles.composer,
+            { borderTopColor: t.border, paddingBottom: Math.max(insets.bottom, space.sm) },
+          ]}
+        >
+          <TextInput
+            value={draft}
+            onChangeText={(next) => {
+              setDraft(next);
+              chat.notifyTyping();
+            }}
+            placeholder="Message..."
+            placeholderTextColor={t.textSecondary}
+            style={[
+              styles.input,
+              { color: t.textPrimary, backgroundColor: t.surface, borderColor: t.border },
+            ]}
+            multiline
+            maxLength={1000}
+            editable={!chat.sending}
+            onSubmitEditing={() => void onSend()}
+            blurOnSubmit={false}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            disabled={draft.trim().length === 0 || chat.sending}
+            onPress={() => void onSend()}
+            style={[
+              styles.send,
+              {
+                backgroundColor: t.accent,
+                opacity: draft.trim().length === 0 || chat.sending ? 0.4 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.sendLabel, { color: t.textInverse }]}>Send</Text>
+          </Pressable>
         </View>
       ) : (
-        <View style={[styles.composer, { paddingBottom: insets.bottom + 8, borderColor: t.border }]}>
-          {error ? (
-            <Text allowFontScaling={false} style={{ color: t.danger, marginBottom: 6 }}>
-              {error}
-            </Text>
-          ) : null}
-          <View style={styles.composerRow}>
-            <TextInput
-              value={draft}
-              onChangeText={(text) => {
-                setDraft(text);
-                typingRef.current?.broadcast();
-              }}
-              placeholder="Message…"
-              placeholderTextColor={t.textMuted}
-              maxLength={280}
-              style={[
-                styles.input,
-                { color: t.textPrimary, backgroundColor: t.inputBackground, borderColor: t.border },
-              ]}
-            />
-            <Pressable
-              onPress={() => void onSend()}
-              disabled={sending || !draft.trim()}
-              style={[
-                styles.send,
-                {
-                  backgroundColor: t.textPrimary,
-                  opacity: sending || !draft.trim() ? 0.45 : 1,
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Send"
-            >
-              <Text style={{ color: t.background, fontWeight: '800' }}>Send</Text>
-            </Pressable>
-          </View>
+        <View
+          style={[
+            styles.footer,
+            { borderTopColor: t.border, paddingBottom: Math.max(insets.bottom, space.sm) },
+          ]}
+        >
+          <Text style={[styles.dim, { color: t.textSecondary }]}>{footerNote}</Text>
+          <MeetButton label="Find someone else" tone="light" onPress={() => void onNext()} />
+          <MeetButton label="Leave" tone="glass" onPress={() => void onLeave()} />
         </View>
       )}
     </KeyboardAvoidingView>
   );
 }
 
+
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  screen: { flex: 1 },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: layout.screenX,
+    gap: space.sm,
+  },
+  unavailable: {
+    ...typeScale.bodyStrong,
+    textAlign: 'center',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: space.sm,
     paddingHorizontal: layout.screenX,
-    paddingBottom: 12,
+    paddingVertical: space.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  peer: { ...typeScale.section, fontSize: 18, fontWeight: '800' },
-  menu: {
-    marginHorizontal: layout.screenX,
-    marginTop: 8,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: space.sm,
-    gap: 8,
-  },
-  bubble: {
-    maxWidth: '78%',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  footer: {
-    paddingHorizontal: layout.screenX,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  composer: {
-    paddingHorizontal: layout.screenX,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  composerRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  input: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-    fontSize: 15,
-  },
-  send: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 999,
+  backHit: {
+    minWidth: layout.hit,
+    minHeight: layout.hit,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chevron: { ...typeScale.label },
+  headerMeta: { flex: 1, alignItems: 'center' },
+  alias: { ...typeScale.bodyStrong },
+  status: { ...typeScale.meta },
+  menu: {
+    marginHorizontal: layout.screenX,
+    marginTop: space.sm,
+    padding: space.sm,
+    gap: space.xs,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  list: {
+    paddingHorizontal: layout.screenX,
+    paddingVertical: space.md,
+    gap: space.xs,
+    flexGrow: 1,
+  },
+  bubbleRow: { flexDirection: 'row', justifyContent: 'flex-start' },
+  bubbleRowMine: { justifyContent: 'flex-end' },
+  bubble: {
+    maxWidth: '80%',
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: radius.lg,
+  },
+  bubbleText: { ...typeScale.body },
+  dim: { ...typeScale.meta },
+  spacer: { height: space.xs },
+  error: {
+    ...typeScale.meta,
+    paddingHorizontal: layout.screenX,
+    paddingBottom: space.xs,
+  },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: space.xs,
+    paddingHorizontal: layout.screenX,
+    paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  input: {
+    flex: 1,
+    minHeight: layout.hit,
+    maxHeight: 120,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.sm,
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
+    ...typeScale.body,
+  },
+  send: {
+    minHeight: layout.hit,
+    paddingHorizontal: space.md,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendLabel: { ...typeScale.button },
+  footer: {
+    paddingHorizontal: layout.screenX,
+    paddingTop: space.sm,
+    gap: space.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
 });
+

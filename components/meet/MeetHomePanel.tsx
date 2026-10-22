@@ -13,16 +13,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { MeetButton } from './MeetButton';
+import { useMeetSearch } from '../../hooks/useMeetSearch';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { analytics } from '../../services/analytics';
 import {
   ackMeetVideoSafety,
   hasMeetVideoSafetyAck,
-  joinMeetQueue,
-  leaveMeetQueue,
-  leaveMeetSession,
   MEET_INTERESTS,
-  pollMeetQueue,
   type MeetChannel,
   type MeetHoodId,
   type MeetMatchMode,
@@ -40,13 +37,14 @@ const MODES: { id: MeetMatchMode; label: string; hint: string }[] = [
   { id: 'HOOD', label: 'Hood', hint: 'Same Hood community' },
 ];
 
-type Phase = 'pick' | 'prefs' | 'safety' | 'searching' | 'matched';
+type Phase = 'pick' | 'prefs' | 'safety';
 
 export function MeetHomePanel(): React.JSX.Element {
   const t = useThemeColors();
   const router = useRouter();
   const requireAuth = useRequireAuth();
   const reduced = useReducedMotion();
+  const search = useMeetSearch();
 
   const [phase, setPhase] = React.useState<Phase>('pick');
   const [channel, setChannel] = React.useState<MeetChannel>('TEXT');
@@ -55,13 +53,12 @@ export function MeetHomePanel(): React.JSX.Element {
   const [interest, setInterest] = React.useState<string>(MEET_INTERESTS[0]!);
   const [hood, setHood] = React.useState<MeetHoodId>('techtakes');
   const HOODS: MeetHoodId[] = ['techtakes', 'movies', 'gaming', 'startups'];
-  const [matched, setMatched] = React.useState<MeetSession | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [busy, setBusy] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
 
   const pulse = useSharedValue(0.35);
   React.useEffect(() => {
-    if (phase !== 'searching' || reduced) {
+    if (search.phase !== 'searching' || reduced) {
       pulse.value = 0.55;
       return;
     }
@@ -70,7 +67,7 @@ export function MeetHomePanel(): React.JSX.Element {
       -1,
       true,
     );
-  }, [phase, pulse, reduced]);
+  }, [pulse, reduced, search.phase]);
 
   const orbStyle = useAnimatedStyle(() => ({
     opacity: 0.35 + pulse.value * 0.45,
@@ -82,61 +79,38 @@ export function MeetHomePanel(): React.JSX.Element {
   }, []);
 
   React.useEffect(() => {
-    if (phase !== 'searching') return;
-    const id = setInterval(() => {
-      void pollMeetQueue()
-        .then((state) => {
-          if (state.matched && state.session) {
-            setMatched(state.session);
-            setPhase('matched');
-            analytics.track(
-              state.session.channel === 'VIDEO' ? 'meet_video_matched' : 'meet_matched',
-              { realm: 'explore', source: 'explore' },
-            );
-          }
-        })
-        .catch(() => undefined);
-    }, 2200);
-    return () => clearInterval(id);
-  }, [phase]);
+    const matched: MeetSession | null = search.session;
+    if (search.phase !== 'matched' || !matched) return;
+    analytics.track(matched.channel === 'VIDEO' ? 'meet_video_matched' : 'meet_matched', {
+      realm: 'explore',
+      source: 'explore',
+    });
+  }, [search.phase, search.session]);
 
-  const startSearch = async () => {
+  const runSearch = async (
+    nextMode: MeetMatchMode,
+    nextChannel: MeetChannel = channel,
+  ): Promise<void> => {
     if (!requireAuth()) return;
-    setBusy(true);
-    setError(null);
-    setMatched(null);
-    try {
-      if (channel === 'VIDEO') {
-        analytics.track('meet_video_queue_joined', { realm: 'explore', source: 'explore' });
-      } else {
-        analytics.track('meet_queue_joined', { realm: 'explore', source: 'explore' });
-      }
-      const state = await joinMeetQueue({
-        mode,
-        channel,
-        countryCode: mode === 'COUNTRY' ? countryCode : null,
-        hood: mode === 'HOOD' ? hood : null,
-        interests: mode === 'INTERESTS' ? [interest] : [],
-      });
-      if (state.matched && state.session) {
-        setMatched(state.session);
-        setPhase('matched');
-        analytics.track(
-          state.session.channel === 'VIDEO' ? 'meet_video_matched' : 'meet_matched',
-          { realm: 'explore', source: 'explore' },
-        );
-      } else if (state.alreadyActive && state.session) {
-        setMatched(state.session);
-        setPhase('matched');
-      } else {
-        setPhase('searching');
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not start matching');
-    } finally {
-      setBusy(false);
-    }
+    setMode(nextMode);
+    analytics.track(
+      nextChannel === 'VIDEO' ? 'meet_video_queue_joined' : 'meet_queue_joined',
+      { realm: 'explore', source: 'explore' },
+    );
+    await search.start({
+      mode: nextMode,
+      channel: nextChannel,
+      countryCode,
+      hood,
+      interests: [interest],
+    });
   };
+
+  const startSearch = async (): Promise<void> => {
+    if (!requireAuth()) return;
+    await runSearch(mode);
+  };
+
 
   const chooseChannel = async (next: MeetChannel) => {
     hapticTap();
@@ -156,7 +130,9 @@ export function MeetHomePanel(): React.JSX.Element {
     }
   };
 
-  const openMatched = () => {
+  const matched: MeetSession | null = search.session;
+
+  const openMatched = (): void => {
     if (!matched) return;
     if (matched.channel === 'VIDEO') {
       router.push(`/explore/meet/video/${matched.sessionId}` as never);
@@ -166,7 +142,7 @@ export function MeetHomePanel(): React.JSX.Element {
     }
   };
 
-  if (phase === 'matched' && matched?.status === 'active') {
+  if (search.phase === 'matched' && matched) {
     return (
       <View style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
@@ -193,17 +169,12 @@ export function MeetHomePanel(): React.JSX.Element {
         <MeetButton
           label="Leave"
           onPress={() => {
+            analytics.track(matched.channel === 'VIDEO' ? 'meet_video_left' : 'meet_left', {
+              realm: 'explore',
+              source: 'explore',
+            });
             void (async () => {
-              try {
-                await leaveMeetSession(matched.sessionId, 'leave');
-                analytics.track(
-                  matched.channel === 'VIDEO' ? 'meet_video_left' : 'meet_left',
-                  { realm: 'explore', source: 'explore' },
-                );
-              } catch {
-                /* clear local UI anyway */
-              }
-              setMatched(null);
+              await search.release();
               setPhase('pick');
             })();
           }}
@@ -214,7 +185,7 @@ export function MeetHomePanel(): React.JSX.Element {
     );
   }
 
-  if (phase === 'searching') {
+  if (search.phase === 'searching') {
     return (
       <View style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
         <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
@@ -246,32 +217,21 @@ export function MeetHomePanel(): React.JSX.Element {
           Still looking… No bots. Real people only.
         </Text>
         <MeetButton
-          label={busy ? 'Cancelling…' : 'Cancel'}
+          label={search.busy ? 'Cancelling…' : 'Cancel'}
           onPress={() => {
             void (async () => {
-              setBusy(true);
-              try {
-                await leaveMeetQueue();
-                setPhase('prefs');
-              } finally {
-                setBusy(false);
-              }
+              await search.cancel();
+              setPhase('prefs');
             })();
           }}
           tone="glass"
-          disabled={busy}
+          disabled={search.busy}
         />
         {mode !== 'ANYWHERE' ? (
           <Pressable
             onPress={() => {
               hapticTap();
-              setMode('ANYWHERE');
-              void (async () => {
-                await leaveMeetQueue();
-                setMode('ANYWHERE');
-                setPhase('prefs');
-                await startSearch();
-              })();
+              void runSearch('ANYWHERE');
             }}
           >
             <Text allowFontScaling={false} style={{ color: t.textMuted, fontWeight: '700' }}>
@@ -301,19 +261,19 @@ export function MeetHomePanel(): React.JSX.Element {
           label="I understand"
           onPress={() => {
             void (async () => {
-              setBusy(true);
+              setSaving(true);
               try {
                 await ackMeetVideoSafety();
                 setPhase('prefs');
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Could not save');
               } finally {
-                setBusy(false);
+                setSaving(false);
               }
             })();
           }}
           tone="light"
-          disabled={busy}
+          disabled={saving}
         />
         <MeetButton label="Back" onPress={() => setPhase('pick')} tone="glass" compact />
       </View>
@@ -445,13 +405,17 @@ export function MeetHomePanel(): React.JSX.Element {
           />
         ) : (
           <MeetButton
-            label={busy ? 'Starting…' : 'Find someone'}
+            label={search.busy ? 'Starting…' : 'Find someone'}
             onPress={() => void startSearch()}
             tone="light"
-            disabled={busy}
+            disabled={search.busy}
           />
         )}
 
+        {search.notice ? (
+          <Text style={{ color: t.textMuted, textAlign: 'center' }}>{search.notice}</Text>
+        ) : null}
+        {search.error ? <Text style={{ color: t.danger }}>{search.error}</Text> : null}
         {error ? <Text style={{ color: t.danger }}>{error}</Text> : null}
       </View>
     );
