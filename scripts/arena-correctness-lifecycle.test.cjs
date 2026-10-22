@@ -20,8 +20,9 @@ function harness(file, name, reduced = false, sharedRegistry) {
   };
   const registry = sharedRegistry ?? load('utils/motionOnce.ts', () => { throw Error('Unexpected dependency'); });
   const chain = new Proxy({}, { get: () => () => chain });
-  const exported = load(file, dep => {
+  const requireMock = dep => {
     if (dep === 'react') return React;
+    if (dep === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
     if (dep === 'react-native') return { View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'Input', FlatList: 'List', Platform: { OS: 'android' }, StyleSheet: { create: x => x }, useWindowDimensions: () => ({ width: 360, fontScale: 1 }) };
     if (dep === 'react-native-reanimated') return { __esModule: true, default: { View: 'AnimatedView', Text: 'AnimatedText' },
       FadeIn: chain, FadeInDown: chain, SlideInLeft: chain, SlideInRight: chain, ZoomIn: chain, Easing: { out: x => x, cubic: 0 },
@@ -29,6 +30,8 @@ function harness(file, name, reduced = false, sharedRegistry) {
     if (dep.endsWith('/motionOnce')) return registry;
     if (dep.endsWith('/crowdPresentation')) return load('utils/crowdPresentation.ts', () => { throw Error('Unexpected dependency'); });
     if (dep.endsWith('/crowdArrivals')) return load('utils/crowdArrivals.ts', () => { throw Error('Unexpected dependency'); });
+    const helper = /\/(challengePresentation|arenaChallengePayload|verdictPresentation|duelStageMotion|spectatorPresentation)(?:\.ts)?$/.exec(dep)?.[1];
+    if (helper) return load(`utils/${helper}.ts`, requireMock);
     if (dep.endsWith('/arenaCrowd')) return { validCrowdText: text => !!text.trim() };
     if (dep.endsWith('/haptics')) return { notify: () => { haptics++; } };
     if (dep.endsWith('/verdictView')) return { verdictView: () => ({ title: 'Official result', aPct: 50, bPct: 50 }) };
@@ -37,7 +40,8 @@ function harness(file, name, reduced = false, sharedRegistry) {
     if (dep.endsWith('/ArenaAtmosphere')) return { ArenaAtmosphere: 'Atmosphere' };
     if (dep.endsWith('/theme')) return { useThemeColors: () => ({}), space: {}, typeScale: {}, layout: {} };
     throw Error('Unexpected dependency: ' + dep);
-  });
+  };
+  const exported = load(file, requireMock);
   return { registry, get haptics() { return haptics; },
     render(props, commit = true) { index = 0; effects = []; const tree = exported[name](props); if (commit) effects.forEach(fn => fn()); return tree; },
     tick(ms) { const end = time + ms; for (;;) { const due = [...timers].filter(([, task]) => task.at <= end).sort((a, b) => a[1].at - b[1].at)[0]; if (!due) break; time = due[1].at; timers.delete(due[0]); due[1].fn(); } time = end; },
