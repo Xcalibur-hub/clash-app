@@ -243,6 +243,8 @@ select dblink_exec('e325_worker',$remote$
  delete from public.meet_sessions where id like 'e325-lock-%'
    or id in (select matched_session_id from public.meet_queue where id like 'e325-lock-%');
  delete from auth.users where id::text like 'e3250000-0000-0000-0000-00000000001%';
+ -- Auth deletion SET NULLs profiles.auth_user_id; remove the committed fixtures too.
+ delete from public.profiles where id like 'e325-lock-%';
  $remote$);
 select dblink_disconnect('e325_locker');
 select dblink_disconnect('e325_worker');

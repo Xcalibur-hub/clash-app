@@ -87,6 +87,81 @@ for (const marker of ['BEFORE INSERT releases','contending sweep skips','matchin
   'heartbeat number 121','second sweep is a no-op','populated peer reports']) {
   check(tests.includes(marker), 'executable assertion authored: ' + marker);
 }
-const assertionCount = (tests.match(/^select (?:ok|is|isnt|matches|has_function|has_table|lives_ok|throws_ok)\(/gm) ?? []).length;
+// ── E3.2.8: the moderation audit outlives the moderator ─────────────────────
+// The contract is structural, not conventional: null-instead-of-cascade on the
+// actor link, an immutable stamped pseudonym, an append-only guard, and no
+// client credential that can rewrite or erase a row. Comments are stripped first
+// (the header quotes the defect it closes, including the cascade it removes) and
+// whitespace is flattened so the assertions describe clauses, not formatting.
+const retention = fs.readFileSync('supabase/migrations/20261023120000_meet_moderation_audit_retention.sql', 'utf8');
+const retentionTests = fs.readFileSync('supabase/tests/098_meet_moderation_audit_retention.sql', 'utf8');
+const LF = String.fromCharCode(10), CR = String.fromCharCode(13), TAB = String.fromCharCode(9);
+const SQ = String.fromCharCode(39);
+const retentionSql = retention.split(CR).join('').split(LF)
+  .map((line) => line.split('--')[0])
+  .join(' ')
+  .split(TAB).join(' ')
+  .replace(/ {2,}/g, ' ')
+  .trim();
+function occurrences(haystack, needle) { return haystack.split(needle).length - 1; }
+function queries(source, verbs) {
+  return source.split(LF).filter((line) => verbs.some((verb) => line.startsWith('select ' + verb + '('))).length;
+}
+check(balanced(retention), 'retention migration lexical delimiters balanced');
+check(balanced(retentionTests), 'retention pgTAP lexical delimiters balanced');
+check(!/on delete cascade/i.test(retentionSql), 'no audit actor link cascades a profile delete');
+check(!/security definer/i.test(retentionSql), 'audit triggers run as the invoking role, not a definer');
+for (const table of ['meet_moderation_reads', 'moderation_actions']) {
+  const has = (needle, label) => check(retentionSql.includes(needle), table + ' ' + label);
+  has('add column if not exists moderator_ref text', 'gains an actor snapshot column');
+  has('alter column moderator_id drop not null', 'actor link may become null');
+  has('add constraint ' + table + '_moderator_fk foreign key (moderator_id) '
+    + 'references public.profiles (id) on delete set null', 'nulls the actor link instead of deleting the row');
+  has('before insert on public.' + table + ' for each row execute function public.stamp_moderation_actor()',
+    'stamps the actor on insert');
+  has('before update or delete on public.' + table + ' for each row execute function public.guard_moderation_audit()',
+    'is append-only for UPDATE and DELETE');
+  has('before truncate on public.' + table + ' for each statement execute function public.guard_moderation_audit()',
+    'resists TRUNCATE');
+  has('revoke insert, update, delete, truncate, references, trigger on public.' + table
+    + ' from anon, authenticated, service_role;', 'withdraws every write privilege from client roles');
+  has('grant select on table public.' + table + ' to authenticated;', 'grants authenticated exactly SELECT');
+}
+check(occurrences(retentionSql, 'grant ') === 2, 'the migration asserts no grant beyond SELECT');
+check(occurrences(retentionSql, 'check (moderator_ref ~ ' + SQ + '^mod_[0-9a-f]{64}$' + SQ + ')') === 2,
+  'both snapshots are shape-checked');
+check(occurrences(retentionSql, 'check (moderator_id is null or moderator_ref = ') === 2,
+  'both snapshots are bound to their live actor');
+check(retentionSql.includes('if new.moderator_id is null then raise exception ' + SQ
+  + 'moderation audit requires an actor' + SQ + ' using errcode = ' + SQ + '23502' + SQ + ';'),
+  'the stamp refuses a row without an actor');
+check(retentionSql.includes('if (pg_catalog.to_jsonb(new) - ' + SQ + 'moderator_id' + SQ
+  + ') is distinct from (pg_catalog.to_jsonb(old) - ' + SQ + 'moderator_id' + SQ + ') then'),
+  'the guard only tolerates the actor column changing');
+check(retentionSql.includes('from public.profiles where id = old.moderator_id) > 0 then'),
+  'the guard refuses a hand-made anonymisation while the actor still exists');
+check(retentionSql.includes('current_user not in (' + SQ + 'postgres' + SQ + ', ' + SQ + 'supabase_admin' + SQ + ')'),
+  'DELETE and TRUNCATE need an owner-level role');
+check(retentionSql.includes('revoke execute on function public.stamp_moderation_actor() from public, anon, authenticated;')
+  && retentionSql.includes('revoke execute on function public.guard_moderation_audit() from public, anon, authenticated;'),
+  'audit trigger functions are not callable by client roles');
+check(retentionSql.includes('notify pgrst, ' + SQ + 'reload schema' + SQ + ';'),
+  'PostgREST schema cache is reloaded');
+check(retentionTests.includes('select no_plan();') && retentionTests.includes('select finish();')
+  && retentionTests.trim().endsWith('rollback;'), 'retention pgTAP uses transactional conventions');
+check(retentionTests.includes('current_database() !~ ' + SQ + '^clash_e325_')
+  && retentionTests.includes('test.e325_disposable'), 'retention pgTAP rejects unapproved database targets');
+check(!retentionTests.includes('dblink_connect'), 'retention pgTAP needs no cross-database fixture');
+for (const marker of ['staff evidence read succeeds', 'a supplied snapshot is accepted as input',
+  'the trigger replaced the supplied snapshot', 'an audit row cannot exist without an actor',
+  'a caller cannot anonymise by hand either', 'delete privilege alone cannot erase audit rows',
+  'the pseudonymous actor history survives', 'the read audit outlives the session it describes',
+  'an ordinary user still cannot read the trail', 'an owner-level retention purge is still possible']) {
+  check(retentionTests.includes(marker), 'retention assertion authored: ' + marker);
+}
+
+const assertionCount = queries(tests, ['ok', 'is', 'isnt', 'matches', 'has_function', 'has_table', 'lives_ok', 'throws_ok']);
+const retentionAssertions = queries(retentionTests, ['ok', 'is', 'isnt', 'matches', 'has_column',
+  'has_trigger', 'lives_ok', 'throws_ok']);
 console.log(JSON.stringify({ status: 'PASS', staticChecks: checks, authoredAssertions: assertionCount,
-  databaseExecution: 'NOT EXECUTED', postgresSyntaxAndSemantics: 'NOT VERIFIED' }));
+  retentionAssertions, databaseExecution: 'NOT EXECUTED', postgresSyntaxAndSemantics: 'NOT VERIFIED' }));

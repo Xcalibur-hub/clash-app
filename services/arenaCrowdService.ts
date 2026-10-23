@@ -1,11 +1,18 @@
+import type { PostgrestError } from '@supabase/supabase-js';
 import { isSupabaseConfigured, requireSupabase, requestError } from './supabaseClient';
 import { parseCrowdContext, parseCrowdMessage, parseCrowdPage, type CrowdMessage } from '../utils/arenaCrowd';
 
 // Additive RPC contracts follow the existing expressive-media service boundary;
 // validate all JSON at runtime rather than exposing database rows to the UI.
+type CrowdRpc = (
+  name: string,
+  args: Record<string, unknown>,
+) => Promise<{ data: unknown; error: PostgrestError | null }>;
 async function rpc(name: string, args: Record<string, unknown>): Promise<unknown> {
   const client = requireSupabase();
-  const call = client.rpc.bind(client) as unknown as (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: Parameters<typeof requestError>[0] | null }>;
+  // A runtime name cannot select one of the generated per-RPC overloads, and
+  // binding the whole overload set makes TypeScript instantiate every one.
+  const call = (client as unknown as { rpc: CrowdRpc }).rpc;
   const { data, error } = await call(name, args);
   if (error) throw requestError(error);
   return data;

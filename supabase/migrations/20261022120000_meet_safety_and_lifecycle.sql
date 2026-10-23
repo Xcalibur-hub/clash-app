@@ -362,7 +362,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.get_meet_session(text) from public;
+-- Supabase defaults grant anon explicitly; revoking PUBLIC alone leaves that grant.
+revoke execute on function public.get_meet_session(text) from public, anon;
 grant execute on function public.get_meet_session(text) to authenticated;
 
 
@@ -429,7 +430,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.poll_meet_queue() from public;
+revoke execute on function public.poll_meet_queue() from public, anon;
 grant execute on function public.poll_meet_queue() to authenticated;
 
 create or replace function public.join_meet_queue(
@@ -547,7 +548,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.join_meet_queue(public.meet_match_mode, text, public.hood_id, text[], public.meet_channel) from public;
+revoke execute on function public.join_meet_queue(public.meet_match_mode, text, public.hood_id, text[], public.meet_channel) from public, anon;
 grant execute on function public.join_meet_queue(public.meet_match_mode, text, public.hood_id, text[], public.meet_channel) to authenticated;
 
 
@@ -622,7 +623,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.send_meet_message(text, text) from public;
+revoke execute on function public.send_meet_message(text, text) from public, anon;
 grant execute on function public.send_meet_message(text, text) to authenticated;
 
 -- ── 10. Message history: participant-only, read-budgeted, never peer ids ────
@@ -674,7 +675,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.list_meet_messages(text, integer, timestamptz) from public;
+revoke execute on function public.list_meet_messages(text, integer, timestamptz) from public, anon;
 grant execute on function public.list_meet_messages(text, integer, timestamptz) to authenticated;
 
 
@@ -729,7 +730,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.leave_meet_session(text, text) from public;
+revoke execute on function public.leave_meet_session(text, text) from public, anon;
 grant execute on function public.leave_meet_session(text, text) to authenticated;
 
 -- ── 12. Heartbeat: the only way a client can extend its own lease ───────────
@@ -809,7 +810,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.touch_meet_session(text) from public;
+revoke execute on function public.touch_meet_session(text) from public, anon;
 grant execute on function public.touch_meet_session(text) to authenticated;
 
 
@@ -854,7 +855,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.block_meet_peer(text) from public;
+revoke execute on function public.block_meet_peer(text) from public, anon;
 grant execute on function public.block_meet_peer(text) to authenticated;
 
 create or replace function public.report_meet_session(
@@ -895,7 +896,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.report_meet_session(text, public.report_reason, text) from public;
+revoke execute on function public.report_meet_session(text, public.report_reason, text) from public, anon;
 grant execute on function public.report_meet_session(text, public.report_reason, text) to authenticated;
 
 -- Message-level report: the target the `meet_message` enum value always
@@ -954,7 +955,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.report_meet_message(text, text, public.report_reason, text) from public;
+revoke execute on function public.report_meet_message(text, text, public.report_reason, text) from public, anon;
 grant execute on function public.report_meet_message(text, text, public.report_reason, text) to authenticated;
 
 
@@ -1178,7 +1179,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.publish_meet_signal(text, public.meet_signal_kind, jsonb) from public;
+revoke execute on function public.publish_meet_signal(text, public.meet_signal_kind, jsonb) from public, anon;
 grant execute on function public.publish_meet_signal(text, public.meet_signal_kind, jsonb) to authenticated;
 
 create or replace function public.list_meet_signals(
@@ -1234,7 +1235,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.list_meet_signals(text, timestamptz) from public;
+revoke execute on function public.list_meet_signals(text, timestamptz) from public, anon;
 grant execute on function public.list_meet_signals(text, timestamptz) to authenticated;
 
 notify pgrst, 'reload schema';
