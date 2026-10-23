@@ -13,7 +13,7 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
   // A runtime name cannot select one of the generated per-RPC overloads, and
   // binding the whole overload set makes TypeScript instantiate every one.
   const call = (client as unknown as { rpc: CrowdRpc }).rpc;
-  const { data, error } = await call(name, args);
+  const { data, error } = await call.call(client, name, args);
   if (error) throw requestError(error);
   return data;
 }
