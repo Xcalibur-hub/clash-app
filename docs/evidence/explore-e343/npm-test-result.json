@@ -1,0 +1,20 @@
+{
+    "summary":  [
+                    "# tests 806",
+                    "# suites 194",
+                    "# pass 806",
+                    "# fail 0",
+                    "# cancelled 0",
+                    "# skipped 0",
+                    "# todo 0",
+                    "# tests 132",
+                    "# suites 0",
+                    "# pass 132",
+                    "# fail 0",
+                    "# cancelled 0",
+                    "# skipped 0",
+                    "# todo 0"
+                ],
+    "exitCode":  0,
+    "command":  "npm test"
+}

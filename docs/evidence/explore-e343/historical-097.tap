@@ -1,0 +1,102 @@
+ok 1 - heartbeat exists
+ok 2 - message report exists
+ok 3 - sweeper exists
+ok 4 - moderation read audit exists
+ok 5 - audit RLS enabled
+ok 6 - cannot forge participant rows
+ok 7 - cannot forge lease
+ok 8 - cannot forge staff audit
+ok 9 - anonymous cannot heartbeat
+ok 10 - client cannot sweep
+ok 11 - trigger is not an RPC
+ok 12 - active seat index remains unique
+ok 13 - seat uniqueness is partial
+ok 14 - row BEFORE INSERT release trigger enabled
+ok 15 - BEFORE INSERT releases both stale seats before the partial index check
+ok 16 - both stale seats released
+ok 17 - a genuinely live seat still prevents another session
+ok 18 - ordinary user cannot read report evidence
+ok 19 - outsider cannot renew another lease
+ok 20 - heartbeat existence oracle is closed
+ok 21 - outsider cannot block participants or end their session
+ok 22 - outsider cannot report a guessed session
+ok 23 - outsider cannot report guessed messages
+ok 24 - outsider cannot read transcript
+ok 25 - direct forged participant insert denied
+ok 26 - client cannot extend lease directly
+ok 27 - audit RLS hides staff reads from ordinary users
+ok 28 - outsider cannot read others reports
+ok 29 - participant renews a live lease
+ok 30 - lease duration is chosen by server
+ok 31 - participant heartbeat recorded
+ok 32 - repeat heartbeat remains valid
+ok 33 - own message is not a report target
+ok 34 - cross-session evidence injection denied
+ok 35 - missing target has the same response
+ok 36 - oversized report detail rejected
+ok 37 - peer child-safety message report accepted
+ok 38 - participant session report accepted
+ok 39 - reporting does not end session
+ok 40 - open message/session reports pin evidence
+ok 41 - message report alone pins its session
+ok 42 - unreported session is not pinned by another report
+ok 43 - repeat heartbeat did not stack lease extensions
+ok 44 - expired active row is presented as ended
+ok 45 - expired reason is explicit
+ok 46 - heartbeat cannot resurrect expired lease
+ok 47 - expired active session rejects message writes
+ok 48 - expired participant retains intentional history access
+ok 49 - expired active video rejects signals
+ok 50 - expired signal poll reports inactive
+ok 51 - expired signal poll discloses no candidates
+ok 52 - poll does not return expired active session as matched
+ok 53 - expired active session does not prevent a fresh queue entry
+ok 54 - cancel fixture requeue
+ok 55 - heartbeat cannot extend beyond six-hour ceiling
+ok 56 - six-hour bound is persisted
+ok 57 - heartbeat number 120 reaches the RPC
+ok 58 - heartbeat number 121 is rate limited
+ok 59 - client cannot clear its abuse ledger
+ok 60 - final shared report allowance succeeds for past participation
+ok 61 - session and message reports share one budget
+ok 62 - join budget enforced
+ok 63 - poll budget enforced
+ok 64 - session read budget enforced
+ok 65 - send budget enforced
+ok 66 - history budget enforced
+ok 67 - leave budget enforced
+ok 68 - block budget enforced
+ok 69 - signal write budget enforced
+ok 70 - signal read budget enforced
+ok 71 - staff sees only this session transcript
+ok 72 - staff sees only this session report targets
+ok 73 - foreign evidence excluded
+ok 74 - foreign report evidence excluded
+ok 75 - signaling is excluded from moderation payload
+ok 76 - staff bundle excludes actual stored ICE payload
+ok 77 - missing staff read fails
+ok 78 - successful staff read persisted exactly one audit row
+ok 79 - failed staff read has no fabricated audit
+ok 80 - ordinary user cannot see populated moderation audit
+ok 81 - ordinary user cannot read populated peer reports
+ok 82 - staff evidence reads are rate limited
+ok 83 - resolved evidence is no longer pinned
+ok 84 - session deletion cascades transcript
+ok 85 - moderation read audit survives permitted session deletion
+ok 86 - sweep closes expired fixtures
+ok 87 - sweep persists end state
+ok 88 - sweep releases both seats
+ok 89 - second sweep is a no-op
+ok 90 - repeated sweep preserves end timestamp
+ok 91 - contending sweep skips locked oldest row and drains another
+ok 92 - locked row remains untouched
+ok 93 - second batch drains remaining unlocked backlog
+ok 94 - only locked backlog remains
+ok 95 - released oldest row drains on next sweep
+ok 96 - drained backlog does not loop
+ok 97 - matching skips a locked candidate and matches another
+ok 98 - locked candidate is not stolen
+ok 99 - both unlocked peers share one committed session
+ok 100 - released candidate can match later instead of starving
+ok 101 - contended matching does not duplicate active seats
+1..101

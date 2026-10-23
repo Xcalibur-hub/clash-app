@@ -1,0 +1,119 @@
+{
+  "baseline": "f96b2851c95f254d62b33d4f8ae25df9ddecac02",
+  "migrations": 110,
+  "freshLedgerSha256": "f0f0011204ba2e2e6c517e3ba8684997480fa5861cbc33418f137e8def819b1a",
+  "historical109LedgerSha256": "3401b4167a0d118f03ad2972a9c737095f6361f0ac6578ab595749a322e1e143",
+  "historical110LedgerSha256": "945c42a79108b2509c11fc5601bab054d1bf59f78aab5bd65a563351a26ab0dd",
+  "historical109RowsUnchanged": true,
+  "forwardStatementsSha256": "4d83e39df84d3d69a2d283f9436100503624cddb1e55caff8b6b9c44df8c11af",
+  "historicalPreservation": {
+    "profiles": 4,
+    "sessions": 2,
+    "messages": 1,
+    "actions": 1,
+    "actorSnapshots": 1
+  },
+  "actualTapPasses": 564,
+  "environments": {
+    "fresh": {
+      "database": "clash_e325_e343_ade4ff97524f_fresh",
+      "rollback": {
+        "authFixtures": 0,
+        "profileFixtures": 0,
+        "sessionFixtures": 0,
+        "probeRole": 0
+      },
+      "suites": [
+        {
+          "file": "097_meet_safety_and_lifecycle.sql",
+          "expected": 101,
+          "passed": 101,
+          "failed": 0,
+          "skipped": 0,
+          "plans": [
+            101
+          ],
+          "sequential": true,
+          "pass": true,
+          "testSha256": "b561760d60d2c712bea895d66ee9e07df35000257f0fa44629cfdbcc9e2f9a72"
+        },
+        {
+          "file": "098_meet_moderation_audit_retention.sql",
+          "expected": 61,
+          "passed": 61,
+          "failed": 0,
+          "skipped": 0,
+          "plans": [
+            61
+          ],
+          "sequential": true,
+          "pass": true,
+          "testSha256": "d445dc784e730490c63fed9e2cfb1697ae79979cb60a1d263797168b156c2a63"
+        },
+        {
+          "file": "099_meet_rpc_permissions.sql",
+          "expected": 120,
+          "passed": 120,
+          "failed": 0,
+          "skipped": 0,
+          "plans": [
+            120
+          ],
+          "sequential": true,
+          "pass": true,
+          "testSha256": "ab48f97b4b1d38bb5a9187c9314494ce9e68398ea7a348ff3dcca02d812ab881"
+        }
+      ]
+    },
+    "historical": {
+      "database": "clash_e325_e343_ade4ff97524f_historical",
+      "rollback": {
+        "authFixtures": 0,
+        "profileFixtures": 0,
+        "sessionFixtures": 0,
+        "probeRole": 0
+      },
+      "suites": [
+        {
+          "file": "097_meet_safety_and_lifecycle.sql",
+          "expected": 101,
+          "passed": 101,
+          "failed": 0,
+          "skipped": 0,
+          "plans": [
+            101
+          ],
+          "sequential": true,
+          "pass": true,
+          "testSha256": "b561760d60d2c712bea895d66ee9e07df35000257f0fa44629cfdbcc9e2f9a72"
+        },
+        {
+          "file": "098_meet_moderation_audit_retention.sql",
+          "expected": 61,
+          "passed": 61,
+          "failed": 0,
+          "skipped": 0,
+          "plans": [
+            61
+          ],
+          "sequential": true,
+          "pass": true,
+          "testSha256": "d445dc784e730490c63fed9e2cfb1697ae79979cb60a1d263797168b156c2a63"
+        },
+        {
+          "file": "099_meet_rpc_permissions.sql",
+          "expected": 120,
+          "passed": 120,
+          "failed": 0,
+          "skipped": 0,
+          "plans": [
+            120
+          ],
+          "sequential": true,
+          "pass": true,
+          "testSha256": "ab48f97b4b1d38bb5a9187c9314494ce9e68398ea7a348ff3dcca02d812ab881"
+        }
+      ]
+    }
+  }
+}

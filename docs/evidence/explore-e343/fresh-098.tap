@@ -1,0 +1,62 @@
+ok 1 - read audit keeps an actor snapshot
+ok 2 - action log keeps an actor snapshot
+ok 3 - read audit actor link is nullable
+ok 4 - action log actor link is nullable
+ok 5 - read audit snapshot is mandatory
+ok 6 - action log snapshot is mandatory
+ok 7 - profile deletion nulls the read audit link
+ok 8 - profile deletion nulls the action log link
+ok 9 - read audit keeps exactly one foreign key
+ok 10 - snapshot shape and binding are both enforced
+ok 11 - read audit stamps its actor
+ok 12 - read audit is append-only
+ok 13 - read audit resists truncate
+ok 14 - action log stamps its actor
+ok 15 - action log is append-only
+ok 16 - action log resists truncate
+ok 17 - read audit RLS is still enabled
+ok 18 - action log RLS is still enabled
+ok 19 - service key cannot delete read audit
+ok 20 - service key cannot rewrite read audit
+ok 21 - service key cannot fabricate read audit
+ok 22 - service key cannot truncate read audit
+ok 23 - service key cannot delete the action log
+ok 24 - service key cannot rewrite the action log
+ok 25 - service key cannot fabricate the action log
+ok 26 - service key cannot truncate the action log
+ok 27 - staff-visible read grant is intact
+ok 28 - client cannot delete read audit
+ok 29 - client cannot fabricate read audit
+ok 30 - anonymous cannot read the trail
+ok 31 - anonymous cannot read the action log
+ok 32 - the stamp trigger is not an RPC
+ok 33 - the guard trigger is not an RPC
+ok 34 - staff evidence read succeeds
+ok 35 - the staff read is audited exactly once
+ok 36 - the snapshot has the documented shape
+ok 37 - the snapshot is the deterministic hash of the actor id
+ok 38 - a supplied snapshot is accepted as input
+ok 39 - the trigger replaced the supplied snapshot
+ok 40 - an audit row cannot exist without an actor
+ok 41 - the action log stamps the same snapshot
+ok 42 - read evidence cannot be rewritten
+ok 43 - the actor snapshot cannot be re-pointed
+ok 44 - a caller cannot anonymise by hand either
+ok 45 - the action log cannot be rewritten
+ok 46 - delete privilege alone cannot erase audit rows
+ok 47 - truncate privilege alone cannot erase audit rows
+ok 48 - deleting the moderator keeps every read audit row
+ok 49 - the delete rule nulls the actor link instead of removing the row
+ok 50 - the pseudonymous actor history survives
+ok 51 - the snapshot is unchanged by the deletion
+ok 52 - the evidence still names its session
+ok 53 - the moderation action survives moderator deletion
+ok 54 - the action actor link is nulled
+ok 55 - the read actor link is nulled
+ok 56 - the read audit outlives the session it describes
+ok 57 - an ordinary user still cannot read the trail
+ok 58 - an ordinary user still cannot read the action log
+ok 59 - an owner-level retention purge is still possible
+ok 60 - the purge removed only the chosen row
+ok 61 - the purge left the retained evidence intact
+1..61

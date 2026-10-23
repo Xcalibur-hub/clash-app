@@ -1,0 +1,666 @@
+{
+  "count": 110,
+  "head": "f96b2851c95f254d62b33d4f8ae25df9ddecac02",
+  "migrations": [
+    {
+      "file": "20260926120000_initial_arena_schema.sql",
+      "version": "20260926120000",
+      "bytes": 23559,
+      "sha256": "3b6acf75d770c844f0d55ea62a79687cb36c60bd260bfff66926e721d9c4b2f3"
+    },
+    {
+      "file": "20260926130000_auth_profile_trigger.sql",
+      "version": "20260926130000",
+      "bytes": 2984,
+      "sha256": "6eb95a10f9633e245c6cbb1c53c4e983e0e5a9caee2255e5d417b2ae2e8aef3d"
+    },
+    {
+      "file": "20260926140000_social_foundation.sql",
+      "version": "20260926140000",
+      "bytes": 18782,
+      "sha256": "62d41ccbdf99dd912072d8684c88979e0966d8e1fb171cac0c798aa786b6be42"
+    },
+    {
+      "file": "20260926150000_media_storage.sql",
+      "version": "20260926150000",
+      "bytes": 14007,
+      "sha256": "340582e2f0710a01944d5cd26d77de57c69c6c76ece82ea65c4a38c17e6b57b5"
+    },
+    {
+      "file": "20260926160000_clash_engine.sql",
+      "version": "20260926160000",
+      "bytes": 16408,
+      "sha256": "d90c4e066d6a1faeac19c55e31a8f1a16b6206b581a7724035a44f69bbc3b9f8"
+    },
+    {
+      "file": "20260926170000_production_hardening.sql",
+      "version": "20260926170000",
+      "bytes": 15016,
+      "sha256": "208d0ce99eb5392fd464adda14b66d7d61b5a622de23c3f3a6cda8a46cd6975b"
+    },
+    {
+      "file": "20260926180000_take_reactions.sql",
+      "version": "20260926180000",
+      "bytes": 6833,
+      "sha256": "6a1ac7118e273849cdbeec10b4c105e0a5e0a3a87201599f7410666f1e9ce58c"
+    },
+    {
+      "file": "20260926190000_hoods_and_threads.sql",
+      "version": "20260926190000",
+      "bytes": 7365,
+      "sha256": "37fd0f94cf8ababcfe40efa66293a59c79e4d5bbb8dde250521a27f9ed2404f9"
+    },
+    {
+      "file": "20260926200000_take_creation_rpc.sql",
+      "version": "20260926200000",
+      "bytes": 3551,
+      "sha256": "cf669516fe4c39459b8cea56cc63aca43b38f6af428152422b4791e61ea41352"
+    },
+    {
+      "file": "20260927000000_feed_visibility.sql",
+      "version": "20260927000000",
+      "bytes": 2093,
+      "sha256": "a9a99dd7cf8b0c7c07739a2520d44d2cc16068642eacda6de729681eac447f3c"
+    },
+    {
+      "file": "20260927010000_clash_draw.sql",
+      "version": "20260927010000",
+      "bytes": 7130,
+      "sha256": "580623d65ddd0045930b05710d5fa322f09fd272a787c4b928251f6f794ac9af"
+    },
+    {
+      "file": "20260927020000_take_insert_lockdown.sql",
+      "version": "20260927020000",
+      "bytes": 1753,
+      "sha256": "6a3a464d9f0683565e19bea4061dcdd4c937f0a2d9f11b57103aa6bd8235eae2"
+    },
+    {
+      "file": "20260927030000_clash_scheduler.sql",
+      "version": "20260927030000",
+      "bytes": 3482,
+      "sha256": "d8fbb9522b447567683ed257526230191b6c6d59e5b97d34ebec3f6861d75cc7"
+    },
+    {
+      "file": "20260928000000_vault_foundation.sql",
+      "version": "20260928000000",
+      "bytes": 22046,
+      "sha256": "b173ad932d34ed408ffa82c639634af3a1827c94ed4599819545b9698a02ceff"
+    },
+    {
+      "file": "20260928010000_vault_rpcs.sql",
+      "version": "20260928010000",
+      "bytes": 14834,
+      "sha256": "052ce0e9a53d947cac82cbb5edb2885a0235d6c8e26965b417dfbc2d11236492"
+    },
+    {
+      "file": "20260928020000_vault_entitlement.sql",
+      "version": "20260928020000",
+      "bytes": 5439,
+      "sha256": "6b4aa9ce2d61c925695afcb7466018a661746f830bbea2f59ae9ddf539dea23a"
+    },
+    {
+      "file": "20260928030000_vault_notifications.sql",
+      "version": "20260928030000",
+      "bytes": 5636,
+      "sha256": "28456957ee0eb34d369bd6643a6f9a8b8936a39e4329263c51403958804ab7b4"
+    },
+    {
+      "file": "20260928040000_vault_maintenance.sql",
+      "version": "20260928040000",
+      "bytes": 5124,
+      "sha256": "454682a0277a039f52854173d6cccc4ec724293445b43ed872053f6b03989998"
+    },
+    {
+      "file": "20260928050000_vault_storefront.sql",
+      "version": "20260928050000",
+      "bytes": 5068,
+      "sha256": "aced3df188f265d6e0414a828527820d70d80ee17d243e5c2aba13f128f30dfa"
+    },
+    {
+      "file": "20260928100000_mindshift.sql",
+      "version": "20260928100000",
+      "bytes": 9788,
+      "sha256": "ecfd3be9bf1ffd9c5c85b2031ecfe300240787bf082c702fe597588e0d4118fa"
+    },
+    {
+      "file": "20260928110000_blind_clash.sql",
+      "version": "20260928110000",
+      "bytes": 11398,
+      "sha256": "8aa5c38d1e2f8a2c2d52fd56fe52b9a86cf00ef9d223eddccc9aa6a7b59d5465"
+    },
+    {
+      "file": "20260928120000_hood_prediction.sql",
+      "version": "20260928120000",
+      "bytes": 20578,
+      "sha256": "a2dd80168897f4141bdc4f8a2b2701ac748625249862896342ccc85afcc6cb52"
+    },
+    {
+      "file": "20260928130000_world_missions.sql",
+      "version": "20260928130000",
+      "bytes": 27768,
+      "sha256": "3a62430bcbd6b5ce5068996483b9ed5eb4a37b367fe99bf4cb0485f768ce5541"
+    },
+    {
+      "file": "20260928140000_world_drop_view.sql",
+      "version": "20260928140000",
+      "bytes": 1406,
+      "sha256": "891e35ec00a715568d4a85620d8fe96534aa30a3bb9145eaeeee4ad9c84be840"
+    },
+    {
+      "file": "20260930100000_sponsor_attribution.sql",
+      "version": "20260930100000",
+      "bytes": 35597,
+      "sha256": "2bfa0a561395d97e14d8923d39f93b3f6b59b94ea7a69cfc139191ae558e157a"
+    },
+    {
+      "file": "20260930110000_sponsor_attribution_hardening.sql",
+      "version": "20260930110000",
+      "bytes": 13669,
+      "sha256": "b1e86d80dcb2da5f57fd4390e48fad2b001763af03401088e87de35043251781"
+    },
+    {
+      "file": "20260930120000_sponsor_studio_rpcs.sql",
+      "version": "20260930120000",
+      "bytes": 31344,
+      "sha256": "5eb508da4001d40fda47b911db8b8d32710df6c8cd99e14deb523cf2cd6fc753"
+    },
+    {
+      "file": "20260930130000_creator_earnings.sql",
+      "version": "20260930130000",
+      "bytes": 9052,
+      "sha256": "3dc1f71d1d248f72e9fa3d1ed503a39ea3c8576a8795e932f639578265875e5d"
+    },
+    {
+      "file": "20260930140000_comment_media.sql",
+      "version": "20260930140000",
+      "bytes": 11844,
+      "sha256": "ca17d8c23352b523254e992a783422621a4e854b5a4a5a0ede0e2abaf072c620"
+    },
+    {
+      "file": "20261002140000_comment_gifs_enum.sql",
+      "version": "20261002140000",
+      "bytes": 339,
+      "sha256": "90e4d9ce7a82a1d6016a17a47f73e2d7a880dfd73048aed70e34b871bc2b31e0"
+    },
+    {
+      "file": "20261002140100_comment_gifs.sql",
+      "version": "20261002140100",
+      "bytes": 10536,
+      "sha256": "7664381221383e3ca400cb550505a79e7bbf69e928f35143bbc8069a81674ea7"
+    },
+    {
+      "file": "20261002150000_live_arena_enums.sql",
+      "version": "20261002150000",
+      "bytes": 4133,
+      "sha256": "2bd612020aafda1e166297eb09bd9df0b3e200c152a9bc3443cd59b564c10289"
+    },
+    {
+      "file": "20261002150100_live_arena_schema.sql",
+      "version": "20261002150100",
+      "bytes": 93745,
+      "sha256": "2d513c8bb06de0b0bdcd113daae70d62852d794e67b167237c39b38cc2ddde6a"
+    },
+    {
+      "file": "20261002160000_live_arena_spectator.sql",
+      "version": "20261002160000",
+      "bytes": 25556,
+      "sha256": "0221839526e703157f82514e18ff08e1dcb0fa44fc3be60d728d361b04131add"
+    },
+    {
+      "file": "20261002170000_arena_spectator_upgrade.sql",
+      "version": "20261002170000",
+      "bytes": 5157,
+      "sha256": "dd333ff557aeda0564e1b9f70cc742bec5557e5f37d3a79c590894d76b98cb9c"
+    },
+    {
+      "file": "20261002180000_arena_feel_alive.sql",
+      "version": "20261002180000",
+      "bytes": 7978,
+      "sha256": "332b02dac48b1f492b803e0326b57b860117b8cceea7d6888a7cf3ea71b9fd90"
+    },
+    {
+      "file": "20261003120000_list_arena_topic_rooms.sql",
+      "version": "20261003120000",
+      "bytes": 2171,
+      "sha256": "7201a87c69cd7738fd6c9a8fe4c38a8146a19fdc711e77f784708a852c596b83"
+    },
+    {
+      "file": "20261003140000_watch_arena_room.sql",
+      "version": "20261003140000",
+      "bytes": 5721,
+      "sha256": "eeab8c4567f8b8ac7fd588a7e1254b9f3b43f091b90828daabe38814ce08a874"
+    },
+    {
+      "file": "20261003150000_list_arena_room_presence.sql",
+      "version": "20261003150000",
+      "bytes": 1979,
+      "sha256": "f0c3298c1eb197e290ad45bd786b357ed28f9f40d7a76e64464c6c74f8b5fe74"
+    },
+    {
+      "file": "20261003160000_room_pulse_and_scale.sql",
+      "version": "20261003160000",
+      "bytes": 14086,
+      "sha256": "db791c428c240b97f1afabe7d13be4add415e926012bd3b9a2375037b8bc31fe"
+    },
+    {
+      "file": "20261003180000_explore_global.sql",
+      "version": "20261003180000",
+      "bytes": 33934,
+      "sha256": "a3716b0a20fba4bb9d626725ac59da1f8577403e3436e16b102984f55bb0965e"
+    },
+    {
+      "file": "20261003190000_explore_vault_preview.sql",
+      "version": "20261003190000",
+      "bytes": 23454,
+      "sha256": "fd419f1521894b38d051966633216841cce3ab08a2139f77bcbd21a6ca3275d1"
+    },
+    {
+      "file": "20261003200000_explore_for_you_ia.sql",
+      "version": "20261003200000",
+      "bytes": 11098,
+      "sha256": "0895d572da8d1113edb6a02ae0ffef204441940b621b5216a6b9139bdddb84f3"
+    },
+    {
+      "file": "20261004120000_explore_play_system.sql",
+      "version": "20261004120000",
+      "bytes": 30713,
+      "sha256": "a904306b711b4c5b649ba437e1a8b9c51187cfc422c8322b76eccf82cc3e44a3"
+    },
+    {
+      "file": "20261004120100_explore_treasure_gameplay.sql",
+      "version": "20261004120100",
+      "bytes": 23562,
+      "sha256": "ae947f2e3d5c246ac137ea3b9fff7ad600a4927fc9aba214e5419f25d62c4ab4"
+    },
+    {
+      "file": "20261004140000_meet_text_matching.sql",
+      "version": "20261004140000",
+      "bytes": 25736,
+      "sha256": "8c1f0d69a59180032487c6a3a68e0184497a55fe41675d5d8f62655732fc4745"
+    },
+    {
+      "file": "20261004150000_meet_video.sql",
+      "version": "20261004150000",
+      "bytes": 23985,
+      "sha256": "c458734080fb3ef4f0c7a6d196f5ff70fd08e641d549d9e63397ae6fe038422d"
+    },
+    {
+      "file": "20261004160000_vault_storefront_preview.sql",
+      "version": "20261004160000",
+      "bytes": 4909,
+      "sha256": "72dba3e6ea3b7673ced4f2c79074ee11c87dca81c796daf48c2a4e0c31aaccec"
+    },
+    {
+      "file": "20261004170000_vault_commerce.sql",
+      "version": "20261004170000",
+      "bytes": 27634,
+      "sha256": "6591fcaec38bf9a42f055ad2f8ffaf39e2e744e84dc4ba835ba4b368c4681bb4"
+    },
+    {
+      "file": "20261004170100_vault_commerce_rpcs.sql",
+      "version": "20261004170100",
+      "bytes": 26807,
+      "sha256": "8c7d2b4adec6f5ee1c43a5ecf3ad1773b5a72e8cad5adf6faef54b1c05479b3f"
+    },
+    {
+      "file": "20261004181000_vault_discover_worlds.sql",
+      "version": "20261004181000",
+      "bytes": 11410,
+      "sha256": "015d10906e274284825b1c6f01d1ff209c0ed979ccd3eb3a2c1630c7d0c80770"
+    },
+    {
+      "file": "20261004190000_vault_communities.sql",
+      "version": "20261004190000",
+      "bytes": 15455,
+      "sha256": "bd0d5dfba26ccb7648c04d51fd58fef1216b40998ca9ee13454616c718a05f21"
+    },
+    {
+      "file": "20261004190100_vault_community_rpcs.sql",
+      "version": "20261004190100",
+      "bytes": 34975,
+      "sha256": "fd20ef6b42c598696fd7b1fbf42db5a9728006a2a14b3bc690327c372ade5084"
+    },
+    {
+      "file": "20261004200000_creator_world_drops.sql",
+      "version": "20261004200000",
+      "bytes": 4734,
+      "sha256": "b54be73ca3abbf8ce034f7ab7976ece7203246e122453abef5cf45a81cbedf74"
+    },
+    {
+      "file": "20261004200100_creator_world_drop_rpcs.sql",
+      "version": "20261004200100",
+      "bytes": 19322,
+      "sha256": "6405205d2b25615fdd7122839b74bfc54872fb0e640c5d871fe95a303fbd3a91"
+    },
+    {
+      "file": "20261005100000_creator_live.sql",
+      "version": "20261005100000",
+      "bytes": 15778,
+      "sha256": "d444e3a408f705a55845d735a09f6a0554d9a85dbfaf3a802e4c7557085660d2"
+    },
+    {
+      "file": "20261005100100_creator_live_rpcs.sql",
+      "version": "20261005100100",
+      "bytes": 38137,
+      "sha256": "3a547705f35f66f605f75ab9b1bad61eb759531d7ddb16565119b64252eca493"
+    },
+    {
+      "file": "20261005110000_creator_ai.sql",
+      "version": "20261005110000",
+      "bytes": 9744,
+      "sha256": "65de57c9aea4326618bbe6956d7b9d36f9b085c6bcbb8912596b98ac0fcc9d73"
+    },
+    {
+      "file": "20261005110100_creator_ai_rpcs.sql",
+      "version": "20261005110100",
+      "bytes": 28976,
+      "sha256": "778137b059f5b55afa7e5a80bcc51170f85a9f3fc6eb8ae13e594be83e0484ba"
+    },
+    {
+      "file": "20261005120000_digital_creator.sql",
+      "version": "20261005120000",
+      "bytes": 5467,
+      "sha256": "5f57a135912239beed5f74bfe4b744296d7302ba8a1cb733375e6b6496ed2daf"
+    },
+    {
+      "file": "20261005120100_digital_creator_rpcs.sql",
+      "version": "20261005120100",
+      "bytes": 19198,
+      "sha256": "adc5a349d10a456b7bf8d8a75dd41d9fff974a2bde291adf45c7e0d25ac66a8a"
+    },
+    {
+      "file": "20261005130000_arena_game_enums.sql",
+      "version": "20261005130000",
+      "bytes": 5185,
+      "sha256": "56aa995c55996cb0c790e66baf569d0cc13963df83b047cfc5ff0b12536b4795"
+    },
+    {
+      "file": "20261005130100_arena_reputation_facets.sql",
+      "version": "20261005130100",
+      "bytes": 13041,
+      "sha256": "6f7bad65b1a54d97b42ad6144edd22fc30bb31bf0dbd4697cd85c5c85bcb545a"
+    },
+    {
+      "file": "20261005130200_arena_call_backup.sql",
+      "version": "20261005130200",
+      "bytes": 46793,
+      "sha256": "52849ced63dac8024ab6a1a44a272672718c05a35c2ad91bfd13753c938493ea"
+    },
+    {
+      "file": "20261005130300_arena_reactions_and_entertainment.sql",
+      "version": "20261005130300",
+      "bytes": 10501,
+      "sha256": "77b0fe00ee9791d495b4a8a10a11349eac81ad224a4ec5103d2a11ca625cc8fa"
+    },
+    {
+      "file": "20261005140000_arena_trending_and_scale.sql",
+      "version": "20261005140000",
+      "bytes": 28593,
+      "sha256": "30f01cdc26707c20d9abb3621766032c422ccafc0c19ee45f643e72452bafc28"
+    },
+    {
+      "file": "20261005150000_arena_trending_rank_race.sql",
+      "version": "20261005150000",
+      "bytes": 8300,
+      "sha256": "89ce2cab0bf83b1794d0167ba6bc9ddae3623485e1ba607c59cfe13b3ad74ffc"
+    },
+    {
+      "file": "20261005160000_arena_trending_visibility.sql",
+      "version": "20261005160000",
+      "bytes": 10707,
+      "sha256": "29686295d67f8b12e9e1ad3ad2e067eae598f96131785a61ba3f692db3e9de9c"
+    },
+    {
+      "file": "20261005210000_arena_expressive_media.sql",
+      "version": "20261005210000",
+      "bytes": 12958,
+      "sha256": "9d9766014a24a3772d0a53e025ddc0005fe955701dfe4c9e6c69f925b62cab36"
+    },
+    {
+      "file": "20261006120000_arena_crews_enums.sql",
+      "version": "20261006120000",
+      "bytes": 1536,
+      "sha256": "6d1f29632aa63daea354105371d82876c654152327a66f1f5ea354225fcf3b18"
+    },
+    {
+      "file": "20261006120100_arena_crews_foundation.sql",
+      "version": "20261006120100",
+      "bytes": 37174,
+      "sha256": "745e270e1a13e606d45212e721bab1f7569e21712e788ce4b5b7702d7e8478b9"
+    },
+    {
+      "file": "20261006130000_arena_crews_hardening.sql",
+      "version": "20261006130000",
+      "bytes": 11948,
+      "sha256": "cb09101410992c900fe26ba64dfac2b1e2230952274c8a430a665492258c2487"
+    },
+    {
+      "file": "20261006140000_arena_crews_discovery.sql",
+      "version": "20261006140000",
+      "bytes": 9705,
+      "sha256": "89e7df19b8e9e4fe9fa711fe8776931a350edb8e599c30a49d0e7700ddb31dcf"
+    },
+    {
+      "file": "20261006150000_arena_correctness_foundation.sql",
+      "version": "20261006150000",
+      "bytes": 18626,
+      "sha256": "a8ac4a2441dac029bc43d29398ca1412f60465775cae2f9cd39747d6339e37e9"
+    },
+    {
+      "file": "20261007120000_arena_duel_foundation.sql",
+      "version": "20261007120000",
+      "bytes": 26613,
+      "sha256": "e5e966c2976b74846e744aef2eb3140e0fdb54103db09cd2601e4ea607982a8e"
+    },
+    {
+      "file": "20261007130000_arena_challenge_notifications.sql",
+      "version": "20261007130000",
+      "bytes": 236,
+      "sha256": "be4b09ff6d259a66bac8bd87ae15d535c2cb0b4cacef47e9f67ee4d4eb427a42"
+    },
+    {
+      "file": "20261007130100_arena_challenge_lifecycle.sql",
+      "version": "20261007130100",
+      "bytes": 15081,
+      "sha256": "85eb74d096bb85751d52844548e66dc3db039b1b5d41b8c46689faa626854494"
+    },
+    {
+      "file": "20261008100000_arena_crowd_report_target.sql",
+      "version": "20261008100000",
+      "bytes": 144,
+      "sha256": "fc332a2eaa850da801956d64ddd4a80538bdb6163d6cee5c5ca1395202e7faa7"
+    },
+    {
+      "file": "20261008100100_arena_crowd_chat.sql",
+      "version": "20261008100100",
+      "bytes": 11562,
+      "sha256": "fb7adce47e244626210da17da4b5b4c2156374d3ff3f4d3d46dea5b2285df95c"
+    },
+    {
+      "file": "20261008110000_profile_read_security.sql",
+      "version": "20261008110000",
+      "bytes": 1371,
+      "sha256": "ba2396fd40d4d57dc4d98830119a9bfd575a25bfd8c84ee6761b4292b3418a6e"
+    },
+    {
+      "file": "20261008110100_relationship_and_crew_security.sql",
+      "version": "20261008110100",
+      "bytes": 4244,
+      "sha256": "4b2f7dcf71ef3d1e9c8b5a57dfd3d96482bb8859072c2eb612beb457afd31f80"
+    },
+    {
+      "file": "20261008110200_arena_content_visibility.sql",
+      "version": "20261008110200",
+      "bytes": 4502,
+      "sha256": "dd7656ce40d664945b20e3555d56aecaf451db72d96b645e1f91b4e9500bf33b"
+    },
+    {
+      "file": "20261008110300_private_room_typing.sql",
+      "version": "20261008110300",
+      "bytes": 4408,
+      "sha256": "11dddca1246c80f9888b0bd7db4d924aac224cb5c79573e9e64fc32d8d1ae5ef"
+    },
+    {
+      "file": "20261008110400_legacy_visibility_helpers.sql",
+      "version": "20261008110400",
+      "bytes": 3728,
+      "sha256": "9020208ac082aaaaaac1755018d3bd8c7374f384df6b200038124e2c1441ca55"
+    },
+    {
+      "file": "20261008110500_private_viewer_helpers.sql",
+      "version": "20261008110500",
+      "bytes": 1696,
+      "sha256": "5ef557fcab4500c7dfcd182a590efee2f9403ddb6a2f4557fae25a7ee5cd3617"
+    },
+    {
+      "file": "20261008110600_canonical_topic_visibility.sql",
+      "version": "20261008110600",
+      "bytes": 3900,
+      "sha256": "42bf5d96292b6b0b909e5f37449f8e5bdc3ed5335241fcb2810f400b709da09c"
+    },
+    {
+      "file": "20261008121000_arena_discovery_states.sql",
+      "version": "20261008121000",
+      "bytes": 2105,
+      "sha256": "60e249c9a05dc6ffc4679e98809aa2a76d706f4f9b305e9d7daa3b7e3818d7c0"
+    },
+    {
+      "file": "20261008133000_arena_interest_catalogue.sql",
+      "version": "20261008133000",
+      "bytes": 2420,
+      "sha256": "683bc7f330f1c4a8d55fbc00a18a866404621933cf31e8f36d52d11bcef5ccc2"
+    },
+    {
+      "file": "20261008134000_arena_interest_preferences.sql",
+      "version": "20261008134000",
+      "bytes": 3812,
+      "sha256": "c5b1ac6525e69d262fed1db22913f4b02433cac3df0641457bf1be3536e06064"
+    },
+    {
+      "file": "20261008135000_arena_personalized_feed.sql",
+      "version": "20261008135000",
+      "bytes": 2973,
+      "sha256": "7c451dd24f756c6c644fe131a6dc35990d788440bd9a405eb080a554a9239fd6"
+    },
+    {
+      "file": "20261008135500_arena_interest_conflict_http.sql",
+      "version": "20261008135500",
+      "bytes": 2067,
+      "sha256": "6dea555a9b1ef16da9813e1d805a3532a3c02aa5a4390722a5ed291fbff7d33e"
+    },
+    {
+      "file": "20261008140000_arena_interest_feed_index.sql",
+      "version": "20261008140000",
+      "bytes": 220,
+      "sha256": "0521cdec6a25c0d6dcf9370c1441ad49753c9a8a22e767c136ea0dacf3fc0c5b"
+    },
+    {
+      "file": "20261008151000_arena_challenge_inbox.sql",
+      "version": "20261008151000",
+      "bytes": 4367,
+      "sha256": "08e0c0a693811a0ba5edbea35338ebb190f68a3a1f3daab828098eb6fde9d29e"
+    },
+    {
+      "file": "20261009100000_canonical_authorization.sql",
+      "version": "20261009100000",
+      "bytes": 3839,
+      "sha256": "07b88b4b2538d57e5aa50b662665e954837ce37cb1cb74a9d8fde99ac235ca38"
+    },
+    {
+      "file": "20261009110000_official_retry_and_recovery.sql",
+      "version": "20261009110000",
+      "bytes": 9739,
+      "sha256": "7182e24acb7879630fb918fd412936c0fb2e54c5a68d5a9c61121a6837bf7958"
+    },
+    {
+      "file": "20261009120000_historical_settlement_recovery.sql",
+      "version": "20261009120000",
+      "bytes": 7762,
+      "sha256": "fe1775b15b77db9360a49b933a0d0c8f93b1f505c61ba41b79af958999482fca"
+    },
+    {
+      "file": "20261009130000_arena_casual_questions.sql",
+      "version": "20261009130000",
+      "bytes": 9620,
+      "sha256": "b4d16bf184a4b6faea94a145c30c0d19c5240d24088fc75a7e2d8b923a6b4e23"
+    },
+    {
+      "file": "20261009140000_arena_editorial_pipeline.sql",
+      "version": "20261009140000",
+      "bytes": 35860,
+      "sha256": "5e771ee857d5a94ca7e061b2a4ff35e5e156dda3d59bfdb5d3c8ea9ac803b85f"
+    },
+    {
+      "file": "20261009170000_arena_gif_proxy_budget.sql",
+      "version": "20261009170000",
+      "bytes": 974,
+      "sha256": "6097e54b2062368e4861be1af89333479101f7c99bda51b94099d119336ee8e6"
+    },
+    {
+      "file": "20261009180000_explore_security_contract.sql",
+      "version": "20261009180000",
+      "bytes": 12071,
+      "sha256": "926e24cebeb5914584a300a3e192093c71faa70d382679b84576e63d8fc8e9b1"
+    },
+    {
+      "file": "20261009190000_world_read_security.sql",
+      "version": "20261009190000",
+      "bytes": 3124,
+      "sha256": "b5f5b2ea752d8112e7f597eb6157f760f5f68769fb552d635c0357b384f63f42"
+    },
+    {
+      "file": "20261014100000_arena_discussion_paging_indexes.sql",
+      "version": "20261014100000",
+      "bytes": 976,
+      "sha256": "76de1b1655decf15a7e86044a1a4937cef6b63fe07c1e787b06ffc09c915ec3f"
+    },
+    {
+      "file": "20261014121857_canonical_arena_private_assists.sql",
+      "version": "20261014121857",
+      "bytes": 158,
+      "sha256": "b283d003997c9cf74f71f8dd1b0b2859df647a06453a8e2ff1b4d2617ad537c5"
+    },
+    {
+      "file": "20261014122051_canonical_arena_assist_rpcs.sql",
+      "version": "20261014122051",
+      "bytes": 13209,
+      "sha256": "ff9b2238c01d9fa7d07db4d8e819db8510b0a328d89ba7156bddd8d97e6fb739"
+    },
+    {
+      "file": "20261019120000_clash_follows.sql",
+      "version": "20261019120000",
+      "bytes": 9310,
+      "sha256": "a80e45a5fef2da0d4cfe2360b7dd2bf3ff751c7e698505c86bc651f5f7ecd390"
+    },
+    {
+      "file": "20261019130000_clash_follows_hardening.sql",
+      "version": "20261019130000",
+      "bytes": 6154,
+      "sha256": "b3656b3e1edefe7b5581de489ee6a3221b1841e8f82bb148319849f6d3296133"
+    },
+    {
+      "file": "20261019140000_clash_follows_4e.sql",
+      "version": "20261019140000",
+      "bytes": 6630,
+      "sha256": "b9b5b874769416fdd77367ec973de2afc3e803466369166ad7b8ccdc6413a305"
+    },
+    {
+      "file": "20261022120000_meet_safety_and_lifecycle.sql",
+      "version": "20261022120000",
+      "bytes": 45072,
+      "sha256": "363e263e7a9e44cfa36542b2b95c20bd5646b2cc9df235622ab9be90f04242a7"
+    },
+    {
+      "file": "20261023120000_meet_moderation_audit_retention.sql",
+      "version": "20261023120000",
+      "bytes": 11778,
+      "sha256": "e7e3381d493887566252bee6e2ae49964d48a270d0a46f459b14a704099fc5bb"
+    },
+    {
+      "file": "20261023130000_meet_rpc_permission_hardening.sql",
+      "version": "20261023130000",
+      "bytes": 1298,
+      "sha256": "2f6d391cd4f033ff4909102e420287c068092578ef5eb26995bf9b5a3930b1bc"
+    }
+  ]
+}

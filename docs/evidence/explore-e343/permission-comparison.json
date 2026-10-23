@@ -1,0 +1,10 @@
+{
+  "historicalBaseline": 109,
+  "after": 110,
+  "beforeAnon": 17,
+  "afterAnon": 0,
+  "old109LedgerRowsUnchanged": true,
+  "allMeetDefinitionsOwnersSearchPathsAndAuthServiceGrantsUnchanged": true,
+  "sourceHistoricalCommit": "59cdf394eecf06cf240a32d22fdbfcb1e43d0998",
+  "historicalSourceSha256": "e89c20e3a994bc459a0cd32eb36f10cbfdf584889c990cf0c1712dfb6363b9d4"
+}

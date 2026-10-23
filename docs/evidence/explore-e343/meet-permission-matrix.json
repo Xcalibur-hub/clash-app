@@ -1,0 +1,998 @@
+{
+  "before": [
+    {
+      "signature": "ack_meet_video_safety()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "54fa52698e9da1b6e6b87f7d9170263b39849f224d99e8ba1e1db864f1555129"
+    },
+    {
+      "signature": "block_meet_peer(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "9e5e7d57a0e83b35ad22890f6e5cfbe31a7233bd9270883c9ed75356d823ecd7"
+    },
+    {
+      "signature": "can_use_video_meet(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "e568be0cfee83dc7772dd28b4ac530e698e8381bcb0109b5e3288bf5a62c2222"
+    },
+    {
+      "signature": "cleanup_meet_signals(integer)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "02fe55cc0df6e376bb214d6f19eb1d3b720a3a3df42934358fe835d1181bec08"
+    },
+    {
+      "signature": "expire_stale_meet_sessions(integer)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "90d221571ec9d8cd29ca93ff2339c4c665a88cdd3073a14f58ab750edb7f6693"
+    },
+    {
+      "signature": "get_meet_ice_servers()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "5ef3fadf97b33ee5cac0b09311b992209072bc213c00b0cd54863aaed3b4d7bd"
+    },
+    {
+      "signature": "get_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "1ee1cfc87df8d3a49ae721767cb5c355d525bbafd816122b32526ac7129f0d28"
+    },
+    {
+      "signature": "has_meet_video_safety_ack()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "7c129bc8e3288a3335ce1056f29fff8fa0ef970ab59640e0c9d512080c1eff29"
+    },
+    {
+      "signature": "join_meet_queue(meet_match_mode,text,hood_id,text[],meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "a337840fb12759248e5f2829351674f57addda65e1a26294e9968a9fb7bde57d"
+    },
+    {
+      "signature": "leave_meet_queue()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "ecc28b57ff2fa9fc4f0e83c34955ae3ee73ada325b284ff61fcc034564bcb4ce"
+    },
+    {
+      "signature": "leave_meet_session(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "7f0bf2f183e8e32e678ac80580d3f316a8e8dba0f71f809231af1e22ba073ee6"
+    },
+    {
+      "signature": "list_meet_messages(text,integer,timestamp with time zone)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "ae20ac1d2b5a04955ec70ac2940f3c338c4b825da31e88058ebccc372629dde4"
+    },
+    {
+      "signature": "list_meet_signals(text,timestamp with time zone)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "5d989c117b9ab313109802f3ed118ae4a9097151347780df3d055b66d930ffe4"
+    },
+    {
+      "signature": "meet_create_session(text,text,meet_match_mode,text,hood_id,text,meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "665cc74a9be8f4267085c331ff97af3282726e3e8395fe9687d67e2a8850d5ae"
+    },
+    {
+      "signature": "meet_has_active_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "c20c0a159544b82d5f0416af31df61302106efc0755cd33197d3e2f407f64165"
+    },
+    {
+      "signature": "meet_is_blocked(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "855fdd5ab26d8ad4e5dbb86160654b0f5eabbbe82fed77d0952a44adc13516ee"
+    },
+    {
+      "signature": "meet_recently_matched(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "a4e1d1e99f333b23320f695c52252824eef2260dd396cd2fd3c58f560ed1dffe"
+    },
+    {
+      "signature": "meet_session_is_live(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "1c382b2bb0941e3259bd16cf69f9463b257ecaa57fa91aca814b6beaef242ddc"
+    },
+    {
+      "signature": "meet_session_payload(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "d9c9c7f276f6c3ed8ecd7b7aa23c44922eb67def385edc99e6482addc90f2442"
+    },
+    {
+      "signature": "meet_session_under_review(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "a18350be9bbee3550eaa1ffe5e367afeef2671971b78a0fdaa4ede3effe82ae0"
+    },
+    {
+      "signature": "moderate_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "e09bccfc91a48eca67f4fc477628baaa697d0840954fcb7423b7a95ea1a9e455"
+    },
+    {
+      "signature": "next_meet(text,meet_match_mode,text,hood_id,text[],meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "1b341e04f2bef1635ffb5c4bf1948666f918aa4b456e2503d7e1e64761fae7c2"
+    },
+    {
+      "signature": "poll_meet_queue()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "4ece2b9c63b0e134b6dc2bb40f0711568676b4597663baa3f0f0c951d08a4981"
+    },
+    {
+      "signature": "publish_meet_signal(text,meet_signal_kind,jsonb)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "db8d025fa3a1fd8746e51839f542bf8b086bffb9b5a52bba57342b779a2629b9"
+    },
+    {
+      "signature": "release_stale_meet_participation()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "539ef99673ecdec4c43f8ad9289e506670fc9f50c82d416962f749eb82733a8d"
+    },
+    {
+      "signature": "report_meet_message(text,text,report_reason,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "86235b70e8abe0338e5ddb102c89f84c2ff406407f4883ff1d772b7a29aa3d50"
+    },
+    {
+      "signature": "report_meet_session(text,report_reason,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "281f2231252a366a462a142c4d399cbb4190a0b8c10d3c7df03c6ea2c5ea3ddb"
+    },
+    {
+      "signature": "send_meet_message(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "88d1011a9d46c5d3e434e9b5115aa6f1c2eb6562d4c0a0d4f18011f960f22e01"
+    },
+    {
+      "signature": "touch_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": true,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "7f6819b8b285939a588ba37111fb2f5db01ae502080c80a30fca436775cc20a4"
+    },
+    {
+      "signature": "try_meet_match(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "6bc136569b836396bd0f97c0d18f667680417f19255a8c7f7922daa63d685e13"
+    }
+  ],
+  "after": [
+    {
+      "signature": "ack_meet_video_safety()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "54fa52698e9da1b6e6b87f7d9170263b39849f224d99e8ba1e1db864f1555129"
+    },
+    {
+      "signature": "block_meet_peer(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "9e5e7d57a0e83b35ad22890f6e5cfbe31a7233bd9270883c9ed75356d823ecd7"
+    },
+    {
+      "signature": "can_use_video_meet(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "e568be0cfee83dc7772dd28b4ac530e698e8381bcb0109b5e3288bf5a62c2222"
+    },
+    {
+      "signature": "cleanup_meet_signals(integer)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "02fe55cc0df6e376bb214d6f19eb1d3b720a3a3df42934358fe835d1181bec08"
+    },
+    {
+      "signature": "expire_stale_meet_sessions(integer)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "90d221571ec9d8cd29ca93ff2339c4c665a88cdd3073a14f58ab750edb7f6693"
+    },
+    {
+      "signature": "get_meet_ice_servers()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "5ef3fadf97b33ee5cac0b09311b992209072bc213c00b0cd54863aaed3b4d7bd"
+    },
+    {
+      "signature": "get_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "1ee1cfc87df8d3a49ae721767cb5c355d525bbafd816122b32526ac7129f0d28"
+    },
+    {
+      "signature": "has_meet_video_safety_ack()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "7c129bc8e3288a3335ce1056f29fff8fa0ef970ab59640e0c9d512080c1eff29"
+    },
+    {
+      "signature": "join_meet_queue(meet_match_mode,text,hood_id,text[],meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "a337840fb12759248e5f2829351674f57addda65e1a26294e9968a9fb7bde57d"
+    },
+    {
+      "signature": "leave_meet_queue()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "ecc28b57ff2fa9fc4f0e83c34955ae3ee73ada325b284ff61fcc034564bcb4ce"
+    },
+    {
+      "signature": "leave_meet_session(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "7f0bf2f183e8e32e678ac80580d3f316a8e8dba0f71f809231af1e22ba073ee6"
+    },
+    {
+      "signature": "list_meet_messages(text,integer,timestamp with time zone)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "ae20ac1d2b5a04955ec70ac2940f3c338c4b825da31e88058ebccc372629dde4"
+    },
+    {
+      "signature": "list_meet_signals(text,timestamp with time zone)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "5d989c117b9ab313109802f3ed118ae4a9097151347780df3d055b66d930ffe4"
+    },
+    {
+      "signature": "meet_create_session(text,text,meet_match_mode,text,hood_id,text,meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "665cc74a9be8f4267085c331ff97af3282726e3e8395fe9687d67e2a8850d5ae"
+    },
+    {
+      "signature": "meet_has_active_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "c20c0a159544b82d5f0416af31df61302106efc0755cd33197d3e2f407f64165"
+    },
+    {
+      "signature": "meet_is_blocked(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "855fdd5ab26d8ad4e5dbb86160654b0f5eabbbe82fed77d0952a44adc13516ee"
+    },
+    {
+      "signature": "meet_recently_matched(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "a4e1d1e99f333b23320f695c52252824eef2260dd396cd2fd3c58f560ed1dffe"
+    },
+    {
+      "signature": "meet_session_is_live(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "1c382b2bb0941e3259bd16cf69f9463b257ecaa57fa91aca814b6beaef242ddc"
+    },
+    {
+      "signature": "meet_session_payload(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "d9c9c7f276f6c3ed8ecd7b7aa23c44922eb67def385edc99e6482addc90f2442"
+    },
+    {
+      "signature": "meet_session_under_review(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "a18350be9bbee3550eaa1ffe5e367afeef2671971b78a0fdaa4ede3effe82ae0"
+    },
+    {
+      "signature": "moderate_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "e09bccfc91a48eca67f4fc477628baaa697d0840954fcb7423b7a95ea1a9e455"
+    },
+    {
+      "signature": "next_meet(text,meet_match_mode,text,hood_id,text[],meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "1b341e04f2bef1635ffb5c4bf1948666f918aa4b456e2503d7e1e64761fae7c2"
+    },
+    {
+      "signature": "poll_meet_queue()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "4ece2b9c63b0e134b6dc2bb40f0711568676b4597663baa3f0f0c951d08a4981"
+    },
+    {
+      "signature": "publish_meet_signal(text,meet_signal_kind,jsonb)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "db8d025fa3a1fd8746e51839f542bf8b086bffb9b5a52bba57342b779a2629b9"
+    },
+    {
+      "signature": "release_stale_meet_participation()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "539ef99673ecdec4c43f8ad9289e506670fc9f50c82d416962f749eb82733a8d"
+    },
+    {
+      "signature": "report_meet_message(text,text,report_reason,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "86235b70e8abe0338e5ddb102c89f84c2ff406407f4883ff1d772b7a29aa3d50"
+    },
+    {
+      "signature": "report_meet_session(text,report_reason,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "281f2231252a366a462a142c4d399cbb4190a0b8c10d3c7df03c6ea2c5ea3ddb"
+    },
+    {
+      "signature": "send_meet_message(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "88d1011a9d46c5d3e434e9b5115aa6f1c2eb6562d4c0a0d4f18011f960f22e01"
+    },
+    {
+      "signature": "touch_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "7f6819b8b285939a588ba37111fb2f5db01ae502080c80a30fca436775cc20a4"
+    },
+    {
+      "signature": "try_meet_match(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "6bc136569b836396bd0f97c0d18f667680417f19255a8c7f7922daa63d685e13"
+    }
+  ],
+  "fresh": [
+    {
+      "signature": "ack_meet_video_safety()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "54fa52698e9da1b6e6b87f7d9170263b39849f224d99e8ba1e1db864f1555129"
+    },
+    {
+      "signature": "block_meet_peer(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "c82d25e29496734ac4cfbb3e4403510fcc4fdd3965a49e806a9a4c9354a967fb"
+    },
+    {
+      "signature": "can_use_video_meet(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "e568be0cfee83dc7772dd28b4ac530e698e8381bcb0109b5e3288bf5a62c2222"
+    },
+    {
+      "signature": "cleanup_meet_signals(integer)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "ab7d8940fb3da97dc57e173e866408160c8126910878fa5f62b3e3e9363e46c6"
+    },
+    {
+      "signature": "expire_stale_meet_sessions(integer)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "2434f13ee282d1dabaedea0175d7e3bc02a2e2202ebd9d89677b917789e15fab"
+    },
+    {
+      "signature": "get_meet_ice_servers()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "5ef3fadf97b33ee5cac0b09311b992209072bc213c00b0cd54863aaed3b4d7bd"
+    },
+    {
+      "signature": "get_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "15b0b5c127fc8609025c337f9dcd95254e7f25560617f50fdb88fef6f22c1448"
+    },
+    {
+      "signature": "has_meet_video_safety_ack()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "7c129bc8e3288a3335ce1056f29fff8fa0ef970ab59640e0c9d512080c1eff29"
+    },
+    {
+      "signature": "join_meet_queue(meet_match_mode,text,hood_id,text[],meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "a51882e39a76c8f36ac95b6b65b33af37ba3ee39420b1940ce9d6167e43eccb0"
+    },
+    {
+      "signature": "leave_meet_queue()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "ecc28b57ff2fa9fc4f0e83c34955ae3ee73ada325b284ff61fcc034564bcb4ce"
+    },
+    {
+      "signature": "leave_meet_session(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "d34d1aaf2580db68f177f750c0f3fd23b6832b2259c434c1d523668af5067045"
+    },
+    {
+      "signature": "list_meet_messages(text,integer,timestamp with time zone)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "82a31623e259fd80b8d8288b9d73241417117c258879d8c9314b6e53ac26a44b"
+    },
+    {
+      "signature": "list_meet_signals(text,timestamp with time zone)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "32eb5b930aa03ba7a6e9f2975ffbfe2aeb1537860c1a729d4188d81230d116df"
+    },
+    {
+      "signature": "meet_create_session(text,text,meet_match_mode,text,hood_id,text,meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "665cc74a9be8f4267085c331ff97af3282726e3e8395fe9687d67e2a8850d5ae"
+    },
+    {
+      "signature": "meet_has_active_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "b255ecba77aa6aadd5d22a896c91748e92b038d8a13a7a63630d20fd686e385a"
+    },
+    {
+      "signature": "meet_is_blocked(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "855fdd5ab26d8ad4e5dbb86160654b0f5eabbbe82fed77d0952a44adc13516ee"
+    },
+    {
+      "signature": "meet_recently_matched(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "a4e1d1e99f333b23320f695c52252824eef2260dd396cd2fd3c58f560ed1dffe"
+    },
+    {
+      "signature": "meet_session_is_live(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "9919c875a346550b8ed140f9745f1542cba63f873b49ba052eac7b5c02254903"
+    },
+    {
+      "signature": "meet_session_payload(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "1306e267abb382e3fb9386ec8c5d75181e79b6cb48b14ce1c7cdf34d95acfcf7"
+    },
+    {
+      "signature": "meet_session_under_review(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "3639f0dd8b104dc3211f9c1ed76928ea38eb25e5660c66c294e2054a0d5d6e88"
+    },
+    {
+      "signature": "moderate_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "5b8b3cb44ad8f2ab3914b9f741093287f99ff86a6a21f5d4c9cbab5fb7f98528"
+    },
+    {
+      "signature": "next_meet(text,meet_match_mode,text,hood_id,text[],meet_channel)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "1b341e04f2bef1635ffb5c4bf1948666f918aa4b456e2503d7e1e64761fae7c2"
+    },
+    {
+      "signature": "poll_meet_queue()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "4ccd9c66e10292ad20a3eb79c6bfc968812d2acc7afab5b703a120c195243d63"
+    },
+    {
+      "signature": "publish_meet_signal(text,meet_signal_kind,jsonb)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "2d3c95554fa37a529bc05d9a3831d875e3823ccb94eb2cb836255a1432ebb63c"
+    },
+    {
+      "signature": "release_stale_meet_participation()",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "c9cf3c5fba304861d2fc34519401cac0ccc4da4d156525f74054cac14354d6b6"
+    },
+    {
+      "signature": "report_meet_message(text,text,report_reason,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "e5ddbb1cb36ac0185745e12ef640b8b8bb13a6c8538ece74067520b4af397bd1"
+    },
+    {
+      "signature": "report_meet_session(text,report_reason,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "1c3a06c219de29487dc6d22464ae6c5ef5e93692d4bb007b1f513e5791e95a68"
+    },
+    {
+      "signature": "send_meet_message(text,text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "4742df728eb5e05a2787302f5b9b2b98e3b70a376f4aaac0e7ca1fd44ea1588e"
+    },
+    {
+      "signature": "touch_meet_session(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": true,
+      "service": true,
+      "definitionSha256": "62ee84517e8ed691fd137cb5606541a1401c3f65fcc8713a0c1d9fb6f66f29d8"
+    },
+    {
+      "signature": "try_meet_match(text)",
+      "owner": "postgres",
+      "configuration": [
+        "search_path=\"\""
+      ],
+      "anon": false,
+      "authenticated": false,
+      "service": true,
+      "definitionSha256": "6bc136569b836396bd0f97c0d18f667680417f19255a8c7f7922daa63d685e13"
+    }
+  ]
+}
