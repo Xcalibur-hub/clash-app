@@ -53,7 +53,7 @@ export interface MeetChatApi {
   failures: number;
   canSend: boolean;
   send: (body: string) => Promise<boolean>;
-  notifyTyping: () => void;
+  notifyTyping: (hasText?: boolean) => void;
   /** Ends the session for both sides (leave). Safe to call twice. */
   leave: () => Promise<void>;
   /** Another action already ended it server-side (block / next / report). */
@@ -89,7 +89,12 @@ export function useMeetChat(sessionId: string): MeetChatApi {
     if (meetStatusIsTerminal(statusRef.current) && !meetStatusIsTerminal(next)) return;
     statusRef.current = next;
     setStatus(next);
-    if (meetStatusIsTerminal(next)) leftRef.current = true;
+    if (meetStatusIsTerminal(next)) {
+      leftRef.current = true;
+      typingRef.current?.unsubscribe();
+      typingRef.current = null;
+      setPeerTyping(false);
+    }
   }, []);
 
   /** Only the newest session response may commit. */
@@ -297,26 +302,27 @@ export function useMeetChat(sessionId: string): MeetChatApi {
     };
   }, [commitStatus, paused, ready, sessionGuard, sessionId, terminal]);
 
-  // Presence: one subscription per screen, torn down on unmount.
+  // Private server-authorized typing; no client Presence identities/payloads.
+  const typingLease = session?.expiresAt;
   React.useEffect(() => {
-    if (!ready || terminal || !sessionId) return undefined;
+    if (!ready || terminal || paused || !sessionId || !typingLease || typingLease <= Date.now()) {
+      setPeerTyping(false);
+      return undefined;
+    }
     const sub = subscribeMeetTyping(sessionId, setPeerTyping);
     typingRef.current = sub;
+    const deadline = setTimeout(() => sub.unsubscribe(), Math.max(0, typingLease - Date.now()));
     return () => {
+      clearTimeout(deadline);
       typingRef.current = null;
       setPeerTyping(false);
       sub.unsubscribe();
     };
-  }, [ready, sessionId, terminal]);
+  }, [paused, ready, sessionId, terminal, typingLease]);
 
-  React.useEffect(() => {
-    if (!ready || terminal) return;
-    if (paused) typingRef.current?.clear();
-    else typingRef.current?.broadcast();
-  }, [paused, ready, terminal]);
-
-  const notifyTyping = React.useCallback((): void => {
-    typingRef.current?.broadcast();
+  const notifyTyping = React.useCallback((hasText = true): void => {
+    if (hasText) typingRef.current?.broadcast();
+    else typingRef.current?.clear();
   }, []);
 
   const send = React.useCallback(
@@ -330,9 +336,11 @@ export function useMeetChat(sessionId: string): MeetChatApi {
       sendingRef.current = true;
       setSending(true);
       setError(null);
+      const typingScope = typingRef.current;
       try {
         const message = await sendMeetMessage(sessionId, trimmed);
         setMessages((current) => mergeMeetMessages(current, [message]));
+        typingScope?.clear();
         return true;
       } catch (e) {
         if (e instanceof SupabaseError && meetIsTerminalError(e.code)) {

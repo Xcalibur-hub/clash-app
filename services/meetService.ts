@@ -11,6 +11,7 @@ import {
 import { requestError, requireSupabase, SupabaseError } from './supabaseClient';
 
 export { MEET_INTERESTS, type MeetChannel, type MeetHoodId, type MeetMatchMode };
+export { subscribeMeetTyping } from './meetTypingService';
 
 export interface MeetSession {
   sessionId: string;
@@ -467,54 +468,5 @@ export function pollMeetMessages(
   return () => {
     alive = false;
     clearInterval(id);
-  };
-}
-
-export function subscribeMeetTyping(
-  sessionId: string,
-  onPeers: (typing: boolean) => void,
-): {
-  broadcast: () => void;
-  clear: () => void;
-  unsubscribe: () => void;
-} {
-  const channel = client().channel(`meet-typing:${sessionId}`, {
-    config: { presence: { key: 'typing' } },
-  });
-
-  // Presence events can land after the screen unmounts; never call back then.
-  let closed = false;
-
-  channel
-    .on('presence', { event: 'sync' }, () => {
-      if (closed) return;
-      const state = channel.presenceState();
-      const keys = Object.keys(state);
-      onPeers(keys.length > 1);
-    })
-    .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED' && !closed) {
-        await channel.track({ t: Date.now() });
-      }
-    });
-
-  let last = 0;
-  return {
-    broadcast: () => {
-      if (closed) return;
-      const now = Date.now();
-      if (now - last < 2000) return;
-      last = now;
-      void channel.track({ t: now });
-    },
-    clear: () => {
-      if (closed) return;
-      void channel.untrack();
-    },
-    unsubscribe: () => {
-      if (closed) return;
-      closed = true;
-      void client().removeChannel(channel);
-    },
   };
 }

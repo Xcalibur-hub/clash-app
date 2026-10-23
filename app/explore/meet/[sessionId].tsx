@@ -290,7 +290,7 @@ export default function MeetChatScreen(): React.JSX.Element {
             value={draft}
             onChangeText={(next) => {
               setDraft(next);
-              chat.notifyTyping();
+              chat.notifyTyping(next.trim().length > 0);
             }}
             placeholder="Message..."
             placeholderTextColor={t.textSecondary}
