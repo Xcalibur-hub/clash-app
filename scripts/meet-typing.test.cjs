@@ -68,12 +68,14 @@ test('private broadcast only; no Presence key, track, or auto-publish on join',a
   const h=harness(t);await h.auth();await h.connected();
   assert.equal(h.channels[0].options.config.private,true);assert.equal(h.channels[0].topic,'meet-typing:fictional-room');
   assert.equal(h.channels[0].options.config.presence,undefined);assert.equal(h.channels[0].handlers.presence,undefined);
-  assert.deepEqual(h.writes,[]);assert.equal(h.reads.length,1);
+  assert.deepEqual(h.writes,[]);
+  // Immediate authoritative read on start, plus refresh on first SUBSCRIBED.
+  assert.equal(h.reads.length,2);
 });
 test('two peers sharing a legacy key cannot corrupt server-derived peer detection',async t=>{
   const h=harness(t);h.setRead(async()=>({typing:true,validForMs:5000}));await h.auth();await h.connected();
   await h.hint({presence:{typing:[{userId:'spoofed'},{userId:'self'}]},typing:false});
-  assert.equal(h.events.at(-1),true);assert.equal(h.reads.length,2);
+  assert.equal(h.events.at(-1),true);assert.equal(h.reads.length,3);
 });
 test('forged broadcast data never becomes typing without an authorized read',async t=>{
   const h=harness(t);await h.auth();await h.connected();await h.hint({typing:true,validForMs:999999,userId:'peer'});
@@ -83,6 +85,21 @@ for(const code of ['42501','P0002','P0003','PGRST202'])test(`denied/unavailable 
   const h=harness(t);h.setRead(async()=>{throw {code};});await h.auth();await h.connected();
   h.sub.broadcast();await h.time.advance(20000);assert.equal(h.events.at(-1),false);
   assert.equal(h.reads.length,1);assert.ok(h.writes.every(x=>x===false));
+});
+test('A writer publishes set_meet_typing before Realtime SUBSCRIBED (B→A path independent)',async t=>{
+  const h=harness(t);await h.auth();
+  assert.equal(h.channels.length,1);assert.equal(h.writes.length,0);
+  h.sub.broadcast();await flush();
+  assert.deepEqual(h.writes,[true]);
+});
+test('B→A peer indicator appears via authoritative poll without SUBSCRIBED',async t=>{
+  const h=harness(t);h.setRead(async()=>({typing:true,validForMs:5000}));await h.auth();
+  assert.equal(h.events.at(-1),true);
+  assert.ok(h.reads.length>=1);
+});
+test('A→B idle clear still enqueues false after three seconds without channel',async t=>{
+  const h=harness(t);await h.auth();h.sub.broadcast();await flush();
+  assert.deepEqual(h.writes,[true]);await h.time.advance(3001);assert.deepEqual(h.writes,[true,false]);
 });
 test('signed-out initial scope never subscribes or invokes RPCs',async t=>{
   const h=harness(t);await h.auth(null);h.sub.broadcast();await flush();
@@ -111,6 +128,12 @@ test('reconnect and periodic reconciliation recover a missed hint',async t=>{
   const h=harness(t);await h.auth();await h.connected();h.channels[0].status('CLOSED');
   h.setRead(async()=>({typing:true,validForMs:5000}));await h.connected();assert.equal(h.events.at(-1),true);
   h.setRead(async()=>({typing:false,validForMs:0}));await h.time.advance(4000);assert.equal(h.events.at(-1),false);
+});
+test('channel error still reconciles peer typing on the next poll (teardown-safe)',async t=>{
+  const h=harness(t);await h.auth();await h.connected();
+  h.channels[0].status('CHANNEL_ERROR');await flush();assert.equal(h.events.at(-1),false);
+  h.setRead(async()=>({typing:true,validForMs:4500}));await h.time.advance(4000);
+  assert.equal(h.events.at(-1),true);
 });
 test('peer server TTL expires while a subsequent network read is hung',async t=>{
   const h=harness(t);h.setRead(async()=>({typing:true,validForMs:5000}));await h.auth();await h.connected();
@@ -169,8 +192,11 @@ test('failed publish is not replayed automatically',async t=>{
 test('hook wiring clears terminal/background/expired scopes; no resume fake typing (static)',()=>{
   const s=fs.readFileSync('hooks/useMeetChat.ts','utf8');
   assert.match(s,/typingRef\.current\?\.unsubscribe\(\)/);assert.match(s,/!ready \|\| terminal \|\| paused/);
-  assert.match(s,/typingLease <= Date\.now\(\)/);assert.match(s,/setTimeout\(\(\) => sub\.unsubscribe\(\)/);
+  assert.match(s,/typingLeaseAlive/);assert.match(s,/typingLease > Date\.now\(\)/);
+  assert.match(s,/Math\.max\(0, typingLease - Date\.now\(\)\)/);
   assert.doesNotMatch(s,/else typingRef\.current\?\.broadcast\(\)/);
+  // Lease extensions must not be effect deps that recreate the channel.
+  assert.doesNotMatch(s,/}, \[paused, ready, sessionId, terminal, typingLease\]\)/);
 });
 test('draft SQL admission, restrictive namespace and lexical checks (STATIC, no SQL execution)',()=>{
   const sql=fs.readFileSync('supabase/migrations/20261023140000_meet_private_typing.sql','utf8');
@@ -240,4 +266,20 @@ test('mounted production hook clears after a genuine send or empty composer',asy
   const h=await mountedChat(t);await h.React.act(async()=>h.sub.show(true));
   await h.React.act(async()=>h.view.send('A harmless message'));assert.equal(h.view.peerTyping,true);assert.equal(h.clears,1);
   await h.React.act(async()=>h.view.notifyTyping(false));assert.equal(h.clears,2);
+});
+test('mounted production hook keeps typing subscription across lease extensions',async t=>{
+  const h=await mountedChat(t);const first=h.sub;
+  await h.React.act(async()=>{h.services.fetchMeetSession=async()=>({
+    sessionId:'fictional-room',status:'active',peerConnected:true,endReason:null,expiresAt:120000});
+    await h.view.refresh();});
+  assert.equal(h.sub,first);assert.equal(first.closed,false);
+});
+test('mounted production hook A notifyTyping reaches subscription before teardown',async t=>{
+  const h=await mountedChat(t);
+  await h.React.act(async()=>h.view.notifyTyping(true));
+  assert.equal(h.sub.publishes,1);
+  await h.React.act(async()=>h.view.leave());
+  assert.equal(h.sub.closed,true);
+  await h.React.act(async()=>h.view.notifyTyping(true));
+  assert.equal(h.sub.publishes,1);
 });

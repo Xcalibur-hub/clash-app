@@ -303,22 +303,38 @@ export function useMeetChat(sessionId: string): MeetChatApi {
   }, [commitStatus, paused, ready, sessionGuard, sessionId, terminal]);
 
   // Private server-authorized typing; no client Presence identities/payloads.
-  const typingLease = session?.expiresAt;
+  // Subscribe once per active foreground scope. Do NOT recreate the Realtime
+  // channel whenever heartbeat extends expiresAt — that churn dropped
+  // SUBSCRIBED and blanked indicators in E3.7.0 (E3.7.1).
+  const typingLease = session?.expiresAt ?? null;
+  const typingLeaseAlive = typingLease != null && typingLease > Date.now();
   React.useEffect(() => {
-    if (!ready || terminal || paused || !sessionId || !typingLease || typingLease <= Date.now()) {
+    if (!ready || terminal || paused || !sessionId || !typingLeaseAlive) {
       setPeerTyping(false);
       return undefined;
     }
     const sub = subscribeMeetTyping(sessionId, setPeerTyping);
     typingRef.current = sub;
-    const deadline = setTimeout(() => sub.unsubscribe(), Math.max(0, typingLease - Date.now()));
     return () => {
-      clearTimeout(deadline);
       typingRef.current = null;
       setPeerTyping(false);
       sub.unsubscribe();
     };
-  }, [paused, ready, sessionId, terminal, typingLease]);
+  }, [paused, ready, sessionId, terminal, typingLeaseAlive]);
+
+  // Keep the lease deadline current without tearing down the subscription.
+  React.useEffect(() => {
+    if (!typingLeaseAlive || typingLease == null) return undefined;
+    const sub = typingRef.current;
+    if (!sub) return undefined;
+    const deadline = setTimeout(() => {
+      if (typingRef.current !== sub) return;
+      typingRef.current = null;
+      setPeerTyping(false);
+      sub.unsubscribe();
+    }, Math.max(0, typingLease - Date.now()));
+    return () => clearTimeout(deadline);
+  }, [typingLease, typingLeaseAlive]);
 
   const notifyTyping = React.useCallback((hasText = true): void => {
     if (hasText) typingRef.current?.broadcast();

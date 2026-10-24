@@ -30,13 +30,15 @@ export function createMeetTyping(transport: MeetTypingTransport, onPeer: (typing
   }
   const enqueue = (value: boolean) => { pending = value; void drain(); };
   async function refresh(): Promise<void> {
-    if (closed || !connected || reading) return;
+    // Authoritative reads must not wait on Realtime SUBSCRIBED. Broadcast is a
+    // hint only; get_meet_typing remains the UI source of truth (E3.7.1).
+    if (closed || reading) return;
     const scope = generation;
     const started = Date.now();
     reading = true;
     try {
       const result = await transport.read();
-      if (closed || !connected || scope !== generation) return;
+      if (closed || scope !== generation) return;
       clearTimeout(expiry);
       // Never display a TTL that elapsed while its response was in transit.
       const elapsed = Date.now() - started;
@@ -62,16 +64,24 @@ export function createMeetTyping(transport: MeetTypingTransport, onPeer: (typing
     pending = undefined;
   }
   onPeer(false);
+  // First poll immediately so a late/failed private channel cannot blank the
+  // indicator while the peer already has a live typing_until row.
+  void refresh();
   return {
     refresh,
     setConnected(value: boolean): void {
       if (closed) return;
+      if (connected === value) {
+        if (value) void refresh();
+        return;
+      }
       connected = value; generation++; hide();
       if (value) void refresh();
       else { clearTimeout(idle); enqueue(false); }
     },
     broadcast(): void {
-      if (closed || !connected) return;
+      // Writes are REST RPCs; do not require a live Broadcast subscription.
+      if (closed) return;
       clearTimeout(idle);
       idle = setTimeout(() => enqueue(false), 3000);
       if (Date.now() - lastWrite < 2000) return;
