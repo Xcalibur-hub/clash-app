@@ -7,6 +7,7 @@ import React from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -45,6 +46,26 @@ export default function MeetChatScreen(): React.JSX.Element {
   const chat = useMeetChat(sessionId);
   const session = chat.session;
   const [draft, setDraft] = React.useState('');
+  // Android KAV `height` can retain a post-IME bottom offset when hide
+  // coordinates do not match the restored frame (E3.6.5: 209px). Gate
+  // avoidance to IME-visible windows and remount after hide so the next
+  // open does not compound sticky `state.bottom`.
+  const [androidImeOpen, setAndroidImeOpen] = React.useState(
+    () => Platform.OS === 'android' && Keyboard.isVisible(),
+  );
+  const [androidKavEpoch, setAndroidKavEpoch] = React.useState(0);
+  React.useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', () => setAndroidImeOpen(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setAndroidImeOpen(false);
+      setAndroidKavEpoch((epoch) => epoch + 1);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
@@ -183,8 +204,10 @@ export default function MeetChatScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.screen, { backgroundColor: t.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      key={Platform.OS === 'android' ? `meet-kav-${androidKavEpoch}` : 'meet-kav'}
+      style={[styles.screen, { backgroundColor: t.background, paddingTop: Platform.OS === 'android' ? insets.top : 0 }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      enabled={Platform.OS !== 'android' || androidImeOpen}
     >
       <View style={[styles.header, { borderBottomColor: t.border }]}>
         <Pressable
@@ -194,7 +217,7 @@ export default function MeetChatScreen(): React.JSX.Element {
           onPress={() => router.back()}
           style={styles.backHit}
         >
-          <Text style={styles.chevron}>Back</Text>
+          <Text style={[styles.chevron, { color: t.textPrimary }]}>Back</Text>
         </Pressable>
         <View style={styles.headerMeta}>
           <Text style={[styles.alias, { color: t.textPrimary }]} numberOfLines={1}>
@@ -229,6 +252,9 @@ export default function MeetChatScreen(): React.JSX.Element {
 
 
       <FlatList
+        style={styles.messageViewport}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
         data={chat.messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -287,6 +313,7 @@ export default function MeetChatScreen(): React.JSX.Element {
           ]}
         >
           <TextInput
+            accessibilityLabel="Message"
             value={draft}
             onChangeText={(next) => {
               setDraft(next);
@@ -362,6 +389,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   header: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
@@ -387,6 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  messageViewport: { flex: 1, minHeight: 0 },
   list: {
     paddingHorizontal: layout.screenX,
     paddingVertical: space.md,
@@ -410,6 +439,7 @@ const styles = StyleSheet.create({
     paddingBottom: space.xs,
   },
   composer: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: space.xs,
@@ -429,6 +459,8 @@ const styles = StyleSheet.create({
     ...typeScale.body,
   },
   send: {
+    flexShrink: 0,
+    minWidth: layout.hit,
     minHeight: layout.hit,
     paddingHorizontal: space.md,
     borderRadius: radius.lg,
@@ -437,6 +469,7 @@ const styles = StyleSheet.create({
   },
   sendLabel: { ...typeScale.button },
   footer: {
+    flexShrink: 0,
     paddingHorizontal: layout.screenX,
     paddingTop: space.sm,
     gap: space.xs,

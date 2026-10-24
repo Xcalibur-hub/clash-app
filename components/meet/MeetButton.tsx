@@ -4,7 +4,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { radius, scale, typeScale } from '../../theme';
+import { radius, scale, typeScale, useThemeColors } from '../../theme';
 import { BUTTON_TONES, type ButtonTone } from '../shared/buttonTones';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 
@@ -26,7 +26,10 @@ export function MeetButton({
   accessibilityLabel?: string;
 }): React.JSX.Element {
   const press = useSharedValue(0);
-  const palette = BUTTON_TONES[tone];
+  const t = useThemeColors();
+  const palette = tone === 'glass'
+    ? { fill: t.surface, text: t.textPrimary, border: t.border }
+    : BUTTON_TONES[tone];
   const animated = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - (1 - scale.press) * press.value }],
   }));
