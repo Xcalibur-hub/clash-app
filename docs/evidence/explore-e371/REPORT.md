@@ -1,6 +1,6 @@
 # E3.7.1 — Meet typing indicator root-cause investigation
 
-24 October 2026. Branch `arena-ui-review`; HEAD at investigation start **d5426593d1cc0666ce9e5219fb2ad88e684c19b9**.
+24 October 2026. Branch `arena-ui-review`; investigation start **d5426593**; fix commit **bd05d66**.
 
 **Overall: PASS (offline root-cause + client fix).** Confirmed why A50 never showed `Typing...` despite healthy `set_meet_typing` / `get_meet_typing` RPCs in E3.7.0. Applied the smallest justified client-side fix. Offline TypeScript and focused typing tests **PASS**. **Native A50 re-acceptance remains outstanding** (no new sessions, no device writes in this task).
 
