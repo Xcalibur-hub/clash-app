@@ -1,0 +1,14 @@
+{
+  "which": "android",
+  "bytes": 23767267,
+  "sha256": "c9d6f0c50779d6419c34466edaf8d380b887258b83f1c7718295a17f291e585e",
+  "authoritativeReadComment": true,
+  "broadcastRestComment": true,
+  "broadcastWithoutConnected": true,
+  "refreshWithoutConnectedGate": true,
+  "typingLeaseAlive": true,
+  "leaseNotResubscribeDep": true,
+  "separateLeaseDeadline": true,
+  "backend": "http://127.0.0.1:55471",
+  "e371TypingFix": true
+}

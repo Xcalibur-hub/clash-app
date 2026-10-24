@@ -1,0 +1,53 @@
+{
+  "checkedAt": "2026-10-24T12:42:19.730Z",
+  "head": "1c831fc66c974e42ae6aa75ddce4f99324952aee",
+  "branch": "arena-ui-review",
+  "e371Commits": {
+    "fix": "bd05d66",
+    "docs": "1c831fc",
+    "bothAncestorsOfHead": true
+  },
+  "pass": true,
+  "device": "SM-A505F",
+  "serial": "RZ8M30DE9NL",
+  "unlocked": true,
+  "metroPid": 5112,
+  "metroPort": 8081,
+  "usbPorts": [
+    8081,
+    55471
+  ],
+  "project": "e357-ce48b72fd636",
+  "database": "clash_e325_e357_ce48b72fd636_fresh",
+  "ledgerCount": 111,
+  "migration111": true,
+  "utcDate": "2026-10-24",
+  "currentPartition": "realtime.messages_2026_10_24",
+  "rls": true,
+  "sessionCount": 13,
+  "activeSessions": 0,
+  "messageCount": 5,
+  "setTyping": true,
+  "getTyping": true,
+  "health": [
+    {
+      "path": "/auth/v1/health",
+      "status": 200
+    },
+    {
+      "path": "/rest/v1/",
+      "status": 200
+    }
+  ],
+  "realtimeHealth": 200,
+  "fictionalAOnDevice": true,
+  "fictionalBConfigured": true,
+  "bSdkAuthenticated": false,
+  "phoneBundleVerifiedThisPhase": false,
+  "sessionCreated": false,
+  "typingRpcs": false,
+  "authorizationConsumed": false,
+  "e370AuthorizationReused": false,
+  "uncommittedMeetUiPreserved": true,
+  "note": "Read-only precheck. No Meet session, typing RPC, Leave, or B Auth sign-in in this script."
+}

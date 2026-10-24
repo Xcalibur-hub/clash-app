@@ -1,0 +1,14 @@
+{
+  "which": "phone",
+  "bytes": 23768327,
+  "sha256": "7a84d52d6e92c87b9aca76e89f9d8a1907c336c0dd6add24235c4bf75bcaea8f",
+  "authoritativeReadComment": true,
+  "broadcastRestComment": true,
+  "broadcastWithoutConnected": true,
+  "refreshWithoutConnectedGate": true,
+  "typingLeaseAlive": true,
+  "leaseNotResubscribeDep": true,
+  "separateLeaseDeadline": true,
+  "backend": "http://127.0.0.1:55471",
+  "e371TypingFix": true
+}

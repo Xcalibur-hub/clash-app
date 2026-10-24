@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-24T12:43:21.673Z",
+  "fictionalB": true,
+  "actualServerGetUser": true,
+  "tokensLogged": false,
+  "gateway": "http://127.0.0.1:55471",
+  "bMatchesConfig": true,
+  "sessionCreated": false,
+  "typingRpcs": false,
+  "note": "B SDK Auth established for E3.7.2 precheck. Typing/session still require separate owner approval."
+}

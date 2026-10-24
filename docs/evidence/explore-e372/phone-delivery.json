@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-24T12:43:08.009Z",
+  "device": "SM-A505F",
+  "phoneOriginatedHTTP200": true,
+  "event": {
+    "started": 1792845785837,
+    "finished": 1792845786823,
+    "status": 200,
+    "android": true,
+    "bytes": 23768327,
+    "sha256": "7a84d52d6e92c87b9aca76e89f9d8a1907c336c0dd6add24235c4bf75bcaea8f"
+  },
+  "actualResponseBytesCaptured": true,
+  "newInstallation": false,
+  "dataCleared": false,
+  "e371MarkersRequired": true
+}

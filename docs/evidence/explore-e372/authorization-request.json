@@ -1,0 +1,39 @@
+{
+  "at": "2026-10-24T12:44:00.000Z",
+  "phase": "E3.7.2",
+  "status": "AWAITING_OWNER_APPROVAL",
+  "e370AuthorizationReused": false,
+  "requested": {
+    "database": "clash_e325_e357_ce48b72fd636_fresh",
+    "gateway": "127.0.0.1:55471",
+    "device": "SM-A505F",
+    "createOneDisposableAbTextSession": true,
+    "bSetMeetTypingForA50Ui": true,
+    "aComposerTypingObservableByB": true,
+    "idleClear": true,
+    "realtimeReconnectOrDelayedSubscribe": true,
+    "leaseExtensionStability": true,
+    "leaveClearsIndicators": true,
+    "sanitizedScreenshotsAndTransport": true,
+    "cleanupLeave": true
+  },
+  "notRequested": {
+    "matchmaking": true,
+    "block": true,
+    "reports": true,
+    "media": true,
+    "unnecessaryMessages": true,
+    "migrations": true,
+    "rlsChanges": true,
+    "nativeRebuild": true,
+    "pushMergeDeploy": true
+  },
+  "alreadyCompletedWithoutSessionWrites": [
+    "git HEAD and E3.7.1 commits verified",
+    "device/Metro/USB/backend identity",
+    "fictional A on device",
+    "migration 111 + Realtime partition",
+    "phone-delivered JS with E3.7.1 markers",
+    "fictional B SDK Auth getUser only"
+  ]
+}
