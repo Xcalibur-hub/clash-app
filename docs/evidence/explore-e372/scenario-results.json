@@ -1,0 +1,94 @@
+{
+  "results": {
+    "create-session": {
+      "status": "PASS",
+      "detail": {
+        "sessionId": "ms_8e8b9b7dd70166c6",
+        "abortedBootstrap": "ms_06628e8d11171f14",
+        "surface": "SQL meet_create_session"
+      },
+      "at": "2026-10-24T13:07:40.149Z"
+    },
+    "open-a50-connect-b": {
+      "status": "PASS",
+      "detail": {
+        "sessionId": "ms_8e8b9b7dd70166c6",
+        "a50Active": true,
+        "surface": "A50+SDK"
+      },
+      "at": "2026-10-24T13:07:53.550Z"
+    },
+    "typing-b-to-a": {
+      "status": "PASS",
+      "detail": {
+        "a50TypingVisible": true,
+        "aSdkSeesPeerTyping": true,
+        "validForMs": 4745.045,
+        "surface": "A50 UI"
+      },
+      "at": "2026-10-24T13:07:59.555Z"
+    },
+    "typing-idle-clear": {
+      "status": "PASS",
+      "detail": {
+        "a50TypingVisible": false,
+        "sdkTyping": false,
+        "surface": "A50+SDK"
+      },
+      "at": "2026-10-24T13:08:11.178Z"
+    },
+    "typing-a-to-b": {
+      "status": "PASS",
+      "detail": {
+        "bSdkSeesTyping": true,
+        "validForMs": 3293.232,
+        "draftText": null,
+        "surface": "A50 composer→SDK"
+      },
+      "at": "2026-10-24T13:08:38.194Z"
+    },
+    "typing-reconnect-or-delayed": {
+      "status": "PASS",
+      "detail": {
+        "a50TypingVisible": true,
+        "note": "B Realtime disconnected; A50 indicator via authoritative poll/hint path",
+        "surface": "A50 UI"
+      },
+      "at": "2026-10-24T13:08:53.888Z"
+    },
+    "typing-lease-stability": {
+      "status": "PASS",
+      "detail": {
+        "before": true,
+        "after": true,
+        "note": "Held B typing across >15s while A heartbeats extend expiresAt; subscription must not blank indicator",
+        "surface": "A50 UI"
+      },
+      "at": "2026-10-24T13:09:20.281Z"
+    },
+    "leave-clears-and-rejects": {
+      "status": "PASS",
+      "detail": {
+        "a50TypingVisible": false,
+        "inactive": true,
+        "typingRejected": true,
+        "leavePath": "sdk-a-leave",
+        "endedUi": true,
+        "surface": "sdk-a-leave"
+      },
+      "at": "2026-10-24T13:09:37.516Z"
+    }
+  },
+  "final": {
+    "sessionId": "ms_8e8b9b7dd70166c6",
+    "session": {
+      "id": "ms_8e8b9b7dd70166c6",
+      "status": "ended",
+      "end_reason": "leave"
+    },
+    "active": 0,
+    "sessionCount": 15,
+    "messageCount": 5,
+    "ledger": 111
+  }
+}

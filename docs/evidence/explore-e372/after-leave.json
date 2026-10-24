@@ -1,0 +1,103 @@
+{
+  "tag": "after-leave",
+  "keyboard": false,
+  "active": false,
+  "ended": true,
+  "typingVisible": false,
+  "input": null,
+  "send": null,
+  "back": {
+    "bounds": [
+      42,
+      115,
+      158,
+      230
+    ]
+  },
+  "leave": null,
+  "bubbleTexts": [
+    "Stranger B",
+    "Find someone else",
+    "Report stranger",
+    "Block stranger",
+    "Say hello, keep it kind. Nothing here lasts forever.",
+    "This conversation has ended.",
+    "Find someone else"
+  ],
+  "controls": [
+    {
+      "label": "Back",
+      "bounds": [
+        42,
+        115,
+        158,
+        230
+      ],
+      "enabled": true,
+      "clickable": true
+    },
+    {
+      "label": "Back",
+      "bounds": [
+        56,
+        146,
+        143,
+        199
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Conversation ended",
+      "bounds": [
+        374,
+        180,
+        706,
+        228
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Conversation actions",
+      "bounds": [
+        923,
+        115,
+        1038,
+        230
+      ],
+      "enabled": true,
+      "clickable": true
+    },
+    {
+      "label": "Leave chat",
+      "bounds": [
+        436,
+        804,
+        645,
+        857
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Leave",
+      "bounds": [
+        482,
+        2125,
+        597,
+        2131
+      ],
+      "enabled": true,
+      "clickable": false
+    }
+  ],
+  "scrollContainers": [
+    [
+      0,
+      926,
+      1080,
+      1840
+    ]
+  ]
+}

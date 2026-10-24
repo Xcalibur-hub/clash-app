@@ -1,0 +1,131 @@
+{
+  "tag": "leave-menu",
+  "keyboard": true,
+  "active": true,
+  "ended": false,
+  "typingVisible": false,
+  "input": {
+    "bounds": [
+      42,
+      1117,
+      835,
+      1233
+    ],
+    "focused": true,
+    "text": "typingtyp"
+  },
+  "send": {
+    "bounds": [
+      856,
+      1118,
+      1038,
+      1233
+    ],
+    "enabled": true
+  },
+  "back": {
+    "bounds": [
+      42,
+      115,
+      158,
+      230
+    ]
+  },
+  "leave": null,
+  "bubbleTexts": [
+    "Stranger B",
+    "Find someone else",
+    "Report stranger",
+    "Block stranger",
+    "Say hello, keep it kind. Nothing here lasts forever.",
+    "typingtyp",
+    "Send"
+  ],
+  "controls": [
+    {
+      "label": "Back",
+      "bounds": [
+        42,
+        115,
+        158,
+        230
+      ],
+      "enabled": true,
+      "clickable": true
+    },
+    {
+      "label": "Back",
+      "bounds": [
+        56,
+        146,
+        143,
+        199
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Connected",
+      "bounds": [
+        449,
+        180,
+        630,
+        228
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Conversation actions",
+      "bounds": [
+        923,
+        115,
+        1038,
+        230
+      ],
+      "enabled": true,
+      "clickable": true
+    },
+    {
+      "label": "Leave chat",
+      "bounds": [
+        436,
+        804,
+        645,
+        857
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Message",
+      "bounds": [
+        42,
+        1117,
+        835,
+        1233
+      ],
+      "enabled": true,
+      "clickable": true
+    },
+    {
+      "label": "Send message",
+      "bounds": [
+        856,
+        1118,
+        1038,
+        1233
+      ],
+      "enabled": true,
+      "clickable": true
+    }
+  ],
+  "scrollContainers": [
+    [
+      0,
+      926,
+      1080,
+      1085
+    ]
+  ]
+}

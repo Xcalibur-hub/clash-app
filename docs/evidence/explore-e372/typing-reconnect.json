@@ -1,0 +1,128 @@
+{
+  "tag": "typing-reconnect",
+  "keyboard": true,
+  "active": true,
+  "ended": false,
+  "typingVisible": true,
+  "input": {
+    "bounds": [
+      42,
+      1117,
+      835,
+      1233
+    ],
+    "focused": true,
+    "text": "typingtyp"
+  },
+  "send": {
+    "bounds": [
+      856,
+      1118,
+      1038,
+      1233
+    ],
+    "enabled": true
+  },
+  "back": {
+    "bounds": [
+      42,
+      115,
+      158,
+      230
+    ]
+  },
+  "leave": null,
+  "bubbleTexts": [
+    "Stranger B",
+    "Say hello, keep it kind. Nothing here lasts forever.",
+    "typingtyp",
+    "Send"
+  ],
+  "controls": [
+    {
+      "label": "Back",
+      "bounds": [
+        42,
+        115,
+        158,
+        230
+      ],
+      "enabled": true,
+      "clickable": true
+    },
+    {
+      "label": "Back",
+      "bounds": [
+        56,
+        146,
+        143,
+        199
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Typing...",
+      "bounds": [
+        469,
+        180,
+        611,
+        228
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Conversation actions",
+      "bounds": [
+        923,
+        115,
+        1038,
+        230
+      ],
+      "enabled": true,
+      "clickable": true
+    },
+    {
+      "label": "Typing...",
+      "bounds": [
+        42,
+        374,
+        1038,
+        422
+      ],
+      "enabled": true,
+      "clickable": false
+    },
+    {
+      "label": "Message",
+      "bounds": [
+        42,
+        1117,
+        835,
+        1233
+      ],
+      "enabled": true,
+      "clickable": true
+    },
+    {
+      "label": "Send message",
+      "bounds": [
+        856,
+        1118,
+        1038,
+        1233
+      ],
+      "enabled": true,
+      "clickable": true
+    }
+  ],
+  "scrollContainers": [
+    [
+      0,
+      263,
+      1080,
+      1085
+    ]
+  ]
+}
