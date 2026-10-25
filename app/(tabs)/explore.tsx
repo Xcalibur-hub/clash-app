@@ -39,12 +39,12 @@ import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { Notice } from '../../components/shared/Notice';
 import { MeetHomePanel } from '../../components/meet/MeetHomePanel';
 import { PlayHomePanel } from '../../components/play/PlayHomePanel';
+import { ExploreLivePanel, useExploreLive } from '../../components/explore/ExploreLivePanel';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { countryByCode } from '../../data/exploreCountries';
 import { analytics } from '../../services/analytics';
 import {
   fetchExploreForYou,
-  fetchExploreLive,
   fetchExploreWorldSummary,
   fetchTeleportCandidate,
   rememberTeleportId,
@@ -52,7 +52,6 @@ import {
   clearTeleportHistory,
   searchExplore,
   type ExploreForYouItem,
-  type ExploreLiveFeed,
   type ExploreSearchResults,
   type ExploreTeleportCandidate,
   type ExploreWorldSummary,
@@ -99,7 +98,7 @@ function ExploreScreen(): React.JSX.Element {
   const [forYou, setForYou] = React.useState<ExploreForYouItem[]>([]);
   const [forYouCursor, setForYouCursor] = React.useState<number | null>(0);
   const [forYouFilter, setForYouFilter] = React.useState<ForYouFilterId>(DEFAULT_FOR_YOU_FILTER);
-  const [live, setLive] = React.useState<ExploreLiveFeed | null>(null);
+  const live = useExploreLive();
   const [loading, setLoading] = React.useState(true);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const paging = React.useRef(false);
@@ -130,14 +129,13 @@ function ExploreScreen(): React.JSX.Element {
     setLoadingMore(false);
     setLoading(true);
     setError(null);
-    void Promise.all([fetchExploreWorldSummary(), fetchExploreForYou(24, 0), fetchExploreLive(20)])
-      .then(([world, page, liveFeed]) => {
+    void Promise.all([fetchExploreWorldSummary(), fetchExploreForYou(24, 0)])
+      .then(([world, page]) => {
         if (cancelled) return;
         setSummary(world);
         const mixed = diversifyByCreator(dedupeExploreItems(page.items));
         setForYou(mixed);
         setForYouCursor(page.nextCursor);
-        setLive(liveFeed);
       })
       .catch(() => {if(!cancelled)setError('Explore unavailable.');})
       .finally(() => {
@@ -353,7 +351,7 @@ function ExploreScreen(): React.JSX.Element {
         }}
       >
         {compactHeader}
-        {error ? <Pressable accessibilityRole="button" accessibilityLabel="Retry Explore" onPress={()=>setRetry(n=>n+1)}><Text style={{color:t.textSecondary}}>{error} Tap to retry.</Text></Pressable> : null}
+        {error && (mode !== 'live' || searching) ? <Pressable accessibilityRole="button" accessibilityLabel="Retry Explore" onPress={()=>setRetry(n=>n+1)}><Text style={{color:t.textSecondary}}>{error} Tap to retry.</Text></Pressable> : null}
       </View>
 
       {searching && !searchResults ? (<ActivityIndicator accessibilityLabel="Loading search" color={t.textPrimary} />) : searching && searchResults ? (
@@ -393,7 +391,7 @@ function ExploreScreen(): React.JSX.Element {
               // Cross-surface shelves only on the unfiltered feed: a filtered
               // mosaic should read as one surface, not a mixed header.
               forYouFilter === 'all' && !loading ? (
-                <ExploreDiscoverShelves live={live} onSeeAllLive={() => changeMode('live')} />
+                <ExploreDiscoverShelves live={live.data} onSeeAllLive={() => changeMode('live')} />
               ) : null
             }
             onScroll={(e) => onFeedScroll(e.nativeEvent.contentOffset.y)}
@@ -555,46 +553,7 @@ function ExploreScreen(): React.JSX.Element {
               </View>
             ) : null}
 
-            {mode === 'live' ? (
-              <View style={{ gap: space.sm }}>
-                <Text allowFontScaling={false} style={[styles.modeLabel, { color: t.textMuted }]}>
-                  LIVE
-                </Text>
-                {(live?.topics.length ?? 0) === 0 && (live?.takes.length ?? 0) === 0 ? (
-                  <Text allowFontScaling={false} style={{ color: t.textMuted }}>
-                    No live activity right now.
-                  </Text>
-                ) : null}
-                {live?.topics.map((topic) => (
-                  <ExploreMediaTile
-                    key={topic.id}
-                    kind="LIVE"
-                    title={topic.title}
-                    subtitle={topic.hood}
-                    accent="#1B3A4B"
-                    span="hero"
-                    onPress={() => router.push(topic.href as never)}
-                  />
-                ))}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.rail}
-                >
-                  {live?.takes.map((take) => (
-                    <ExploreDiscoveryCard
-                      key={take.id}
-                      kind="TAKE"
-                      title={take.title}
-                      subtitle={take.subtitle}
-                      mediaUrl={take.mediaUrl}
-                      meta={`Heat ${take.heat}`}
-                      onPress={() => router.push(take.href as never)}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            ) : null}
+            {mode === 'live' ? <ExploreLivePanel live={live} /> : null}
 
             {mode === 'play' ? <PlayHomePanel /> : null}
 

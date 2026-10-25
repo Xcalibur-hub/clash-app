@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   StyleSheet,
@@ -12,16 +11,16 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchProfileById } from '../../services/profileService';
 import { fetchCollection, fetchDrop } from '../../services/vaultService';
-import type { StorefrontDrop, VaultCollection } from '../../services/vaultMappers';
-import type { User } from '../../store';
+import type { StorefrontDrop } from '../../services/vaultMappers';
+import { useAuth } from '../../store/AuthProvider';
+import { useRetryableRead } from '../../hooks/useRetryableRead';
+import { ReadFeedback } from '../shared/ReadFeedback';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { EmptyState } from '../shared/EmptyState';
-import { BackIcon, VaultIcon } from '../shared/icons';
+import { VaultIcon } from '../shared/icons';
 import { VaultDropCard } from './VaultDropCard';
 import { SubscriptionInfoSheet } from './SubscriptionInfoSheet';
-import { tap as hapticTap } from '../../utils/haptics';
-
-type Phase = 'loading' | 'ready' | 'missing' | 'error';
+import { VaultBackButton } from './VaultBackButton';
 
 export interface CollectionWorldProps {
   collectionId: string;
@@ -35,57 +34,25 @@ export function CollectionWorld({ collectionId }: CollectionWorldProps): React.J
   const insets = useSafeAreaInsets();
   const t = useThemeColors();
 
-  const [phase, setPhase] = React.useState<Phase>('loading');
-  const [collection, setCollection] = React.useState<VaultCollection | null>(null);
-  const [creator, setCreator] = React.useState<User | null>(null);
-  const [episodes, setEpisodes] = React.useState<StorefrontDrop[]>([]);
+  const { user } = useAuth();
   const [subscribeOpen, setSubscribeOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const next = await fetchCollection(collectionId);
-        if (!next) {
-          if (!cancelled) setPhase('missing');
-          return;
-        }
-        const profile = await fetchProfileById(next.creatorId);
-        const cards = await Promise.all(next.drops.map((drop) => fetchDrop(drop.id)));
-        if (cancelled) return;
-        setCollection(next);
-        setCreator(profile);
-        setEpisodes(cards.filter((card): card is StorefrontDrop => Boolean(card)));
-        setPhase('ready');
-      } catch {
-        if (!cancelled) setPhase('error');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const load = React.useCallback(async () => {
+    const collection = await fetchCollection(collectionId);
+    if (!collection) return null;
+    const creator = await fetchProfileById(collection.creatorId);
+    const cards = await Promise.all(collection.drops.map(drop => fetchDrop(drop.id)));
+    return { collection, creator, episodes: cards.filter((card): card is StorefrontDrop => Boolean(card)) };
   }, [collectionId]);
-
-  if (phase === 'loading') {
-    return (
-      <View style={[styles.screen, styles.centered, { backgroundColor: t.background, paddingTop: insets.top }]}>
-        <ActivityIndicator color={t.textPrimary} />
-      </View>
-    );
-  }
-
-  if (phase !== 'ready' || !collection) {
+  const read = useRetryableRead(load, `${user?.id ?? 'guest'}:${collectionId}`);
+  if (read.status !== 'ready' || !read.data) {
     return (
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
-        <BackChip onPress={() => router.back()} />
-        <EmptyState
-          icon={VaultIcon}
-          title="Collection unavailable"
-          body="This series could not be opened."
-        />
+        <VaultBackButton onPress={() => router.back()} />
+        <ReadFeedback status={read.status} subject="Collection" retry={read.retry} />
       </View>
     );
   }
+  const { collection, creator, episodes } = read.data;
 
   const renderItem = ({ item, index }: ListRenderItemInfo<StorefrontDrop>): React.JSX.Element => {
     const n = String(index + 1).padStart(2, '0');
@@ -112,7 +79,7 @@ export function CollectionWorld({ collectionId }: CollectionWorldProps): React.J
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.head}>
-            <BackChip onPress={() => router.back()} />
+            <VaultBackButton onPress={() => router.back()} />
             <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
               SERIES
             </Text>
@@ -155,23 +122,6 @@ export function CollectionWorld({ collectionId }: CollectionWorldProps): React.J
   );
 }
 
-function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
-  const t = useThemeColors();
-  return (
-    <Pressable
-      onPress={() => {
-        hapticTap();
-        onPress();
-      }}
-      style={[styles.back, { backgroundColor: t.surface, borderColor: t.border }]}
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-    >
-      <BackIcon size={18} color={t.textPrimary} strokeWidth={2.2} />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   centered: { justifyContent: 'center', alignItems: 'center' },
@@ -183,13 +133,4 @@ const styles = StyleSheet.create({
   creator: { ...typeScale.meta },
   episode: { gap: space.sm },
   episodeLabel: { ...typeScale.meta },
-  back: {
-    alignSelf: 'flex-start',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
 });

@@ -6,16 +6,14 @@ import { ProfileHero } from '../../components/profile/ProfileHero';
 import { SegmentedTabs, type SegmentedTab } from '../../components/shared/SegmentedTabs';
 import { ReputationBar } from '../../components/profile/ReputationBar';
 import { TakeMiniCard } from '../../components/profile/TakeMiniCard';
-import { WinCard } from '../../components/profile/WinCard';
+import { VaultWins } from '../../components/vault/VaultWins';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
-import { ArenaIcon, TrophyIcon } from '../../components/shared/icons';
+import { ArenaIcon } from '../../components/shared/icons';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import {
-  selectAuthor,
   selectViewerTakes,
   useClash,
-  type WinEntry,
 } from '../../store';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
@@ -29,7 +27,7 @@ const VAULT_TABS: readonly SegmentedTab<VaultProfileTab>[] = [
 
 /**
  * Vault PROFILE — same viewer identity, continuous editorial page.
- * Wins stay empty until server Clash history is wired (no mocks).
+ * Wins use the existing authorized profile-history contract.
  */
 export default function VaultProfileScreen(): React.JSX.Element {
   const { state } = useClash();
@@ -39,13 +37,6 @@ export default function VaultProfileScreen(): React.JSX.Element {
   const t = useThemeColors();
   const viewer = state.viewer;
   const takes = React.useMemo(() => selectViewerTakes(state), [state]);
-  const wins: readonly WinEntry[] = [];
-
-  const winnerHandle = (entry: WinEntry): string => {
-    const authorId =
-      entry.result.winningSide === 'A' ? entry.take.authorId : entry.clash.challengerId;
-    return selectAuthor(state, authorId)?.handle ?? 'unknown';
-  };
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
@@ -79,17 +70,10 @@ export default function VaultProfileScreen(): React.JSX.Element {
                 key={take.id}
                 take={take}
                 now={Date.now()}
-                onPress={() => router.push(`/clash/${take.id}`)}
+                onPress={() => router.push(`/take/${take.id}`)}
               />
             ))
-          : wins.map((entry) => (
-              <WinCard
-                key={entry.result.clashId}
-                entry={entry}
-                winnerHandle={winnerHandle(entry)}
-                onPress={() => router.push(`/clash/${entry.take.id}`)}
-              />
-            ))}
+          : <VaultWins profileId={viewer.id} />}
         {tab === 'takes' && takes.length === 0 ? (
           <EmptyState
             icon={ArenaIcon}
@@ -97,13 +81,6 @@ export default function VaultProfileScreen(): React.JSX.Element {
             body="Share an opinion in Arena."
             actionLabel="Open Arena"
             onAction={() => router.replace('/(tabs)')}
-          />
-        ) : null}
-        {tab === 'wins' && wins.length === 0 ? (
-          <EmptyState
-            icon={TrophyIcon}
-            title="No Clash wins yet"
-            body="Settled wins will appear here when available."
           />
         ) : null}
       </ScrollView>

@@ -1,69 +1,43 @@
 import React from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchProfileById } from '../../services/profileService';
 import { fetchCreatorProduct, vaultCoverUrl } from '../../services/vaultCommerceService';
-import type { CreatorProduct } from '../../services/vaultCommerceMappers';
-import type { User } from '../../store';
+import { useAuth } from '../../store/AuthProvider';
+import { useRetryableRead } from '../../hooks/useRetryableRead';
 import { analytics } from '../../services/analytics';
 import { vaultOfferPriceLabel } from '../../utils/vaultMoney';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { Avatar } from '../shared/Avatar';
-import { EmptyState } from '../shared/EmptyState';
-import { BackIcon, VaultIcon } from '../shared/icons';
-import { VaultActionButton } from './VaultActionButton';
-import { tap as hapticTap } from '../../utils/haptics';
+import { ReadFeedback } from '../shared/ReadFeedback';
+import { ProductAction } from './ProductAction';
+import { VaultBackButton } from './VaultBackButton';
 
 export function ProductDetail({ productId }: { productId: string }): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useThemeColors();
-  const [product, setProduct] = React.useState<CreatorProduct | null>(null);
-  const [creator, setCreator] = React.useState<User | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const next = await fetchCreatorProduct(productId);
-        if (!next) {
-          if (!cancelled) setLoading(false);
-          return;
-        }
-        const profile = await fetchProfileById(next.creatorId);
-        if (cancelled) return;
-        setProduct(next);
-        setCreator(profile);
-        analytics.trackOnce(`vault_product_viewed:${productId}`, 'vault_product_viewed', {
-          realm: 'vault',
-        });
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const { user } = useAuth();
+  const load = React.useCallback(async () => {
+    const product = await fetchCreatorProduct(productId);
+    if (!product) return null;
+    const creator = await fetchProfileById(product.creatorId);
+    return { product, creator };
   }, [productId]);
-
-  if (loading) {
-    return (
-      <View style={[styles.screen, styles.centered, { backgroundColor: t.background, paddingTop: insets.top }]}>
-        <ActivityIndicator color={t.textPrimary} />
-      </View>
-    );
-  }
-
-  if (!product) {
+  const read = useRetryableRead(load, `${user?.id ?? 'guest'}:${productId}`);
+  React.useEffect(() => {
+    if (read.status === 'ready') analytics.trackOnce(`vault_product_viewed:${productId}`, 'vault_product_viewed', { realm: 'vault' });
+  }, [read.status, productId]);
+  if (read.status !== 'ready' || !read.data) {
     return (
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
-        <BackChip onPress={() => router.back()} />
-        <EmptyState icon={VaultIcon} title="Product unavailable" body="This product could not be opened." />
+        <VaultBackButton onPress={() => router.back()} />
+        <ReadFeedback status={read.status} subject="Product" retry={read.retry} />
       </View>
     );
   }
+  const { product, creator } = read.data;
 
   const cover = vaultCoverUrl(product.coverMedia);
   const price = vaultOfferPriceLabel({
@@ -82,7 +56,7 @@ export function ProductDetail({ productId }: { productId: string }): React.JSX.E
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <BackChip onPress={() => router.back()} />
+        <VaultBackButton onPress={() => router.back()} />
         <View style={[styles.hero, { backgroundColor: t.surfaceMuted }]}>
           {cover ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
           <View style={styles.scrim} />
@@ -114,43 +88,9 @@ export function ProductDetail({ productId }: { productId: string }): React.JSX.E
             Checkout isn't available in this build. Nothing was charged.
           </Text>
         ) : null}
-        {product.externalUrl ? (
-          <>
-            <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
-              Opens outside CLASH.
-            </Text>
-            <VaultActionButton
-              label="Open store"
-              onPress={() => {
-                analytics.track('vault_product_external_opened', { realm: 'vault' });
-                void Linking.openURL(product.externalUrl!);
-              }}
-            />
-          </>
-        ) : product.accessType === 'free' ? (
-          <VaultActionButton label="Included" tone="quiet" onPress={() => undefined} />
-        ) : (
-          <VaultActionButton label="Unavailable" tone="quiet" onPress={() => undefined} />
-        )}
+        <ProductAction key={product.id} product={product} />
       </ScrollView>
     </View>
-  );
-}
-
-function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
-  const t = useThemeColors();
-  return (
-    <Pressable
-      onPress={() => {
-        hapticTap();
-        onPress();
-      }}
-      style={[styles.back, { backgroundColor: t.surface, borderColor: t.border }]}
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-    >
-      <BackIcon size={18} color={t.textPrimary} strokeWidth={2.2} />
-    </Pressable>
   );
 }
 
@@ -158,15 +98,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   centered: { justifyContent: 'center', alignItems: 'center' },
   content: { paddingHorizontal: layout.screenX, gap: space.md },
-  back: {
-    alignSelf: 'flex-start',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
   hero: {
     aspectRatio: 5 / 4,
     borderRadius: radius.xxl,
