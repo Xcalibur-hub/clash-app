@@ -37,6 +37,8 @@ import { WorldExperience } from '../../components/explore/WorldExperience';
 import { Avatar } from '../../components/shared/Avatar';
 import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import { Notice } from '../../components/shared/Notice';
+import { ReadFeedback } from '../../components/shared/ReadFeedback';
+import { useRetryableRead } from '../../hooks/useRetryableRead';
 import { MeetHomePanel } from '../../components/meet/MeetHomePanel';
 import { PlayHomePanel } from '../../components/play/PlayHomePanel';
 import { ExploreLivePanel, useExploreLive } from '../../components/explore/ExploreLivePanel';
@@ -54,7 +56,6 @@ import {
   type ExploreForYouItem,
   type ExploreSearchResults,
   type ExploreTeleportCandidate,
-  type ExploreWorldSummary,
 } from '../../services/exploreService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import {
@@ -80,6 +81,8 @@ import { tap as hapticTap } from '../../utils/haptics';
  * EXPLORE IA: For You | World | Live | Play | Meet
  * Floating mode rail + compact rolling filters. Feed stays virtualized.
  */
+const loadWorldSummary = () => fetchExploreWorldSummary();
+
 function ExploreScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const isCurrent = useOperationScope('ExploreScreen');
@@ -94,12 +97,15 @@ function ExploreScreen(): React.JSX.Element {
   const [searchGroup, setSearchGroup] = React.useState<ExploreSearchGroup>('top');
   const [searchResults, setSearchResults] = React.useState<ExploreSearchResults | null>(null);
 
-  const [summary, setSummary] = React.useState<ExploreWorldSummary | null>(null);
+  const world = useRetryableRead(loadWorldSummary, 'explore-world');
+  const summary = world.data;
   const [forYou, setForYou] = React.useState<ExploreForYouItem[]>([]);
   const [forYouCursor, setForYouCursor] = React.useState<number | null>(0);
   const [forYouFilter, setForYouFilter] = React.useState<ForYouFilterId>(DEFAULT_FOR_YOU_FILTER);
   const live = useExploreLive();
   const [loading, setLoading] = React.useState(true);
+  const [feedLoaded, setFeedLoaded] = React.useState(false);
+  const [feedError, setFeedError] = React.useState<string | null>(null);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const paging = React.useRef(false);
   const feedGeneration = React.useRef(0);
@@ -129,15 +135,16 @@ function ExploreScreen(): React.JSX.Element {
     setLoadingMore(false);
     setLoading(true);
     setError(null);
-    void Promise.all([fetchExploreWorldSummary(), fetchExploreForYou(24, 0)])
-      .then(([world, page]) => {
+    setFeedError(null);
+    void fetchExploreForYou(24, 0)
+      .then((page) => {
         if (cancelled) return;
-        setSummary(world);
         const mixed = diversifyByCreator(dedupeExploreItems(page.items));
         setForYou(mixed);
         setForYouCursor(page.nextCursor);
+        setFeedLoaded(true);
       })
-      .catch(() => {if(!cancelled)setError('Explore unavailable.');})
+      .catch(() => {if(!cancelled)setFeedError('Explore unavailable.');})
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -248,7 +255,7 @@ function ExploreScreen(): React.JSX.Element {
   }, [reduced, isCurrent, selectCountry]);
 
   const loadMoreForYou = React.useCallback(async () => {
-    if (loading || paging.current || forYouCursor == null || !isCurrent()) return;
+    if (loading || !feedLoaded || feedError || paging.current || forYouCursor == null || !isCurrent()) return;
     paging.current=true;
     const generation=feedGeneration.current;
     setLoadingMore(true);
@@ -258,11 +265,11 @@ function ExploreScreen(): React.JSX.Element {
       setForYou((prev) => diversifyByCreator(dedupeExploreItems([...prev, ...page.items])));
       setForYouCursor(page.nextCursor);
     } catch {
-      if(isCurrent() && generation===feedGeneration.current)setError('Could not load more. Scroll to retry.');
+      if(isCurrent() && generation===feedGeneration.current)setFeedError('Could not load more.');
     } finally {
       if(isCurrent() && generation===feedGeneration.current){paging.current=false;setLoadingMore(false);}
     }
-  }, [forYouCursor, isCurrent, loading]);
+  }, [forYouCursor, isCurrent, loading, feedLoaded, feedError]);
 
   const filteredForYou = React.useMemo(() => {
     if (forYouFilter === 'all') return forYou;
@@ -351,7 +358,7 @@ function ExploreScreen(): React.JSX.Element {
         }}
       >
         {compactHeader}
-        {error && (mode !== 'live' || searching) ? <Pressable accessibilityRole="button" accessibilityLabel="Retry Explore" onPress={()=>setRetry(n=>n+1)}><Text style={{color:t.textSecondary}}>{error} Tap to retry.</Text></Pressable> : null}
+        {error && (searching || mode === 'world') ? <Pressable accessibilityRole="button" accessibilityLabel="Retry Explore" onPress={()=>setRetry(n=>n+1)}><Text style={{color:t.textSecondary}}>{error} Tap to retry.</Text></Pressable> : null}
       </View>
 
       {searching && !searchResults ? (<ActivityIndicator accessibilityLabel="Loading search" color={t.textPrimary} />) : searching && searchResults ? (
@@ -388,11 +395,13 @@ function ExploreScreen(): React.JSX.Element {
             }}
             renderItem={({ item }) => <ExploreMosaicRowView row={item} />}
             ListHeaderComponent={
-              // Cross-surface shelves only on the unfiltered feed: a filtered
-              // mosaic should read as one surface, not a mixed header.
-              forYouFilter === 'all' && !loading ? (
-                <ExploreDiscoverShelves live={live.data} onSeeAllLive={() => changeMode('live')} />
-              ) : null
+              <>
+                <ReadFeedback status={!loading && feedError ? 'error' : 'ready'} subject="Explore feed" retry={() => setRetry(n => n + 1)} />
+                {/* Keep cross-surface shelves on a successfully loaded, unfiltered feed. */}
+                {forYouFilter === 'all' && !loading && feedLoaded && !feedError ? (
+                  <ExploreDiscoverShelves live={live.data} onSeeAllLive={() => changeMode('live')} />
+                ) : null}
+              </>
             }
             onScroll={(e) => onFeedScroll(e.nativeEvent.contentOffset.y)}
             scrollEventThrottle={16}
@@ -404,7 +413,7 @@ function ExploreScreen(): React.JSX.Element {
               ) : null
             }
             ListEmptyComponent={
-              !loading ? (
+              !loading && feedLoaded && !feedError ? (
                 <Text allowFontScaling={false} style={{ color: t.textMuted, marginTop: space.md }}>
                   Nothing here yet — try World or Teleport.
                 </Text>
@@ -505,6 +514,8 @@ function ExploreScreen(): React.JSX.Element {
                 </View>
 
                 <WorldExperience
+                  activityStatus={world.status}
+                  onRetry={world.retry}
                   countries={worldCountries}
                   challenges={summary?.challenges ?? []}
                   treasures={summary?.treasures ?? []}

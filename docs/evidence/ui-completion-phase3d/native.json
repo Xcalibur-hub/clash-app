@@ -1,0 +1,76 @@
+{
+  "reloadCount": 1,
+  "transport": "targeted Metro reload notification",
+  "target": "socket#0",
+  "peerCount": 2,
+  "unidentifiedPeerUntouched": true,
+  "origin": "http://127.0.0.1:8081",
+  "since": 1792915978784,
+  "event": {
+    "started": 1792915980529,
+    "finished": 1792915981075,
+    "status": 200,
+    "android": true,
+    "bytes": 23780079,
+    "sha256": "38daba53cda80949c1572e409f4ca2b3fac0d6d79fa79be42a5e700dec4f16c4"
+  },
+  "identifiedPeer": {
+    "device": "SM-A505F",
+    "app": "com.clash.v2.dev"
+  },
+  "hostBundleRequestsDuringWindow": 0,
+  "responsePatched": true,
+  "nativeCachePatched": true,
+  "cacheSHA256": "930e73d3cbacd53527f4f9307fa8c19dd996779ce58b03cfd25115aadb680aa0",
+  "cacheBytes": 23779415,
+  "backend": "http://127.0.0.1:55471",
+  "sourceHashes": {
+    "app/(tabs)/explore.tsx": "274d46e2148e89349e05b716cbe2ce367c451c54f60a332c98dc02a825cdf243",
+    "components/explore/WorldExperience.tsx": "5098002213973641363a9b9ed02ca9d9e8ef2f7a14c0447a2b063ce8a18db2ff"
+  },
+  "currentRenderingChecks": [
+    {
+      "capture": "02-for-you-after",
+      "errorSubjectPresent": true,
+      "explicitNotEmptyCopy": true,
+      "contradictoryEmptyAbsent": true,
+      "retryPresent": true
+    },
+    {
+      "capture": "03-for-you-retry",
+      "errorSubjectPresent": true,
+      "explicitNotEmptyCopy": true,
+      "contradictoryEmptyAbsent": true,
+      "retryPresent": true
+    },
+    {
+      "capture": "04-world-after",
+      "errorSubjectPresent": true,
+      "explicitNotEmptyCopy": true,
+      "contradictoryEmptyAbsent": true,
+      "retryPresent": true
+    },
+    {
+      "capture": "05-world-retry",
+      "errorSubjectPresent": true,
+      "explicitNotEmptyCopy": true,
+      "contradictoryEmptyAbsent": true,
+      "retryPresent": true
+    },
+    {
+      "capture": "06-for-you-return",
+      "errorSubjectPresent": true,
+      "explicitNotEmptyCopy": true,
+      "contradictoryEmptyAbsent": true,
+      "retryPresent": true
+    }
+  ],
+  "restoration": {
+    "preferencesByteIdentical": true,
+    "reversesByteIdentical": true,
+    "appearanceChanged": false,
+    "metroRestarted": false,
+    "finalScreen": "normal guest Arena",
+    "backendStarted": false
+  }
+}

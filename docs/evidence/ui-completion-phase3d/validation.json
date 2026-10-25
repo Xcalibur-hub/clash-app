@@ -1,0 +1,46 @@
+{
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit --incremental false",
+    "exit": 0
+  },
+  "focused": {
+    "command": "node --test scripts/explore-read-states.test.cjs",
+    "tests": 8,
+    "passed": 8,
+    "failed": 0
+  },
+  "full": {
+    "command": "npm.cmd test",
+    "unit": 806,
+    "followUp": 232,
+    "total": 1038,
+    "failed": 0,
+    "skipped": 0,
+    "exit": 0
+  },
+  "faultProbes": {
+    "feedGuardRestored": {
+      "passed": 6,
+      "failed": 2,
+      "exit": 1,
+      "productionReadsMutated": 8
+    },
+    "worldGuardRestored": {
+      "passed": 5,
+      "failed": 3,
+      "exit": 1
+    }
+  },
+  "sourceSHA256": {
+    "app/(tabs)/explore.tsx": "274d46e2148e89349e05b716cbe2ce367c451c54f60a332c98dc02a825cdf243",
+    "components/explore/WorldExperience.tsx": "5098002213973641363a9b9ed02ca9d9e8ef2f7a14c0447a2b063ce8a18db2ff",
+    "scripts/explore-read-states.test.cjs": "5322597c4753a21d8d527cc285ad5d17e2ba9cd5404e1fa0729a73ee8f74959c",
+    "scripts/ui-completion-harness.cjs": "b84448034f1879bd368bda389cb182607089b9e96327f4aca6e38ed4a470f916",
+    "package.json": "3315239af79ef6847b17813b2bc06e9638e9b7209c75aaa157df31d28cc9cbdb"
+  },
+  "preservation": {
+    "originalUntrackedFiles": 1695,
+    "contentHash": "e311a75a5ff34318acf7eebe563ee7ce7f99fb122b5a8eff5cedf4b5dd72fb81",
+    "verified": true
+  }
+}

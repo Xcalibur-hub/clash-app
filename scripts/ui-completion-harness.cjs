@@ -71,7 +71,7 @@ function harness(file, initialProps = {}, select = exports => exports.default ??
       } });
       if (!name.startsWith('.')) throw Error('Unmocked dependency: ' + name);
       const next = path.resolve(path.dirname(filename), name);
-      return load(fs.existsSync(next + '.tsx') ? next + '.tsx' : next + '.ts');
+      return load(/\.tsx?$/.test(next) ? next : fs.existsSync(next + '.tsx') ? next + '.tsx' : next + '.ts');
     }
     vm.runInThisContext('(function(module,exports,require,setTimeout,clearTimeout){' + code + '\n})')(
       module, module.exports, dependency, options.setTimeout ?? setTimeout, options.clearTimeout ?? clearTimeout);
