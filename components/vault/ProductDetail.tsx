@@ -32,7 +32,7 @@ export function ProductDetail({ productId }: { productId: string }): React.JSX.E
   if (read.status !== 'ready' || !read.data) {
     return (
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
-        <VaultBackButton onPress={() => router.back()} />
+        <VaultBackButton />
         <ReadFeedback status={read.status} subject="Product" retry={read.retry} />
       </View>
     );
@@ -56,35 +56,35 @@ export function ProductDetail({ productId }: { productId: string }): React.JSX.E
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <VaultBackButton onPress={() => router.back()} />
+        <VaultBackButton />
         <View style={[styles.hero, { backgroundColor: t.surfaceMuted }]}>
           {cover ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
           <View style={styles.scrim} />
-          <Text allowFontScaling={false} style={styles.kicker}>
+          <Text style={styles.kicker}>
             ARTIFACT
           </Text>
-          <Text allowFontScaling={false} style={styles.title}>
+          <Text style={styles.title}>
             {product.title}
           </Text>
         </View>
         {creator ? (
-          <Pressable style={styles.identity} onPress={() => router.push(`/vault/${creator.id}`)}>
+          <Pressable style={styles.identity} accessibilityRole="button" accessibilityLabel={`Open ${creator.name}'s Vault`} onPress={() => router.push(`/vault/${creator.id}`)}>
             <Avatar name={creator.name} tint={creator.tint} size={44} />
-            <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
+            <Text style={[styles.name, { color: t.textPrimary, flex: 1 }]}>
               @{creator.handle}
             </Text>
           </Pressable>
         ) : null}
         {product.description ? (
-          <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+          <Text style={[styles.body, { color: t.textSecondary }]}>
             {product.description}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {product.productType.toUpperCase()} · {price}
         </Text>
         {product.accessType === 'paid' && !product.externalUrl ? (
-          <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+          <Text style={[styles.note, { color: t.textMuted }]}>
             Checkout isn't available in this build. Nothing was charged.
           </Text>
         ) : null}
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   centered: { justifyContent: 'center', alignItems: 'center' },
   content: { paddingHorizontal: layout.screenX, gap: space.md },
   hero: {
-    aspectRatio: 5 / 4,
+    minHeight: 240,
     borderRadius: radius.xxl,
     overflow: 'hidden',
     justifyContent: 'flex-end',

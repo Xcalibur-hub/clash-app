@@ -75,9 +75,8 @@ export const VaultMediaTile = React.memo(function VaultMediaTile({
         style={[
           styles.tile,
           {
-            height: fill && (span === 'half' || span === 'hero') ? undefined : height,
             flex: fill && span === 'half' ? 1 : undefined,
-            minHeight: fill && span === 'hero' ? 248 : fill && span === 'half' ? 118 : undefined,
+            minHeight: fill && span === 'hero' ? 248 : fill && span === 'half' ? 118 : height,
             backgroundColor: fallback,
             borderColor: t.scheme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
           },
@@ -97,19 +96,19 @@ export const VaultMediaTile = React.memo(function VaultMediaTile({
         )}
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.78)']} style={styles.scrim} />
         <View style={styles.copy}>
-          <Text allowFontScaling={false} style={styles.kind}>
+          <Text style={styles.kind}>
             {kind}
           </Text>
-          <Text allowFontScaling={false} style={styles.title} numberOfLines={span === 'hero' ? 3 : 2}>
+          <Text style={styles.title} numberOfLines={span === 'hero' ? 3 : 2}>
             {title}
           </Text>
           {subtitle ? (
-            <Text allowFontScaling={false} style={styles.sub} numberOfLines={1}>
+            <Text style={styles.sub}>
               {subtitle}
             </Text>
           ) : null}
           {meta ? (
-            <Text allowFontScaling={false} style={styles.meta} numberOfLines={1}>
+            <Text style={styles.meta}>
               {meta}
             </Text>
           ) : null}

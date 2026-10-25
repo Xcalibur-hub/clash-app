@@ -30,6 +30,7 @@ export interface WorldHeroProps {
   secondary?: string | null;
   description?: string | null;
   following: boolean;
+  followBusy?: boolean;
   isSelf: boolean;
   subscribed: boolean;
   onToggleFollow?: () => void;
@@ -53,6 +54,7 @@ export function WorldHero({
   secondary,
   description,
   following,
+  followBusy,
   isSelf,
   subscribed,
   onToggleFollow,
@@ -83,7 +85,8 @@ export function WorldHero({
         style={[
           styles.bleed,
           {
-            height,
+            minHeight: height,
+            paddingTop: Math.max(insets.top, topInset) + 56,
             marginHorizontal: -layout.screenX,
             backgroundColor: fallback,
           },
@@ -119,6 +122,7 @@ export function WorldHero({
           creatorName={creatorName}
           identity={identity}
           following={following}
+          followBusy={followBusy}
           isSelf={isSelf}
           subscribed={subscribed}
           onToggleFollow={onToggleFollow}
@@ -144,8 +148,8 @@ const styles = StyleSheet.create({
   back: {
     position: 'absolute',
     zIndex: 3,
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',

@@ -4,7 +4,7 @@ export type ReadStatus = 'loading' | 'ready' | 'missing' | 'denied' | 'unavailab
 
 function failureStatus(error: unknown): ReadStatus {
   const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
-  if (code === '42501' || code === 'PGRST301' || code === '401' || code === '403') return 'denied';
+  if (code === '42501' || code === 'PGRST301' || code === '401' || code === '403' || code === 'auth_required' || code === 'media_access_denied') return 'denied';
   return code === 'not_configured' ? 'unavailable' : 'error';
 }
 

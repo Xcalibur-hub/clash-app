@@ -47,7 +47,7 @@ export function CollectionWorld({ collectionId }: CollectionWorldProps): React.J
   if (read.status !== 'ready' || !read.data) {
     return (
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
-        <VaultBackButton onPress={() => router.back()} />
+        <VaultBackButton />
         <ReadFeedback status={read.status} subject="Collection" retry={read.retry} />
       </View>
     );
@@ -58,7 +58,7 @@ export function CollectionWorld({ collectionId }: CollectionWorldProps): React.J
     const n = String(index + 1).padStart(2, '0');
     return (
       <View style={styles.episode}>
-        <Text allowFontScaling={false} style={[styles.episodeLabel, { color: t.textMuted }]}>
+        <Text style={[styles.episodeLabel, { color: t.textMuted }]}>
           {n} — {item.caption}
         </Text>
         <VaultDropCard
@@ -79,21 +79,21 @@ export function CollectionWorld({ collectionId }: CollectionWorldProps): React.J
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.head}>
-            <VaultBackButton onPress={() => router.back()} />
-            <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+            <VaultBackButton />
+            <Text style={[styles.kicker, { color: t.textMuted }]}>
               SERIES
             </Text>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               {collection.title}
             </Text>
             {collection.description ? (
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+              <Text style={[styles.body, { color: t.textSecondary }]}>
                 {collection.description}
               </Text>
             ) : null}
             {creator ? (
-              <Pressable onPress={() => router.push(`/vault/${creator.id}`)}>
-                <Text allowFontScaling={false} style={[styles.creator, { color: t.textMuted }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Open ${creator.name}'s Vault`} style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => router.push(`/vault/${creator.id}`)}>
+                <Text style={[styles.creator, { color: t.textMuted }]}>
                   @{creator.handle}
                 </Text>
               </Pressable>

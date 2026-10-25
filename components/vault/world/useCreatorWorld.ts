@@ -1,7 +1,8 @@
 import React from 'react';
-import { followUser, unfollowUser } from '../../../services/socialService';
 import { getPublicMediaUrl } from '../../../services/mediaService';
-import { errorText } from '../../../services/supabaseClient';
+import { useAuth } from '../../../store/AuthProvider';
+import { useCreatorWorldFollow } from './useCreatorWorldFollow';
+import { useRetryableRead } from '../../../hooks/useRetryableRead';
 import { analytics } from '../../../services/analytics';
 import { resolveCreatorWorldModules, type CreatorWorldModule } from '../../../utils/vaultModules';
 import { vaultPublicVisualMedia } from '../../../utils/vaultAccess';
@@ -37,6 +38,10 @@ export interface CreatorWorldModel {
   posterUrl: string | null;
   posterLabel: string | null;
   toggleFollow: () => void;
+  retry: () => void;
+  followBusy: boolean;
+  followError: boolean;
+  isGuest: boolean;
 }
 
 function publicVisualUrl(drop: StorefrontDrop): string | null {
@@ -51,39 +56,17 @@ function publicVisualUrl(drop: StorefrontDrop): string | null {
 
 /** All data + follow state for a Creator World. Composition lives elsewhere. */
 export function useCreatorWorld(creatorId: string): CreatorWorldModel {
-  const [data, setData] = React.useState<CreatorWorldData | null>(null);
-
-  const load = React.useCallback(async (): Promise<void> => {
-    try {
-      const next = await fetchCreatorWorld(creatorId);
-      setData(next);
-      if (next.phase === 'ready') {
-        analytics.trackOnce(`vault_opened:${creatorId}`, 'vault_opened', {
-          realm: 'vault',
-          is_creator: next.isSelf,
-          is_guest: next.isGuest,
-        });
-      }
-    } catch (error) {
-      void errorText(error);
-      setData(emptyCreatorWorldData('error'));
-    }
-  }, [creatorId]);
-
+  const { user } = useAuth();
+  const scope = `${user?.id ?? 'guest'}:${creatorId}`;
+  const load = React.useCallback(() => fetchCreatorWorld(creatorId), [creatorId]);
+  const read = useRetryableRead(load, scope);
+  const data = read.data;
+  const { following, toggleFollow, busy, error } = useCreatorWorldFollow(creatorId, scope, data, Boolean(user));
   React.useEffect(() => {
-    setData(null);
-    void load();
-  }, [load]);
-
-  const toggleFollow = React.useCallback((): void => {
-    setData((prev) => {
-      if (!prev?.follow) return prev;
-      const follow = prev.follow;
-      const next = follow.following ? unfollowUser(creatorId) : followUser(creatorId);
-      void next.catch(() => setData((current) => (current ? { ...current, follow } : current)));
-      return { ...prev, follow: { ...follow, following: !follow.following } };
+    if (data?.phase === 'ready') analytics.trackOnce(`vault_opened:${creatorId}`, 'vault_opened', {
+      realm: 'vault', is_creator: data.isSelf, is_guest: data.isGuest,
     });
-  }, [creatorId]);
+  }, [data, creatorId]);
 
   const liveDrops = React.useMemo(
     () =>
@@ -137,13 +120,13 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
     return { url: publicVisualUrl(drop), label: drop.caption };
   }, [liveDrops]);
 
-  const fallback = data ?? emptyCreatorWorldData('loading');
+  const fallback = data ?? emptyCreatorWorldData(read.status === 'loading' ? 'loading' : read.status === 'denied' ? 'blocked' : 'error');
 
   return {
     phase: fallback.phase,
     creator: fallback.creator,
     vault: fallback.vault,
-    follow: fallback.follow,
+    follow: fallback.follow ? { ...fallback.follow, following } : null,
     subscription: fallback.subscription,
     storefront: fallback.storefront,
     liveDrops,
@@ -161,5 +144,9 @@ export function useCreatorWorld(creatorId: string): CreatorWorldModel {
     posterUrl: poster.url,
     posterLabel: poster.label,
     toggleFollow,
+    retry: read.retry,
+    followBusy: busy,
+    followError: error,
+    isGuest: fallback.isGuest,
   };
 }

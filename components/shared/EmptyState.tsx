@@ -37,10 +37,10 @@ export function EmptyState({
       >
         <Icon size={26} color={t.textSecondary} strokeWidth={2} />
       </View>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         {title}
       </Text>
-      <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+      <Text style={[styles.body, { color: t.textMuted }]}>
         {body}
       </Text>
       {actionLabel && onAction ? (

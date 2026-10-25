@@ -1,209 +1,51 @@
 import React from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  completeCourseLesson,
-  fetchCourseLessonCard,
-  requestLessonMediaAccess,
-  vaultCoverUrl,
-} from '../../services/vaultCommerceService';
-import type { CourseLessonCard } from '../../services/vaultCommerceMappers';
+import { useAuth } from '../../store/AuthProvider';
+import { useRetryableRead } from '../../hooks/useRetryableRead';
+import { fetchCourseLessonCard, requestLessonMediaAccess } from '../../services/vaultCommerceService';
 import { getPublicMediaUrl } from '../../services/mediaService';
-import { errorText } from '../../services/supabaseClient';
-import { analytics } from '../../services/analytics';
-import { showNotice, useClash } from '../../store';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
-import { EmptyState } from '../shared/EmptyState';
-import { BackIcon, PlayIcon, VaultIcon } from '../shared/icons';
+import { ReadFeedback } from '../shared/ReadFeedback';
+import { VaultBackButton } from './VaultBackButton';
 import { VaultActionButton } from './VaultActionButton';
-import { tap as hapticTap } from '../../utils/haptics';
+import { VaultAvailability } from './VaultAvailability';
+import { VaultReaderMedia } from './VaultReaderMedia';
+import { LessonCompletion } from './LessonCompletion';
 
-export function LessonReader({
-  courseId,
-  lessonId,
-}: {
-  courseId: string;
-  lessonId: string;
-}): React.JSX.Element {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const t = useThemeColors();
-  const { dispatch } = useClash();
-  const [lesson, setLesson] = React.useState<CourseLessonCard | null>(null);
-  const [mediaUrl, setMediaUrl] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const card = await fetchCourseLessonCard(lessonId);
-        if (!card || cancelled) {
-          if (!cancelled) setLoading(false);
-          return;
-        }
-        setLesson(card);
-        if (card.publicMedia) {
-          setMediaUrl(getPublicMediaUrl(card.publicMedia.bucket, card.publicMedia.path));
-        } else if (card.accessible && card.hasPrivateMedia) {
-          try {
-            const access = await requestLessonMediaAccess(lessonId);
-            if (!cancelled) setMediaUrl(access.url);
-          } catch {
-            // locked or unavailable — leave media empty
-          }
-        } else if (card.previewAllowed) {
-          setMediaUrl(vaultCoverUrl(card.publicMedia));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [lessonId]);
-
-  if (loading) {
-    return (
-      <View style={[styles.screen, styles.centered, { backgroundColor: t.background, paddingTop: insets.top }]}>
-        <ActivityIndicator color={t.textPrimary} />
-      </View>
-    );
-  }
-
-  if (!lesson) {
-    return (
-      <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
-        <BackChip onPress={() => router.back()} />
-        <EmptyState icon={VaultIcon} title="Lesson unavailable" body="This lesson could not be opened." />
-      </View>
-    );
-  }
-
-  const markDone = async (): Promise<void> => {
-    try {
-      await completeCourseLesson(lesson.id);
-      analytics.track('vault_lesson_completed', { realm: 'vault' });
-      dispatch(showNotice('Marked complete.'));
-    } catch (error) {
-      dispatch(showNotice(errorText(error)));
-    }
-  };
-
-  return (
-    <View style={[styles.screen, { backgroundColor: t.background }]}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.xxl },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <BackChip onPress={() => router.back()} />
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-          LESSON {String(lesson.position).padStart(2, '0')}
-        </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
-          {lesson.title}
-        </Text>
-
-        {!lesson.accessible ? (
-          <View style={[styles.locked, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
-            {mediaUrl ? (
-              <Image source={{ uri: mediaUrl }} style={styles.preview} resizeMode="cover" />
-            ) : null}
-            <Text allowFontScaling={false} style={[styles.lockedTitle, { color: t.textPrimary }]}>
-              {lesson.previewAllowed ? 'Preview' : 'Locked'}
-            </Text>
-            <Text allowFontScaling={false} style={[styles.lockedBody, { color: t.textSecondary }]}>
-              Full lesson content stays protected until you have access.
-            </Text>
-            <VaultActionButton
-              label="Back to course"
-              tone="quiet"
-              onPress={() => router.replace(`/vault/course/${courseId}`)}
-            />
-          </View>
-        ) : (
-          <>
-            {mediaUrl ? (
-              lesson.contentType === 'video' ? (
-                <View style={[styles.video, { backgroundColor: t.surfaceMuted }]}>
-                  <PlayIcon size={28} color={t.textPrimary} strokeWidth={2.2} />
-                  <Text allowFontScaling={false} style={[styles.videoNote, { color: t.textMuted }]}>
-                    Video playback arrives with the media player.
-                  </Text>
-                </View>
-              ) : (
-                <Image source={{ uri: mediaUrl }} style={styles.media} resizeMode="cover" />
-              )
-            ) : null}
-            {lesson.bodyText ? (
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
-                {lesson.bodyText}
-              </Text>
-            ) : null}
-            <VaultActionButton label="Mark complete" onPress={() => void markDone()} />
-          </>
-        )}
-      </ScrollView>
-    </View>
-  );
+export function LessonReader({ courseId, lessonId }: { courseId: string; lessonId: string }): React.JSX.Element {
+  const router = useRouter(), insets = useSafeAreaInsets(), t = useThemeColors(), { user } = useAuth();
+  const scope = `${user?.id ?? 'guest'}:${courseId}:${lessonId}`;
+  const load = React.useCallback(async () => {
+    const lesson = await fetchCourseLessonCard(lessonId);
+    return lesson?.courseId === courseId ? lesson : null;
+  }, [courseId, lessonId]);
+  const read = useRetryableRead(load, scope);
+  const loadMedia = React.useCallback(async () => {
+    const lesson = read.data;
+    if (!lesson) return null;
+    if (lesson.publicMedia && (lesson.accessible || lesson.previewAllowed)) return { url: getPublicMediaUrl(lesson.publicMedia.bucket, lesson.publicMedia.path), kind: lesson.publicMedia.kind };
+    if (lesson.accessible && lesson.hasPrivateMedia) { const access = await requestLessonMediaAccess(lesson.id); return { url: access.url, kind: access.mediaKind }; }
+    return null;
+  }, [read.data]);
+  return <View style={[styles.screen, { backgroundColor: t.background }]}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.xxl }]}>
+      <VaultBackButton fallback={`/vault/course/${courseId}`} />
+      {read.status !== 'ready' || !read.data ? <ReadFeedback status={read.status} subject="Lesson" retry={read.retry} /> : <>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>LESSON {read.data.position}</Text>
+        <Text style={[styles.title, { color: t.textPrimary }]}>{read.data.title}</Text>
+        <VaultAvailability state={read.data.accessible ? read.data.accessType === 'subscriber' ? 'member' : read.data.accessType === 'free' ? 'free' : 'available' : read.data.previewAllowed ? 'preview' : 'locked'} />
+        <VaultReaderMedia key={scope} load={loadMedia} scope={scope} />
+        {read.data.accessible ? <>
+          <Text style={[styles.body, { color: t.textSecondary }]}>{read.data.bodyText}</Text>
+          <LessonCompletion key={scope} lessonId={read.data.id} />
+        </> : <VaultActionButton label="Back to course" tone="quiet" onPress={() => router.replace(`/vault/course/${courseId}`)} />}
+      </>}
+    </ScrollView>
+  </View>;
 }
-
-function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
-  const t = useThemeColors();
-  return (
-    <Pressable
-      onPress={() => {
-        hapticTap();
-        onPress();
-      }}
-      style={[styles.back, { backgroundColor: t.surface, borderColor: t.border }]}
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-    >
-      <BackIcon size={18} color={t.textPrimary} strokeWidth={2.2} />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  centered: { justifyContent: 'center', alignItems: 'center' },
-  content: { paddingHorizontal: layout.screenX, gap: space.md },
-  back: {
-    alignSelf: 'flex-start',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  kicker: { ...typeScale.caption, letterSpacing: 0.8 },
-  title: { ...typeScale.title },
-  body: { ...typeScale.body },
-  media: { width: '100%', aspectRatio: 4 / 5, borderRadius: 24 },
-  preview: { width: '100%', aspectRatio: 16 / 9, borderRadius: 18, marginBottom: space.sm },
-  video: {
-    aspectRatio: 16 / 9,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space.sm,
-    padding: space.lg,
-  },
-  videoNote: { ...typeScale.meta, textAlign: 'center' },
-  locked: {
-    gap: space.sm,
-    padding: space.lg,
-    borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-  },
-  lockedTitle: { ...typeScale.section, textAlign: 'center' },
-  lockedBody: { ...typeScale.body, textAlign: 'center' },
+  screen: { flex: 1 }, content: { paddingHorizontal: layout.screenX, gap: space.md },
+  kicker: { ...typeScale.caption }, title: { ...typeScale.title }, body: { ...typeScale.body },
 });

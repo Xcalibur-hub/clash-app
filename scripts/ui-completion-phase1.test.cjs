@@ -92,6 +92,7 @@ test('Collection navigation change invalidates deferred episodes and leaves Back
     await h.mount(); await h.update({ collectionId: 'b' });
     await h.act(async () => gate.resolve({ creatorId: 'a', drops: [] }));
     assert.equal(node(h, 'ReadFeedback').props.status, 'missing');
+    h.router.canGoBack = () => true;
     const back = node(h, 'VaultBackButton'); await press(h, back.type(back.props)); assert.deepEqual(h.calls, [['back']]);
   } finally { await h.unmount(); }
 });

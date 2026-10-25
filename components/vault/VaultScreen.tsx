@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
@@ -13,7 +13,9 @@ import { creatorDropMediaUrl } from '../../services/creatorWorldDropService';
 import { worldPersonality } from '../../utils/vaultWorldPersonality';
 import { layout, space, useThemeColors } from '../../theme';
 import { EmptyState } from '../shared/EmptyState';
-import { BackIcon, VaultIcon } from '../shared/icons';
+import { VaultIcon } from '../shared/icons';
+import { VaultBackButton } from './VaultBackButton';
+import { ReadFeedback } from '../shared/ReadFeedback';
 import { SubscriptionInfoSheet } from './SubscriptionInfoSheet';
 import { WorldChapter } from './world/WorldChapter';
 import { WorldHero } from './world/WorldHero';
@@ -118,12 +120,10 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
       <View
         style={[
           styles.screen,
-          styles.centered,
           { backgroundColor: t.background, paddingTop: hideSafeTop ? 0 : insets.top },
         ]}
       >
-        <View style={[styles.loadBlock, { backgroundColor: t.surfaceMuted }]} />
-        <View style={[styles.loadLine, { backgroundColor: t.surfaceMuted }]} />
+        <View style={{ margin: layout.screenX }}><VaultBackButton /><ReadFeedback status="loading" subject="Creator Vault" retry={world.retry} /></View>
       </View>
     );
   }
@@ -134,7 +134,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
     const mine = world.isSelf;
     return (
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: hideSafeTop ? 0 : insets.top }]}>
-        <BackChip onPress={() => router.back()} />
+        <View style={{ margin: layout.screenX }}><VaultBackButton /></View>
         <EmptyState
           icon={VaultIcon}
           title={isBlocked ? 'Vault unavailable' : isNone && mine ? 'Your Vault is ready' : isNone ? 'Nothing inside yet' : 'Vault unavailable'}
@@ -147,8 +147,8 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
                   ? 'This creator has not opened their Vault yet.'
                   : 'This Vault could not be loaded.'
           }
-          actionLabel={isNone && mine ? 'Create first Drop' : undefined}
-          onAction={isNone && mine ? () => router.replace('/vault/studio') : undefined}
+          actionLabel={isNone && mine ? 'Create first Drop' : world.phase === 'error' ? 'Try again' : undefined}
+          onAction={isNone && mine ? () => router.replace('/vault/studio') : world.phase === 'error' ? world.retry : undefined}
         />
       </View>
     );
@@ -194,7 +194,7 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
           />
         )}
         ListHeaderComponent={
-          <WorldHero
+          <><WorldHero
             creatorName={creator.name}
             identity={creator.bio ?? vault?.description ?? 'Creator'}
             accent={creator.tint}
@@ -210,13 +210,14 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
             following={world.follow?.following ?? false}
             isSelf={world.isSelf}
             subscribed={world.subscription?.active === true}
-            onToggleFollow={world.toggleFollow}
+            followBusy={world.followBusy}
+            onToggleFollow={() => { if (world.isGuest) router.push('/auth'); else world.toggleFollow(); }}
             onSubscribe={() => setSubscribeOpen(true)}
             onManage={() => router.push('/vault/studio')}
-            onBack={() => router.back()}
+            onBack={() => router.canGoBack() ? router.back() : router.replace('/(vault)')}
             topInset={hideSafeTop ? space.sm : insets.top}
             scrollY={scrollY}
-          />
+          />{world.followError ? <Text accessibilityLiveRegion="polite" style={{ color: t.textSecondary }}>Couldn't update following. Try again.</Text> : null}</>
         }
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -234,34 +235,10 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
   );
 }
 
-function BackChip({ onPress }: { onPress: () => void }): React.JSX.Element {
-  const t = useThemeColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.back, { backgroundColor: t.surface, borderColor: t.border }]}
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-    >
-      <BackIcon size={18} color={t.textPrimary} strokeWidth={2.2} />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   centered: { justifyContent: 'center', alignItems: 'center', gap: space.md },
   content: { paddingHorizontal: layout.screenX, gap: space.lg },
-  back: {
-    alignSelf: 'flex-start',
-    margin: layout.screenX,
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
   loadBlock: { width: '100%', height: 300, borderRadius: 12 },
   loadLine: { width: '40%', height: 12, borderRadius: 8 },
 });
