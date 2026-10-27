@@ -482,9 +482,10 @@ const styles = StyleSheet.create({
   back: {
     position: 'absolute',
     left: layout.screenX,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    // 44dp minimum accessible target (Phase 4F.1); prior 40×40 under-sized the control.
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
