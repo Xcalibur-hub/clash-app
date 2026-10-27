@@ -18,6 +18,7 @@ import MapView, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WorldDropMarker, WorldClusterMarker } from '../../components/world/WorldDropMarker';
 import { WorldDropPreview } from '../../components/world/WorldDropPreview';
+import { WorldMapUnavailable } from '../../components/world/WorldMapUnavailable';
 import { WorldMissionBeacon } from '../../components/world/WorldMissionBeacon';
 import { Notice } from '../../components/shared/Notice';
 import { BackIcon, LocateIcon, PlusIcon, WorldIcon } from '../../components/shared/icons';
@@ -46,6 +47,7 @@ import { showNotice, useClash } from '../../store';
 import { radius, space, typeScale, useTheme, useThemeColors } from '../../theme';
 import { clusterWorldDrops, regionMovedSignificantly } from '../../utils/worldCluster';
 import { tap as hapticTap } from '../../utils/haptics';
+import { isWorldNativeMapAvailable } from '../../utils/worldNativeMapAvailability';
 
 type WorldFilter = 'nearby' | 'recent' | 'mission';
 
@@ -375,6 +377,7 @@ export default function WorldScreen(): React.JSX.Element {
     router.push(`/world/drop/${drop.id}`);
   };
 
+  const nativeMap = isWorldNativeMapAvailable(Platform.OS);
   const provider = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
   const mapStyle = light ? WORLD_MAP_STYLE_LIGHT : WORLD_MAP_STYLE_DARK;
   const bottomPad = insets.bottom + space.md;
@@ -382,58 +385,72 @@ export default function WorldScreen(): React.JSX.Element {
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        provider={provider}
-        initialRegion={FALLBACK_REGION}
-        customMapStyle={mapStyle}
-        userInterfaceStyle={light ? 'light' : 'dark'}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-        showsCompass={false}
-        showsPointsOfInterest={false}
-        toolbarEnabled={false}
-        moveOnMarkerPress={false}
-        onRegionChangeComplete={(next) => {
-          latestDiscovery.current.centre = next;
-          setRegion(next);
-          setShowSearchArea(regionMovedSignificantly(queryOrigin, next));
-        }}
-        onPress={() => setSelectedId(null)}
-      >
-        {mapItems.map((item) => {
-          if (item.kind === 'cluster') {
+      {nativeMap ? (
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFill}
+          provider={provider}
+          initialRegion={FALLBACK_REGION}
+          customMapStyle={mapStyle}
+          userInterfaceStyle={light ? 'light' : 'dark'}
+          showsUserLocation={false}
+          showsMyLocationButton={false}
+          showsCompass={false}
+          showsPointsOfInterest={false}
+          toolbarEnabled={false}
+          moveOnMarkerPress={false}
+          onRegionChangeComplete={(next) => {
+            latestDiscovery.current.centre = next;
+            setRegion(next);
+            setShowSearchArea(regionMovedSignificantly(queryOrigin, next));
+          }}
+          onPress={() => setSelectedId(null)}
+        >
+          {mapItems.map((item) => {
+            if (item.kind === 'cluster') {
+              return (
+                <WorldClusterMarker
+                  key={item.id}
+                  id={item.id}
+                  latitude={item.latitude}
+                  longitude={item.longitude}
+                  count={item.count}
+                  onPress={() => zoomToCluster(item.latitude, item.longitude)}
+                />
+              );
+            }
             return (
-              <WorldClusterMarker
+              <WorldDropMarker
                 key={item.id}
-                id={item.id}
-                latitude={item.latitude}
-                longitude={item.longitude}
-                count={item.count}
-                onPress={() => zoomToCluster(item.latitude, item.longitude)}
+                drop={item.drop}
+                selected={item.drop.id === selectedId}
+                onPress={selectDrop}
               />
             );
-          }
-          return (
-            <WorldDropMarker
-              key={item.id}
-              drop={item.drop}
-              selected={item.drop.id === selectedId}
-              onPress={selectDrop}
+          })}
+          {viewerDot ? (
+            <Circle
+              center={viewerDot}
+              radius={140}
+              strokeWidth={1}
+              strokeColor={light ? 'rgba(17,17,19,0.22)' : 'rgba(255,255,255,0.28)'}
+              fillColor={light ? 'rgba(17,17,19,0.06)' : 'rgba(255,255,255,0.07)'}
             />
-          );
-        })}
-        {viewerDot ? (
-          <Circle
-            center={viewerDot}
-            radius={140}
-            strokeWidth={1}
-            strokeColor={light ? 'rgba(17,17,19,0.22)' : 'rgba(255,255,255,0.28)'}
-            fillColor={light ? 'rgba(17,17,19,0.06)' : 'rgba(255,255,255,0.07)'}
+          ) : null}
+        </MapView>
+      ) : (
+        <View style={[styles.fallbackBody, { paddingTop: insets.top + 64 }]}>
+          <WorldMapUnavailable
+            missions={missions}
+            drops={drops}
+            loading={loading}
+            searching={searching}
+            now={now}
+            onOpenDrop={openDrop}
+            onParticipate={participate}
           />
-        ) : null}
-      </MapView>
+        </View>
+      )}
 
       {/* Top floating World bar — not a conventional nav header */}
       <View style={[styles.topChrome, { paddingTop: insets.top + space.sm }]} pointerEvents="box-none">
@@ -478,15 +495,17 @@ export default function WorldScreen(): React.JSX.Element {
             >
               <WorldIcon size={18} color={t.textSecondary} />
             </Pressable>
-            <Pressable
-              onPress={() => void recenter()}
-              style={styles.barIcon}
-              accessibilityRole="button"
-              accessibilityLabel="Use my location to recenter map"
-              hitSlop={8}
-            >
-              <LocateIcon size={18} color={t.textPrimary} />
-            </Pressable>
+            {nativeMap ? (
+              <Pressable
+                onPress={() => void recenter()}
+                style={styles.barIcon}
+                accessibilityRole="button"
+                accessibilityLabel="Use my location to recenter map"
+                hitSlop={8}
+              >
+                <LocateIcon size={18} color={t.textPrimary} />
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
@@ -502,11 +521,13 @@ export default function WorldScreen(): React.JSX.Element {
               },
             ]}
           >
-            World shows approximate areas where content was posted, not live people. Opening World never reads your location. Tap the locate icon to request one-time foreground access.
+            {nativeMap
+              ? 'World shows approximate areas where content was posted, not live people. Opening World never reads your location. Tap the locate icon to request one-time foreground access.'
+              : 'World shows approximate areas where content was posted, not live people. Opening World never reads your location. The street map is unavailable in this Android build.'}
           </Text>
         ) : null}
 
-        {primaryMission ? (
+        {nativeMap && primaryMission ? (
           <WorldMissionBeacon
             mission={primaryMission}
             now={now}
@@ -516,7 +537,7 @@ export default function WorldScreen(): React.JSX.Element {
           />
         ) : null}
 
-        {locationDenied ? (
+        {nativeMap && locationDenied ? (
           <Text
             allowFontScaling={false}
             style={[
@@ -533,80 +554,82 @@ export default function WorldScreen(): React.JSX.Element {
         ) : null}
       </View>
 
-      <View style={[styles.midChrome, { bottom: midBottom }]} pointerEvents="box-none">
-        {showSearchArea && filter === 'nearby' ? (
-          <Pressable
-            onPress={() => void searchThisArea()}
-            style={[
-              styles.searchArea,
-              {
-                backgroundColor: light ? '#111113' : '#F5F5F7',
-                shadowColor: t.shadowColor,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Search this area"
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.searchAreaText, { color: light ? '#F5F5F7' : '#111113' }]}
+      {nativeMap ? (
+        <View style={[styles.midChrome, { bottom: midBottom }]} pointerEvents="box-none">
+          {showSearchArea && filter === 'nearby' ? (
+            <Pressable
+              onPress={() => void searchThisArea()}
+              style={[
+                styles.searchArea,
+                {
+                  backgroundColor: light ? '#111113' : '#F5F5F7',
+                  shadowColor: t.shadowColor,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Search this area"
             >
-              {searching ? 'Searching…' : 'Search this area'}
-            </Text>
-          </Pressable>
-        ) : null}
-
-        {!loading && !searching && drops.length === 0 ? (
-          <View
-            style={[
-              styles.empty,
-              {
-                backgroundColor: floatBg,
-                borderColor: floatBorder,
-                shadowColor: t.shadowColor,
-              },
-            ]}
-          >
-            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
-              {filter === 'nearby' ? 'No Drops in this area' : filter === 'mission' ? (primaryMission ? 'No Mission Drops yet' : 'No active Mission') : 'No recent Drops yet'}
-            </Text>
-            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textSecondary }]}>
-              {filter === 'nearby'
-                ? 'Try another part of the map or browse recent Drops.'
-                : filter === 'mission'
-                  ? (primaryMission ? 'This Mission is waiting for its first Drop.' : 'Browse recent Drops or explore the map.')
-                  : 'Explore the map or join a Mission to get things started.'}
-            </Text>
-            <View style={styles.emptyActions}>
-              <Pressable
-                onPress={() => void onFilterChange(filter === 'recent' ? 'nearby' : 'recent')}
-                style={[styles.emptyCta, { backgroundColor: light ? '#111113' : '#F5F5F7' }]}
-                accessibilityRole="button"
-                accessibilityLabel={filter === 'recent' ? 'Explore map area' : 'Browse recent Drops'}
+              <Text
+                allowFontScaling={false}
+                style={[styles.searchAreaText, { color: light ? '#F5F5F7' : '#111113' }]}
               >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.emptyCtaText, { color: light ? '#F5F5F7' : '#111113' }]}
-                >
-                  {filter === 'recent' ? 'Explore map area' : 'Browse recent'}
-                </Text>
-              </Pressable>
-              {primaryMission ? (
+                {searching ? 'Searching…' : 'Search this area'}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {!loading && !searching && drops.length === 0 ? (
+            <View
+              style={[
+                styles.empty,
+                {
+                  backgroundColor: floatBg,
+                  borderColor: floatBorder,
+                  shadowColor: t.shadowColor,
+                },
+              ]}
+            >
+              <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+                {filter === 'nearby' ? 'No Drops in this area' : filter === 'mission' ? (primaryMission ? 'No Mission Drops yet' : 'No active Mission') : 'No recent Drops yet'}
+              </Text>
+              <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textSecondary }]}>
+                {filter === 'nearby'
+                  ? 'Try another part of the map or browse recent Drops.'
+                  : filter === 'mission'
+                    ? (primaryMission ? 'This Mission is waiting for its first Drop.' : 'Browse recent Drops or explore the map.')
+                    : 'Explore the map or join a Mission to get things started.'}
+              </Text>
+              <View style={styles.emptyActions}>
                 <Pressable
-                  onPress={participate}
-                  style={[styles.emptySecondary, { borderColor: t.border }]}
+                  onPress={() => void onFilterChange(filter === 'recent' ? 'nearby' : 'recent')}
+                  style={[styles.emptyCta, { backgroundColor: light ? '#111113' : '#F5F5F7' }]}
                   accessibilityRole="button"
-                  accessibilityLabel="Join this week's Mission"
+                  accessibilityLabel={filter === 'recent' ? 'Explore map area' : 'Browse recent Drops'}
                 >
-                  <Text allowFontScaling={false} style={[styles.emptyCtaText, { color: t.textPrimary }]}>
-                    Join Mission
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.emptyCtaText, { color: light ? '#F5F5F7' : '#111113' }]}
+                  >
+                    {filter === 'recent' ? 'Explore map area' : 'Browse recent'}
                   </Text>
                 </Pressable>
-              ) : null}
+                {primaryMission ? (
+                  <Pressable
+                    onPress={participate}
+                    style={[styles.emptySecondary, { borderColor: t.border }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Join this week's Mission"
+                  >
+                    <Text allowFontScaling={false} style={[styles.emptyCtaText, { color: t.textPrimary }]}>
+                      Join Mission
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
-          </View>
-        ) : null}
-      </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={[styles.bottomChrome, { paddingBottom: bottomPad }]} pointerEvents="box-none">
         {selected ? (
@@ -617,46 +640,50 @@ export default function WorldScreen(): React.JSX.Element {
           />
         ) : (
           <View style={styles.controls}>
-            <View
-              style={[
-                styles.filters,
-                {
-                  backgroundColor: floatBg,
-                  borderColor: floatBorder,
-                  shadowColor: t.shadowColor,
-                },
-              ]}
-            >
-              {FILTERS.map((item) => {
-                const active = filter === item.key;
-                return (
-                  <Pressable
-                    key={item.key}
-                    onPress={() => void onFilterChange(item.key)}
-                    style={[
-                      styles.filter,
-                      active && {
-                        backgroundColor: light ? '#111113' : 'rgba(255,255,255,0.14)',
-                      },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    accessibilityLabel={item.label}
-                  >
-                    <Text
-                      allowFontScaling={false}
+            {nativeMap ? (
+              <View
+                style={[
+                  styles.filters,
+                  {
+                    backgroundColor: floatBg,
+                    borderColor: floatBorder,
+                    shadowColor: t.shadowColor,
+                  },
+                ]}
+              >
+                {FILTERS.map((item) => {
+                  const active = filter === item.key;
+                  return (
+                    <Pressable
+                      key={item.key}
+                      onPress={() => void onFilterChange(item.key)}
                       style={[
-                        styles.filterText,
-                        { color: active ? (light ? '#F5F5F7' : t.textPrimary) : t.textMuted },
-                        active && styles.filterTextOn,
+                        styles.filter,
+                        active && {
+                          backgroundColor: light ? '#111113' : 'rgba(255,255,255,0.14)',
+                        },
                       ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={item.label}
                     >
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          styles.filterText,
+                          { color: active ? (light ? '#F5F5F7' : t.textPrimary) : t.textMuted },
+                          active && styles.filterTextOn,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.filtersSpacer} />
+            )}
 
             <Pressable
               onPress={participate}
@@ -689,6 +716,8 @@ export default function WorldScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  fallbackBody: { flex: 1 },
+  filtersSpacer: { flex: 1 },
   topChrome: {
     position: 'absolute',
     left: space.md,

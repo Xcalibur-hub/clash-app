@@ -1,0 +1,29 @@
+{
+  "at": "2026-10-27T07:54:40.095Z",
+  "device": "SM-A505F",
+  "serial": "RZ8M30DE9NL",
+  "package": "com.clash.v2.dev",
+  "processIdStable": "2546",
+  "installedApkHasGeoApiKeyMeta": false,
+  "result": "safe_fallback_not_real_street_map",
+  "checks": {
+    "sidebarWorldNoCrash": true,
+    "streetMapUnavailableBanner": true,
+    "missionCardVisible": true,
+    "mapAreaFilterHidden": true,
+    "createWorldDropPresent": true,
+    "backToHomePreservesSession": true,
+    "localSupabaseSessionChip": true,
+    "qaHandleVisibleAfterBack": true,
+    "exploreWorldSvgStillWorks": true,
+    "apiKeyCrashAbsent": true
+  },
+  "evidence": {
+    "fallbackUi": ".expo/ui-completion-phase4e-missions-map/13-world-fallback-ui.xml",
+    "fallbackPng": ".expo/ui-completion-phase4e-missions-map/13-world-fallback.png",
+    "afterBackUi": ".expo/ui-completion-phase4e-missions-map/14-after-back-ui.xml",
+    "afterBackPng": ".expo/ui-completion-phase4e-missions-map/14-after-back-home.png",
+    "exploreWorldSvgPng": ".expo/ui-completion-phase4e-missions-map/12-explore-world-svg.png",
+    "phase4e1Crash": "../ui-completion-phase4e-world/native-map-failure.json"
+  }
+}

@@ -43,9 +43,12 @@ Module._load=function(r,parent){
  if(own&&r.endsWith('/theme'))return{space:{},radius:{},typeScale:new Proxy({},{get:()=>({})}),useTheme:()=>({scheme:'dark'}),useThemeColors:()=>({})};
  if(own&&r.endsWith('/haptics'))return{tap(){}};
  if(own&&r.endsWith('/worldCluster'))return{clusterWorldDrops:drops=>drops.map(drop=>({kind:'drop',id:drop.id,drop})),regionMovedSignificantly:(a,b)=>a.latitude!==b.latitude||a.longitude!==b.longitude};
+ // Map scenarios assume a Maps-capable binary; Android production gates MapView separately.
+ if(own&&r.endsWith('/worldNativeMapAvailability'))return{isWorldNativeMapAvailable:()=>nativeMapAvailable}; // ignore Platform.OS; harness toggles the gate
  if(own&&r.includes('/components/'))return new Proxy({},{get:(_,key)=>String(key)});
  return original.apply(this,arguments);
 };
+let nativeMapAvailable=true;
 const Screen=require('../app/world/index.tsx').default;
 const AccountScope=require('../store/AccountScope.tsx').AccountScope;
 const nodes=t=>!t||typeof t!=='object'?[]:[t,...React.Children.toArray(t.props?.children).flatMap(nodes)];
@@ -53,7 +56,7 @@ function render(){index=0;const t=Screen();const run=effects;effects=[];run.forE
 function cleanup(){cells.forEach(c=>c?.cleanup?.());}
 function blur(){focused=false;cells.filter(c=>c?.focus).forEach(c=>{c.cleanup?.();c.cleanup=undefined;});}
 function focus(){render();focused=true;cells.filter(c=>c?.focus).forEach(c=>{c.cleanup=c.fn();});}
-function reset(){cleanup();cells=[];effects=[];requests=[];notices=[];writes=0;focused=true;routes=[];authLoading=false;}
+function reset(){cleanup();cells=[];effects=[];requests=[];notices=[];writes=0;focused=true;routes=[];authLoading=false;nativeMapAvailable=true;}
 function find(t,label){const n=nodes(t).find(n=>n.props?.accessibilityLabel===label);assert.ok(n,'missing '+label);return n;}
 function byType(t,type){return nodes(t).find(n=>n.type===type);}
 function press(label){find(render(),label).props.onPress();}
@@ -103,5 +106,6 @@ function pass(name){passed++;console.log('PASS '+name);}
  reset();await boot();press('Map area');const unchanged=pending('area');unchanged.resolve([]);await flush();assert.equal(nodes(render()).some(n=>n.props?.accessibilityLabel==='Search this area'),false);pass('unmoved map after filter query does not show redundant Search this area');
  reset();await boot();press('Map area');pending('area').resolve([]);await flush();byType(render(),'Map').props.onRegionChangeComplete({latitude:11,longitude:71,latitudeDelta:0.12,longitudeDelta:0.12});press('Search this area');const areaPan=pending('area');byType(render(),'Map').props.onRegionChangeComplete({latitude:12,longitude:72,latitudeDelta:0.12,longitudeDelta:0.12});areaPan.resolve([]);await flush();assert.ok(find(render(),'Search this area'));pass('pan while Search this area request is pending preserves the action for the newer viewport');
  reset();await boot();press('Use my location to recenter map');pending('permission').resolve('granted');await flush();pending('gps').resolve({latitude:14,longitude:73});await flush();const gpsPan=pending('area');byType(render(),'Map').props.onRegionChangeComplete({latitude:15,longitude:74,latitudeDelta:0.08,longitudeDelta:0.08});gpsPan.resolve([]);await flush();assert.ok(find(render(),'Search this area'));assert.equal(requests.filter(r=>r.kind==='gps').length,1);pass('pan during explicit Locate nearby fetch preserves Search this area without additional GPS');
+ reset();nativeMapAvailable=false;await boot();assert.equal(byType(render(),'Map'),undefined);assert.ok(byType(render(),'WorldMapUnavailable'));assert.equal(nodes(render()).some(n=>n.props?.accessibilityLabel==='Use my location to recenter map'),false);assert.equal(nodes(render()).some(n=>n.props?.accessibilityLabel==='Map area'),false);assert.ok(find(render(),'Back'));assert.ok(find(render(),'Create World Drop'));assert.equal(requests.some(r=>['permission','prompt','gps'].includes(r.kind)),false);pass('Android without Maps binary gate mounts WorldMapUnavailable instead of MapView');
  cleanup();console.log(`${passed}/${passed} World runtime checks passed; controlled hook bridge, not device tests.`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
