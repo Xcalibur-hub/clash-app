@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import type { ArenaEvidence, ArenaMessage, ArenaRoom } from '../../services/liveArenaService';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
@@ -95,6 +96,7 @@ function DuelLoadingBones(): React.JSX.Element {
 
 /** Official Stage and independently authorized public Crowd within one event. */
 export function DuelRoomExperience(props: Props): React.JSX.Element {
+  const { fontScale } = useWindowDimensions();
   const { room, messages } = props;
   const duel = room.duel!;
   const account = useAuth().user?.id ?? null;
@@ -404,11 +406,11 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           followError={followError}
           onToggleFollow={duel.status === 'open' || following ? toggleFollow : undefined}
           crowdPaddingBottom={
-            presentation.canPublish ? 0 : keyboardOpen ? space.xs : Math.max(bottomInset, space.sm)
+            keyboardOpen ? space.xs : Math.max(bottomInset, space.sm)
           }
           stageFooter={
             <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 }}><ArenaButton label="Transcript" variant="tertiary" onPress={() => setHistoryOpen(true)} />{assist !== 'hidden' ? <ArenaButton label={assist === 'inbox' ? 'Assist inbox' : 'Private assist'} variant="tertiary" disabled={assist === 'closed'} onPress={() => setAssistOpen(true)} /> : null}</View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 }}><ArenaButton key={`transcript:${fontScale}`} label="Transcript" variant="tertiary" onPress={() => setHistoryOpen(true)} />{assist !== 'hidden' ? <ArenaButton key={`assist:${fontScale}`} label={assist === 'inbox' ? 'Assist inbox' : 'Private assist'} variant="tertiary" disabled={assist === 'closed'} onPress={() => setAssistOpen(true)} /> : null}</View>
             {assist !== 'hidden' ? <Text style={[styles.assistNote, { color: t.textMuted }]}>{assist === 'closed' ? 'Assists are closed for this Clash.' : 'Private assists go to one fighter only — never posted in the Crowd.'}</Text> : null}
             {showOutcome ? (
               <View style={styles.outcome}>
@@ -468,9 +470,9 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
               }
             : undefined
         }
-      />
-
-      <DuelDevPanel room={room} />
+      >
+        <DuelDevPanel room={room} />
+      </ClashMoreSheet>
       <DuelEntrance
         duel={duel}
         proposition={proposition}

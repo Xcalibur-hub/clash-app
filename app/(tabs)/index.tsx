@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
+import { FlatList, ScrollView, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -528,27 +528,49 @@ export default function ArenaScreen(): React.JSX.Element {
       {arenaMode === 'community' ? <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} /> : null}
       <ArenaTopBar paddingTop={insets.top} contextLine="ARENA" />
       <ArenaSideRail mode={arenaMode} onChange={setArenaMode} />
-      {arenaMode === 'clashes' ? <View style={[{ flex: 1 }, styles.listLayer, entrance && styles.listDimmed]} pointerEvents={entrance ? 'none' : 'auto'}>{header}</View> : <FlatList
-        key={arenaMode}
-        data={listData}
-        keyExtractor={(take) => take.id}
-        renderItem={renderItem}
-        ListHeaderComponent={header}
-        ListEmptyComponent={showEmpty ? empty : null}
-        contentContainerStyle={[styles.list, { paddingBottom: dockBottomPadding(insets.bottom) }]}
-        showsVerticalScrollIndicator={false}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        refreshing={refreshing}
-        onRefresh={() => {
-          void onRefresh();
-        }}
-        initialNumToRender={6}
-        maxToRenderPerBatch={8}
-        windowSize={9}
-        style={[styles.listLayer, entrance && styles.listDimmed]}
-        pointerEvents={entrance ? 'none' : 'auto'}
-      />}
+      {arenaMode === 'clashes' ? (
+        <View
+          key={arenaMode}
+          style={[{ flex: 1 }, styles.listLayer, entrance && styles.listDimmed]}
+          pointerEvents={entrance ? 'none' : 'auto'}
+        >
+          {header}
+        </View>
+      ) : arenaMode === 'community' || arenaMode === 'topics' ? (
+        <ScrollView
+          key={arenaMode}
+          style={[{ flex: 1 }, styles.listLayer, entrance && styles.listDimmed]}
+          contentContainerStyle={[styles.list, { paddingBottom: dockBottomPadding(insets.bottom) }]}
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          pointerEvents={entrance ? 'none' : 'auto'}
+        >
+          {header}
+        </ScrollView>
+      ) : (
+        <FlatList
+          key={arenaMode}
+          data={listData}
+          keyExtractor={(take) => take.id}
+          renderItem={renderItem}
+          ListHeaderComponent={header}
+          ListEmptyComponent={showEmpty ? empty : null}
+          contentContainerStyle={[styles.list, { paddingBottom: dockBottomPadding(insets.bottom) }]}
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          refreshing={refreshing}
+          onRefresh={() => {
+            void onRefresh();
+          }}
+          initialNumToRender={6}
+          maxToRenderPerBatch={8}
+          windowSize={9}
+          style={[styles.listLayer, entrance && styles.listDimmed]}
+          pointerEvents={entrance ? 'none' : 'auto'}
+        />
+      )}
       <PostActionsSheet
         visible={menu !== null}
         target={menu?.target ?? null}

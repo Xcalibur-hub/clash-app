@@ -51,10 +51,10 @@ export function WorldCountryPanel({
     >
       <View style={styles.head}>
         <View style={styles.headCopy}>
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             {name}
           </Text>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text style={[styles.meta, { color: t.textMuted }]}>
             {meta}
           </Text>
         </View>
@@ -93,7 +93,7 @@ export function WorldCountryPanel({
         />
       ))}
       {openCount === 0 ? (
-        <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+        <Text style={[styles.empty, { color: t.textMuted }]}>
           No challenge or hunt is open here yet.
         </Text>
       ) : null}
@@ -104,7 +104,7 @@ export function WorldCountryPanel({
         accessibilityRole="button"
         accessibilityLabel={`Explore ${name}`}
       >
-        <Text allowFontScaling={false} style={[styles.ctaText, { color: t.background }]}>
+        <Text style={[styles.ctaText, { color: t.background }]}>
           Explore {name}
         </Text>
         <ArrowRightIcon size={16} color={t.background} />
@@ -143,6 +143,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: space.xs,
     marginTop: space.xs,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
   },
-  ctaText: { ...typeScale.label, fontSize: 15, fontWeight: '700' },
+  ctaText: { ...typeScale.label, fontSize: 15, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
 });

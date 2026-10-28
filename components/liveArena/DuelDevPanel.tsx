@@ -22,6 +22,7 @@ export function DuelDevPanel({ room }: DuelDevPanelProps): React.JSX.Element | n
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Toggle Clash debug panel"
+        accessibilityState={{ expanded: open }}
         onPress={() => setOpen((v) => !v)}
         style={[styles.toggle, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}
       >
@@ -51,14 +52,13 @@ export function DuelDevPanel({ room }: DuelDevPanelProps): React.JSX.Element | n
 
 const styles = StyleSheet.create({
   wrap: {
-    position: 'absolute',
-    left: space.sm,
-    bottom: 88,
-    zIndex: 20,
-    maxWidth: 220,
+    paddingHorizontal: space.md,
   },
   toggle: {
     alignSelf: 'flex-start',
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import { getPublicMediaImageSource } from '../../utils/publicMediaImageSource';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -85,7 +86,7 @@ export const VaultMediaTile = React.memo(function VaultMediaTile({
         accessibilityLabel={`${kind}. ${title}${subtitle ? `. ${subtitle}` : ''}`}
       >
         {mediaUrl ? (
-          <Image source={{ uri: mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image source={getPublicMediaImageSource(mediaUrl)} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : (
           <LinearGradient
             colors={[fallback, t.scheme === 'light' ? '#D8D2C8' : '#121216']}

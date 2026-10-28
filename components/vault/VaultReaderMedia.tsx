@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image } from 'react-native';
 import { useRetryableRead } from '../../hooks/useRetryableRead';
+import { getPublicMediaImageSource } from '../../utils/publicMediaImageSource';
 import { ReadFeedback } from '../shared/ReadFeedback';
 import { MediaViewer } from '../shared/MediaViewer';
 import { VaultActionButton } from './VaultActionButton';
@@ -17,7 +18,7 @@ export function VaultReaderMedia({ load, scope }: { load: () => Promise<VaultRea
   const video = read.data.kind === 'video';
   return <>
     {video ? <VaultActionButton label="Play video" onPress={() => setOpen(true)} />
-      : <Image source={{ uri: read.data.url }} accessibilityRole="image" accessibilityLabel="Content media"
+      : <Image source={getPublicMediaImageSource(read.data.url)} accessibilityRole="image" accessibilityLabel="Content media"
         style={{ width: '100%', aspectRatio: 4 / 5, borderRadius: 18 }} resizeMode="contain" onError={() => setFailed(true)} />}
     {video && open ? <MediaViewer visible uri={read.data.url} kind="video" onClose={() => setOpen(false)} /> : null}
   </>;

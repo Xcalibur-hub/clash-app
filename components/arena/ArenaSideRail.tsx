@@ -66,7 +66,8 @@ export function ArenaSideRail({
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 0 },
+  // Above Arena list/header layers so destination taps are never stolen.
+  scroll: { flexGrow: 0, zIndex: 2, elevation: 2 },
   shell: {
     paddingHorizontal: layout.screenX,
     paddingTop: 4,

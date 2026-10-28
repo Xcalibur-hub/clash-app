@@ -328,6 +328,7 @@ const styles = StyleSheet.create({
   },
   latestLabel: { fontSize: 13, fontWeight: '700' },
   sendButton: {
+    flexShrink: 0,
     minHeight: 44,
     minWidth: 62,
     alignItems: 'center',
@@ -336,6 +337,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   composer: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'flex-end',
     borderTopWidth: StyleSheet.hairlineWidth,

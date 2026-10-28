@@ -3,7 +3,8 @@
  * Stage (calm) + Crowd (live) blend through spacing/atmosphere, not card chrome.
  */
 import React from 'react';
-import { AccessibilityInfo, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, AppState, Keyboard, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ArenaRoomText as Text } from './ArenaRoomText';
 import Animated, {
   Easing,
   FadeIn,
@@ -112,6 +113,7 @@ export function ImmersiveClash({
   onToggleFollow,
 }: ImmersiveClashProps): React.JSX.Element {
   const t = useThemeColors();
+  const { fontScale } = useWindowDimensions();
   const [crowdExpanded, setCrowdExpanded] = React.useState(false);
   const stageMode = duelStageMode({ judging: judgingFocus, condensed, crowdExpanded });
   // A cancelled Clash has no Crowd, so the Stage takes the whole canvas.
@@ -173,13 +175,20 @@ export function ImmersiveClash({
   }));
   // The Crowd takes the remaining share of the same animated split.
   const compact = condensed || judgingFocus || crowdExpanded;
-  const showPinnedSpectatorActions = !compactSummary;
+  // Keep live mutation controls in their existing host across font-scale changes.
+  // Read-only outcome actions can share the enlarged Stage's scroll budget.
+  const showPinnedSpectatorActions = !compactSummary && (fontScale < 1.25 || liveStage);
   const showBackingActions = canBack && !judgingFocus && !condensed;
   // Plain View when Crowd is collapsed — Reanimated host dropped absolute height:48 on A50.
   const StageShell = crowdHeaderOnly ? View : Animated.View;
 
   return (
-    <View style={styles.root} accessibilityLabel="Live Clash">
+    <View
+      // Otherwise the mounted fighter composer or expanded Crowd owns this inset.
+      // One physical pixel keeps Android's rounded hit bounds above system navigation.
+      style={[styles.root, { paddingBottom: crowdHeaderOnly && !fighterComposer ? crowdPaddingBottom + StyleSheet.hairlineWidth : 0 }]}
+      accessibilityLabel="Live Clash"
+    >
       <ClashEventHeader
         live={liveStage}
         statusLabel={statusLabel}
@@ -275,7 +284,7 @@ export function ImmersiveClash({
           <>
             <ScrollView
               style={styles.stageScroll}
-              contentContainerStyle={styles.stageContent}
+              contentContainerStyle={[styles.stageContent, crowdHeaderOnly && !showPinnedSpectatorActions ? { paddingBottom: 96 } : null]}
               showsVerticalScrollIndicator
               keyboardShouldPersistTaps="handled"
               accessibilityLabel="Clash stage and official arguments"
@@ -441,7 +450,7 @@ export function ImmersiveClash({
               {
                 borderTopColor: t.border,
                 backgroundColor: t.background,
-                minHeight: DUEL_CROWD_MIN_HEIGHT,
+                minHeight: condensed ? 0 : DUEL_CROWD_MIN_HEIGHT,
               },
               crowdStyle,
             ]}
@@ -452,7 +461,7 @@ export function ImmersiveClash({
               accessibilityLabel="Focus official Stage"
               accessibilityState={{ expanded: true }}
               accessibilityHint="Returns focus to the official Stage"
-              onPress={() => setCrowdExpanded(false)}
+              onPress={() => { Keyboard.dismiss(); setCrowdExpanded(false); }}
               style={[
                 styles.crowdToggle,
                 { backgroundColor: t.surface, borderBottomColor: t.border },
@@ -487,7 +496,11 @@ export function ImmersiveClash({
       ) : null}
 
       {fighterComposer ? (
-        <View style={[styles.composer, { borderTopColor: t.border }]}>
+        <View
+          accessibilityElementsHidden={crowdExpanded}
+          importantForAccessibility={crowdExpanded ? 'no-hide-descendants' : 'auto'}
+          style={[styles.composer, { borderTopColor: t.border }, crowdExpanded && { display: 'none' }]}
+        >
           {fighterComposer}
         </View>
       ) : null}

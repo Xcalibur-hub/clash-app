@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,12 +10,16 @@ import type { WorldDrop, WorldMission } from '../../services/worldService';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { WorldDropCard } from './WorldDropCard';
 import { WorldMissionCard } from './WorldMissionCard';
+import { ReadFeedback } from '../shared/ReadFeedback';
+import type { ReadStatus } from '../../hooks/useRetryableRead';
 
 export interface WorldMapUnavailableProps {
   missions: WorldMission[];
   drops: WorldDrop[];
-  loading: boolean;
-  searching: boolean;
+  missionStatus: ReadStatus;
+  dropStatus: ReadStatus;
+  onRetryMissions: () => void;
+  onRetryDrops: () => void;
   now: number;
   onOpenDrop: (drop: WorldDrop) => void;
   onParticipate: () => void;
@@ -29,15 +32,16 @@ export interface WorldMapUnavailableProps {
 export function WorldMapUnavailable({
   missions,
   drops,
-  loading,
-  searching,
+  missionStatus,
+  dropStatus,
+  onRetryMissions,
+  onRetryDrops,
   now,
   onOpenDrop,
   onParticipate,
 }: WorldMapUnavailableProps): React.JSX.Element {
   const t = useThemeColors();
   const primary = missions[0] ?? null;
-  const busy = loading || searching;
 
   return (
     <ScrollView
@@ -58,17 +62,16 @@ export function WorldMapUnavailable({
         </Text>
       </View>
 
+      <ReadFeedback status={missionStatus} subject="World missions" retry={onRetryMissions} />
       {primary ? (
         <WorldMissionCard mission={primary} now={now} onParticipate={onParticipate} />
-      ) : (
+      ) : missionStatus === 'ready' ? (
         <Text style={[styles.empty, { color: t.textSecondary }]}>No active Mission this week.</Text>
-      )}
+      ) : null}
 
       <Text style={[styles.section, { color: t.textPrimary }]}>Recent drops</Text>
-      {busy && drops.length === 0 ? (
-        <ActivityIndicator color={t.textPrimary} style={styles.spinner} />
-      ) : null}
-      {!busy && drops.length === 0 ? (
+      <ReadFeedback status={dropStatus} subject="World drops" retry={onRetryDrops} />
+      {dropStatus === 'ready' && drops.length === 0 ? (
         <Text style={[styles.empty, { color: t.textSecondary }]}>No recent Drops yet.</Text>
       ) : null}
       {drops.map((drop) => (
@@ -103,6 +106,5 @@ const styles = StyleSheet.create({
   bannerBody: { ...typeScale.meta },
   section: { ...typeScale.section, marginTop: space.xs },
   empty: { ...typeScale.meta },
-  spinner: { marginVertical: space.md },
   dropPress: { borderRadius: radius.card },
 });

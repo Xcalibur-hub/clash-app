@@ -79,7 +79,7 @@ export function WorldExperience({
           </Pressable>
         </View>
       ) : null : empty ? (
-        <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+        <Text style={[styles.empty, { color: t.textMuted }]}>
           No public activity to map yet. Pick any country to look around.
         </Text>
       ) : selectedCode ? (
@@ -104,7 +104,7 @@ export function WorldExperience({
 
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
-  empty: { ...typeScale.caption, fontSize: 12, paddingVertical: space.xs },
+  empty: { ...typeScale.caption, fontSize: 12, paddingVertical: space.xs, marginRight: worldPanelRailInset() },
   countryAction: { minHeight: 44, justifyContent: 'center' },
   /** Reserves the floating modes-rail footprint so dismiss + CTA stay reachable. */
   panelShell: { marginRight: worldPanelRailInset() },

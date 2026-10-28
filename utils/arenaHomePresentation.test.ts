@@ -123,10 +123,13 @@ describe('UI Phase 4 Arena Home presentation', () => {
     assert.match(rail, /topics/);
     assert.match(rail, /community/);
     assert.match(rail, /clashes/);
+    assert.match(rail, /zIndex:\s*2/);
     const home = read('app/(tabs)/index.tsx');
     assert.match(home, /ArenaTopics/);
     assert.match(home, /ArenaCommunity/);
     assert.match(home, /ArenaClashes/);
     assert.match(home, /prioritizeInterestTopics/);
+    // Groups/Discover must not nest under the For You FlatList (touch + scroll dead ends).
+    assert.match(home, /arenaMode === 'community' \|\| arenaMode === 'topics'/);
   });
 });

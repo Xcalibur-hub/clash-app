@@ -6,6 +6,7 @@ import React from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { getPublicMediaImageSource } from '../../utils/publicMediaImageSource';
 import type { MediaKind } from '../../store/types';
 import { typeScale } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
@@ -50,7 +51,7 @@ export function MediaViewer({
           <ViewerVideo key={uri} uri={uri} />
         ) : showMedia && uri ? (
           <Image
-            source={{ uri }}
+            source={getPublicMediaImageSource(uri)}
             style={styles.media}
             resizeMode="contain"
             accessibilityRole="image"

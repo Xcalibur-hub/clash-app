@@ -49,6 +49,7 @@ export const WorldChapter = React.memo(function WorldChapter({
   community,
   isSelf,
   onOpenDrop,
+  onOpenCollection,
   onOpenService,
   onOpenCourse,
   onOpenProduct,
@@ -85,6 +86,7 @@ export const WorldChapter = React.memo(function WorldChapter({
           radius={radius}
           scatter={scatter}
           onOpen={onOpenDrop}
+          onOpenCollection={onOpenCollection}
         />
       );
     case 'services':

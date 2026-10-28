@@ -442,7 +442,7 @@ function ExploreScreen(): React.JSX.Element {
             {mode === 'world' ? (
               <View style={styles.worldBlock}>
                 <View style={styles.worldTop}>
-                  <Text allowFontScaling={false} style={[styles.modeLabel, { color: t.textMuted }]}>
+                  <Text style={[styles.modeLabel, { color: t.textMuted }]}>
                     WORLD
                   </Text>
                   <View
@@ -471,7 +471,6 @@ function ExploreScreen(): React.JSX.Element {
                           accessibilityLabel={label}
                         >
                           <Text
-                            allowFontScaling={false}
                             style={{
                               color: on ? t.background : t.textPrimary,
                               fontWeight: '800',
@@ -486,7 +485,7 @@ function ExploreScreen(): React.JSX.Element {
                   </View>
                 </View>
 
-                <Text allowFontScaling={false} style={[styles.worldHint, { color: t.textMuted }]}>
+                <Text style={[styles.worldHint, { color: t.textMuted }]}>
                   Pick a country — the globe turns to it on its own.
                 </Text>
 
@@ -619,7 +618,6 @@ function RoundControl({
       accessibilityLabel={label}
     >
       <Text
-        allowFontScaling={false}
         style={[styles.roundText, { color: emphasis ? t.background : t.textPrimary }]}
       >
         {label}
@@ -846,7 +844,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   visualChip: {
-    minHeight: 30,
+    minHeight: 44,
     paddingHorizontal: 12,
     borderRadius: radius.pill,
     alignItems: 'center',
@@ -859,8 +857,8 @@ const styles = StyleSheet.create({
     marginTop: space.xs,
   },
   round: {
-    minHeight: 40,
-    minWidth: 40,
+    minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,

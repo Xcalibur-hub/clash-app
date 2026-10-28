@@ -28,6 +28,7 @@ import {
 } from '../../components/world/worldMapStyle';
 import { useClock } from '../../hooks/useClock';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import type { ReadStatus } from '../../hooks/useRetryableRead';
 import { analytics } from '../../services/analytics';
 import {
   getForegroundPermission,
@@ -105,6 +106,8 @@ export default function WorldScreen(): React.JSX.Element {
   const light = scheme === 'light';
 
   const [missions, setMissions] = React.useState<WorldMission[]>([]);
+  const [missionStatus, setMissionStatus] = React.useState<ReadStatus>('loading');
+  const [dropsError, setDropsError] = React.useState(false);
   const [drops, setDrops] = React.useState<WorldDrop[]>([]);
   const [filter, setFilter] = React.useState<WorldFilter>('recent');
   const [region, setRegion] = React.useState<Region>(FALLBACK_REGION);
@@ -147,6 +150,21 @@ export default function WorldScreen(): React.JSX.Element {
     return fetchActiveMissions();
   }, []);
 
+  const refreshMissions = React.useCallback(async (): Promise<void> => {
+    const request = ++missionRequest.current;
+    setMissionStatus('loading');
+    try {
+      const active = await loadMissions();
+      if (request !== missionRequest.current) return;
+      setMissions(active);
+      setMissionStatus('ready');
+    } catch (error) {
+      if (request !== missionRequest.current) return;
+      setMissionStatus('error');
+      dispatch(showNotice(errorText(error)));
+    }
+  }, [dispatch, loadMissions]);
+
   const loadDropsFor = React.useCallback(
     async (mode: WorldFilter, centre: { latitude: number; longitude: number }): Promise<WorldDrop[]> => {
       if (mode === 'recent') {
@@ -167,13 +185,11 @@ export default function WorldScreen(): React.JSX.Element {
 
   const bootstrap = React.useCallback(async (): Promise<void> => {
     const request = ++discoveryRequest.current;
-    const metadataRequest = ++missionRequest.current;
     setLoading(true);
+    setDropsError(false);
+    // Independent reads: a failed Mission request must not hide recent Drops.
+    void refreshMissions();
     try {
-      const activeMissions = await loadMissions();
-      if (metadataRequest !== missionRequest.current) return;
-      setMissions(activeMissions);
-      if (request !== discoveryRequest.current) return;
       // Browsing is permission-free. Only the recenter button requests GPS.
       // In particular, an already-granted OS permission is not consent to
       // automatically transmit the viewer's location when this screen opens.
@@ -181,11 +197,14 @@ export default function WorldScreen(): React.JSX.Element {
       if (request !== discoveryRequest.current) return;
       setDrops(recentDrops);
     } catch (error) {
-      if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
+      if (request === discoveryRequest.current) {
+        setDropsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
     } finally {
       if (request === discoveryRequest.current) setLoading(false);
     }
-  }, [dispatch, loadMissions, loadDropsFor]);
+  }, [dispatch, refreshMissions, loadDropsFor]);
 
   // Expo Router can retain this screen while another route is in front of it.
   // Refresh on return; don't keep showing old results after blocks, expiry,
@@ -197,7 +216,6 @@ export default function WorldScreen(): React.JSX.Element {
         void bootstrap();
       } else {
         const request = ++discoveryRequest.current;
-        const metadataRequest = ++missionRequest.current;
         const { mode, centre } = latestDiscovery.current;
         setSelectedId(null);
         setDrops([]);
@@ -207,13 +225,8 @@ export default function WorldScreen(): React.JSX.Element {
         setLocationDenied(true);
         setLoading(false);
         setSearching(true);
-        void loadMissions()
-          .then((active) => {
-            if (metadataRequest === missionRequest.current) setMissions(active);
-          })
-          .catch((error) => {
-            if (metadataRequest === missionRequest.current) dispatch(showNotice(errorText(error)));
-          });
+        setDropsError(false);
+        void refreshMissions();
         void loadDropsFor(mode, centre)
           .then((result) => {
             if (request === discoveryRequest.current) {
@@ -224,7 +237,10 @@ export default function WorldScreen(): React.JSX.Element {
             }
           })
           .catch((error) => {
-            if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
+            if (request === discoveryRequest.current) {
+              setDropsError(true);
+              dispatch(showNotice(errorText(error)));
+            }
           })
           .finally(() => {
             if (request === discoveryRequest.current) setSearching(false);
@@ -236,7 +252,7 @@ export default function WorldScreen(): React.JSX.Element {
         discoveryRequest.current += 1;
         missionRequest.current += 1;
       };
-    }, [bootstrap, dispatch, loadDropsFor, loadMissions]),
+    }, [bootstrap, dispatch, loadDropsFor, refreshMissions]),
   );
 
   // A query's centre is where the request began, not necessarily where the
@@ -256,6 +272,7 @@ export default function WorldScreen(): React.JSX.Element {
     setDrops([]);
     setLoading(false);
     setSearching(true);
+    setDropsError(false);
     const requestRegion = region;
     try {
       const result = await loadDropsFor(next, { latitude: requestRegion.latitude, longitude: requestRegion.longitude });
@@ -263,7 +280,10 @@ export default function WorldScreen(): React.JSX.Element {
       setDrops(result);
       recordQueryOrigin(requestRegion);
     } catch (error) {
-      if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
+      if (request === discoveryRequest.current) {
+        setDropsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
     } finally {
       if (request === discoveryRequest.current) setSearching(false);
     }
@@ -277,6 +297,7 @@ export default function WorldScreen(): React.JSX.Element {
     setDrops([]);
     setLoading(false);
     setSearching(true);
+    setDropsError(false);
     const requestRegion = region;
     try {
       const result = await loadDropsFor('nearby', { latitude: requestRegion.latitude, longitude: requestRegion.longitude });
@@ -285,7 +306,10 @@ export default function WorldScreen(): React.JSX.Element {
       recordQueryOrigin(requestRegion);
       setSelectedId(null);
     } catch (error) {
-      if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
+      if (request === discoveryRequest.current) {
+        setDropsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
     } finally {
       if (request === discoveryRequest.current) setSearching(false);
     }
@@ -327,12 +351,16 @@ export default function WorldScreen(): React.JSX.Element {
       setDrops([]);
       setLoading(false);
       setSearching(true);
+      setDropsError(false);
       const result = await loadDropsFor('nearby', point);
       if (request !== discoveryRequest.current) return;
       setDrops(result);
       recordQueryOrigin(next);
     } catch (error) {
-      if (request === discoveryRequest.current) dispatch(showNotice(errorText(error)));
+      if (request === discoveryRequest.current) {
+        setDropsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
     } finally {
       if (request === discoveryRequest.current) setSearching(false);
     }
@@ -443,8 +471,10 @@ export default function WorldScreen(): React.JSX.Element {
           <WorldMapUnavailable
             missions={missions}
             drops={drops}
-            loading={loading}
-            searching={searching}
+            missionStatus={missionStatus}
+            dropStatus={loading || searching ? 'loading' : dropsError ? 'error' : 'ready'}
+            onRetryMissions={() => { void refreshMissions(); }}
+            onRetryDrops={() => { void onFilterChange(filter); }}
             now={now}
             onOpenDrop={openDrop}
             onParticipate={participate}
