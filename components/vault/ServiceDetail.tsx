@@ -1,3 +1,4 @@
+import { releaseAllows } from '../../utils/releaseScope';
 import React from 'react';
 import { Image, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -57,7 +58,7 @@ export function ServiceDetail({ serviceId }: { serviceId: string }): React.JSX.E
       <Text style={[styles.body, { color: t.textSecondary }]}>{service.description}</Text>
       <Text style={[styles.meta, { color: t.textMuted }]}>{service.deliveryType.replace('_', ' ')} ? {price}</Text>
       <Text style={[styles.body, { color: t.textSecondary }]}>This is a request, not a booking or purchase. In-app purchases and new subscriptions are unavailable.</Text>
-      {service.externalUrl ? <VaultActionButton label="Open link" busy={linkState?.scope === scope && linkState.busy} onPress={() => void openLink()} /> : null}
+      {service.externalUrl && releaseAllows('commerce', 'admit') ? <VaultActionButton label="Open link" busy={linkState?.scope === scope && linkState.busy} onPress={() => void openLink()} /> : null}
       {linkState?.scope === scope && linkState.failed ? <Text accessibilityLiveRegion="polite" style={{ color: t.textSecondary }}>Couldn't open the link. Try again.</Text> : null}
       <ServiceRequest key={scope} serviceId={service.id} />
     </ScrollView>

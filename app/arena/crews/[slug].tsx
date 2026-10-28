@@ -1,3 +1,4 @@
+import { releaseAllows, releaseUnavailableCopy } from '../../../utils/releaseScope';
 import React from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -209,12 +210,13 @@ export default function CrewProfileScreen(): React.JSX.Element {
             }]}>{crew.followerCount.toLocaleString()}</Text><Text style={[styles.handle, {
               color: t.textMuted
             }]}>followers</Text></View></View>
-              <GroupButton label={actionLabel} busy={busy} disabled={action !== 'join' && action !== 'request'} onPress={() => {
+              <GroupButton label={action === 'member' || releaseAllows('groups', 'admit') ? actionLabel : 'New membership unavailable'} busy={busy} disabled={!releaseAllows('groups', 'admit') || action !== 'join' && action !== 'request'} onPress={() => {
           void perform(() => action === 'join' ? joinArenaCrew(crew.id) : requestArenaCrewJoin(crew.id), action === 'request' ? 'Your request has been sent.' : undefined);
         }} />
-              {!crew.viewer.isMember ? <GroupButton secondary label={crew.viewer.isFollowing ? 'Following · Unfollow' : 'Follow group'} busy={busy} onPress={() => {
+              {!crew.viewer.isMember ? <GroupButton secondary label={crew.viewer.isFollowing ? 'Following · Unfollow' : 'Follow group'} busy={busy} disabled={!crew.viewer.isFollowing && !releaseAllows('groups', 'admit')} onPress={() => {
           void perform(() => crew.viewer.isFollowing ? unfollowArenaCrew(crew.id) : followArenaCrew(crew.id));
         }} /> : null}
+              {!releaseAllows('groups', 'admit') ? <Text style={[styles.bodyText, { color: t.textSecondary }]}>{releaseUnavailableCopy('groups')}</Text> : null}
               {action === 'blocked_other' ? <Text style={[styles.bodyText, {
           color: t.textSecondary
         }]}>You can follow many groups, but belong to one competitive Crew.</Text> : action === 'invite_only' ? <Text style={[styles.bodyText, {

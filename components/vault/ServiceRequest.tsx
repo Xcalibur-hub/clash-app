@@ -1,3 +1,4 @@
+import { releaseAllows, releaseUnavailableCopy } from '../../utils/releaseScope';
 import React from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,7 @@ export function ServiceRequest({ serviceId }: { serviceId: string }): React.JSX.
     } catch { if (active.current) setNotice("Couldn't send your request. Your draft is kept; try again."); }
     finally { pending.current = false; if (active.current) setBusy(false); }
   };
+  if (!releaseAllows('commerce', 'admit')) return <Text style={{ ...typeScale.body, color: t.textSecondary }}>{releaseUnavailableCopy('commerce')}</Text>;
   if (!user) return <VaultActionButton label="Sign in to request" onPress={() => router.push('/auth')} />;
   return <View style={{ gap: space.sm }}>
     <Text style={{ ...typeScale.label, color: t.textPrimary }}>Request a session</Text>

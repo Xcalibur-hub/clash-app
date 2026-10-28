@@ -1,3 +1,4 @@
+import { communityVerdictCopy } from '../../../utils/communityVerdict';
 /**
  * Server-authoritative verdict reveal — dramatic but restrained.
  */
@@ -89,20 +90,20 @@ export function VerdictReveal({
           content,
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: dark ? '#E7D6E3' : '#635262' }]}>
-          THE PEOPLE HAVE SPOKEN
+        <Text allowFontScaling={true} style={[styles.eyebrow, { color: dark ? '#E7D6E3' : '#635262' }]}>
+          COMMUNITY VERDICT
         </Text>
         {!isDraw ? (
-          <Text allowFontScaling={false} style={[styles.sideWin, { color: tone }]}>
+          <Text allowFontScaling={true} style={[styles.sideWin, { color: tone }]}>
             SIDE {verdict.winnerSide}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={[styles.headline, { color: tone }]}>
+        <Text allowFontScaling={true} style={[styles.headline, { color: tone }]}>
           {isDraw ? 'IT’S A DRAW' : 'TAKES THE WIN.'}
         </Text>
         {!isDraw ? (
-          <Text allowFontScaling={false} style={[styles.label, { color: dark ? '#E7D6E3' : '#635262' }]}>
-            {verdict.verdictLabel}
+          <Text allowFontScaling={true} style={[styles.label, { color: dark ? '#E7D6E3' : '#635262' }]}>
+            {communityVerdictCopy(verdict)}
           </Text>
         ) : null}
 
@@ -113,7 +114,7 @@ export function VerdictReveal({
             style={[styles.pct, { color: tone }]}
             accessibilityLabel={`${pct} percent`}
           />
-          <Text allowFontScaling={false} style={[styles.meta, { color: dark ? '#E7D6E3' : '#635262' }]}>
+          <Text allowFontScaling={true} style={[styles.meta, { color: dark ? '#E7D6E3' : '#635262' }]}>
             {verdict.jurySize.toLocaleString('en-IN')} {judgeWord}
           </Text>
         </View>
@@ -133,22 +134,22 @@ export function VerdictReveal({
           />
         </View>
         <View style={styles.tally}>
-          <Text allowFontScaling={false} style={[styles.tallyText, { color: dark ? '#DDC6F2' : '#65417C' }]}>
+          <Text allowFontScaling={true} style={[styles.tallyText, { color: dark ? '#DDC6F2' : '#65417C' }]}>
             A · {verdict.sideAScore}
           </Text>
-          <Text allowFontScaling={false} style={[styles.tallyText, { color: dark ? '#FFCEBB' : '#8B432F' }]}>
+          <Text allowFontScaling={true} style={[styles.tallyText, { color: dark ? '#FFCEBB' : '#8B432F' }]}>
             B · {verdict.sideBScore}
           </Text>
         </View>
 
         {personal ? (
-          <Text allowFontScaling={false} style={[styles.personal, { color: tone }]}>
+          <Text allowFontScaling={true} style={[styles.personal, { color: tone }]}>
             {personal}
           </Text>
         ) : null}
 
         {reputationDelta > 0 || coinsDelta > 0 ? (
-          <Text allowFontScaling={false} style={[styles.reward, { color: dark ? '#E7D6E3' : '#635262' }]}>
+          <Text allowFontScaling={true} style={[styles.reward, { color: dark ? '#E7D6E3' : '#635262' }]}>
             {reputationDelta > 0 ? `+${reputationDelta} reputation` : ''}
             {reputationDelta > 0 && coinsDelta > 0 ? ' · ' : ''}
             {coinsDelta > 0 ? `+${coinsDelta} coins` : ''}

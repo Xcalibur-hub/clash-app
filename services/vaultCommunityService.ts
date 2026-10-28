@@ -1,10 +1,9 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Creator Communities API (Phase 15.2).
  *
- * Every read/write goes through a SECURITY DEFINER RPC that resolves the caller
- * from the session; the client never supplies an author id and never decides
- * access. The only direct table read is the creator's own community row for the
- * Studio (RLS limits it to the owner / staff).
+ * RPCs and RLS resolve access from the caller. Client scope checks are not security.
+ * Direct reads cover the owner Studio row and a reply's authorized parent community.
  */
 
 import { currentViewerProfileId } from './apiService';
@@ -61,6 +60,13 @@ export async function fetchCommunity(communityId: string): Promise<CommunitySumm
  * (P0005) when the server refuses access — the client never fakes entry.
  */
 export async function enterCommunity(communityId: string): Promise<CommunitySummary> {
+  const existing = await fetchCommunity(communityId);
+  if (!existing?.viewerAccess) throw new SupabaseError('Community unavailable', 'not_permitted');
+  if (!existing.viewerIsMember && !existing.viewerIsCreator) {
+    // Keep already authorized reading; do not create membership as a side effect of a deep link.
+    return { ...existing, viewerCanPost: false, viewerCanAnnounce: false };
+  }
+
   const { data, error } = await requireSupabase().rpc('enter_vault_community', {
     p_community_id: communityId,
   });
@@ -112,6 +118,9 @@ export async function createCommunityPost(input: {
   mediaObjectId?: string | null;
   pseudonymous?: boolean;
 }): Promise<CommunityPostCard> {
+  const existing = await fetchCommunity(input.communityId);
+  if (!existing?.viewerIsMember && !existing?.viewerIsCreator) assertReleaseAdmission('commerce');
+
   const { data, error } = await requireSupabase().rpc('create_vault_community_post', {
     p_community_id: input.communityId,
     p_post_type: input.type,
@@ -131,6 +140,13 @@ export async function createCommunityReply(input: {
   body: string;
   pseudonymous?: boolean;
 }): Promise<CommunityReplyCard> {
+  const { data: post, error: postError } = await requireSupabase().from('vault_community_posts')
+    .select('community_id').eq('id', input.postId).maybeSingle();
+  if (postError) throw requestError(postError);
+  if (!post) throw new SupabaseError('Discussion unavailable', 'not_permitted');
+  const existing = await fetchCommunity(post.community_id);
+  if (!existing?.viewerIsMember && !existing?.viewerIsCreator) assertReleaseAdmission('commerce');
+
   const { data, error } = await requireSupabase().rpc('create_vault_community_reply', {
     p_post_id: input.postId,
     p_parent_reply_id: input.parentReplyId ?? undefined,
@@ -186,6 +202,7 @@ export interface CommunitySettingsInput {
 }
 
 export async function createCommunity(input: CommunitySettingsInput): Promise<CommunitySettings> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_vault_community', {
     p_name: input.name,
     p_description: input.description ?? '',
@@ -221,6 +238,7 @@ export async function setCommunityStatus(
   communityId: string,
   status: CommunityStatus,
 ): Promise<CommunitySettings> {
+  if (status === 'active') assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('set_vault_community_status', {
     p_community_id: communityId,
     p_status: status,

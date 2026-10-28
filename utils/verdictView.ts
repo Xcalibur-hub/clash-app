@@ -4,6 +4,7 @@
  * when a field is absent.
  */
 import type { ArenaDuel } from './arenaDuelPayload';
+import { communityVerdictCopy } from './communityVerdict.ts';
 import { duelResultTitle } from './duelPresentation.ts';
 
 export type VerdictKind = 'settled' | 'cancelled' | 'pending';
@@ -17,7 +18,7 @@ export interface VerdictView {
   winnerLabel: string | null;
   /** Explanatory line for cancelled or pending states. */
   support: string | null;
-  /** "1 judgment · SPLIT DECISION" from the canonical jury size and label. */
+  /** Neutral jury size and A/B totals from the canonical payload. */
   juryLabel: string | null;
   /** Share of the panel, only when both authoritative scores exist. */
   aPct: number | null;
@@ -59,7 +60,7 @@ export function verdictView(duel: ArenaDuel): VerdictView {
       title: null,
       winnerSide: null,
       winnerLabel: null,
-      support: 'Settlement is pending. Refresh to check for the official verdict.',
+      support: duel.status === 'settled' ? 'Official result unavailable. Only authorized results can be shown.' : 'Settlement is pending. Refresh to check for the official verdict.',
       juryLabel: null,
       aPct: null,
       bPct: null,
@@ -72,9 +73,7 @@ export function verdictView(duel: ArenaDuel): VerdictView {
       : verdict.winnerSide === 'A'
         ? `SIDE A · ${duel.fighterA.name}`
         : `SIDE B · ${duel.fighterB.name}`;
-  const juryLabel = `${verdict.jurySize} judgment${verdict.jurySize === 1 ? '' : 's'}${
-    verdict.verdictLabel ? ` · ${verdict.verdictLabel}` : ''
-  }`;
+  const juryLabel = communityVerdictCopy(verdict);
   const split = typeof verdict.sideAScore === 'number' && typeof verdict.sideBScore === 'number';
 
   return {

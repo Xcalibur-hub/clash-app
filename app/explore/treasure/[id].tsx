@@ -1,3 +1,4 @@
+import { releaseAllows, releaseUnavailableCopy } from '../../../utils/releaseScope';
 import {withExploreAccount} from '../../../components/explore/ExploreAccountBoundary';
 import {useOperationScope} from '../../../hooks/useOperationScope';
 import React from 'react';
@@ -260,7 +261,8 @@ function TreasureDetailScreen(): React.JSX.Element {
 
         <ClueProgressDots solved={detail.progress} total={detail.clueCount} />
 
-        {!detail.joined ? (
+        {!releaseAllows('play', 'admit') ? <Text style={{ color: t.textSecondary }}>{releaseUnavailableCopy('play')}</Text> : null}
+        {releaseAllows('play', 'admit') && !detail.joined ? (
           <GlowButton
             label={busy ? 'Joining…' : 'Begin hunt'}
             onPress={() => void onJoin()}

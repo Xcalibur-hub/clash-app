@@ -23,7 +23,8 @@ async function inspectArchive() {
   const required = ['app.json', 'app.config.ts', 'eas.json', 'package.json', 'package-lock.json', 'tsconfig.json',
     'metro.config.js', 'babel.config.js', 'config/release-targets.json', 'scripts/arena-demo-resolver.cjs',
     'app/_layout.tsx', 'components/liveArena/ArenaRoomText.tsx', 'utils/publicMediaImageSource.ts',
-    'supabase/database.types.ts', 'data/exploreWorldGeometry.json'];
+    'supabase/database.types.ts', 'data/exploreWorldGeometry.json', 'utils/releaseScope.ts',
+    'utils/communityVerdict.ts', 'components/shared/ReleaseUnavailable.tsx'];
   for (const item of required) assert.ok(set.has(item), 'Missing required archive input: ' + item);
   const denied = ['.expo/phase5d2/recover.cjs', 'docs/evidence/private.png', '.env', '.env.local', '.env.example',
     'services/.env', 'config/credentials.json', 'android/app/debug.keystore', 'app/private.dpapi.json',
@@ -32,7 +33,7 @@ async function inspectArchive() {
     '.expo/ui-completion-phase4c/fictional-a.dpapi.json', 'docs/evidence/release-readiness/PHASE_6D1_ENV_ARCHIVE_REPORT.md'];
   for (const item of denied) assert.ok(ignore.ignores(item), 'Private path not ignored');
   const untracked = cp.execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { encoding: 'utf8', windowsHide: true }).split('\0').filter(Boolean);
-  const authorizedNewInputs = new Set(['.easignore', 'config/release-targets.json']);
+  const authorizedNewInputs = new Set(['.easignore', 'config/release-targets.json', 'utils/releaseScope.ts', 'utils/communityVerdict.ts', 'components/shared/ReleaseUnavailable.tsx']);
   const unexpected = untracked.filter(file => set.has(file) && !authorizedNewInputs.has(file));
   assert.equal(unexpected.length, 0, 'Unreviewed untracked files entered archive inventory');
   // Resolve every static relative dependency of included runtime/config sources.

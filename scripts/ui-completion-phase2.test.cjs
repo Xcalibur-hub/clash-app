@@ -113,7 +113,11 @@ test('Service read retry preserves normal request entry; request busy/error stat
   detail.services.fetchCreatorService = async () => { if (++reads === 1) throw Error('offline'); return { id: 's', creatorId: 'p', accessType: 'free', deliveryType: 'online' }; };
   detail.services.fetchProfileById = async () => null; detail.services.vaultCoverUrl = () => null;
   try { await detail.mount(); await detail.act(async () => find(detail.tree, 'ReadFeedback').props.retry()); assert.equal(find(detail.tree, 'ServiceRequest').props.serviceId, 's'); } finally { await detail.unmount(); }
-  const h = harness('components/vault/ServiceRequest.tsx', { serviceId: 's' }), gate = deferred(); let writes = 0;
+  // Keep exercising the underlying request lifecycle under an explicitly admitted test policy.
+  // The shipped first-release policy is verified separately to expose no request composer.
+  const h = harness('components/vault/ServiceRequest.tsx', { serviceId: 's' }, undefined, {
+    dependencies: { releaseScope: { releaseAllows: () => true } },
+  }), gate = deferred(); let writes = 0;
   h.services.requestCreatorService = async (id, message) => { assert.equal(id, 's'); assert.equal(message, 'A question'); writes++; if (writes === 1) return gate.promise; };
   try {
     await h.mount(); assert.equal(find(h.tree, 'VaultActionButton').props.disabled, true);

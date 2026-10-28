@@ -36,7 +36,7 @@ describe('verdict presentation sections', () => {
     assert.equal(verdictEyebrow(view, 'settled'), 'VERDICT');
     assert.equal(sections.announcement, true);
     assert.equal(sections.winner, true);
-    assert.match(sections.explanation ?? '', /4 judgments/);
+    assert.match(sections.explanation ?? '', /4 ballots/);
     assert.equal(sections.scores, true);
   });
 

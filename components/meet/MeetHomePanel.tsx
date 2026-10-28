@@ -1,3 +1,4 @@
+import { withReleaseAdmission } from '../shared/ReleaseUnavailable';
 /**
  * Explore → MEET — TEXT / VIDEO entry + matchmaking.
  */
@@ -39,7 +40,7 @@ const MODES: { id: MeetMatchMode; label: string; hint: string }[] = [
 
 type Phase = 'pick' | 'prefs' | 'safety';
 
-export function MeetHomePanel(): React.JSX.Element {
+function MeetHomePanelContent(): React.JSX.Element {
   const t = useThemeColors();
   const router = useRouter();
   const requireAuth = useRequireAuth();
@@ -536,3 +537,5 @@ const styles = StyleSheet.create({
     minHeight: 88,
   },
 });
+
+export const MeetHomePanel = withReleaseAdmission(MeetHomePanelContent, 'meet');

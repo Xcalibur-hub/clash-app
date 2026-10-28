@@ -1,3 +1,4 @@
+import { releaseAllows } from '../../../utils/releaseScope';
 /**
  * 1:1 pseudonymous text Meet chat.
  * Lifecycle (terminal absorbing, request ordering, AppState pausing) lives in
@@ -243,7 +244,7 @@ export default function MeetChatScreen(): React.JSX.Element {
 
       {menuOpen ? (
         <View style={[styles.menu, { backgroundColor: t.surface, borderColor: t.border }]}>
-          <MeetButton label="Find someone else" tone="glass" onPress={() => void onNext()} />
+          <MeetButton label="New Meet sessions unavailable" disabled={!releaseAllows('meet', 'admit')} tone="glass" onPress={() => void onNext()} />
           <MeetButton label="Report stranger" tone="glass" onPress={() => openReport(null)} />
           <MeetButton label="Block stranger" tone="glass" onPress={() => void onBlock()} />
           <MeetButton label="Leave chat" tone="glass" onPress={() => void onLeave()} />
@@ -355,7 +356,7 @@ export default function MeetChatScreen(): React.JSX.Element {
           ]}
         >
           <Text style={[styles.dim, { color: t.textSecondary }]}>{footerNote}</Text>
-          <MeetButton label="Find someone else" tone="light" onPress={() => void onNext()} />
+          <MeetButton label="New Meet sessions unavailable" disabled={!releaseAllows('meet', 'admit')} tone="light" onPress={() => void onNext()} />
           <MeetButton label="Leave" tone="glass" onPress={() => void onLeave()} />
         </View>
       )}

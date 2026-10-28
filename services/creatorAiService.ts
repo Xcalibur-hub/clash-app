@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Creator AI API (Phase 15.5).
  *
@@ -10,7 +11,6 @@ import { getPublicMediaUrl } from './mediaService';
 import { requireSupabase, requestError, SupabaseError } from './supabaseClient';
 import {
   parseCreatorAiConfig,
-  parseCreatorAiConversationRef,
   parseCreatorAiMessageList,
   parseCreatorAiProfile,
   parseCreatorAiTurn,
@@ -48,6 +48,7 @@ export async function fetchMyCreatorAi(): Promise<CreatorAiConfig | null> {
 }
 
 export async function saveCreatorAiProfile(input: SaveCreatorAiInput): Promise<CreatorAiConfig | null> {
+  if (input.enabled) assertReleaseAdmission('ai');
   const { data, error } = await requireSupabase().rpc('upsert_creator_ai_profile', {
     p_display_name: input.displayName,
     p_description: input.description,
@@ -63,6 +64,7 @@ export async function saveCreatorAiProfile(input: SaveCreatorAiInput): Promise<C
 }
 
 export async function addCreatorAiKnowledge(input: AddCreatorAiKnowledgeInput): Promise<string> {
+  assertReleaseAdmission('ai');
   const { data, error } = await requireSupabase().rpc('add_creator_ai_knowledge', {
     p_kind: input.kind,
     p_title: input.title,
@@ -86,13 +88,11 @@ export async function removeCreatorAiKnowledge(knowledgeId: string): Promise<boo
 export async function startCreatorAiConversation(
   creatorId: string,
 ): Promise<CreatorAiConversationRef> {
-  const { data, error } = await requireSupabase().rpc('start_creator_ai_conversation', {
-    p_creator_id: creatorId,
-  });
+  const { data, error } = await requireSupabase().from('creator_ai_conversations').select('id').eq('creator_id', creatorId).maybeSingle();
   if (error) throw requestError(error);
-  const ref = parseCreatorAiConversationRef(data);
-  if (!ref) throw new SupabaseError('the AI room could not be opened', 'bad_payload');
-  return ref;
+  if (data) return { conversationId: data.id, profile: null };
+  assertReleaseAdmission('ai');
+  throw new Error('Conversation unavailable');
 }
 
 /** One page of history, newest first. Bounded by the server, never unbounded. */

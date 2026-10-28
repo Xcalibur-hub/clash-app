@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Play — Challenges + Treasure Hunts.
  * Server RPCs are authoritative; answers/rewards never trusted from the client.
@@ -380,6 +381,7 @@ export async function listChallengeEntries(
 }
 
 export async function joinChallenge(challengeId: string): Promise<void> {
+  assertReleaseAdmission('play');
   const { error } = await client().rpc('join_challenge', { p_challenge_id: challengeId });
   if (error) throw requestError(error);
 }
@@ -450,6 +452,7 @@ export async function fetchTreasureDetail(huntId: string): Promise<TreasureDetai
 }
 
 export async function joinTreasureHunt(huntId: string): Promise<void> {
+  assertReleaseAdmission('play');
   const { error } = await client().rpc('join_treasure_hunt', { p_hunt_id: huntId });
   if (error) throw requestError(error);
 }

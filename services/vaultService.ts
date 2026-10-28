@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Vault data API (Phase 3 Step 1).
  *
@@ -60,6 +61,7 @@ export async function fetchMyVault(): Promise<CreatorVault | null> {
 
 /** Opens the caller's Vault. Fails if they already have one (one Vault each). */
 export async function createVault(title: string, description = ''): Promise<CreatorVault> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_vault', {
     p_title: title,
     p_description: description,
@@ -95,6 +97,7 @@ export async function createDrop(
   accessLevel: VaultDropAccess,
   mediaObjectId?: string,
 ): Promise<VaultDrop> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_vault_drop', {
     p_vault_id: vaultId,
     p_caption: caption,
@@ -112,6 +115,7 @@ export async function createDrop(
  * which one could try.
  */
 export async function publishDrop(dropId: string): Promise<VaultDrop> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('publish_vault_drop', {
     p_drop_id: dropId,
   });
@@ -135,6 +139,7 @@ export async function createCollection(
   title: string,
   description = '',
 ): Promise<VaultCollection> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_collection', {
     p_vault_id: vaultId,
     p_title: title,
@@ -147,6 +152,7 @@ export async function createCollection(
 
 /** Shelves a Drop. Allowed for an expired Drop too — that is what permanence means. */
 export async function addToCollection(collectionId: string, dropId: string): Promise<void> {
+  assertReleaseAdmission('creator');
   const { error } = await requireSupabase().rpc('add_drop_to_collection', {
     p_collection_id: collectionId,
     p_drop_id: dropId,

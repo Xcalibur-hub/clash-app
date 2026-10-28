@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Hood Prediction Games API. Screens never talk to PostgREST for entries or
  * resolution — every write is an RPC, and aggregates come only from
@@ -151,6 +152,7 @@ export async function createPredictionGame(
   options: readonly string[],
   closesAt: Date,
 ): Promise<string> {
+  assertReleaseAdmission('media');
   const { data, error } = await requireSupabase().rpc('create_prediction_game', {
     p_hood: hood as DbHood,
     p_question: question,

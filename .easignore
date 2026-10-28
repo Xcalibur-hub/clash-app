@@ -791,3 +791,9 @@ supabase/.branches/
 /android/
 /ios/
 /docs/
+
+!/utils/releaseScope.ts
+
+!/utils/communityVerdict.ts
+
+!/components/shared/ReleaseUnavailable.tsx

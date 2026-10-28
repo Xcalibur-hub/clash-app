@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 import { currentUserId,requireSupabase,requestError,SupabaseError } from './supabaseClient';
 import { toTake } from './arenaMappers';
 import { parseQuestionState } from '../utils/arenaQuestions';
@@ -21,6 +22,7 @@ export async function voteQuestion(id:string,side:'A'|'B',revision:number,accoun
  return parseQuestionState(await rpc('vote_arena_question',{p_take_id:id,p_side:side,p_expected_revision:revision,p_expected_auth_uid:account},account),id);
 }
 export async function createQuestion(text:string,hood:DbHood,a:string,b:string,account:string,media?:NewTakeMedia,topicId?:string){
+ assertReleaseAdmission('media');
  const data=await rpc('create_arena_question',{p_hood:hood,p_text:text,p_side_a:a,p_side_b:b,p_topic_id:topicId??null,
   p_media_object_id:media?.mediaObjectId??null,p_media_url:media?.url??null,p_media_poster_url:media?.posterUrl??null,p_expected_auth_uid:account},account);
  if(!Array.isArray(data)||data.length!==1||!data[0]?.question_a)throw new SupabaseError('Question could not be confirmed','bad_payload');

@@ -1,3 +1,4 @@
+import { withReleaseAdmission } from '../../components/shared/ReleaseUnavailable';
 /**
  * Create advertiser workspace or a new sponsor campaign.
  */
@@ -37,7 +38,7 @@ function slugify(name: string): string {
     .slice(0, 48);
 }
 
-export default function SponsorNewScreen(): React.JSX.Element {
+function SponsorNewScreen(): React.JSX.Element {
   const t = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -338,3 +339,5 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 96, textAlignVertical: 'top' },
   error: { ...typeScale.caption, marginVertical: space.xs },
 });
+
+export default withReleaseAdmission(SponsorNewScreen, 'sponsorship');

@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 import type { ChallengerComment, HoodId, MediaKind, Take, User } from '../store/types';
 import type { DbHood } from '../supabase/types';
 import {
@@ -179,6 +180,7 @@ export async function postTake(
   hood: DbHood,
   media?: NewTakeMedia,
 ): Promise<Take> {
+  if (media) assertReleaseAdmission('media');
   const { data, error } = await requireSupabase().rpc('create_take', {
     p_hood: hood,
     p_text: text,
@@ -219,6 +221,7 @@ export async function postComment(
   media?: NewCommentMedia,
   gif?: NewCommentGif,
 ): Promise<ChallengerComment> {
+  if (media || gif) assertReleaseAdmission('media');
   if (media && gif) {
     throw new SupabaseError('Choose either an upload or a GIF, not both', 'bad_payload');
   }

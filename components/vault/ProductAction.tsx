@@ -1,3 +1,4 @@
+import { releaseAllows, releaseUnavailableCopy } from '../../utils/releaseScope';
 import React from 'react';
 import { Linking, Text, View } from 'react-native';
 import type { CreatorProduct } from '../../services/vaultCommerceMappers';
@@ -12,6 +13,7 @@ export function ProductAction({ product }: { product: CreatorProduct }): React.J
   const active = React.useRef(true), pending = React.useRef(false);
   React.useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const open = async () => {
+    if (product.accessType !== 'free' && !releaseAllows('commerce', 'admit')) return;
     if (pending.current || !product.externalUrl) return;
     pending.current = true; setBusy(true); setFailed(false);
     try {
@@ -20,6 +22,7 @@ export function ProductAction({ product }: { product: CreatorProduct }): React.J
     } catch { if (active.current) setFailed(true); }
     finally { pending.current = false; if (active.current) setBusy(false); }
   };
+  if (product.accessType !== 'free' && !releaseAllows('commerce', 'admit')) return <Text style={{ color: t.textSecondary }}>{releaseUnavailableCopy('commerce')}</Text>;
   if (!product.externalUrl) return (
     <View style={{ gap: space.sm }}>
       <Text style={{ ...typeScale.label, color: t.textSecondary }}>

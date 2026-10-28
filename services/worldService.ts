@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * World API — Missions + location-safe Drops.
  *
@@ -252,6 +253,7 @@ export async function createWorldDrop(input: {
   latitude: number;
   longitude: number;
 }): Promise<string> {
+  assertReleaseAdmission('world');
   const { data, error } = await requireSupabase().rpc('create_world_drop', {
     p_mission_id: input.missionId,
     p_media_object_id: input.mediaObjectId,

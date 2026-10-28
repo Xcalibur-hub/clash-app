@@ -14,7 +14,7 @@ for (const accessType of ['free', 'paid', 'subscriber', 'contact']) {
     try {
       await h.mount(); assert.equal(find(h, 'VaultActionButton'), undefined);
       assert.equal(h.nodes.some(n => n.props?.accessibilityRole === 'button'), false);
-      assert.match(text(h.tree), /No delivery link/); assert.doesNotMatch(text(h.tree), /unlocked|purchased/i);
+      assert.match(text(h.tree), accessType === 'free' ? /No delivery link/ : /unavailable in the text-debate beta/); assert.doesNotMatch(text(h.tree), /unlocked|purchased/i);
     } finally { await h.unmount(); }
   });
 }
