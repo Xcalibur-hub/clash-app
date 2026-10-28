@@ -53,7 +53,7 @@ The migration enables `pg_cron` where the platform allows it, unschedules any
 existing `clash-maintenance` job, then schedules exactly one — so it is safe to
 re-run or redeploy repeatedly.
 
-## Inspect
+## Inspect (read-only; requires authorized catalogue access)
 
 ```sql
 select jobid, jobname, schedule, command, username, active
@@ -62,8 +62,16 @@ select jobid, jobname, schedule, command, username, active
 select status, return_message, start_time, end_time
   from cron.job_run_details order by start_time desc limit 10;
 
-select public.run_maintenance(0);   -- shape check; limit 0 does no work
+-- Read-only inspection; NEVER invoke maintenance as a probe, even with limit 0.
+select current_setting('cron.launch_active_jobs', true) as scheduler_enabled;
+select p.oid::regprocedure, p.prosecdef, p.proconfig, p.proacl
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname in ('run_maintenance', 'settle_due_clashes', 'settle_clash');
+select pg_get_functiondef('public.run_maintenance(integer)'::regprocedure);
+select has_function_privilege('authenticated', 'public.run_maintenance(integer)', 'EXECUTE');
 ```
+
+A zero limit is not a dry run: helper clamping, trend refreshes and diagnostics can still write. The following operational commands mutate scheduler state and require separate approval.
 
 ## Unschedule / recreate safely
 

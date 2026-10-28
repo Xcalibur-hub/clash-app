@@ -1,3 +1,4 @@
+import { communityVerdictCopy } from '../../utils/communityVerdict';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ServerVerdict } from '../../services/clashEngineService';
@@ -27,18 +28,18 @@ export function ClashResultView({ verdict, reputationDelta, coinsDelta }: ClashR
   return (
     <FadeRise>
       <View style={styles.wrap}>
-        <Text allowFontScaling={false} style={[styles.winner, { color: tone }]}>
+        <Text allowFontScaling={true} style={[styles.winner, { color: tone }]}>
           {isDraw ? 'DRAW' : `SIDE ${winnerSide} WINS`}
         </Text>
         <View style={styles.scoreRow}>
           <CountUp value={pct} suffix="%" style={[styles.pct, { color: tone }]} accessibilityLabel={`${pct} percent agreement`} />
-          <Text allowFontScaling={false} style={styles.scoreMeta}>
+          <Text allowFontScaling={true} style={styles.scoreMeta}>
             agreement · {verdict.jurySize} {judgeWord}
           </Text>
         </View>
         {isDraw ? null : (
-          <Text allowFontScaling={false} style={styles.label}>
-            {verdict.verdictLabel}
+          <Text allowFontScaling={true} style={styles.label}>
+            {communityVerdictCopy(verdict)}
           </Text>
         )}
         <View style={styles.barTrack}>
@@ -47,20 +48,20 @@ export function ClashResultView({ verdict, reputationDelta, coinsDelta }: ClashR
         </View>
         <View style={styles.tally}>
           <View style={styles.tallyItem}>
-            <Text allowFontScaling={false} style={[styles.tallyText, { color: sideTone('A').tone }]}>
+            <Text allowFontScaling={true} style={[styles.tallyText, { color: sideTone('A').tone }]}>
               A ·{' '}
             </Text>
             <CountUp value={verdict.sideAScore} style={styles.tallyNum} />
           </View>
           <View style={styles.tallyItem}>
-            <Text allowFontScaling={false} style={[styles.tallyText, { color: sideTone('B').tone }]}>
+            <Text allowFontScaling={true} style={[styles.tallyText, { color: sideTone('B').tone }]}>
               B ·{' '}
             </Text>
             <CountUp value={verdict.sideBScore} style={styles.tallyNum} />
           </View>
         </View>
         {reputationDelta > 0 || coinsDelta > 0 ? (
-          <Text allowFontScaling={false} style={styles.reward}>
+          <Text allowFontScaling={true} style={styles.reward}>
             {reputationDelta > 0 ? `+${reputationDelta} reputation` : ''}
             {reputationDelta > 0 && coinsDelta > 0 ? ' · ' : ''}
             {coinsDelta > 0 ? `+${coinsDelta} coins` : ''}

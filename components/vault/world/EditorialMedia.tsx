@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import { getPublicMediaImageSource } from '../../../utils/publicMediaImageSource';
 import { duration, space, typeScale, useThemeColors } from '../../../theme';
 import { tap as hapticTap } from '../../../utils/haptics';
 import { PressableScale } from '../../shared/PressableScale';
@@ -106,7 +107,7 @@ export const EditorialMedia = React.memo(function EditorialMedia({
         ]}
       >
         {mediaUrl ? (
-          <Image source={{ uri: mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image source={getPublicMediaImageSource(mediaUrl)} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : (
           <LinearGradient
             colors={[fallback, t.scheme === 'light' ? '#D8D2C8' : '#101014']}

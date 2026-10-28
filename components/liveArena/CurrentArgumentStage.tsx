@@ -3,7 +3,8 @@
  * Typography-led; collapses long text without scrolling the whole canvas.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ArenaRoomText as Text } from './ArenaRoomText';
 import Animated, {
   FadeInDown,
   useReducedMotion,
@@ -47,9 +48,10 @@ export function CurrentArgumentStage({
         : null;
   const accent = speaker?.tint ?? t.borderStrong;
   const body = message?.body?.trim() ?? '';
-  const previewLimit = condensed ? 110 : type.compact ? 160 : 220;
+  const enlarged = fontScale >= 1.25 && !condensed;
+  const previewLimit = enlarged ? Math.max(body.length, 1) : condensed ? 110 : type.compact ? 160 : 220;
   const { preview, truncated } = duelArgumentPreview(body, previewLimit);
-  const lineCap = condensed ? 3 : type.compact ? 5 : 6;
+  const lineCap = enlarged ? undefined : condensed ? 3 : type.compact ? 5 : 6;
   // Layout clipping can hide a mid-sentence ending even when the preview fits —
   // keep an accessible route to the full argument whenever the body is long.
   const needsFullAccess = truncated || body.length > previewLimit * 0.7;

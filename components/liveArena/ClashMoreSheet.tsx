@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { layout, space, typeScale, useThemeColors } from '../../theme';
 
 export interface ClashMoreSheetProps {
@@ -12,6 +13,7 @@ export interface ClashMoreSheetProps {
   onArgumentHistory?: () => void;
   onShare?: () => void;
   onReport?: () => void;
+  children?: React.ReactNode;
 }
 
 export function ClashMoreSheet({
@@ -20,8 +22,13 @@ export function ClashMoreSheet({
   onArgumentHistory,
   onShare,
   onReport,
+  children,
 }: ClashMoreSheetProps): React.JSX.Element {
   const t = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = typeof __DEV__ !== 'undefined' && __DEV__
+    ? Math.max(insets.bottom, space.xl) + space.sm
+    : space.xl;
 
   const rows: { label: string; onPress?: () => void; hint?: string }[] = [
     {
@@ -43,7 +50,7 @@ export function ClashMoreSheet({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Dismiss">
+      <Pressable style={[styles.backdrop, { paddingBottom: bottomPadding }]} onPress={onClose} accessibilityLabel="Dismiss">
         <View style={[styles.sheet, { backgroundColor: t.background, borderColor: t.border }]}>
           {rows.map((row) => (
             <Pressable
@@ -63,6 +70,7 @@ export function ClashMoreSheet({
               ) : null}
             </Pressable>
           ))}
+          {children}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close"
@@ -83,7 +91,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.45)',
     padding: layout.screenX,
-    paddingBottom: space.xl,
   },
   sheet: {
     borderRadius: 16,

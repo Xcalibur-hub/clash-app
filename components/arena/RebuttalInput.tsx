@@ -1,4 +1,5 @@
 import React from 'react';
+import { assertReleaseAdmission, releaseAllows, releaseUnavailableCopy } from '../../utils/releaseScope';
 import {
   ActivityIndicator,
   Image,
@@ -120,6 +121,7 @@ export function RebuttalInput({
       realm: 'arena',
     });
     try {
+      assertReleaseAdmission('media');
       const picked = kind === 'image' ? await pickImage() : await pickVideo();
       if(!isCurrent())return;
       if (picked) {
@@ -133,12 +135,14 @@ export function RebuttalInput({
   };
 
   const openGifPicker = (): void => {
+    if (!releaseAllows('media', 'admit')) { dispatch(showNotice(releaseUnavailableCopy('media'))); return; }
     if (!requireAuth()) return;
     hapticTap();
     setGifOpen(true);
   };
 
   const uploadMedia = async (picked: PickedMedia): Promise<NewCommentMedia> => {
+    assertReleaseAdmission('media');
     const mime = mimeFor(picked);
     const plan = await createUpload(picked.kind, mime, 'public');
     try {

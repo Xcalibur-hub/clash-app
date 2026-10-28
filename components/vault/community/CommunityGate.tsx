@@ -45,19 +45,20 @@ export function CommunityGate({
     <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }]}>
       <View style={[styles.badge, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
         <LockIcon size={16} color={t.textSecondary} strokeWidth={2.2} />
-        <Text allowFontScaling={false} style={[styles.access, { color: t.textMuted }]}>
+        <Text style={[styles.access, { color: t.textMuted }]}>
           {communityAccessLabel(accessType).toUpperCase()}
         </Text>
       </View>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         {gate.title}
       </Text>
-      <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
-        {gate.body}
+      <Text style={[styles.body, { color: t.textSecondary }]}>
+        {gate.action === 'subscribe' ? 'This community is member-only. New subscriptions are unavailable in this build; existing access remains server-authorized.' : gate.body}
       </Text>
       {onPress ? (
         <VaultActionButton
-          label={busy ? 'Working…' : gate.actionLabel}
+          label={busy ? 'Working…' : gate.action === 'subscribe' ? 'View creator' : gate.actionLabel}
+          busy={busy}
           onPress={onPress}
         />
       ) : null}

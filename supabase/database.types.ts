@@ -6589,6 +6589,11 @@ export type Database = {
         Args: { p_invite_id: string }
         Returns: Json
       }
+      /** Phase 6F.4 additive contract — source migration not yet applied. */
+      cancel_meet_search: {
+        Args: { p_queue_id: string }
+        Returns: Json
+      }
       claim_arena_gif_request: {
         Args: { p_auth_uid: string }
         Returns: undefined

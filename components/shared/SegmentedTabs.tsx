@@ -58,13 +58,11 @@ export function SegmentedTabs<T extends string>({
             ]}
           >
             <Text
-              allowFontScaling={false}
               style={[
                 styles.label,
                 compact && styles.labelCompact,
                 { color: active ? t.textPrimary : t.textMuted, fontWeight: active ? '700' : '500' },
               ]}
-              numberOfLines={1}
             >
               {item.label}
             </Text>
@@ -87,6 +85,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   item: {
+    minHeight: 44,
+    minWidth: 44,
+    flexShrink: 1,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -99,6 +100,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     flex: 0,
   },
-  label: { ...typeScale.label },
+  label: { ...typeScale.label, textAlign: 'center', flexShrink: 1 },
   labelCompact: { fontSize: 12 },
 });

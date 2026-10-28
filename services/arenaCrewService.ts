@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Arena Crews client — Phase A writes + Phase B discovery/profile reads.
  */
@@ -46,6 +47,7 @@ export async function createArenaCrew(input: {
   joinMode?: ArenaCrewJoinMode;
   specialties?: string[];
 }): Promise<ArenaCrew> {
+  assertReleaseAdmission('groups');
   const data = await crewRpc('create_arena_crew', {
     p_name: input.name,
     p_slug: input.slug,
@@ -59,6 +61,7 @@ export async function createArenaCrew(input: {
 }
 
 export async function joinArenaCrew(crewId: string): Promise<ArenaCrew> {
+  assertReleaseAdmission('groups');
   const crew = parseArenaCrewPayload(await crewRpc('join_arena_crew', { p_crew_id: crewId }));
   if (!crew) throw new Error('join_arena_crew returned unexpected payload');
   return crew;
@@ -71,6 +74,7 @@ export async function leaveArenaCrew(crewId: string): Promise<ArenaCrew> {
 }
 
 export async function followArenaCrew(crewId: string): Promise<ArenaCrew> {
+  assertReleaseAdmission('groups');
   const crew = parseArenaCrewPayload(await crewRpc('follow_arena_crew', { p_crew_id: crewId }));
   if (!crew) throw new Error('follow_arena_crew returned unexpected payload');
   return crew;
@@ -86,6 +90,7 @@ export async function inviteToArenaCrew(
   crewId: string,
   recipientId: string,
 ): Promise<{ id: string; status: string }> {
+  assertReleaseAdmission('groups');
   const data = (await crewRpc('invite_to_arena_crew', {
     p_crew_id: crewId,
     p_recipient_id: recipientId,
@@ -97,6 +102,7 @@ export async function respondArenaCrewInvite(
   inviteId: string,
   accept: boolean,
 ): Promise<ArenaCrew | { id: string; status: string }> {
+  if (accept) assertReleaseAdmission('groups');
   const data = await crewRpc('respond_arena_crew_invite', {
     p_invite_id: inviteId,
     p_accept: accept,
@@ -108,6 +114,7 @@ export async function respondArenaCrewInvite(
 }
 
 export async function requestArenaCrewJoin(crewId: string): Promise<{ id: string; status: string }> {
+  assertReleaseAdmission('groups');
   const data = (await crewRpc('request_arena_crew_join', { p_crew_id: crewId })) as {
     id?: string;
     status?: string;
@@ -119,6 +126,7 @@ export async function decideArenaCrewJoinRequest(
   requestId: string,
   approve: boolean,
 ): Promise<ArenaCrew | { id: string; status: string }> {
+  if (approve) assertReleaseAdmission('groups');
   const data = await crewRpc('decide_arena_crew_join_request', {
     p_request_id: requestId,
     p_approve: approve,

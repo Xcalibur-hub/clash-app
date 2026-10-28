@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Creator World Drops API (Phase 15.3).
  *
@@ -81,6 +82,7 @@ export async function fetchCreatorWorldDrop(dropId: string): Promise<CreatorWorl
 
 /** Idempotent claim. Safe to replay; a second call returns alreadyClaimed. */
 export async function claimWorldDrop(dropId: string): Promise<CreatorDropClaim> {
+  assertReleaseAdmission('play');
   const { data, error } = await requireSupabase().rpc('claim_world_drop', { p_drop_id: dropId });
   if (error) throw requestError(error);
   const claim = toCreatorDropClaim(data);
@@ -96,6 +98,7 @@ export async function fetchMyWorldArtifacts(limit = 40): Promise<WorldArtifact[]
 }
 
 export async function createCreatorWorldDrop(input: CreateWorldDropInput): Promise<string> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_creator_world_drop', {
     p_caption: input.caption,
     p_clue: input.clue ?? '',
@@ -120,6 +123,7 @@ export async function setCreatorWorldDropStatus(
   dropId: string,
   status: 'DRAFT' | 'PUBLISHED' | 'REMOVED',
 ): Promise<void> {
+  if (status === 'PUBLISHED') assertReleaseAdmission('creator');
   const { error } = await requireSupabase().rpc('set_creator_world_drop_status', {
     p_drop_id: dropId,
     p_status: status,

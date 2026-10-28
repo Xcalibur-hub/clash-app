@@ -17,12 +17,12 @@ export function WorldHeroMeta({
   return (
     <View style={[styles.wrap, { borderLeftColor: t.borderStrong }]}>
       {secondary ? (
-        <Text allowFontScaling={false} style={[styles.secondary, { color: t.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.secondary, { color: t.textPrimary }]}>
           {secondary}
         </Text>
       ) : null}
       {description ? (
-        <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]} numberOfLines={2}>
+        <Text style={[styles.description, { color: t.textSecondary }]}>
           {description}
         </Text>
       ) : null}

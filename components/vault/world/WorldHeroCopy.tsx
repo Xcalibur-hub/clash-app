@@ -8,6 +8,7 @@ export interface WorldHeroCopyProps {
   creatorName: string;
   identity: string;
   following: boolean;
+  followBusy?: boolean;
   isSelf: boolean;
   subscribed: boolean;
   onToggleFollow?: () => void;
@@ -21,6 +22,7 @@ export function WorldHeroCopy({
   creatorName,
   identity,
   following,
+  followBusy = false,
   isSelf,
   subscribed,
   onToggleFollow,
@@ -29,13 +31,13 @@ export function WorldHeroCopy({
 }: WorldHeroCopyProps): React.JSX.Element {
   return (
     <View style={styles.copy}>
-      <Text allowFontScaling={false} style={styles.eyebrow}>
+      <Text style={styles.eyebrow}>
         {eyebrow}
       </Text>
-      <Text allowFontScaling={false} style={styles.name} numberOfLines={2}>
+      <Text style={styles.name}>
         {creatorName}
       </Text>
-      <Text allowFontScaling={false} style={styles.identity} numberOfLines={2}>
+      <Text style={styles.identity}>
         {identity}
       </Text>
       <View style={styles.actions}>
@@ -45,28 +47,29 @@ export function WorldHeroCopy({
             tone="quiet"
             compact
             overMedia
-            onPress={onManage ?? (() => undefined)}
+            onPress={onManage}
           />
         ) : (
           <>
             <VaultActionButton
               label={following ? 'Following' : 'Follow'}
+              busy={followBusy}
               tone={following ? 'quiet' : 'solid'}
               compact
               overMedia
-              onPress={onToggleFollow ?? (() => undefined)}
+              onPress={onToggleFollow}
             />
             {!subscribed ? (
               <VaultActionButton
-                label="Subscribe"
+                label="Membership availability"
                 tone="quiet"
                 compact
                 overMedia
-                onPress={onSubscribe ?? (() => undefined)}
+                onPress={onSubscribe}
               />
             ) : (
-              <Text allowFontScaling={false} style={styles.subscribed}>
-                Inside this world
+              <Text style={styles.subscribed}>
+                Member access
               </Text>
             )}
           </>
@@ -94,7 +97,7 @@ const styles = StyleSheet.create({
     color: '#FAFAF8',
   },
   identity: { ...typeScale.body, fontSize: 15, color: 'rgba(250,250,248,0.86)', maxWidth: 300 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm, marginTop: space.sm },
   subscribed: {
     ...typeScale.caption,
     fontWeight: '700',

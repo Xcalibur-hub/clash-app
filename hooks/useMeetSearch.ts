@@ -5,14 +5,16 @@
  *  - one self-scheduling poll loop (no overlapping ticks, no double intervals);
  *  - exponential backoff after transport failures;
  *  - polling pauses while the app is backgrounded and resumes on foreground;
- *  - cancelling during a match ends that match instead of showing it;
+ *  - cancelling uses actor-scoped cancel_meet_search for the admitted queue id
+ *    (never poll_meet_queue for recovery — that path can match);
  *  - a matched session is always the *current* session (never revived);
- *  - leaving the screen while queued removes the queue row.
+ *  - leaving the screen while queued cancels that search id when known.
  */
 import * as React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { errorText } from '../services/supabaseClient';
 import {
+  cancelMeetSearch,
   fetchMeetSession,
   joinMeetQueue,
   leaveMeetQueue,
@@ -75,6 +77,10 @@ export function useMeetSearch(): MeetSearchApi {
   const sessionRef = React.useRef<MeetSession | null>(null);
   const cancelledRef = React.useRef(false);
   const startingRef = React.useRef(false);
+  /** Generation of the current start intent; cancel bumps it so late join is dropped. */
+  const searchGenerationRef = React.useRef(0);
+  /** Queue id returned by the admitted join for this generation. */
+  const searchQueueIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     phaseRef.current = phase;
@@ -90,24 +96,31 @@ export function useMeetSearch(): MeetSearchApi {
     return () => sub.remove();
   }, []);
 
-
   const cancel = React.useCallback(async (): Promise<void> => {
     cancelledRef.current = true;
+    searchGenerationRef.current += 1;
     guard.invalidate();
     sessionRef.current = null;
     setSession(null);
     setPhase('idle');
+    setError(null);
+
+    const queueId = searchQueueIdRef.current;
+    searchQueueIdRef.current = null;
+
     try {
-      // Cancels the waiting row; if a match landed in the same instant, end it
-      // so the peer is never stranded in a session nobody will open.
-      await leaveMeetQueue();
-      const state = await pollMeetQueue();
-      const outcome = meetQueueOutcome(state, Date.now());
-      if (outcome === 'matched' && state.session) {
-        await leaveMeetSession(state.session.sessionId, 'leave');
+      if (queueId) {
+        // Actor-scoped cancel for THIS search only — never poll_meet_queue (can match).
+        const result = await cancelMeetSearch(queueId);
+        if (!result.resolved) {
+          setNotice('Could not confirm that Meet search was cleared. Try again if it reappears.');
+        }
+        return;
       }
+      // No admitted queue id yet (cancel during in-flight join): best-effort waiting sweep.
+      await leaveMeetQueue();
     } catch {
-      // Offline: the server sweep reclaims the waiting row.
+      setNotice('Could not confirm that Meet search was cleared. Try again if it reappears.');
     }
   }, [guard]);
 
@@ -136,6 +149,8 @@ export function useMeetSearch(): MeetSearchApi {
       if (startingRef.current) return null;
       startingRef.current = true;
       cancelledRef.current = false;
+      const generation = ++searchGenerationRef.current;
+      searchQueueIdRef.current = null;
       guard.invalidate();
       setBusy(true);
       setError(null);
@@ -149,13 +164,25 @@ export function useMeetSearch(): MeetSearchApi {
           hood: input.mode === 'HOOD' ? (input.hood ?? null) : null,
           interests: input.mode === 'INTERESTS' ? (input.interests ?? []) : [],
         });
+
+        // Cancel / newer start invalidated this join — do not restore searching.
+        if (cancelledRef.current || generation !== searchGenerationRef.current) {
+          const lateQueueId = state.queueId ?? null;
+          if (lateQueueId) {
+            await cancelMeetSearch(lateQueueId).catch(() => undefined);
+          } else if (state.session?.sessionId) {
+            await leaveMeetSession(state.session.sessionId, 'cancel').catch(() => undefined);
+          } else {
+            await leaveMeetQueue().catch(() => undefined);
+          }
+          setPhase('idle');
+          return null;
+        }
+
+        if (state.queueId) searchQueueIdRef.current = state.queueId;
+
         const outcome = meetQueueOutcome(state, Date.now());
         if (outcome === 'matched' && state.session) {
-          if (meetCancelVsMatch(cancelledRef.current, true) === 'discard') {
-            await leaveMeetSession(state.session.sessionId, 'leave').catch(() => undefined);
-            setPhase('idle');
-            return null;
-          }
           sessionRef.current = state.session;
           setSession(state.session);
           setPhase('matched');
@@ -169,6 +196,10 @@ export function useMeetSearch(): MeetSearchApi {
         setNotice('Your last search expired. Start again.');
         return null;
       } catch (e) {
+        if (cancelledRef.current || generation !== searchGenerationRef.current) {
+          setPhase('idle');
+          return null;
+        }
         setPhase('idle');
         setError(errorText(e));
         return null;
@@ -179,7 +210,6 @@ export function useMeetSearch(): MeetSearchApi {
     },
     [guard],
   );
-
 
   // One poll loop for the whole search; `paused` tears it down cleanly.
   React.useEffect(() => {
@@ -202,15 +232,16 @@ export function useMeetSearch(): MeetSearchApi {
       try {
         const state = await pollMeetQueue();
         // A newer tick (or a cancel) already owns the state: drop this payload.
-        if (!alive || !guard.isCurrent(token)) return;
+        if (!alive || !guard.isCurrent(token) || cancelledRef.current) return;
         strikes = 0;
         setFailures(0);
+        if (state.queueId) searchQueueIdRef.current = state.queueId;
         const outcome = meetQueueOutcome(state, Date.now());
         if (outcome === 'matched' && state.session) {
           if (meetCancelVsMatch(cancelledRef.current, true) === 'discard') {
-            await leaveMeetSession(state.session.sessionId, 'leave').catch(
-              () => undefined,
-            );
+            const qid = searchQueueIdRef.current ?? state.queueId;
+            if (qid) await cancelMeetSearch(qid).catch(() => undefined);
+            else await leaveMeetSession(state.session.sessionId, 'cancel').catch(() => undefined);
             setPhase('idle');
             return;
           }
@@ -226,7 +257,7 @@ export function useMeetSearch(): MeetSearchApi {
         }
         schedule(MEET_QUEUE_POLL_MS);
       } catch {
-        if (!alive) return;
+        if (!alive || cancelledRef.current) return;
         strikes += 1;
         setFailures(strikes);
         schedule(meetPollDelay(MEET_QUEUE_POLL_MS, strikes, MEET_MAX_POLL_MS));
@@ -288,10 +319,18 @@ export function useMeetSearch(): MeetSearchApi {
     };
   }, [guard, matchedId, paused, phase]);
 
-  // Unmounting mid-search must not leave a phantom waiting row behind.
+  // Unmounting mid-search must not leave a phantom waiting/matched row behind.
   React.useEffect(
     () => () => {
-      if (phaseRef.current !== 'searching') return;
+      if (phaseRef.current !== 'searching' && phaseRef.current !== 'matched') return;
+      const queueId = searchQueueIdRef.current;
+      searchQueueIdRef.current = null;
+      cancelledRef.current = true;
+      searchGenerationRef.current += 1;
+      if (queueId) {
+        void cancelMeetSearch(queueId).catch(() => undefined);
+        return;
+      }
       void leaveMeetQueue().catch(() => undefined);
     },
     [],

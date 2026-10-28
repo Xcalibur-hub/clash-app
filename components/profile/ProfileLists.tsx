@@ -1,3 +1,4 @@
+import { communityVerdictCopy } from '../../utils/communityVerdict';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Take, User } from '../../store';
@@ -70,22 +71,6 @@ export function ProfileReplyItem({ reply, onOpen }: { reply: ProfileReply; onOpe
   );
 }
 
-function winShareLabel(clash: ProfileClash): string | null {
-  const verdict = clash.verdict;
-  if (!verdict || clash.outcome !== 'won') return null;
-  const total = verdict.sideAScore + verdict.sideBScore;
-  if (total <= 0) return null;
-  const winning =
-    verdict.winnerSide === 'A'
-      ? verdict.sideAScore
-      : verdict.winnerSide === 'B'
-        ? verdict.sideBScore
-        : Math.max(verdict.sideAScore, verdict.sideBScore);
-  const pct = Math.round((winning / total) * 100);
-  if (!Number.isFinite(pct) || pct <= 0) return null;
-  return `${pct}% judged your side stronger`;
-}
-
 /** Clash history row — receipt of an argument, not a trophy. */
 export function ProfileClashRow({
   clash,
@@ -109,7 +94,6 @@ export function ProfileClashRow({
         ? 'No verdict'
         : 'Cancelled';
 
-  const share = winShareLabel(clash);
   const isWin = clash.outcome === 'won';
 
   return (
@@ -138,14 +122,8 @@ export function ProfileClashRow({
         </Text>
       ) : null}
 
-      {share ? (
-        <Text allowFontScaling={false} style={[styles.share, { color: t.textSecondary }]}>
-          {share}
-        </Text>
-      ) : clash.verdict ? (
-        <Text allowFontScaling={false} style={[styles.share, { color: t.textSecondary }]}>
-          {clash.verdict.sideAScore}–{clash.verdict.sideBScore} · {clash.verdict.verdictLabel}
-        </Text>
+      {clash.verdict ? (
+        <Text style={[styles.share, { color: t.textSecondary }]}>{communityVerdictCopy(clash.verdict)}</Text>
       ) : null}
 
       <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>

@@ -1,0 +1,28 @@
+{
+  "at": "2026-10-24T13:02:00.000Z",
+  "status": "CONSUMED",
+  "ownerApproval": "CODEX — E3.7.2 AUTHORIZATION CONFIRMED",
+  "database": "clash_e325_e357_ce48b72fd636_fresh",
+  "gateway": "127.0.0.1:55471",
+  "device": "SM-A505F",
+  "accounts": ["fictional-A", "fictional-B"],
+  "e370AuthorizationReused": false,
+  "approved": [
+    "Exactly one disposable A/B TEXT session",
+    "B→A and A→B typing verification",
+    "Idle clearing, reconnect/delayed subscription, lease stability, Leave cleanup",
+    "Sanitized screenshots and evidence"
+  ],
+  "forbidden": [
+    "additional sessions",
+    "matchmaking",
+    "Block",
+    "reports",
+    "media",
+    "migrations",
+    "rebuild",
+    "push",
+    "merge",
+    "deployment"
+  ]
+}

@@ -1,3 +1,4 @@
+import { withReleaseAdmission } from '../../../../components/shared/ReleaseUnavailable';
 /**
  * VIDEO MEET pre-call — camera preview + permissions + START queue.
  */
@@ -13,7 +14,7 @@ import { peekMeetVideoPrefs } from '../../../../services/meetVideoPrefs';
 import { meetActiveSessionChannel } from '../../../../utils/meetLifecycle';
 import { radius, space, typeScale, useThemeColors } from '../../../../theme';
 
-export default function MeetVideoPrepScreen(): React.JSX.Element {
+function MeetVideoPrepScreen(): React.JSX.Element {
   const t = useThemeColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -209,3 +210,5 @@ const styles = StyleSheet.create({
   permRow: { flexDirection: 'row', gap: 16 },
   perm: { color: 'rgba(255,255,255,0.75)', fontWeight: '700', fontSize: 13 },
 });
+
+export default withReleaseAdmission(MeetVideoPrepScreen, 'meet');

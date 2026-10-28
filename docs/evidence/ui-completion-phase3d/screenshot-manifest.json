@@ -1,0 +1,152 @@
+{
+  "device": "SM-A505F",
+  "nativeCapture": "ADB screencap",
+  "imagesCommitted": false,
+  "resized": false,
+  "captures": [
+    {
+      "file": "01-after-patched-reload.png",
+      "width": 1080,
+      "height": 2340,
+      "privateOriginal": ".expo/ui-completion-phase3d-20261025/01-after-patched-reload.png",
+      "privateRedacted": ".expo/ui-completion-phase3d-20261025/sanitized/01-after-patched-reload.png",
+      "originalSHA256": "310032424e355f0eed0760b9a4585ade244739e0a95a7228544ac4f70893e670",
+      "redactedSHA256": "50a97c72fd69f7ac68ecfb084ce4ec0d77a8338760e211f25ef7bfa072e6bbd3",
+      "hierarchy": ".expo/ui-completion-phase3d-20261025/01-after-patched-reload.xml",
+      "redactions": [
+        [
+          0,
+          0,
+          1080,
+          650
+        ],
+        [
+          0,
+          2196,
+          1080,
+          144
+        ]
+      ]
+    },
+    {
+      "file": "02-for-you-after.png",
+      "width": 1080,
+      "height": 2340,
+      "privateOriginal": ".expo/ui-completion-phase3d-20261025/02-for-you-after.png",
+      "privateRedacted": ".expo/ui-completion-phase3d-20261025/sanitized/02-for-you-after.png",
+      "originalSHA256": "46c30d26d3dc8147ac74ea2817f94b964936ce66677340f057d15102f46d4a4d",
+      "redactedSHA256": "eac7fd85dcd536fb644b4a3aea16fd48200429d200152a205b8d7233a9252362",
+      "hierarchy": ".expo/ui-completion-phase3d-20261025/02-for-you-after.xml",
+      "redactions": [
+        [
+          0,
+          0,
+          1080,
+          650
+        ],
+        [
+          0,
+          2196,
+          1080,
+          144
+        ]
+      ]
+    },
+    {
+      "file": "03-for-you-retry.png",
+      "width": 1080,
+      "height": 2340,
+      "privateOriginal": ".expo/ui-completion-phase3d-20261025/03-for-you-retry.png",
+      "privateRedacted": ".expo/ui-completion-phase3d-20261025/sanitized/03-for-you-retry.png",
+      "originalSHA256": "ba6ce5d1db6864c05d501df07f082711fbec985dd978b19c4b358d4d8df3e22d",
+      "redactedSHA256": "eac7fd85dcd536fb644b4a3aea16fd48200429d200152a205b8d7233a9252362",
+      "hierarchy": ".expo/ui-completion-phase3d-20261025/03-for-you-retry.xml",
+      "redactions": [
+        [
+          0,
+          0,
+          1080,
+          650
+        ],
+        [
+          0,
+          2196,
+          1080,
+          144
+        ]
+      ]
+    },
+    {
+      "file": "04-world-after.png",
+      "width": 1080,
+      "height": 2340,
+      "privateOriginal": ".expo/ui-completion-phase3d-20261025/04-world-after.png",
+      "privateRedacted": ".expo/ui-completion-phase3d-20261025/sanitized/04-world-after.png",
+      "originalSHA256": "27ab49e2ae9d1d508e81c7ddaba6014de2e4c81ab8dbb8d69edcabcb18913f8a",
+      "redactedSHA256": "1b7b936c70bc1fa136c3f2cead722e9a87b6b8eb3369378a667b3806b385fa9d",
+      "hierarchy": ".expo/ui-completion-phase3d-20261025/04-world-after.xml",
+      "redactions": [
+        [
+          0,
+          0,
+          1080,
+          650
+        ],
+        [
+          0,
+          2196,
+          1080,
+          144
+        ]
+      ]
+    },
+    {
+      "file": "05-world-retry.png",
+      "width": 1080,
+      "height": 2340,
+      "privateOriginal": ".expo/ui-completion-phase3d-20261025/05-world-retry.png",
+      "privateRedacted": ".expo/ui-completion-phase3d-20261025/sanitized/05-world-retry.png",
+      "originalSHA256": "da257fb414aabdc57a78e7cc00f6f4be44cac6ccefd8a601a0862f1669518caa",
+      "redactedSHA256": "1b7b936c70bc1fa136c3f2cead722e9a87b6b8eb3369378a667b3806b385fa9d",
+      "hierarchy": ".expo/ui-completion-phase3d-20261025/05-world-retry.xml",
+      "redactions": [
+        [
+          0,
+          0,
+          1080,
+          650
+        ],
+        [
+          0,
+          2196,
+          1080,
+          144
+        ]
+      ]
+    },
+    {
+      "file": "06-for-you-return.png",
+      "width": 1080,
+      "height": 2340,
+      "privateOriginal": ".expo/ui-completion-phase3d-20261025/06-for-you-return.png",
+      "privateRedacted": ".expo/ui-completion-phase3d-20261025/sanitized/06-for-you-return.png",
+      "originalSHA256": "c5b9419105219f3f723cda6185d810bbd52d027b3f3c07047acec6afbe3b2ffd",
+      "redactedSHA256": "eac7fd85dcd536fb644b4a3aea16fd48200429d200152a205b8d7233a9252362",
+      "hierarchy": ".expo/ui-completion-phase3d-20261025/06-for-you-return.xml",
+      "redactions": [
+        [
+          0,
+          0,
+          1080,
+          650
+        ],
+        [
+          0,
+          2196,
+          1080,
+          144
+        ]
+      ]
+    }
+  ]
+}

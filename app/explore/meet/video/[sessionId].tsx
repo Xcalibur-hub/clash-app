@@ -1,3 +1,4 @@
+import { releaseAllows } from '../../../../utils/releaseScope';
 /**
  * Immersive Meet VIDEO call UI.
  */
@@ -213,7 +214,7 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
         </Text>
 
         {peerLeft ? (
-          <MeetButton label="Next person" onPress={() => void onNext()} tone="light" disabled={busy} />
+          <MeetButton label="New Meet sessions unavailable" onPress={() => void onNext()} tone="light" disabled={busy || !releaseAllows('meet', 'admit')} />
         ) : (
           <View style={styles.controls}>
             <RoundCtrl
@@ -234,8 +235,8 @@ export default function MeetVideoCallScreen(): React.JSX.Element {
               }}
               style={[styles.next, busy && { opacity: 0.5 }]}
               accessibilityRole="button"
-              accessibilityLabel="Next"
-              disabled={busy}
+              accessibilityLabel="New Meet sessions unavailable"
+              disabled={busy || !releaseAllows('meet', 'admit')}
             >
               <Text style={styles.nextText}>NEXT</Text>
             </Pressable>

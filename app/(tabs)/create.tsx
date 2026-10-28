@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../../utils/releaseScope';
 import React from 'react';
 import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -154,6 +155,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
 
   const attach = async (kind: 'image' | 'video'): Promise<void> => {
     try {
+      assertReleaseAdmission('media');
       const picked = kind === 'image' ? await pickImage() : await pickVideo();
       if (picked) setMedia(picked);
     } catch (error) {
@@ -268,7 +270,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
             }
           />
 
-          <SegmentedTabs value={kind} items={[{key:'take',label:'Take'},{key:'question',label:'A/B question'}]} onChange={next=>{if(!posting)setKind(next);}} label="Post type" />
+          <SegmentedTabs value={kind} items={[{key:'take',label:'Text Take'}]} onChange={next=>{if(!posting)setKind(next);}} label="Post type" />
           <TakeComposerFields
             text={text}
             onChangeText={(next) => setText(next.slice(0, MAX_CHARS))}

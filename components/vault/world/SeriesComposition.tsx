@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { WorldCollectionItem } from '../../../utils/vaultWorldRows';
 import { space, typeScale, useThemeColors } from '../../../theme';
 import { PosterStrip } from './PosterStrip';
@@ -9,6 +9,7 @@ export interface SeriesCompositionProps {
   radius: number;
   scatter: readonly number[];
   onOpen: (id: string) => void;
+  onOpenCollection: (id: string) => void;
 }
 
 /** The Collections chapter: named series, each a numbered film strip. */
@@ -17,6 +18,7 @@ export const SeriesComposition = React.memo(function SeriesComposition({
   radius,
   scatter,
   onOpen,
+  onOpenCollection,
 }: SeriesCompositionProps): React.JSX.Element {
   const t = useThemeColors();
 
@@ -24,19 +26,19 @@ export const SeriesComposition = React.memo(function SeriesComposition({
     <View style={styles.stack}>
       {collections.map((collection) => (
         <View key={collection.id} style={styles.series}>
-          <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-            SERIES
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={[styles.title, { color: t.textPrimary }]}
-            numberOfLines={2}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open collection ${collection.title}`}
+            accessibilityHint="View this collection and its episodes"
+            onPress={() => onOpenCollection(collection.id)}
+            style={styles.collectionEntry}
           >
-            {collection.title}
-          </Text>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
-            {`${collection.count} episode${collection.count === 1 ? '' : 's'}`}
-          </Text>
+            <Text style={[styles.kicker, { color: t.textMuted }]}>SERIES</Text>
+            <Text style={[styles.title, { color: t.textPrimary }]}>{collection.title}</Text>
+            <Text style={[styles.meta, { color: t.textMuted }]}>
+              {`${collection.count} episode${collection.count === 1 ? '' : 's'}`}
+            </Text>
+          </Pressable>
           <PosterStrip
             items={collection.drops.map((drop) => ({
               id: drop.id,
@@ -67,6 +69,7 @@ export const SeriesComposition = React.memo(function SeriesComposition({
 const styles = StyleSheet.create({
   stack: { gap: space.lg },
   series: { gap: 4 },
+  collectionEntry: { minHeight: 44, gap: 4, alignSelf: 'stretch' },
   kicker: { ...typeScale.caption, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   title: { ...typeScale.title, fontSize: 24, lineHeight: 27, fontWeight: '800', letterSpacing: -0.6 },
   meta: { ...typeScale.caption, letterSpacing: 0.3, marginBottom: space.sm },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ExploreDiscoveryCard } from '../explore/ExploreDiscoveryCard';
 import { WorldDropsShelf } from './WorldDropsShelf';
@@ -15,6 +15,9 @@ import { space, typeScale, useThemeColors } from '../../theme';
 import { timeLeftLabel } from '../../utils/format';
 import { tap as hapticTap } from '../../utils/haptics';
 import { useClock } from '../../hooks/useClock';
+import { useAuth } from '../../store/AuthProvider';
+import { useRetryableRead } from '../../hooks/useRetryableRead';
+import { ReadFeedback } from '../shared/ReadFeedback';
 
 type PlayTab = 'challenges' | 'treasure';
 
@@ -94,28 +97,13 @@ export function PlayHomePanel(): React.JSX.Element {
   const router = useRouter();
   const now = useClock(30_000);
   const [tab, setTab] = React.useState<PlayTab>('challenges');
-  const [home, setHome] = React.useState<PlayHome | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const { user } = useAuth();
+  const read = useRetryableRead(fetchPlayHome, user?.id ?? 'guest');
+  const home: PlayHome | null = read.data;
+  const loading = read.status === 'loading', error = read.status !== 'ready';
 
   React.useEffect(() => {
     analytics.track('play_opened', { realm: 'explore', source: 'explore' });
-    let alive = true;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchPlayHome();
-        if (alive) setHome(data);
-      } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : 'Could not load Play');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
   }, []);
 
   const openChallenge = (id: string) => {
@@ -184,12 +172,7 @@ export function PlayHomePanel(): React.JSX.Element {
 
       <WorldDropsShelf />
 
-      {loading ? <ActivityIndicator color={t.textPrimary} style={{ marginTop: space.lg }} /> : null}
-      {error ? (
-        <Text allowFontScaling={false} style={{ color: t.danger }}>
-          {error}
-        </Text>
-      ) : null}
+      <ReadFeedback status={read.status} subject="Play" retry={read.retry} />
 
       {!loading && !error && tab === 'challenges' ? (
         <>

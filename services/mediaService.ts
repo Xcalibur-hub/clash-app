@@ -127,6 +127,8 @@ export function getPublicMediaUrl(bucket: string, path: string): string {
   return requireSupabase().storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
 
+export { getPublicMediaImageSource } from '../utils/publicMediaImageSource';
+
 /**
  * Sibling poster path for a video storage object.
  * `owner/m_abc/m_abc.mp4` → `owner/m_abc/m_abc_poster.jpg`

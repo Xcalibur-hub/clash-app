@@ -1,3 +1,4 @@
+import { withReleaseAdmission } from '../../components/shared/ReleaseUnavailable';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -47,7 +48,7 @@ function mimeFor(picked: PickedMedia): string {
  * Mission → Participate publish flow.
  * Foreground location only; copy states approximate storage up front.
  */
-export default function WorldComposeScreen(): React.JSX.Element {
+function WorldComposeScreen(): React.JSX.Element {
   const { missionId: missionParam } = useLocalSearchParams<{ missionId?: string | string[] }>();
   const missionId = Array.isArray(missionParam) ? missionParam[0] : missionParam;
   const router = useRouter();
@@ -299,3 +300,5 @@ const styles = StyleSheet.create({
   },
   meta: { ...typeScale.meta, color: ink.tertiary },
 });
+
+export default withReleaseAdmission(WorldComposeScreen, 'world');

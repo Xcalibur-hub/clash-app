@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ArenaRoomText as Text } from './ArenaRoomText';
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
 import { space, typeScale, useThemeColors } from '../../theme';
@@ -21,6 +22,7 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
   nextClash?: NextClashSuggestion | null; nextBusy?: boolean; nextNotice?: string | null; onOpenNext?: () => void;
 }): React.JSX.Element {
   const t = useThemeColors();
+  const { fontScale } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -42,12 +44,12 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
         {(resultTitle || duel.status === 'cancelled') && (onReview || onReturn) ? (
           <View style={styles.row}>
             {onReview ? (
-              <PressableScale style={styles.followUp} accessibilityRole="button" onPress={onReview}>
+              <PressableScale style={styles.followUp} accessibilityRole="button" accessibilityLabel="Review transcript" onPress={onReview}>
                 <Text style={[styles.followUpText, { color: t.textPrimary }]}>Review transcript</Text>
               </PressableScale>
             ) : null}
             {onReturn ? (
-              <PressableScale style={styles.followUp} accessibilityRole="button" onPress={onReturn}>
+              <PressableScale style={styles.followUp} accessibilityRole="button" accessibilityLabel="Return to Arena" onPress={onReturn}>
                 <Text style={[styles.followUpText, { color: t.textPrimary }]}>Return to Arena</Text>
               </PressableScale>
             ) : null}
@@ -79,6 +81,7 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
       ) : null}
 
       <Animated.Text
+        key={`outcome-heading:${fontScale}`}
         entering={reduceMotion || !judgingOpen ? undefined : FadeInDown.delay(40).springify().damping(16)}
         accessibilityRole="header"
         accessibilityLiveRegion="polite"
@@ -148,12 +151,12 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
       {awaiting && (onReview || onReturn) ? (
         <View style={styles.row}>
           {onReview ? (
-            <PressableScale style={styles.followUp} accessibilityRole="button" onPress={onReview}>
+            <PressableScale style={styles.followUp} accessibilityRole="button" accessibilityLabel="Review transcript" onPress={onReview}>
               <Text style={[styles.followUpText, { color: t.textPrimary }]}>Review transcript</Text>
             </PressableScale>
           ) : null}
           {onReturn ? (
-            <PressableScale style={styles.followUp} accessibilityRole="button" onPress={onReturn}>
+            <PressableScale style={styles.followUp} accessibilityRole="button" accessibilityLabel="Return to Arena" onPress={onReturn}>
               <Text style={[styles.followUpText, { color: t.textPrimary }]}>Return to Arena</Text>
             </PressableScale>
           ) : null}

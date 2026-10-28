@@ -1,4 +1,6 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+import { createHash } from 'node:crypto';
+import approvedTargets from './config/release-targets.json';
 
 /**
  * Expo app configuration.
@@ -7,16 +9,9 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  * app's shape is still readable in one place. This file adds the one thing JSON
  * cannot express: an environment variant.
  *
- * `APP_VARIANT` is set by the EAS build profiles in `eas.json`
- * (`development` / `preview` / `production`) and falls back to `production`, so
- * `npx expo start` and a release build keep the exact identity they have today.
- * Only development is re-named, which is what lets a dev build and a store build
- * live on the same device without overwriting each other — and stops a dev deep
- * link from opening the live app.
- *
- * Supabase credentials are deliberately NOT read here: Expo inlines
- * `EXPO_PUBLIC_*` from the environment at build time, and keeping keys out of
- * this file means none can be baked into committed config.
+ * APP_VARIANT is mandatory, including local commands. Development retains local QA.
+ * Preview/production require separately reviewed target and public-key approval.
+ * Validation never returns credentials in Expo config or includes them in errors.
  *
  * Sentry source-map upload (EAS): set `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and
  * `SENTRY_PROJECT` as EAS secrets/env — never commit those values.
@@ -27,7 +22,49 @@ const VARIANTS = ['development', 'preview', 'production'] as const;
 type Variant = (typeof VARIANTS)[number];
 
 function resolveVariant(value: string | undefined): Variant {
-  return VARIANTS.find((variant) => variant === value) ?? 'production';
+  const variant = VARIANTS.find((variant) => variant === value);
+  if (!variant) throw new Error('Set APP_VARIANT explicitly to development, preview or production.');
+  return variant;
+}
+
+interface ApprovedTarget { projectRef: string; supabaseUrl: string; publicKeySha256: string }
+/** Approval is an owner-reviewed pin, not cryptographic verification of JWTs or opaque keys. */
+function validateReleaseEnvironment(): void {
+  const targets: Record<string, ApprovedTarget> = approvedTargets;
+  const selection = process.env.CLASH_RELEASE_TARGET ?? '';
+  if (!Object.hasOwn(targets, selection)) {
+    throw new Error('Release target approval required in config/release-targets.json; select CLASH_RELEASE_TARGET.');
+  }
+  const target = targets[selection];
+  if (!/^[a-z0-9]{20}$/.test(target.projectRef) || !/^[a-f0-9]{64}$/.test(target.publicKeySha256)) {
+    throw new Error('Invalid release-target approval record.');
+  }
+  const approvedOrigin = `https://${target.projectRef}.supabase.co`;
+  // Only standard hosted Supabase project origins are approved by this contract.
+  // Thus IPs, emulator/private/link-local aliases and custom domains fail closed.
+  let url: URL;
+  try { url = new URL(process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''); }
+  catch { throw new Error('Release requires the approved HTTPS Supabase origin.'); }
+  if (target.supabaseUrl !== approvedOrigin || url.origin !== approvedOrigin ||
+      url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
+    throw new Error('Release requires the approved HTTPS Supabase origin.');
+  }
+  const key: string = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  if (key.startsWith('sb_secret_')) throw new Error('Privileged credentials cannot be used by a public client.');
+  if (!/^sb_publishable_[A-Za-z0-9_-]{20,}$/.test(key)) {
+    try {
+      const parts = key.split('.');
+      if (parts.length !== 3 || !parts.every(part => /^[A-Za-z0-9_-]+$/.test(part))) throw new Error();
+      const header: { alg?: string } = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
+      const claims: { role?: string; ref?: string; exp?: number } = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      if (header.alg !== 'HS256' || claims.role !== 'anon' || claims.ref !== target.projectRef ||
+          !Number.isFinite(claims.exp) || (claims.exp ?? 0) * 1000 <= Date.now() ||
+          Buffer.from(parts[2], 'base64url').length !== 32) throw new Error();
+    } catch { throw new Error('Release requires an approved public-client credential.'); }
+  }
+  if (createHash('sha256').update(key).digest('hex') !== target.publicKeySha256) {
+    throw new Error('Public-client credential does not match the approved target fingerprint.');
+  }
 }
 
 export default ({ config }: ConfigContext): ExpoConfig => {
@@ -35,18 +72,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const isDevelopment = variant === 'development';
   const applicationId = isDevelopment ? 'com.clash.v2.dev' : 'com.clash.v2';
 
-  // Guard: EAS/CI must never bake a local Docker URL into preview/production.
-  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-  const isCiBuild = Boolean(process.env.EAS_BUILD || process.env.CI);
-  if (
-    isCiBuild &&
-    !isDevelopment &&
-    /127\.0\.0\.1|localhost/i.test(supabaseUrl)
-  ) {
-    throw new Error(
-      'Local Supabase URL (127.0.0.1/localhost) cannot be used for preview/production EAS builds. Clear .env.local and use hosted EAS secrets.',
-    );
-  }
+  if (!isDevelopment) validateReleaseEnvironment();
 
   const sentryOrg = process.env.SENTRY_ORG?.trim();
   const sentryProject = process.env.SENTRY_PROJECT?.trim();

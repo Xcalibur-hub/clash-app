@@ -19,14 +19,14 @@ for (const ext of ['.ts','.tsx']) Module._extensions[ext] = (mod, filename) => {
   mod._compile(transformed.code, filename);
 };
 const originalLoad = Module._load;
-let theme;
+let theme, fontScale = 1;
 const noop = () => {};
 const fade = { duration() { return this; } };
 Module._load = function(request, parent, isMain) {
   if (request === 'react-native') {
     return {
       ...RN,
-      useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
+      useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale }),
       Modal: ({ children, visible }) => (visible ? React.createElement(RN.View, null, children) : null),
     };
   }
@@ -147,7 +147,7 @@ for (const [name, overrides] of Object.entries(scenarios)) {
   }
   if (name === 'judging') assert.match(html, /Judge Kevin, Fighter A, made the stronger case/);
   if (name === 'draw') {
-    assert.match(html, /Draw|VERDICT/); assert.match(html, /50%/); assert.match(html, /4 judgment/);
+    assert.match(html, /Draw|VERDICT/); assert.match(html, /50%/); assert.match(html, /4 ballots/);
     // Step 3.1: the gold decoration is a short in-flow rule, never a 200px disc
     // behind the headline and percentages.
     assert.doesNotMatch(html, /border-radius:\s*100px/, 'no circular gold bloom');
@@ -257,3 +257,22 @@ for(const [name,crowd] of Object.entries({
   process.stdout.write(`PASS ${name}\n`);
 }
 process.stdout.write('22/22 component render scenarios passed. Native media and animation are bridged; no device interaction asserted.\n');
+
+// Numerical verdict presentation with real Room result component and font-scale layout inputs.
+const { VerdictReveal: CommunityResult } = require('../components/liveArena/VerdictReveal.tsx');
+const { communityVerdictCopy } = require('../utils/communityVerdict.ts');
+const { lightTheme } = require('../theme/palettes.ts');
+let communityScenarios = 0;
+for (const palette of [darkTheme, lightTheme]) for (const scale of [1, 1.3]) {
+  theme.useThemeColors = () => palette; fontScale = scale;
+  for (const [a, b, winnerSide] of [[1, 0, 'A'], [5, 0, 'A'], [3, 2, 'A'], [2, 2, 'DRAW']]) {
+    const verdict = { jurySize: a + b, sideAScore: a, sideBScore: b, winnerSide, verdictLabel: 'SPLIT DECISION' };
+    const html = renderToStaticMarkup(React.createElement(CommunityResult, { duel: { ...duel, status: 'settled', verdict }, visible: false }));
+    assert.ok(html.includes(communityVerdictCopy(verdict))); assert.doesNotMatch(html, /SPLIT DECISION|LANDSLIDE|CLEAR DECISION/); communityScenarios++;
+  }
+  for (const state of [{ status: 'cancelled', verdict: null }, { status: 'settled', verdict: null }, { status: 'settled', verdict: { jurySize: 1, winnerSide: 'A', verdictLabel: '' } }]) {
+    const html = renderToStaticMarkup(React.createElement(CommunityResult, { duel: { ...duel, ...state }, visible: false }));
+    assert.match(html, state.status === 'cancelled' ? /No verdict/ : state.verdict ? /side totals unavailable/ : /unavailable/); communityScenarios++;
+  }
+}
+console.log(communityScenarios + '/' + communityScenarios + ' community result renders passed at normal/enlarged font-scale inputs in both themes; not native geometry acceptance.');

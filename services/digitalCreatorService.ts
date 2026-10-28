@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Digital Creator API (Phase 15.5B).
  *
@@ -58,6 +59,7 @@ export async function startDigitalCreatorSession(
   creatorId: string,
   mode: DigitalCreatorSessionMode,
 ): Promise<DigitalCreatorSession | null> {
+  assertReleaseAdmission('ai');
   const { data, error } = await requireSupabase().functions.invoke('digital-creator', {
     body: { action: 'start', creatorId, mode },
   });
@@ -92,6 +94,7 @@ export async function endDigitalCreatorSession(sessionId: string): Promise<void>
 export async function saveCreatorDigitalVersion(
   input: SaveDigitalCreatorInput,
 ): Promise<DigitalCreatorConfig> {
+  if (input.avatarEnabled || input.voiceEnabled || input.textFallbackEnabled) assertReleaseAdmission('ai');
   const { data, error } = await requireSupabase().rpc('set_creator_digital_version', {
     p_provider: input.provider,
     p_avatar_external_id: input.avatarExternalId ?? undefined,

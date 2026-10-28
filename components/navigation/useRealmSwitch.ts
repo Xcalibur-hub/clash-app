@@ -4,6 +4,7 @@ import { switchRealm, useClash, type Realm } from '../../store';
 import { requestArenaEntrance } from '../../utils/arenaEntranceState';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
 import { REALM_SHIFT_MS, REALM_SHIFT_REPEAT_MS, type RealmDirection } from './RealmPortal';
+import { useReducedMotion } from 'react-native-reanimated';
 
 interface RealmSwitch {
   /** True while the §14 portal/crossfade is on screen. */
@@ -27,6 +28,9 @@ let sessionShifted = false;
 export function useRealmSwitch(): RealmSwitch {
   const { state, dispatch } = useClash();
   const router = useRouter();
+  const reduced = useReducedMotion();
+  const timers = React.useRef<ReturnType<typeof setTimeout>[]>([]);
+  React.useEffect(() => () => timers.current.forEach(clearTimeout), []);
   const [shifting, setShifting] = React.useState(false);
   const [first, setFirst] = React.useState(true);
   const [direction, setDirection] = React.useState<RealmDirection>('arena-to-vault');
@@ -34,6 +38,15 @@ export function useRealmSwitch(): RealmSwitch {
   const shiftTo = React.useCallback(
     (realm: Realm, href?: string): void => {
       if (realm === state.realm) {
+        if (href) router.replace(href as never);
+        return;
+      }
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+      if (reduced) {
+        dispatch(switchRealm(realm));
+        if (realm === 'arena') requestArenaEntrance();
+        setShifting(false);
         if (href) router.replace(href as never);
         return;
       }
@@ -47,13 +60,13 @@ export function useRealmSwitch(): RealmSwitch {
       dispatch(switchRealm(realm));
       const ms = isFirst ? REALM_SHIFT_MS : REALM_SHIFT_REPEAT_MS;
       const swapAt = isFirst ? REALM_SHIFT_MS - 160 : REALM_SHIFT_REPEAT_MS - 100;
-      setTimeout(() => {
+      timers.current.push(setTimeout(() => {
         hapticPress();
         if (href) router.replace(href as never);
-      }, swapAt);
-      setTimeout(() => setShifting(false), ms + 40);
+      }, swapAt));
+      timers.current.push(setTimeout(() => setShifting(false), ms + 40));
     },
-    [dispatch, router, state.realm],
+    [dispatch, router, state.realm, reduced],
   );
 
   return { shifting, first, direction, realm: state.realm, shiftTo };

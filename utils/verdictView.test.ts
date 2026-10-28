@@ -27,7 +27,7 @@ describe('verdict view', () => {
     assert.equal(view.title, 'Kevin made the stronger case');
     assert.equal(view.aPct, 75);
     assert.equal(view.bPct, 25);
-    assert.equal(view.juryLabel, '4 judgments · SPLIT DECISION');
+    assert.equal(view.juryLabel, 'Community verdict \u00b7 4 ballots \u00b7 A 3 \u00b7 B 1');
   });
 
   it('reports a Side B win', () => {
@@ -65,7 +65,7 @@ describe('verdict view', () => {
     const view = verdictView(duel({ verdict: { winnerSide: 'A', jurySize: 5, verdictLabel: 'SPLIT DECISION' } }));
     assert.equal(view.aPct, null);
     assert.equal(view.bPct, null);
-    assert.equal(view.juryLabel, '5 judgments · SPLIT DECISION');
+    assert.equal(view.juryLabel, 'Community verdict \u00b7 5 ballots \u00b7 side totals unavailable');
   });
 
   it('handles a zero-jury verdict without dividing by zero', () => {
@@ -74,7 +74,7 @@ describe('verdict view', () => {
     );
     assert.equal(view.aPct, null);
     assert.equal(view.bPct, null);
-    assert.equal(view.juryLabel, '0 judgments');
+    assert.equal(view.juryLabel, 'Community verdict \u00b7 0 ballots \u00b7 A 0 \u00b7 B 0');
   });
 
   it('presents a cancelled Clash as terminal with no verdict', () => {

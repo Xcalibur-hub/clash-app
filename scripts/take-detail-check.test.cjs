@@ -54,6 +54,16 @@ const find = (tree, type) => nodes(tree).find(n => n.type === type);
 function reset() { for (const c of cells) c?.cleanup?.(); cells = []; effects = []; uid = 'a'; now = 100; request = 0; events = []; canBack = true; pendingFetch = new Promise(() => {}); state.takes = [take]; }
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
+test('actual Take detail wires its author profile destination for active and archived reads', () => {
+  for (const clock of [100, 200]) {
+    reset(); now = clock;
+    const header = find(render(), 'TakeEditorialHeader');
+    assert.equal(typeof header.props.onOpenAuthor, 'function');
+    header.props.onOpenAuthor();
+    assert.deepEqual(events, ['/profile/a']);
+  }
+});
+
 test('active Take retains voting, composer and challenge contracts; reply action focuses composer', () => {
   reset(); let tree = render();
   assert.equal(find(tree, 'TakeActionRow').props.readOnly, false);

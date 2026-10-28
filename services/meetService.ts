@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Meet the World — pseudonymous TEXT + VIDEO matching.
  * Server owns queue matching / signaling; media is peer-to-peer WebRTC.
@@ -185,6 +186,7 @@ export async function joinMeetQueue(input: {
   hood?: MeetHoodId | null;
   interests?: string[];
 }): Promise<MeetQueueState> {
+  assertReleaseAdmission('meet');
   const { data, error } = await client().rpc('join_meet_queue', {
     p_mode: input.mode,
     p_country_code: input.countryCode ?? undefined,
@@ -197,6 +199,7 @@ export async function joinMeetQueue(input: {
 }
 
 export async function pollMeetQueue(): Promise<MeetQueueState> {
+  assertReleaseAdmission('meet');
   const { data, error } = await client().rpc('poll_meet_queue');
   if (error) throw requestError(error);
   return toQueueState(data);
@@ -205,6 +208,53 @@ export async function pollMeetQueue(): Promise<MeetQueueState> {
 export async function leaveMeetQueue(): Promise<void> {
   const { error } = await client().rpc('leave_meet_queue');
   if (error) throw requestError(error);
+}
+
+/** Explicit cancel/recovery outcomes from `cancel_meet_search` (never matches). */
+export type MeetCancelOutcome =
+  | 'cancelled_waiting'
+  | 'ended_session'
+  | 'already_terminal'
+  | 'not_found'
+  | 'unresolved';
+
+export interface MeetCancelResult {
+  outcome: MeetCancelOutcome;
+  queueId: string;
+  sessionId?: string;
+  resolved: boolean;
+}
+
+function toCancelResult(value: unknown, fallbackQueueId: string): MeetCancelResult {
+  const r = asRecord(value) ?? {};
+  const outcomeRaw = str(r.outcome);
+  const outcome: MeetCancelOutcome =
+    outcomeRaw === 'cancelled_waiting' ||
+    outcomeRaw === 'ended_session' ||
+    outcomeRaw === 'already_terminal' ||
+    outcomeRaw === 'not_found' ||
+    outcomeRaw === 'unresolved'
+      ? outcomeRaw
+      : 'unresolved';
+  return {
+    outcome,
+    queueId: str(r.queueId) ?? fallbackQueueId,
+    sessionId: str(r.sessionId) ?? undefined,
+    resolved: r.resolved === true || outcome === 'cancelled_waiting' || outcome === 'ended_session' || outcome === 'already_terminal',
+  };
+}
+
+/**
+ * Actor-scoped cancel of one admitted search by queue id.
+ * Ends a waiting row or the session linked to that search. Never admits/matches.
+ * Exit contract — not gated by new-admission release policy.
+ */
+export async function cancelMeetSearch(queueId: string): Promise<MeetCancelResult> {
+  const id = queueId.trim();
+  if (!id) throw new SupabaseError('Meet search id required', 'bad_payload');
+  const { data, error } = await client().rpc('cancel_meet_search', { p_queue_id: id });
+  if (error) throw requestError(error);
+  return toCancelResult(data, id);
 }
 
 export async function fetchMeetSession(sessionId: string): Promise<MeetSession> {
@@ -286,6 +336,7 @@ export async function nextMeet(
     interests?: string[];
   },
 ): Promise<MeetQueueState> {
+  assertReleaseAdmission('meet');
   const { data, error } = await client().rpc('next_meet', {
     p_session_id: sessionId,
     p_mode: input.mode,

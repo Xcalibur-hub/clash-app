@@ -1,12 +1,14 @@
 import React from 'react';
-import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
 
 export interface VaultActionButtonProps {
   label: string;
-  onPress: () => void;
+  onPress?: () => void;
+  disabled?: boolean;
+  busy?: boolean;
   tone?: 'solid' | 'quiet';
   compact?: boolean;
   /** Translucent treatment for controls sitting on hero media. */
@@ -24,8 +26,11 @@ export function VaultActionButton({
   overMedia = false,
   style,
   accessibilityLabel,
+  disabled = false,
+  busy = false,
 }: VaultActionButtonProps): React.JSX.Element {
   const t = useThemeColors();
+  const blocked = disabled || busy || !onPress;
   const solid = tone === 'solid';
 
   let backgroundColor: string;
@@ -49,9 +54,12 @@ export function VaultActionButton({
 
   return (
     <PressableScale
+      disabled={blocked}
+      accessibilityState={{ disabled: blocked, busy }}
       onPress={() => {
+        if (blocked) return;
         hapticTap();
-        onPress();
+        onPress?.();
       }}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
@@ -63,9 +71,11 @@ export function VaultActionButton({
           borderColor,
         },
         style,
+        blocked && { opacity: 0.55 },
       ]}
     >
-      <Text allowFontScaling={false} style={[styles.label, { color: labelColor }]}>
+      {busy ? <ActivityIndicator color={labelColor} accessibilityLabel="Working" /> : null}
+      <Text style={[styles.label, { color: labelColor }]}>
         {label}
       </Text>
     </PressableScale>
@@ -74,6 +84,11 @@ export function VaultActionButton({
 
 const styles = StyleSheet.create({
   btn: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
     alignSelf: 'flex-start',
     paddingHorizontal: space.lg,
     paddingVertical: 12,

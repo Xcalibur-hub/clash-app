@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Vault Services / Store / Courses API.
  * Entitlement and ownership stay server-side.
@@ -111,6 +112,7 @@ export async function createCreatorService(input: {
   coverMediaObjectId?: string | null;
   externalUrl?: string | null;
 }): Promise<CreatorService> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_creator_service', {
     p_title: input.title,
     p_description: input.description ?? '',
@@ -131,6 +133,7 @@ export async function setCreatorServiceStatus(
   serviceId: string,
   status: VaultOfferStatus,
 ): Promise<CreatorService> {
+  if (status === 'published') assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('set_creator_service_status', {
     p_service_id: serviceId,
     p_status: status,
@@ -144,6 +147,7 @@ export async function requestCreatorService(
   serviceId: string,
   message: string,
 ): Promise<VaultServiceRequest> {
+  assertReleaseAdmission('commerce');
   const { data, error } = await requireSupabase().rpc('request_creator_service', {
     p_service_id: serviceId,
     p_message: message,
@@ -224,6 +228,7 @@ export async function createCreatorProduct(input: {
   inventoryMode?: VaultInventoryMode;
   inventoryCount?: number | null;
 }): Promise<CreatorProduct> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_creator_product', {
     p_title: input.title,
     p_description: input.description ?? '',
@@ -245,6 +250,7 @@ export async function setCreatorProductStatus(
   productId: string,
   status: VaultOfferStatus,
 ): Promise<CreatorProduct> {
+  if (status === 'published') assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('set_creator_product_status', {
     p_product_id: productId,
     p_status: status,
@@ -321,6 +327,7 @@ export async function createCreatorCourse(input: {
   currency?: string | null;
   coverMediaObjectId?: string | null;
 }): Promise<CreatorCourse> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_creator_course', {
     p_title: input.title,
     p_description: input.description ?? '',
@@ -338,6 +345,7 @@ export async function setCreatorCourseStatus(
   courseId: string,
   status: VaultOfferStatus,
 ): Promise<CreatorCourse> {
+  if (status === 'published') assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('set_creator_course_status', {
     p_course_id: courseId,
     p_status: status,
@@ -357,6 +365,7 @@ export async function createCourseLesson(input: {
   accessType?: VaultOfferAccess;
   previewAllowed?: boolean;
 }): Promise<CourseLessonCard> {
+  assertReleaseAdmission('creator');
   const { data, error } = await requireSupabase().rpc('create_course_lesson', {
     p_course_id: input.courseId,
     p_title: input.title,
@@ -378,6 +387,7 @@ export async function setCourseLessonStatus(
   lessonId: string,
   status: VaultOfferStatus,
 ): Promise<void> {
+  if (status === 'published') assertReleaseAdmission('creator');
   const { error } = await requireSupabase().rpc('set_course_lesson_status', {
     p_lesson_id: lessonId,
     p_status: status,

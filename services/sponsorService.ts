@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Sponsor Studio — advertiser read + management APIs (Phase 10 Step 2).
  *
@@ -149,6 +150,7 @@ export async function fetchMyAdvertisers(): Promise<readonly Advertiser[]> {
 }
 
 export async function createAdvertiser(name: string, slug: string): Promise<Advertiser> {
+  assertReleaseAdmission('sponsorship');
   const { data, error } = await requireSupabase().rpc('create_advertiser', {
     p_name: name,
     p_slug: slug,
@@ -160,6 +162,7 @@ export async function createAdvertiser(name: string, slug: string): Promise<Adve
 }
 
 export async function activateAdvertiser(advertiserId: string): Promise<Advertiser> {
+  assertReleaseAdmission('sponsorship');
   const { data, error } = await requireSupabase().rpc('activate_advertiser', {
     p_advertiser_id: advertiserId,
   });
@@ -287,6 +290,7 @@ export async function createCampaign(input: {
   startsAt?: string | null;
   endsAt?: string | null;
 }): Promise<{ id: string; title: string; status: string }> {
+  assertReleaseAdmission('sponsorship');
   const args: {
     p_advertiser_id: string;
     p_title: string;
@@ -395,6 +399,7 @@ export async function setCampaignStatus(
   campaignId: string,
   status: SponsorCampaignStatus,
 ): Promise<void> {
+  if (status === 'ACTIVE') assertReleaseAdmission('sponsorship');
   const { error } = await requireSupabase().rpc('set_sponsor_campaign_status', {
     p_campaign_id: campaignId,
     p_status: status,
@@ -410,6 +415,7 @@ export async function pauseCampaign(campaignId: string): Promise<void> {
 }
 
 export async function resumeCampaign(campaignId: string): Promise<void> {
+  assertReleaseAdmission('sponsorship');
   const { error } = await requireSupabase().rpc('resume_sponsor_campaign', {
     p_campaign_id: campaignId,
   });
@@ -422,6 +428,7 @@ export async function assignCreator(input: {
   commissionType: CommissionType;
   commissionValue: number;
 }): Promise<void> {
+  assertReleaseAdmission('sponsorship');
   const { error } = await requireSupabase().rpc('assign_creator_to_campaign', {
     p_campaign_id: input.campaignId,
     p_creator_profile_id: input.creatorProfileId,
@@ -443,6 +450,7 @@ export async function createReferralLink(
   campaignId: string,
   creatorProfileId: string,
 ): Promise<ReferralLinkRow> {
+  assertReleaseAdmission('sponsorship');
   const { data, error } = await requireSupabase().rpc('create_campaign_referral_link', {
     p_campaign_id: campaignId,
     p_creator_profile_id: creatorProfileId,
@@ -476,6 +484,7 @@ export async function createCoupon(input: {
   expiresAt?: string | null;
   maxRedemptions?: number | null;
 }): Promise<CouponRow> {
+  assertReleaseAdmission('sponsorship');
   const args: {
     p_campaign_id: string;
     p_creator_profile_id: string;

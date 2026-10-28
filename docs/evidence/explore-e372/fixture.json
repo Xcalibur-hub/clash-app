@@ -1,0 +1,13 @@
+{
+  "session": "ms_8e8b9b7dd70166c6",
+  "participants": [
+    "A",
+    "B"
+  ],
+  "channel": "TEXT",
+  "priorSessionCount": 14,
+  "authorizationConsumed": true,
+  "abortedBootstrap": "ms_06628e8d11171f14",
+  "note": "Prior bootstrap fixture left immediately after B refresh_token failure; this is the sole acceptance fixture.",
+  "createdAt": "2026-10-24T13:07:40.148Z"
+}

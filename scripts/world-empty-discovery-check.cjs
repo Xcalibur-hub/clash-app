@@ -10,7 +10,9 @@ const section = (start, end) => {
   assert.ok(from >= 0 && to > from, 'Missing World section: ' + start);
   return source.slice(from, to);
 };
-const empty = section('        {!loading && !searching && drops.length === 0', '      </View>\n\n      <View style={[styles.bottomChrome');
+const empty = section('          {!loading && !searching && drops.length === 0', '      <View style={[styles.bottomChrome');
+assert.match(source, /isWorldNativeMapAvailable\(Platform\.OS\)/, 'Android MapView gated by installed-binary availability');
+assert.match(source, /WorldMapUnavailable/, 'non-crashing fallback when MapView is unavailable');
 const filter = section('  const onFilterChange = async', '  const searchThisArea = async');
 const area = section('  const searchThisArea = async', '  const recenter = async');
 const locate = section('  const recenter = async', '  const zoomToCluster =');

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ImageIcon, VideoIcon } from '../shared/icons';
+import { releaseAllows, releaseUnavailableCopy } from '../../utils/releaseScope';
 
 export interface MediaAttachRowProps {
   onPick: (kind: 'image' | 'video') => void;
@@ -16,6 +17,7 @@ const ITEMS = [
 /** Attachment buttons for a new Take. */
 export function MediaAttachRow({ onPick }: MediaAttachRowProps): React.JSX.Element {
   const t = useThemeColors();
+  if (!releaseAllows('media', 'admit')) return <Text style={[typeScale.meta, { color: t.textSecondary }]}>{releaseUnavailableCopy('media')}</Text>;
   return (
     <View style={styles.row}>
       {ITEMS.map(({ kind, label, icon: Icon }) => (

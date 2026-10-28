@@ -1,3 +1,4 @@
+import { assertReleaseAdmission, releaseAllows, releaseUnavailableCopy } from '../../../utils/releaseScope';
 import {withExploreAccount} from '../../../components/explore/ExploreAccountBoundary';
 import {useOperationScope} from '../../../hooks/useOperationScope';
 import React from 'react';
@@ -142,6 +143,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
     setError(null);
     let planId:string|null=null;
     try {
+      if (!detail?.joined) assertReleaseAdmission('play');
       const picked=kind==='image'?await pickImage():await pickVideo();
       if(!picked || !isCurrent())return;
       const mime=picked.mimeType??(kind==='video'?'video/mp4':'image/jpeg');
@@ -342,7 +344,8 @@ function ChallengeDetailScreen(): React.JSX.Element {
                 </View>
               ) : null}
 
-              {!ended && !detail.myEntryId ? (
+              {!releaseAllows('play', 'admit') ? <Text style={{ color: t.textSecondary }}>{releaseUnavailableCopy('play')}</Text> : null}
+              {(detail.joined || releaseAllows('play', 'admit')) && !ended && !detail.myEntryId ? (
                 <GlowButton
                   label={detail.joined ? 'Submit entry' : joining ? 'Joining…' : 'Join challenge'}
                   onPress={() => {
@@ -353,7 +356,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
                 />
               ) : null}
 
-              {composeOpen && !ended && !detail.myEntryId ? (
+              {detail.joined && composeOpen && !ended && !detail.myEntryId ? (
                 <View style={[styles.compose, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
                   <TextInput
                     value={caption}
@@ -482,9 +485,10 @@ const styles = StyleSheet.create({
   back: {
     position: 'absolute',
     left: layout.screenX,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    // 44dp minimum accessible target (Phase 4F.1); prior 40×40 under-sized the control.
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',

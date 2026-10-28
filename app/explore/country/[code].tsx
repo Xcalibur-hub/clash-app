@@ -161,7 +161,7 @@ function ExploreCountryScreen(): React.JSX.Element {
         </View>
 
         <Animated.View entering={reduced ? undefined : FadeInDown.duration(380)} style={styles.heroCopy}>
-          <Text allowFontScaling={false} style={[styles.country, { color: t.textPrimary }]}>
+          <Text style={[styles.country, { color: t.textPrimary }]}>
             {(meta?.name ?? code).toUpperCase()}
           </Text>
           <Text allowFontScaling={false} style={[styles.activity, { color: t.textSecondary }]}>
@@ -409,8 +409,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   top: { flexDirection: 'row', alignItems: 'center' },
   back: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     marginLeft: -8,
     alignItems: 'center',
     justifyContent: 'center',

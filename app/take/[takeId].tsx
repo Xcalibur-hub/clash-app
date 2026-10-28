@@ -483,7 +483,8 @@ export default function TakeDetailScreen(): React.JSX.Element {
           }
           ListHeaderComponent={
             <View style={styles.headerContent}>
-          <TakeEditorialHeader take={take} author={author} archived={archived} isViewer={isViewerAuthor} />
+          <TakeEditorialHeader take={take} author={author} archived={archived} isViewer={isViewerAuthor}
+            onOpenAuthor={() => router.push(`/profile/${author.id}`)} />
           <TakeActionRow
             reactions={take.reactions}
             commentCount={comments.length}

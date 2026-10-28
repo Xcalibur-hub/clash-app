@@ -28,7 +28,7 @@ import {
   VaultIcon,
   WorldIcon,
 } from '../shared/icons';
-import { selectViewer, showNotice, useClash } from '../../store';
+import { selectViewer, useClash } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
 import { useRealmSwitch } from './useRealmSwitch';
 import { REALM_ROUTES } from './realmRoutes';
@@ -56,7 +56,7 @@ export function AppSidebar(): React.JSX.Element | null {
   const pathname = usePathname();
   const router = useRouter();
   const { shiftTo } = useRealmSwitch();
-  const { state, dispatch } = useClash();
+  const { state } = useClash();
   const viewer = selectViewer(state);
   const { signedIn } = useAuth();
 
@@ -185,14 +185,11 @@ export function AppSidebar(): React.JSX.Element | null {
       key: 'settings',
       label: 'Settings',
       icon: SettingsIcon,
-      match: () => false,
-      onPress: () => {
-        hapticTap();
-        dispatch(showNotice('Settings are not wired up yet.'));
-      },
+      match: (path) => path === '/settings',
+      onPress: (go) => go(() => router.push('/settings')),
     });
     return items;
-  }, [dispatch, router, signedIn]);
+  }, [router, signedIn]);
 
   if (!visible) return null;
 
@@ -266,10 +263,6 @@ export function AppSidebar(): React.JSX.Element | null {
                   item={item}
                   active={item.match(pathname)}
                   onPress={() => {
-                    if (item.key === 'settings') {
-                      item.onPress(closeThen);
-                      return;
-                    }
                     hapticTap();
                     item.onPress(closeThen);
                   }}

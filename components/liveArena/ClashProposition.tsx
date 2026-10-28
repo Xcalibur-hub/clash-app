@@ -3,7 +3,8 @@
  * No card wrapper; keeps vertical budget tight.
  */
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { ArenaRoomText as Text } from './ArenaRoomText';
 import { layout, typeScale, useThemeColors } from '../../theme';
 
 export interface ClashPropositionProps {

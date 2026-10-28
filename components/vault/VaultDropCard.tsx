@@ -39,14 +39,15 @@ export function VaultDropCard({
     hasPreviewMedia: Boolean(drop.previewMedia),
   });
   const locked = display === 'PREVIEW' || display === 'SUBSCRIBER_LOCKED';
+  const unavailable = !drop.accessible && drop.accessLevel === 'free' && !drop.previewMedia;
   const visual = vaultPublicVisualMedia({
     accessLevel: drop.accessLevel,
     accessible: drop.accessible,
-    publicMedia: drop.publicMedia,
+    publicMedia: drop.accessible ? drop.publicMedia : null,
     previewMedia: drop.previewMedia,
   });
   const mediaUrl = visual ? getPublicMediaUrl(visual.bucket, visual.path) : null;
-  const badge = vaultAccessMeta(display);
+  const badge = unavailable ? 'UNAVAILABLE' : locked ? display === 'PREVIEW' ? 'PREVIEW ONLY' : 'LOCKED · MEMBERS' : display === 'SUBSCRIBER' ? 'MEMBER ACCESS' : vaultAccessMeta(display);
   const expiry =
     drop.expiresAt && drop.status === 'published' ? vaultExpiryLabel(drop.expiresAt) : null;
 
@@ -65,19 +66,19 @@ export function VaultDropCard({
           onOpen();
         }}
       />
-      {locked ? (
+      {locked && onSubscribe ? (
         <Pressable
           onPress={() => {
             hapticTap();
             onSubscribe?.();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Unlock"
+          accessibilityLabel="Membership availability information"
           hitSlop={8}
           style={styles.unlock}
         >
-          <Text allowFontScaling={false} style={[styles.unlockText, { color: t.textPrimary }]}>
-            Unlock →
+          <Text style={[styles.unlockText, { color: t.textPrimary }]}>
+            Membership availability →
           </Text>
         </Pressable>
       ) : null}
@@ -87,6 +88,6 @@ export function VaultDropCard({
 
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
-  unlock: { paddingLeft: 2 },
+  unlock: { minHeight: 44, justifyContent: 'center', paddingLeft: 2 },
   unlockText: { ...typeScale.label, fontWeight: '700' },
 });

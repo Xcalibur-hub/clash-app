@@ -1,3 +1,4 @@
+import { assertReleaseAdmission } from '../utils/releaseScope';
 /**
  * Interactive Creator Live API (Phase 15.4).
  *
@@ -105,6 +106,7 @@ export async function fetchCreatorLiveInteractions(
 }
 
 export async function createCreatorLiveSession(input: CreateLiveSessionInput): Promise<string> {
+  assertReleaseAdmission('live');
   const { data, error } = await requireSupabase().rpc('create_creator_live_session', {
     p_title: input.title,
     p_description: input.description ?? '',
@@ -128,6 +130,7 @@ export async function createCreatorLiveSession(input: CreateLiveSessionInput): P
 }
 
 export async function startCreatorLiveSession(sessionId: string): Promise<void> {
+  assertReleaseAdmission('live');
   const { error } = await requireSupabase().rpc('start_creator_live_session', {
     p_session_id: sessionId,
   });

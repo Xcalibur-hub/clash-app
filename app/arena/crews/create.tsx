@@ -1,3 +1,4 @@
+import { withReleaseAdmission } from '../../../components/shared/ReleaseUnavailable';
 /**
  * Focused Crew creation — name, slug, bio, specialties, join mode.
  * Deterministic crest until avatar upload fits the media architecture.
@@ -36,7 +37,7 @@ const JOIN_MODES: readonly { key: ArenaCrewJoinMode; label: string; hint: string
   { key: 'INVITE_ONLY', label: 'Invite', hint: 'Invite only' },
 ];
 
-export default function CreateCrewScreen(): React.JSX.Element {
+function CreateCrewScreen(): React.JSX.Element {
   const t = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -318,3 +319,5 @@ const styles = StyleSheet.create({
   modeLabel: { ...typeScale.cardTitle, fontSize: 15 },
   modeHint: { ...typeScale.meta, fontSize: 12 },
 });
+
+export default withReleaseAdmission(CreateCrewScreen, 'groups');

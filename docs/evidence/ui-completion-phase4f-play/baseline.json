@@ -1,0 +1,19 @@
+﻿{
+    "exploreChallenges":  0,
+    "qaSystemId":  "7700622043081482277",
+    "serial":  "RZ8M30DE9NL",
+    "at":  "2026-10-27T08:22:06.9811825Z",
+    "package":  "com.clash.v2.dev",
+    "headMatchesReported":  true,
+    "exploreTreasures":  0,
+    "device":  "SM-A505F",
+    "listPlayHome":  {
+                         "challenges":  [
+
+                                        ],
+                         "treasures":  [
+
+                                       ]
+                     },
+    "head":  "6ca92225dfc1521851781db17339d427063d8a7e"
+}
