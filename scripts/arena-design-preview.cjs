@@ -38,6 +38,12 @@ const animation = { __esModule: true, default: { View: RN.View, Text: RN.Text, c
   LinearTransition: chain, FadeIn: chain, FadeInDown: chain, FadeOut: chain,
   useReducedMotion: () => reduced, useSharedValue: value => ({ value }), useAnimatedStyle: f => f(),
   withTiming: x => x, withSpring: x => x, withDelay: (_, x) => x, withSequence: x => x,
+  withRepeat: x => x, cancelAnimation: noop, runOnJS: fn => fn,
+  Extrapolation: { CLAMP: 'clamp' },
+  interpolate: (value, input, output) => {
+    const progress = Math.max(0, Math.min(1, (value - input[0]) / (input[1] - input[0])));
+    return output[0] + progress * (output[1] - output[0]);
+  },
   Easing: { bezier: () => ({}), out: x => x, inOut: x => x },
 };
 let controlling = null, stateIndex = 0;
@@ -64,6 +70,11 @@ Module._load = function (request, parent) {
   };
   if (request === 'react-native-svg') return originalLoad.call(this, 'react-native-svg/lib/commonjs/ReactNativeSVG.web.js', parent);
   if (request === 'react-native-reanimated') return animation;
+  if (request === 'react-native-gesture-handler') {
+    const pan = { enabled() { return this; }, activeOffsetX() { return this; }, failOffsetY() { return this; },
+      onBegin() { return this; }, onUpdate() { return this; }, onEnd() { return this; } };
+    return { Gesture: { Pan: () => pan }, GestureDetector: ({ children }) => children, GestureHandlerRootView: RN.View };
+  }
   if (request === 'expo-linear-gradient') return { LinearGradient: ({ style, children }) => React.createElement(RN.View, { style }, children) };
   if (request === 'expo-constants') return { expoConfig: { extra: { appVariant: 'preview' } } };
   if (request === 'expo-router') return { useRouter: () => ({ canGoBack: () => true, back: noop, push: noop, replace: noop }), useFocusEffect: noop, useLocalSearchParams: () => ({ takeId: 'preview-only' }) };
