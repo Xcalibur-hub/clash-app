@@ -22,7 +22,7 @@ export interface ArenaTopBarProps {
  */
 export function ArenaTopBar({
   paddingTop,
-  contextLine = 'Where the internet takes sides.',
+  contextLine,
 }: ArenaTopBarProps): React.JSX.Element {
   const { state } = useClash();
   const viewer = selectViewer(state);
@@ -88,7 +88,7 @@ export function ArenaTopBar({
 const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: space.md,
-    paddingBottom: 12,
+    paddingBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -98,9 +98,9 @@ const styles = StyleSheet.create({
   brand: {
     ...typeScale.title,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
-    fontSize: 28,
-    lineHeight: 36,
-    letterSpacing: -1.2,
+    fontSize: 24,
+    lineHeight: 30,
+    letterSpacing: -1,
     fontWeight: '800',
   },
   context: {

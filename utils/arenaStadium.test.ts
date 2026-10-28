@@ -60,7 +60,7 @@ function message(
 }
 
 describe('Arena IA', () => {
-  it('organizes Arena as Home / Live Clashes / Communities / Topics & Trends', () => {
+  it('preserves For You, Live, Groups, and Discover destinations', () => {
     assert.equal(DEFAULT_ARENA_MODE, 'for_you');
     assert.deepEqual(
       ARENA_MODES.map((m) => m.id),

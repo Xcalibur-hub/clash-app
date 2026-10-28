@@ -8,10 +8,51 @@ const store = { useClash: () => ({ state, dispatch, reloadArena: async () => {} 
   selectFeedForScope: () => [], showNotice: text => ({ text }) };
 const homeDeps = Object.fromEntries(['ArenaTopBar', 'ArenaLiveGateway', 'ArenaDiscoveryRail', 'ArenaSideRail',
   'ArenaCommunity', 'ArenaTopics', 'ArenaAtmosphere', 'ArenaEntrance', 'FreshTakesSection',
-  'PostActionsSheet', 'TakeFeedItem', 'LiveDuelCard'].map(name => [name, leaf(name)]));
+  'PostActionsSheet', 'TakeFeedItem', 'LiveDuelCard', 'ArenaSheet'].map(name => [name, leaf(name)]));
 Object.assign(homeDeps, { store, native: focus, 'expo-router': { ...focus, useRouter: () => ({ push() {} }) },
   useRequireAuth: { useRequireAuth: () => () => true }, arenaEntranceState: { consumeArenaEntrance: () => false },
   ArenaPrimitives: leaf('ArenaButton'), arena: { arena: { type: {} } } });
+
+test('Home Back ownership follows actual navigation focus, cleanup and refocus', async () => {
+  const back = new Set(), listeners = { focus: new Set(), blur: new Set() };
+  let focused = true, useActualFocus;
+  const navigation = { isFocused: () => focused, addListener(event, callback) {
+    listeners[event].add(callback); return () => listeners[event].delete(callback);
+  } };
+  const native = { ...Object.fromEntries(['View', 'Text', 'Pressable', 'FlatList'].map(n => [n, n])),
+    StyleSheet: { create: x => x }, BackHandler: { addEventListener(event, callback) {
+      assert.equal(event, 'hardwareBackPress'); back.add(callback);
+      return { remove() { back.delete(callback); } };
+    } } };
+  const h = harness('app/(tabs)/index.tsx', {}, e => e.default, { dependencies: {
+    ...homeDeps, 'react-native': native,
+    native: { useFocusEffect: callback => useActualFocus(callback) },
+    useNavigation: { useNavigation: () => navigation },
+  } });
+  useActualFocus = h.load('node_modules/@react-navigation/core/src/useFocusEffect.tsx').useFocusEffect;
+  h.services.fetchFollowingIds = async () => []; h.services.fetchLiveTopics = async () => [];
+  const mode = () => h.nodes.find(n => n.type === 'ArenaSideRail').props.mode;
+  const selectLive = () => h.nodes.find(n => n.type === 'ArenaSideRail').props.onChange('clashes');
+  const hardwareBack = () => [...back].reverse().some(callback => callback());
+  try {
+    await h.mount(); await h.act(async () => selectLive());
+    assert.equal(back.size, 1);
+    await h.act(async () => assert.equal(hardwareBack(), true));
+    assert.equal(mode(), 'for_you');
+    for (const route of ['/arena/challenges', '/arena/crews', '/arena/topics', '/explore']) {
+      await h.act(async () => selectLive());
+      await h.act(async () => { focused = false; for (const callback of listeners.blur) callback(); });
+      assert.equal(back.size, 0, 'No background Home listener on ' + route);
+      assert.equal(hardwareBack(), false);
+      assert.equal(mode(), 'clashes');
+      await h.act(async () => { focused = true; for (const callback of listeners.focus) callback(); });
+      assert.equal(back.size, 1, 'One listener after refocus');
+      assert.equal(mode(), 'clashes');
+    }
+  } finally { await h.unmount(); }
+  assert.equal(back.size, 0);
+  assert.equal(listeners.focus.size + listeners.blur.size, 0);
+});
 function ancestry(tree, name, parents = []) {
   if (!tree || typeof tree !== 'object') return null;
   if ((tree.type?.name ?? tree.type) === name) return [...parents, tree];
@@ -20,28 +61,30 @@ function ancestry(tree, name, parents = []) {
   }
   return null;
 }
-test('production Home gives Live a bounded View and preserves separate Groups/Discover scroll and rail', async () => {
+test('production Home gives Live a bounded View and keeps Groups/Discover off the Home list', async () => {
   const h = harness('app/(tabs)/index.tsx', {}, e => e.default, { dependencies: homeDeps });
   h.services.fetchFollowingIds = async () => []; h.services.fetchLiveTopics = async () => [];
   try {
     await h.mount();
-    for (const mode of ['clashes', 'community', 'topics', 'clashes', 'for_you']) {
+    for (const mode of ['clashes', 'for_you', 'clashes']) {
       await h.act(async () => h.nodes.find(n => n.type === 'ArenaSideRail').props.onChange(mode));
-      const child = mode === 'clashes' ? 'ArenaClashes' : mode === 'community' ? 'ArenaCommunity' : mode === 'topics' ? 'ArenaTopics' : 'FlatList';
+      const child = mode === 'clashes' ? 'ArenaClashes' : 'FlatList';
       const chain = ancestry(h.tree, child); assert.ok(chain, child);
       assert.equal(chain.slice(0, -1).some(n => n.type === 'FlatList'), false);
-      assert.equal(chain.slice(0, -1).some(n => n.type === 'ScrollView'), ['community', 'topics'].includes(mode));
+      assert.equal(h.nodes.some(n => n.type === 'ArenaCommunity' || n.type === 'ArenaTopics'), false);
       if (mode === 'clashes') {
         assert.equal(chain.at(-2).type, 'View');
         assert.equal(Object.assign({}, ...chain.at(-2).props.style.filter(Boolean)).flex, 1);
         const live = harness('components/arena/ArenaClashes.tsx', chain.at(-1).props, e => e.ArenaClashes, { dependencies: homeDeps });
         live.services.fetchPersonalizedLiveDiscovery = async () => ({ rows: [], signals: {} });
         try {
-          await live.mount(); assert.equal(live.tree.type, 'FlatList');
-          assert.equal(live.tree.props.style.flex, 1);
-          assert.equal(typeof live.tree.props.onRefresh, 'function');
-          assert.equal(typeof live.tree.props.onEndReached, 'function');
-          assert.ok(live.tree.props.contentContainerStyle.at(-1).paddingBottom > 0);
+          await live.mount();
+          const list = live.nodes.find(n => n.type === 'FlatList');
+          assert.ok(list);
+          assert.equal(list.props.style.flex, 1);
+          assert.equal(typeof list.props.onRefresh, 'function');
+          assert.equal(typeof list.props.onEndReached, 'function');
+          assert.ok(list.props.contentContainerStyle.at(-1).paddingBottom > 0);
         } finally { await live.unmount(); }
       }
       const rail = ancestry(h.tree, 'ArenaSideRail');

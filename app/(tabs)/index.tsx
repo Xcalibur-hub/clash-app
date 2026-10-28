@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, ScrollView, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
+import { BackHandler, FlatList, Share, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,9 +8,6 @@ import { ArenaLiveGateway } from '../../components/arena/ArenaLiveGateway';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
 import { ArenaSideRail } from '../../components/arena/ArenaSideRail';
 import { ArenaClashes } from '../../components/arena/ArenaClashes';
-import { ArenaCommunity } from '../../components/arena/ArenaCommunity';
-import { ArenaTopics } from '../../components/arena/ArenaTopics';
-import { ArenaAtmosphere } from '../../components/liveArena/ArenaAtmosphere';
 import { ArenaEntrance } from '../../components/liveArena/ArenaEntrance';
 import { consumeArenaEntrance } from '../../utils/arenaEntranceState';
 import { FreshTakesSection } from '../../components/arena/FreshTakesSection';
@@ -46,7 +43,11 @@ import {
 } from '../../store';
 import { useAuth } from '../../store/AuthProvider';
 import { layout, space, useThemeColors } from '../../theme';
-import { DEFAULT_ARENA_MODE, type ArenaMode } from '../../utils/arenaNav';
+import {
+  recalledArenaHomePrimaryMode,
+  rememberArenaHomePrimaryMode,
+  type ArenaHomePrimaryMode,
+} from '../../utils/arenaHomeDestinations';
 import {
   arenaFlatListData,
   shouldShowArenaFeedEmpty,
@@ -77,7 +78,11 @@ export default function ArenaScreen(): React.JSX.Element {
   const requireAuth = useRequireAuth();
   const theme = useThemeColors();
 
-  const [arenaMode, setArenaMode] = React.useState<ArenaMode>(DEFAULT_ARENA_MODE);
+  const [arenaMode, setArenaModeState] = React.useState<ArenaHomePrimaryMode>(recalledArenaHomePrimaryMode);
+  const setArenaMode = React.useCallback((mode: ArenaHomePrimaryMode): void => {
+    rememberArenaHomePrimaryMode(mode);
+    setArenaModeState(mode);
+  }, []);
   const [scope, setScope] = React.useState<FeedScope>('for-you');
   const [followingIds, setFollowingIds] = React.useState<ReadonlySet<string> | null>(null);
   const [followingError, setFollowingError] = React.useState(false);
@@ -102,6 +107,17 @@ export default function ArenaScreen(): React.JSX.Element {
       if (consumeArenaEntrance()) setEntrance(true);
     }, []),
   );
+
+  useFocusEffect(React.useCallback(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (arenaMode === 'clashes') {
+        setArenaMode('for_you');
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [arenaMode, setArenaMode]));
 
   useFocusEffect(
     React.useCallback(() => {
@@ -349,8 +365,6 @@ export default function ArenaScreen(): React.JSX.Element {
     [dispatch, openClash, openDetail, openMenu, requireAuth, shareTake, state, toggleReaction],
   );
 
-  const heroTopic = liveTopics[0] ?? null;
-
   const header = React.useMemo(() => {
     if (arenaMode === 'clashes') {
       return (
@@ -365,16 +379,6 @@ export default function ArenaScreen(): React.JSX.Element {
           }}
           onWatch={(topic) => openTopic(topic.id)}
         />
-      );
-    }
-    if (arenaMode === 'community') {
-      return <ArenaCommunity refreshToken={refreshKey} onParticipate={() => setArenaMode('for_you')} />;
-    }
-    if (arenaMode === 'topics') {
-      return (
-        <>
-          <ArenaTopics refreshToken={refreshKey} onOpenTopic={openTopic} onOpenRoom={openRoom} />
-        </>
       );
     }
     // For You: keep loading/error above the fold — do not bury status under live hero chrome.
@@ -427,7 +431,6 @@ export default function ArenaScreen(): React.JSX.Element {
     arenaMode,
     dispatch,
     freshItems,
-    heroTopic,
     insets.bottom,
     liveTopics,
     liveTopicsLoading,
@@ -438,7 +441,6 @@ export default function ArenaScreen(): React.JSX.Element {
     openMenu,
     openRoom,
     openTopic,
-    refreshKey,
     requireAuth,
     scope,
     shareTake,
@@ -525,8 +527,7 @@ export default function ArenaScreen(): React.JSX.Element {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {arenaMode === 'community' ? <ArenaAtmosphere mood="discovery" energy={heroTopic ? 0.28 : 0.18} /> : null}
-      <ArenaTopBar paddingTop={insets.top} contextLine="ARENA" />
+      <ArenaTopBar paddingTop={insets.top} />
       <ArenaSideRail mode={arenaMode} onChange={setArenaMode} />
       {arenaMode === 'clashes' ? (
         <View
@@ -536,18 +537,6 @@ export default function ArenaScreen(): React.JSX.Element {
         >
           {header}
         </View>
-      ) : arenaMode === 'community' || arenaMode === 'topics' ? (
-        <ScrollView
-          key={arenaMode}
-          style={[{ flex: 1 }, styles.listLayer, entrance && styles.listDimmed]}
-          contentContainerStyle={[styles.list, { paddingBottom: dockBottomPadding(insets.bottom) }]}
-          showsVerticalScrollIndicator={false}
-          keyboardDismissMode="on-drag"
-          keyboardShouldPersistTaps="handled"
-          pointerEvents={entrance ? 'none' : 'auto'}
-        >
-          {header}
-        </ScrollView>
       ) : (
         <FlatList
           key={arenaMode}

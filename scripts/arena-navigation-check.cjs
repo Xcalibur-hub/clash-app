@@ -26,7 +26,7 @@ const react = {
   ...realReact,
   useState(initial) {
     const i = index++;
-    return [i < values.length ? values[i] : initial, v => writes.push([i, v])];
+    return [i < values.length ? values[i] : typeof initial === 'function' ? initial() : initial, v => writes.push([i, v])];
   },
   useCallback: fn => fn
 };
@@ -56,9 +56,13 @@ const client = {
   }
 };
 Module._load = function (request, parent) {
-  if (request === 'react-native-reanimated') return {__esModule:true,default:{Text:RN.Text},useReducedMotion:()=>true};
+  // Native SVG Fabric modules contain Flow syntax; retain the production graph,
+  // replacing only its native drawing primitives in this Node harness.
+  if (request === 'react-native-svg') return { __esModule: true, default: RN.View, Line: RN.View };
+  if (request === 'react-native-reanimated') return {__esModule:true,default:{Text:RN.Text,View:RN.View},useReducedMotion:()=>true};
+  if (request === 'lucide-react-native') return { ArrowRight: RN.View, Plus: RN.View, Users: RN.View };
   if (request === 'react') return react;
-  if (request === 'react-native') return RN;
+  if (request === 'react-native') return { ...RN, useWindowDimensions: () => ({ width: 360, height: 800, scale: 1, fontScale: 1 }) };
   if (request.endsWith('/PressableScale')) return { PressableScale: RN.Pressable };
   if (request === 'expo-router') return {
     useRouter: () => ({
@@ -89,7 +93,7 @@ Module._load = function (request, parent) {
   };
   if (file.endsWith('/store/AuthProvider.tsx')) return {
     useAuth: () => ({
-      signedIn: true
+      signedIn: true, user: { id: 'qa' }
     })
   };
   if (file.endsWith('/services/arenaInterestService.ts')) return {
@@ -99,6 +103,7 @@ Module._load = function (request, parent) {
     fetchLiveTopics: () => topicsResponse
   };
   if (file.endsWith('/services/arenaCrewService.ts')) return {
+    ARENA_CREW_SPECIALTIES: require('../utils/arenaCrewSpecialties.ts').ARENA_CREW_SPECIALTIES,
     listMyArenaCrews: () => crewResponse,
     listArenaCrews: () => crewResponse,
   };
@@ -133,20 +138,22 @@ async function main() {
   } = require('../components/arena/ArenaSideRail.tsx');
   let mode;
   reset();
-  const tabs = nodes(ArenaSideRail({
+  const railTree = ArenaSideRail({
     mode: 'for_you',
     onChange: m => mode = m
-  })).filter(n => n.props.accessibilityRole === 'tab');
-  assert.equal(tabs.length, 4);
-  assert.deepEqual(tabs.map(n => n.props.accessibilityState.selected), [true, false, false, false]);
-  console.log('PASS four destinations with selected accessibility state');
+  });
+  const tabs = nodes(railTree).filter(n => n.props.accessibilityRole === 'tab');
+  const links = nodes(railTree).filter(n => n.props.accessibilityRole === 'button');
+  assert.equal(tabs.length, 2);
+  assert.deepEqual(tabs.map(n => n.props.accessibilityState.selected), [true, false]);
+  assert.deepEqual(links.map(n => n.props.accessibilityLabel), ['Groups', 'Discover']);
+  console.log('PASS two Home modes with Groups and Discover route links');
   tabs[1].props.onPress();
   assert.equal(mode, 'clashes');
-  tabs[2].props.onPress();
-  assert.equal(mode, 'community');
-  tabs[3].props.onPress();
-  assert.equal(mode, 'topics');
-  console.log('PASS all non-Home destination interactions');
+  links[0].props.onPress();
+  links[1].props.onPress();
+  assert.deepEqual(routes, ['/arena/crews', '/arena/topics']);
+  console.log('PASS Live chip and Groups/Discover route interactions');
   const {
     ArenaTopics
   } = require('../components/arena/ArenaTopics.tsx');
@@ -156,41 +163,50 @@ async function main() {
     description: 'Canonical',
     hoods: ['movies']
   }];
-  reset([interests, [{
+  const snapshot = topics => ({ owner: 'qa', catalogue: interests, topics, trends: [] });
+  const noErrors = { catalogue: false, topics: false, trends: false };
+  const discussion = {
     id: 'topic-live',
     title: 'Real discussion',
     viewerRoomId: 'room-canonical'
-  }], false, false, false]);
+  };
+  reset([snapshot([discussion]), false, noErrors, 0, null]);
   let opened;
   let tree = ArenaTopics({
     onOpenTopic: id => opened = id,
     onOpenRoom: id => opened = id
   });
   let buttons = nodes(tree).filter(n => n.props.accessibilityRole === 'button');
-  buttons[0].props.onPress();
+  buttons.find(button => button.props.accessibilityLabel === 'Explore Film').props.onPress();
+  assert.ok(writes.some(([slot, value]) => slot === 4 && value === 'film'));
+  // Select the actual constellation node before exercising its revealed Hood action.
+  reset([snapshot([discussion]), false, noErrors, 0, 'film']);
+  tree = ArenaTopics({ onOpenTopic: id => opened = id, onOpenRoom: id => opened = id });
+  buttons = nodes(tree).filter(n => n.props.accessibilityRole === 'button');
+  buttons.find(button => nodes(button).some(n => Array.isArray(n.props?.children) && n.props.children.join('').startsWith('Explore movies'))).props.onPress();
   assert.deepEqual(routes, ['/hood/movies']);
   buttons.find(button=>button.props.accessibilityLabel==='Open discussion Real discussion').props.onPress();
   assert.equal(opened, 'room-canonical');
   console.log('PASS catalogue mapping and existing Room navigation');
-  reset([[], [{
+  reset([snapshot([{
     id: 'topic-real',
     title: 'Discussion',
     viewerRoomId: null
-  }], false, false, false]);
+  }]), false, noErrors]);
   tree = ArenaTopics({
     onOpenTopic: id => opened = id,
     onOpenRoom: id => opened = id
   });
-  nodes(tree).find(n => n.props.accessibilityRole === 'button').props.onPress();
+  nodes(tree).find(n => n.props.accessibilityLabel === 'Open discussion Discussion').props.onPress();
   assert.equal(opened, 'topic-real');
   console.log('PASS discussion without membership opens topic');
-  reset([[], [], false, true, true]);
+  reset([snapshot([]), false, { catalogue: true, topics: true, trends: false }]);
   tree = ArenaTopics({
     onOpenTopic() {},
     onOpenRoom() {}
   });
   const text = nodes(tree).map(n => n.props.children).filter(c => typeof c === 'string').join(' ');
-  assert.match(text, /Couldn't load topics/);
+  assert.match(text, /Couldn't load this map/);
   assert.match(text, /Couldn't load discussions/);
   assert.ok(!text.includes('No active discussions'));
   console.log('PASS failure is not misrepresented as no activity');
@@ -214,8 +230,9 @@ async function main() {
   global.__DEV__ = true;
   const trends = require('../services/arenaTrendService.ts');
   assert.equal(trends.trendingDemoActive(), true);
+  const beforeTrendRead = rpcCalls;
   assert.deepEqual(await trends.fetchTrendingBattles(10, true), []);
-  assert.equal(rpcCalls, 1);
+  assert.equal(rpcCalls - beforeTrendRead, 1);
   console.log('PASS server-only trends bypass an enabled development fixture');
   const hoodService = require('../services/hoodService.ts');
   assert.equal((await hoodService.fetchHoodOverview('techtakes')).liveCount,0);
@@ -226,12 +243,14 @@ async function main() {
   assert.ok(nodes(header).some(n=>n.props.children==='Live takes unavailable'));
   console.log('PASS unknown Hood count never becomes a fabricated zero');
   const { ArenaCommunity }=require('../components/arena/ArenaCommunity.tsx');
-  reset([[],[],false,false,0,false]);
-  const community=ArenaCommunity({});
-  assert.ok(nodes(community).some(n=>n.props.children==='No communities available.'));
+  const renderCommunity = () => { const child = ArenaCommunity({}); return child.type(child.props); };
+  reset(['explore', null, 'popular', [null], 0, 0,
+    { owner: 'qa', query: JSON.stringify([0,null,'popular',false]), mine: [], page: [], hasMore: false }, false, false]);
+  const community=renderCommunity();
+  assert.ok(nodes(community).some(n=>n.props.children==='No groups match this interest. Try another or create your own.'));
   console.log('PASS empty Crew discovery remains honest');
   let resolveCrew;
-  crewResponse=new Promise(r=>resolveCrew=r);reset();ArenaCommunity({});
+  crewResponse=new Promise(r=>resolveCrew=r);reset();renderCommunity();
   const disposeCrew=focus[0]();writes=[];disposeCrew();resolveCrew([]);
   await new Promise(r=>setImmediate(r));assert.equal(writes.length,0);
   console.log('PASS late Crew response cannot repopulate disposed account view');

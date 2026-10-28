@@ -1,14 +1,23 @@
-/** Arena V2 compact destination selector — retains all four existing modes. */
+/** Home primary modes plus lightweight Groups / Discover route links. */
 import React from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ArenaIcon, CreatorsIcon, HashIcon, SparklesIcon } from '../shared/icons';
 import { layout, useThemeColors } from '../../theme';
-import { ARENA_MODES, arenaModeAccessibilityLabel, type ArenaMode } from '../../utils/arenaNav';
+import {
+  ARENA_HOME_PRIMARY_MODES,
+  ARENA_HOME_ROUTE_DESTINATIONS,
+  type ArenaHomePrimaryMode,
+} from '../../utils/arenaHomeDestinations';
+import { arenaModeAccessibilityLabel } from '../../utils/arenaNav';
 import { tap } from '../../utils/haptics';
 
 const ICONS = {
   for_you: SparklesIcon,
   clashes: ArenaIcon,
+};
+
+const ROUTE_ICONS = {
   community: CreatorsIcon,
   topics: HashIcon,
 };
@@ -17,10 +26,11 @@ export function ArenaSideRail({
   mode,
   onChange,
 }: {
-  mode: ArenaMode;
-  onChange: (mode: ArenaMode) => void;
+  mode: ArenaHomePrimaryMode;
+  onChange: (mode: ArenaHomePrimaryMode) => void;
 }): React.JSX.Element {
   const t = useThemeColors();
+  const router = useRouter();
   return (
     <ScrollView
       horizontal
@@ -28,9 +38,9 @@ export function ArenaSideRail({
       style={styles.scroll}
       contentContainerStyle={styles.shell}
       accessibilityRole="tablist"
-      accessibilityLabel="Arena destinations"
+      accessibilityLabel="Home destinations"
     >
-      {ARENA_MODES.map((item) => {
+      {ARENA_HOME_PRIMARY_MODES.map((item) => {
         const selected = item.id === mode;
         const Icon = ICONS[item.id];
         const textColor = selected ? t.textPrimary : t.textSecondary;
@@ -61,6 +71,29 @@ export function ArenaSideRail({
           </Pressable>
         );
       })}
+      {ARENA_HOME_ROUTE_DESTINATIONS.map((item) => {
+        const Icon = ROUTE_ICONS[item.id];
+        return (
+          <Pressable
+            key={item.id}
+            collapsable={false}
+            onPress={() => {
+              tap();
+              router.push(item.route);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={item.label}
+            accessibilityHint={`Opens ${item.label}`}
+            style={({ pressed }) => [
+              styles.link,
+              { opacity: pressed ? 0.78 : 1 },
+            ]}
+          >
+            <Icon size={14} color={t.textSecondary} />
+            <Text style={[styles.linkLabel, { color: t.textSecondary }]}>{item.label}</Text>
+          </Pressable>
+        );
+      })}
     </ScrollView>
   );
 }
@@ -87,7 +120,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  link: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
   label: {
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  linkLabel: {
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
     fontSize: 13,
     fontWeight: '600',

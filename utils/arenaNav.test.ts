@@ -12,14 +12,14 @@ describe('arena navigation', () => {
     assert.equal(DEFAULT_ARENA_MODE, 'for_you');
   });
 
-  it('exposes exactly four Arena destinations', () => {
+  it('exposes four preserved destinations with Home labeled For You', () => {
     assert.deepEqual(
       ARENA_MODES.map((m) => m.id),
       ['for_you', 'clashes', 'community', 'topics'],
     );
     assert.deepEqual(
       ARENA_MODES.map((m) => m.label),
-      ['Home', 'Live', 'Groups', 'Discover'],
+      ['For You', 'Live', 'Groups', 'Discover'],
     );
   });
 

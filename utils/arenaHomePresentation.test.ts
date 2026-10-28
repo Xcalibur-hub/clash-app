@@ -119,17 +119,23 @@ describe('UI Phase 4 Arena Home presentation', () => {
 
   it('keeps topic and community destinations reachable from Home chrome', () => {
     const rail = read('components/arena/ArenaSideRail.tsx');
-    assert.match(rail, /ARENA_MODES/);
-    assert.match(rail, /topics/);
-    assert.match(rail, /community/);
+    assert.match(rail, /ARENA_HOME_PRIMARY_MODES/);
+    assert.match(rail, /ARENA_HOME_ROUTE_DESTINATIONS/);
+    assert.match(rail, /router\.push\(item\.route\)/);
     assert.match(rail, /clashes/);
     assert.match(rail, /zIndex:\s*2/);
     const home = read('app/(tabs)/index.tsx');
-    assert.match(home, /ArenaTopics/);
-    assert.match(home, /ArenaCommunity/);
+    assert.doesNotMatch(home, /ArenaTopics/);
+    assert.doesNotMatch(home, /ArenaCommunity/);
     assert.match(home, /ArenaClashes/);
     assert.match(home, /prioritizeInterestTopics/);
-    // Groups/Discover must not nest under the For You FlatList (touch + scroll dead ends).
-    assert.match(home, /arenaMode === 'community' \|\| arenaMode === 'topics'/);
+    assert.match(home, /hardwareBackPress/);
+    const destinations = read('utils/arenaHomeDestinations.ts');
+    assert.match(destinations, /\/arena\/crews/);
+    assert.match(destinations, /\/arena\/topics/);
+    const discover = read('app/arena/topics.tsx');
+    assert.match(discover, /ArenaTopics/);
+    const groups = read('app/arena/crews/index.tsx');
+    assert.match(groups, /GroupDiscovery/);
   });
 });

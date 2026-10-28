@@ -1,6 +1,6 @@
 /**
- * Arena primary navigation vocabulary (UI/IA only).
- * Four clear destinations within the existing Arena screen.
+ * Arena navigation vocabulary (UI/IA only).
+ * Home itself hosts two primary modes. Groups and Discover keep stack routes.
  */
 
 export type ArenaMode =
@@ -10,7 +10,7 @@ export type ArenaMode =
   | 'topics';
 
 export const ARENA_MODES: readonly { id: ArenaMode; label: string }[] = [
-  { id: 'for_you', label: 'Home' },
+  { id: 'for_you', label: 'For You' },
   { id: 'clashes', label: 'Live' },
   { id: 'community', label: 'Groups' },
   { id: 'topics', label: 'Discover' },
