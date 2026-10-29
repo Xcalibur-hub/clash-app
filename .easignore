@@ -810,3 +810,7 @@ supabase/.branches/
 !/components/dev/creatorEventDemo/EventStage.tsx
 !/components/dev/creatorEventDemo/RoundDecision.tsx
 !/components/dev/creatorEventDemo/CreatorEventDemo.tsx
+
+# GROUPS-X1: reviewed activity hub and local-only mission.
+!/components/arena/groups/GroupActivityHub.tsx
+!/components/arena/groups/GroupMissionRehearsal.tsx

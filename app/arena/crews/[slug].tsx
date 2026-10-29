@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Users } from 'lucide-react-native';
 import { GroupMark, GroupSpecialties } from '../../../components/arena/groups/GroupIdentity';
 import { GroupButton } from '../../../components/arena/groups/GroupButton';
+import { GroupActivityHub } from '../../../components/arena/groups/GroupActivityHub';
 import { Avatar } from '../../../components/shared/Avatar';
 import { useRequireAuth } from '../../../hooks/useRequireAuth';
 import { useAuth } from '../../../store/AuthProvider';
@@ -167,7 +168,8 @@ export default function CrewProfileScreen(): React.JSX.Element {
   const action = crew ? crewJoinAction(crew.joinMode, crew.viewer, crew.id) : null;
   const actionLabel = action === 'join' ? 'Join group' : action === 'request' ? 'Request to join' : action === 'pending' ? 'Request pending' : action === 'member' ? 'Joined' : action === 'invite_only' ? 'Invite only' : 'One Crew at a time';
   return <View style={[styles.screen, {
-    backgroundColor: t.background
+    backgroundColor: t.background,
+    paddingBottom: insets.bottom
   }]}>
     <View style={[styles.bar, {
       paddingTop: insets.top,
@@ -186,7 +188,7 @@ export default function CrewProfileScreen(): React.JSX.Element {
       }]}>{error ? 'Couldn’t load group' : 'Group unavailable'}</Text><Text style={[styles.bodyText, {
         color: t.textSecondary
       }]}>{error ?? 'This group may no longer be available to you.'}</Text><GroupButton label={error ? 'Try again' : 'Explore groups'} onPress={() => error ? setRetry(n => n + 1) : router.replace('/arena/crews')} /></View> : <ScrollView contentContainerStyle={{
-      paddingBottom: insets.bottom + 32
+      paddingBottom: 32
     }}>
             {crew.bannerUrl ? <Image source={{
         uri: crew.bannerUrl
@@ -238,12 +240,8 @@ export default function CrewProfileScreen(): React.JSX.Element {
               fontSize: 14,
               fontWeight: '600',
               color: tab === key ? t.textPrimary : t.textMuted
-            }}>{key === 'about' ? 'About' : 'Members'}</Text></Pressable>)}</View>
-              {tab === 'about' ? <><Text style={[styles.section, {
-            color: t.textPrimary
-          }]}>What brings us together</Text><Text style={[styles.bodyText, {
-            color: t.textSecondary
-          }]}>{crew.bio || 'This group hasn’t added a description yet.'}</Text>
+            }}>{key === 'about' ? 'Activity' : 'Members'}</Text></Pressable>)}</View>
+              {tab === 'about' ? <><GroupActivityHub crew={crew} identity={identity} onMembers={() => setTab('members')} />
                 <View style={[styles.record, {
             backgroundColor: t.surface
           }]}><Text style={[styles.section, {
