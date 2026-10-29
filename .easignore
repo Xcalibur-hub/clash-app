@@ -814,3 +814,11 @@ supabase/.branches/
 # GROUPS-X1: reviewed activity hub and local-only mission.
 !/components/arena/groups/GroupActivityHub.tsx
 !/components/arena/groups/GroupMissionRehearsal.tsx
+
+# PLAY-X1: reviewed local SIGNAL game dependencies.
+!/components/play/signal
+!/components/play/signal/model.ts
+!/components/play/signal/SignalBoard.tsx
+!/components/play/signal/SignalGame.tsx
+!/components/play/signal/SignalEntry.tsx
+!/app/explore/play/signal.tsx

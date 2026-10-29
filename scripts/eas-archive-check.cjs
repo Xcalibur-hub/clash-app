@@ -28,7 +28,7 @@ async function inspectArchive() {
     'utils/arenaHomeDestinations.ts', 'app/arena/topics.tsx',
     'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx',
     'components/dev/creatorEventDemo/model.ts', 'components/dev/creatorEventDemo/EventStage.tsx',
-    'components/dev/creatorEventDemo/RoundDecision.tsx', 'components/dev/creatorEventDemo/CreatorEventDemo.tsx', 'components/arena/groups/GroupActivityHub.tsx', 'components/arena/groups/GroupMissionRehearsal.tsx'];
+    'components/dev/creatorEventDemo/RoundDecision.tsx', 'components/dev/creatorEventDemo/CreatorEventDemo.tsx', 'components/arena/groups/GroupActivityHub.tsx', 'components/arena/groups/GroupMissionRehearsal.tsx', 'components/play/signal/model.ts', 'components/play/signal/SignalBoard.tsx', 'components/play/signal/SignalGame.tsx', 'components/play/signal/SignalEntry.tsx', 'app/explore/play/signal.tsx'];
   for (const item of required) assert.ok(set.has(item), 'Missing required archive input: ' + item);
   const denied = ['.expo/phase5d2/recover.cjs', 'docs/evidence/private.png', '.env', '.env.local', '.env.example',
     'services/.env', 'config/credentials.json', 'android/app/debug.keystore', 'app/private.dpapi.json',
@@ -41,7 +41,7 @@ async function inspectArchive() {
     'utils/arenaHomeDestinations.ts', 'app/arena/topics.tsx',
     'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx',
     'components/dev/creatorEventDemo/model.ts', 'components/dev/creatorEventDemo/EventStage.tsx',
-    'components/dev/creatorEventDemo/RoundDecision.tsx', 'components/dev/creatorEventDemo/CreatorEventDemo.tsx', 'components/arena/groups/GroupActivityHub.tsx', 'components/arena/groups/GroupMissionRehearsal.tsx']);
+    'components/dev/creatorEventDemo/RoundDecision.tsx', 'components/dev/creatorEventDemo/CreatorEventDemo.tsx', 'components/arena/groups/GroupActivityHub.tsx', 'components/arena/groups/GroupMissionRehearsal.tsx', 'components/play/signal/model.ts', 'components/play/signal/SignalBoard.tsx', 'components/play/signal/SignalGame.tsx', 'components/play/signal/SignalEntry.tsx', 'app/explore/play/signal.tsx']);
   const unexpected = untracked.filter(file => set.has(file) && !authorizedNewInputs.has(file));
   assert.equal(unexpected.length, 0, 'Unreviewed untracked files entered archive inventory');
   // Resolve every static relative dependency of included runtime/config sources.

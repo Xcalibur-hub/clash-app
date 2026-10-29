@@ -18,6 +18,7 @@ import { useClock } from '../../hooks/useClock';
 import { useAuth } from '../../store/AuthProvider';
 import { useRetryableRead } from '../../hooks/useRetryableRead';
 import { ReadFeedback } from '../shared/ReadFeedback';
+import { SignalEntry } from './signal/SignalEntry';
 
 type PlayTab = 'challenges' | 'treasure';
 
@@ -170,6 +171,7 @@ export function PlayHomePanel(): React.JSX.Element {
         })}
       </View>
 
+      <SignalEntry />
       <WorldDropsShelf />
 
       <ReadFeedback status={read.status} subject="Play" retry={read.retry} />

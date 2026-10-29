@@ -57,7 +57,7 @@ test('Live successful cards retain actual service destinations and metrics', asy
 });
 
 test('Play retry preserves selected Treasure tab and makes one new read', async () => {
-  const h = harness('components/play/PlayHomePanel.tsx'); let calls = 0;
+  const h = harness('components/play/PlayHomePanel.tsx', {}, undefined, { dependencies: { 'expo-constants': { __esModule: true, default: { expoConfig: { extra: { appVariant: 'production' } } } } } }); let calls = 0;
   h.services.fetchPlayHome = async () => { if (++calls === 1) throw Error('offline'); return { challenges: [], treasures: [] }; };
   try {
     await h.mount(); await press(h, h.nodes.find(n => n.props?.accessibilityLabel === 'TREASURE'));
