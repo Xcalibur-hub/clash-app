@@ -61,7 +61,7 @@ function AnimatedPercent({
   return (
     <Animated.Text
       allowFontScaling
-      style={[styles.pct, { fontSize: size, minWidth, color: t.textPrimary }, style]}
+      style={[styles.pct, { fontSize: size, lineHeight: Math.ceil(size * 1.3), minWidth, color: t.textPrimary }, style]}
     >
       {value}%
     </Animated.Text>
@@ -115,7 +115,7 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
 
   if (!verdict) {
     return (
-      <View style={styles.wrap} accessibilityLabel="Verdict pending">
+      <View style={[styles.wrap, { backgroundColor: t.background }]} accessibilityLabel="Verdict pending">
         {accent}
         {sections.announcement ? (
           <Text
@@ -145,7 +145,7 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
   const bPct = view.bPct;
 
   return (
-    <View style={styles.wrap} accessibilityLabel="Official verdict">
+    <View style={[styles.wrap, { backgroundColor: t.background }]} accessibilityLabel="Official verdict">
       {/* 1 — Announcement */}
       <Animated.View entering={reduced || !animate ? undefined : FadeIn.duration(220)}>
         {accent}

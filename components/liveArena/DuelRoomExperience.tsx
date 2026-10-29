@@ -357,12 +357,12 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
-      <ArenaAtmosphere
+      {duel.status === 'open' && room.phase !== 'closed' ? <ArenaAtmosphere
         mood={atmosphereMood}
         energy={
           judgingFocus ? 0.08 : live ? 0.38 : atmosphereMood === 'verdict' ? 0.28 : 0.18
         }
-      />
+      /> : null}
 
       <KeyboardAvoidingView
         style={[styles.root, styles.layer]}
@@ -383,6 +383,8 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           onViewResult={duel.status !== 'open' || room.phase === 'closed' ? () => setResultOpen(true) : undefined}
           spectatorCount={crowd.context?.spectatorCount ?? props.spectatorCount}
           reactionBurst={reactionBurst}
+          canReact={live && !props.threadLocked && Boolean(account) && Boolean(room.viewer) && (duel.viewerRelationship === 'fighter_a' || duel.viewerRelationship === 'fighter_b')}
+          onReact={props.onReact}
           crowd={crowd}
           crowdUnavailableReason={cancelled ? 'Crowd chat is unavailable because this Clash was cancelled.' : undefined}
           onReportCrowd={props.onReportCrowd}
@@ -476,6 +478,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       <DuelEntrance
         duel={duel}
         proposition={proposition}
+        phase={room.phase}
         momentKey={entranceKey}
         active={entrance}
         onDone={finishEntrance}

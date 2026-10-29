@@ -800,3 +800,6 @@ supabase/.branches/
 
 !/utils/arenaHomeDestinations.ts
 !/app/arena/topics.tsx
+
+!/components/liveArena/DuelPositions.tsx
+!/components/liveArena/DuelArgumentReactions.tsx

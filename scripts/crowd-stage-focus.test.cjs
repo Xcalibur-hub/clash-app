@@ -73,3 +73,14 @@ test('live action hosts stay pinned across font-scale changes',()=>{
     assert.ok(nodes.some(n=>n.props.accessibilityLabel==='Spectator stage actions'&&n.props.children.includes(footer)));
   }
 });
+
+test('terminal outcome actions scroll at normal and enlarged text without compressing Stage',()=>{
+  for(const terminal of ['settled','cancelled']) for(const fontScale of [1,1.3]){
+    const footer={fixture:'terminal result actions'};
+    const {nodes}=render({expanded:false,condensed:false,fontScale,terminal,fighterComposer:null,stageFooter:footer});
+    const scroll=nodes.find(n=>n.type==='ScrollView');
+    assert.ok(scroll.props.children.includes(footer));
+    assert.equal(nodes.some(n=>n.props.accessibilityLabel==='Spectator stage actions'),false);
+    assert.equal(nodes.filter(n=>n.props.children===footer).length,0,'footer is not duplicated in an outside host');
+  }
+});

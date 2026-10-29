@@ -160,12 +160,12 @@ export function LiveCrowdLayer({
             </Pressable>
           ) : null
         }
-        ListEmptyComponent={
+        ListEmptyComponent={crowd?.error ? null :
           <View style={styles.emptyWrap}>
             <Text style={[styles.emptyTitle, { color: t.textSecondary }]}>
-              {readOnly ? 'Crowd quiet' : 'Start the conversation'}
+              {crowd?.loading ? 'Finding the Crowd' : !crowd?.context ? 'Crowd unavailable' : readOnly ? 'The conversation is preserved' : canSend ? 'The floor is yours' : 'A quiet Crowd'}
             </Text>
-            <Text style={[styles.empty, { color: t.textMuted }]}>{emptyCopy}</Text>
+            <Text style={[styles.empty, { color: t.textMuted }]}>{!readOnly && !crowd?.loading && crowd?.context && !canSend ? 'No messages in the visible Crowd. Sending is unavailable for your current role or phase.' : emptyCopy}</Text>
           </View>
         }
         renderItem={({ item }) => (

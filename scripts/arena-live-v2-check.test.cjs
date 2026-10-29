@@ -38,7 +38,7 @@ test('demo keyboard avoids stale Android offsets, reserves composer room and hid
 test('compact Stage gives all free space to Crowd and keeps a working full-argument action',async()=>{
   const {harness,nodes,React}=require('./ui-completion-harness.cjs');
   const leaf=name=>({[name]:name}),noop=()=>{};let history=0,dismissed=0;
-  const dependencies=Object.fromEntries(['ClashEventHeader','ClashProposition','ClashFighterRail','CurrentArgumentStage','ClashBackingActions','LiveCrowdLayer','ReactionBurst'].map(n=>[n,leaf(n)]));
+  const dependencies=Object.fromEntries(['ClashEventHeader','ClashProposition','ClashFighterRail','CurrentArgumentStage','ClashBackingActions','LiveCrowdLayer','ReactionBurst','DuelPositions','DuelArgumentReactions'].map(n=>[n,leaf(n)]));
   dependencies.ArenaRoomText={ArenaRoomText:'Text'};
   dependencies['react-native']={...Object.fromEntries(['View','Text','Pressable','ScrollView'].map(n=>[n,n])),
     StyleSheet:{create:x=>x,hairlineWidth:1},useWindowDimensions:()=>({width:360,height:800,fontScale:1}),

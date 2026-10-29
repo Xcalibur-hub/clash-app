@@ -59,7 +59,8 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
     );
   }
 
-  const headline = phase === 'closed'
+  const resultUnavailable = duel.status === 'settled' && !verdict;
+  const headline = resultUnavailable ? 'Official result unavailable' : phase === 'closed'
     ? 'Settlement pending'
     : duel.hasJudged || recorded
     ? 'Your ballot is recorded'
@@ -91,7 +92,7 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
       </Animated.Text>
 
       <Text style={[styles.support, { color: t.textSecondary }]}>
-        {phase === 'closed'
+        {resultUnavailable ? 'The official result is unavailable. You can review the visible transcript.' : phase === 'closed'
           ? presentation.hint
           : duel.hasJudged || recorded
           ? 'Your judgement was submitted. Results appear after voting closes.'

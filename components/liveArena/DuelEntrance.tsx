@@ -1,191 +1,71 @@
-/**
- * Short fighter-intro when entering a canonical Duel Room.
- * Event-driven, one-shot — never replays on hydration, keyboard, or transcript.
- */
+/** One committed intro per canonical room visit; reduced motion stays static. */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  SlideInLeft,
-  SlideInRight,
-  ZoomIn,
-  useReducedMotion,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import type { ArenaDuel } from '../../utils/arenaDuelPayload';
+import type { ArenaPhase } from '../../services/liveArenaService';
 import { duelEntranceDurationMs } from '../../utils/challengePresentation';
 import { space, typeScale, useThemeColors } from '../../theme';
 import { Avatar } from '../shared/Avatar';
-import { ArenaAtmosphere } from './ArenaAtmosphere';
 import { hasPlayed, shouldPlayOnce } from '../../utils/motionOnce';
 
 export interface DuelEntranceProps {
-  duel: ArenaDuel;
-  proposition: string;
-  active: boolean;
-  momentKey: string;
-  onDone: () => void;
+  duel: ArenaDuel; proposition: string; phase?: ArenaPhase;
+  active: boolean; momentKey: string; onDone: () => void;
 }
-
-export function DuelEntrance({
-  duel,
-  proposition,
-  active,
-  momentKey,
-  onDone,
-}: DuelEntranceProps): React.JSX.Element | null {
-  const t = useThemeColors();
-  const insets = useSafeAreaInsets();
-  const reduced = useReducedMotion();
-  const doneRef = React.useRef(false);
-  const callback = React.useRef(onDone);
+export function DuelEntrance({ duel, proposition, phase = 'open', active, momentKey, onDone }: DuelEntranceProps): React.JSX.Element | null {
+  const t = useThemeColors(), insets = useSafeAreaInsets(), reduced = useReducedMotion();
+  const done = React.useRef(false), claimed = React.useRef(false), callback = React.useRef(onDone);
   callback.current = onDone;
-  const claimed = React.useRef(false);
   const visible = active && (claimed.current || !hasPlayed(momentKey));
-
   React.useEffect(() => {
     if (!visible) return undefined;
-    // Runs only after the visible overlay has committed — not in loading/error gates.
     if (!claimed.current) {
       if (!shouldPlayOnce(momentKey)) return undefined;
       claimed.current = true;
     }
-    const ms = duelEntranceDurationMs(Boolean(reduced));
-    const id = setTimeout(() => {
-      if (doneRef.current) return;
-      doneRef.current = true;
-      callback.current();
-    }, ms);
-    return () => clearTimeout(id);
+    const timer = setTimeout(() => {
+      if (done.current) return;
+      done.current = true; callback.current();
+    }, duelEntranceDurationMs(Boolean(reduced)));
+    return () => clearTimeout(timer);
   }, [visible, momentKey, reduced]);
-
   if (!visible) return null;
-
-  const finish = (): void => {
-    if (doneRef.current) return;
-    doneRef.current = true;
-    callback.current();
-  };
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Skip Clash intro"
-      accessibilityHint="Dismisses the intro and enters the Stage"
-      onPress={finish}
-      style={[
-        styles.root,
-        {
-          backgroundColor: t.background,
-          paddingTop: Math.max(insets.top, space.md),
-          paddingBottom: Math.max(insets.bottom, space.md),
-        },
-      ]}
-    >
-      <ArenaAtmosphere mood="live" energy={0.35} />
-      <View style={styles.content}>
-        <Animated.Text
-          entering={reduced ? undefined : FadeIn.duration(180)}
-          style={[styles.kicker, { color: t.textMuted }]}
-        >
-          LIVE DUEL
-        </Animated.Text>
-        <Animated.Text
-          entering={reduced ? undefined : FadeIn.duration(200)}
-          numberOfLines={3}
-          style={[styles.prop, { color: t.textPrimary }]}
-        >
-          {proposition}
-        </Animated.Text>
-        <View style={styles.row}>
-          <Animated.View
-            entering={reduced ? undefined : SlideInLeft.springify().damping(16)}
-            style={styles.col}
-          >
-            <Avatar name={duel.fighterA.name} tint={duel.fighterA.tint ?? t.textMuted} size={64} />
-            <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
-              {duel.fighterA.name}
-            </Text>
-            <Text numberOfLines={1} style={[styles.handle, { color: t.textMuted }]}>
-              @{duel.fighterA.handle}
-            </Text>
-          </Animated.View>
-          <Animated.Text
-            entering={reduced ? undefined : ZoomIn.delay(80).springify().damping(14)}
-            style={[styles.vs, { color: t.textMuted }]}
-          >
-            VS
-          </Animated.Text>
-          <Animated.View
-            entering={reduced ? undefined : SlideInRight.springify().damping(16)}
-            style={styles.col}
-          >
-            <Avatar name={duel.fighterB.name} tint={duel.fighterB.tint ?? t.textMuted} size={64} />
-            <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
-              {duel.fighterB.name}
-            </Text>
-            <Text numberOfLines={1} style={[styles.handle, { color: t.textMuted }]}>
-              @{duel.fighterB.handle}
-            </Text>
-          </Animated.View>
-        </View>
-        <Animated.Text
-          entering={reduced ? undefined : FadeInDown.delay(120).duration(220)}
-          style={[styles.live, { color: t.textSecondary }]}
-        >
-          ENTERING ARENA
-        </Animated.Text>
-        <Text style={[styles.skip, { color: t.textMuted }]}>Tap anywhere to skip</Text>
+  const event = duel.status === 'settled' ? 'OFFICIAL RESULT' : duel.status === 'cancelled' ? 'CLASH CLOSED'
+    : phase === 'closed' ? 'AWAITING SETTLEMENT' : phase === 'judging' ? 'COMMUNITY JUDGING'
+    : phase === 'final_arguments' ? 'FINAL ARGUMENTS' : phase === 'scheduled' ? 'UPCOMING CLASH' : 'LIVE DUEL';
+  return <Pressable accessibilityRole="button" accessibilityLabel="Skip Clash intro"
+    accessibilityHint="Dismisses the fighter introduction and enters the Stage"
+    onPress={() => { if (!done.current) { done.current = true; callback.current(); } }}
+    style={[styles.root, { backgroundColor: t.background, paddingTop: Math.max(insets.top, space.md), paddingBottom: Math.max(insets.bottom, space.md) }]}>
+    <View style={styles.content}>
+      <Text style={[styles.kicker, { color: t.textSecondary }]}>{event}</Text>
+      <Text style={[styles.takeLabel, { color: t.textMuted }]}>THE TAKE</Text>
+      <Text numberOfLines={3} style={[styles.proposition, { color: t.textPrimary }]}>{proposition}</Text>
+      <View style={styles.matchup}>
+        {([duel.fighterA, duel.fighterB] as const).map((fighter, index) => <Animated.View key={fighter.id}
+          entering={reduced ? undefined : FadeInDown.duration(180 + index * 60)} style={styles.fighter}>
+          <Text style={[styles.takeLabel, { color: t.textMuted }]}>FIGHTER {index === 0 ? 'A' : 'B'}</Text>
+          <Avatar name={fighter.name} tint={fighter.tint ?? t.textMuted} size={48} />
+          <Text numberOfLines={2} style={[styles.name, { color: t.textPrimary }]}>{fighter.name}</Text>
+          <Text numberOfLines={2} style={[styles.handle, { color: t.textSecondary }]}>@{fighter.handle}</Text>
+        </Animated.View>)}
       </View>
-    </Pressable>
-  );
+      <Text style={[styles.versus, { color: t.textSecondary }]}>TWO PERSPECTIVES. ONE STAGE.</Text>
+      <Text style={[styles.handle, { color: t.textMuted }]}>Tap anywhere to skip. Full positions inside</Text>
+    </View>
+  </Pressable>;
 }
-
 const styles = StyleSheet.create({
-  root: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 30,
-    justifyContent: 'center',
-  },
-  content: {
-    zIndex: 1,
-    paddingHorizontal: space.lg,
-    gap: space.lg,
-    alignItems: 'center',
-  },
-  kicker: {
-    ...typeScale.caption,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.6,
-  },
-  prop: {
-    ...typeScale.title,
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  row: { flexDirection: 'row', alignItems: 'center', width: '100%', gap: space.md },
-  col: { flex: 1, alignItems: 'center', gap: 6, minWidth: 0 },
-  name: { ...typeScale.label, fontSize: 15, fontWeight: '700', textAlign: 'center', width: '100%' },
-  handle: {
-    ...typeScale.caption,
-    fontSize: 12,
-    textAlign: 'center',
-    width: '100%',
-  },
-  vs: { ...typeScale.caption, fontSize: 13, fontWeight: '700', letterSpacing: 1.4 },
-  live: {
-    ...typeScale.caption,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-  },
-  skip: {
-    ...typeScale.caption,
-    fontSize: 12,
-    marginTop: space.xs,
-  },
+  root: { ...StyleSheet.absoluteFillObject, zIndex: 30, justifyContent: 'center' },
+  content: { paddingHorizontal: space.lg, gap: space.md, alignItems: 'center' },
+  kicker: { ...typeScale.caption, fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  takeLabel: { ...typeScale.caption, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
+  proposition: { ...typeScale.title, fontSize: 22, lineHeight: 29, textAlign: 'center', fontWeight: '700' },
+  matchup: { flexDirection: 'row', gap: space.md, width: '100%', paddingVertical: space.md },
+  fighter: { flex: 1, minWidth: 0, alignItems: 'center', gap: space.sm },
+  name: { ...typeScale.label, fontSize: 16, lineHeight: 23, fontWeight: '700', textAlign: 'center', width: '100%' },
+  handle: { ...typeScale.caption, fontSize: 12, lineHeight: 18, textAlign: 'center', width: '100%' },
+  versus: { ...typeScale.caption, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
 });

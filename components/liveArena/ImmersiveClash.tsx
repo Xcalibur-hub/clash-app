@@ -23,6 +23,8 @@ import { ClashEventHeader } from './ClashEventHeader';
 import { ClashProposition } from './ClashProposition';
 import { ClashFighterRail } from './ClashFighterRail';
 import { CurrentArgumentStage } from './CurrentArgumentStage';
+import { DuelPositions } from './DuelPositions';
+import { DuelArgumentReactions } from './DuelArgumentReactions';
 import { ClashBackingActions } from './ClashBackingActions';
 import { LiveCrowdLayer, type LiveCrowdLayerProps } from './LiveCrowdLayer';
 import { space, typeScale, useThemeColors } from '../../theme';
@@ -72,6 +74,8 @@ export interface ImmersiveClashProps {
   onToggleFollow?: () => void;
   /** Real reaction burst on the newest Stage message, or null. */
   reactionBurst?: { emoji: string; key: string } | null;
+  canReact?: boolean;
+  onReact?: (message: ArenaMessage, emoji: string) => void;
   /** Terminal states drop live chrome: RESULT for settled, CLOSED for cancelled. */
   terminal?: 'settled' | 'cancelled' | null;
 }
@@ -106,6 +110,8 @@ export function ImmersiveClash({
   crowdUnavailableReason,
   onReportCrowd,
   reactionBurst = null,
+  canReact = false,
+  onReact,
   terminal = null,
   following = false,
   followBusy = false,
@@ -176,8 +182,8 @@ export function ImmersiveClash({
   // The Crowd takes the remaining share of the same animated split.
   const compact = condensed || judgingFocus || crowdExpanded;
   // Keep live mutation controls in their existing host across font-scale changes.
-  // Read-only outcome actions can share the enlarged Stage's scroll budget.
-  const showPinnedSpectatorActions = !compactSummary && (fontScale < 1.25 || liveStage);
+  // Terminal results share the Stage's scroll budget so they cannot compress its content.
+  const showPinnedSpectatorActions = !compactSummary && !terminal && (fontScale < 1.25 || liveStage);
   const showBackingActions = canBack && !judgingFocus && !condensed;
   // Plain View when Crowd is collapsed — Reanimated host dropped absolute height:48 on A50.
   const StageShell = crowdHeaderOnly ? View : Animated.View;
@@ -290,6 +296,7 @@ export function ImmersiveClash({
               accessibilityLabel="Clash stage and official arguments"
             >
               <ClashProposition text={proposition} condensed={compact} />
+              <DuelPositions key={duel.clashId} duel={duel} />
 
               {(roleLabel || onToggleFollow) && !terminal ? (
                 <View style={styles.metaRow}>
@@ -357,6 +364,7 @@ export function ImmersiveClash({
                   onOpenFull={onViewHistory}
                 />
               ) : null}
+              {!judgingFocus ? <DuelArgumentReactions key={latestMessage?.id ?? 'none'} message={latestMessage} canReact={canReact && liveStage} onReact={onReact} /> : null}
               {/* When pinned, actions sit outside the scroll so they stay tappable on A50. */}
               {!showPinnedSpectatorActions && showBackingActions ? (
                 <ClashBackingActions
