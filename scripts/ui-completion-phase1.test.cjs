@@ -124,7 +124,9 @@ test('Vault Takes open redesigned detail; Wins is a real history child', async (
 });
 
 test('Settings account, Back fallback, help and appearance use existing actions in both themes', async () => {
-  const h = harness('app/settings.tsx');
+  const h = harness('app/settings.tsx', {}, undefined, { dependencies: {
+    'expo-constants': { __esModule: true, default: { expoConfig: { extra: { appVariant: 'production' } } } },
+  } });
   try {
     await h.mount(); await press(h, h.nodes.find(n => n.props?.accessibilityLabel === 'Back')); assert.deepEqual(h.calls.pop(), ['replace', '/(tabs)']);
     await press(h, h.nodes.find(n => text(n) === 'Open profile')); assert.deepEqual(h.calls.pop(), ['push', '/(tabs)/profile']);

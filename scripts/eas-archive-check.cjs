@@ -26,7 +26,9 @@ async function inspectArchive() {
     'supabase/database.types.ts', 'data/exploreWorldGeometry.json', 'utils/releaseScope.ts',
     'utils/communityVerdict.ts', 'components/shared/ReleaseUnavailable.tsx',
     'utils/arenaHomeDestinations.ts', 'app/arena/topics.tsx',
-    'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx'];
+    'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx',
+    'components/dev/creatorEventDemo/model.ts', 'components/dev/creatorEventDemo/EventStage.tsx',
+    'components/dev/creatorEventDemo/RoundDecision.tsx', 'components/dev/creatorEventDemo/CreatorEventDemo.tsx'];
   for (const item of required) assert.ok(set.has(item), 'Missing required archive input: ' + item);
   const denied = ['.expo/phase5d2/recover.cjs', 'docs/evidence/private.png', '.env', '.env.local', '.env.example',
     'services/.env', 'config/credentials.json', 'android/app/debug.keystore', 'app/private.dpapi.json',
@@ -37,7 +39,9 @@ async function inspectArchive() {
   const untracked = cp.execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { encoding: 'utf8', windowsHide: true }).split('\0').filter(Boolean);
   const authorizedNewInputs = new Set(['.easignore', 'config/release-targets.json', 'utils/releaseScope.ts', 'utils/communityVerdict.ts', 'components/shared/ReleaseUnavailable.tsx',
     'utils/arenaHomeDestinations.ts', 'app/arena/topics.tsx',
-    'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx']);
+    'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx',
+    'components/dev/creatorEventDemo/model.ts', 'components/dev/creatorEventDemo/EventStage.tsx',
+    'components/dev/creatorEventDemo/RoundDecision.tsx', 'components/dev/creatorEventDemo/CreatorEventDemo.tsx']);
   const unexpected = untracked.filter(file => set.has(file) && !authorizedNewInputs.has(file));
   assert.equal(unexpected.length, 0, 'Unreviewed untracked files entered archive inventory');
   // Resolve every static relative dependency of included runtime/config sources.

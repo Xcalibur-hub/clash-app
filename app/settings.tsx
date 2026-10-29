@@ -1,4 +1,5 @@
 import React from 'react';
+import Constants from 'expo-constants';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +7,7 @@ import { AppearanceRow } from '../components/profile/AppearanceRow';
 import { useAuth } from '../store/AuthProvider';
 import { useClash } from '../store';
 import { layout, space, typeScale, useThemeColors } from '../theme';
+import { arenaDemoAllowed } from '../utils/arenaDemoGate';
 
 export default function SettingsScreen(): React.JSX.Element {
   const t = useThemeColors(), insets = useSafeAreaInsets(), router = useRouter();
@@ -45,6 +47,14 @@ export default function SettingsScreen(): React.JSX.Element {
         </Pressable>
         {helpOpen ? <Text style={[styles.body, { color: t.textSecondary }]}>Arena is for Takes and debates. Explore contains World, Play and Meet. Vault is for creator content. Use each screen's Back control to return. A locked or unavailable item does not mean a purchase was made.</Text> : null}
       </View>
+      {arenaDemoAllowed(typeof __DEV__ !== 'undefined' && __DEV__, Constants.expoConfig?.extra?.appVariant) ? <View style={[styles.section, { borderColor: t.border }]}>
+        <Text accessibilityRole="header" style={[styles.heading, { color: t.textPrimary }]}>Development lab</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Interactive creator event demo" style={styles.row}
+          onPress={() => router.push('/demo-arena?demoScreen=creator-event')}>
+          <Text style={[styles.label, { color: t.textPrimary }]}>Interactive creator event demo →</Text>
+        </Pressable>
+        <Text style={[styles.body, { color: t.textSecondary }]}>Local simulation only. No stream or account actions.</Text>
+      </View> : null}
     </ScrollView>
   );
 }

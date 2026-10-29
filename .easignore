@@ -803,3 +803,10 @@ supabase/.branches/
 
 !/components/liveArena/DuelPositions.tsx
 !/components/liveArena/DuelArgumentReactions.tsx
+
+# LIVE-X1: reviewed local demo dependencies; release Metro redirects the guarded entry.
+!/components/dev/creatorEventDemo
+!/components/dev/creatorEventDemo/model.ts
+!/components/dev/creatorEventDemo/EventStage.tsx
+!/components/dev/creatorEventDemo/RoundDecision.tsx
+!/components/dev/creatorEventDemo/CreatorEventDemo.tsx
