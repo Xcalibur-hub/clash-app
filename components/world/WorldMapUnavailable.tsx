@@ -12,6 +12,7 @@ import { WorldDropCard } from './WorldDropCard';
 import { WorldMissionCard } from './WorldMissionCard';
 import { ReadFeedback } from '../shared/ReadFeedback';
 import type { ReadStatus } from '../../hooks/useRetryableRead';
+import { BeaconEntry } from './beacon/BeaconEntry';
 
 export interface WorldMapUnavailableProps {
   missions: WorldMission[];
@@ -63,6 +64,7 @@ export function WorldMapUnavailable({
       </View>
 
       <ReadFeedback status={missionStatus} subject="World missions" retry={onRetryMissions} />
+      <BeaconEntry />
       {primary ? (
         <WorldMissionCard mission={primary} now={now} onParticipate={onParticipate} />
       ) : missionStatus === 'ready' ? (

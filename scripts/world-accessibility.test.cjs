@@ -6,6 +6,7 @@ const leaf = name => ({ [name]: name });
 const props = { activityStatus: 'ready', countries: [], challenges: [], treasures: [], selectedCode: null,
   onRetry() {}, onSelectCountry() {}, onOpenCountry() {}, onOpenChallenge() {}, onOpenTreasure() {}, onSurprise() {}, onClear() {} };
 const worldDeps = Object.fromEntries(['WorldActiveRail', 'WorldCountryPanel', 'WorldSurpriseCard'].map(n => [n, leaf(n)]));
+worldDeps['expo-constants'] = { __esModule: true, default: { expoConfig: { extra: { appVariant: 'production' } } } };
 
 test('successful World empty copy scales without a line clamp; other read states never claim emptiness', async () => {
   const h = harness('components/explore/WorldExperience.tsx', props, e => e.WorldExperience, { dependencies: worldDeps });

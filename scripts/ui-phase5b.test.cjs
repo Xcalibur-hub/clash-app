@@ -96,6 +96,7 @@ test('production Home gives Live a bounded View and keeps Groups/Discover off th
 const worldDeps = Object.fromEntries(['WorldDropMarker', 'WorldDropPreview', 'WorldMissionBeacon',
   'WorldMissionCard', 'WorldDropCard'].map(name => [name, leaf(name)]));
 Object.assign(worldDeps, { store, native: focus, useRequireAuth: { useRequireAuth: () => () => true },
+  'expo-constants': { __esModule: true, default: { expoConfig: { extra: { appVariant: 'production' } } } },
   'react-native': { ...Object.fromEntries(['View', 'Text', 'Pressable', 'ScrollView', 'ActivityIndicator'].map(n => [n, n])),
     Platform: { OS: 'android' }, StyleSheet: { create: x => x, hairlineWidth: 1, absoluteFill: {} } },
   'react-native-maps': { __esModule: true, default: 'Map', Circle: 'Circle' },

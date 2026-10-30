@@ -829,3 +829,12 @@ supabase/.branches/
 !/components/vault/story/StoryEntry.tsx
 !/components/vault/story/StoryExperience.tsx
 !/app/vault/story.tsx
+
+# WORLD-X1: fictional local expedition; no map/GPS/backend admission.
+!/components/world/beacon
+!/app/world/beacon.tsx
+!/components/world/beacon/model.ts
+!/components/world/beacon/BeaconChart.tsx
+!/components/world/beacon/BeaconField.tsx
+!/components/world/beacon/BeaconExperience.tsx
+!/components/world/beacon/BeaconEntry.tsx

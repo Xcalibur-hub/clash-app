@@ -5,6 +5,7 @@ const dependencies = Object.fromEntries(['CountryPickerSheet', 'ExploreDiscoverS
   'ExploreModeRail', 'ExploreSearch', 'ExploreWorldCanvas', 'MeetHomePanel', 'PlayHomePanel',
   'WorldActiveRail', 'WorldCountryPanel', 'WorldSurpriseCard'].map(name => [name, leaf(name)]));
 Object.assign(dependencies, {
+  'expo-constants': { __esModule: true, default: { expoConfig: { extra: { appVariant: 'production' } } } },
   ExploreAccountBoundary: { withExploreAccount: Screen => Screen },
   ExploreMosaicRow: leaf('ExploreMosaicRowView'),
   useDebouncedValue: { useDebouncedValue: value => value },

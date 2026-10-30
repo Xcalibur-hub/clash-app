@@ -18,6 +18,7 @@ import { worldPanelRailInset } from '../../utils/exploreWorldLayout';
 import { WorldActiveRail } from './WorldActiveRail';
 import { WorldCountryPanel } from './WorldCountryPanel';
 import { WorldSurpriseCard } from './WorldSurpriseCard';
+import { BeaconEntry } from '../world/beacon/BeaconEntry';
 
 export interface WorldExperienceProps {
   activityStatus: ReadStatus;
@@ -63,6 +64,7 @@ export function WorldExperience({
 
   return (
     <View style={styles.wrap}>
+      <View style={styles.panelShell}><BeaconEntry /></View>
       <WorldActiveRail
         countries={rail}
         selectedCode={selectedCode}
