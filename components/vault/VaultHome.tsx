@@ -29,6 +29,7 @@ import { VaultIcon } from '../shared/icons';
 import { VaultScopeControl } from './VaultScopeControl';
 import { HomeRowView } from './world/HomeRowView';
 import { tap as hapticTap } from '../../utils/haptics';
+import { StoryEntry } from './story/StoryEntry';
 
 type Phase = 'loading' | 'ready' | 'error';
 
@@ -158,6 +159,7 @@ export function VaultHome(): React.JSX.Element {
             Enter their world
           </Text>
           <VaultHomeSkeleton tint={t.surfaceMuted} />
+          <StoryEntry />
         </View>
       </View>
     );
@@ -180,6 +182,7 @@ export function VaultHome(): React.JSX.Element {
               void load(scope);
             }}
           />
+          <StoryEntry />
         </View>
       </View>
     );
@@ -188,6 +191,7 @@ export function VaultHome(): React.JSX.Element {
   return (
     <View style={[styles.screen, { backgroundColor: t.background }]}>
       <FlatList
+        ListHeaderComponent={StoryEntry}
         data={rows}
         keyExtractor={(row, index) => {
           if (row.kind === 'featured') return `featured:${row.creator.creatorId}`;

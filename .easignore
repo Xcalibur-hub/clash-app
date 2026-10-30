@@ -822,3 +822,10 @@ supabase/.branches/
 !/components/play/signal/SignalGame.tsx
 !/components/play/signal/SignalEntry.tsx
 !/app/explore/play/signal.tsx
+
+# VAULT-X1: reviewed local interactive fiction; no backend admission.
+!/components/vault/story
+!/components/vault/story/model.ts
+!/components/vault/story/StoryEntry.tsx
+!/components/vault/story/StoryExperience.tsx
+!/app/vault/story.tsx
