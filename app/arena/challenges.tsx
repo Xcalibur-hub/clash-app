@@ -9,7 +9,7 @@ import { layout, space, useThemeColors } from '../../theme';
 export default function ChallengeInboxScreen(): React.JSX.Element {
   const t=useThemeColors(),insets=useSafeAreaInsets(),router=useRouter();
   return <View style={{flex:1,backgroundColor:t.background,paddingTop:insets.top,paddingBottom:insets.bottom}}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Back to Arena" onPress={()=>router.canGoBack()?router.back():router.replace('/')}
+    <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)/notifications')}
       style={{minHeight:44,paddingHorizontal:layout.screenX,flexDirection:'row',alignItems:'center',gap:space.sm}}>
       <BackIcon size={20} color={t.textPrimary}/><Text style={{color:t.textPrimary}}>Back</Text>
     </Pressable>

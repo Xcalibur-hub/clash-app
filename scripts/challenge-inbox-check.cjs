@@ -112,6 +112,7 @@ Module._load = function (request, parent) {
     })
   };
   if (file.endsWith('/theme/index.ts')) return theme;
+  if (file.endsWith('/components/shared/Avatar.tsx')) return { Avatar: 'Avatar' };
   if (file.endsWith('/utils/haptics.ts')) return {
     tap() {}
   };
@@ -264,8 +265,8 @@ async function main() {
   reset(['INCOMING', [a], false, false, null, null, null, 0]);
   let tree = ChallengeInbox();
   let buttons = nodes(tree).filter(n => n.props.accessibilityRole === 'button');
-  assert.ok(buttons.some(n => n.props.accessibilityLabel === 'Accept'));
-  assert.ok(buttons.some(n => n.props.accessibilityLabel === 'Decline'));
+  assert.ok(buttons.some(n => n.props.accessibilityLabel === 'Accept this challenge'));
+  assert.ok(buttons.some(n => n.props.accessibilityLabel === 'Pass on this challenge'));
   assert.ok(!buttons.some(n => n.props.accessibilityLabel === 'Cancel invitation'));
   console.log('PASS incoming exposes recipient-only controls');
   reset(['OUTGOING', [a], false, false, null, null, null, 0]);
@@ -273,7 +274,7 @@ async function main() {
   buttons = nodes(tree).filter(n => n.props.accessibilityRole === 'button');
   buttons.find(n => n.props.accessibilityLabel === 'Cancel invitation').props.onPress();
   assert.equal(captured.buttons[1].style, 'destructive');
-  assert.ok(!buttons.some(n => n.props.accessibilityLabel === 'Accept'));
+  assert.ok(!buttons.some(n => n.props.accessibilityLabel === 'Accept this challenge'));
   console.log('PASS outgoing uses cancellation confirmation and no accept control');
   reset(['INCOMING', [{
     ...accepted,
@@ -327,14 +328,15 @@ async function main() {
     items: [accepted],
     hasMore: false
   };
-  const acceptButton = nodes(tree).find(n => n.props.accessibilityLabel === 'Accept');
+  const acceptButton = nodes(tree).find(n => n.props.accessibilityLabel === 'Accept this challenge');
   const actionBefore = callsByName.filter(n => n === 'resolve_arena_challenge').length;
   acceptButton.props.onPress();
   acceptButton.props.onPress();
   await new Promise(r => setImmediate(r));
   assert.equal(callsByName.filter(n => n === 'resolve_arena_challenge').length - actionBefore, 1);
-  assert.equal(captured.name, 'list_my_arena_challenges');
-  console.log('PASS duplicate action taps submit once and refresh canonical state');
+  assert.equal(captured.name, 'resolve_arena_challenge');
+  assert.deepEqual(routes, ['/arena/room/room-canonical']);
+  console.log('PASS duplicate action taps submit once and enter the confirmed canonical Room');
   let resolve;
   reset();
   deferred = new Promise(r => resolve = r);

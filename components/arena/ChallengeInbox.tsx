@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../store/AuthProvider';
 import { fetchChallengeInbox, resolveArenaChallenge } from '../../services/arenaChallengeService';
 import { challengeCanAct } from '../../utils/arenaChallengePayload';
+import { linkedRoomAfterAccept } from '../../utils/arenaAcceptNavigation';
 import {
   challengeDestination,
   challengeInboxError,
@@ -26,7 +27,7 @@ export function ChallengeInbox(): React.JSX.Element {
   const [direction, setDirection] = React.useState<InboxDirection>('INCOMING');
   const [items, setItems] = React.useState<InboxChallenge[]>([]);
   const [hasMore, setHasMore] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(Boolean(user));
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
@@ -35,16 +36,27 @@ export function ChallengeInbox(): React.JSX.Element {
   const focused = React.useRef(false);
   const working = React.useRef(false);
   const loadingRef = React.useRef(false);
+  const scope = `${user?.id ?? 'guest'}:${direction}`;
+  const currentScope = React.useRef({ key: scope });
+  const displayedScope = React.useRef(currentScope.current);
+  if (currentScope.current.key !== scope) {
+    currentScope.current = { key: scope };
+    generation.current += 1;
+    working.current = false;
+    loadingRef.current = false;
+  }
+  const actionScope = currentScope.current;
+  const isCurrent = (): boolean => focused.current && currentScope.current === actionScope;
 
   const load = React.useCallback(async (before?: InboxChallenge): Promise<void> => {
-    if (!user || (before && loadingRef.current)) return;
+    if (!user || currentScope.current !== actionScope || (before && loadingRef.current)) return;
     const request = ++generation.current;
     loadingRef.current = true;
     setLoading(true);
     setError(null);
     try {
       const page = await fetchChallengeInbox(direction, user.id, before);
-      if (!focused.current || request !== generation.current) return;
+      if (!isCurrent() || request !== generation.current) return;
       setItems((previous) =>
         before
           ? [...previous, ...page.items.filter((item) => !previous.some((old) => old.id === item.id))]
@@ -52,9 +64,9 @@ export function ChallengeInbox(): React.JSX.Element {
       );
       setHasMore(page.hasMore);
     } catch (e) {
-      if (focused.current && request === generation.current) setError(challengeInboxError(e));
+      if (isCurrent() && request === generation.current) setError(challengeInboxError(e));
     } finally {
-      if (focused.current && request === generation.current) {
+      if (isCurrent() && request === generation.current) {
         loadingRef.current = false;
         setLoading(false);
       }
@@ -64,6 +76,8 @@ export function ChallengeInbox(): React.JSX.Element {
   useFocusEffect(
     React.useCallback(() => {
       focused.current = true;
+      displayedScope.current = actionScope;
+      if (!working.current) setBusy(null);
       setItems([]);
       setHasMore(false);
       setError(null);
@@ -89,7 +103,8 @@ export function ChallengeInbox(): React.JSX.Element {
   );
 
   const act = async (item: InboxChallenge, action: 'ACCEPT' | 'PASS' | 'CANCEL'): Promise<void> => {
-    if (!user || !focused.current || working.current || loadingRef.current || !challengeCanAct(item)) {
+    const allowed = direction === 'INCOMING' ? action !== 'CANCEL' : action === 'CANCEL';
+    if (!user || !isCurrent() || !allowed || working.current || loadingRef.current || !challengeCanAct(item)) {
       return;
     }
     working.current = true;
@@ -100,7 +115,12 @@ export function ChallengeInbox(): React.JSX.Element {
     tap();
     try {
       const result = await resolveArenaChallenge(item.id, action, user.id);
-      if (!focused.current || request !== generation.current) return;
+      if (!isCurrent() || request !== generation.current) return;
+      const roomId = action === 'ACCEPT' ? linkedRoomAfterAccept(result) : null;
+      if (roomId) {
+        router.push(`/arena/room/${roomId}`);
+        return;
+      }
       const status = challengeStatusPresentation(result.status);
       setNotice(
         result.status === 'ACCEPTED' && !result.roomId
@@ -109,12 +129,14 @@ export function ChallengeInbox(): React.JSX.Element {
       );
       await load();
     } catch (e) {
-      if (!focused.current || request !== generation.current) return;
+      if (!isCurrent() || request !== generation.current) return;
       await load();
-      if (focused.current) setError(challengeInboxError(e));
+      if (isCurrent()) setError(challengeInboxError(e));
     } finally {
-      working.current = false;
-      if (focused.current) setBusy(null);
+      if (currentScope.current === actionScope) {
+        working.current = false;
+        if (focused.current) setBusy(null);
+      }
     }
   };
 
@@ -142,6 +164,7 @@ export function ChallengeInbox(): React.JSX.Element {
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
       style={[styles.button, { borderColor: t.border, opacity: disabled ? 0.5 : 1 }]}
@@ -177,7 +200,11 @@ export function ChallengeInbox(): React.JSX.Element {
           </View>
         </View>
 
-        <Text style={[styles.summary, { color: t.textMuted }]}>{status.summary}</Text>
+        <Text style={[styles.summary, { color: t.textMuted }]}>
+          {item.status === 'ACCEPTED'
+            ? 'Acceptance confirmed. Open the Room for its current phase, arguments and result.'
+            : status.summary}
+        </Text>
 
         <View style={[styles.source, { borderColor: t.border }]}>
           <Text style={[styles.role, { color: t.textMuted }]}>SOURCE TAKE</Text>
@@ -249,7 +276,7 @@ export function ChallengeInbox(): React.JSX.Element {
 
   return (
     <FlatList
-      data={items}
+      data={displayedScope.current === actionScope ? items : []}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => renderCard(item)}
       contentContainerStyle={styles.content}
@@ -262,7 +289,7 @@ export function ChallengeInbox(): React.JSX.Element {
         <View style={{ gap: space.md }}>
           <Text style={[styles.title, { color: t.textPrimary }]}>Challenge Inbox</Text>
           <Text style={[styles.body, { color: t.textSecondary }]}>
-            Invitations and their latest status.
+            Review the source Take and counterposition. Accept opens the confirmed Room; only its two fighters can publish official arguments.
           </Text>
           <View style={styles.actions} accessibilityRole="tablist">
             {(['INCOMING', 'OUTGOING'] as InboxDirection[]).map((section) => (
