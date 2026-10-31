@@ -838,3 +838,6 @@ supabase/.branches/
 !/components/world/beacon/BeaconField.tsx
 !/components/world/beacon/BeaconExperience.tsx
 !/components/world/beacon/BeaconEntry.tsx
+
+# CONNECT-X1: caller-scoped Take-to-Arena navigation.
+!/components/arena/TakeArenaJourney.tsx

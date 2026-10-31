@@ -19,6 +19,7 @@ import { RebuttalInput } from '../../components/arena/RebuttalInput';
 import { MindshiftPanel } from '../../components/arena/MindshiftPanel';
 import { TakeActionRow } from '../../components/arena/TakeActionRow';
 import { TakeChallenges } from '../../components/arena/TakeChallenges';
+import { TakeArenaJourney } from '../../components/arena/TakeArenaJourney';
 import { QuestionVotePanel } from '../../components/arena/QuestionVotePanel';
 import { TakeEditorialHeader } from '../../components/arena/TakeEditorialHeader';
 import { ArenaDivider, ArenaSectionHeading } from '../../components/arena/ui/ArenaPrimitives';
@@ -393,12 +394,6 @@ export default function TakeDetailScreen(): React.JSX.Element {
     : buildCommentTree(comments, sort);
   const isViewerAuthor = author.id === state.viewer.id;
 
-  const openClash = (): void => {
-    if (!requireAuth()) return;
-    hapticPress();
-    router.push(`/clash/${take.id}`);
-  };
-
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
@@ -493,7 +488,6 @@ export default function TakeDetailScreen(): React.JSX.Element {
             readOnly={archived}
             onReact={() => { if (!archived) void react(take); }}
             onComment={requestReply}
-            onClash={openClash}
             onShare={() => void Share.share({ message: `CLASH — @${author.handle}: "${take.text}"` })}
             onSave={() => {
               if (requireAuth()) dispatch(toggleSave(take.id));
@@ -501,6 +495,7 @@ export default function TakeDetailScreen(): React.JSX.Element {
             prominence="conversation"
           />
           <ArenaDivider />
+          <TakeArenaJourney takeId={take.id} />
           <TakeChallenges compact take={take} openComposer={challenge === '1'} readOnly={archived} onTakeRefreshed={refreshChallengeTake} />
           <View style={[styles.perspective, { borderColor: colors.line }]}>
             <Pressable accessibilityRole="button" accessibilityLabel={take.question ? 'Question voting' : 'Your perspective'}

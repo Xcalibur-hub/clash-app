@@ -78,7 +78,8 @@ test('expiry tick closes reply/challenge/reaction UI while preserving historical
   assert.equal(find(tree, 'RebuttalInput'), undefined);
   const actions = find(tree, 'TakeActionRow').props;
   assert.equal(actions.readOnly, true); actions.onReact(); assert.equal(events.includes('reaction'), false);
-  actions.onClash(); assert.ok(events.includes('/clash/take'));
+  assert.equal(actions.onClash, undefined); // Related Arena owns the resolved destination, not the blind legacy shortcut.
+  assert.equal(find(tree, 'TakeArenaJourney').props.takeId, 'take');
   assert.equal(find(tree, 'TakeChallenges').props.readOnly, true);
   assert.ok(nodes(tree).some(n => n.props?.children === 'Archived discussion'));
 });

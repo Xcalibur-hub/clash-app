@@ -252,12 +252,13 @@ test('C3 R5 throwing subscriber cannot suppress other listeners or queued writes
 });
 
 test('C3 R5 self-enqueueing subscriber is bounded and the store remains usable', () => {
-  const script = `const {harness,row}=require('./scripts/arena-room-harness.cjs');
-    const h=harness(),s=h.load('utils/arenaTranscriptStore.ts').createArenaTranscriptStore();
+  // Exercise the real store without parsing the unrelated Room hook inside the watchdog.
+  const script = `import {createArenaTranscriptStore} from './utils/arenaTranscriptStore.ts';
+    const s=createArenaTranscriptStore();
     let notifications=0,error;const stop=s.subscribe(()=>{notifications++;s.update(current=>[...current]);});
-    try{s.update([row('m',1)]);}catch(e){error=e.name;}stop();s.update([]);
+    try{s.update(${JSON.stringify([row('m',1)])});}catch(e){error=e.name;}stop();s.update([]);
     console.log(JSON.stringify({notifications,error,remaining:s.getSnapshot().length}));`;
-  const result = spawnSync(process.execPath, [], { input: script, encoding: 'utf8', timeout: 6000 });
+  const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module'], { input: script, encoding: 'utf8', timeout: 6000 });
   assert.equal(result.error?.code, undefined, 'unbounded synchronous drain: ' + result.error?.code);
   assert.equal(result.status, 0, result.stderr);
   const outcome = JSON.parse(result.stdout.trim());

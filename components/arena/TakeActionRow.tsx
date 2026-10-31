@@ -24,7 +24,7 @@ export interface TakeActionRowProps {
   hasReacted: boolean;
   onReact: () => void;
   onComment: () => void;
-  onClash: () => void;
+  onClash?: () => void;
   onShare: () => void;
   onSave: () => void;
   /** conversation = Take Detail — CLASH reads as the primary CTA. */
@@ -114,7 +114,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
   }));
   const conversation = prominence === 'conversation';
 
-  const clashButton = (
+  const clashButton = onClash ? (
     <PressableScale
       onPress={() => {
         hapticTap();
@@ -137,7 +137,7 @@ export function TakeActionRow(props: TakeActionRowProps): React.JSX.Element {
         </Text>
       </Animated.View>
     </PressableScale>
-  );
+  ) : null;
 
   if (conversation) {
     return (
