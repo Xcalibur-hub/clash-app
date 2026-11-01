@@ -1,10 +1,7 @@
 /**
- * Bounded, pure reducer for the live event stream (Phase 15.4).
- *
- * Realtime is transport only: the database stays authoritative. Events are
- * applied locally so a busy room never forces a full refetch (or a full screen
- * rerender) — and after a reconnect the same events are replayed from
- * `creator_live_events_since` to resync.
+ * Compatibility event presentation helpers. Production Live readers treat
+ * delivery as invalidation and reread the server, never as an ordered ledger
+ * or proof of participation. Monotonic guards protect older helper callers.
  */
 
 import type {
@@ -112,6 +109,8 @@ function patch(
 
 /** Apply one event. Unknown or stale shapes leave the state untouched. */
 export function applyLiveEvent(state: LiveScreenState, event: LiveEvent): LiveScreenState {
+  // Compatibility reducer only. Production readers invalidate snapshots instead.
+  if ((state.status === 'ENDED' || state.status === 'CANCELLED') && event.kind !== 'SESSION_ENDED') return state;
   switch (event.kind) {
     case 'SESSION_STARTED':
       return {
@@ -128,7 +127,7 @@ export function applyLiveEvent(state: LiveScreenState, event: LiveEvent): LiveSc
     case 'TALLY': {
       const tallies = asTallies(event.payload.tallies);
       const total = asNumber(event.payload.total);
-      return patch(state, event.interactionId, (current) => ({
+      return patch(state, event.interactionId, (current) => current.status !== 'OPEN' || (total !== null && total < current.totalVotes) ? current : ({
         ...current,
         tallies: tallies ?? current.tallies,
         totalVotes: total ?? current.totalVotes,
@@ -137,6 +136,7 @@ export function applyLiveEvent(state: LiveScreenState, event: LiveEvent): LiveSc
     case 'INTERACTION_OPENED': {
       const id = event.interactionId;
       if (id === null) return state;
+      if (state.interactions.some(item => item.id === id)) return state;
       const next: LiveInteractionState = {
         id,
         type: (event.payload.type as LiveInteractionType) ?? 'POLL',
@@ -152,7 +152,7 @@ export function applyLiveEvent(state: LiveScreenState, event: LiveEvent): LiveSc
         closesAt: asNumber(event.payload.closesAt),
         voted: false,
         myVote: null,
-        canParticipate: true,
+        canParticipate: false,
       };
       const exists = state.interactions.some((item) => item.id === id);
       return {

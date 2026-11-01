@@ -16,12 +16,19 @@ import { worldPersonality } from '../../../utils/vaultWorldPersonality';
 import { layout, space, typeScale, useThemeColors } from '../../../theme';
 import { tap as hapticTap } from '../../../utils/haptics';
 import { useClash } from '../../../store';
+import { LiveSessionReadOnly } from '../../../components/vault/live/LiveSessionReadOnly';
 
 /**
  * The live room. A large event plane, then only the interactions the creator
  * opened — no comment wall, no dashboard chrome.
  */
 export default function CreatorLiveScreen(): React.JSX.Element {
+  const { mode, sessionId: id } = useLocalSearchParams<{ mode?: string; sessionId?: string | string[] }>();
+  if (mode === 'read') return <LiveSessionReadOnly sessionId={Array.isArray(id) ? id[0] : id} />;
+  return <CreatorLiveContinuation />;
+}
+
+function CreatorLiveContinuation(): React.JSX.Element {
   const params = useLocalSearchParams<{ sessionId: string | string[] }>();
   const sessionId = Array.isArray(params.sessionId) ? params.sessionId[0] : params.sessionId;
   const router = useRouter();
@@ -31,7 +38,7 @@ export default function CreatorLiveScreen(): React.JSX.Element {
   const clash = useClash();
   const live = useCreatorLive(sessionId);
   const signedIn = clash.state.viewer !== null;
-  const host = useCreatorLiveHost(sessionId, live.refresh);
+  const host = useCreatorLiveHost(sessionId, live.refresh, { isCurrent: live.isCurrent, isOwner: live.session?.isOwner === true });
   const session = live.session;
 
   const personality = worldPersonality({
@@ -119,6 +126,7 @@ export default function CreatorLiveScreen(): React.JSX.Element {
           <LiveInteractionPanel
             interaction={live.featured}
             busy={live.voting}
+            intent={live.voteIntent}
             blockedNote={signedIn ? undefined : 'Sign in to take part'}
             onVote={(optionId) => void live.vote(live.featured?.id ?? '', optionId)}
           />
@@ -137,6 +145,7 @@ export default function CreatorLiveScreen(): React.JSX.Element {
             key={item.id}
             interaction={item}
             busy={live.voting}
+            intent={live.voteIntent}
             blockedNote={signedIn ? undefined : 'Sign in to take part'}
             onVote={(optionId) => void live.vote(item.id, optionId)}
           />

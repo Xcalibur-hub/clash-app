@@ -187,7 +187,8 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
             onCreate={() => router.push('/vault/compose')}
             onOpenWorldDrop={(id) => router.push(`/world/drop/${id}`)}
             onManageWorldDrops={() => router.push('/vault/studio')}
-            onOpenLive={(sessionId) => router.push(`/vault/live/${sessionId}`)}
+            onOpenLive={(sessionId) => router.push(world.isSelf ? `/vault/live/${sessionId}`
+              : { pathname: '/vault/live/[sessionId]', params: { sessionId, mode: 'read' } })}
             onManageLive={() => router.push('/vault/studio')}
             onOpenAi={() => router.push(`/vault/ai/${creatorId}`)}
             onManageAi={() => router.push('/vault/studio')}

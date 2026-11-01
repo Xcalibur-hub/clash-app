@@ -83,6 +83,8 @@ export interface CreatorLiveVoteResult {
   triggered: boolean;
   actionKind: LiveActionKind | null;
   status: LiveInteractionStatus;
+  /** Undefined on legacy servers: never infer it from the submitted option. */
+  myVote?: string | null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -252,6 +254,7 @@ export function parseCreatorLiveVoteResult(value: unknown): CreatorLiveVoteResul
   const r = asRecord(value);
   if (!r) return null;
   if (r.accepted === undefined && r.alreadyVoted === undefined) return null;
+  if ('myVote' in r && r.myVote !== null && !str(r.myVote)) return null;
   return {
     accepted: r.accepted === true,
     alreadyVoted: r.alreadyVoted === true,
@@ -260,6 +263,7 @@ export function parseCreatorLiveVoteResult(value: unknown): CreatorLiveVoteResul
     triggered: r.triggered === true,
     actionKind: typeof r.actionKind === 'string' ? oneOf(r.actionKind, ACTIONS, 'LIGHTS_OFF') : null,
     status: oneOf(r.status, INTERACTION_STATUSES, 'OPEN'),
+    ...('myVote' in r ? { myVote: str(r.myVote) } : {}),
   };
 }
 

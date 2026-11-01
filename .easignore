@@ -841,3 +841,6 @@ supabase/.branches/
 
 # CONNECT-X1: caller-scoped Take-to-Arena navigation.
 !/components/arena/TakeArenaJourney.tsx
+
+# LIVE-CONNECT-X1: authorized read-only Creator Live snapshot.
+!/components/vault/live/LiveSessionReadOnly.tsx

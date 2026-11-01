@@ -10,6 +10,7 @@ import {
 } from '../../../utils/creatorLiveState';
 import { space, typeScale, useThemeColors } from '../../../theme';
 import { VaultActionButton } from '../VaultActionButton';
+import { releaseAllows } from '../../../utils/releaseScope';
 import {
   LiveInteractionFormSheet,
   type LiveInteractionDraft,
@@ -55,11 +56,11 @@ export function LiveControlPanel({
 
       <View style={styles.row}>
         {session.status === 'SCHEDULED' ? (
-          <VaultActionButton label={busy ? 'Starting…' : 'START LIVE'} onPress={onStart} />
+          <VaultActionButton label={busy ? 'Starting…' : 'START LIVE'} disabled={busy || !releaseAllows('live', 'admit')} onPress={onStart} />
         ) : null}
         {isLive ? (
           <>
-            <VaultActionButton label="Open an interaction" onPress={() => setFormOpen(true)} />
+            <VaultActionButton label="Open an interaction" disabled={busy || !releaseAllows('live', 'admit')} onPress={() => setFormOpen(true)} />
             <VaultActionButton label={busy ? 'Ending…' : 'END LIVE'} tone="quiet" onPress={onEnd} />
           </>
         ) : null}

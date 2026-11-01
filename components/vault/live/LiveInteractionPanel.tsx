@@ -10,6 +10,7 @@ import {
   tallyFor,
   thresholdProgress,
   thresholdRemaining,
+  liveResultWinner, liveResultLabel, liveVoteIntentLabel, type LiveVoteIntent,
 } from '../../../utils/creatorLiveState';
 import { radius, space, typeScale, useThemeColors } from '../../../theme';
 import { tap as hapticTap } from '../../../utils/haptics';
@@ -21,6 +22,7 @@ export interface LiveInteractionPanelProps {
   onVote: (optionId: string | null) => void;
   /** Shown instead of "Watching only" when the viewer cannot take part yet. */
   blockedNote?: string;
+  intent?: LiveVoteIntent;
 }
 
 function secondsLeft(closesAt: number | null, now: number): number | null {
@@ -34,12 +36,15 @@ export function LiveInteractionPanel({
   busy,
   onVote,
   blockedNote,
+  intent,
 }: LiveInteractionPanelProps): React.JSX.Element {
   const t = useThemeColors();
   const left = secondsLeft(interaction.closesAt, Date.now());
   const participable = interaction.canParticipate && !busy;
   const reveal = interaction.voted || interaction.status !== 'OPEN';
   const crowd = interaction.type === 'CROWD_ACTION';
+  const resultLabel = liveResultLabel(interaction.result, interaction.totalVotes, interaction.options ?? []);
+  const intentLabel = intent?.interactionId === interaction.id ? liveVoteIntentLabel(intent) : null;
 
   return (
     <View style={[styles.wrap, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
@@ -57,6 +62,8 @@ export function LiveInteractionPanel({
       <Text allowFontScaling={false} style={[styles.prompt, { color: t.textPrimary }]}>
         {interaction.prompt}
       </Text>
+      {intentLabel ? <Text accessibilityLiveRegion="polite" style={[styles.meta, { color: t.textSecondary }]}>{intentLabel}</Text> : null}
+      {!crowd && resultLabel ? <Text style={[styles.meta, { color: t.textSecondary }]}>{resultLabel}</Text> : null}
 
       {crowd ? (
         <View style={styles.crowd}>
@@ -90,6 +97,8 @@ export function LiveInteractionPanel({
               }
               tone={interaction.voted ? 'quiet' : 'solid'}
               compact
+              disabled={!participable || interaction.voted}
+              busy={busy}
               onPress={() => {
                 if (!participable) return;
                 hapticTap();
@@ -106,10 +115,7 @@ export function LiveInteractionPanel({
             const count = tallyFor(interaction.tallies, option.id);
             const share = optionShare(interaction.tallies, option.id);
             const mine = interaction.myVote === option.id;
-            const winner =
-              interaction.result !== null &&
-              typeof interaction.result.winner === 'string' &&
-              interaction.result.winner === option.id;
+            const winner = liveResultWinner(interaction.result, interaction.totalVotes) === option.id;
             return (
               <Pressable
                 key={option.id}
@@ -120,6 +126,7 @@ export function LiveInteractionPanel({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={option.label}
+                accessibilityState={{ disabled: !participable || interaction.voted, busy }}
                 style={[
                   styles.option,
                   {

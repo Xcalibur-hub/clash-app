@@ -8,6 +8,7 @@ import {
 import { errorText } from '../services/supabaseClient';
 import { showNotice, useClash } from '../store';
 import type { CreateLiveInteractionInput } from '../services/creatorLiveService';
+import { assertReleaseAdmission } from '../utils/releaseScope';
 
 export interface CreatorLiveHost {
   busy: boolean;
@@ -25,32 +26,42 @@ export interface CreatorLiveHost {
  */
 export function useCreatorLiveHost(
   sessionId: string | undefined,
-  onChanged: () => Promise<void>,
+  onChanged: () => Promise<unknown>,
+  context: { isCurrent: () => boolean; isOwner: boolean },
 ): CreatorLiveHost {
   const { dispatch } = useClash();
-  const [busy, setBusy] = React.useState(false);
+  const gate = React.useMemo(() => ({ busy: false }), [context.isCurrent]);
+  const latest = React.useRef(context); latest.current = context;
+  const current = React.useRef(gate); current.current = gate;
+  const [pending, setPending] = React.useState<object | null>(null);
+  const active = (): boolean => current.current === gate && context.isCurrent() && latest.current.isOwner;
+  const busy = pending === gate && gate.busy;
 
   const run = React.useCallback(
     async (work: () => Promise<unknown>, notice?: string): Promise<void> => {
-      setBusy(true);
+      if (!active() || gate.busy) return;
+      gate.busy = true; setPending(gate);
       try {
         await work();
-        if (notice) dispatch(showNotice(notice));
-        await onChanged();
+        if (active()) {
+          if (notice) dispatch(showNotice(notice));
+          await onChanged();
+        }
       } catch (caught) {
-        dispatch(showNotice(errorText(caught)));
+        if (active()) dispatch(showNotice(errorText(caught)));
       } finally {
-        setBusy(false);
+        gate.busy = false;
+        if (active()) setPending(null);
       }
     },
-    [dispatch, onChanged],
+    [dispatch, onChanged, gate, context.isCurrent],
   );
 
   return {
     busy,
     start: () =>
       run(
-        () => (sessionId ? startCreatorLiveSession(sessionId) : Promise.resolve()),
+        () => { assertReleaseAdmission('live'); return sessionId ? startCreatorLiveSession(sessionId) : Promise.resolve(); },
         'You are live.',
       ),
     end: () =>
@@ -60,10 +71,11 @@ export function useCreatorLiveHost(
       ),
     openInteraction: (draft) =>
       run(
-        () =>
-          sessionId
+        () => {
+          assertReleaseAdmission('live');
+          return sessionId
             ? createCreatorLiveInteraction({ ...draft, sessionId })
-            : Promise.resolve(),
+            : Promise.resolve(); },
         'Interaction opened.',
       ),
     closeInteraction: (interactionId) =>

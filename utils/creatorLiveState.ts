@@ -28,6 +28,38 @@ export interface LiveTallies {
   [key: string]: number;
 }
 
+export interface LiveVoteIntent {
+  kind: 'idle' | 'pending' | 'confirmed' | 'replayed' | 'rejected' | 'ambiguous';
+  interactionId: string | null;
+  myVote?: string | null;
+}
+
+export function liveVoteIntentLabel(intent: LiveVoteIntent): string | null {
+  switch (intent.kind) {
+    case 'pending': return 'Sending your choice…';
+    case 'confirmed': return 'The server recorded your choice.';
+    case 'replayed': return 'Your previously recorded choice is unchanged.';
+    case 'rejected': return 'That choice was not accepted.';
+    case 'ambiguous': return 'Delivery is uncertain. Check the latest recorded choice before trying again.';
+    default: return null;
+  }
+}
+
+export function liveResultWinner(result: Record<string, unknown> | null, total: number): string | null {
+  return result && total > 0 && result.total !== 0 && result.tie !== true
+    && result.outcome !== 'TIE' && result.outcome !== 'NO_BALLOTS' && typeof result.winner === 'string'
+    ? result.winner : null;
+}
+
+export function liveResultLabel(result: Record<string, unknown> | null, total: number, options: readonly LiveOption[]): string | null {
+  if (!result) return null;
+  if (total === 0 || result.total === 0 || result.outcome === 'NO_BALLOTS') return 'No ballots were recorded.';
+  if (result.tie === true || result.outcome === 'TIE') return 'The server recorded a tie.';
+  const winner = liveResultWinner(result, total);
+  return winner ? `Server result: ${options.find(item => item.id === winner)?.label ?? 'Result option unavailable'}`
+    : 'No winning option was returned. This is not proof of an applied action.';
+}
+
 /** The badge over the stage. */
 export function liveStatusLabel(status: LiveStatus): string {
   switch (status) {

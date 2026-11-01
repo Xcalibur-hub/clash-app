@@ -72,7 +72,7 @@ export function LiveChapter({
       <View style={styles.actions}>
         {isLive ? (
           <VaultActionButton
-            label={isSelf ? 'Open your live room' : 'ENTER LIVE →'}
+            label={isSelf ? 'Open your live room' : 'View live details'}
             onPress={() => onOpen(session.id)}
           />
         ) : null}
