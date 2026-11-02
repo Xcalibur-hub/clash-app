@@ -6,7 +6,8 @@
 
 CLASH — LIVE-CONNECT-B5D: RECOVERY CLI INITIALIZATION AND FAILURE JOURNAL CORRECTION
 
-Repository: C:\Users\91962\Desktop\Clash  
+Repository: Xcalibur-hub/clash-app  
+Checkout: founder's existing local Windows checkout (exact local user path intentionally omitted from this public handoff)  
 Branch: arena-ui-review  
 Expected local HEAD: 2b898748a48e317ac5737da62c7a964f50aca2a8
 
