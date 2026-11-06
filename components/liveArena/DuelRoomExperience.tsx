@@ -28,6 +28,7 @@ import { ClashMoreSheet } from './ClashMoreSheet';
 import { DuelDevPanel } from './DuelDevPanel';
 import { DuelEntrance } from './DuelEntrance';
 import { DuelRoomOutcome } from './DuelRoomOutcome';
+import { DuelPersonalResult } from './DuelPersonalResult';
 import { ImmersiveClash } from './ImmersiveClash';
 import { softFill } from './liveArenaStyles';
 import type { LiveRoomMessageProps } from './LiveRoomMessage';
@@ -444,7 +445,10 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       </KeyboardAvoidingView>
 
       {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen initialSide={backingSide ?? 'A'} roomId={room.roomId} duel={duel} disabled={assist === 'closed'} onPublished={props.onRefresh} /></ArenaSheet> : null}
-      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}><DuelRoomOutcome revealMotion duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn} nextClash={props.nextClash ?? null} nextBusy={props.nextBusy ?? false} nextNotice={props.nextNotice ?? null} onOpenNext={props.onOpenNext} /></ArenaSheet> : null}
+      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}>
+        {duel.status === 'settled' ? <DuelPersonalResult clashId={duel.clashId} /> : null}
+        <DuelRoomOutcome revealMotion duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn} nextClash={props.nextClash ?? null} nextBusy={props.nextBusy ?? false} nextNotice={props.nextNotice ?? null} onOpenNext={props.onOpenNext} />
+      </ArenaSheet> : null}
       <ArgumentHistorySheet
         visible={historyOpen}
         duel={duel}
