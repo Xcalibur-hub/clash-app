@@ -1,21 +1,16 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { ProfileHero } from '../../components/profile/ProfileHero';
 import { SegmentedTabs, type SegmentedTab } from '../../components/shared/SegmentedTabs';
 import { ReputationBar } from '../../components/profile/ReputationBar';
-import { TakeMiniCard } from '../../components/profile/TakeMiniCard';
+import { VaultProfileTakes } from '../../components/vault/VaultProfileTakes';
 import { VaultWins } from '../../components/vault/VaultWins';
-import { EmptyState } from '../../components/shared/EmptyState';
 import { Notice } from '../../components/shared/Notice';
-import { ArenaIcon } from '../../components/shared/icons';
-import { dockBottomPadding } from '../../components/navigation/dockConfig';
 import {
-  selectViewerTakes,
   useClash,
 } from '../../store';
-import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { layout, space, useThemeColors } from '../../theme';
 import { press as hapticPress } from '../../utils/haptics';
 
 type VaultProfileTab = 'takes' | 'wins';
@@ -33,10 +28,8 @@ export default function VaultProfileScreen(): React.JSX.Element {
   const { state } = useClash();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = React.useState<VaultProfileTab>('takes');
-  const router = useRouter();
   const t = useThemeColors();
   const viewer = state.viewer;
-  const takes = React.useMemo(() => selectViewerTakes(state), [state]);
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
@@ -46,7 +39,7 @@ export default function VaultProfileScreen(): React.JSX.Element {
           styles.content,
           {
             paddingTop: insets.top + space.md,
-            paddingBottom: dockBottomPadding(insets.bottom),
+            paddingBottom: space.lg,
           },
         ]}
       >
@@ -65,24 +58,8 @@ export default function VaultProfileScreen(): React.JSX.Element {
         />
 
         {tab === 'takes'
-          ? takes.map((take) => (
-              <TakeMiniCard
-                key={take.id}
-                take={take}
-                now={Date.now()}
-                onPress={() => router.push(`/take/${take.id}`)}
-              />
-            ))
+          ? <VaultProfileTakes profileId={viewer.id} />
           : <VaultWins profileId={viewer.id} />}
-        {tab === 'takes' && takes.length === 0 ? (
-          <EmptyState
-            icon={ArenaIcon}
-            title="No Takes yet"
-            body="Share an opinion in Arena."
-            actionLabel="Open Arena"
-            onAction={() => router.replace('/(tabs)')}
-          />
-        ) : null}
       </ScrollView>
       <Notice offset={0} />
     </View>

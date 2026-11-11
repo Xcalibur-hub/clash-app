@@ -3,6 +3,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -17,19 +18,19 @@ import {
   type VaultHomeOfferCard,
   type VaultHomeScope,
 } from '../../services/vaultHomeService';
-import { fetchMyVault } from '../../services/vaultService';
-import { errorText } from '../../services/supabaseClient';
+import { useAuth } from '../../store/AuthProvider';
+import { useIsFocused } from '@react-navigation/native';
+import { useOperationScope } from '../../hooks/useOperationScope';
 import { analytics } from '../../services/analytics';
 import { vaultExperienceHref } from '../../utils/vaultExperiences';
 import { buildHomeRows, type HomeRow } from '../../utils/vaultHomeRows';
 import { duration, layout, radius, space, typeScale, useThemeColors } from '../../theme';
-import { dockBottomPadding } from '../navigation/dockConfig';
 import { EmptyState } from '../shared/EmptyState';
 import { VaultIcon } from '../shared/icons';
 import { VaultScopeControl } from './VaultScopeControl';
 import { HomeRowView } from './world/HomeRowView';
-import { tap as hapticTap } from '../../utils/haptics';
 import { StoryEntry } from './story/StoryEntry';
+import { VaultPublishingAvailability } from './VaultAvailability';
 
 type Phase = 'loading' | 'ready' | 'error';
 
@@ -54,66 +55,95 @@ export function VaultHome(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const t = useThemeColors();
   const reduced = useReducedMotion();
+  const { user } = useAuth();
+  const focused = useIsFocused();
+  const account = user?.id ?? 'guest';
+  const identity = React.useRef({ account });
+  if (identity.current.account !== account) identity.current = { account };
+  const identityEpoch = identity.current;
 
   const [phase, setPhase] = React.useState<Phase>('loading');
   const [scope, setScope] = React.useState<VaultHomeScope>('discover');
+  const isCurrent = useOperationScope(`${account}:${focused}:${scope}`);
   const [model, setModel] = React.useState<VaultHomeModel | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [readError, setReadError] = React.useState(false);
+  const [modelAccount, setModelAccount] = React.useState(identityEpoch);
+  const request = React.useRef(0);
+  const refreshingRequest = React.useRef(false);
 
   const modelRef = React.useRef<VaultHomeModel | null>(null);
-  modelRef.current = model;
+  const visibleModel = modelAccount === identityEpoch ? model : null;
+  modelRef.current = visibleModel;
 
   const load = React.useCallback(
     async (nextScope: VaultHomeScope, opts?: { soft?: boolean }): Promise<void> => {
+      if (!isCurrent() || !focused) return;
+      const ticket = ++request.current;
+      setReadError(false);
       try {
         const next = await fetchVaultHome(nextScope);
+        if (!isCurrent() || ticket !== request.current) return;
         setModel(next);
+        setModelAccount(identityEpoch);
         setPhase('ready');
         analytics.trackOnce(`vault_home:${nextScope}`, 'vault_opened', {
           realm: 'vault',
-          is_creator: next.canCreate,
-          is_guest: !next.canCreate,
+          is_guest: account === 'guest',
         });
-      } catch (error) {
-        void errorText(error);
+      } catch (error: unknown) {
+        if (!isCurrent() || ticket !== request.current) return;
+        setReadError(true);
+        const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : null;
+        if (code === '42501' || code === 'PGRST301' || code === '401' || code === '403') {
+          setModel(null);
+          setPhase('error');
+          return;
+        }
         if (!opts?.soft || !modelRef.current) setPhase('error');
       }
     },
-    [],
+    [isCurrent, focused, account, identityEpoch],
   );
 
   useFocusEffect(
     React.useCallback(() => {
+      refreshingRequest.current = false;
+      setRefreshing(false);
       if (!modelRef.current) setPhase('loading');
       void load(scope, { soft: Boolean(modelRef.current) });
+      return () => { request.current++; };
     }, [load, scope]),
   );
 
   const onRefresh = async (): Promise<void> => {
+    if (!isCurrent() || refreshingRequest.current) return;
+    refreshingRequest.current = true;
     setRefreshing(true);
     await load(scope, { soft: true });
+    if (!isCurrent()) return;
+    refreshingRequest.current = false;
     setRefreshing(false);
   };
 
-  const onCreate = async (): Promise<void> => {
-    hapticTap();
-    try {
-      const mine = await fetchMyVault();
-      if (mine) router.push('/vault/compose');
-      else router.push('/vault/studio');
-    } catch {
-      router.push('/vault/studio');
-    }
-  };
-
   const openOffer = (offer: VaultHomeOfferCard): void => {
+    if (!isCurrent()) return;
     const type =
       offer.kind === 'service' ? 'SERVICE' : offer.kind === 'course' ? 'COURSE' : 'PRODUCT';
     const href = vaultExperienceHref({ type, id: offer.id });
     if (href) router.push(href as never);
   };
 
-  const rows = model ? buildHomeRows(model, scope) : [];
+  const rows = visibleModel ? buildHomeRows(visibleModel, scope) : [];
+
+  const alternatives = <View>
+    <Pressable accessibilityRole="button" onPress={() => { if (isCurrent()) router.push('/(tabs)'); }} style={{ minHeight: 48, justifyContent: 'center' }}>
+      <Text style={{ ...typeScale.body, color: t.textPrimary }}>Explore Takes</Text>
+    </Pressable>
+    <Pressable accessibilityRole="button" onPress={() => { if (isCurrent()) router.push('/arena/challenges'); }} style={{ minHeight: 48, justifyContent: 'center' }}>
+      <Text style={{ ...typeScale.body, color: t.textPrimary }}>View Challenge Inbox</Text>
+    </Pressable>
+  </View>;
 
   const renderItem = ({ item }: ListRenderItemInfo<HomeRow>): React.JSX.Element | null => {
     if (item.kind === 'masthead') {
@@ -126,14 +156,10 @@ export function VaultHome(): React.JSX.Element {
             <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
               Enter their world
             </Text>
-            {model?.canCreate ? (
-              <Pressable onPress={() => void onCreate()} hitSlop={12} accessibilityLabel="Create Drop">
-                <Text allowFontScaling={false} style={[styles.createLink, { color: t.textMuted }]}>
-                  Create
-                </Text>
-              </Pressable>
-            ) : null}
           </View>
+          <VaultPublishingAvailability />
+          {readError ? <Text accessibilityLiveRegion="polite" style={{ color: t.textSecondary }}>Refresh failed. Previously loaded content is shown; access is checked again when opened.</Text> : null}
+          {visibleModel?.isEmpty || readError ? alternatives : null}
         </Animated.View>
       );
     }
@@ -141,17 +167,16 @@ export function VaultHome(): React.JSX.Element {
     return (
       <HomeRowView
         row={item}
-        onEnterWorld={(id) => router.push(`/vault/${id}`)}
-        onOpenDrop={(id) => router.push(`/vault/drop/${id}`)}
+        onEnterWorld={(id) => { if (isCurrent()) router.push(`/vault/${id}`); }}
+        onOpenDrop={(id) => { if (isCurrent()) router.push(`/vault/drop/${id}`); }}
         onOpenOffer={openOffer}
         onDiscover={() => setScope('discover')}
       />
     );
   };
-  if (phase === 'loading' && !model) {
+  if ((phase === 'loading' || (modelAccount !== identityEpoch && phase !== 'error')) && !visibleModel) {
     return (
-      <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
-        <View style={styles.content}>
+      <ScrollView style={[styles.screen, { backgroundColor: t.background }]} contentContainerStyle={[styles.content, { paddingTop: insets.top + space.md, paddingBottom: space.lg }]}>
           <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
             VAULT
           </Text>
@@ -159,16 +184,15 @@ export function VaultHome(): React.JSX.Element {
             Enter their world
           </Text>
           <VaultHomeSkeleton tint={t.surfaceMuted} />
+          {alternatives}
           <StoryEntry />
-        </View>
-      </View>
+      </ScrollView>
     );
   }
 
-  if (phase === 'error' && !model) {
+  if (phase === 'error' && !visibleModel) {
     return (
-      <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
-        <View style={styles.content}>
+      <ScrollView style={[styles.screen, { backgroundColor: t.background }]} contentContainerStyle={[styles.content, { paddingTop: insets.top + space.md, paddingBottom: space.lg }]}>
           <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
             VAULT
           </Text>
@@ -182,9 +206,10 @@ export function VaultHome(): React.JSX.Element {
               void load(scope);
             }}
           />
+          <VaultPublishingAvailability />
+          {alternatives}
           <StoryEntry />
-        </View>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -212,7 +237,7 @@ export function VaultHome(): React.JSX.Element {
         }
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + space.md, paddingBottom: dockBottomPadding(insets.bottom) },
+          { paddingTop: insets.top + space.md, paddingBottom: space.lg },
         ]}
       />
     </View>

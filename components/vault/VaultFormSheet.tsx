@@ -13,6 +13,7 @@ import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { CloseIcon } from '../shared/icons';
 import { duration, radius, space, typeScale, useThemeColors } from '../../theme';
 import { VaultActionButton } from './VaultActionButton';
+import { releaseAllows } from '../../utils/releaseScope';
 
 export interface VaultFormSheetProps {
   visible: boolean;
@@ -47,7 +48,7 @@ export function VaultFormSheet({
 
   if (!visible) return null;
 
-  const canSubmit = title.trim().length > 0 && !busy;
+  const canSubmit = title.trim().length > 0 && !busy && (mode === 'edit' || releaseAllows('creator', 'admit'));
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
@@ -116,6 +117,8 @@ export function VaultFormSheet({
               />
 
               <VaultActionButton
+                admission={mode === 'create' ? 'creator' : undefined}
+                disabled={!canSubmit}
                 label={busy ? 'Saving…' : mode === 'create' ? 'Create Vault' : 'Save'}
                 onPress={() => {
                   if (canSubmit) onSubmit(title.trim(), description.trim());

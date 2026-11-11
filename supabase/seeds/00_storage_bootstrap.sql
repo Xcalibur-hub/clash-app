@@ -42,22 +42,42 @@ begin
   $p$;
 
   execute 'drop policy if exists "media upload into own namespace" on storage.objects';
+  execute 'drop policy if exists "admitted media upload only" on storage.objects';
   execute $p$
-    create policy "media upload into own namespace"
+    create policy "admitted media upload only"
       on storage.objects for insert to authenticated
       with check (
         bucket_id in ('public-media', 'private-media')
-        and name like public.my_profile_id() || '/%'
+        and owner = auth.uid()
+        and (owner_id is null or owner_id = auth.uid()::text)
+        and public.my_profile_id() is not null
+        and exists (
+          select 1
+            from public.media_objects m
+           where m.owner_id = public.my_profile_id()
+             and m.bucket = bucket_id
+             and m.storage_path = name
+             and m.status = 'uploading'::public.media_status
+             and m.deleted_at is null
+             and m.created_at > clock_timestamp() - interval '24 hours'
+             and m.visibility = case
+               when bucket_id = 'public-media' then 'public'::public.media_visibility
+               else 'private'::public.media_visibility
+             end
+        )
       )
   $p$;
 
   execute 'drop policy if exists "own media objects are updatable" on storage.objects';
-  execute $p$
-    create policy "own media objects are updatable"
-      on storage.objects for update to authenticated
-      using (owner = auth.uid())
-      with check (owner = auth.uid())
-  $p$;
+
+  if to_regprocedure('public.guard_beta_storage_upload()') is not null then
+    execute 'drop trigger if exists beta_storage_upload_admission on storage.objects';
+    execute $t$
+      create trigger beta_storage_upload_admission
+        before insert or update on storage.objects
+        for each row execute function public.guard_beta_storage_upload()
+    $t$;
+  end if;
 
   execute 'drop policy if exists "own media objects are deletable" on storage.objects';
   execute $p$

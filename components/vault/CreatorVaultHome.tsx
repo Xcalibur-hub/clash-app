@@ -23,6 +23,8 @@ import { VaultIcon } from '../shared/icons';
 import { CreatorDropRow } from './CreatorDropRow';
 import { VaultActionButton } from './VaultActionButton';
 import { VaultFormSheet } from './VaultFormSheet';
+import { releaseAllows } from '../../utils/releaseScope';
+import { VaultPublishingAvailability } from './VaultAvailability';
 
 type Phase = 'loading' | 'ready';
 
@@ -72,6 +74,7 @@ export function CreatorVaultHome(): React.JSX.Element {
     setBusy(true);
     try {
       if (formMode === 'create') {
+        if (!releaseAllows('creator', 'admit')) return;
         await createVault(title, description);
         dispatch(showNotice('Vault opened.'));
       } else if (vault) {
@@ -89,6 +92,7 @@ export function CreatorVaultHome(): React.JSX.Element {
 
   const publish = async (dropId: string): Promise<void> => {
     try {
+      if (!releaseAllows('creator', 'admit')) return;
       await publishDrop(dropId);
       dispatch(showNotice('Drop published.'));
       await load();
@@ -127,6 +131,7 @@ export function CreatorVaultHome(): React.JSX.Element {
           },
         ]}
       >
+        <VaultPublishingAvailability />
         <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
           Vault
         </Text>
@@ -161,7 +166,7 @@ export function CreatorVaultHome(): React.JSX.Element {
 
               <View style={styles.actions}>
                 <VaultActionButton
-                  label="New Drop"
+                  admission="creator" label="New Drop"
                   compact
                   onPress={() => router.push('/vault/compose')}
                 />
@@ -181,9 +186,9 @@ export function CreatorVaultHome(): React.JSX.Element {
               <EmptyState
                 icon={VaultIcon}
                 title="Your Vault is ready"
-                body={"Share something your followers won't find in Arena."}
-                actionLabel="Create first Drop"
-                onAction={() => router.push('/vault/compose')}
+                body={"Publishing is unavailable in this beta. Existing content remains accessible."}
+                actionLabel="Browse Vault"
+                onAction={() => router.push('/(vault)')}
               />
             ) : (
               <View style={styles.list}>
@@ -195,7 +200,7 @@ export function CreatorVaultHome(): React.JSX.Element {
                     key={drop.id}
                     drop={drop}
                     onOpen={() => router.push(`/vault/drop/${drop.id}`)}
-                    onPublish={drop.status === 'draft' ? () => void publish(drop.id) : undefined}
+                    onPublish={drop.status === 'draft' && releaseAllows('creator', 'admit') ? () => void publish(drop.id) : undefined}
                     onRemove={() => void remove(drop.id)}
                   />
                 ))}
@@ -205,13 +210,10 @@ export function CreatorVaultHome(): React.JSX.Element {
         ) : (
           <EmptyState
             icon={VaultIcon}
-            title="Open your Vault"
-            body={"A private space for free moments, subscriber Drops, and permanent Collections."}
-            actionLabel="Create Vault"
-            onAction={() => {
-              setFormMode('create');
-              setFormOpen(true);
-            }}
+            title="Vault publishing unavailable"
+            body={"New Vaults and publishing are unavailable in this beta. Existing authorized content remains accessible."}
+            actionLabel="Browse Vault"
+            onAction={() => router.push('/(vault)')}
           />
         )}
 

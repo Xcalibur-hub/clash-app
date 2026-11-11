@@ -93,12 +93,13 @@ export function AiChapter({
         variant="badge"
       />
 
+      <Text style={{ ...typeScale.meta, color: t.textSecondary }}>New AI conversations are unavailable in this beta. Existing authorized conversations remain accessible.</Text>
       <View style={styles.actions}>
         {isSelf ? (
-          <VaultActionButton label="Preview your AI" tone="quiet" onPress={onOpen} />
+          <VaultActionButton label="View AI details / history" tone="quiet" onPress={onOpen} />
         ) : (
           <VaultActionButton
-            label={locked ? `${aiDisclosureLabel(profile.creatorName)} · MEMBERS` : `ASK ${profile.displayName.toUpperCase()}`}
+            label={locked ? `${aiDisclosureLabel(profile.creatorName)} · MEMBERS / DETAILS` : 'View AI details / existing conversations'}
             onPress={onOpen}
           />
         )}

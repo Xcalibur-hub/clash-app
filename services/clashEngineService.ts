@@ -347,7 +347,23 @@ export async function fetchClashViewForTake(takeId: string): Promise<ClashView |
   return toClashView(data);
 }
 
-/** A profile's public reward ledger. */
+/** Clash-filtered before the server cap; an exact count detects truncated reads. */
+export async function fetchClashReputationEvents(profileId: string, clashId: string): Promise<{
+  events: ReputationEvent[]; complete: boolean;
+}> {
+  const { data, error, count } = await requireSupabase().from('reputation_events')
+    .select('*', { count: 'exact' }).eq('profile_id', profileId).eq('clash_id', clashId)
+    .order('id', { ascending: true }).limit(100);
+  if (error) throw requestError(error);
+  const rows = data ?? [];
+  return { complete: data !== null && count !== null && count === rows.length
+      && rows.every(row => row.profile_id === profileId && row.clash_id === clashId),
+    events: rows.map(row => ({ id: row.id, profileId: row.profile_id, clashId: row.clash_id,
+      kind: row.kind, reputationDelta: row.reputation_delta, coinsDelta: row.coins_delta,
+      createdAt: Date.parse(row.created_at) })) };
+}
+
+/** A profile's capped public reward history; not a complete per-Clash ledger. */
 export async function fetchReputationEvents(profileId: string): Promise<ReputationEvent[]> {
   const { data, error } = await requireSupabase()
     .from('reputation_events')

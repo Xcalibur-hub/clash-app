@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, type StyleProp, type ViewStyle } f
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { PressableScale } from '../shared/PressableScale';
+import { releaseAllows, type ReleaseCapability } from '../../utils/releaseScope';
 
 export interface VaultActionButtonProps {
   label: string;
@@ -15,6 +16,8 @@ export interface VaultActionButtonProps {
   overMedia?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
+  /** Only new admission; never attach to reads, exits or existing authorized continuation. */
+  admission?: ReleaseCapability;
 }
 
 /** Calm Vault CTA — no glow, no neon. */
@@ -28,9 +31,11 @@ export function VaultActionButton({
   accessibilityLabel,
   disabled = false,
   busy = false,
+  admission,
 }: VaultActionButtonProps): React.JSX.Element {
   const t = useThemeColors();
-  const blocked = disabled || busy || !onPress;
+  const deferred = admission !== undefined && !releaseAllows(admission, 'admit');
+  const blocked = disabled || busy || !onPress || deferred;
   const solid = tone === 'solid';
 
   let backgroundColor: string;
@@ -63,6 +68,7 @@ export function VaultActionButton({
       }}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={deferred ? 'Unavailable in this beta. Existing content and authorized history remain accessible.' : undefined}
       style={[
         styles.btn,
         compact && styles.compact,
@@ -76,7 +82,7 @@ export function VaultActionButton({
     >
       {busy ? <ActivityIndicator color={labelColor} accessibilityLabel="Working" /> : null}
       <Text style={[styles.label, { color: labelColor }]}>
-        {label}
+        {deferred ? `${label} · Unavailable` : label}
       </Text>
     </PressableScale>
   );

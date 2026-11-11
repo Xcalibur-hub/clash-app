@@ -34,6 +34,7 @@ export function ChallengeInbox(): React.JSX.Element {
   const [, tick] = React.useState(0);
   const generation = React.useRef(0);
   const focused = React.useRef(false);
+  const focusEpoch = React.useRef(0);
   const working = React.useRef(false);
   const loadingRef = React.useRef(false);
   const scope = `${user?.id ?? 'guest'}:${direction}`;
@@ -76,8 +77,10 @@ export function ChallengeInbox(): React.JSX.Element {
   useFocusEffect(
     React.useCallback(() => {
       focused.current = true;
+      focusEpoch.current++;
       displayedScope.current = actionScope;
-      if (!working.current) setBusy(null);
+      working.current = false;
+      setBusy(null);
       setItems([]);
       setHasMore(false);
       setError(null);
@@ -94,6 +97,7 @@ export function ChallengeInbox(): React.JSX.Element {
       });
       return () => {
         focused.current = false;
+        focusEpoch.current++;
         generation.current += 1;
         loadingRef.current = false;
         clearInterval(timer);
@@ -108,17 +112,21 @@ export function ChallengeInbox(): React.JSX.Element {
       return;
     }
     working.current = true;
+    const epoch = focusEpoch.current;
     const request = ++generation.current;
     setBusy(item.id);
     setError(null);
     setNotice(null);
     tap();
+    let enteringRoom = false;
     try {
       const result = await resolveArenaChallenge(item.id, action, user.id);
       if (!isCurrent() || request !== generation.current) return;
+      if (result.id !== item.id || result.takeId !== item.takeId) throw new Error('Invitation response did not match. Refresh to verify its state.');
       const roomId = action === 'ACCEPT' ? linkedRoomAfterAccept(result) : null;
       if (roomId) {
         router.push(`/arena/room/${roomId}`);
+        enteringRoom = true;
         return;
       }
       const status = challengeStatusPresentation(result.status);
@@ -133,7 +141,8 @@ export function ChallengeInbox(): React.JSX.Element {
       await load();
       if (isCurrent()) setError(challengeInboxError(e));
     } finally {
-      if (currentScope.current === actionScope) {
+      // Preserve navigation reservation; an old focus must not unlock a newer action.
+      if (currentScope.current === actionScope && epoch === focusEpoch.current && !enteringRoom) {
         working.current = false;
         if (focused.current) setBusy(null);
       }

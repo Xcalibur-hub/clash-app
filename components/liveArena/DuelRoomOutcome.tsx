@@ -12,11 +12,14 @@ import { VerdictReveal } from './VerdictReveal';
 import { NextClashAction, type NextClashSuggestion } from './NextClashAction';
 import { nextClashActionVisible } from '../../utils/nextClashNotice';
 import { VERDICT_IS_NOT_SUPPORT } from '../../utils/verdictPresentation';
+import { useDuelBallot } from './useDuelBallot';
+import { ResultRefresh } from './ResultRefresh';
 
 /** Uses the canonical Clash ballot and verdict; no group Room tally. */
-export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, nextClash = null, nextBusy = false, nextNotice = null, onOpenNext, revealMotion = false }: {
-  duel: ArenaDuel; phase: ArenaPhase; onJudge: (side: 'A' | 'B') => Promise<void>;
+export function DuelRoomOutcome({ duel, phase, roomId, topicTitle, onJudge, onRefreshResult, onReview, onReturn, nextClash = null, nextBusy = false, nextNotice = null, onOpenNext, revealMotion = false }: {
+  duel: ArenaDuel; phase: ArenaPhase; roomId?: string; topicTitle?: string; onJudge: (side: 'A' | 'B') => Promise<void>;
   onReview?: () => void; onReturn?: () => void;
+  onRefreshResult?: () => Promise<void>;
   revealMotion?: boolean;
   /** One live Clash from existing discovery, or null when none is eligible. */
   nextClash?: NextClashSuggestion | null; nextBusy?: boolean; nextNotice?: string | null; onOpenNext?: () => void;
@@ -24,10 +27,10 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
   const t = useThemeColors();
   const { fontScale } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
-  const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [recorded, setRecorded] = React.useState(false);
-  const inFlight = React.useRef(false);
+  const ballot = useDuelBallot(duel.clashId, onJudge);
+  const busy = ballot.busy, recorded = ballot.status === 'confirmed';
+  const error = ballot.status === 'unknown' ? 'Your ballot outcome is unknown. Verify it before submitting again.'
+    : ballot.status === 'rejected' ? 'The server rejected your request. You may try again if judging is still open.' : null;
   const verdict = duel.verdict;
   const presentation = duelPresentation(duel, phase);
   const resultTitle = duelResultTitle(duel);
@@ -36,8 +39,12 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
 
   if (verdict || duel.status === 'cancelled') {
     return (
-      <View style={[styles.wrap, { borderTopColor: t.border }]}>
-        <VerdictReveal duel={duel} visible={revealMotion} />
+      <View
+        style={[styles.wrap, { borderTopColor: t.border }]}
+        collapsable={false}
+        testID={`arena-outcome:${duel.clashId}:${roomId ?? 'unknown'}:${duel.status}:${phase}`}
+      >
+        <VerdictReveal duel={duel} visible={revealMotion} roomId={roomId} topicTitle={topicTitle} />
         {nextClashActionVisible({ hasVerdict: Boolean(verdict), hasSuggestion: Boolean(nextClash), notice: nextNotice }) ? (
           <NextClashAction clash={nextClash} busy={nextBusy} notice={nextNotice} onOpen={onOpenNext ?? (() => undefined)} />
         ) : null}
@@ -69,7 +76,11 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
       : 'Judging opens after final arguments';
 
   return (
-    <View style={[styles.wrap, { borderTopColor: t.border }]}>
+    <View
+      style={[styles.wrap, { borderTopColor: t.border }]}
+      collapsable={false}
+      testID={`arena-outcome:${duel.clashId}:${roomId ?? 'unknown'}:${duel.status}:${phase}`}
+    >
       {judgingOpen ? (
         <Animated.Text
           entering={reduceMotion ? undefined : FadeInDown.duration(260)}
@@ -114,28 +125,19 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
               key={side}
               accessibilityRole="button"
               accessibilityLabel={`Judge ${fighter.name}, Fighter ${side}, made the stronger case`}
-              disabled={busy}
-              accessibilityState={{ disabled: busy, busy }}
+              disabled={ballot.locked}
+              accessibilityState={{ disabled: ballot.locked, busy }}
               style={[
                 styles.choice,
                 {
                   borderColor: t.borderStrong,
-                  opacity: busy ? 0.5 : 1,
+                  opacity: ballot.locked ? 0.5 : 1,
                 },
               ]}
               onPress={() => {
-                if (inFlight.current) return;
-                inFlight.current = true;
+                if (ballot.locked) return;
                 hapticJudge();
-                setBusy(true);
-                setError(null);
-                void onJudge(side)
-                  .then(() => setRecorded(true))
-                  .catch(() => setError('Your ballot could not be confirmed. Please retry.'))
-                  .finally(() => {
-                    inFlight.current = false;
-                    setBusy(false);
-                  });
+                void ballot.submit(side);
               }}
             >
               <Text numberOfLines={1} style={[styles.choiceName, { color: t.textPrimary }]}>
@@ -169,6 +171,11 @@ export function DuelRoomOutcome({ duel, phase, onJudge, onReview, onReturn, next
           {error}
         </Text>
       ) : null}
+      {recorded ? <Text style={[styles.support, { color: t.textPrimary }]}>Your recorded ballot: Side {ballot.side}</Text> : null}
+      {ballot.status === 'unknown' ? <PressableScale accessibilityRole="button" accessibilityLabel="Verify recorded ballot"
+        disabled={busy} accessibilityState={{ disabled: busy, busy }} style={styles.followUp}
+        onPress={() => void ballot.reconcile()}><Text style={[styles.followUpText, { color: t.textPrimary }]}>Verify recorded ballot</Text></PressableScale> : null}
+      {(phase === 'closed' || resultUnavailable) && onRefreshResult ? <ResultRefresh onRefresh={onRefreshResult} /> : null}
     </View>
   );
 }

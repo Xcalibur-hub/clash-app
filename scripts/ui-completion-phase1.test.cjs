@@ -116,11 +116,14 @@ test('failed Wins read reports unavailable history, not zero wins', async () => 
 });
 
 test('Vault Takes open redesigned detail; Wins is a real history child', async () => {
-  const h = harness('app/(vault)/profile.tsx'); h.drafts.push({ id: 'take' });
+  const h = harness('app/(vault)/profile.tsx'); let history;
   try {
-    await h.mount(); await press(h, node(h, 'TakeMiniCard')); assert.deepEqual(h.calls, [['push', '/take/take']]);
+    await h.mount(); const props = node(h, 'VaultProfileTakes').props; assert.equal(props.profileId, 'profile-a');
+    history = harness('components/vault/VaultProfileTakes.tsx', props);
+    history.services.fetchProfileTakes = async id => { assert.equal(id, 'profile-a'); return [{ id: 'take', status: 'expired' }]; };
+    await history.mount(); await press(history, node(history, 'TakeMiniCard')); assert.deepEqual(history.calls, [['push', '/take/take']]);
     await h.act(async () => node(h, 'SegmentedTabs').props.onChange('wins')); assert.equal(node(h, 'VaultWins').props.profileId, 'profile-a');
-  } finally { await h.unmount(); }
+  } finally { if (history) await history.unmount(); await h.unmount(); }
 });
 
 test('Settings account, Back fallback, help and appearance use existing actions in both themes', async () => {

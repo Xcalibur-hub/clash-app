@@ -802,6 +802,7 @@ supabase/.branches/
 !/app/arena/topics.tsx
 
 !/components/liveArena/DuelPositions.tsx
+!/components/liveArena/DuelPersonalResult.tsx
 !/components/liveArena/DuelArgumentReactions.tsx
 
 # LIVE-X1: reviewed local demo dependencies; release Metro redirects the guarded entry.
@@ -844,3 +845,15 @@ supabase/.branches/
 
 # LIVE-CONNECT-X1: authorized read-only Creator Live snapshot.
 !/components/vault/live/LiveSessionReadOnly.tsx
+
+# Phase 8: focused Arena product correctness dependencies.
+!/components/liveArena/useDuelBallot.ts
+!/components/liveArena/ResultRefresh.tsx
+!/components/liveArena/DuelPhaseCountdown.tsx
+!/utils/arenaPhaseClock.ts
+
+# MVP2: existing interest editor recovery and read-only first-action handoff.
+!/components/onboarding/useArenaInterestEditor.ts
+!/components/onboarding/OnboardingNextStep.tsx
+
+!/components/vault/VaultProfileTakes.tsx

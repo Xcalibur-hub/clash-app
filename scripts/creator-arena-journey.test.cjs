@@ -138,3 +138,32 @@ test('initial loading and a delayed account read never present successful-empty 
     assert.match(text(r.h.tree.props.ListHeaderComponent), /No\s+incoming\s+invitations/);
   } finally { await r.h.unmount(); }
 });
+
+test('acceptance for another invitation cannot navigate to its Room', async () => {
+  const r = setup(); r.h.services.resolveArenaChallenge = async () => invitation({ id: 'different-invitation', status: 'ACCEPTED', roomId: 'foreign-room' });
+  try { await r.h.mount(); await r.press('Accept this challenge'); assert.deepEqual(r.h.calls, []);
+    assert.match(text(r.h.tree.props.ListHeaderComponent), /Could not reach the server/);
+  } finally { await r.h.unmount(); }
+});
+
+test('confirmed Room navigation remains locked against a queued second acceptance tap', async () => {
+  const r = setup();
+  try { await r.h.mount(); const accept = r.button('Accept this challenge').props.onPress;
+    await r.h.act(async () => accept()); await r.h.act(async () => accept());
+    assert.equal(r.calls.length, 1); assert.deepEqual(r.h.calls, [['push', '/arena/room/server-room']]);
+    r.focus(false); await r.h.update(); r.focus(true); await r.h.update();
+    assert.equal(r.button('Accept this challenge').props.disabled, false, 'Reentry reloads authoritative invitations');
+  } finally { await r.h.unmount(); }
+});
+
+test('a previous-focus response cannot unlock an in-flight decision after reentry', async () => {
+  const r = setup(), first = deferred(), second = deferred();
+  r.h.services.resolveArenaChallenge = (...args) => { r.calls.push(args); return r.calls.length === 1 ? first.promise : second.promise; };
+  try { await r.h.mount(); await r.press('Accept this challenge'); r.focus(false); await r.h.update(); r.focus(true); await r.h.update();
+    const current = r.button('Accept this challenge').props.onPress; await r.h.act(async () => current());
+    await r.h.act(async () => first.resolve(invitation({ status: 'ACCEPTED', roomId: 'old-room' })));
+    await r.h.act(async () => current()); assert.equal(r.calls.length, 2); assert.deepEqual(r.h.calls, []);
+    await r.h.act(async () => second.resolve(invitation({ status: 'ACCEPTED', roomId: 'current-room' })));
+    assert.deepEqual(r.h.calls, [['push', '/arena/room/current-room']]);
+  } finally { await r.h.unmount(); }
+});

@@ -72,11 +72,11 @@ export function buildHomeRows(model: VaultHomeModel, scope: VaultHomeScope): Hom
     rows.push({ kind: 'courses', offers: model.discoverCourses.slice(0, 4) });
   }
   if (model.discoverServices.length > 0) {
-    rows.push({ kind: 'chapter', title: 'Work with a creator' });
+    rows.push({ kind: 'chapter', title: 'Service details' });
     rows.push({ kind: 'services', offers: model.discoverServices.slice(0, 4) });
   }
   if (model.discoverProducts.length > 0) {
-    rows.push({ kind: 'chapter', title: 'From the shelf' });
+    rows.push({ kind: 'chapter', title: 'Product details' });
     rows.push({ kind: 'products', offers: model.discoverProducts.slice(0, 6) });
   }
 

@@ -14,20 +14,18 @@ export class ChallengeEligibilityError extends Error {
 }
 
 /** Fresh caller-scoped reads. No cached feed object grants challenge eligibility. */
-export async function fetchEligibleChallengeTake(takeId: string, legacy = false): Promise<Take> {
+export async function fetchEligibleChallengeTake(takeId: string): Promise<Take> {
   const account = await currentUserId();
   if (!account) throw new SupabaseError('Sign in to challenge this Take.', '42501');
   const take = await fetchTakeById(takeId);
-  const reason = takeChallengeIneligibility(take, Date.now(), legacy);
+  const reason = takeChallengeIneligibility(take);
   if (await currentUserId() !== account) throw new SupabaseError('Account changed', 'account_changed');
   if (reason || !take) throw new ChallengeEligibilityError(take, reason ?? 'unavailable');
-  if (!legacy) {
-    const clash = await fetchClashViewForTake(takeId);
-    if (await currentUserId() !== account) throw new SupabaseError('Account changed', 'account_changed');
-    if (clash?.battleMode === 'DUEL' && clash.status === 'open') throw new ChallengeEligibilityError(take, 'active_duel');
-  }
+  const clash = await fetchClashViewForTake(takeId);
+  if (await currentUserId() !== account) throw new SupabaseError('Account changed', 'account_changed');
+  if (clash?.battleMode === 'DUEL' && clash.status === 'open') throw new ChallengeEligibilityError(take, 'active_duel');
   // Network time can consume the remaining duel window too.
-  const currentReason = takeChallengeIneligibility(take, Date.now(), legacy);
+  const currentReason = takeChallengeIneligibility(take);
   if (currentReason) throw new ChallengeEligibilityError(take, currentReason);
   return take;
 }
@@ -36,14 +34,15 @@ async function timed<T>(request: (signal: AbortSignal) => PromiseLike<T>): Promi
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try { return await request(controller.signal); } finally { clearTimeout(timeout); }
 }
-export async function createArenaChallenge(takeId: string, counterPosition: string): Promise<ArenaChallenge> {
+export async function createArenaChallenge(takeId: string, counterPosition: string, expectedAccountId?: string, isActive: () => boolean = () => true): Promise<ArenaChallenge> {
   const account = await currentUserId();
+  if (!isActive() || !account || (expectedAccountId && account !== expectedAccountId)) throw new SupabaseError('Account changed', 'account_changed');
   const source = await fetchEligibleChallengeTake(takeId);
-  if (!account || await currentUserId() !== account) throw new SupabaseError('Account changed', 'account_changed');
+  if (await currentUserId() !== account || !isActive()) throw new SupabaseError('Account changed', 'account_changed');
   const { data, error } = await requireSupabase().rpc('create_arena_challenge', {
     p_take_id: takeId, p_counter_position: counterPosition,
   });
-  if (await currentUserId() !== account) throw new SupabaseError('Account changed', 'account_changed');
+  if (await currentUserId() !== account || !isActive()) throw new SupabaseError('Account changed', 'account_changed');
   if (error) {
     // Eligibility can change after the read and before the serialized RPC check.
     if (['P0002', 'P0003', 'P0006', '42501'].includes(error.code)) {

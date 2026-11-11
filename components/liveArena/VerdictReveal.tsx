@@ -28,6 +28,8 @@ import { notify as hapticNotify } from '../../utils/haptics';
 export interface VerdictRevealProps {
   duel: ArenaDuel;
   visible?: boolean;
+  roomId?: string;
+  topicTitle?: string;
 }
 
 function AnimatedPercent({
@@ -68,7 +70,7 @@ function AnimatedPercent({
   );
 }
 
-export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): React.JSX.Element {
+export function VerdictReveal({ duel, visible = false, roomId, topicTitle }: VerdictRevealProps): React.JSX.Element {
   const t = useThemeColors();
   const reduced = useReducedMotion();
   const verdict = duel.verdict;
@@ -145,9 +147,19 @@ export function VerdictReveal({ duel, visible = false }: VerdictRevealProps): Re
   const bPct = view.bPct;
 
   return (
-    <View style={[styles.wrap, { backgroundColor: t.background }]} accessibilityLabel="Official verdict">
+    <View
+      style={[styles.wrap, { backgroundColor: t.background }]}
+      collapsable={false}
+      testID={`arena-verdict:${duel.clashId}:${roomId ?? 'unknown'}:${duel.status}`}
+      accessibilityLabel="Official verdict"
+    >
       {/* 1 — Announcement */}
-      <Animated.View entering={reduced || !animate ? undefined : FadeIn.duration(220)}>
+      <Animated.View
+        entering={reduced || !animate ? undefined : FadeIn.duration(220)}
+        collapsable={false}
+        testID={`arena-verdict-room:${roomId ?? 'unknown'}:${duel.status}`}
+        accessibilityLabel={topicTitle ? `Clash topic: ${topicTitle}` : undefined}
+      >
         {accent}
       </Animated.View>
 

@@ -37,6 +37,7 @@ export const GalleryShelf = React.memo(function GalleryShelf({
           <View key={item.id} style={[styles.row, right && styles.rowRight]}>
             <View style={bleed ? styles.bleed : undefined}>
               <EditorialMedia
+                accessibilityLabel={`View product details: ${item.title}`}
                 mediaUrl={item.mediaUrl}
                 accent={item.tint}
                 height={large ? 320 : 230}

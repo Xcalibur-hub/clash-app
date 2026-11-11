@@ -124,15 +124,25 @@ test('historical accepted duel remains reachable when challenge creation closes'
   const take = { ...base, expiresAt: clock }, props = { take, readOnly: true, openComposer: true }; render(TakeChallenges, props); await flush(); const tree = render(TakeChallenges, props);
   assert.equal(node(tree, 'Modal').props.visible, false); button(tree, 'OPEN DUEL').props.onPress(); assert.deepEqual(routes, ['/arena/room/room']);
 });
-test('legacy comment challenge preflights stale source before showing mode sheet', async () => {
-  reset(); fresh = { ...base, expiresAt: clock }; const tree = render(Detail); const row = node(tree, 'List').props.renderItem({ item: { comment: { id: 'comment' }, children: [] } });
-  await node(row, 'CommentBranch').props.onClash({ id: 'comment' }); await flush(); const updated = render(Detail);
-  assert.equal(node(updated, 'ClashModeSheet').props.visible, false); assert.equal(startCalls, 0);
+test('comment entry never opens the legacy creation sheet, including a stale source', async () => {
+  reset(); fresh = { ...base, expiresAt: clock }; const tree = render(Detail);
+  const row = node(tree, 'List').props.renderItem({ item: { comment: { id: 'comment', authorId: 'viewer' }, children: [] } });
+  await node(row, 'CommentBranch').props.onClash({ id: 'comment', authorId: 'viewer', text: challenge.counterPosition });
+  await flush(); const updated = render(Detail);
+  assert.equal(node(updated, 'ClashModeSheet'), undefined); assert.equal(startCalls, 0); assert.equal(rpcCalls.length, 0);
 });
-test('legacy sheet also refreshes before submitting, retaining its distinct timing contract', async () => {
-  reset(); fresh.expiresAt = clock + 60000; let tree = render(Detail); const row = node(tree, 'List').props.renderItem({ item: { comment: { id: 'comment' }, children: [] } });
-  await node(row, 'CommentBranch').props.onClash({ id: 'comment' }); await flush(); tree = render(Detail); const sheet = node(tree, 'ClashModeSheet'); assert.equal(sheet.props.visible, true);
-  fresh = { ...fresh, status: 'expired' }; await sheet.props.onChoose('STANDARD'); await flush(); tree = render(Detail); assert.equal(node(tree, 'ClashModeSheet').props.visible, false); assert.equal(startCalls, 0);
+
+test('own comment supplies only a canonical draft; sending still rechecks the full duel window', async () => {
+  reset(); fresh.expiresAt = clock + 60000; let tree = render(Detail);
+  const row = node(tree, 'List').props.renderItem({ item: { comment: { id: 'comment', authorId: 'viewer' }, children: [] } });
+  await node(row, 'CommentBranch').props.onClash({ id: 'comment', authorId: 'viewer', text: challenge.counterPosition });
+  tree = render(Detail); const request = node(tree, 'TakeChallenges').props.composerRequest;
+  assert.equal(request.text, challenge.counterPosition); assert.equal(startCalls, 0);
+  reset(); fresh.expiresAt = clock + 60000;
+  const props = { take: base, openComposer: false, composerRequest: request };
+  render(TakeChallenges, props); await flush(); tree = render(TakeChallenges, props);
+  assert.equal(node(tree, 'Modal').props.visible, false);
+  assert.match(text(tree), /more than 30 minutes/); assert.equal(rpcCalls.filter(c => c.name === 'create_arena_challenge').length, 0);
 });
 
 test('server veto after successful preflight closes composer, retaining history instead of displaying a retryable duel-window error', async () => {

@@ -69,7 +69,7 @@ export function DigitalVersionPanel({
 
           <View style={styles.actions}>
             <VaultActionButton label="Preview" tone="quiet" compact onPress={onPreview} />
-            <VaultActionButton label="Configure" tone="quiet" compact onPress={onConnect} />
+            <VaultActionButton admission="ai" label="Configure" tone="quiet" compact onPress={onConnect} />
             <VaultActionButton
               label={busy ? 'Disconnecting…' : 'Disconnect'}
               tone="quiet"
@@ -81,9 +81,9 @@ export function DigitalVersionPanel({
       ) : (
         <>
           <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
-            Bring your AI to life with your authorized avatar and voice.
+            New digital creator connections are unavailable in this beta. Existing authorized history and Disconnect remain accessible.
           </Text>
-          <VaultActionButton label="Connect" compact onPress={onConnect} />
+          <VaultActionButton admission="ai" label="Connect" compact onPress={onConnect} />
         </>
       )}
     </View>

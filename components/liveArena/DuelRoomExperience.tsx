@@ -29,6 +29,8 @@ import { ClashMoreSheet } from './ClashMoreSheet';
 import { DuelDevPanel } from './DuelDevPanel';
 import { DuelEntrance } from './DuelEntrance';
 import { DuelRoomOutcome } from './DuelRoomOutcome';
+import { DuelPersonalResult } from './DuelPersonalResult';
+import { DuelPhaseCountdown } from './DuelPhaseCountdown';
 import { ImmersiveClash } from './ImmersiveClash';
 import { softFill } from './liveArenaStyles';
 import type { LiveRoomMessageProps } from './LiveRoomMessage';
@@ -71,6 +73,7 @@ interface Props extends Actions {
   onBack: () => void;
   onReturn: () => void;
   onRefresh: () => Promise<void>;
+  onRefreshResult?: () => Promise<void>;
   onLoadOlder: () => Promise<void>;
   onJudge: (side: 'A' | 'B') => Promise<void>;
   onWatch: () => Promise<void>;
@@ -242,9 +245,18 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
     </Pressable>
   );
 
+  const outcomeTopic =
+    duel.sourceText?.trim() && duel.sourceText.trim() !== room.topic.title
+      ? `${room.topic.title} — ${duel.sourceText.trim()}`
+      : (duel.sourceText?.trim() || room.topic.title);
+
   if (props.threadLocked) {
     return (
-      <View style={[styles.root, { backgroundColor: t.background }]}>
+      <View
+        style={[styles.root, { backgroundColor: t.background }]}
+        collapsable={false}
+        testID={`arena-room:${room.roomId}:${duel.clashId}:${duel.status}:${room.phase}`}
+      >
         <ArenaAtmosphere mood={atmosphereMood} energy={0.15} />
         <View style={[styles.top, styles.layer, { paddingTop: props.paddingTop }]}>
           <Pressable
@@ -356,7 +368,11 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: t.background }]}>
+    <View
+      style={[styles.root, { backgroundColor: t.background }]}
+      collapsable={false}
+      testID={`arena-room:${room.roomId}:${duel.clashId}:${duel.status}:${room.phase}`}
+    >
       {duel.status === 'open' && room.phase !== 'closed' ? <ArenaAtmosphere
         mood={atmosphereMood}
         energy={
@@ -412,6 +428,7 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
           }
           stageFooter={
             <>
+            <DuelPhaseCountdown room={room} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 }}><ArenaButton key={`transcript:${fontScale}`} label="Transcript" variant="tertiary" onPress={() => setHistoryOpen(true)} />{assist !== 'hidden' ? <ArenaButton key={`assist:${fontScale}`} label={assist === 'inbox' ? 'Assist inbox' : 'Private assist'} variant="tertiary" disabled={assist === 'closed'} onPress={() => setAssistOpen(true)} /> : null}</View>
             {assist !== 'hidden' ? <Text style={[styles.assistNote, { color: t.textMuted }]}>{assist === 'closed' ? 'Assists are closed for this Clash.' : 'Private assists go to one fighter only — never posted in the Crowd.'}</Text> : null}
             {showOutcome ? (
@@ -420,7 +437,10 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
                   key={duel.clashId}
                   duel={duel}
                   phase={room.phase}
+                  roomId={room.roomId}
+                  topicTitle={outcomeTopic}
                   onJudge={props.onJudge}
+                  onRefreshResult={props.onRefreshResult}
                   onReview={() => setHistoryOpen(true)}
                   onReturn={props.onReturn}
                   nextClash={props.nextClash ?? null}
@@ -448,7 +468,10 @@ export function DuelRoomExperience(props: Props): React.JSX.Element {
       </KeyboardAvoidingView>
 
       {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen initialSide={backingSide ?? 'A'} roomId={room.roomId} duel={duel} disabled={assist === 'closed'} onPublished={props.onRefresh} /></ArenaSheet> : null}
-      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}><DuelRoomOutcome revealMotion duel={duel} phase={room.phase} onJudge={props.onJudge} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn} nextClash={props.nextClash ?? null} nextBusy={props.nextBusy ?? false} nextNotice={props.nextNotice ?? null} onOpenNext={props.onOpenNext} /></ArenaSheet> : null}
+      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}>
+        {duel.status === 'settled' ? <DuelPersonalResult clashId={duel.clashId} /> : null}
+        <DuelRoomOutcome revealMotion duel={duel} phase={room.phase} roomId={room.roomId} topicTitle={outcomeTopic} onJudge={props.onJudge} onRefreshResult={props.onRefreshResult} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn} nextClash={props.nextClash ?? null} nextBusy={props.nextBusy ?? false} nextNotice={props.nextNotice ?? null} onOpenNext={props.onOpenNext} />
+      </ArenaSheet> : null}
       <ArgumentHistorySheet
         visible={historyOpen}
         duel={duel}

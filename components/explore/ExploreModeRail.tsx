@@ -109,7 +109,7 @@ export function ExploreModeRail({
   };
 
   const shellStyle = useAnimatedStyle(() => ({
-    width: interpolate(expand.value, [0, 1], [COLLAPSED_W, EXPANDED_W]),
+    width: expandable ? interpolate(expand.value, [0, 1], [COLLAPSED_W, EXPANDED_W]) : COLLAPSED_W,
   }));
 
   const indicatorStyle = useAnimatedStyle(() => ({
@@ -117,8 +117,8 @@ export function ExploreModeRail({
   }));
 
   const labelStyle = useAnimatedStyle(() => ({
-    opacity: expand.value,
-    maxWidth: interpolate(expand.value, [0, 1], [0, 72]),
+    opacity: expandable ? expand.value : 0,
+    maxWidth: expandable ? interpolate(expand.value, [0, 1], [0, 72]) : 0,
   }));
 
   return (

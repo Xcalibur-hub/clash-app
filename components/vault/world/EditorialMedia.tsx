@@ -38,6 +38,7 @@ export interface EditorialMediaProps {
   /** Free-form overlay content (quote, chips, CTA). */
   overlay?: React.ReactNode;
   onPress?: () => void;
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -60,6 +61,7 @@ export const EditorialMedia = React.memo(function EditorialMedia({
   meta,
   overlay,
   onPress,
+  accessibilityLabel,
   style,
 }: EditorialMediaProps): React.JSX.Element {
   const t = useThemeColors();
@@ -179,7 +181,7 @@ export const EditorialMedia = React.memo(function EditorialMedia({
             onPress();
           }}
           accessibilityRole="button"
-          accessibilityLabel={`${kicker ?? ''} ${title ?? ''}`.trim()}
+          accessibilityLabel={accessibilityLabel?.trim() || [kicker, title, meta].filter(Boolean).join(' ').trim() || 'View Vault content'}
         >
           {body}
         </PressableScale>

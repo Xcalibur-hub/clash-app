@@ -70,6 +70,7 @@ export const WorldDropsChapter = React.memo(function WorldDropsChapter({
               ]}
             >
               <EditorialMedia
+                accessibilityLabel={`View World Drop: ${item.caption}`}
                 mediaUrl={item.mediaUrl}
                 accent={item.tint ?? tint ?? null}
                 height={132}

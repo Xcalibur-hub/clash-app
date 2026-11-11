@@ -27,7 +27,7 @@ select is((select e->>'state' from jsonb_array_elements(public.list_arena_clash_
 select is((select count(*)::integer from jsonb_array_elements(public.list_arena_clash_discovery()) e where e->>'id' in ('discovery-fixture','discovery-removed')),0,'fixtures and removed source excluded');
 select is((select e->>'state' from jsonb_array_elements(public.list_arena_clash_discovery()) e where e->>'takeId'='discovery-7'),'PENDING','party sees pending under Pending');
 select ok((select e->>'roomId' is null from jsonb_array_elements(public.list_arena_clash_discovery()) e where e->>'takeId'='discovery-7'),'pending has no Room');
-select ok(public.clash_view('discovery-fixture') is not null,'fixture still available directly for verification');
+select is(public.clash_view('discovery-fixture'),null::jsonb,'ordinary callers cannot read runtime fixtures through legacy RPC');
 select throws_ok($$update public.takes set is_runtime_fixture=false where id='discovery-5'$$,'42501',null,'client cannot republish fixture');
 reset role;
 select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000006403","role":"authenticated"}',true);

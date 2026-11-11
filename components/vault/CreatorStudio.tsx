@@ -58,6 +58,8 @@ import { LiveStudio } from './LiveStudio';
 import { AiStudio } from './AiStudio';
 import { VaultActionButton } from './VaultActionButton';
 import { VaultFormSheet } from './VaultFormSheet';
+import { releaseAllows } from '../../utils/releaseScope';
+import { VaultPublishingAvailability } from './VaultAvailability';
 
 type StudioTab =
   | 'drops'
@@ -150,6 +152,7 @@ export function CreatorStudio(): React.JSX.Element {
     setBusy(true);
     try {
       if (formMode === 'create') {
+        if (!releaseAllows('creator', 'admit')) return;
         await createVault(nextTitle, nextDescription);
         dispatch(showNotice('Vault opened.'));
       } else if (vault) {
@@ -166,7 +169,7 @@ export function CreatorStudio(): React.JSX.Element {
   };
 
   const submitCreate = async (): Promise<void> => {
-    if (!title.trim() || busy) return;
+    if (!releaseAllows('creator', 'admit') || !title.trim() || busy) return;
     setBusy(true);
     try {
       if (createKind === 'service') {
@@ -219,16 +222,13 @@ export function CreatorStudio(): React.JSX.Element {
 
   if (!vault) {
     return (
-      <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top }]}>
+      <ScrollView style={[styles.screen, { backgroundColor: t.background }]} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: dockBottomPadding(insets.bottom) }}>
         <EmptyState
           icon={VaultIcon}
-          title="Open your Vault"
-          body="Create your world before adding services, courses, or products."
-          actionLabel="Create Vault"
-          onAction={() => {
-            setFormMode('create');
-            setFormOpen(true);
-          }}
+          title="Vault publishing unavailable"
+          body="New Vaults and publishing are unavailable in this beta. Browse existing creators instead."
+          actionLabel="Browse Vault"
+          onAction={() => router.push('/(vault)')}
         />
         <VaultFormSheet
           visible={formOpen}
@@ -239,7 +239,7 @@ export function CreatorStudio(): React.JSX.Element {
           onClose={() => setFormOpen(false)}
           onSubmit={(a, b) => void submitVault(a, b)}
         />
-      </View>
+      </ScrollView>
     );
   }
 
@@ -255,6 +255,7 @@ export function CreatorStudio(): React.JSX.Element {
           },
         ]}
       >
+        <VaultPublishingAvailability />
         <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
           Studio
         </Text>
@@ -263,7 +264,7 @@ export function CreatorStudio(): React.JSX.Element {
         </Text>
 
         <View style={styles.actions}>
-          <VaultActionButton label="New Drop" compact onPress={() => router.push('/vault/compose')} />
+          <VaultActionButton admission="creator" label="New Drop" compact onPress={() => router.push('/vault/compose')} />
           <VaultActionButton
             label="Manage Vault"
             tone="quiet"
@@ -282,9 +283,9 @@ export function CreatorStudio(): React.JSX.Element {
             <EmptyState
               icon={VaultIcon}
               title="No Drops yet"
-              body="Share something your followers won't find in Arena."
-              actionLabel="Create Drop"
-              onAction={() => router.push('/vault/compose')}
+              body="Publishing is unavailable in this beta. Existing content remains accessible."
+              actionLabel="Browse Vault"
+              onAction={() => router.push('/(vault)')}
             />
           ) : (
             <View style={styles.list}>
@@ -294,7 +295,7 @@ export function CreatorStudio(): React.JSX.Element {
                   drop={drop}
                   onOpen={() => router.push(`/vault/drop/${drop.id}`)}
                   onPublish={
-                    drop.status === 'draft'
+                    drop.status === 'draft' && releaseAllows('creator', 'admit')
                       ? () =>
                           void publishDrop(drop.id)
                             .then(() => load())
@@ -315,7 +316,7 @@ export function CreatorStudio(): React.JSX.Element {
         {tab === 'services' ? (
           <View style={styles.list}>
             <VaultActionButton
-              label="Create service"
+              admission="creator" label="Create service"
               compact
               onPress={() => {
                 setCreateKind('service');
@@ -388,7 +389,7 @@ export function CreatorStudio(): React.JSX.Element {
         {tab === 'courses' ? (
           <View style={styles.list}>
             <VaultActionButton
-              label="Create course"
+              admission="creator" label="Create course"
               compact
               onPress={() => {
                 setCreateKind('course');
@@ -412,7 +413,7 @@ export function CreatorStudio(): React.JSX.Element {
                   toggleLabel={course.status === 'published' ? 'Unpublish' : 'Publish'}
                 />
                 <VaultActionButton
-                  label="Add lesson"
+                  admission="creator" label="Add lesson"
                   tone="quiet"
                   compact
                   onPress={() => {
@@ -429,7 +430,7 @@ export function CreatorStudio(): React.JSX.Element {
         {tab === 'shop' ? (
           <View style={styles.list}>
             <VaultActionButton
-              label="Create product"
+              admission="creator" label="Create product"
               compact
               onPress={() => {
                 setCreateKind('product');
@@ -534,7 +535,7 @@ function StudioRow({
           {meta}
         </Text>
       </Pressable>
-      <VaultActionButton label={toggleLabel} tone="quiet" compact onPress={onToggle} />
+      <VaultActionButton admission={toggleLabel === 'Publish' ? 'creator' : undefined} label={toggleLabel} tone="quiet" compact onPress={onToggle} />
     </View>
   );
 }

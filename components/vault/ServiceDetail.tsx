@@ -56,7 +56,7 @@ export function ServiceDetail({ serviceId }: { serviceId: string }): React.JSX.E
         <Avatar name={creator.name} tint={creator.tint} size={44} /><Text style={[styles.name, { color: t.textPrimary, flex: 1 }]}>{creator.name}</Text>
       </Pressable> : null}
       <Text style={[styles.body, { color: t.textSecondary }]}>{service.description}</Text>
-      <Text style={[styles.meta, { color: t.textMuted }]}>{service.deliveryType.replace('_', ' ')} ? {price}</Text>
+      <Text style={[styles.meta, { color: t.textMuted }]}>{service.deliveryType.replace('_', ' ')} · {price}</Text>
       <Text style={[styles.body, { color: t.textSecondary }]}>This is a request, not a booking or purchase. In-app purchases and new subscriptions are unavailable.</Text>
       {service.externalUrl && releaseAllows('commerce', 'admit') ? <VaultActionButton label="Open link" busy={linkState?.scope === scope && linkState.busy} onPress={() => void openLink()} /> : null}
       {linkState?.scope === scope && linkState.failed ? <Text accessibilityLiveRegion="polite" style={{ color: t.textSecondary }}>Couldn't open the link. Try again.</Text> : null}

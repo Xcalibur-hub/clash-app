@@ -142,12 +142,14 @@ test('settled but unavailable result is not called pending settlement', async ()
   finally { await h.unmount(); }
 });
 
-test('judging confirms one real callback, exposes failure and never lets a fighter cast a ballot', async () => {
+test('judging confirms one callback, reconciles ambiguous failure without resubmission and never lets a fighter cast a ballot', async () => {
   const response = deferred(); let calls = 0;
   const props = { duel: duel({ viewerRelationship: 'spectator', mayJudge: true }), phase: 'judging',
     onJudge: () => { calls++; return response.promise; } };
   const options = { dependencies: { haptics: { judge() {} } } };
   const h = harness('components/liveArena/DuelRoomOutcome.tsx', props, e => e.DuelRoomOutcome, options);
+  h.services.currentUserId = async () => 'account-a';
+  h.services.fetchClashView = async () => ({ clashId: props.duel.clashId, myBallot: null });
   const choices = () => h.nodes.filter(n => n.props?.accessibilityLabel?.startsWith('Judge '));
   try {
     await h.mount(); assert.equal(choices().length, 2);
@@ -155,10 +157,14 @@ test('judging confirms one real callback, exposes failure and never lets a fight
     await h.act(async () => { vote(); vote(); }); assert.equal(calls, 1);
     assert.ok(choices().every(n => n.props.disabled));
     await h.act(async () => response.reject(Error('Fictional network failure')));
-    assert.match(text(h.tree), /could not be confirmed/); assert.doesNotMatch(text(h.tree), /Your ballot is recorded/);
+    assert.match(text(h.tree), /outcome is unknown/); assert.doesNotMatch(text(h.tree), /Your ballot is recorded/);
     await h.update({ ...props, onJudge: async () => { calls++; } });
     await h.act(async () => choices()[0].props.onPress());
-    assert.equal(calls, 2); assert.match(text(h.tree), /Your ballot is recorded/);
+    assert.equal(calls, 1); assert.ok(choices().every(n => n.props.disabled));
+    h.services.fetchClashView = async () => ({ clashId: props.duel.clashId, myBallot: 'B' });
+    await h.act(async () => button(h, 'Verify recorded ballot').props.onPress());
+    assert.equal(calls, 1); assert.match(text(h.tree), /Your ballot is recorded/);
+    assert.match(text(h.tree), /Your recorded ballot: Side\s+B/);
     assert.equal(choices().length, 0);
   } finally { await h.unmount(); }
   for (const viewerRelationship of ['fighter_a', 'fighter_b', 'staff']) {

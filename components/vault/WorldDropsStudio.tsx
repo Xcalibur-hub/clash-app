@@ -108,9 +108,9 @@ export function WorldDropsStudio(): React.JSX.Element {
         WORLD DROPS
       </Text>
       <Text allowFontScaling={false} style={[styles.blurb, { color: t.textSecondary }]}>
-        Hide something in CLASH World. Fans discover it, claim it, and the reward leads back here.
+        New World publishing is unavailable in this beta. Read existing drops or remove your own.
       </Text>
-      <VaultActionButton label="Place a World Drop" onPress={() => setFormOpen(true)} />
+      <VaultActionButton admission="world" label="Place a World Drop" onPress={() => setFormOpen(true)} />
 
       {drops.length === 0 ? (
         <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
@@ -145,6 +145,7 @@ export function WorldDropsStudio(): React.JSX.Element {
                 />
                 {drop.status !== 'REMOVED' ? (
                   <VaultActionButton
+                    admission={drop.status === 'PUBLISHED' ? undefined : 'world'}
                     label={drop.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
                     tone="quiet"
                     compact

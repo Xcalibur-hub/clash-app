@@ -27,6 +27,9 @@ export const EXPLORE_RAIL_GUTTER = space.xs;
 /** Right padding of the World scroll content (`screenX` + shelf gutter). */
 export const EXPLORE_WORLD_CONTENT_RIGHT = layout.screenX + space.xs;
 
+/** Content must end before the resting rail, not under its absolute overlay. */
+export const EXPLORE_FEED_CONTENT_RIGHT = EXPLORE_RAIL_RIGHT + EXPLORE_RAIL_COLLAPSED_W + EXPLORE_RAIL_GUTTER;
+
 export interface ExploreHorizontalBand {
   left: number;
   right: number;

@@ -26,7 +26,7 @@ async function inspectArchive() {
     'supabase/database.types.ts', 'data/exploreWorldGeometry.json', 'utils/releaseScope.ts',
     'utils/communityVerdict.ts', 'components/shared/ReleaseUnavailable.tsx',
     'utils/arenaHomeDestinations.ts', 'app/arena/topics.tsx',
-    'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx',
+    'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx', 'components/onboarding/useArenaInterestEditor.ts', 'components/onboarding/OnboardingNextStep.tsx', 'components/vault/VaultProfileTakes.tsx', 'components/liveArena/DuelPersonalResult.tsx', 'components/liveArena/useDuelBallot.ts', 'components/liveArena/ResultRefresh.tsx', 'components/liveArena/DuelPhaseCountdown.tsx', 'utils/arenaPhaseClock.ts',
     'components/dev/creatorEventDemo/model.ts', 'components/dev/creatorEventDemo/EventStage.tsx',
     'components/dev/creatorEventDemo/RoundDecision.tsx', 'components/dev/creatorEventDemo/CreatorEventDemo.tsx', 'components/arena/groups/GroupActivityHub.tsx', 'components/arena/groups/GroupMissionRehearsal.tsx', 'components/play/signal/model.ts', 'components/play/signal/SignalBoard.tsx', 'components/play/signal/SignalGame.tsx', 'components/play/signal/SignalEntry.tsx', 'app/explore/play/signal.tsx', 'components/vault/story/model.ts', 'components/vault/story/StoryEntry.tsx', 'components/vault/story/StoryExperience.tsx', 'app/vault/story.tsx', 'components/vault/live/LiveSessionReadOnly.tsx', 'components/arena/TakeArenaJourney.tsx', 'app/world/beacon.tsx', 'components/world/beacon/model.ts', 'components/world/beacon/BeaconChart.tsx', 'components/world/beacon/BeaconField.tsx', 'components/world/beacon/BeaconExperience.tsx', 'components/world/beacon/BeaconEntry.tsx'];
   for (const item of required) assert.ok(set.has(item), 'Missing required archive input: ' + item);
@@ -38,6 +38,7 @@ async function inspectArchive() {
   for (const item of denied) assert.ok(ignore.ignores(item), 'Private path not ignored');
   const untracked = cp.execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { encoding: 'utf8', windowsHide: true }).split('\0').filter(Boolean);
   const authorizedNewInputs = new Set(['.easignore', 'config/release-targets.json', 'utils/releaseScope.ts', 'utils/communityVerdict.ts', 'components/shared/ReleaseUnavailable.tsx',
+    'components/onboarding/useArenaInterestEditor.ts', 'components/onboarding/OnboardingNextStep.tsx', 'components/vault/VaultProfileTakes.tsx', 'components/liveArena/DuelPersonalResult.tsx', 'components/liveArena/useDuelBallot.ts', 'components/liveArena/ResultRefresh.tsx', 'components/liveArena/DuelPhaseCountdown.tsx', 'utils/arenaPhaseClock.ts',
     'utils/arenaHomeDestinations.ts', 'app/arena/topics.tsx',
     'components/liveArena/DuelPositions.tsx', 'components/liveArena/DuelArgumentReactions.tsx',
     'components/dev/creatorEventDemo/model.ts', 'components/dev/creatorEventDemo/EventStage.tsx',

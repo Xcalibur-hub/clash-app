@@ -1,3 +1,4 @@
+import { releaseAllows } from '../utils/releaseScope';
 /**
  * Vault home composition — Creator Worlds discovery surface.
  * Discover uses list_vault_discover_worlds (no follows required).
@@ -229,7 +230,7 @@ export async function fetchVaultHome(scope: VaultHomeScope = 'discover'): Promis
     courses,
     products,
     continueItems: [],
-    canCreate: Boolean(me),
+    canCreate: Boolean(me) && releaseAllows('creator', 'admit'),
   });
 
   return composed;

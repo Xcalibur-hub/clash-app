@@ -66,6 +66,12 @@ Module._load = function(request, parent, isMain) {
   if (resolved.endsWith('/store/AuthProvider.tsx')) return { useAuth: () => ({ user: { id: 'render-account' } }) };
   if (resolved.endsWith('/hooks/useMediaPicker.ts')) return { useMediaPicker: () => ({ pickImage: async () => null, pickVideo: async () => null }) };
   if (resolved.endsWith('/services/arenaAssistService.ts')) return {};
+  // Personal result reads run in effects, never in this static renderer.
+  // Keep the actual component; refuse network effects at its service boundary.
+  const offlineRead = async () => { throw Error('Unexpected read in static render'); };
+  if (resolved.endsWith('/services/supabaseClient.ts')) return { currentUserId: offlineRead };
+  if (resolved.endsWith('/services/apiService.ts')) return { currentViewerProfileId: offlineRead };
+  if (resolved.endsWith('/services/clashEngineService.ts')) return { fetchClashView: offlineRead, fetchReputationEvents: offlineRead };
   // Step 4A: follow state is fetched in effects, which never run in this render check.
   if (resolved.endsWith('/services/clashFollowService.ts')) return {
     fetchClashFollowState: async () => false,

@@ -1,4 +1,5 @@
 import { currentUserId } from './supabaseClient';
+import { phaseClock } from '../utils/arenaPhaseClock';
 import type { OfficialCursor } from '../utils/officialRecovery';
 /**
  * Live Daily Arena API (Phase 13).
@@ -176,6 +177,8 @@ export interface ArenaResult {
 }
 
 export interface ArenaRoom {
+  /** Local monotonic receipt of a server-derived deadline estimate; display only. */
+  timing?: import('../utils/arenaPhaseClock').PhaseClock;
   roomMode: 'GROUP' | 'DUEL';
   clashId: string | null;
   duel: ArenaDuel | null;
@@ -861,9 +864,20 @@ export async function upgradeSpectator(
 // ── Room + thread ───────────────────────────────────────────────────────────
 
 export async function fetchRoom(roomId: string): Promise<ArenaRoom> {
+  const started = performance.now();
   const { data, error } = await client().rpc('get_arena_room', { p_room_id: roomId });
   if (error) throw requestError(error);
-  return toRoom(data);
+  const received = performance.now(), room = toRoom(data);
+  const raw = asRecord(data), topic = asRecord(raw?.topic ?? null);
+  const seconds = room.phase === 'open' ? raw?.secondsToFinalArguments
+    : room.phase === 'final_arguments' ? raw?.secondsToJudging : raw?.secondsRemaining;
+  const deadline = room.phase === 'open' ? topic?.finalArgumentsAt
+    : room.phase === 'final_arguments' ? topic?.judgingAt : raw?.closesAt;
+  // Do not turn parser defaults for missing fields into a real deadline.
+  if (num(seconds) !== null && millis(deadline) !== null) {
+    room.timing = phaseClock(room, received, received - started);
+  }
+  return room;
 }
 
 /**

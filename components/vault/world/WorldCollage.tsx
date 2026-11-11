@@ -63,6 +63,7 @@ export const WorldCollage = React.memo(function WorldCollage({
             >
               <View style={styles.leadBleed}>
                 <EditorialMedia
+                  accessibilityLabel={`View creator Vault: ${world.name}`}
                   mediaUrl={world.mediaUrl}
                   accent={world.tint}
                   height={310}
@@ -99,6 +100,7 @@ export const WorldCollage = React.memo(function WorldCollage({
               style={[styles.cluster, { marginTop: Math.max(8, scatter) }]}
             >
               <EditorialMedia
+                accessibilityLabel={`View creator Vault: ${world.name}`}
                 mediaUrl={world.mediaUrl}
                 accent={world.tint}
                 height={200}
@@ -120,6 +122,7 @@ export const WorldCollage = React.memo(function WorldCollage({
                 ]}
               >
                 <EditorialMedia
+                  accessibilityLabel={`View creator Vault: ${world.name}`}
                   mediaUrl={world.mediaUrl}
                   accent={world.tint}
                   height={shape === 'circle' ? 148 : 176}
@@ -163,6 +166,7 @@ export const WorldCollage = React.memo(function WorldCollage({
             ]}
           >
             <EditorialMedia
+              accessibilityLabel={`View creator Vault: ${world.name}`}
               mediaUrl={world.mediaUrl}
               accent={world.tint}
               height={shape === 'circle' ? 200 : 240}

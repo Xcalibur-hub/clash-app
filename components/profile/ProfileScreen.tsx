@@ -31,6 +31,7 @@ import { EditProfileSheet } from './EditProfileSheet';
 import { SignOutSheet } from './SignOutSheet';
 import { PostActionsSheet } from '../arena/PostActionsSheet';
 import { tap as hapticTap } from '../../utils/haptics';
+import { useOperationScope } from '../../hooks/useOperationScope';
 
 type ProfileTab = 'takes' | 'replies' | 'clashes';
 
@@ -49,7 +50,8 @@ export interface ProfileScreenProps {
 /** Full profile body — continuous identity page, not a stack of cards. */
 export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenProps): React.JSX.Element {
   const { dispatch, state } = useClash();
-  const { signedIn } = useAuth();
+  const { signedIn, user } = useAuth();
+  const isCurrentEntry = useOperationScope(`${user?.id ?? 'guest'}:${profileId}`);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useThemeColors();
@@ -228,9 +230,9 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
 
   const vaultLabel = hasVault
     ? self
-      ? 'Enter your Vault'
-      : `Enter ${profile.name.split(' ')[0]}'s Vault`
-    : 'Start your Vault';
+      ? 'Read your Vault'
+      : `Read ${profile.name.split(' ')[0]}'s Vault`
+    : 'Browse Vault creators';
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -272,12 +274,12 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
         {hasVault !== null && (hasVault || self) ? (
           <Pressable
             onPress={() => {
+              if (!isCurrentEntry()) return;
               hapticTap();
               if (hasVault) {
-                if (self) router.replace('/(vault)');
-                else router.push(`/vault/${profileId}`);
+                router.push(`/vault/${profileId}`);
               } else {
-                router.replace('/(vault)');
+                router.push('/(vault)');
               }
             }}
             style={[

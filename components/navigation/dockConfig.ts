@@ -34,6 +34,14 @@ export function dockBottomPadding(insetsBottom: number): number {
   return insetsBottom + DOCK_SCROLL_CLEARANCE;
 }
 
+/** Actual floating dock footprint plus a gap; reserve in the Vault scene itself.
+ * Unlike scroll-end padding this protects every card while scrolling. Icons have
+ * a fixed height and do not grow with font scale; content retains normal scaling.
+ */
+export function dockViewportInset(insetsBottom: number): number {
+  return DOCK_HEIGHT + Math.max(insetsBottom, 8) + 8;
+}
+
 export type TabRoute = BottomTabBarProps['state']['routes'][number];
 
 export const ARENA_TABS: Record<string, { label: string; icon: LucideIcon }> = {

@@ -83,8 +83,9 @@ describe('E2.6 D1 — country panel clears the floating Explore modes rail', () 
 
     const screen = read('app/(tabs)/explore.tsx');
     assert.match(screen, /const countryPanelOpen = mode === 'world' && selectedCountry !== null/);
-    assert.match(screen, /expandable=\{exploreRailExpandable\(countryPanelOpen\)\}/);
-    assert.match(screen, /paddingRight: EXPLORE_WORLD_CONTENT_RIGHT/);
+    assert.match(screen, /expandable=\{mode === 'world' && !searching && exploreRailExpandable\(countryPanelOpen\)\}/);
+    assert.match(screen, /paddingRight: mode === 'world' \? EXPLORE_WORLD_CONTENT_RIGHT : EXPLORE_FEED_CONTENT_RIGHT/);
+    assert.match(screen, /paddingRight: EXPLORE_FEED_CONTENT_RIGHT/);
 
     const panel = read('components/explore/WorldCountryPanel.tsx');
     assert.match(panel, /width: layout\.hit/, 'dismiss control must keep its 44dp target');

@@ -21,7 +21,7 @@ export interface SessionInviteProps {
 }
 
 /**
- * Access to the creator — large portrait + editorial type + REQUEST.
+ * Read-only service discovery. Opening details does not request a session.
  * Not a marketplace listing; no inventory card chrome.
  */
 export const SessionInvite = React.memo(function SessionInvite({
@@ -43,10 +43,11 @@ export const SessionInvite = React.memo(function SessionInvite({
             onOpen(item.id);
           }}
           accessibilityRole="button"
-          accessibilityLabel={`Request session: ${item.title}`}
+          accessibilityLabel={`View service details: ${item.title}`}
           style={styles.invite}
         >
           <EditorialMedia
+            accessibilityLabel={`View service details: ${item.title}`}
             mediaUrl={item.mediaUrl}
             accent={item.tint}
             height={168}
@@ -56,7 +57,7 @@ export const SessionInvite = React.memo(function SessionInvite({
           />
           <View style={styles.body}>
             <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
-              {`WORK WITH ${first.toUpperCase()}`}
+              {`SERVICES BY ${first.toUpperCase()}`}
             </Text>
             <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={3}>
               {item.title}
@@ -75,7 +76,7 @@ export const SessionInvite = React.memo(function SessionInvite({
                 <View />
               )}
               <Text allowFontScaling={false} style={[styles.cta, { color: t.textPrimary }]}>
-                REQUEST SESSION →
+                VIEW DETAILS →
               </Text>
             </View>
           </View>

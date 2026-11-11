@@ -28,6 +28,8 @@ import { useRouter } from 'expo-router';
 import { EmptyState } from '../shared/EmptyState';
 import { VaultIcon } from '../shared/icons';
 import { VaultActionButton } from './VaultActionButton';
+import { releaseAllows } from '../../utils/releaseScope';
+import { VaultPublishingAvailability } from './VaultAvailability';
 
 type Phase = 'loading' | 'ready';
 
@@ -72,7 +74,7 @@ export function CreatorCollections(): React.JSX.Element {
   }, [load]);
 
   const create = async (): Promise<void> => {
-    if (!vault || newTitle.trim().length === 0) return;
+    if (!releaseAllows('creator', 'admit') || !vault || newTitle.trim().length === 0) return;
     try {
       await createCollection(vault.id, newTitle.trim());
       setNewTitle('');
@@ -115,15 +117,15 @@ export function CreatorCollections(): React.JSX.Element {
 
   if (!vault) {
     return (
-      <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top }]}>
+      <ScrollView style={[styles.screen, { backgroundColor: t.background }]} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: dockBottomPadding(insets.bottom) }}>
         <EmptyState
           icon={VaultIcon}
-          title="Open your Vault first"
-          body="Collections are permanent chapters inside your Vault."
-          actionLabel="Open Studio"
-          onAction={() => router.push('/vault/studio')}
+          title="New collection publishing unavailable"
+          body="You can still browse existing Vault content."
+          actionLabel="Browse Vault"
+          onAction={() => router.push('/(vault)')}
         />
-      </View>
+      </ScrollView>
     );
   }
 
@@ -148,9 +150,10 @@ export function CreatorCollections(): React.JSX.Element {
           Permanent chapters. Drops expire — these stay.
         </Text>
 
+        <VaultPublishingAvailability />
         <View style={styles.newRow}>
           <TextInput
-            value={newTitle}
+            editable={releaseAllows('creator', 'admit')} value={newTitle}
             onChangeText={setNewTitle}
             maxLength={80}
             placeholder="New Collection title"
@@ -166,7 +169,7 @@ export function CreatorCollections(): React.JSX.Element {
             ]}
             onSubmitEditing={() => void create()}
           />
-          <VaultActionButton label="Create" compact onPress={() => void create()} />
+          <VaultActionButton admission="creator" label="Create" compact onPress={() => void create()} />
         </View>
 
         {collections.length === 0 ? (
@@ -209,7 +212,7 @@ export function CreatorCollections(): React.JSX.Element {
                       </Text>
                     </View>
                     <VaultActionButton
-                      label="Add"
+                      admission="creator" label="Add"
                       tone="quiet"
                       compact
                       onPress={() => setPickerFor(collection.id)}

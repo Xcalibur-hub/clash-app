@@ -50,6 +50,7 @@ export const PosterStrip = React.memo(function PosterStrip({
         return (
           <View style={[styles.frame, { width: frameWidth, marginTop: Math.max(0, offset) }]}>
             <EditorialMedia
+              accessibilityLabel={`Read Drop: ${item.title}`}
               mediaUrl={item.mediaUrl}
               accent={item.tint}
               height={frameHeight}

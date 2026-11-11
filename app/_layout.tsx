@@ -114,7 +114,7 @@ function RootLayout(): React.JSX.Element {
 /** The offline visual route must not be covered by a failed interest read. */
 function NormalArenaOverlays(): React.JSX.Element | null {
   const path = usePathname();
-  if (path === '/demo-arena' && arenaDemoAllowed(__DEV__, Constants.expoConfig?.extra?.appVariant)) return null;
+  if ((path === '/demo-arena' || path === '/dev-arena-preview') && arenaDemoAllowed(__DEV__, Constants.expoConfig?.extra?.appVariant)) return null;
   return <><InterestOnboardingGate /><LocalSupabaseBadge /></>;
 }
 

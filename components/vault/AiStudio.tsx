@@ -135,6 +135,7 @@ export function AiStudio(): React.JSX.Element {
           </Text>
           <View style={styles.rowActions}>
             <VaultActionButton
+              admission={enabled ? undefined : 'ai'}
               label={busy ? 'Saving…' : enabled ? 'Switch off' : 'Switch on'}
               tone={enabled ? 'quiet' : 'solid'}
               compact
@@ -173,11 +174,11 @@ export function AiStudio(): React.JSX.Element {
 
       <View style={styles.rowActions}>
         <VaultActionButton
-          label={config?.hasProfile ? 'Edit configuration' : 'Create your AI'}
+          admission={config?.hasProfile ? undefined : 'ai'} label={config?.hasProfile ? 'Edit configuration' : 'Create your AI'}
           onPress={() => setProfileOpen(true)}
         />
         <VaultActionButton
-          label="Add knowledge"
+          admission="ai" label="Add knowledge"
           tone="quiet"
           compact
           onPress={() => setKnowledgeOpen(true)}

@@ -6,6 +6,7 @@
 -- action vocabulary, private media and ended interactions.
 -- ============================================================================
 begin;
+set local search_path=public,extensions;
 select no_plan();
 
 reset role;
@@ -29,6 +30,16 @@ select is(has_table_privilege('authenticated', 'public.creator_live_sessions', '
 select is(has_table_privilege('authenticated', 'public.creator_live_viewers', 'SELECT'), false, 'the watch roster is never readable');
 select is(has_function_privilege('anon', 'public.creator_live_session_card(public.creator_live_sessions,text)', 'EXECUTE'), false, 'the raw card builder stays internal');
 
+-- Rollback-only owner fixtures represent reviewed EXISTING sessions.
+-- Never infer continuation from visibility, presence or ballots.
+do $$ begin
+ if exists(select 1 from public.profiles where id in ('lv-maya','lv-fan','lv-blocked','lv-expired','lv-other'))
+    or exists(select 1 from auth.users where id in
+      ('00000000-0000-0000-0000-00000000f501','00000000-0000-0000-0000-00000000f502',
+       '00000000-0000-0000-0000-00000000f503','00000000-0000-0000-0000-00000000f504','00000000-0000-0000-0000-00000000f505')) then
+   raise exception 'Creator Live historical fixture collision';
+ end if;
+end $$;
 -- Fixtures
 insert into auth.users (id) values
   ('00000000-0000-0000-0000-00000000f501'),
@@ -57,9 +68,9 @@ insert into public.blocks (blocker_id, blocked_id) values ('lv-blocked', 'lv-fan
 
 -- â”€â”€ Creator-owned lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f501","role":"authenticated"}', true);
-select lives_ok(
+select throws_ok(
   $$ select public.create_creator_live_session('We are filming Episode 05', 'Basement or attic?', 'FREE', null, 'lv-cover', true, true, true, true, null, 'standby') $$,
-  'a creator creates their own session'
+  'P0006', null, 'a creator cannot create a new session while admission is closed'
 );
 select throws_ok(
   $$ select public.create_creator_live_session('Private cover', '', 'FREE', null, 'lv-priv', true, true, true, true, null, 'standby') $$,
@@ -70,7 +81,23 @@ select throws_ok(
   'P0003', null, 'a real provider needs an https url'
 );
 
-select (public.create_creator_live_session('We are filming Episode 05', 'Basement or attic?', 'FREE', null, 'lv-cover', true, true, true, true, null, 'standby')).id as free_session_id \gset
+-- These are trusted test-owner fixtures, not an admission RPC bypass claim.
+insert into public.creator_live_sessions
+ (id,creator_id,vault_id,title,access,status,started_at,allow_crowd_actions,allow_game_actions)
+values ('lv-existing-free','lv-maya','lv-maya-vault','Retained fictional free session','FREE','LIVE',now(),true,true),
+ ('lv-existing-sub','lv-maya','lv-maya-vault','Retained fictional subscriber session','SUBSCRIBER','LIVE',now(),false,false),
+ ('lv-existing-blocked','lv-blocked','lv-blocked-vault','Retained fictional blocked session','FREE','LIVE',now(),false,false);
+insert into public.creator_live_sessions(id,creator_id,vault_id,title,status)
+values('lv-not-started','lv-maya','lv-maya-vault','Fictional scheduled session','SCHEDULED');
+-- All identities below have explicit fixture provenance, not inferred approval.
+insert into public.creator_live_continuation_approvals(session_id,profile_id,capability,evidence_ref,expires_at)
+select sid,pid,case when pid='lv-maya' then 'HOST' else 'VIEWER' end,
+ '043 rollback-only existing-participant evidence',clock_timestamp()+interval '1 hour'
+from unnest(array['lv-existing-free','lv-existing-sub']) sid
+cross join unnest(array['lv-maya','lv-fan','lv-expired','lv-other']) pid;
+select throws_ok($$select public.start_creator_live_session('lv-not-started')$$,
+ 'P0006',null,'new start remains closed despite owning the Vault');
+select 'lv-existing-free'::text as free_session_id \gset
 select ((public.start_creator_live_session(:'free_session_id')).status) as started;
 
 -- Cross-creator denial: another creator can neither start nor end it.
@@ -159,7 +186,7 @@ select is(
 
 -- â”€â”€ Subscriber-only access, enforced server-side â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f501","role":"authenticated"}', true);
-select (public.create_creator_live_session('Members only session', 'Behind the curtain', 'SUBSCRIBER', null, null, true, true, false, false, null, 'standby')).id as sub_session_id \gset
+select 'lv-existing-sub'::text as sub_session_id \gset
 select ((public.start_creator_live_session(:'sub_session_id')).status) as sub_started;
 select (public.create_creator_live_interaction(:'sub_session_id', 'CHOICE', 'Heavy or minimal?', '[{"id":"heavy","label":"Heavy drums"},{"id":"minimal","label":"Minimal drums"}]'::jsonb, null, null, null)).id as sub_choice_id \gset
 
@@ -186,7 +213,7 @@ select throws_ok(
 
 -- â”€â”€ Blocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f503","role":"authenticated"}', true);
-select (public.create_creator_live_session('Blocked broadcast', '', 'FREE', null, null, true, true, false, false, null, 'standby')).id as blocked_session_id \gset
+select 'lv-existing-blocked'::text as blocked_session_id \gset
 select ((public.start_creator_live_session(:'blocked_session_id')).status) as blocked_started;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f502","role":"authenticated"}', true);
 select is(public.get_creator_live_session(:'blocked_session_id'), null, 'a blocked creator is invisible');
@@ -213,7 +240,7 @@ select throws_ok(
 -- The viewer-safe event log replays after a reconnect, and the report path
 -- reuses the shared pipeline.
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f502","role":"authenticated"}', true);
-select is(jsonb_array_length(public.creator_live_events_since(:'free_session_id', null, 60)) > 0, true, 'the event log is replayable');
+select is(jsonb_array_length(public.creator_live_events_since(:'free_session_id', null, 60)) > 0, true, 'available event hints are readable (not a lossless replay claim)');
 select is(
   (public.report_creator_live_session(:'sub_session_id', 'spam', null)) like 'rpt_%',
   true, 'a visible session can be reported'

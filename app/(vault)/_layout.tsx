@@ -6,11 +6,14 @@ import { useRealmSwitch } from '../../components/navigation/useRealmSwitch';
 import { REALM_ROUTES } from '../../components/navigation/realmRoutes';
 import { ArenaIcon } from '../../components/shared/icons';
 import { useThemeColors } from '../../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { dockViewportInset } from '../../components/navigation/dockConfig';
 
 /** Vault realm: Creator Worlds, Collections studio, Profile. */
 export default function VaultLayout(): React.JSX.Element {
   const { shifting, first, direction, shiftTo } = useRealmSwitch();
   const t = useThemeColors();
+  const insets = useSafeAreaInsets();
   return (
     <>
       <Tabs
@@ -25,7 +28,7 @@ export default function VaultLayout(): React.JSX.Element {
         )}
         screenOptions={{
           headerShown: false,
-          sceneStyle: { backgroundColor: t.background },
+          sceneStyle: { backgroundColor: t.background, paddingBottom: dockViewportInset(insets.bottom) },
         }}
       >
         <Tabs.Screen name="index" options={{ title: 'Worlds' }} />

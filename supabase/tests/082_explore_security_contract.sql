@@ -77,6 +77,10 @@ insert into vault_drops(id,vault_id,creator_id,caption,media_object_id,access_le
  ('es-v-deleted-teaser','es-vault','es-a','Deleted teaser','es-private','subscriber','published',now(),now()+interval '7 days','es-deleted'),
  ('es-v-expired','es-vault','es-a','Expired','es-ready','free','published',now()-interval '8 days',now()-interval '1 day',null);
 update media_objects set deleted_at=now() where id='es-deleted';
+-- Trusted synthetic pre-existing participation: retain the original cross-owner
+-- media and future-window assertions without enabling new beta admission.
+insert into public.explore_challenge_participants(challenge_id,profile_id)
+ values('es-ch','es-b'),('es-ch-future','es-b');
 select set_config('role','anon',true);
 select ok(public.list_explore_vault_previews(40)::text like '%es-v-free%','public free media remains visible');
 select ok(public.list_explore_vault_previews(40)::text like '%es-v-teaser%','intentional subscriber teaser remains visible');

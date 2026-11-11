@@ -14,30 +14,38 @@ type InterestDatabase = Omit<Database, 'public'> & { public: Omit<Database['publ
 function client(): SupabaseClient<InterestDatabase> { return requireSupabase() as unknown as SupabaseClient<InterestDatabase>; }
 async function timed<T>(request: (signal: AbortSignal) => PromiseLike<T>): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15_000);
-  try { return await request(controller.signal); } finally { clearTimeout(timer); }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new SupabaseError('Request timed out. Check saved interests before retrying.', 'timeout'));
+      controller.abort();
+    }, 15_000);
+  });
+  try { return await Promise.race([request(controller.signal), deadline]); } finally { clearTimeout(timer); }
 }
 export async function fetchInterestCatalogue() {
   const { data, error } = await timed(signal => client().rpc('get_arena_interest_catalogue', {}).abortSignal(signal));
   if (error) throw requestError(error);
   return parseInterestCatalogue(data);
 }
-export async function fetchMyArenaInterests() {
+export async function fetchMyArenaInterests(expectedAccountId?: string) {
+  if (expectedAccountId && await currentUserId() !== expectedAccountId) throw new SupabaseError('Account changed. Reopen Interests.', 'account_changed');
   const { data, error } = await timed(signal => client().rpc('get_my_arena_interests', {}).abortSignal(signal));
   if (error) throw requestError(error);
+  if (expectedAccountId && await currentUserId() !== expectedAccountId) throw new SupabaseError('Account changed. Reopen Interests.', 'account_changed');
   return parseInterestPreferences(data);
 }
-export async function saveMyArenaInterests(topicIds: readonly string[], skip: boolean, revision: number, expectedAccountId: string) {
-  if (await currentUserId() !== expectedAccountId) throw new SupabaseError('Account changed. Reopen Interests.', 'account_changed');
+export async function saveMyArenaInterests(topicIds: readonly string[], skip: boolean, revision: number, expectedAccountId: string, isActive: () => boolean = () => true) {
+  if (await currentUserId() !== expectedAccountId || !isActive()) throw new SupabaseError('Account changed. Reopen Interests.', 'account_changed');
   const { data, error } = await timed(signal => client().rpc('save_my_arena_interests', {
     p_topic_ids: [...topicIds], p_skip: skip, p_expected_revision: revision,
   }).abortSignal(signal));
   if (error) throw requestError(error);
-  if (await currentUserId() !== expectedAccountId) throw new SupabaseError('Account changed. Reopen Interests.', 'account_changed');
+  if (await currentUserId() !== expectedAccountId || !isActive()) throw new SupabaseError('Account changed. Reopen Interests.', 'account_changed');
   return parseInterestPreferences(data);
 }
 export async function fetchPersonalizedArenaTakes(snapshotIds?: readonly string[]) {
-  const { data, error } = await client().rpc('rank_arena_for_you', snapshotIds ? { p_ids: [...snapshotIds] } : {});
+  const { data, error } = await timed(signal => client().rpc('rank_arena_for_you', snapshotIds ? { p_ids: [...snapshotIds] } : {}).abortSignal(signal));
   if (error) throw requestError(error);
   if (!Array.isArray(data)) throw new Error('Invalid personalized feed');
   return data.map(row => toTake(row as unknown as TableRow<'takes'>));

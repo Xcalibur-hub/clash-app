@@ -25,6 +25,7 @@ export interface CommentThreadProps {
   nodes: CommentNode[];
   takeAuthorId?: string;
   readOnly?: boolean;
+  canChallenge?: boolean;
   onUpvote: (comment: ChallengerComment) => void;
   onReply: (comment: ChallengerComment) => void;
   onClash: (comment: ChallengerComment) => void;
@@ -38,6 +39,7 @@ export function CommentThread({
   nodes,
   takeAuthorId,
   readOnly,
+  canChallenge,
   onUpvote,
   onReply,
   onClash,
@@ -57,7 +59,7 @@ export function CommentThread({
           node={node}
           depth={0}
           takeAuthorId={takeAuthorId}
-          readOnly={readOnly}
+          readOnly={readOnly} canChallenge={canChallenge}
           onUpvote={onUpvote}
           onReply={onReply}
           onClash={onClash}
@@ -86,7 +88,7 @@ export function CommentThread({
 export function CommentBranch(props: Omit<CommentThreadProps, 'nodes'> & { node: CommentNode }): React.JSX.Element {
   return <CommentItem node={props.node} depth={0} takeAuthorId={props.takeAuthorId}
     onUpvote={props.onUpvote} onReply={props.onReply}
-    onClash={props.onClash} onMore={props.onMore} readOnly={props.readOnly} serverReplies={props.serverReplies} locallyCreated={props.locallyCreated} />;
+    onClash={props.onClash} onMore={props.onMore} readOnly={props.readOnly} canChallenge={props.canChallenge} serverReplies={props.serverReplies} locallyCreated={props.locallyCreated} />;
 }
 
 interface CommentItemProps {
@@ -97,6 +99,7 @@ interface CommentItemProps {
   depth: number;
   takeAuthorId?: string;
   readOnly?: boolean;
+  canChallenge?: boolean;
   onUpvote: (comment: ChallengerComment) => void;
   onReply: (comment: ChallengerComment) => void;
   onClash: (comment: ChallengerComment) => void;
@@ -106,6 +109,7 @@ interface CommentItemProps {
 const CommentItem = React.memo(function CommentItem({
   node,
   readOnly = false,
+  canChallenge = false,
   depth,
   serverReplies,
   parentHandle,
@@ -280,7 +284,7 @@ const CommentItem = React.memo(function CommentItem({
                 Reply
               </Text>
             </Pressable>
-            {isViewer && !readOnly ? (
+            {canChallenge && isViewer && !isOp && !readOnly ? (
               <PressableScale
                 onPress={() => {
                   hapticTap();
@@ -341,7 +345,7 @@ const CommentItem = React.memo(function CommentItem({
               key={child.comment.id}
               node={child}
               depth={depth + 1}
-              readOnly={readOnly}
+              readOnly={readOnly} canChallenge={canChallenge}
               takeAuthorId={takeAuthorId}
               onUpvote={onUpvote}
               onReply={onReply}

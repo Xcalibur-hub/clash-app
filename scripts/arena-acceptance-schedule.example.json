@@ -1,0 +1,220 @@
+{
+  "//": "EXAMPLE DRY-RUN CONFIG — no real IDs, hashes or credentials. Offsets are minutes from server opens_at. This file cannot authorize a live run.",
+  "description": "Illustrative step table for the hardened Arena acceptance scheduler.",
+  "mode": "dry-run",
+  "authorization": {
+    "approved": false,
+    "manifestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "expiresAt": 0,
+    "budget": {
+      "fixture": 1,
+      "spectator": 2,
+      "official": 4,
+      "crowd": 4,
+      "ballot": 2,
+      "settle": 2,
+      "gateway": 1
+    },
+    "attemptCaps": {
+      "official": 4,
+      "crowd": 4,
+      "ballot": 4,
+      "settle": 2,
+      "spectator": 2
+    }
+  },
+  "steps": [
+    {
+      "id": "S2-C-watch",
+      "offsetMin": 0.5,
+      "phase": "open",
+      "effect": "device_write",
+      "budgetKey": "spectator",
+      "handler": "watchC",
+      "requiresHealth": true
+    },
+    {
+      "id": "S2-D-watch",
+      "offsetMin": 0.5,
+      "phase": "open",
+      "effect": "api_write",
+      "budgetKey": "spectator",
+      "handler": "watchD"
+    },
+    {
+      "id": "S3-A-official-open",
+      "offsetMin": 2,
+      "phase": "open",
+      "effect": "api_write",
+      "budgetKey": "official",
+      "handler": "officialAOpen"
+    },
+    {
+      "id": "S3-B-official-open",
+      "offsetMin": 2,
+      "phase": "open",
+      "effect": "api_write",
+      "budgetKey": "official",
+      "handler": "officialBOpen"
+    },
+    {
+      "id": "S4-capture-open",
+      "offsetMin": 3,
+      "phase": "open",
+      "effect": "device_read",
+      "handler": "shotOpen",
+      "requiresHealth": true
+    },
+    {
+      "id": "S5-C-crowd-open",
+      "offsetMin": 4,
+      "phase": "open",
+      "effect": "device_write",
+      "budgetKey": "crowd",
+      "handler": "crowdCOpen",
+      "requiresHealth": true
+    },
+    {
+      "id": "S6-D-crowd-open",
+      "offsetMin": 10,
+      "phase": "open",
+      "effect": "api_write",
+      "budgetKey": "crowd",
+      "handler": "crowdDOpen"
+    },
+    {
+      "id": "S6b-capture-remote",
+      "offsetMin": 10.5,
+      "phase": "open",
+      "effect": "device_read",
+      "handler": "shotRemote",
+      "requiresHealth": true
+    },
+    {
+      "id": "S7-A-official-final",
+      "offsetMin": 20.5,
+      "phase": "final_arguments",
+      "effect": "api_write",
+      "budgetKey": "official",
+      "handler": "officialAFinal"
+    },
+    {
+      "id": "S7-B-official-final",
+      "offsetMin": 20.5,
+      "phase": "final_arguments",
+      "effect": "api_write",
+      "budgetKey": "official",
+      "handler": "officialBFinal"
+    },
+    {
+      "id": "S8-capture-final",
+      "offsetMin": 21.5,
+      "phase": "final_arguments",
+      "effect": "device_read",
+      "handler": "shotFinal",
+      "requiresHealth": true
+    },
+    {
+      "id": "S9-C-crowd-final",
+      "offsetMin": 22.5,
+      "phase": "final_arguments",
+      "effect": "device_write",
+      "budgetKey": "crowd",
+      "handler": "crowdCFinal",
+      "requiresHealth": true
+    },
+    {
+      "id": "S10-D-crowd-final",
+      "offsetMin": 23.5,
+      "phase": "final_arguments",
+      "effect": "api_write",
+      "budgetKey": "crowd",
+      "handler": "crowdDFinal"
+    },
+    {
+      "id": "S11-capture-judging",
+      "offsetMin": 25.5,
+      "phase": "judging",
+      "effect": "device_read",
+      "handler": "shotJudging",
+      "requiresHealth": true
+    },
+    {
+      "id": "S12-C-ballot",
+      "offsetMin": 26,
+      "phase": "judging",
+      "effect": "device_write",
+      "budgetKey": "ballot",
+      "handler": "ballotC",
+      "requiresHealth": true
+    },
+    {
+      "id": "S12-D-ballot",
+      "offsetMin": 26,
+      "phase": "judging",
+      "effect": "api_write",
+      "budgetKey": "ballot",
+      "handler": "ballotD"
+    },
+    {
+      "id": "S13-D-duplicate-ballot",
+      "offsetMin": 27,
+      "phase": "judging",
+      "effect": "api_write",
+      "budgetKey": "ballot",
+      "handler": "ballotDDuplicate",
+      "expect": "rejected",
+      "expectCode": "already_judged"
+    },
+    {
+      "id": "S14-C-duplicate-ballot",
+      "offsetMin": 28,
+      "phase": "judging",
+      "effect": "device_write",
+      "budgetKey": "ballot",
+      "handler": "ballotCDuplicate",
+      "requiresHealth": true,
+      "expect": "rejected",
+      "expectCode": "already_judged"
+    },
+    {
+      "id": "S15-settle",
+      "offsetMin": 30.1,
+      "phase": "closed",
+      "effect": "api_write",
+      "budgetKey": "settle",
+      "handler": "settleFirst"
+    },
+    {
+      "id": "S16-settle-replay",
+      "offsetMin": 30.3,
+      "phase": "closed",
+      "effect": "api_write",
+      "budgetKey": "settle",
+      "handler": "settleReplay"
+    },
+    {
+      "id": "S17-capture-verdict",
+      "offsetMin": 31,
+      "phase": "closed",
+      "effect": "device_read",
+      "handler": "shotVerdict",
+      "requiresHealth": true
+    },
+    {
+      "id": "S19-capture-reentry",
+      "offsetMin": 33,
+      "phase": "closed",
+      "effect": "device_read",
+      "handler": "shotReentry",
+      "requiresHealth": true
+    },
+    {
+      "id": "S20-final-inspection",
+      "offsetMin": 35,
+      "phase": "closed",
+      "effect": "read",
+      "handler": "inspectFinal"
+    }
+  ]
+}

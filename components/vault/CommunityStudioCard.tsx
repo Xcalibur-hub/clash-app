@@ -51,17 +51,19 @@ export function CommunityStudioCard({
           </>
         ) : (
           <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
-            Give your fans a room inside your world — announcements and discussion.
+            New communities are unavailable in this beta. Existing authorized community access is preserved.
           </Text>
         )}
         <View style={styles.actions}>
           <VaultActionButton
+            admission={community ? undefined : 'creator'}
             label={community ? 'Edit' : 'Enable community'}
             onPress={onEdit}
             style={busy ? styles.disabled : undefined}
           />
           {community ? (
             <VaultActionButton
+              admission={community.status === 'active' ? undefined : 'creator'}
               label={community.status === 'active' ? 'Disable' : 'Enable'}
               tone="quiet"
               onPress={onToggle}

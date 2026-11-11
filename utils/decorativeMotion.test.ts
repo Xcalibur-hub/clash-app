@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 import {
   DECORATIVE_MOTION_ENV,
   DECORATIVE_MOTION_FROZEN,
+  VISUAL_COUNTDOWN_PAUSED,
   decorativeMotionFrozen,
+  visualCountdownPaused,
 } from './decorativeMotion.ts';
 
 describe('decorative motion freeze flag', () => {
@@ -33,5 +35,13 @@ describe('decorative motion freeze flag', () => {
   it('resolves to off outside a development build (this test process)', () => {
     // `__DEV__` does not exist under node: the production rule must hold.
     assert.equal(DECORATIVE_MOTION_FROZEN, false);
+    assert.equal(VISUAL_COUNTDOWN_PAUSED, false);
+  });
+
+  it('pauses visual countdown ticks only in dev mode with explicit =1 flag', () => {
+    assert.equal(visualCountdownPaused({ isDev: true, flag: '1' }), true);
+    assert.equal(visualCountdownPaused({ isDev: true, flag: undefined }), false);
+    assert.equal(visualCountdownPaused({ isDev: true, flag: '0' }), false);
+    assert.equal(visualCountdownPaused({ isDev: false, flag: '1' }), false);
   });
 });

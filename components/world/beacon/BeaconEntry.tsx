@@ -10,7 +10,7 @@ export function BeaconEntry(): React.JSX.Element | null {
   if (!arenaDemoAllowed(typeof __DEV__ !== 'undefined' && __DEV__, Constants.expoConfig?.extra?.appVariant)) return null;
   return <Pressable accessibilityRole="button" accessibilityLabel="Explore The Lost Beacon fictional local mission" onPress={() => router.push('/world/beacon')}
     style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-    <Text style={[styles.meta, { color: t.textMuted }]}>WORLD LAB / LOCAL FICTION</Text>
+    <Text style={[styles.meta, { color: t.textMuted }]}>WORLD LAB / LOCAL DEMO</Text>
     <Text style={[styles.title, { color: t.textPrimary }]}>The Lost Beacon</Text>
     <Text style={[styles.body, { color: t.textSecondary }]}>Explore Aster Reach. Follow three trails, collect evidence and restore a forgotten light.</Text>
     <Text style={[styles.meta, { color: t.textMuted }]}>No GPS, real places, saved progress or rewards.</Text>

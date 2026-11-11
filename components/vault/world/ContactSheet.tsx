@@ -45,6 +45,7 @@ export const ContactSheet = React.memo(function ContactSheet({
                 ]}
               >
                 <EditorialMedia
+                  accessibilityLabel={`Read Drop: ${item.title}`}
                   mediaUrl={item.mediaUrl}
                   accent={item.tint}
                   height={158}

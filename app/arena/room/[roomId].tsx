@@ -179,6 +179,7 @@ function RoomScope(): React.JSX.Element {
     hasOlder,
     roomFullOnUpgrade,
     refresh,
+    refreshResult,
     loadOlder,
     send,
     react,
@@ -818,7 +819,7 @@ function RoomScope(): React.JSX.Element {
     <DuelRoomExperience key={room.roomId} room={room} messages={messages} evidence={evidence}
       paddingTop={insets.top} paddingBottom={insets.bottom} spectatorCount={backup.load?.spectatorCount ?? null}
       loading={loading} refreshing={refreshing} loadingOlder={loadingOlder} hasOlder={hasOlder} threadLocked={threadLocked} error={error}
-      composer={bottom} onRefresh={refresh} onLoadOlder={loadOlder}
+      composer={bottom} onRefresh={refresh} onRefreshResult={refreshResult} onLoadOlder={loadOlder}
       onRequireAuth={() => { requireAuth(); }}
       onWatch={async () => { if (!requireAuth()) return; await watchRoom(room.roomId); await refresh(); }}
       onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
@@ -827,7 +828,11 @@ function RoomScope(): React.JSX.Element {
       nextBusy={nextBusy}
       nextNotice={nextNotice}
       onOpenNext={nextClash ? openNextClash : undefined}
-      onJudge={async side => { await submitJudgement(room.duel!.clashId, side); await refresh(); }}
+      onJudge={async side => {
+        await submitJudgement(room.duel!.clashId, side);
+        // A failed display refresh must not masquerade as a rejected ballot write.
+        void refreshResult().catch(() => undefined);
+      }}
       onReply={message => { setReplyTo(message); setComposerFocus(n => n + 1); }}
       onExpressiveReply={(message, mode) => { setReplyTo(message); setExpressiveTab(mode === 'gif' ? 'gifs' : mode === 'meme' ? 'memes' : 'stickers'); setComposerFocus(n => n + 1); }}
       onReact={(message, emoji) => { void react(message.id, emoji); }} onOpenProfile={openProfile}
@@ -1038,9 +1043,9 @@ function RoomScope(): React.JSX.Element {
                 </View>
               ) : null}
               {bottom}
-              {room.duel ? <DuelRoomOutcome duel={room.duel} phase={room.phase} onJudge={async side => {
+              {room.duel ? <DuelRoomOutcome duel={room.duel} phase={room.phase} onRefreshResult={refreshResult} onJudge={async side => {
                 await submitJudgement(room.duel!.clashId, side);
-                await refresh();
+                void refreshResult().catch(() => undefined);
               }} /> : null}
             </View>
           </>

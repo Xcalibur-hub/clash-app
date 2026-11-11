@@ -73,6 +73,8 @@ export interface LiveArenaRoomController {
   /** True after a capacity rejection on upgrade â€” user stays spectator. */
   roomFullOnUpgrade: boolean;
   refresh: () => Promise<void>;
+  /** Result-only read: no thread recovery, heartbeat, pulse or mutation. */
+  refreshResult: () => Promise<void>;
   loadOlder: () => Promise<void>;
   /** Optimistic; rolls the placeholder back and surfaces a notice on failure. */
   send: (input: Omit<PostArenaMessageInput, 'roomId'>) => Promise<boolean>;
@@ -562,6 +564,24 @@ export function useLiveArenaRoom(
     [clearPrivateThread, liveSession],
   );
 
+  const resultReadBusy = React.useRef(false);
+  const refreshResult = React.useCallback(async (): Promise<void> => {
+    const session = sessionRef.current;
+    if (resultReadBusy.current || session.roomId !== roomId || !liveSession(session)) return;
+    resultReadBusy.current = true;
+    try {
+      const owner = await currentUserId();
+      if (!liveSession(session)) return;
+      const next = await fetchRoom(session.roomId);
+      if (await currentUserId() === owner && liveSession(session)) { setRoom(next); setError(null); }
+    } catch (caught) {
+      if (liveSession(session)) {
+        if (isMembershipRefusal(caught)) { clearPrivateThread(); setRoom(null); }
+        throw caught;
+      }
+    } finally { resultReadBusy.current = false; }
+  }, [clearPrivateThread, liveSession, roomId]);
+
   const refresh = React.useCallback(async () => {
     const session = sessionRef.current;
     if (session.roomId !== roomId || !liveSession(session) || refreshBusy.current) return;
@@ -1001,6 +1021,7 @@ export function useLiveArenaRoom(
     hasOlder,
     roomFullOnUpgrade,
     refresh,
+    refreshResult,
     loadOlder,
     send,
     react,

@@ -18,3 +18,11 @@ export function VaultAvailability({ state, detail }: { state: VaultAvailabilityS
     </Text> : null}
   </View>;
 }
+
+/** Admission availability, independent of existing content entitlement above. */
+export function VaultPublishingAvailability(): React.JSX.Element {
+  const t = useThemeColors();
+  return <Text style={{ ...typeScale.meta, color: t.textSecondary }}>
+    Browse public free content and your authorized library. New publishing, purchases and creator hosting are unavailable in this beta.
+  </Text>;
+}

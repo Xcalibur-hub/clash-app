@@ -80,10 +80,9 @@ export function LiveStudio(): React.JSX.Element {
         LIVE
       </Text>
       <Text allowFontScaling={false} style={[styles.blurb, { color: t.textSecondary }]}>
-        Go live, then open polls, choices and crowd actions. Viewers can only affect what you
-        allow — the server counts every vote.
+        New hosting and participation are unavailable in this beta. Existing sessions and authorized terminal controls remain accessible.
       </Text>
-      <VaultActionButton label="Go live" onPress={() => setFormOpen(true)} />
+      <VaultActionButton admission="live" label="Go live" onPress={() => setFormOpen(true)} />
 
       {sessions.length === 0 ? (
         <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
@@ -123,7 +122,7 @@ export function LiveStudio(): React.JSX.Element {
               <View style={styles.rowActions}>
                 {session.status === 'SCHEDULED' ? (
                   <VaultActionButton
-                    label="Start live"
+                    admission="live" label="Start live"
                     compact
                     onPress={() =>
                       void run(() => startCreatorLiveSession(session.id), 'You are live.')

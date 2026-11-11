@@ -1,4 +1,6 @@
 import React from 'react';
+import Constants from 'expo-constants';
+import { arenaDemoAllowed } from '../utils/arenaDemoGate';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -71,9 +73,12 @@ export default function AuthScreen(): React.JSX.Element {
   const router = useRouter();
   const t = useThemeColors();
   const { signedIn, requestOtp, verifyOtp, isLocalSupabase, signInWithPasswordLocal } = useAuth();
+  const issuedCodeEntry = isLocalSupabase &&
+    arenaDemoAllowed(__DEV__, Constants.expoConfig?.extra?.appVariant) &&
+    process.env.EXPO_PUBLIC_LOCAL_ISSUED_OTP === '1';
 
   const [step, setStep] = React.useState<'email' | 'code'>('email');
-  const [email, setEmail] = React.useState(isLocalSupabase ? 'dev@clash.local' : '');
+  const [email, setEmail] = React.useState(isLocalSupabase && !issuedCodeEntry ? 'dev@clash.local' : '');
   const [password, setPassword] = React.useState('');
   const [code, setCode] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -176,7 +181,9 @@ export default function AuthScreen(): React.JSX.Element {
           <View style={styles.head}>
             <Text style={[styles.wordmark, { color: t.textPrimary }]}>CLASH</Text>
             <Text style={[styles.sub, { color: t.textSecondary }]}>
-              {isLocalSupabase
+              {issuedCodeEntry
+                ? 'Isolated development sign-in.'
+                : isLocalSupabase
                 ? 'Local Supabase — use the seeded developer account.'
                 : step === 'email'
                   ? 'Say what everyone else is thinking.'
@@ -216,7 +223,15 @@ export default function AuthScreen(): React.JSX.Element {
                 ]}
                 accessibilityLabel="Email address"
               />
-              {isLocalSupabase ? (
+              {issuedCodeEntry ? (
+                <PrimaryButton
+                  label="Use issued development code"
+                  onPress={() => { setCode(''); setError(null); setStep('code'); }}
+                  disabled={!emailValid || busy}
+                  fill={t.clashFill}
+                  text={t.clashText}
+                />
+              ) : isLocalSupabase ? (
                 <>
                   <Text style={[styles.label, { color: t.textMuted }]}>Password (local only)</Text>
                   <TextInput
@@ -269,7 +284,7 @@ export default function AuthScreen(): React.JSX.Element {
           ) : (
             <View style={styles.form}>
               <Text style={[styles.codeHint, { color: t.textSecondary }]}>
-                We sent a code to{'\n'}
+                {issuedCodeEntry ? 'Enter the issued code for' : 'We sent a code to'}{'\n'}
                 <Text style={{ color: t.textPrimary, fontWeight: '600' }}>{email.trim()}</Text>
               </Text>
               <Text style={[styles.label, { color: t.textMuted }]}>Code</Text>
@@ -298,6 +313,7 @@ export default function AuthScreen(): React.JSX.Element {
                   },
                 ]}
                 accessibilityLabel="Verification code"
+                secureTextEntry={issuedCodeEntry}
               />
               <PrimaryButton
                 label={busy ? 'Verifying…' : 'Verify'}
@@ -308,12 +324,12 @@ export default function AuthScreen(): React.JSX.Element {
                 text={t.clashText}
               />
               <View style={styles.codeActions}>
-                <TextButton
+                {!issuedCodeEntry ? <TextButton
                   label={cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
                   onPress={() => void sendCode()}
                   disabled={busy || cooldown > 0}
                   color={t.textSecondary}
-                />
+                /> : null}
                 <TextButton
                   label="Change email"
                   onPress={() => {

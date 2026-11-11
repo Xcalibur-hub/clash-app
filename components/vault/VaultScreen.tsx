@@ -142,13 +142,13 @@ export function VaultScreen({ creatorId, hideSafeTop = false }: VaultScreenProps
             isBlocked
               ? 'You can not see this Vault right now.'
               : isNone && mine
-                ? 'Share something your followers will not find in Arena.'
+                ? 'Publishing is unavailable in this beta. You can browse existing creators.'
                 : isNone
                   ? 'This creator has not opened their Vault yet.'
                   : 'This Vault could not be loaded.'
           }
-          actionLabel={isNone && mine ? 'Create first Drop' : world.phase === 'error' ? 'Try again' : undefined}
-          onAction={isNone && mine ? () => router.replace('/vault/studio') : world.phase === 'error' ? world.retry : undefined}
+          actionLabel={isNone && mine ? 'Browse Vault' : world.phase === 'error' ? 'Try again' : undefined}
+          onAction={isNone && mine ? () => router.push('/(vault)') : world.phase === 'error' ? world.retry : undefined}
         />
       </View>
     );

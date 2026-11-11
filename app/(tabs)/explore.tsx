@@ -73,7 +73,7 @@ import {
   packExploreMosaicRows,
   type ForYouFilterId,
 } from '../../utils/exploreNav';
-import { exploreRailExpandable, EXPLORE_WORLD_CONTENT_RIGHT } from '../../utils/exploreWorldLayout';
+import { exploreRailExpandable, EXPLORE_WORLD_CONTENT_RIGHT, EXPLORE_FEED_CONTENT_RIGHT } from '../../utils/exploreWorldLayout';
 import { worldActivityCountries, surpriseCountry } from '../../utils/exploreWorldModel';
 import { tap as hapticTap } from '../../utils/haptics';
 
@@ -365,6 +365,7 @@ function ExploreScreen(): React.JSX.Element {
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: layout.screenX,
+            paddingRight: EXPLORE_FEED_CONTENT_RIGHT,
             paddingBottom: dockBottomPadding(insets.bottom),
             gap: space.sm,
             paddingTop: space.xs,
@@ -391,7 +392,7 @@ function ExploreScreen(): React.JSX.Element {
               paddingHorizontal: layout.screenX,
               paddingBottom: dockBottomPadding(insets.bottom),
               paddingTop: space.xs,
-              paddingRight: layout.screenX + 8,
+              paddingRight: EXPLORE_FEED_CONTENT_RIGHT,
             }}
             renderItem={({ item }) => <ExploreMosaicRowView row={item} />}
             ListHeaderComponent={
@@ -433,7 +434,7 @@ function ExploreScreen(): React.JSX.Element {
               paddingBottom: dockBottomPadding(insets.bottom),
               gap: space.md,
               paddingTop: space.xs,
-              paddingRight: EXPLORE_WORLD_CONTENT_RIGHT,
+              paddingRight: mode === 'world' ? EXPLORE_WORLD_CONTENT_RIGHT : EXPLORE_FEED_CONTENT_RIGHT,
             }}
             showsVerticalScrollIndicator={false}
             onScroll={(e) => onFeedScroll(e.nativeEvent.contentOffset.y)}
@@ -576,7 +577,7 @@ function ExploreScreen(): React.JSX.Element {
         mode={mode}
         onChange={changeMode}
         bottomOffset={dockBottomPadding(insets.bottom) - 24}
-        expandable={exploreRailExpandable(countryPanelOpen)}
+        expandable={mode === 'world' && !searching && exploreRailExpandable(countryPanelOpen)}
       />
 
       <CountryPickerSheet

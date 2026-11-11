@@ -17,6 +17,7 @@ import { CommunityChapterCard } from '../community/CommunityChapterCard';
 import { WorldDropsChapter } from './WorldDropsChapter';
 import { LiveChapter } from '../live/LiveChapter';
 import { AiChapter } from '../ai/AiChapter';
+import { releaseAllows } from '../../../utils/releaseScope';
 
 export interface WorldChapterProps {
   row: WorldRow;
@@ -111,6 +112,7 @@ export const WorldChapter = React.memo(function WorldChapter({
           {row.items.map((course, index) => (
             <View key={course.id} style={styles.course}>
               <EditorialMedia
+                accessibilityLabel={`View course: ${course.title}`}
                 mediaUrl={course.mediaUrl}
                 accent={creatorTint}
                 height={personality === 'studio' ? 240 : 280}
@@ -215,11 +217,11 @@ export const WorldChapter = React.memo(function WorldChapter({
           title={isSelf ? 'Your Vault is ready' : 'Nothing inside yet'}
           body={
             isSelf
-              ? 'Share something your followers will not find in Arena.'
+              ? 'New publishing is unavailable in this beta. Existing content remains accessible.'
               : 'This creator has not posted a Drop yet.'
           }
-          actionLabel={isSelf ? 'Create first Drop' : undefined}
-          onAction={isSelf ? onCreate : undefined}
+          actionLabel={isSelf && releaseAllows('creator', 'admit') ? 'Create first Drop' : undefined}
+          onAction={isSelf && releaseAllows('creator', 'admit') ? onCreate : undefined}
         />
       );
 

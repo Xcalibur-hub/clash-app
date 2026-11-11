@@ -41,3 +41,20 @@ export const DECORATIVE_MOTION_FROZEN: boolean = decorativeMotionFrozen({
     ? process.env.EXPO_PUBLIC_ARENA_DISABLE_DECORATIVE_MOTION ?? null
     : null,
 });
+
+/**
+ * Narrowly scoped development-only accessibility inspection mode:
+ * pauses nonessential 1-second visual countdown re-renders that otherwise collide
+ * with Android UI Automator's 1000ms idle threshold, without touching server clocks,
+ * server deadlines, Arena phases, or voting guards.
+ */
+export function visualCountdownPaused(input: DecorativeMotionInput): boolean {
+  return decorativeMotionFrozen(input);
+}
+
+export const VISUAL_COUNTDOWN_PAUSED: boolean = visualCountdownPaused({
+  isDev: typeof __DEV__ !== 'undefined' && __DEV__ === true,
+  flag: typeof process !== 'undefined'
+    ? process.env.EXPO_PUBLIC_ARENA_DISABLE_DECORATIVE_MOTION ?? null
+    : null,
+});

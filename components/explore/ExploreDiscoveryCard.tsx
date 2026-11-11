@@ -32,11 +32,11 @@ export interface ExploreDiscoveryCardProps {
 const KIND_LABEL: Record<ExploreCardKind, string> = {
   LIVE: 'LIVE',
   TAKE: 'TAKE',
-  VAULT: 'VAULT PREVIEW',
-  CHALLENGE: 'CHALLENGE',
-  TREASURE: 'TREASURE',
+  VAULT: 'VAULT · READ / PREVIEW',
+  CHALLENGE: 'CHALLENGE · VIEW / HISTORY',
+  TREASURE: 'TREASURE · VIEW / HISTORY',
   DROP: 'WORLD DROP',
-  CREATOR: 'CREATOR',
+  CREATOR: 'CREATOR · VIEW PROFILE',
   CLASH: 'CLASH',
 };
 
