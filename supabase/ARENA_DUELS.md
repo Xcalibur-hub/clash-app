@@ -136,6 +136,7 @@ reported. Those unrelated implementation changes are outside this commit.
 
 No Challenge requests, ACCEPT/PASS, notifications or ranking; Corners, support state,
 Assists (including media, ranking, attribution and use/dismiss); new Mindshift;
-fighter career records or rivalries; Crew qualification or Phase B expansion;
+fighter career records or rivalries (Phase 1 pays a flat per-Clash reward instead —
+see CLASH_SPEC.md); Crew qualification or Phase B expansion;
 Community Clashes, seasons, promotion/relegation, XP or RPG roles. Vault and World
 are unchanged. Phase 1 ends at this foundation.

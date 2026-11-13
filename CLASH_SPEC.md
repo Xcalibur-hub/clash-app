@@ -480,15 +480,40 @@ Provocateur
 Clash King / Clash Queen
 Legend
 
-Use Reputation XP.
+Use Reputation XP. Every award names the actor it pays — a fighter and a juror
+are paid differently for the same Clash and must never be conflated.
 
-Example:
+FIGHTERS (the two people in the Clash), text-debate beta policy:
 
-Winning Clash:
-+120 XP
+Winning debater:
++40 XP, 0 coins
 
-Participating:
-+15 XP
+Losing debater:
++15 XP, 0 coins
+
+Both debaters on a DRAW:
++15 XP each, 0 coins
+
+No ballots (CANCELLED):
+no reward to anyone
+
+JURORS (the people who voted), unchanged:
+
+Winning-side juror:
++120 XP (+40 coins), streak +1
+
+Dissenting juror:
++25 XP (+18 coins), streak reset
+
+Juror on a DRAW:
++15 XP, no coins, streak unchanged
+
+Fighter awards are recorded under their own ledger kinds
+(`clash_fighter_win`, `clash_fighter_participation`) so a credit can be
+attributed to a fighter or a juror from the ledger alone. Fighter awards never
+carry coins and never change a streak.
+
+Other awards:
 
 Creating popular Take:
 +30 XP
@@ -496,7 +521,8 @@ Creating popular Take:
 Entering Hall of Fame:
 +500 XP
 
-Coins are strictly virtual reputation/status points.
+Coins are strictly virtual reputation/status points. Coins are currently awarded
+only to jurors; fighters receive none.
 
 DO NOT create a real-money cashout system.
 

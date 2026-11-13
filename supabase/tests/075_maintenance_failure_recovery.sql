@@ -61,14 +61,15 @@ select is((select result->>'partial_failure' from recovered_run),'false','recove
 select is((select status::text from clashes where id=pg_temp.c()),'settled','next existing maintenance run settles failed Clash');
 select is((select status::text from arena_rooms where id=pg_temp.r()),'SETTLED','recovery reaches coherent terminal Room');
 select is((select count(*)::int from verdicts where clash_id=pg_temp.c()),1,'one verdict after recovery');
-select is((select count(*)::int from reputation_events where clash_id=pg_temp.c()),2,'one participation and win award after recovery');
-select is((select count(*)::int from notifications where entity_id=pg_temp.c()),3,'one juror and two fighter notifications after recovery');
+select is((select count(*)::int from reputation_events where clash_id=pg_temp.c()),4,'one participation and win award per juror, plus two fighter awards, after recovery');
+select is((select count(*)::int from reputation_events where clash_id=pg_temp.c() and kind in('clash_fighter_win','clash_fighter_participation')),2,'recovery pays both fighters once');
+select is((select count(*)::int from notifications where entity_id=pg_temp.c()),5,'one juror, two result and two fighter notifications after recovery');
 select is((select p.reputation-o.reputation from profiles p cross join recovery_original o where id='recovery-j'),120,'one winning jury reputation award');
 select is((select count(*)::int from arena_maintenance_failures where item_id in(pg_temp.c(),pg_temp.r()) and retry_status='resolved' and resolved_at is not null),2,'terminal recovery resolves both diagnostic categories');
 select is(settle_clash(pg_temp.c())->>'winner_side','A','direct settled retry returns original verdict');
 select run_maintenance(500);
-select is((select count(*)::int from reputation_events where clash_id=pg_temp.c()),2,'maintenance and direct retries do not duplicate awards');
-select is((select count(*)::int from notifications where entity_id=pg_temp.c()),3,'maintenance and direct retries do not duplicate notifications');
+select is((select count(*)::int from reputation_events where clash_id=pg_temp.c()),4,'maintenance and direct retries do not duplicate awards');
+select is((select count(*)::int from notifications where entity_id=pg_temp.c()),5,'maintenance and direct retries do not duplicate notifications');
 -- Legacy GROUP failures are isolated and recover through the same existing batch.
 insert into arena_daily_topics(id,title,status,opens_at,final_arguments_at,judging_at,closes_at)
  values('recovery-group-topic','Group recovery rollback fixture','closed',now()-interval '31 minutes',now()-interval '11 minutes',now()-interval '6 minutes',now()-interval '1 minute');

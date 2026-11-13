@@ -135,19 +135,44 @@ select is((select side_b_score from public.verdicts where clash_id = (select id 
 select is((select jury_size from public.verdicts where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 3, 'jury size 3');
 
 -- reward ledger: 2 rows per juror, matching the contract
-select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 6, '6 ledger rows');
+select is((select count(*)::int from public.reputation_events where kind in ('clash_fighter_win','clash_fighter_participation') and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 2, '2 fighter reward rows');
+select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 8, '8 ledger rows (6 juror + 2 fighter)');
 select is((select count(*)::int from public.reputation_events where kind = 'clash_participation' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 3, '3 participation events');
 select is((select count(*)::int from public.reputation_events where kind = 'clash_win' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 2, '2 win events');
 select is((select count(*)::int from public.reputation_events where kind = 'clash_dissent' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 1, '1 dissent event');
 
 -- derived profile state (winner +120/+40/streak+1, minority +25/+18/streak 0)
-select is((select reputation from public.profiles where id = 't-j1'), 120, 'j1 reputation +120');
+select is((select reputation from public.profiles where id = 't-j1'), 120, 'winning juror reputation +120 (juror economy unchanged)');
 select is((select coins from public.profiles where id = 't-j1'), 40, 'j1 coins +40');
 select is((select streak from public.profiles where id = 't-j1'), 1, 'j1 streak 1');
-select is((select reputation from public.profiles where id = 't-j2'), 25, 'j2 reputation +25');
+select is((select reputation from public.profiles where id = 't-j2'), 25, 'dissenting juror reputation +25 (juror economy unchanged)');
 select is((select coins from public.profiles where id = 't-j2'), 18, 'j2 coins +18');
 select is((select streak from public.profiles where id = 't-j2'), 0, 'j2 streak 0');
 select is((select rank::text from public.profiles where id = 't-j1'), 'Rookie', 'rank derived from reputation');
+
+-- fighter policy (2026-11-12): winner +40, loser +15, zero coins.
+-- Side A is the take author (app/clash/[takeId].tsx:117 — sideAText is the
+-- take's own text), and side A won this fixture, so the AUTHOR is the winner.
+select is((select reputation from public.profiles where id = 't-author'), 40,
+  'winning debater (author, side A) receives +40');
+select is((select reputation from public.profiles where id = 't-challenger'), 15,
+  'losing debater (challenger, side B) receives +15 participation');
+select is((select coins from public.profiles where id = 't-author'), 0,
+  'winning debater receives no coins');
+select is((select streak from public.profiles where id = 't-author'), 0,
+  'winning debater streak is untouched');
+select is((select kind::text from public.reputation_events
+            where clash_id = (select id from public.clashes where take_id = 't-test-clash')
+              and profile_id = 't-author' and kind like 'clash_fighter%'), 'clash_fighter_win',
+  'winner is paid under clash_fighter_win');
+select is((select kind::text from public.reputation_events
+            where clash_id = (select id from public.clashes where take_id = 't-test-clash')
+              and profile_id = 't-challenger' and kind like 'clash_fighter%'), 'clash_fighter_participation',
+  'loser is paid under clash_fighter_participation');
+select is((select count(*)::int from public.reputation_events
+            where clash_id = (select id from public.clashes where take_id = 't-test-clash')
+              and kind like 'clash_fighter%' and coins_delta <> 0), 0,
+  'no fighter award carries coins');
 
 -- client cannot write economy columns or forge the ledger
 select set_config('role', 'authenticated', true);
@@ -161,14 +186,14 @@ reset role;
 -- idempotent settlement: re-settle neither duplicates nor re-awards
 select lives_ok($$ select public.settle_clash((select id from public.clashes where take_id = 't-test-clash')) $$, 're-settle is idempotent');
 select is((select count(*)::int from public.verdicts where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 1, 'still one verdict');
-select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 6, 'still 6 ledger rows');
+select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 8, 'still 8 ledger rows after replay');
 select is((select reputation from public.profiles where id = 't-j1'), 120, 'j1 reputation unchanged');
 
 -- notifications are server-created only
-select is((select count(*)::int from public.notifications where entity_id = (select id from public.clashes where take_id = 't-test-clash')), 6, '6 clash notifications');
+select is((select count(*)::int from public.notifications where entity_id = (select id from public.clashes where take_id = 't-test-clash')), 8, '8 clash notifications (2 extra fighter reputation notices)');
 select is((select count(*)::int from public.notifications where kind = 'clash_started' and recipient_id = 't-author'), 1, 'clash_started to author');
 select is((select count(*)::int from public.notifications where kind = 'clash_result' and entity_id = (select id from public.clashes where take_id = 't-test-clash')), 2, 'clash_result to both debaters');
-select is((select count(*)::int from public.notifications where kind = 'reputation' and entity_id = (select id from public.clashes where take_id = 't-test-clash')), 3, 'reputation to each juror');
+select is((select count(*)::int from public.notifications where kind = 'reputation' and entity_id = (select id from public.clashes where take_id = 't-test-clash')), 5, 'reputation notice to each juror and each fighter');
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000c","role":"authenticated"}', true);
 select throws_ok($$ insert into public.notifications (id, recipient_id, kind) values ('n-forge', 't-j1', 'clash_result') $$, '42501', null, 'client cannot forge notifications');

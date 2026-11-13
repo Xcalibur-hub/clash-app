@@ -1,29 +1,71 @@
 import type { Alignment, RankName } from '../store/types';
 
-/** Reputation awarded per interaction (spec §11). */
+/**
+ * Reputation awarded per interaction.
+ *
+ * ACTOR SEPARATION (2026-11-12): a Clash pays two different groups, and they are
+ * NOT paid the same. These constants mirror the server ledger exactly:
+ *
+ *   FIGHTERS — the two debaters (settle_clash_legacy, kinds
+ *   `clash_fighter_win` / `clash_fighter_participation`):
+ *     win  +40 rep, 0 coins
+ *     loss +15 rep, 0 coins
+ *     draw +15 rep each, 0 coins
+ *
+ *   JURORS — the people who voted (kinds `clash_win` / `clash_dissent` /
+ *   `clash_participation`):
+ *     winning side +120 rep, +40 coins, streak +1
+ *     dissenting   +25 rep, +18 coins, streak reset
+ *     draw         +15 rep, no coins, streak unchanged
+ *
+ * Fighter awards never carry coins and never change a streak. Do not collapse
+ * these two groups into one "clash reward" number — that conflation is exactly
+ * what made the previous 120 ambiguous.
+ */
 export const XP = {
-  /** "Participating: +15 XP". */
+  // ── Fighter awards (debate participation) ──────────────────────────────────
+  /** Winning debater: `clash_fighter_win`. */
+  fighterWin: 40,
+  /** Losing debater, and each debater on a DRAW: `clash_fighter_participation`. */
+  fighterParticipate: 15,
+
+  // ── Juror awards (voting) ──────────────────────────────────────────────────
+  /** Winning-side juror: `clash_participation` + `clash_win` = 120. */
   participate: 15,
-  /** Win bonus on top of participation — 15 + 105 = the spec's +120 for a won clash. */
+  /** Win bonus on top of participation — 15 + 105 = 120 for a winning-side juror. */
   winBonus: 105,
-  /** Prototype tuning: a small credit for filing a dissenting ballot, so judging still pays. */
+  /** Dissenting juror credit: `clash_dissent` (+18 coins on the server). */
   dissent: 10,
+
+  // ── Other ──────────────────────────────────────────────────────────────────
   /** "Creating popular Take: +30 XP". */
   popularTake: 30,
   /** "Entering Hall of Fame: +500 XP" (Phase 2). */
   hallOfFame: 500,
 } as const;
 
-/** "Winning Clash: +120 XP" — participation plus the win bonus. */
-export const CLASH_WIN_TOTAL = XP.participate + XP.winBonus;
+/** "Winning Clash: +120 XP" for a WINNING-SIDE JUROR — participation + bonus. */
+export const JUROR_CLASH_WIN_TOTAL = XP.participate + XP.winBonus;
 
-/** Human label for how a ballot compared to the settled winner (display only). */
+/** Total for a winning debater. Fighter awards carry no coins. */
+export const FIGHTER_CLASH_WIN_TOTAL = XP.fighterWin;
+
+/** Total for a losing debater, identical to a DRAW debater. */
+export const FIGHTER_CLASH_LOSS_TOTAL = XP.fighterParticipate;
+
+/**
+ * @deprecated Ambiguous name. The value is the JUROR total (120), not a
+ * fighter's. Use {@link JUROR_CLASH_WIN_TOTAL} or
+ * {@link FIGHTER_CLASH_WIN_TOTAL} so the actor is explicit.
+ */
+export const CLASH_WIN_TOTAL = JUROR_CLASH_WIN_TOTAL;
+
+/** Human label for how a JUROR's ballot compared to the settled winner. */
 export function awardDescription(alignment: Alignment): string {
   if (alignment === 'majority') return 'Your judgement matched the jury';
   if (alignment === 'minority') return 'You backed the losing side — dissent logged';
   return 'You abstained, so the jury decided';
 }
-
 
 export interface RankStep {
   name: RankName;

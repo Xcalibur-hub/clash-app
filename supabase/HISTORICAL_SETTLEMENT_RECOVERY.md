@@ -35,7 +35,7 @@ Successful maintenance retains every previous result key and adds:
 
 The failure count includes failed attempts in both loops, even if a later attempt in that run recovers. Pending count reflects current retained unresolved records. Existing `clashes_settled` continues counting successful terminal operations, including zero-ballot cancellations, as before.
 
-No new single-Clash client retry was necessary. Operators can retry through existing maintenance; failed items remain due and are attempted on later existing cron ticks. `settle_clash` and its locked, transactional tally are unchanged. A failed item rolls back verdict, ledger, profile and notification writes together. The next successful attempt awards once; settled/cancelled retries retain existing early-return behavior. Zero votes still cancel, one ballot still suffices, and nonzero ties remain DRAW. Fighters receive no new rewards.
+No new single-Clash client retry was necessary. Operators can retry through existing maintenance; failed items remain due and are attempted on later existing cron ticks. `settle_clash` and its locked, transactional tally are unchanged. A failed item rolls back verdict, ledger, profile and notification writes together. The next successful attempt awards once; settled/cancelled retries retain existing early-return behavior. Zero votes still cancel, one ballot still suffices, and nonzero ties remain DRAW. Fighter rewards (added 2026-11-12) are part of the same locked transaction, so the rollback guarantee extends to them: a failed attempt leaves no fighter ledger row and no fighter reputation change, and the next successful attempt awards each fighter once.
 
 Operator inspection (owner/service role only):
 

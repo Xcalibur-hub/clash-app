@@ -9609,6 +9609,8 @@ export type Database = {
         | "arena_backup_arrival"
         | "arena_crowd_favorite"
         | "arena_mind_impact"
+        | "clash_fighter_win"
+        | "clash_fighter_participation"
       sponsor_campaign_status:
         | "DRAFT"
         | "ACTIVE"
@@ -10024,6 +10026,8 @@ export const Constants = {
         "arena_backup_arrival",
         "arena_crowd_favorite",
         "arena_mind_impact",
+        "clash_fighter_win",
+        "clash_fighter_participation",
       ],
       sponsor_campaign_status: [
         "DRAFT",

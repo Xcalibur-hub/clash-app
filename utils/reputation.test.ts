@@ -1,13 +1,34 @@
 /** Reputation and rank rules (spec §11 / §10). Pure arithmetic — no network, no device. */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { XP, CLASH_WIN_TOTAL, awardDescription, rankFor, nextRank, rankProgress, RANKS } from './reputation.ts';
+import {
+  XP, CLASH_WIN_TOTAL, JUROR_CLASH_WIN_TOTAL, FIGHTER_CLASH_WIN_TOTAL,
+  FIGHTER_CLASH_LOSS_TOTAL, awardDescription, rankFor, nextRank, rankProgress, RANKS,
+} from './reputation.ts';
 
 describe('clash reward totals', () => {
-  it('a won clash pays exactly the spec total of 120', () => {
+  it('a won clash pays a winning-side juror exactly 120', () => {
     assert.equal(XP.participate, 15);
     assert.equal(XP.winBonus, 105);
+    assert.equal(JUROR_CLASH_WIN_TOTAL, 120);
+  });
+
+  it('keeps the deprecated CLASH_WIN_TOTAL aliased to the JUROR total', () => {
+    assert.equal(CLASH_WIN_TOTAL, JUROR_CLASH_WIN_TOTAL);
     assert.equal(CLASH_WIN_TOTAL, 120);
+  });
+
+  it('pays a winning debater +40, not the juror 120', () => {
+    assert.equal(XP.fighterWin, 40);
+    assert.equal(FIGHTER_CLASH_WIN_TOTAL, 40);
+    assert.notEqual(FIGHTER_CLASH_WIN_TOTAL, JUROR_CLASH_WIN_TOTAL);
+  });
+
+  it('pays a losing debater +15, the same as a DRAW debater', () => {
+    assert.equal(XP.fighterParticipate, 15);
+    assert.equal(FIGHTER_CLASH_LOSS_TOTAL, 15);
+    assert.equal(FIGHTER_CLASH_LOSS_TOTAL, XP.fighterParticipate);
+    assert.ok(FIGHTER_CLASH_LOSS_TOTAL < FIGHTER_CLASH_WIN_TOTAL);
   });
 
   it('participation alone is paid without the win bonus', () => {
@@ -15,12 +36,11 @@ describe('clash reward totals', () => {
     assert.equal(XP.participate + XP.winBonus, CLASH_WIN_TOTAL);
   });
 
-  it('a lost clash pays participation only — the win bonus is never granted', () => {
-    // Losing earns XP.participate and nothing else; a win is participate + winBonus.
-    const loss = XP.participate;
-    const win = CLASH_WIN_TOTAL;
-    assert.equal(win - loss, XP.winBonus);
-    assert.ok(loss < win);
+  it('a dissenting juror earns participation + dissent, never the win bonus', () => {
+    const dissent = XP.participate + XP.dissent;
+    assert.equal(dissent, 25);
+    assert.equal(JUROR_CLASH_WIN_TOTAL - dissent, 95);
+    assert.ok(dissent < JUROR_CLASH_WIN_TOTAL);
   });
 
   it('dissenting ballots pay the documented dissent credit', () => {

@@ -177,12 +177,22 @@ verdict, reward or result notification. A single ballot suffices. Verdict labels
 use margin: DRAW, SPLIT DECISION (at most one), CLEAR DECISION (at most three), then
 LANDSLIDE. These are backend labels, not confidence from an independent jury.
 
-Existing economy rewards **jurors**, not fighter wins/careers: winning-side jurors
-receive +120 reputation/+40 coins and increment streak; dissent receives +25/+18
-and resets streak; draw participation receives +15/+0 with no streak change.
-Rank is recalculated by the existing helper. Fighters receive result notifications
-but no canonical fighter-career award. Jury reward notifications and two fighter
-result notifications are inside the settlement transaction. Their random IDs do
+The economy rewards **jurors and fighters separately**, under distinct ledger kinds.
+
+Jurors: winning-side jurors receive +120 reputation/+40 coins and increment streak;
+dissent receives +25/+18 and resets streak; draw participation receives +15/+0 with
+no streak change. These amounts and kinds (`clash_participation`, `clash_win`,
+`clash_dissent`) are unchanged.
+
+Fighters (owner-approved 2026-11-12, text-debate beta): the winning debater receives
++40 reputation/0 coins (`clash_fighter_win`), the losing debater +15/0
+(`clash_fighter_participation`), and both debaters receive +15/0 on a DRAW. Fighter
+awards never carry coins and never change streak, so `clash_win`/`clash_participation`
+rows remain unambiguously juror rows. A zero-ballot cancellation awards nobody.
+
+Rank is recalculated by the existing helper. Fighter rewards, jury reward
+notifications and two fighter result notifications are inside the settlement
+transaction. There is no historical backfill: already-settled Clashes early-return. Their random IDs do
 not provide a separate deduplication key; exactly-once behavior relies on the
 locked terminal-state early return and atomic transaction. Challenge notifications
 use deterministic IDs. No notification for decline/cancel/expiry is implemented.
@@ -213,7 +223,7 @@ was created to reproduce these gaps. Passing existing tests does not cover them.
 Missing features / policy decisions, **not fixes to invent now**: alternating turns,
 fighter readiness, pause/resume, forfeiture, per-turn deadlines, scheduled acceptance,
 minimum official participation, independent judging/Crew conflict checks, stronger
-quorum, fighter career awards, user cancellation after acceptance, cancellation
+quorum, longer-term fighter careers/records, user cancellation after acceptance, cancellation
 reason/timestamps, complete notification lifecycle and durable offline queues.
 The backend can settle a one-ballot duel with no official posts; changing this
 requires an approved eligibility/outcome policy, not a fabricated automatic winner.

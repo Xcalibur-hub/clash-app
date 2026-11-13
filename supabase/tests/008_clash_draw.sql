@@ -89,7 +89,9 @@ select is((select margin from public.verdicts where clash_id=(select id from pub
 select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_win'), 0, 'draw awards no clash_win (no side wins)');
 select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_dissent'), 0, 'draw awards no dissent');
 select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_participation'), 4, 'draw keeps 4 participation events');
-select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 4, 'draw writes exactly 4 ledger rows');
+select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 6, 'draw writes exactly 6 ledger rows (4 jurors + 2 fighters)');
+select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_fighter_participation'), 2, 'draw pays both fighters participation');
+select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_fighter_win'), 0, 'draw pays no fighter win');
 select is((select coalesce(sum(coins_delta),0)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 0, 'draw awards no coins');
 select is((select reputation from public.profiles where id='td-j1'), 15, 'A voter gets participation only');
 select is((select coins from public.profiles where id='td-j1'), 0, 'A voter gets no coins');
@@ -99,20 +101,24 @@ select is((select streak from public.profiles where id='td-j1'), 0, 'draw does n
 
 -- draw still notifies both debaters, and jurors, without naming a winner
 select is((select count(*)::int from public.notifications where entity_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_result'), 2, 'draw notifies both debaters');
-select is((select count(*)::int from public.notifications where entity_id=(select id from public.clashes where take_id='td-take-draw') and kind='reputation'), 4, 'juror reputation notifications');
+select is((select count(*)::int from public.notifications where entity_id=(select id from public.clashes where take_id='td-take-draw') and kind='reputation'), 6, 'juror and fighter reputation notifications');
 
 -- idempotent re-settlement: one verdict, no duplicate ledger rows, no double reward
 select lives_ok($$ select public.settle_clash((select id from public.clashes where take_id='td-take-draw')) $$, 're-settle draw clash');
 reset role;
 select is((select count(*)::int from public.verdicts where clash_id=(select id from public.clashes where take_id='td-take-draw')), 1, 're-settle keeps exactly one verdict');
-select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 4, 're-settle writes no duplicate ledger rows');
+select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 6, 're-settle writes no duplicate ledger rows');
 select is((select reputation from public.profiles where id='td-j1'), 15, 're-settle awards no duplicate reputation');
 
 -- ── B majority still settles B ──────────────────────────────────────────────
 select lives_ok($$ select public.settle_clash((select id from public.clashes where take_id='td-take-bwin')) $$, 'settle B-majority clash');
 reset role;
 select is((select winner_side::text from public.verdicts where clash_id=(select id from public.clashes where take_id='td-take-bwin')), 'B', 'B majority settles B');
-select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin')), 6, 'B-win keeps 6 ledger rows');
+select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin')), 8, 'B-win keeps 8 ledger rows (6 jurors + 2 fighters)');
+-- running totals: the DRAW already paid both 15, so after this B-win the author
+-- (side A, the loser) holds 30 and the challenger (side B) holds 55.
+select is((select reputation from public.profiles where id='td-author'), 30, 'B-win pays the author (side A) only participation');
+select is((select reputation from public.profiles where id='td-challenger'), 55, 'B-win pays the challenger (side B) the win bonus');
 select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin') and kind='clash_win'), 2, 'B-win keeps 2 win events');
 select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin') and kind='clash_dissent'), 1, 'B-win keeps 1 dissent event');
 select is((select coalesce(sum(coins_delta),0)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin')), 98, 'B-win coin contract unchanged');
@@ -121,7 +127,10 @@ select is((select coalesce(sum(coins_delta),0)::int from public.reputation_event
 select lives_ok($$ select public.settle_clash((select id from public.clashes where take_id='td-take-awin')) $$, 'settle A-majority clash');
 reset role;
 select is((select winner_side::text from public.verdicts where clash_id=(select id from public.clashes where take_id='td-take-awin')), 'A', 'A majority settles A');
-select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin')), 6, 'A-win keeps 6 ledger rows');
+select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin')), 8, 'A-win keeps 8 ledger rows (6 jurors + 2 fighters)');
+select is((select reputation from public.profiles where id='td-author'), 70, 'A-win pays the author (side A) the +40 win bonus');
+select is((select reputation from public.profiles where id='td-challenger'), 70, 'each debater holds 70 across the three clashes');
+select is((select count(*)::int from public.reputation_events where kind like 'clash_fighter%' and coins_delta<>0), 0, 'no fighter award anywhere carries coins');
 select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin') and kind='clash_win'), 2, 'A-win keeps 2 win events');
 select is((select coalesce(sum(coins_delta),0)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin')), 98, 'A-win coin contract unchanged');
 

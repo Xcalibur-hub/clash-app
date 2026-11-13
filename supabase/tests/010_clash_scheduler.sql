@@ -89,12 +89,27 @@ select is((public.run_maintenance(10))->>'clashes_settled', '0', 're-running mai
 select is((select count(*)::int from public.verdicts where clash_id = (select id from public.clashes where take_id = 'ts-take-a')), 1, 'verdict count stays 1');
 select is(
   (select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 'ts-take-a')),
+  4,
+  'reputation ledger does not duplicate (1 juror 2 rows + 2 fighter rows)'
+);
+select is(
+  (select count(*)::int from public.reputation_events
+    where clash_id = (select id from public.clashes where take_id = 'ts-take-a')
+      and kind in ('clash_fighter_win','clash_fighter_participation')),
   2,
-  'reputation ledger does not duplicate'
+  'scheduled path pays both fighters exactly once'
+);
+select is(
+  (select reputation from public.profiles where id = 'ts-author'), 40,
+  'scheduled path pays the winning debater +40'
+);
+select is(
+  (select reputation from public.profiles where id = 'ts-chall'), 15,
+  'scheduled path pays the losing debater +15'
 );
 select is(
   (select count(*)::int from public.notifications where entity_id = (select id from public.clashes where take_id = 'ts-take-a')),
-  4,
+  6,
   'notifications do not duplicate'
 );
 
