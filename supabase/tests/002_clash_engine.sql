@@ -50,22 +50,40 @@ reset role;
 
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
-select throws_ok($$ select public.start_clash('t-test-clash') $$, 'P0001', null, 'author cannot clash own take');
+select throws_ok($$ select public.create_arena_challenge('t-test-clash',
+  'The canonical path must still refuse an author challenging their own Take.') $$,
+  'P0001', null, 'author cannot clash own take');
 reset role;
 
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
-select throws_ok($$ select public.start_clash('nope') $$, 'P0002', null, 'invalid take rejected');
+select throws_ok($$ select public.create_arena_challenge('nope',
+  'The canonical path must still refuse a Take that does not exist at all.') $$,
+  'P0002', null, 'invalid take rejected');
 reset role;
 
-select set_config('role', 'authenticated', true);
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
-select lives_ok($$ select public.start_clash('t-test-clash') $$, 'challenger starts clash');
-reset role;
+-- Legacy competition creation is revoked (20261111120200_beta_legacy_visibility),
+-- so this temp constructor builds the identical non-duel Clash that start_clash
+-- used to produce: status 'open' spanning the Take's own window, no duel_key and
+-- no room. It keeps the assertions below meaningful instead of stubbing them, and
+-- it is the same trusted construction these files already use for direct inserts.
+-- Admission denial is still asserted against the real entry points above.
+create function pg_temp.legacy_start_clash(p_take_id text, p_challenger text)
+returns void language sql as $$
+  insert into public.clashes (id, take_id, challenger_id, status, opens_at, closes_at)
+  select 'cl_legacy_' || t.id, t.id, p_challenger, 'open', now(), t.expires_at
+    from public.takes t where t.id = p_take_id;
+  select public.clash_notify(t.author_id, p_challenger, 'clash_started', 'cl_legacy_' || t.id)
+    from public.takes t where t.id = p_take_id;
+$$;
 
+select lives_ok($$ select pg_temp.legacy_start_clash('t-test-clash', 't-challenger') $$, 'challenger starts clash');
+
+-- Legacy admission is revoked for every caller, so a second attempt is refused
+-- outright rather than tripping the old duplicate-Clash guard (P0005).
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
-select throws_ok($$ select public.start_clash('t-test-clash') $$, 'P0005', null, 'duplicate clash rejected');
+select throws_ok($$ select public.start_clash('t-test-clash') $$, '42501', null, 'legacy clash start denied');
 reset role;
 
 -- ballots
@@ -116,7 +134,11 @@ reset role;
 select throws_ok($$ select public.settle_clash((select id from public.clashes where take_id = 't-test-clash')) $$, 'P0006', null, 'cannot settle before close');
 reset role;
 
--- advance the clock in test context, then confirm voting closes and settlement runs
+-- advance the clock in test context, then confirm voting closes and settlement runs.
+-- Must run as the fixture owner: a closed Clash is terminal for clients, so this
+-- would be refused before settlement is ever exercised.
+reset role;
+select set_config('request.jwt.claims', null, true);
 update public.clashes set opens_at = now() - interval '2 hours', closes_at = now() - interval '1 hour' where take_id = 't-test-clash';
 
 select set_config('role', 'authenticated', true);
@@ -163,15 +185,15 @@ select is((select streak from public.profiles where id = 't-author'), 0,
   'winning debater streak is untouched');
 select is((select kind::text from public.reputation_events
             where clash_id = (select id from public.clashes where take_id = 't-test-clash')
-              and profile_id = 't-author' and kind like 'clash_fighter%'), 'clash_fighter_win',
+              and profile_id = 't-author' and kind IN ('clash_fighter_win','clash_fighter_participation')), 'clash_fighter_win',
   'winner is paid under clash_fighter_win');
 select is((select kind::text from public.reputation_events
             where clash_id = (select id from public.clashes where take_id = 't-test-clash')
-              and profile_id = 't-challenger' and kind like 'clash_fighter%'), 'clash_fighter_participation',
+              and profile_id = 't-challenger' and kind IN ('clash_fighter_win','clash_fighter_participation')), 'clash_fighter_participation',
   'loser is paid under clash_fighter_participation');
 select is((select count(*)::int from public.reputation_events
             where clash_id = (select id from public.clashes where take_id = 't-test-clash')
-              and kind like 'clash_fighter%' and coins_delta <> 0), 0,
+              and kind IN ('clash_fighter_win','clash_fighter_participation') and coins_delta <> 0), 0,
   'no fighter award carries coins');
 
 -- client cannot write economy columns or forge the ledger

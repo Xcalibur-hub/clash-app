@@ -55,12 +55,24 @@ select ok(
   'run_maintenance reports the full maintenance summary'
 );
 
-select set_config('role', 'authenticated', true);
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000202","role":"authenticated"}', true);
-select lives_ok($$ select public.start_clash('ts-take-a') $$, 'start clash A');
-select lives_ok($$ select public.start_clash('ts-take-b1') $$, 'start clash B1');
-select lives_ok($$ select public.start_clash('ts-take-b2') $$, 'start clash B2');
-reset role;
+-- Legacy competition creation is revoked (20261111120200_beta_legacy_visibility),
+-- so this temp constructor builds the identical non-duel Clash that start_clash
+-- used to produce: status 'open' spanning the Take's own window, no duel_key and
+-- no room. It keeps the assertions below meaningful instead of stubbing them, and
+-- it is the same trusted construction these files already use for direct inserts.
+-- Admission denial is still asserted against the real entry points above.
+create function pg_temp.legacy_start_clash(p_take_id text, p_challenger text)
+returns void language sql as $$
+  insert into public.clashes (id, take_id, challenger_id, status, opens_at, closes_at)
+  select 'cl_legacy_' || t.id, t.id, p_challenger, 'open', now(), t.expires_at
+    from public.takes t where t.id = p_take_id;
+  select public.clash_notify(t.author_id, p_challenger, 'clash_started', 'cl_legacy_' || t.id)
+    from public.takes t where t.id = p_take_id;
+$$;
+
+select lives_ok($$ select pg_temp.legacy_start_clash('ts-take-a', 'ts-chall') $$, 'start clash A');
+select lives_ok($$ select pg_temp.legacy_start_clash('ts-take-b1', 'ts-chall') $$, 'start clash B1');
+select lives_ok($$ select pg_temp.legacy_start_clash('ts-take-b2', 'ts-chall') $$, 'start clash B2');
 
 -- One live ballot on clash A, then a non-due clash C created directly.
 select set_config('role', 'authenticated', true);

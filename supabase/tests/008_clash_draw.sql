@@ -39,13 +39,25 @@ insert into public.takes (id, author_id, hood, text, status, expires_at) values
 
 select has_function('public', 'settle_clash', 'settle_clash exists');
 
--- ── Start three Clashes as the challenger ───────────────────────────────────
-select set_config('role', 'authenticated', true);
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000102","role":"authenticated"}', true);
-select lives_ok($$ select public.start_clash('td-take-draw') $$, 'start draw clash');
-select lives_ok($$ select public.start_clash('td-take-bwin') $$, 'start B-majority clash');
-select lives_ok($$ select public.start_clash('td-take-awin') $$, 'start A-majority clash');
-reset role;
+-- ── Build three non-duel Clashes for the challenger ─────────────────────────
+-- Legacy competition creation is revoked (20261111120200_beta_legacy_visibility),
+-- so this temp constructor builds the identical non-duel Clash that start_clash
+-- used to produce: status 'open' spanning the Take's own window, no duel_key and
+-- no room. It keeps the assertions below meaningful instead of stubbing them, and
+-- it is the same trusted construction these files already use for direct inserts.
+-- Admission denial is still asserted against the real entry points above.
+create function pg_temp.legacy_start_clash(p_take_id text, p_challenger text)
+returns void language sql as $$
+  insert into public.clashes (id, take_id, challenger_id, status, opens_at, closes_at)
+  select 'cl_legacy_' || t.id, t.id, p_challenger, 'open', now(), t.expires_at
+    from public.takes t where t.id = p_take_id;
+  select public.clash_notify(t.author_id, p_challenger, 'clash_started', 'cl_legacy_' || t.id)
+    from public.takes t where t.id = p_take_id;
+$$;
+
+select lives_ok($$ select pg_temp.legacy_start_clash('td-take-draw', 'td-challenger') $$, 'start draw clash');
+select lives_ok($$ select pg_temp.legacy_start_clash('td-take-bwin', 'td-challenger') $$, 'start B-majority clash');
+select lives_ok($$ select pg_temp.legacy_start_clash('td-take-awin', 'td-challenger') $$, 'start A-majority clash');
 
 -- Ballots: draw = 2×A + 2×B; B-majority = 1×A + 2×B; A-majority = 2×A + 1×B.
 select set_config('role','authenticated',true); select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000103","role":"authenticated"}',true);
@@ -130,7 +142,7 @@ select is((select winner_side::text from public.verdicts where clash_id=(select 
 select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin')), 8, 'A-win keeps 8 ledger rows (6 jurors + 2 fighters)');
 select is((select reputation from public.profiles where id='td-author'), 70, 'A-win pays the author (side A) the +40 win bonus');
 select is((select reputation from public.profiles where id='td-challenger'), 70, 'each debater holds 70 across the three clashes');
-select is((select count(*)::int from public.reputation_events where kind like 'clash_fighter%' and coins_delta<>0), 0, 'no fighter award anywhere carries coins');
+select is((select count(*)::int from public.reputation_events where kind IN ('clash_fighter_win','clash_fighter_participation') and coins_delta<>0), 0, 'no fighter award anywhere carries coins');
 select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin') and kind='clash_win'), 2, 'A-win keeps 2 win events');
 select is((select coalesce(sum(coins_delta),0)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin')), 98, 'A-win coin contract unchanged');
 

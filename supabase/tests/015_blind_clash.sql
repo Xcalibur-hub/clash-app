@@ -44,11 +44,28 @@ select is(has_column_privilege('authenticated', 'public.clashes', 'id', 'SELECT'
 select is(has_function_privilege('anon', 'public.clash_view(text)', 'EXECUTE'), true, 'anon may call clash_view');
 select is(has_function_privilege('anon', 'public.start_clash(text,text,clash_mode)', 'EXECUTE'), false, 'anon cannot start a clash');
 
+-- ── Fixtures ────────────────────────────────────────────────────────────────
+-- Legacy competition creation is revoked (20261111120200_beta_legacy_visibility),
+-- so this temp constructor builds the identical non-duel Clash that start_clash
+-- used to produce -- 'open' over the Take's own window, carrying mode and
+-- challenger comment, no duel_key, no room -- keeping these BLIND/STANDARD
+-- assertions meaningful rather than stubbing them. Admission denial against the
+-- real entry point is asserted just above.
+create function pg_temp.legacy_start_clash(
+  p_take_id text, p_comment_id text, p_challenger text,
+  p_mode public.clash_mode default 'STANDARD')
+returns void language sql as $$
+  insert into public.clashes
+    (id, take_id, challenger_id, challenger_comment_id, status, mode, opens_at, closes_at)
+  select 'cl_legacy_' || t.id, t.id, p_challenger, p_comment_id, 'open',
+         coalesce(p_mode, 'STANDARD'), now(), t.expires_at
+    from public.takes t where t.id = p_take_id;
+  select public.clash_notify(t.author_id, p_challenger, 'clash_started', 'cl_legacy_' || t.id)
+    from public.takes t where t.id = p_take_id;
+$$;
+
 -- ── STANDARD default unchanged ──────────────────────────────────────────────
-select set_config('role', 'authenticated', true);
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000602","role":"authenticated"}', true);
-select lives_ok($$ select public.start_clash('bl-take-std', 'bl-c-std') $$, 'standard clash starts with two-arg call');
-reset role;
+select lives_ok($$ select pg_temp.legacy_start_clash('bl-take-std', 'bl-c-std', 'bl-b') $$, 'standard clash starts with two-arg call');
 
 select is(
   (select mode::text from public.clashes where take_id = 'bl-take-std'),
@@ -64,11 +81,8 @@ select is(public.clash_view_for_take('bl-take-std') #>> '{sideB,handle}', 'bl_b'
 reset role;
 
 -- ── Blind creation ──────────────────────────────────────────────────────────
-select set_config('role', 'authenticated', true);
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000602","role":"authenticated"}', true);
-select lives_ok($$ select public.start_clash('bl-take-blind', 'bl-c-blind', 'BLIND') $$, 'blind clash creation works');
-select lives_ok($$ select public.start_clash('bl-take-ms', 'bl-c-ms', 'BLIND') $$, 'second blind clash for mindshift');
-reset role;
+select lives_ok($$ select pg_temp.legacy_start_clash('bl-take-blind', 'bl-c-blind', 'bl-b', 'BLIND') $$, 'blind clash creation works');
+select lives_ok($$ select pg_temp.legacy_start_clash('bl-take-ms', 'bl-c-ms', 'bl-b', 'BLIND') $$, 'second blind clash for mindshift');
 
 select is((select mode::text from public.clashes where take_id = 'bl-take-blind'), 'BLIND', 'stored mode is BLIND');
 
