@@ -27,6 +27,7 @@ const state = {
 
 function reset() {
   state.calls.length = 0;
+  notices.length = 0;
   state.watchResult = { status: 'ok' };
   state.upgradeResult = { status: 'ok' };
   state.room = null;
@@ -47,7 +48,7 @@ function callNames() {
 }
 
 function record(name, args) {
-  state.calls.push({ name, args });
+  state.calls.push({ name, args, admitted: state.room?.viewer != null });
 }
 
 const ok = (name) => (v) => {
@@ -104,7 +105,8 @@ async function fetchRoom(roomId) {
 }
 async function fetchEvidence(roomId) {
   record('fetchEvidence', { roomId });
-  return state.evidence;
+  requireMembership(roomId);
+  return [...state.evidence];
 }
 async function fetchMindshiftStats(roomId) {
   record('fetchMindshiftStats', { roomId });
@@ -122,9 +124,15 @@ async function fetchMessage(id) {
   record('fetchMessage', { id });
   return null;
 }
-async function fetchOfficialPage(...args) {
-  record('fetchOfficialPage', args[0] || {});
-  return { messages: state.messages, cursor: null, hasMore: false };
+function requireMembership(roomId) {
+  if (roomId !== state.room?.roomId || !state.room.viewer) {
+    throw new SupabaseError('Join this room to read its transcript', '42501');
+  }
+}
+async function fetchOfficialPage(roomId, stream, cursor, direction) {
+  record('fetchOfficialPage', { roomId, stream, cursor, direction });
+  requireMembership(roomId);
+  return [...(stream === 'message' ? state.messages : state.evidence)];
 }
 
 /**
@@ -134,7 +142,15 @@ async function fetchOfficialPage(...args) {
 async function watchRoom(roomId) {
   record('watchRoom', { roomId });
   if (state.watchError) throw state.watchError;
-  return state.watchResult;
+  if (roomId !== state.room?.roomId) throw new SupabaseError('Unknown room', 'P0002');
+  const joinedAt = 1000;
+  const joined = state.room.viewer == null;
+  state.room = { ...state.room, participantCount: state.room.participantCount + Number(joined),
+    viewer: state.room.viewer ?? { isMember: true, role: 'spectator', stance: null,
+      finalStance: null, finalRecordedAt: null, joinedAt, hasSideVote: false, hasArgumentVote: false } };
+  return { joined, roomId, topicId: state.room.topicId, stance: null, role: 'spectator',
+    status: state.room.status, capacity: state.room.capacity,
+    participantCount: state.room.participantCount, joinedAt };
 }
 
 async function upgradeSpectator(roomId, stance) {

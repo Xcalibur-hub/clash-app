@@ -90,7 +90,7 @@ esbuild
       'expo-modules-core': path.join(SHIM, 'expo-modules.js'),
       'expo-constants': path.join(SHIM, 'expo-modules.js'),
     },
-    plugins: [boundaryPlugin],
+    plugins: [boundaryPlugin, ...(process.argv.includes('--negative-control') ? [require('./mutation.cjs')] : [])],
     loader: { '.png': 'empty', '.ttf': 'empty', '.otf': 'empty' },
     jsx: 'automatic',
     logLevel: 'error',
