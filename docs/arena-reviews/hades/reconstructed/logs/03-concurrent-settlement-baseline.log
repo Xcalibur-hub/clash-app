@@ -1,12 +1,12 @@
+# 2026-11-13T03:08:24Z  PostgreSQL 16.2 (disposable)
 $ node tests/03-concurrent-settlement.mjs
-# 2026-11-13T02:20:13Z  PostgreSQL 16.2 (disposable)
 schema: canonical
 reference award for A,A,B: rows=6 rep=265 coins=98
 
 TEST 3 — Concurrent settlement
 
   PASS  sim2: all workers returned without error
-        outcomes=ok,ok elapsed=18ms
+        outcomes=ok,ok elapsed=20ms
   PASS  sim2: exactly one verdict
         verdicts=1
   PASS  sim2: status settled once
@@ -16,7 +16,7 @@ TEST 3 — Concurrent settlement
   PASS  sim2: no duplicate (actor,kind) pair
         none
   PASS  sim4: all workers returned without error
-        outcomes=ok,ok,ok,ok elapsed=17ms
+        outcomes=ok,ok,ok,ok elapsed=19ms
   PASS  sim4: exactly one verdict
         verdicts=1
   PASS  sim4: status settled once
@@ -26,7 +26,7 @@ TEST 3 — Concurrent settlement
   PASS  sim4: no duplicate (actor,kind) pair
         none
   PASS  sim8: all workers returned without error
-        outcomes=ok,ok,ok,ok,ok,ok,ok,ok elapsed=28ms
+        outcomes=ok,ok,ok,ok,ok,ok,ok,ok elapsed=37ms
   PASS  sim8: exactly one verdict
         verdicts=1
   PASS  sim8: status settled once
@@ -36,7 +36,7 @@ TEST 3 — Concurrent settlement
   PASS  sim8: no duplicate (actor,kind) pair
         none
   PASS  stag3: staggered workers all completed
-        outcomes=ok,ok,ok elapsed=86ms
+        outcomes=ok,ok,ok elapsed=84ms
   PASS  stag3: exactly one verdict
         verdicts=1
   PASS  stag3: status settled once

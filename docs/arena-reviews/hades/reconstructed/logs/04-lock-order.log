@@ -1,15 +1,15 @@
+# 2026-11-13T03:08:33Z  PostgreSQL 16.2 (disposable)
 $ node tests/04-lock-order.mjs
-# 2026-11-13T02:20:20Z  PostgreSQL 16.2 (disposable)
 TEST 4 — Clash -> Room lock order
 
   PASS  static: clash-before-room is the dominant order
-        18 functions: submit_judgement, settle_due_clashes, transition_due_arena_rooms, watch_arena_room, run_maintenance, settle_clash
+        18 functions: settle_due_clashes, transition_due_arena_rooms, watch_arena_room, run_maintenance, submit_judgement, settle_clash
   PASS  static: no function takes the room lock first and also touches clashes
-        5 room-first function(s), none reach public.clashes [submit_arena_argument_vote, settle_arena_group_room, upgrade_arena_spectator, respond_arena_backup, submit_arena_side_vote]
+        5 room-first function(s), none reach public.clashes [settle_arena_group_room, upgrade_arena_spectator, respond_arena_backup, submit_arena_side_vote, submit_arena_argument_vote]
   PASS  static: functions locking BOTH tables do so clash-first
-        settle_due_clashes(clash->room); transition_due_arena_rooms(clash->room); watch_arena_room(clash->room); run_maintenance(clash->room); settle_clash(clash->room); settle_arena_room(clash->room); join_arena_topic(clash->room); assert_private_assist_window(clash->room); send_arena_private_assist(clash->room); incorporate_arena_private_assist(clash->room); respond_arena_private_assist(clash->room)
+        settle_due_clashes(clash->room); transition_due_arena_rooms(clash->room); watch_arena_room(clash->room); run_maintenance(clash->room); settle_clash(clash->room); settle_arena_room(clash->room); join_arena_topic(clash->room); assert_private_assist_window(clash->room); send_arena_private_assist(clash->room); respond_arena_private_assist(clash->room); incorporate_arena_private_assist(clash->room)
   PASS  dynamic: room-first writer does not deadlock against a clash lock holder
-        sqlstate=42501 waited=2ms outcome=error
+        sqlstate=42501 waited=3ms outcome=error
   PASS  dynamic: settlement does not deadlock when the ROOM lock is held first
         sqlstate=57014 waited=20001ms (blocking is acceptable, 40P01 is not)
   PASS  dynamic: settle vs transition_due_arena_rooms raises no deadlock

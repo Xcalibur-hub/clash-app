@@ -1,6 +1,6 @@
+# 2026-11-13T03:08:01Z  PostgreSQL 16.2 (disposable)
 $ node tests/01-cancelled-settlement.mjs --schema=baseline
-# 2026-11-13T02:20:02Z  PostgreSQL 16.2 (disposable)
-TEST 1 — Cancelled-settlement invariant  [schema=baseline]
+TEST 1 — Settlement ledger contract  [schema=baseline, contract=canonical]
 
   PASS  plain: nothing is paid before settlement
         ledgerRows=0
@@ -22,7 +22,19 @@ TEST 1 — Cancelled-settlement invariant  [schema=baseline]
         rows=0 rep=0 coins=0
   PASS  duel: repeat settlement awards nothing
         status=cancelled rep=0
-  PASS  settled clash is idempotent on replay
-        rows=2 (participation + win expected exactly once each)
+  PASS  settled: reaches settled with one verdict
+        contract=canonical status=settled verdicts=1
+  PASS  canonical: ledger holds exactly the juror participation + win kinds
+        kinds=["clash_participation","clash_win"]
+  PASS  canonical: both rows belong to the single juror
+        actors=["juror","juror"]
+  PASS  canonical: juror participation +15 / win +105+40 coins
+        participation=15/0 win=105/40
+  PASS  canonical: no fighter rows exist on a settled clash
+        kinds=["clash_participation","clash_win"]
+  PASS  canonical: juror holds +120 rep / +40 coins / streak 1
+        juror=120/40/1
+  PASS  canonical: fighters are untouched by settlement
+        author=0/0 challenger=0/0
 
-  11/11 assertions passed
+  17/17 assertions passed

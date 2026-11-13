@@ -1,5 +1,5 @@
+# 2026-11-13T03:09:03Z  PostgreSQL 16.2 (disposable)
 $ node tests/02-fighter-rewards.mjs --schema=patched
-# 2026-11-13T02:20:49Z  PostgreSQL 16.2 (disposable, patched schema)
 TEST 2 — Fighter reward accounting  [schema=patched]
 
   PASS  win (AAB): ledger matches reference

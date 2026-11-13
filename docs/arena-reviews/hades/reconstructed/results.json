@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-13T02:23:14.178Z",
+  "generated_at": "2026-11-13T03:07:48.531Z",
   "engine": "PostgreSQL 16.2 (disposable, pgserver)",
   "baseline_migrations": 119,
   "patched_migrations": 121,
@@ -13,7 +13,7 @@
       "exit": 0,
       "expected": 0,
       "ok": true,
-      "summary": "  11/11 assertions passed"
+      "summary": "  17/17 assertions passed"
     },
     {
       "label": "02 fighter-rewards (no fighter kinds)",

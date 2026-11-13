@@ -4,7 +4,7 @@
 
 A **freshly written** test harness for four areas of the CLASH settlement engine:
 
-1. cancelled-settlement invariant (`tests/01`)
+1. cancelled-settlement invariant and the settled-ledger contract, per reward schema (`tests/01`)
 2. fighter-reward accounting against an independent reference calculator (`tests/02`)
 3. concurrent settlement under 2–8 simultaneous workers (`tests/03`)
 4. Clash → Room lock-order analysis, static and dynamic (`tests/04`)
