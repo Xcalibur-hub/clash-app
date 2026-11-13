@@ -38,6 +38,7 @@ const MUST_SHIP = [
   // module. If a release build ever omitted it the ActionRegion would not compile,
   // so it belongs on the must-ship list with the rest.
   'utils/arenaRoomEligibility.ts',
+  'utils/arenaFunctionalCorrections.test.ts',
   'utils/arenaResultConsolidation.test.ts',
   'utils/arenaRoomEligibility.test.ts',
 ];

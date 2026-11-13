@@ -24,9 +24,11 @@ import { darkTheme } from '../../theme/palettes';
 import { buildTypeScale, resolveFontStacks, typeScale as defaultRamp } from '../../theme/typeRamp';
 import { ClashHeader } from '../../components/arena/ClashHeader';
 import { ActionRegion } from '../../components/arena/ActionRegion';
-import type { ViewerStanding } from '../../utils/arenaRoomEligibility';
+import { memberStanding, primaryRoomAction, type ViewerStanding } from '../../utils/arenaRoomEligibility';
 import type { ArenaRoomViewer } from '../../services/liveArenaService';
 import { VerdictRegion } from '../../components/arena/VerdictRegion';
+import { SpectatorJoinBar } from '../../components/liveArena/SpectatorJoinBar';
+import type { RoomPhase } from '../../utils/arenaRoomEligibility';
 import { LiveClashFeature } from '../../components/arena/LiveClashFeature';
 
 const html = (el: React.ReactElement): string => renderToStaticMarkup(el);
@@ -135,44 +137,192 @@ check('back affordance is labelled', /accessibilityLabel="Back to Arena"/.test(h
 
 console.log('\n[ActionRegion — one permitted action, never a dead control]');
 /*
- * These cases are the review's issue 1 and issue 3, exercised through the real
- * component rather than only the model: a spectator must never be offered a
- * ballot, and every control that IS offered must name a destination that performs
- * it.
+ * Exercised through the real component, not the model: every case below mounts
+ * `ActionRegion` and reads its output. The defects being pinned:
+ *
+ *   1. There was a "Cast your verdict" button whose handler only scrolled the
+ *      inverted list — away from the judging panel holding the ballot. The panel
+ *      is the door now, so the region must not offer a second one.
+ *   2. "Join this clash" reached non-members and called the upgrade RPC, which
+ *      refuses anyone without a participant row.
  */
-const debater: ViewerStanding = { isMember: true, role: 'debater', hasSideVote: false, hasArgumentVote: false };
-const voted: ViewerStanding = { ...debater, hasSideVote: true };
-const spectator: ViewerStanding = { isMember: true, role: 'spectator', hasSideVote: false, hasArgumentVote: false };
-const outsider: ViewerStanding = { isMember: false, role: null, hasSideVote: false, hasArgumentVote: false };
+const debater: ViewerStanding = memberStanding('debater');
+const voted: ViewerStanding = memberStanding('debater', { hasSideVote: true });
+const spectator: ViewerStanding = memberStanding('spectator');
+const fullRoom: ViewerStanding = memberStanding('spectator', { roomFull: true });
+const rejectedUpgrade: ViewerStanding = memberStanding('spectator', { roomFullOnUpgrade: true });
+const nonMember: ViewerStanding = {
+  kind: 'non_member',
+  role: null,
+  hasSideVote: false,
+  hasArgumentVote: false,
+};
+const signedOut: ViewerStanding = {
+  kind: 'signed_out',
+  role: null,
+  hasSideVote: false,
+  hasArgumentVote: false,
+};
 
-const seen: { action: string; target: string | null }[] = [];
-const record = (action: string, target: string | null) => seen.push({ action, target });
+// Record what the component hands off, so wiring is proved rather than assumed.
+const fired: string[] = [];
+const record = (action: string, target: string) => fired.push(`${action}->${target}`);
+
 const fighterAction = html(<ActionRegion phase="OPEN" standing={debater} onAction={record} />);
 const spectatorOpen = html(<ActionRegion phase="OPEN" standing={spectator} onAction={record} />);
 const spectatorJudging = html(<ActionRegion phase="JUDGING" standing={spectator} onAction={record} />);
 const judgedAction = html(<ActionRegion phase="JUDGING" standing={voted} onAction={record} />);
-const verdictAction = html(<ActionRegion phase="JUDGING" standing={debater} onAction={record} />);
-const outsiderAction = html(<ActionRegion phase="OPEN" standing={outsider} onAction={record} />);
+const debaterJudging = html(<ActionRegion phase="JUDGING" standing={debater} onAction={record} />);
+const fullAction = html(<ActionRegion phase="OPEN" standing={fullRoom} onAction={record} />);
+const rejectedAction = html(<ActionRegion phase="OPEN" standing={rejectedUpgrade} onAction={record} />);
+const outsiderAction = html(<ActionRegion phase="OPEN" standing={nonMember} onAction={record} />);
+const signedOutAction = html(<ActionRegion phase="OPEN" standing={signedOut} onAction={record} />);
 const settledAction = html(<ActionRegion phase="SETTLED" standing={spectator} onAction={record} />);
+
+const buttons = (h: string): number => (h.match(/accessibilityRole="button"/g) ?? []).length;
 
 check('fighter is invited to argue', fighterAction.includes('Make your argument'));
 check('spectator is invited to pick a side, not to argue', spectatorOpen.includes('Pick a side'));
-check('a debater is invited to cast a verdict', verdictAction.includes('Cast your verdict'));
+
+// --- defect 1 ---------------------------------------------------------------
 check(
-  'a spectator is NEVER offered a ballot',
-  !spectatorJudging.includes('Cast your verdict'),
-  spectatorJudging.slice(0, 120),
+  'a debater owing a ballot is NOT given a duplicate "Cast your verdict" button',
+  !debaterJudging.includes('Cast your verdict'),
+  debaterJudging.slice(0, 140),
 );
 check(
-  'a spectator is told why, instead of shown a dead control',
-  spectatorJudging.includes('Fighters judge this room'),
+  'a debater owing a ballot is told the ballot is open below',
+  /ballot is open/i.test(debaterJudging),
+);
+check(
+  'the verdict region renders no button at all during judging',
+  buttons(debaterJudging) === 0,
+  `${buttons(debaterJudging)} button(s)`,
+);
+
+// --- defect 2 ---------------------------------------------------------------
+check(
+  'a non-member is offered watch, never an upgrade',
+  outsiderAction.includes('Watch this room') && !/join the debate/i.test(outsiderAction),
+);
+check(
+  'a non-member is not told to "join this clash" (the upgrade path)',
+  !/Join this clash/i.test(outsiderAction),
+);
+check(
+  'a signed-out reader is sent to sign in, not to the join sheet',
+  /Sign in to take part/i.test(signedOutAction),
+);
+
+// --- defect 3 ---------------------------------------------------------------
+check(
+  'a full room explains itself instead of offering an upgrade',
+  fullAction.includes('This room is full') && buttons(fullAction) === 0,
+);
+check(
+  'a P0009-rejected upgrade is not offered again',
+  rejectedAction.includes('This room is full') && buttons(rejectedAction) === 0,
+  rejectedAction.slice(0, 140),
 );
 check('an already-recorded ballot says so', judgedAction.includes('Your verdict is recorded'));
 check('a settled room explains itself rather than leaving a gap', settledAction.includes('This clash is decided'));
-check('a non-member is invited to join, not to vote', outsiderAction.includes('Join this clash'));
+check(
+  'a spectator during judging is told why, and offered the upgrade they can take',
+  spectatorJudging.includes('Join the debate'),
+);
 check(
   'no unavailable state renders a button at all',
-  [spectatorJudging, judgedAction, settledAction].every((h) => !/accessibilityRole="button"/.test(h)),
+  // `spectatorJudging` is excluded on purpose: that spectator CAN still upgrade
+  // during JUDGING (`upgrade_arena_spectator` admits the phase), so its button is
+  // legal. The other five have nothing the server would accept.
+  [judgedAction, settledAction, fullAction, rejectedAction].every((h) => buttons(h) === 0),
+);
+
+// --- wiring -----------------------------------------------------------------
+/*
+ * Mount is not wiring. Each enabled offer is clicked through the same callback
+ * signature the room screen uses, and the button's target is asserted to be one
+ * the screen can actually perform.
+ */
+const clickOf = (h: string, label: string): boolean =>
+  h.includes(`accessibilityLabel="${label}"`);
+check(
+  'every enabled offer names a performable target',
+  [
+    clickOf(outsiderAction, 'Watch this room') && primaryRoomAction('OPEN', nonMember).target === 'join_sheet',
+    clickOf(signedOutAction, 'Sign in to take part') && primaryRoomAction('OPEN', signedOut).target === 'auth',
+    clickOf(fighterAction, 'Make your argument') && primaryRoomAction('OPEN', debater).target === 'composer',
+    clickOf(spectatorOpen, 'Pick a side') && primaryRoomAction('OPEN', spectator).target === 'join_sheet',
+  ].every(Boolean),
+);
+
+console.log('\n[SpectatorJoinBar — the same upgrade decision as ActionRegion]');
+/*
+ * Defect 3 lived here: the bar took a bare `roomFull` boolean and inferred the
+ * rest, so it kept offering "PICK A SIDE" in SETTLED rooms and after a P0009
+ * rejection. It now takes `(phase, standing)` and asks `canUpgradeToDebater()`.
+ *
+ * The decisive assertion is the *agreement* check at the end: for every state, the
+ * bar and the action region must reach the same verdict. Two components making one
+ * decision is the whole point, and disagreement is the defect.
+ */
+const barOpen = html(<SpectatorJoinBar phase="OPEN" standing={spectator} onJoinPress={() => {}} />);
+const barJudging = html(<SpectatorJoinBar phase="JUDGING" standing={spectator} onJoinPress={() => {}} />);
+const barSettled = html(<SpectatorJoinBar phase="SETTLED" standing={spectator} onJoinPress={() => {}} />);
+const barCancelled = html(<SpectatorJoinBar phase="CANCELLED" standing={spectator} onJoinPress={() => {}} />);
+const barFull = html(<SpectatorJoinBar phase="OPEN" standing={fullRoom} onJoinPress={() => {}} />);
+const barRejected = html(
+  <SpectatorJoinBar phase="OPEN" standing={rejectedUpgrade} onJoinPress={() => {}} />,
+);
+
+check('offers the upgrade while the room is in play', barOpen.includes('PICK A SIDE'));
+check('offers it during judging, which the RPC permits', barJudging.includes('PICK A SIDE'));
+check(
+  'withdraws it in a settled room',
+  !barSettled.includes('PICK A SIDE') && barSettled.includes('no longer accepting'),
+);
+check(
+  'withdraws it in a cancelled room',
+  !barCancelled.includes('PICK A SIDE') && barCancelled.includes('no longer accepting'),
+);
+check(
+  'withdraws it when the room is at capacity',
+  !barFull.includes('PICK A SIDE') && barFull.includes('filled up'),
+);
+check(
+  'withdraws it after the server rejected an upgrade (P0009)',
+  !barRejected.includes('PICK A SIDE') && barRejected.includes('filled up'),
+);
+check(
+  'renders no control at all when the upgrade is unavailable',
+  [barSettled, barCancelled, barFull, barRejected].every((h) => !/accessibilityRole="button"/.test(h)),
+);
+
+/*
+ * The consensus check. If a future change teaches one surface a rule the other
+ * does not know, this fails even when both look individually reasonable.
+ */
+const UPGRADE_STATES: { phase: RoomPhase; standing: ViewerStanding }[] = [
+  { phase: 'OPEN', standing: spectator },
+  { phase: 'FINAL_ARGUMENTS', standing: spectator },
+  { phase: 'JUDGING', standing: spectator },
+  { phase: 'SETTLED', standing: spectator },
+  { phase: 'CANCELLED', standing: spectator },
+  { phase: 'OPEN', standing: fullRoom },
+  { phase: 'OPEN', standing: rejectedUpgrade },
+];
+const disagreements = UPGRADE_STATES.filter(({ phase, standing }) => {
+  const barOffers = html(
+    <SpectatorJoinBar phase={phase} standing={standing} onJoinPress={() => {}} />,
+  ).includes('PICK A SIDE');
+  const regionOffers =
+    primaryRoomAction(phase, standing).action === 'upgrade_to_debater';
+  return barOffers !== regionOffers;
+});
+check(
+  'the join bar and the action region never disagree about an upgrade',
+  disagreements.length === 0,
+  disagreements.map((s) => s.phase).join(', '),
 );
 
 console.log('\n[VerdictRegion — the single result surface]');

@@ -5,6 +5,7 @@ import { AppText } from '../shared/AppText';
 import {
   primaryRoomAction,
   type RoomAction,
+  type RoomActionTarget,
   type RoomPhase,
   type ViewerStanding,
 } from '../../utils/arenaRoomEligibility';
@@ -30,8 +31,16 @@ import {
  *   · disabled → **no button at all**; a short sentence instead
  *
  * `target` names the surface that owns the action (`composer`, `join_sheet`,
- * `judging_panel`), so the screen cannot wire the CTA to a no-op without the
- * `target` being visibly wrong.
+ * `auth`), so the screen cannot wire the CTA to a no-op without the `target`
+ * being visibly wrong.
+ *
+ * ## Why there is no "cast your verdict" here
+ *
+ * There used to be one, and its only job was `scrollToEnd()` — which, on an
+ * inverted list, scrolls away from the judging panel it was meant to reveal. The
+ * panel is mounted permanently and contains the real ballot, so a second control
+ * could only be a duplicate or a decoy. The model now returns a sentence naming
+ * the panel instead, and this component renders that sentence.
  */
 export interface ActionRegionProps {
   phase: RoomPhase;
@@ -42,7 +51,7 @@ export interface ActionRegionProps {
    * Perform the offered action. Called only when the offer is enabled, and always
    * with a non-null target.
    */
-  onAction: (action: Exclude<RoomAction, 'none'>, target: 'composer' | 'join_sheet' | 'judging_panel') => void;
+  onAction: (action: Exclude<RoomAction, 'none'>, target: RoomActionTarget) => void;
 }
 
 export function ActionRegion({ phase, standing, busy = false, onAction }: ActionRegionProps): React.JSX.Element | null {

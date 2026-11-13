@@ -52,7 +52,7 @@ export const REGION_ORDER: readonly HierarchyRegion[] = [
  * apart; there is one definition of each.
  */
 export type { RoomPhase, ViewerRole } from './arenaRoomEligibility.ts';
-import type { RoomPhase, ViewerRole } from './arenaRoomEligibility.ts';
+import type { RoomPhase, ViewerRole, ViewerStanding } from './arenaRoomEligibility.ts';
 import { primaryRoomAction } from './arenaRoomEligibility.ts';
 
 /**
@@ -109,9 +109,15 @@ export interface ArenaHierarchyInput {
   mayJudge?: boolean;
   /** True when a next clash is actually available to start. */
   hasNextClash?: boolean;
-  /** Signed-out viewers can watch but never act. */
+  /** Defaults to `true`; a signed-out reader gets no action region. */
   signedIn?: boolean;
-  /** Membership as the server reported it. Absent means "not a member". */
+  /**
+   * Whether the viewer holds a participant row.
+   *
+   * Defaults to `true`, because every existing caller passes a concrete role and
+   * a role only exists on a participant row. A non-member must say so explicitly
+   * with `isMember: false` — the model will not infer membership from absence.
+   */
   isMember?: boolean;
   /** True when the server says this participant already recorded a side vote. */
   hasSideVote?: boolean;
@@ -120,6 +126,26 @@ export interface ArenaHierarchyInput {
    * own test. Passed through so the UI hides the upgrade the RPC would reject.
    */
   roomFull?: boolean;
+  /** True after the server rejected an upgrade with P0009. */
+  roomFullOnUpgrade?: boolean;
+}
+
+/**
+ * Translate the plan input into the shared eligibility vocabulary.
+ *
+ * This is the only place the mapping lives. Both `permittedAction()` and
+ * `needsActionRegion()` go through it, so the two cannot drift.
+ */
+function standingFor(input: ArenaHierarchyInput): ViewerStanding {
+  const { role, signedIn = true, isMember = true, hasSideVote, roomFull, roomFullOnUpgrade } = input;
+  return {
+    kind: !signedIn ? 'signed_out' : isMember ? 'member' : 'non_member',
+    role,
+    hasSideVote: hasSideVote === true,
+    hasArgumentVote: false,
+    roomFull: roomFull === true,
+    roomFullOnUpgrade: roomFullOnUpgrade === true,
+  };
 }
 
 /**
@@ -129,8 +155,7 @@ export interface ArenaHierarchyInput {
  * a screen from presenting three competing calls to action.
  */
 export function permittedAction(input: ArenaHierarchyInput): PermittedAction {
-  const { phase, role, hasNextClash = false, signedIn = true, isMember, hasSideVote, roomFull } =
-    input;
+  const { phase, hasNextClash = false, signedIn = true } = input;
 
   // Signed-out viewers can still read a room; they just cannot act in it.
   if (!signedIn) return 'watch';
@@ -147,27 +172,20 @@ export function permittedAction(input: ArenaHierarchyInput): PermittedAction {
    * `mayJudge` flag is deliberately ignored: only membership plus recorded-vote
    * state decide whether a ballot is offered.
    */
-  const offer = primaryRoomAction(phase, {
-    // `isMember` is authoritative when supplied; otherwise a participant role is
-    // the strongest evidence available, and a signed-in non-member gets null role.
-    isMember: isMember ?? role != null,
-    role,
-    hasSideVote: hasSideVote === true,
-    hasArgumentVote: false,
-    roomFull: roomFull === true,
-  });
+  const offer = primaryRoomAction(phase, standingFor(input));
 
   switch (offer.action) {
     case 'argue':
       return 'argue';
     case 'final_argument':
       return 'final_argument';
-    case 'cast_verdict':
-      return 'vote';
-    case 'join_debate':
+    case 'upgrade_to_debater':
       return 'join_side';
-    case 'open_judging':
-      // Judging is open but this viewer holds no ballot: following it is the action.
+    case 'watch':
+      // A non-member may be admitted as a spectator; that is still not an
+      // in-room action, so the hierarchy treats it as watching.
+      return 'watch';
+    case 'sign_in':
       return 'watch';
     case 'none':
       // A settled room can still offer the next clash, which lives outside the
@@ -225,24 +243,18 @@ export function needsActionRegion(input: ArenaHierarchyInput): boolean {
   // an auth wall, and building an in-room sign-in flow is out of scope here.
   if (!signedIn) return false;
 
-  const standing = {
-    isMember: isMember ?? role != null,
-    role,
-    hasSideVote: hasSideVote === true,
-    // Voting on someone else's argument is a separate grant, and no caller of this
-    // function is the argument-vote surface; it is never part of the offer here.
-    hasArgumentVote: false,
-    roomFull: roomFull === true,
-  };
+  const standing = standingFor(input);
 
   // There is a real control to offer.
   if (primaryRoomAction(phase, standing).action !== 'none') return true;
 
   // There is a fact the viewer is owed:
-  //   JUDGING — "you may not vote" is surprising and must be said out loud.
-  //   OPEN    — a non-member needs the invitation to join.
-  if (phase === 'JUDGING') return true;
-  if (phase === 'OPEN' && !standing.isMember) return true;
+  //   JUDGING — a member who may not vote (a spectator, or a debater who has
+  //             already voted) is owed the reason, since the ballot panel is on
+  //             screen and its absence would be ambiguous.
+  //   OPEN    — a non-member needs the invitation to be admitted.
+  if (phase === 'JUDGING' && standing.kind === 'member') return true;
+  if (phase === 'OPEN' && standing.kind !== 'member') return true;
 
   // FINAL_ARGUMENTS, SETTLED and CANCELLED with nothing to offer stay silent: the
   // floor and the result regions already answer the viewer's question.

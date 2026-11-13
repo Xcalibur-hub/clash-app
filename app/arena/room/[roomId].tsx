@@ -55,6 +55,7 @@ import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
 import { navLog } from '../../../utils/navDiagnostics';
 import { useArenaBackup } from '../../../hooks/useArenaBackup';
 import { useLiveArenaRoom } from '../../../hooks/useLiveArenaRoom';
+import { useAuth } from '../../../store/AuthProvider';
 import { useRoomTyping } from '../../../hooks/useRoomTyping';
 import { analytics } from '../../../services/analytics';
 import {
@@ -581,15 +582,31 @@ function RoomScope(): React.JSX.Element {
    * `roomFull` uses `upgrade_arena_spectator`'s own test —
    * `participant_count >= capacity` — so the UI and the RPC agree on "full".
    */
+  /*
+   * Three populations, not two.
+   *
+   * `room.viewer === null` means "no participant row" — but that covers both a
+   * signed-out reader and a signed-in user who has not joined this room. The
+   * previous code collapsed them, which is what let "Join this clash" reach a
+   * signed-out user and then call an upgrade RPC that requires a session *and* a
+   * participant row.
+   *
+   * `signedIn` comes from the auth store, which is the only source that
+   * distinguishes them.
+   */
+  const { signedIn } = useAuth();
   const viewerStanding: ViewerStanding = React.useMemo(
     () => ({
-      isMember: room?.viewer != null,
+      kind: room?.viewer != null ? 'member' : signedIn ? 'non_member' : 'signed_out',
       role: room?.viewer?.role ?? null,
       hasSideVote: room?.viewer?.hasSideVote === true,
       hasArgumentVote: room?.viewer?.hasArgumentVote === true,
+      // `upgrade_arena_spectator`'s own test.
       roomFull: room != null ? room.participantCount >= room.capacity : false,
+      // ...and the server's answer, which outranks a stale room snapshot.
+      roomFullOnUpgrade,
     }),
-    [room],
+    [room, signedIn, roomFullOnUpgrade],
   );
 
   const openProfile = React.useCallback(
@@ -780,7 +797,8 @@ function RoomScope(): React.JSX.Element {
       return (
         <SpectatorJoinBar
           busy={joining}
-          roomFull={roomFullOnUpgrade}
+          phase={room.status}
+          standing={viewerStanding}
           roomIndex={roomIndex ?? 0}
           onJoinPress={() => setJoinOpen(true)}
         />
@@ -1066,42 +1084,50 @@ function RoomScope(): React.JSX.Element {
             {/*
               The permitted action, projected from the server contract.
 
-              Two review defects are fixed here at once:
+              Every enabled offer carries a `target`, and every branch below
+              performs that target. Three review defects are closed here:
 
-              1. The Phase 2 "Cast your verdict" button had a handler that returned
-                 immediately — the most prominent control on screen did nothing.
-                 `primaryRoomAction()` now returns a `target`, and every branch below
-                 performs that target: the composer, the join sheet, or the judging
-                 panel (which is the control that actually records the ballot).
+              1. This region used to render a "Cast your verdict" button whose
+                 handler called `scrollToEnd()` on the inverted message list —
+                 which scrolls away from the judging panel that holds the ballot.
+                 The CTA is gone: `LiveRoomJudgingPanel` is mounted below and *is*
+                 the ballot, so the region now states that instead of duplicating
+                 it. Nothing about the panel, the keyboard or the empty-floor
+                 branch changes.
 
-              3. The old region advertised ballots to spectators and to debaters
-                 who had already voted. `submit_arena_side_vote` refuses both, so
-                 the UI promised actions that could never succeed. Eligibility now
-                 comes from the same pure function the tests exercise, so an
-                 unavailable action is a sentence, never a dead button.
+              2. "Join this clash" was offered to anyone without a participant
+                 row, including signed-out readers, and called `upgradeToDebater`
+                 — which the server rejects with `join the room first`. Signed-out
+                 users now go to auth; signed-in non-members are admitted as
+                 spectators through `watch_arena_room`. No new RPC is invented and
+                 no authorization is bypassed.
+
+              3. Eligibility is one shared decision, so an unavailable action is a
+                 sentence, never a dead button.
             */}
             {!settled && !isDuel ? (
               <ActionRegion
                 phase={room.status}
                 standing={viewerStanding}
                 busy={sending || joining || voting}
-                onAction={(action, target) => {
+                onAction={(_action, target) => {
                   hapticTap();
+                  if (target === 'auth') {
+                    // `useRequireAuth` routes to /auth and returns false; it is the
+                    // app's single gate for account-owned actions.
+                    requireAuth();
+                    return;
+                  }
                   if (target === 'join_sheet') {
                     setJoinOpen(true);
                     return;
                   }
-                  if (target === 'judging_panel') {
-                    // The ballot lives in the judging panel mounted in `bottom`.
-                    // Bring it into view rather than acknowledging into the void.
-                    listRef.current?.scrollToEnd({ animated: true });
-                    return;
+                  if (target === 'composer') {
+                    // Both 'argue' and 'final_argument' are posts, so both hand
+                    // off to the composer, which is also the surface that enforces
+                    // the OPEN / FINAL_ARGUMENTS window server-side.
+                    setComposerFocus((n) => n + 1);
                   }
-                  // target === 'composer' — focus the argument input.
-                  // Both 'argue' and 'final_argument' are posts, so both hand off
-                  // to the composer — which is also the surface that enforces the
-                  // OPEN / FINAL_ARGUMENTS window server-side.
-                  setComposerFocus((n) => n + 1);
                 }}
               />
             ) : null}

@@ -3,6 +3,14 @@
  *
  * Stance note: spectators store null stance by design (privacy). Upgrade always
  * requires a fresh private stance choice — there is no safe reuse path.
+ *
+ * ## Eligibility is not decided here
+ *
+ * This bar used to receive a `roomFull` boolean and infer the rest, so it kept
+ * offering "PICK A SIDE" in SETTLED rooms (where `upgrade_arena_spectator` raises
+ * `this room is no longer accepting debaters`) and after the server had already
+ * refused an upgrade with P0009. It now asks `canUpgradeToDebater()` — the same
+ * predicate `ActionRegion` uses — and renders an explanation when the answer is no.
  */
 import React from 'react';
 import {
@@ -23,6 +31,11 @@ import Animated, {
 import type { Stance } from '../../services/liveArenaService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
+import {
+  canUpgradeToDebater,
+  type RoomPhase,
+  type ViewerStanding,
+} from '../../utils/arenaRoomEligibility';
 import { softFill } from './liveArenaStyles';
 
 const CHOICES: readonly { key: Stance; label: string }[] = [
@@ -33,18 +46,31 @@ const CHOICES: readonly { key: Stance; label: string }[] = [
 
 export interface SpectatorJoinBarProps {
   busy?: boolean;
-  roomFull?: boolean;
+  /** Current room phase. Upgrades are illegal in SETTLED / CANCELLED. */
+  phase: RoomPhase;
+  /** The viewer's server-reported standing, including any recorded P0009. */
+  standing: ViewerStanding;
   roomIndex?: number | null;
   onJoinPress: () => void;
 }
 
 export function SpectatorJoinBar({
   busy = false,
-  roomFull = false,
+  phase,
+  standing,
   roomIndex = null,
   onJoinPress,
 }: SpectatorJoinBarProps): React.JSX.Element {
   const t = useThemeColors();
+
+  /*
+   * The one upgrade decision. Everything below — the CTA, the copy, whether the
+   * join sheet may be opened at all — reads this and nothing else.
+   */
+  const canUpgrade = canUpgradeToDebater(phase, standing);
+  // Distinguish the two reasons a spectator cannot upgrade, because they call for
+  // different copy: the room closed, or the room filled.
+  const full = standing.roomFull === true || standing.roomFullOnUpgrade === true;
 
   return (
     <View style={styles.wrap}>
@@ -59,13 +85,20 @@ export function SpectatorJoinBar({
         ]}
       >
         <Text style={[styles.watching, { color: t.textMuted }]}>
-          {roomFull
-            ? 'This room filled up while you were watching.'
-            : roomIndex != null
-              ? `WATCHER · Room ${roomIndex}`
-              : 'WATCHER'}
+          {roomIndex != null ? `WATCHER · Room ${roomIndex}` : 'WATCHER'}
         </Text>
-        {!roomFull ? (
+        {!canUpgrade ? (
+          /*
+           * No control when the server would refuse. A greyed-out "PICK A SIDE"
+           * still reads as an invitation, which is what made the old bar keep
+           * promising an upgrade that could never complete.
+           */
+          <Text style={[styles.fullText, { color: t.textMuted }]}>
+            {full
+              ? 'This room filled up while you were watching.'
+              : 'This room is no longer accepting new voices.'}
+          </Text>
+        ) : (
           <Pressable
             onPress={() => {
               hapticTap();
@@ -84,7 +117,7 @@ export function SpectatorJoinBar({
               </Text>
             )}
           </Pressable>
-        ) : null}
+        )}
       </View>
     </View>
   );
@@ -204,6 +237,11 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
     elevation: 5,
+  },
+  fullText: {
+    flexShrink: 1,
+    ...typeScale.meta,
+    textAlign: 'right',
   },
   watching: {
     ...typeScale.meta,

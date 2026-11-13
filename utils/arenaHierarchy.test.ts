@@ -62,6 +62,16 @@ describe('Arena hierarchy', () => {
     const full = { phase: 'FINAL_ARGUMENTS', role: 'spectator', roomFull: true } as const;
     assert.equal(permittedAction(full), 'watch');
     assert.equal(arenaRegionPlan(full).some((p) => p.region === 'action'), false);
+
+    // ...and the same holds after the server rejected an upgrade with P0009, even
+    // though the room snapshot still claims a free slot.
+    const rejected = {
+      phase: 'FINAL_ARGUMENTS',
+      role: 'spectator',
+      roomFull: false,
+      roomFullOnUpgrade: true,
+    } as const;
+    assert.equal(permittedAction(rejected), 'watch');
     // A full room also removes the OPEN-phase invitation, for the same reason.
     assert.equal(permittedAction({ phase: 'OPEN', role: 'spectator', roomFull: true }), 'watch');
   });
@@ -78,15 +88,23 @@ describe('Arena hierarchy', () => {
      */
     const spectator = { phase: 'JUDGING', role: 'spectator' } as const;
     assert.equal(needsActionRegion(spectator), true, 'JUDGING must explain itself to a spectator');
-    assert.equal(
-      permittedAction(spectator),
-      'watch',
-      'explaining the exclusion must not become advertising a ballot',
-    );
     assert.equal(arenaRegionPlan(spectator).some((p) => p.region === 'action'), true);
 
-    // ...while a debater who still holds a ballot gets the real offer.
-    assert.equal(permittedAction({ ...spectator, role: 'debater', isMember: true }), 'vote');
+    /*
+     * A spectator during JUDGING gets `join_side`, not `watch`, because
+     * `upgrade_arena_spectator` explicitly admits `status = 'JUDGING'`: they can
+     * still take a side and vote with the fighters. What they must never get is a
+     * ballot *without* upgrading — that is the exclusion the region states.
+     */
+    assert.equal(permittedAction(spectator), 'join_side');
+
+    // ...while a debater's ballot is held by the judging panel, not by an offer
+    // here — the "cast your verdict" CTA was removed as a duplicate door.
+    assert.equal(permittedAction({ ...spectator, role: 'debater', isMember: true }), 'watch');
+    assert.equal(
+      permittedAction({ ...spectator, role: 'debater', isMember: true, hasSideVote: true }),
+      'watch',
+    );
   });
 
   it('gives a fighter the floor action during open and final arguments', () => {
