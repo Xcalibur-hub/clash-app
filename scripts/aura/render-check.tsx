@@ -27,7 +27,9 @@ import { ActionRegion } from '../../components/arena/ActionRegion';
 import { memberStanding, primaryRoomAction, type ViewerStanding } from '../../utils/arenaRoomEligibility';
 import type { ArenaRoomViewer } from '../../services/liveArenaService';
 import { VerdictRegion } from '../../components/arena/VerdictRegion';
-import { SpectatorJoinBar } from '../../components/liveArena/SpectatorJoinBar';
+import { SpectatorJoinBar, JoinDebateSheet } from '../../components/liveArena/SpectatorJoinBar';
+import { WatchRoomSheet } from '../../components/liveArena/WatchRoomSheet';
+import { admissionFor } from '../../utils/arenaAdmission';
 import type { RoomPhase } from '../../utils/arenaRoomEligibility';
 import { LiveClashFeature } from '../../components/arena/LiveClashFeature';
 
@@ -249,7 +251,11 @@ const clickOf = (h: string, label: string): boolean =>
 check(
   'every enabled offer names a performable target',
   [
-    clickOf(outsiderAction, 'Watch this room') && primaryRoomAction('OPEN', nonMember).target === 'join_sheet',
+    // A non-member is admitted via `watch_arena_room`, which takes no stance —
+    // so the CTA must point at the watch surface, not the stance sheet. Pointing
+    // it at the sheet was the integration blocker.
+    clickOf(outsiderAction, 'Watch this room') &&
+      primaryRoomAction('OPEN', nonMember).target === 'watch_confirm',
     clickOf(signedOutAction, 'Sign in to take part') && primaryRoomAction('OPEN', signedOut).target === 'auth',
     clickOf(fighterAction, 'Make your argument') && primaryRoomAction('OPEN', debater).target === 'composer',
     clickOf(spectatorOpen, 'Pick a side') && primaryRoomAction('OPEN', spectator).target === 'join_sheet',
@@ -323,6 +329,91 @@ check(
   'the join bar and the action region never disagree about an upgrade',
   disagreements.length === 0,
   disagreements.map((s) => s.phase).join(', '),
+);
+
+console.log('\n[Admission — Watch and Upgrade never share a handler]');
+/*
+ * The integration blocker, exercised through mounted components.
+ *
+ * Watch and Upgrade are different operations:
+ *   watch_arena_room(p_room_id)                  — no stance, no capacity
+ *   upgrade_arena_spectator(p_room_id, p_stance) — stance required, needs a row
+ *
+ * The join sheet collected a stance and called the upgrade RPC for everyone, so a
+ * non-member's tap could only ever 42501. These checks mount both sheets and assert
+ * they solicit and submit different things.
+ */
+const watchSheet = html(<WatchRoomSheet visible roomIndex={3} onClose={() => {}} onConfirm={() => {}} />);
+const joinSheet = html(<JoinDebateSheet visible roomIndex={3} onClose={() => {}} onChoose={() => {}} />);
+
+check(
+  'the watch sheet confirms admission and asks for no stance',
+  watchSheet.includes('WATCH THIS CLASH') &&
+    !/Agree|Disagree|Unsure/.test(watchSheet),
+  watchSheet.slice(0, 160),
+);
+check(
+  'the watch sheet states that a spectator does not vote',
+  /do not pick a side, and do not vote/i.test(watchSheet),
+);
+check(
+  'the stance sheet still solicits the stance the upgrade RPC requires',
+  /Agree/.test(joinSheet) && /Disagree/.test(joinSheet) && /Unsure/.test(joinSheet),
+);
+check(
+  'the two sheets are not the same surface',
+  watchSheet !== joinSheet &&
+    watchSheet.includes('WATCH THIS CLASH') &&
+    !joinSheet.includes('WATCH THIS CLASH'),
+);
+
+// Busy state: both sheets must refuse a second tap while a call is in flight.
+const watchBusy = html(
+  <WatchRoomSheet visible busy roomIndex={3} onClose={() => {}} onConfirm={() => {}} />,
+);
+check(
+  'a busy watch sheet disables its confirm control',
+  /accessibilityState="[^"]*disabled[^"]*"|disabled=""/.test(watchBusy) &&
+    !watchBusy.includes('WATCH THIS CLASH'),
+  watchBusy.slice(0, 160),
+);
+
+// Cancellation: the viewer can always back out, which is the retry path.
+check(
+  'the watch sheet offers a way out',
+  /accessibilityLabel="Not now"/.test(watchSheet),
+);
+
+// --- per-standing routing ---------------------------------------------------
+/*
+ * The decisive evidence for the report: for each of the five populations, assert
+ * the operation and the surface. This is the mapping the handler dispatches on,
+ * so a wrong entry here is a wrong RPC in the app.
+ */
+const ROUTES: { name: string; phase: RoomPhase; standing: ViewerStanding; op: string; target: string | null }[] = [
+  { name: 'signed out', phase: 'OPEN', standing: signedOut, op: 'authenticate', target: 'auth' },
+  { name: 'non-member', phase: 'OPEN', standing: nonMember, op: 'watch', target: 'watch_confirm' },
+  { name: 'spectator', phase: 'OPEN', standing: spectator, op: 'upgrade', target: 'stance_sheet' },
+  { name: 'debater', phase: 'OPEN', standing: debater, op: 'none', target: null },
+  { name: 'full room', phase: 'OPEN', standing: fullRoom, op: 'none', target: null },
+  { name: 'rejected P0009', phase: 'OPEN', standing: rejectedUpgrade, op: 'none', target: null },
+  { name: 'settled', phase: 'SETTLED', standing: spectator, op: 'none', target: null },
+  { name: 'cancelled', phase: 'CANCELLED', standing: spectator, op: 'none', target: null },
+];
+const wrongRoutes = ROUTES.filter((route) => {
+  const d = admissionFor(route.phase, route.standing);
+  return d.operation !== route.op || d.target !== route.target;
+});
+check(
+  'every standing routes to the right operation and surface',
+  wrongRoutes.length === 0,
+  wrongRoutes.map((r) => `${r.name}: got ${admissionFor(r.phase, r.standing).operation}/${admissionFor(r.phase, r.standing).target}`).join('; '),
+);
+
+check(
+  'the action region sends a non-member to the watch surface, not the stance sheet',
+  primaryRoomAction('OPEN', nonMember).target === 'watch_confirm' &&
+    primaryRoomAction('OPEN', spectator).target === 'join_sheet',
 );
 
 console.log('\n[VerdictRegion — the single result surface]');

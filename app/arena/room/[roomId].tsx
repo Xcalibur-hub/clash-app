@@ -24,6 +24,7 @@ import { LiveRoomEventBanner } from '../../../components/liveArena/LiveRoomEvent
 import { ClashHeader } from '../../../components/arena/ClashHeader';
 import { VerdictRegion } from '../../../components/arena/VerdictRegion';
 import { ActionRegion } from '../../../components/arena/ActionRegion';
+import { canUpgradeToDebater } from '../../../utils/arenaRoomEligibility';
 import type { ViewerStanding } from '../../../utils/arenaRoomEligibility';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
 import { DuelRoomOutcome } from '../../../components/liveArena/DuelRoomOutcome';
@@ -45,6 +46,7 @@ import {
   JoinDebateSheet,
   SpectatorJoinBar,
 } from '../../../components/liveArena/SpectatorJoinBar';
+import { WatchRoomSheet } from '../../../components/liveArena/WatchRoomSheet';
 import { PostActionsSheet } from '../../../components/arena/PostActionsSheet';
 import { EmptyState } from '../../../components/shared/EmptyState';
 import { Notice } from '../../../components/shared/Notice';
@@ -181,6 +183,8 @@ function RoomScope(): React.JSX.Element {
     loadingOlder,
     hasOlder,
     roomFullOnUpgrade,
+    watchAsSpectator,
+    watchFailed,
     refresh,
     loadOlder,
     send,
@@ -211,6 +215,7 @@ function RoomScope(): React.JSX.Element {
   const [proofOpen, setProofOpen] = React.useState(false);
   const [joinOpen, setJoinOpen] = React.useState(false);
   const [joining, setJoining] = React.useState(false);
+  const [watchOpen, setWatchOpen] = React.useState(false);
   const [safety, setSafety] = React.useState<SafetyTarget | null>(null);
   const [voting, setVoting] = React.useState(false);
   const [roomIndex, setRoomIndex] = React.useState<number | null>(null);
@@ -900,6 +905,9 @@ function RoomScope(): React.JSX.Element {
         isDebater={isDebater}
         isSpectator={isSpectator && !isDuel}
         accepting={accepting}
+        // The same upgrade decision every other surface uses — this stage was the
+        // one place a full room still offered "PICK A SIDE".
+        canUpgrade={canUpgradeToDebater(room.status, viewerStanding)}
         onStartArgument={() => setComposerFocus((n) => n + 1)}
         onJoinDebate={() => setJoinOpen(true)}
       />
@@ -1118,7 +1126,16 @@ function RoomScope(): React.JSX.Element {
                     requireAuth();
                     return;
                   }
+                  if (target === 'watch_confirm') {
+                    // Spectator admission is `watch_arena_room`: no stance, no
+                    // capacity, and emphatically not the stance sheet, whose
+                    // handler calls the upgrade RPC and would 42501 here.
+                    setWatchOpen(true);
+                    return;
+                  }
                   if (target === 'join_sheet') {
+                    // The stance sheet exists for one caller only: an existing
+                    // spectator upgrading via `upgrade_arena_spectator`.
                     setJoinOpen(true);
                     return;
                   }
@@ -1171,6 +1188,36 @@ function RoomScope(): React.JSX.Element {
         onClose={() => setProofOpen(false)}
         onSubmit={(input) => addEvidence(input)}
         onError={notify}
+      />
+
+      {/*
+        Admission — `watch_arena_room`. Deliberately its own sheet with its own
+        handler. The two operations take different arguments (no stance here, a
+        required stance there), hit different RPCs, and fail for different reasons,
+        so a shared sheet could only ever be right for one of them.
+      */}
+      <WatchRoomSheet
+        visible={watchOpen}
+        busy={joining}
+        roomIndex={roomIndex ?? 0}
+        onClose={() => {
+          if (joining) return;
+          setWatchOpen(false);
+        }}
+        onConfirm={() => {
+          setJoining(true);
+          void watchAsSpectator()
+            .then((ok) => {
+              if (ok) {
+                setWatchOpen(false);
+                void loadPresence();
+              }
+              // On failure the sheet stays open: admission is retryable, and
+              // `watchFailed` drives the notice. Closing it would strand the
+              // viewer with no way back to the action that failed.
+            })
+            .finally(() => setJoining(false));
+        }}
       />
 
       <JoinDebateSheet

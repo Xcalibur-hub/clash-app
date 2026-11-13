@@ -26,6 +26,7 @@ import {
   submitSideVote,
   subscribeRoomMessages,
   upgradeSpectator,
+  watchRoom,
   type ArenaAuthor,
   type ArenaEvidence,
   type ArenaMessage,
@@ -84,6 +85,14 @@ export interface LiveArenaRoomController {
   recordFinal: (stance: Stance) => Promise<boolean>;
   /** Spectator â†’ debater in-place. Refreshes room state on success. */
   upgradeToDebater: (stance: Stance) => Promise<boolean>;
+  /**
+   * Non-member â†’ spectator. `watch_arena_room`, which takes no stance and
+   * consumes no capacity. This is NOT `upgradeToDebater`: that RPC requires an
+   * existing participant row and refuses a non-member with 42501.
+   */
+  watchAsSpectator: () => Promise<boolean>;
+  /** True after `watch_arena_room` failed in a way the viewer can retry. */
+  watchFailed: boolean;
 }
 
 /** Newest-first merge that keeps one row per id â€” an optimistic echo never doubles. */
@@ -139,6 +148,10 @@ export function useLiveArenaRoom(
   const [loadingOlder, setLoadingOlder] = React.useState(false);
   const [hasOlder, setHasOlder] = React.useState(true);
   const [roomFullOnUpgrade, setRoomFullOnUpgrade] = React.useState(false);
+  // Set when `watch_arena_room` fails. Distinct from `roomFullOnUpgrade`: a
+  // failed admission is retryable, so the UI must keep the control available and
+  // just report what happened — it must not permanently hide the offer.
+  const [watchFailed, setWatchFailed] = React.useState(false);
 
   const mounted = React.useRef(false);
   const accessGeneration = React.useRef(0);
@@ -987,6 +1000,42 @@ export function useLiveArenaRoom(
     [dispatch, notify, roomId, liveSession],
   );
 
+  /*
+   * Spectator admission for a signed-in non-member.
+   *
+   * `watch_arena_room(p_room_id)` — session only, no stance, no capacity. It is
+   * deliberately a separate callback from `upgradeToDebater`:
+   *
+   *   · different RPC        (INSERT a spectator row vs UPDATE role)
+   *   · different arity      (no stance argument exists on the server)
+   *   · different failures   (42501 here means "not signed in"; there it means
+   *                           "no participant row")
+   *
+   * Folding them together is what produced the integration blocker, so they are
+   * kept structurally distinct rather than branch-ed at a shared call site.
+   */
+  const watchAsSpectator = React.useCallback(async (): Promise<boolean> => {
+    const session = sessionRef.current;
+    if (session.roomId !== roomId || !liveSession(session)) return false;
+    try {
+      if (mounted.current) setWatchFailed(false);
+      await watchRoom(session.roomId);
+      if (!liveSession(session)) return false;
+      // Re-read rather than assume: the server decides the resulting role, and a
+      // prior debater row makes `watch_arena_room` refuse a move between rooms.
+      const next = await fetchRoom(session.roomId);
+      if (!liveSession(session)) return false;
+      setRoom(next);
+      return true;
+    } catch (caught) {
+      if (!liveSession(session)) return false;
+      // Retryable: leave the offer in place and say what happened.
+      if (mounted.current) setWatchFailed(true);
+      notify(caught);
+      return false;
+    }
+  }, [notify, roomId, liveSession]);
+
   return {
     room,
     messages,
@@ -1000,6 +1049,8 @@ export function useLiveArenaRoom(
     loadingOlder,
     hasOlder,
     roomFullOnUpgrade,
+    watchAsSpectator,
+    watchFailed,
     refresh,
     loadOlder,
     send,

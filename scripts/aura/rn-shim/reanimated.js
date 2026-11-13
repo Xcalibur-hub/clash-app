@@ -9,6 +9,20 @@ const identity = (t) => t;
  * real primitive representation — a Proxy that answers every property with a
  * function makes coercion throw "Cannot convert object to primitive value".
  */
+/**
+ * A mutable stand-in for a Reanimated shared value.
+ *
+ * The real API is `.value = withSpring(...)`. A plain object works, but the
+ * animation functions must return something assignable — returning `undefined`
+ * silently blanks the value, and a later `scale.value` read then produces
+ * `transform: [{ scale: undefined }]`, which is what made a mounted
+ * `Animated.View` fail here. Each helper echoes its target so assignment is a
+ * no-op rather than an erase.
+ */
+function shared(value) {
+  return { value };
+}
+
 function chainable() {
   const node = {
     delay: () => node,
@@ -36,10 +50,11 @@ const Easing = {
 module.exports = {
   Easing,
   useReducedMotion: () => false,
-  useSharedValue: (v) => ({ value: v }),
+  useSharedValue: (v) => shared(v),
   useAnimatedStyle: (f) => f(),
   withTiming: (v) => v,
   withSpring: (v) => v,
+  withDecay: (v) => v,
   withDelay: (_d, v) => v,
   withSequence: (...v) => v[v.length - 1],
   runOnJS: (f) => f,

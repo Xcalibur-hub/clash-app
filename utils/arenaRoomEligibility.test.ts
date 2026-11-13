@@ -145,7 +145,13 @@ describe('defect 2 — non-members are never routed into the upgrade RPC', () =>
     // This is a *different* action from the upgrade, with a different RPC.
     const o = primaryRoomAction('OPEN', nonMember);
     assert.equal(o.action, 'watch');
-    assert.equal(o.target, 'join_sheet');
+    /*
+     * `watch_confirm`, not `join_sheet`. The join sheet collects a stance and
+     * calls `upgradeToDebater`; a non-member reaching it gets 42501. Admission is
+     * `watch_arena_room(p_room_id)` — no stance, no capacity — so it needs its own
+     * surface. Routing both through one handler was the integration blocker.
+     */
+    assert.equal(o.target, 'watch_confirm');
     assert.equal(o.enabled, true);
     // The label must not promise a debate seat it cannot deliver.
     assert.doesNotMatch(o.label, /join the debate/i);

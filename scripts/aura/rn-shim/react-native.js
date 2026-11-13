@@ -59,6 +59,19 @@ module.exports = {
   ScrollView: el('ScrollView'),
   Image: el('Image'),
   ActivityIndicator: el('ActivityIndicator'),
+  /*
+   * `Modal` renders its children inline in the probe.
+   *
+   * Static markup has no portal, and the checks here are about *which sheet is
+   * mounted and what it says* — not about presentation order. Rendering children
+   * unconditionally also keeps `visible` from silently hiding a broken sheet.
+   */
+  Modal: el('Modal'),
+  Switch: el('Switch'),
+  Platform: { OS: 'ios', select: (o) => (o && (o.ios ?? o.default)) },
+  Dimensions: { get: () => ({ width: 390, height: 844 }) },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
+  Appearance: { getColorScheme: () => 'light' },
   StyleSheet,
   Platform: { OS: 'android', select: (o) => o.android ?? o.default },
   useColorScheme: () => 'dark',

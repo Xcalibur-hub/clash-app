@@ -39,6 +39,9 @@ const MUST_SHIP = [
   // so it belongs on the must-ship list with the rest.
   'utils/arenaRoomEligibility.ts',
   'utils/arenaFunctionalCorrections.test.ts',
+  'utils/arenaAdmission.ts',
+  'utils/arenaAdmission.test.ts',
+  'components/liveArena/WatchRoomSheet.tsx',
   'utils/arenaResultConsolidation.test.ts',
   'utils/arenaRoomEligibility.test.ts',
 ];

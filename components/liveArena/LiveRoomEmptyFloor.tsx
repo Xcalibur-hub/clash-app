@@ -15,6 +15,16 @@ export interface LiveRoomEmptyFloorProps {
   isDebater: boolean;
   isSpectator: boolean;
   accepting: boolean;
+  /**
+   * Whether `upgrade_arena_spectator` would accept this viewer right now.
+   *
+   * Passed in rather than derived from `isSpectator && accepting`, because that
+   * pair says nothing about capacity: a full room offered "PICK A SIDE" from this
+   * stage and then failed with P0009. The caller computes it from
+   * `canUpgradeToDebater()`, the same predicate the join bar and action region
+   * use, so all three surfaces agree.
+   */
+  canUpgrade: boolean;
   onStartArgument: () => void;
   onJoinDebate: () => void;
 }
@@ -25,6 +35,7 @@ export function LiveRoomEmptyFloor({
   isDebater,
   isSpectator,
   accepting,
+  canUpgrade,
   onStartArgument,
   onJoinDebate,
 }: LiveRoomEmptyFloorProps): React.JSX.Element {
@@ -78,7 +89,7 @@ export function LiveRoomEmptyFloor({
         </Pressable>
       ) : null}
 
-      {isSpectator && accepting ? (
+      {isSpectator && accepting && canUpgrade ? (
         <Pressable
           onPress={() => {
             hapticTap();

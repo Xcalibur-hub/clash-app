@@ -97,7 +97,11 @@ export type RoomAction =
   | 'watch'
   | 'none';
 
-export type RoomActionTarget = 'composer' | 'join_sheet' | 'auth';
+export type RoomActionTarget =
+  | 'composer'
+  | 'join_sheet' // the stance sheet — upgrade only
+  | 'watch_confirm' // spectator admission — no stance, a different RPC
+  | 'auth';
 
 export interface RoomActionOffer {
   action: RoomAction;
@@ -243,12 +247,21 @@ export function primaryRoomAction(phase: RoomPhase, standing: ViewerStanding): R
         reason: 'This room is not accepting new spectators.',
       });
     }
+    /*
+     * `watch_confirm`, not `join_sheet`.
+     *
+     * The join sheet collects a stance and calls `upgradeToDebater`. A
+     * non-member reaching it gets 42501 (`join the room first`) because there is
+     * no row to upgrade. Admission is `watch_arena_room(p_room_id)` — a session,
+     * no stance, no capacity — so it needs its own surface. Routing both through
+     * one handler was the integration blocker.
+     */
     return offer({
       action: 'watch',
       label: 'Watch this room',
       enabled: true,
       reason: 'Joining as a spectator lets you read the arguments. Fighters pick a side.',
-      target: 'join_sheet',
+      target: 'watch_confirm',
     });
   }
 

@@ -144,7 +144,9 @@ describe('defect 2 — non-members never reach the upgrade RPC', () => {
 
   it('sends the two outsider populations to different places', () => {
     assert.equal(primaryRoomAction('OPEN', signedOut).target, 'auth');
-    assert.equal(primaryRoomAction('OPEN', nonMember).target, 'join_sheet');
+    // A non-member is admitted by `watch_arena_room`, which takes no stance. The
+    // stance sheet (`join_sheet`) is the upgrade surface and would 42501 here.
+    assert.equal(primaryRoomAction('OPEN', nonMember).target, 'watch_confirm');
     assert.equal(primaryRoomAction('OPEN', signedOut).action, 'sign_in');
     assert.equal(primaryRoomAction('OPEN', nonMember).action, 'watch');
   });
@@ -219,7 +221,12 @@ describe('wiring integrity', () => {
      * asserts the screen handles all three.
      */
     const room = code(ROOM);
-    for (const target of ['auth', 'join_sheet', 'composer']) {
+    /*
+     * Four targets, and each must have its own branch. The list is exhaustive on
+     * purpose: when `watch_confirm` was added, this test failed until the screen
+     * handled it — which is exactly the "dead button" class it was written for.
+     */
+    for (const target of ['auth', 'watch_confirm', 'join_sheet', 'composer']) {
       assert.match(room, new RegExp(`target === '${target}'`), `no branch for target '${target}'`);
     }
   });
