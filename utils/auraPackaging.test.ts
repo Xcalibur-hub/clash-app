@@ -40,6 +40,8 @@ const MUST_SHIP = [
   'utils/arenaRoomEligibility.ts',
   'utils/arenaFunctionalCorrections.test.ts',
   'utils/arenaAdmission.ts',
+  'utils/arenaAdmissionRefresh.ts',
+  'utils/arenaJourneyAudit.test.ts',
   'utils/arenaAdmission.test.ts',
   'components/liveArena/WatchRoomSheet.tsx',
   'utils/arenaResultConsolidation.test.ts',

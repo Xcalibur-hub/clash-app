@@ -31,6 +31,20 @@ export interface WatchRoomSheetProps {
   visible: boolean;
   busy?: boolean;
   roomIndex?: number | null;
+  /**
+   * Why admission became unavailable, if it did.
+   *
+   * The room can settle or be cancelled while this sheet is open — the phase is
+   * realtime and the viewer may take a while to tap. When that happens the
+   * confirm control must disappear rather than fire a call the server now
+   * rejects, and the sheet must say why. A silent close would be worse: the
+   * viewer tapped "Watch", and something needs to explain that the option is
+   * gone.
+   *
+   * Non-null disables confirmation; the sheet stays mounted so the reason is
+   * visible.
+   */
+  blockedReason?: string | null;
   onClose: () => void;
   /** Performs `watch_arena_room`. Resolves true once the row exists. */
   onConfirm: () => void;
@@ -40,10 +54,15 @@ export function WatchRoomSheet({
   visible,
   busy = false,
   roomIndex = null,
+  blockedReason = null,
   onClose,
   onConfirm,
 }: WatchRoomSheetProps): React.JSX.Element {
   const t = useThemeColors();
+  // One predicate for "can this be confirmed". The button, its accessibility
+  // state and the handler all read it, so a stale tap cannot slip through.
+  const blocked = blockedReason !== null;
+  const disabled = busy || blocked;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -67,29 +86,43 @@ export function WatchRoomSheet({
             join the debate once you are in — while the room is still open.
           </Text>
 
-          <Pressable
-            onPress={() => {
-              hapticTap();
-              onConfirm();
-            }}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel="Watch this clash"
-            accessibilityState={{ disabled: busy, busy }}
-            style={({ pressed }) => [
-              styles.confirm,
-              {
-                backgroundColor: busy ? t.surfaceMuted : t.textPrimary,
-                opacity: pressed && !busy ? 0.92 : 1,
-              },
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={t.textMuted} />
-            ) : (
-              <Text style={[typeScale.button, { color: t.background }]}>WATCH THIS CLASH</Text>
-            )}
-          </Pressable>
+          {blocked ? (
+            /*
+             * No control at all. A disabled button still reads as an invitation,
+             * and the whole point of this state is that the invitation expired.
+             */
+            <Text
+              style={[styles.blocked, { color: t.textMuted }]}
+              accessibilityLiveRegion="polite"
+            >
+              {blockedReason}
+            </Text>
+          ) : (
+            <Pressable
+              onPress={() => {
+                if (disabled) return;
+                hapticTap();
+                onConfirm();
+              }}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel="Watch this clash"
+              accessibilityState={{ disabled, busy }}
+              style={({ pressed }) => [
+                styles.confirm,
+                {
+                  backgroundColor: busy ? t.surfaceMuted : t.textPrimary,
+                  opacity: pressed && !busy ? 0.92 : 1,
+                },
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator color={t.textMuted} />
+              ) : (
+                <Text style={[typeScale.button, { color: t.background }]}>WATCH THIS CLASH</Text>
+              )}
+            </Pressable>
+          )}
 
           <Pressable
             onPress={onClose}
@@ -131,5 +164,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancel: { alignItems: 'center', paddingVertical: space.sm },
+  blocked: { ...typeScale.meta, lineHeight: 20, paddingVertical: space.sm },
+  // 48dp minimum touch target. The label is small text, so padding alone left it
+  // around 40dp — below the platform minimum and hard to hit one-handed.
+  cancel: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingVertical: space.sm },
 });

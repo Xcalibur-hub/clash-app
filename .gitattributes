@@ -1,0 +1,27 @@
+# Normalise line endings so the repository is byte-identical on every platform.
+#
+# Without this, a Windows checkout (where `core.autocrlf=true` is the git default)
+# rewrites every text file to CRLF. That is not cosmetic here: the patch-hygiene
+# suite splits source on '\n' and compares lines to their `trimEnd()`, so CRLF made
+# it report hundreds of phantom trailing-whitespace offenders. The gate passed on
+# Linux and failed on Windows.
+#
+# `text=auto` tells git to store LF in the object database and check out native
+# endings; `eol=lf` forces LF in the working tree too, which keeps the test's
+# assumptions true everywhere. Binary assets are excluded explicitly.
+* text=auto eol=lf
+
+# Images and other binaries must never be touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.ttf binary
+*.otf binary
+
+# Lockfiles are generated; normalising them creates noisy diffs.
+package-lock.json -text

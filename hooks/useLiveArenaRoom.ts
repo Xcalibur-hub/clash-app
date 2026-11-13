@@ -37,6 +37,7 @@ import {
   type SubmitArenaEvidenceInput,
 } from '../services/liveArenaService';
 import { errorText, SupabaseError } from '../services/supabaseClient';
+import { admissionFor } from '../utils/arenaAdmission';
 import { showNotice, useClash } from '../store';
 import {
   createTranscriptUpdater,
@@ -1017,6 +1018,47 @@ export function useLiveArenaRoom(
   const watchAsSpectator = React.useCallback(async (): Promise<boolean> => {
     const session = sessionRef.current;
     if (session.roomId !== roomId || !liveSession(session)) return false;
+
+    /*
+     * Re-check eligibility at call time, not only at render time.
+     *
+     * The sheet withdraws its control when admission becomes illegal, but a tap
+     * can land in the same tick as a phase change — before React re-renders the
+     * blocked state. Without this guard that stale tap reaches
+     * `watch_arena_room`, and the server rejects it: safe, but it reports the
+     * wrong thing. The viewer would see a generic failure instead of "this room
+     * closed".
+     *
+     * `roomRef` holds the freshest server state the hook has, and the check is the
+     * same model the screen renders from, so the two cannot disagree.
+     */
+    const current = roomRef.current;
+    if (current) {
+      if (current.status === 'SETTLED' || current.status === 'CANCELLED') {
+        if (mounted.current) setWatchFailed(true);
+        dispatch(showNotice(admissionFor(current.status, {
+          kind: current.viewer != null ? 'member' : 'non_member',
+          role: current.viewer?.role ?? null,
+          hasSideVote: current.viewer?.hasSideVote === true,
+          hasArgumentVote: current.viewer?.hasArgumentVote === true,
+        }).reason ?? 'This room is no longer open.'));
+        return false;
+      }
+      /*
+       * Already a participant. Returning `true` here would be worse than useless:
+       * the caller closes the sheet and reports success for an admission that
+       * never happened, and a member *spectator* would be left believing they had
+       * been admitted as a debater. This path is not reachable from the UI — the
+       * watch offer only exists for non-members — so reaching it means the state
+       * changed mid-tap. Refuse, and do not call the RPC.
+       */
+      if (current.viewer != null) {
+        if (mounted.current) setWatchFailed(true);
+        dispatch(showNotice('You are already taking part in this room.'));
+        return false;
+      }
+    }
+
     try {
       if (mounted.current) setWatchFailed(false);
       await watchRoom(session.roomId);
@@ -1026,6 +1068,27 @@ export function useLiveArenaRoom(
       const next = await fetchRoom(session.roomId);
       if (!liveSession(session)) return false;
       setRoom(next);
+
+      /*
+       * Load the conversation the new membership just authorized.
+       *
+       * This was the defect: admission updated `room` but never touched the
+       * transcript. `load('initial')` only fires when the `roomId` prop changes,
+       * and the room id does not change when you join it — so a viewer who
+       * tapped Watch sat in front of a locked or empty thread until they
+       * navigated away (`useFocusEffect`) or backgrounded the app.
+       *
+       * Order matters. `refreshThread` runs first because it owns cursor
+       * recovery, including the null-initial-cursor obligation: a non-member's
+       * thread request was refused, so `messageCursor` is null and
+       * `initialCoverage` may hold an unacknowledged page. `load('refresh')`
+       * then re-reads the room, the rail and the rollups now that the caller is
+       * a member. Calling `load` alone would leave the cursors unset and the
+       * gap drain skipped.
+       */
+      await refreshThread(session);
+      if (!liveSession(session)) return false;
+      await load('refresh', session);
       return true;
     } catch (caught) {
       if (!liveSession(session)) return false;
@@ -1034,7 +1097,7 @@ export function useLiveArenaRoom(
       notify(caught);
       return false;
     }
-  }, [notify, roomId, liveSession]);
+  }, [load, notify, refreshThread, roomId, liveSession]);
 
   return {
     room,

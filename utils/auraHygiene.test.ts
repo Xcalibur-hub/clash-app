@@ -31,6 +31,31 @@ const SKIP = new Set([
 
 const CODE = /\.(ts|tsx|js|cjs|mjs)$/;
 
+/**
+ * Read a file with line endings normalised to LF.
+ *
+ * ## Why this is required, not defensive noise
+ *
+ * The checks below split on `'\n'` and compare each line to its `trimEnd()`. On a
+ * Windows checkout — `core.autocrlf=true` is the git default there — every line
+ * arrives as `"...\r"`, so:
+ *
+ *   · `line !== line.trimEnd()` is true for *every* line, and
+ *   · a blank line is `"\r"`, which `.trim()` treats as whitespace-only.
+ *
+ * The suite then reports hundreds of offenders that do not exist in the repository.
+ * It passed on Linux and failed on Windows, which is the worst shape for a gate:
+ * the platform that runs CI is not the platform that files bugs.
+ *
+ * Normalising here does **not** weaken the assertions. They run unchanged against
+ * the same logical lines; only the transport artefact is removed. CRLF itself is
+ * prevented at the source by `.gitattributes`, so this is the second line of
+ * defence rather than a way of ignoring the problem.
+ */
+function readNormalised(file: string): string {
+  return readFileSync(file, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     if (SKIP.has(entry)) continue;
@@ -45,7 +70,7 @@ describe('AURA patch hygiene', () => {
   it('has no whitespace-only lines in application source', () => {
     const offenders: string[] = [];
     for (const file of walk(ROOT)) {
-      const lines = readFileSync(file, 'utf8').split('\n');
+      const lines = readNormalised(file).split('\n');
       lines.forEach((line, i) => {
         if (line.length > 0 && line.trim() === '') {
           offenders.push(`${file.replace(ROOT, '')}:${i + 1}`);
@@ -62,7 +87,7 @@ describe('AURA patch hygiene', () => {
   it('has no trailing whitespace on code lines', () => {
     const offenders: string[] = [];
     for (const file of walk(ROOT)) {
-      const lines = readFileSync(file, 'utf8').split('\n');
+      const lines = readNormalised(file).split('\n');
       lines.forEach((line, i) => {
         if (line.length > 0 && line.trim() !== '' && line !== line.trimEnd()) {
           offenders.push(`${file.replace(ROOT, '')}:${i + 1}`);

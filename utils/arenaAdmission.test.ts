@@ -327,8 +327,13 @@ describe('the screen routes each operation to its own handler', () => {
     assert.match(hook, /watchAsSpectator/, 'no admission operation on the hook');
     assert.match(hook, /watchFailed/, 'a failed admission is not observable');
     // The operation must call the watch RPC, not the upgrade RPC.
+    //
+    // Bounded by the callback's own dependency array rather than a character
+    // count: a fixed window silently starts covering the *next* callback as soon
+    // as this one grows, which makes the assertion pass or fail for the wrong
+    // reason.
     const start = hook.indexOf('const watchAsSpectator');
-    const body = hook.slice(start, start + 1200);
+    const body = hook.slice(start, hook.indexOf('}, [', start));
     assert.match(body, /watchRoom\(/, 'the admission operation does not call watch_arena_room');
     assert.doesNotMatch(body, /upgradeSpectator/, 'the admission operation calls the upgrade RPC');
   });

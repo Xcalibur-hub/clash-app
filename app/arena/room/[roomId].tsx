@@ -25,6 +25,7 @@ import { ClashHeader } from '../../../components/arena/ClashHeader';
 import { VerdictRegion } from '../../../components/arena/VerdictRegion';
 import { ActionRegion } from '../../../components/arena/ActionRegion';
 import { canUpgradeToDebater } from '../../../utils/arenaRoomEligibility';
+import { admissionFor } from '../../../utils/arenaAdmission';
 import type { ViewerStanding } from '../../../utils/arenaRoomEligibility';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
 import { DuelRoomOutcome } from '../../../components/liveArena/DuelRoomOutcome';
@@ -64,7 +65,6 @@ import {
   fetchRoomPresence,
   fetchRoomPulse,
   fetchTopicRooms,
-  watchRoom,
   type ArenaAuthor,
   type ArenaEvidence,
   type ArenaMessage,
@@ -614,6 +614,38 @@ function RoomScope(): React.JSX.Element {
     [room, signedIn, roomFullOnUpgrade],
   );
 
+  /*
+   * Live admission state, recomputed whenever the room changes.
+   *
+   * The room is realtime: it can settle or cancel while the watch sheet is open,
+   * and the viewer may take a while to tap. `watchOpen` alone is a stale boolean —
+   * it records that the sheet was opened, not that admission is still legal. This
+   * memo is the authority, so a phase transition re-renders the sheet into its
+   * blocked state instead of leaving a confirm button that the server will reject.
+   */
+  const admission = React.useMemo(
+    () => (room ? admissionFor(room.status, viewerStanding) : null),
+    [room, viewerStanding],
+  );
+  /** Non-null when the open watch sheet can no longer be confirmed. */
+  const watchBlockedReason = React.useMemo(() => {
+    if (!room || !watchOpen) return null;
+    if (admission && admission.operation === 'watch' && admission.enabled) return null;
+    // Prefer the model's own sentence: it is the same string the action region
+    // would show, so the two surfaces cannot describe the state differently.
+    return admission?.reason ?? 'This room is no longer open.';
+  }, [room, watchOpen, admission]);
+
+  /*
+   * Close the sheet when the state that justified it disappears (member,
+   * terminal phase). Closing it while the viewer is mid-tap on "confirm" would
+   * throw away input, so a busy admission is left alone — it will finish.
+   */
+  React.useEffect(() => {
+    if (!watchOpen || joining) return;
+    if (admission && admission.operation !== 'watch') setWatchOpen(false);
+  }, [watchOpen, joining, admission]);
+
   const openProfile = React.useCallback(
     (profileId: string) => router.push(`/profile/${profileId}`),
     [router],
@@ -805,7 +837,6 @@ function RoomScope(): React.JSX.Element {
           phase={room.status}
           standing={viewerStanding}
           roomIndex={roomIndex ?? 0}
-          onJoinPress={() => setJoinOpen(true)}
         />
       );
     }
@@ -866,7 +897,26 @@ function RoomScope(): React.JSX.Element {
       loading={loading} refreshing={refreshing} loadingOlder={loadingOlder} hasOlder={hasOlder} threadLocked={threadLocked} error={error}
       composer={bottom} onRefresh={refresh} onLoadOlder={loadOlder}
       onRequireAuth={() => { requireAuth(); }}
-      onWatch={async () => { if (!requireAuth()) return; await watchRoom(room.roomId); await refresh(); }}
+      /**
+       * The duel experience's admission, now on the same operation as the group
+       * room.
+       *
+       * It used to call `watchRoom` directly and then `refresh()`. That happened
+       * to work — `refresh()` is `refreshThread` then `load('refresh')`, the same
+       * pair admission needs — but it bypassed the error and retry state
+       * `watchAsSpectator` maintains, so a refused or failed admission in a duel
+       * produced an unhandled rejection instead of a notice. One operation, one
+       * path.
+       */
+      onWatch={async () => {
+        if (!requireAuth()) return;
+        // One operation, one path: this is the same callback the group room uses,
+        // so the duel experience inherits its error and retry handling rather than
+        // calling `watchRoom` raw and letting a refusal become an unhandled
+        // rejection.
+        const ok = await watchAsSpectator();
+        if (ok) void loadPresence();
+      }}
       onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
       onReturn={() => router.replace('/(tabs)')}
       nextClash={nextClash ? { clashId: nextClash.entry.id, title: nextClash.entry.title } : null}
@@ -905,11 +955,20 @@ function RoomScope(): React.JSX.Element {
         isDebater={isDebater}
         isSpectator={isSpectator && !isDuel}
         accepting={accepting}
-        // The same upgrade decision every other surface uses — this stage was the
-        // one place a full room still offered "PICK A SIDE".
-        canUpgrade={canUpgradeToDebater(room.status, viewerStanding)}
+        /*
+         * No upgrade CTA here, by design.
+         *
+         * Three surfaces used to offer the same `upgrade_arena_spectator` call at
+         * once: this stage, the `SpectatorJoinBar` docked below, and
+         * `ActionRegion` — all three visible together on an empty room. Ownership
+         * now sits with `ActionRegion` alone, because it is the component whose
+         * purpose is "the one thing you may do right now" and the only one of the
+         * three that explains *why* an upgrade is unavailable.
+         *
+         * This stage keeps its real job: telling the viewer the room is live and
+         * the floor is open.
+         */
         onStartArgument={() => setComposerFocus((n) => n + 1)}
-        onJoinDebate={() => setJoinOpen(true)}
       />
     ) : null;
 
@@ -1200,6 +1259,7 @@ function RoomScope(): React.JSX.Element {
         visible={watchOpen}
         busy={joining}
         roomIndex={roomIndex ?? 0}
+        blockedReason={watchBlockedReason}
         onClose={() => {
           if (joining) return;
           setWatchOpen(false);

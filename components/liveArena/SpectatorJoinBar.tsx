@@ -51,7 +51,6 @@ export interface SpectatorJoinBarProps {
   /** The viewer's server-reported standing, including any recorded P0009. */
   standing: ViewerStanding;
   roomIndex?: number | null;
-  onJoinPress: () => void;
 }
 
 export function SpectatorJoinBar({
@@ -59,7 +58,6 @@ export function SpectatorJoinBar({
   phase,
   standing,
   roomIndex = null,
-  onJoinPress,
 }: SpectatorJoinBarProps): React.JSX.Element {
   const t = useThemeColors();
 
@@ -87,37 +85,18 @@ export function SpectatorJoinBar({
         <Text style={[styles.watching, { color: t.textMuted }]}>
           {roomIndex != null ? `WATCHER · Room ${roomIndex}` : 'WATCHER'}
         </Text>
-        {!canUpgrade ? (
-          /*
-           * No control when the server would refuse. A greyed-out "PICK A SIDE"
-           * still reads as an invitation, which is what made the old bar keep
-           * promising an upgrade that could never complete.
-           */
-          <Text style={[styles.fullText, { color: t.textMuted }]}>
-            {full
+        {/*
+         * One line, always. When an upgrade is available this states the
+         * opportunity; when it is not, it states why. `ActionRegion` carries the
+         * control in both cases.
+         */}
+        <Text style={[styles.status, { color: t.textMuted }]} numberOfLines={2}>
+          {canUpgrade
+            ? 'You can take a side and join the debate.'
+            : full
               ? 'This room filled up while you were watching.'
               : 'This room is no longer accepting new voices.'}
-          </Text>
-        ) : (
-          <Pressable
-            onPress={() => {
-              hapticTap();
-              onJoinPress();
-            }}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel="Pick a side and join"
-            style={[styles.cta, { backgroundColor: t.clashFill }]}
-          >
-            {busy ? (
-              <ActivityIndicator color={t.clashText} />
-            ) : (
-              <Text style={[styles.ctaText, { color: t.clashText }]}>
-                PICK A SIDE
-              </Text>
-            )}
-          </Pressable>
-        )}
+        </Text>
       </View>
     </View>
   );
@@ -238,7 +217,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 5,
   },
-  fullText: {
+  status: {
     flexShrink: 1,
     ...typeScale.meta,
     textAlign: 'right',

@@ -16,6 +16,7 @@
  *     `resolveFontScaling`; layout/pixels are unverified (no emulator).
  */
 import React from 'react';
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AppText } from '../../components/shared/AppText';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -29,6 +30,7 @@ import type { ArenaRoomViewer } from '../../services/liveArenaService';
 import { VerdictRegion } from '../../components/arena/VerdictRegion';
 import { SpectatorJoinBar, JoinDebateSheet } from '../../components/liveArena/SpectatorJoinBar';
 import { WatchRoomSheet } from '../../components/liveArena/WatchRoomSheet';
+import { LiveRoomEmptyFloor } from '../../components/liveArena/LiveRoomEmptyFloor';
 import { admissionFor } from '../../utils/arenaAdmission';
 import type { RoomPhase } from '../../utils/arenaRoomEligibility';
 import { LiveClashFeature } from '../../components/arena/LiveClashFeature';
@@ -272,36 +274,40 @@ console.log('\n[SpectatorJoinBar — the same upgrade decision as ActionRegion]'
  * bar and the action region must reach the same verdict. Two components making one
  * decision is the whole point, and disagreement is the defect.
  */
-const barOpen = html(<SpectatorJoinBar phase="OPEN" standing={spectator} onJoinPress={() => {}} />);
-const barJudging = html(<SpectatorJoinBar phase="JUDGING" standing={spectator} onJoinPress={() => {}} />);
-const barSettled = html(<SpectatorJoinBar phase="SETTLED" standing={spectator} onJoinPress={() => {}} />);
-const barCancelled = html(<SpectatorJoinBar phase="CANCELLED" standing={spectator} onJoinPress={() => {}} />);
-const barFull = html(<SpectatorJoinBar phase="OPEN" standing={fullRoom} onJoinPress={() => {}} />);
-const barRejected = html(
-  <SpectatorJoinBar phase="OPEN" standing={rejectedUpgrade} onJoinPress={() => {}} />,
-);
+const barOpen = html(<SpectatorJoinBar phase="OPEN" standing={spectator} />);
+const barJudging = html(<SpectatorJoinBar phase="JUDGING" standing={spectator} />);
+const barSettled = html(<SpectatorJoinBar phase="SETTLED" standing={spectator} />);
+const barCancelled = html(<SpectatorJoinBar phase="CANCELLED" standing={spectator} />);
+const barFull = html(<SpectatorJoinBar phase="OPEN" standing={fullRoom} />);
+const barRejected = html(<SpectatorJoinBar phase="OPEN" standing={rejectedUpgrade} />);
 
-check('offers the upgrade while the room is in play', barOpen.includes('PICK A SIDE'));
-check('offers it during judging, which the RPC permits', barJudging.includes('PICK A SIDE'));
+/*
+ * The bar is a status strip now. It states your standing and — when an upgrade is
+ * unavailable — why. It no longer renders a control, because `ActionRegion` owns
+ * the admission action and three CTAs for one operation was the duplicate-primary
+ * defect.
+ */
+check('states the upgrade opportunity while the room is in play', barOpen.includes('join the debate'));
+check('states it during judging, which the RPC permits', barJudging.includes('join the debate'));
 check(
-  'withdraws it in a settled room',
-  !barSettled.includes('PICK A SIDE') && barSettled.includes('no longer accepting'),
+  'explains a settled room instead of offering an action',
+  barSettled.includes('no longer accepting'),
 );
 check(
-  'withdraws it in a cancelled room',
-  !barCancelled.includes('PICK A SIDE') && barCancelled.includes('no longer accepting'),
+  'explains a cancelled room instead of offering an action',
+  barCancelled.includes('no longer accepting'),
+);
+check('names capacity when the room is full', barFull.includes('filled up'));
+check('names capacity after the server rejected an upgrade (P0009)', barRejected.includes('filled up'));
+check(
+  'never renders a control of its own',
+  [barOpen, barJudging, barSettled, barCancelled, barFull, barRejected].every(
+    (h) => !/accessibilityRole="button"/.test(h),
+  ),
 );
 check(
-  'withdraws it when the room is at capacity',
-  !barFull.includes('PICK A SIDE') && barFull.includes('filled up'),
-);
-check(
-  'withdraws it after the server rejected an upgrade (P0009)',
-  !barRejected.includes('PICK A SIDE') && barRejected.includes('filled up'),
-);
-check(
-  'renders no control at all when the upgrade is unavailable',
-  [barSettled, barCancelled, barFull, barRejected].every((h) => !/accessibilityRole="button"/.test(h)),
+  'labels the viewer as a watcher',
+  barOpen.includes('WATCHER'),
 );
 
 /*
@@ -318,12 +324,17 @@ const UPGRADE_STATES: { phase: RoomPhase; standing: ViewerStanding }[] = [
   { phase: 'OPEN', standing: rejectedUpgrade },
 ];
 const disagreements = UPGRADE_STATES.filter(({ phase, standing }) => {
-  const barOffers = html(
-    <SpectatorJoinBar phase={phase} standing={standing} onJoinPress={() => {}} />,
-  ).includes('PICK A SIDE');
-  const regionOffers =
-    primaryRoomAction(phase, standing).action === 'upgrade_to_debater';
-  return barOffers !== regionOffers;
+  /*
+   * The bar now *reports* what the model decides rather than acting on it, so the
+   * consensus property is: the sentence it shows agrees with the offer the action
+   * region would render. A "you can join" strip beside a blocked action region
+   * would be the same class of bug as the original disagreement.
+   */
+  const barSaysAvailable = html(
+    <SpectatorJoinBar phase={phase} standing={standing} />,
+  ).includes('join the debate');
+  const regionOffers = primaryRoomAction(phase, standing).action === 'upgrade_to_debater';
+  return barSaysAvailable !== regionOffers;
 });
 check(
   'the join bar and the action region never disagree about an upgrade',
@@ -382,6 +393,68 @@ check(
 check(
   'the watch sheet offers a way out',
   /accessibilityLabel="Not now"/.test(watchSheet),
+);
+
+// --- defect 2: the confirmation expires with the room ----------------------
+const watchBlocked = html(
+  <WatchRoomSheet
+    visible
+    roomIndex={3}
+    blockedReason="This room closed without a verdict."
+    onClose={() => {}}
+    onConfirm={() => {}}
+  />,
+);
+check(
+  'a blocked watch sheet renders the reason',
+  watchBlocked.includes('This room closed without a verdict.'),
+);
+check(
+  'a blocked watch sheet renders no confirm control',
+  !watchBlocked.includes('WATCH THIS CLASH') &&
+    !/accessibilityRole="button"[^>]*Watch this clash/.test(watchBlocked),
+);
+check(
+  'a blocked watch sheet can still be dismissed',
+  /accessibilityLabel="Not now"/.test(watchBlocked),
+);
+/*
+ * Touch targets. 48dp is the platform minimum; `Not now` is small text, so it
+ * needs an explicit minHeight rather than relying on padding and line height.
+ * React DOM cannot measure rendered size, so this asserts the declared style —
+ * which is the part a regression would change.
+ */
+/*
+ * Source-level check, so the path must be resolved from the repo root.
+ *
+ * `new URL(..., import.meta.url)` collides with React Native's `URL` global under
+ * this tsconfig, and `__dirname` points at the bundler output — the runner does a
+ * `cd` to the repo root first, so `process.cwd()` is the reliable base.
+ */
+const sheetSrc = readFileSync(`${process.cwd()}/components/liveArena/WatchRoomSheet.tsx`, 'utf8');
+check(
+  'both watch-sheet controls declare a 48dp minimum height',
+  /minHeight: 52/.test(sheetSrc) && /minHeight: 48, paddingVertical/.test(sheetSrc),
+);
+
+// --- defect 3: the empty floor no longer competes for the tap --------------
+const emptyFloor = html(
+  <LiveRoomEmptyFloor
+    presence={[]}
+    participantCount={2}
+    isDebater={false}
+    isSpectator
+    accepting
+    onStartArgument={() => {}}
+  />,
+);
+check(
+  'an empty room still states the floor is open',
+  emptyFloor.includes('The floor is open'),
+);
+check(
+  'an empty room offers no second upgrade control',
+  !/PICK A SIDE/.test(emptyFloor) && !/Pick a side/.test(emptyFloor),
 );
 
 // --- per-standing routing ---------------------------------------------------
