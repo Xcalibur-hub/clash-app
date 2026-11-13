@@ -1,0 +1,21 @@
+HADES (reconstructed) — full run
+
+loading baseline schema…
+  applied 119/119
+
+baseline tests:
+  PASS  01 cancelled-settlement invariant              exit=0 (expected 0)
+  PASS  02 fighter-rewards (no fighter kinds)          exit=0 (expected 0)
+  PASS  03 concurrent settlement                       exit=0 (expected 0)
+  PASS  04 clash->room lock order                      exit=0 (expected 0)
+
+loading patched schema…
+  applied 121/121
+
+patched tests:
+  PASS  02 fighter-rewards (policy applied)            exit=0 (expected 0)
+  PASS  03 concurrent settlement                       exit=0 (expected 0)
+  PASS  04 clash->room lock order                      exit=0 (expected 0)
+
+7/7 suites passed
+wrote results.json

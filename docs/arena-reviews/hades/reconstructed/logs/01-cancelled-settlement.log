@@ -1,0 +1,28 @@
+$ node tests/01-cancelled-settlement.mjs --schema=baseline
+# 2026-11-13T02:20:02Z  PostgreSQL 16.2 (disposable)
+TEST 1 — Cancelled-settlement invariant  [schema=baseline]
+
+  PASS  plain: nothing is paid before settlement
+        ledgerRows=0
+  PASS  plain: zero-ballot settlement cancels
+        status=cancelled
+  PASS  plain: no verdict is written
+        verdicts=0
+  PASS  plain: nobody is paid
+        rows=0 rep=0 coins=0
+  PASS  plain: repeat settlement awards nothing
+        status=cancelled rep=0
+  PASS  duel: nothing is paid before settlement
+        ledgerRows=0
+  PASS  duel: zero-ballot settlement cancels
+        status=cancelled
+  PASS  duel: no verdict is written
+        verdicts=0
+  PASS  duel: nobody is paid
+        rows=0 rep=0 coins=0
+  PASS  duel: repeat settlement awards nothing
+        status=cancelled rep=0
+  PASS  settled clash is idempotent on replay
+        rows=2 (participation + win expected exactly once each)
+
+  11/11 assertions passed

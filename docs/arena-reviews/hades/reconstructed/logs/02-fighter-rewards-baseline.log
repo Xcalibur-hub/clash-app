@@ -1,0 +1,28 @@
+$ node tests/02-fighter-rewards.mjs --schema=baseline
+# 2026-11-13T02:20:07Z  PostgreSQL 16.2 (disposable)
+TEST 2 — Fighter reward accounting  [schema=baseline]
+
+  PASS  win (AAB): ledger matches reference
+        6 rows exact
+  PASS  win: per-actor profile deltas correct
+        all match
+  PASS  loss (BBA): ledger matches reference
+        6 rows exact
+  PASS  loss: per-actor profile deltas correct
+        all match
+  PASS  draw (AB): ledger matches reference
+        2 rows exact
+  PASS  draw: per-actor profile deltas correct
+        all match
+  PASS  cancel (): ledger matches reference
+        0 rows exact
+  PASS  cancel: per-actor profile deltas correct
+        all match
+  PASS  cancelled clash pays nobody
+        status=cancelled rows=0
+  PASS  baseline has NO fighter reward kinds
+        fighterRows=0
+  PASS  juror economy unchanged by the patch
+        jurorRep=265/265 jurorCoins=98/98
+
+  11/11 assertions passed

@@ -1,0 +1,79 @@
+$ node tests/03-concurrent-settlement.mjs
+# 2026-11-13T02:20:13Z  PostgreSQL 16.2 (disposable)
+schema: canonical
+reference award for A,A,B: rows=6 rep=265 coins=98
+
+TEST 3 — Concurrent settlement
+
+  PASS  sim2: all workers returned without error
+        outcomes=ok,ok elapsed=18ms
+  PASS  sim2: exactly one verdict
+        verdicts=1
+  PASS  sim2: status settled once
+        status=settled
+  PASS  sim2: ledger totals exact (no double credit)
+        rows=6/6 rep=265/265 coins=98/98
+  PASS  sim2: no duplicate (actor,kind) pair
+        none
+  PASS  sim4: all workers returned without error
+        outcomes=ok,ok,ok,ok elapsed=17ms
+  PASS  sim4: exactly one verdict
+        verdicts=1
+  PASS  sim4: status settled once
+        status=settled
+  PASS  sim4: ledger totals exact (no double credit)
+        rows=6/6 rep=265/265 coins=98/98
+  PASS  sim4: no duplicate (actor,kind) pair
+        none
+  PASS  sim8: all workers returned without error
+        outcomes=ok,ok,ok,ok,ok,ok,ok,ok elapsed=28ms
+  PASS  sim8: exactly one verdict
+        verdicts=1
+  PASS  sim8: status settled once
+        status=settled
+  PASS  sim8: ledger totals exact (no double credit)
+        rows=6/6 rep=265/265 coins=98/98
+  PASS  sim8: no duplicate (actor,kind) pair
+        none
+  PASS  stag3: staggered workers all completed
+        outcomes=ok,ok,ok elapsed=86ms
+  PASS  stag3: exactly one verdict
+        verdicts=1
+  PASS  stag3: status settled once
+        status=settled
+  PASS  stag3: ledger totals exact (no double credit)
+        rows=6/6 rep=265/265 coins=98/98
+  PASS  stag3: no duplicate (actor,kind) pair
+        none
+  PASS  stag5: staggered workers all completed
+        outcomes=ok,ok,ok,ok,ok elapsed=166ms
+  PASS  stag5: exactly one verdict
+        verdicts=1
+  PASS  stag5: status settled once
+        status=settled
+  PASS  stag5: ledger totals exact (no double credit)
+        rows=6/6 rep=265/265 coins=98/98
+  PASS  stag5: no duplicate (actor,kind) pair
+        none
+  PASS  contention: second worker blocks on the row lock
+        blocked ~401ms then completed
+  PASS  contention: exactly one verdict
+        verdicts=1
+  PASS  contention: status settled once
+        status=settled
+  PASS  contention: ledger totals exact (no double credit)
+        rows=6/6 rep=265/265 coins=98/98
+  PASS  contention: no duplicate (actor,kind) pair
+        none
+  PASS  unknown: exactly one verdict
+        verdicts=1
+  PASS  unknown: status settled once
+        status=settled
+  PASS  unknown: ledger totals exact (no double credit)
+        rows=6/6 rep=265/265 coins=98/98
+  PASS  unknown: no duplicate (actor,kind) pair
+        none
+  PASS  unknown: later blind retry is a no-op
+        rows 3 -> 3
+
+  35/35 assertions passed

@@ -1,0 +1,20 @@
+$ node tests/04-lock-order.mjs
+# 2026-11-13T02:21:05Z  PostgreSQL 16.2 (disposable, patched schema)
+TEST 4 — Clash -> Room lock order
+
+  PASS  static: clash-before-room is the dominant order
+        18 functions: transition_due_arena_rooms, assert_private_assist_window, settle_due_clashes, watch_arena_room, run_maintenance, submit_judgement
+  PASS  static: no function takes the room lock first and also touches clashes
+        5 room-first function(s), none reach public.clashes [settle_arena_group_room, submit_arena_argument_vote, upgrade_arena_spectator, submit_arena_side_vote, respond_arena_backup]
+  PASS  static: functions locking BOTH tables do so clash-first
+        transition_due_arena_rooms(clash->room); assert_private_assist_window(clash->room); settle_due_clashes(clash->room); watch_arena_room(clash->room); run_maintenance(clash->room); settle_clash(clash->room); settle_arena_room(clash->room); join_arena_topic(clash->room); send_arena_private_assist(clash->room); respond_arena_private_assist(clash->room); incorporate_arena_private_assist(clash->room)
+  PASS  dynamic: room-first writer does not deadlock against a clash lock holder
+        sqlstate=42501 waited=3ms outcome=error
+  PASS  dynamic: settlement does not deadlock when the ROOM lock is held first
+        sqlstate=57014 waited=20001ms (blocking is acceptable, 40P01 is not)
+  PASS  dynamic: settle vs transition_due_arena_rooms raises no deadlock
+        codes=ok,ok finalStatus=cancelled
+  PASS  tolerance: settlement blocked by a room lock stays retryable
+        firstAttempt=57014 finalStatus=cancelled verdicts=0
+
+  7/7 assertions passed

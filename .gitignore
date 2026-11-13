@@ -28,3 +28,6 @@ supabase/.branches/
 # Expo generated native projects
 /android/
 /ios/
+
+# HADES review artifacts: captured test output is evidence, not build residue.
+!docs/arena-reviews/hades/reconstructed/logs/*.log

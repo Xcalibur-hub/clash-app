@@ -1,0 +1,22 @@
+--- a/supabase/migrations/20260928130000_world_missions.sql
++++ b/supabase/migrations/20260928130000_world_missions.sql
+@@ -62,7 +62,7 @@
+   media_object_id      text not null references public.media_objects (id),
+   caption              text not null default '' check (char_length(caption) <= 180),
+   -- Approximate only: never write a precise GPS reading into this column.
+-  approx_location      extensions.geography(Point, 4326) not null,
++  approx_location      extensions.geography not null, -- HADES FIXTURE: typmod dropped (domain stub)
+   location_cell        text not null check (char_length(location_cell) between 1 and 12),
+   location_label       text check (location_label is null or char_length(location_label) between 1 and 60),
+   status               public.world_drop_status not null default 'DRAFT',
+@@ -77,8 +77,8 @@
+ create index if not exists world_drops_status_expires_idx
+   on public.world_drops (status, expires_at)
+   where status = 'PUBLISHED';
+-create index if not exists world_drops_approx_gix
+-  on public.world_drops using gist (approx_location);
++-- HADES FIXTURE: create index world_drops_approx_gix ... using gist omitted
++-- (a text-backed geography domain has no GiST opclass).
+ create index if not exists world_drops_cell_idx on public.world_drops (location_cell);
+ 
+ -- One live submission per mission per author (REMOVED frees the slot).

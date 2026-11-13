@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-11-13T02:23:14.178Z",
+  "engine": "PostgreSQL 16.2 (disposable, pgserver)",
+  "baseline_migrations": 119,
+  "patched_migrations": 121,
+  "suites": [
+    {
+      "label": "01 cancelled-settlement invariant",
+      "script": "tests/01-cancelled-settlement.mjs",
+      "args": [
+        "--schema=baseline"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "ok": true,
+      "summary": "  11/11 assertions passed"
+    },
+    {
+      "label": "02 fighter-rewards (no fighter kinds)",
+      "script": "tests/02-fighter-rewards.mjs",
+      "args": [
+        "--schema=baseline"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "ok": true,
+      "summary": "  11/11 assertions passed"
+    },
+    {
+      "label": "03 concurrent settlement",
+      "script": "tests/03-concurrent-settlement.mjs",
+      "args": [],
+      "exit": 0,
+      "expected": 0,
+      "ok": true,
+      "summary": "  35/35 assertions passed"
+    },
+    {
+      "label": "04 clash->room lock order",
+      "script": "tests/04-lock-order.mjs",
+      "args": [],
+      "exit": 0,
+      "expected": 0,
+      "ok": true,
+      "summary": "  7/7 assertions passed"
+    },
+    {
+      "label": "02 fighter-rewards (policy applied)",
+      "script": "tests/02-fighter-rewards.mjs",
+      "args": [
+        "--schema=patched"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "ok": true,
+      "summary": "  14/14 assertions passed"
+    },
+    {
+      "label": "03 concurrent settlement",
+      "script": "tests/03-concurrent-settlement.mjs",
+      "args": [],
+      "exit": 0,
+      "expected": 0,
+      "ok": true,
+      "summary": "  35/35 assertions passed"
+    },
+    {
+      "label": "04 clash->room lock order",
+      "script": "tests/04-lock-order.mjs",
+      "args": [],
+      "exit": 0,
+      "expected": 0,
+      "ok": true,
+      "summary": "  7/7 assertions passed"
+    }
+  ],
+  "passed": 7,
+  "failed": 0
+}

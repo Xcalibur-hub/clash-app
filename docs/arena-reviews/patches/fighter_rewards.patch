@@ -1,0 +1,909 @@
+diff --git a/CLASH_SPEC.md b/CLASH_SPEC.md
+index b9de7d2..4161604 100644
+--- a/CLASH_SPEC.md
++++ b/CLASH_SPEC.md
+@@ -480,15 +480,40 @@ Provocateur
+ Clash King / Clash Queen
+ Legend
+ 
+-Use Reputation XP.
++Use Reputation XP. Every award names the actor it pays — a fighter and a juror
++are paid differently for the same Clash and must never be conflated.
+ 
+-Example:
++FIGHTERS (the two people in the Clash), text-debate beta policy:
++
++Winning debater:
+++40 XP, 0 coins
++
++Losing debater:
+++15 XP, 0 coins
++
++Both debaters on a DRAW:
+++15 XP each, 0 coins
++
++No ballots (CANCELLED):
++no reward to anyone
++
++JURORS (the people who voted), unchanged:
++
++Winning-side juror:
+++120 XP (+40 coins), streak +1
++
++Dissenting juror:
+++25 XP (+18 coins), streak reset
++
++Juror on a DRAW:
+++15 XP, no coins, streak unchanged
+ 
+-Winning Clash:
+-+120 XP
++Fighter awards are recorded under their own ledger kinds
++(`clash_fighter_win`, `clash_fighter_participation`) so a credit can be
++attributed to a fighter or a juror from the ledger alone. Fighter awards never
++carry coins and never change a streak.
+ 
+-Participating:
+-+15 XP
++Other awards:
+ 
+ Creating popular Take:
+ +30 XP
+@@ -496,7 +521,8 @@ Creating popular Take:
+ Entering Hall of Fame:
+ +500 XP
+ 
+-Coins are strictly virtual reputation/status points.
++Coins are strictly virtual reputation/status points. Coins are currently awarded
++only to jurors; fighters receive none.
+ 
+ DO NOT create a real-money cashout system.
+ 
+diff --git a/supabase/ARENA_DUELS.md b/supabase/ARENA_DUELS.md
+index 9781706..ff2abf5 100644
+--- a/supabase/ARENA_DUELS.md
++++ b/supabase/ARENA_DUELS.md
+@@ -136,6 +136,7 @@ reported. Those unrelated implementation changes are outside this commit.
+ 
+ No Challenge requests, ACCEPT/PASS, notifications or ranking; Corners, support state,
+ Assists (including media, ranking, attribution and use/dismiss); new Mindshift;
+-fighter career records or rivalries; Crew qualification or Phase B expansion;
++fighter career records or rivalries (Phase 1 pays a flat per-Clash reward instead —
++see CLASH_SPEC.md); Crew qualification or Phase B expansion;
+ Community Clashes, seasons, promotion/relegation, XP or RPG roles. Vault and World
+ are unchanged. Phase 1 ends at this foundation.
+diff --git a/supabase/CANONICAL_LIFECYCLE_AUDIT.md b/supabase/CANONICAL_LIFECYCLE_AUDIT.md
+index c3c39a7..63098f0 100644
+--- a/supabase/CANONICAL_LIFECYCLE_AUDIT.md
++++ b/supabase/CANONICAL_LIFECYCLE_AUDIT.md
+@@ -177,12 +177,22 @@ verdict, reward or result notification. A single ballot suffices. Verdict labels
+ use margin: DRAW, SPLIT DECISION (at most one), CLEAR DECISION (at most three), then
+ LANDSLIDE. These are backend labels, not confidence from an independent jury.
+ 
+-Existing economy rewards **jurors**, not fighter wins/careers: winning-side jurors
+-receive +120 reputation/+40 coins and increment streak; dissent receives +25/+18
+-and resets streak; draw participation receives +15/+0 with no streak change.
+-Rank is recalculated by the existing helper. Fighters receive result notifications
+-but no canonical fighter-career award. Jury reward notifications and two fighter
+-result notifications are inside the settlement transaction. Their random IDs do
++The economy rewards **jurors and fighters separately**, under distinct ledger kinds.
++
++Jurors: winning-side jurors receive +120 reputation/+40 coins and increment streak;
++dissent receives +25/+18 and resets streak; draw participation receives +15/+0 with
++no streak change. These amounts and kinds (`clash_participation`, `clash_win`,
++`clash_dissent`) are unchanged.
++
++Fighters (owner-approved 2026-11-12, text-debate beta): the winning debater receives
+++40 reputation/0 coins (`clash_fighter_win`), the losing debater +15/0
++(`clash_fighter_participation`), and both debaters receive +15/0 on a DRAW. Fighter
++awards never carry coins and never change streak, so `clash_win`/`clash_participation`
++rows remain unambiguously juror rows. A zero-ballot cancellation awards nobody.
++
++Rank is recalculated by the existing helper. Fighter rewards, jury reward
++notifications and two fighter result notifications are inside the settlement
++transaction. There is no historical backfill: already-settled Clashes early-return. Their random IDs do
+ not provide a separate deduplication key; exactly-once behavior relies on the
+ locked terminal-state early return and atomic transaction. Challenge notifications
+ use deterministic IDs. No notification for decline/cancel/expiry is implemented.
+@@ -213,7 +223,7 @@ was created to reproduce these gaps. Passing existing tests does not cover them.
+ Missing features / policy decisions, **not fixes to invent now**: alternating turns,
+ fighter readiness, pause/resume, forfeiture, per-turn deadlines, scheduled acceptance,
+ minimum official participation, independent judging/Crew conflict checks, stronger
+-quorum, fighter career awards, user cancellation after acceptance, cancellation
++quorum, longer-term fighter careers/records, user cancellation after acceptance, cancellation
+ reason/timestamps, complete notification lifecycle and durable offline queues.
+ The backend can settle a one-ballot duel with no official posts; changing this
+ requires an approved eligibility/outcome policy, not a fabricated automatic winner.
+diff --git a/supabase/HISTORICAL_SETTLEMENT_RECOVERY.md b/supabase/HISTORICAL_SETTLEMENT_RECOVERY.md
+index 5a1d6ac..90a7244 100644
+--- a/supabase/HISTORICAL_SETTLEMENT_RECOVERY.md
++++ b/supabase/HISTORICAL_SETTLEMENT_RECOVERY.md
+@@ -35,7 +35,7 @@ Successful maintenance retains every previous result key and adds:
+ 
+ The failure count includes failed attempts in both loops, even if a later attempt in that run recovers. Pending count reflects current retained unresolved records. Existing `clashes_settled` continues counting successful terminal operations, including zero-ballot cancellations, as before.
+ 
+-No new single-Clash client retry was necessary. Operators can retry through existing maintenance; failed items remain due and are attempted on later existing cron ticks. `settle_clash` and its locked, transactional tally are unchanged. A failed item rolls back verdict, ledger, profile and notification writes together. The next successful attempt awards once; settled/cancelled retries retain existing early-return behavior. Zero votes still cancel, one ballot still suffices, and nonzero ties remain DRAW. Fighters receive no new rewards.
++No new single-Clash client retry was necessary. Operators can retry through existing maintenance; failed items remain due and are attempted on later existing cron ticks. `settle_clash` and its locked, transactional tally are unchanged. A failed item rolls back verdict, ledger, profile and notification writes together. The next successful attempt awards once; settled/cancelled retries retain existing early-return behavior. Zero votes still cancel, one ballot still suffices, and nonzero ties remain DRAW. Fighter rewards (added 2026-11-12) are part of the same locked transaction, so the rollback guarantee extends to them: a failed attempt leaves no fighter ledger row and no fighter reputation change, and the next successful attempt awards each fighter once.
+ 
+ Operator inspection (owner/service role only):
+ 
+diff --git a/supabase/database.types.ts b/supabase/database.types.ts
+index daa5009..3ebc28a 100644
+--- a/supabase/database.types.ts
++++ b/supabase/database.types.ts
+@@ -9609,6 +9609,8 @@ export type Database = {
+         | "arena_backup_arrival"
+         | "arena_crowd_favorite"
+         | "arena_mind_impact"
++        | "clash_fighter_win"
++        | "clash_fighter_participation"
+       sponsor_campaign_status:
+         | "DRAFT"
+         | "ACTIVE"
+@@ -10024,6 +10026,8 @@ export const Constants = {
+         "arena_backup_arrival",
+         "arena_crowd_favorite",
+         "arena_mind_impact",
++        "clash_fighter_win",
++        "clash_fighter_participation",
+       ],
+       sponsor_campaign_status: [
+         "DRAFT",
+diff --git a/supabase/migrations/20261112120000_clash_fighter_reward_kinds.sql b/supabase/migrations/20261112120000_clash_fighter_reward_kinds.sql
+new file mode 100644
+index 0000000..b1e455e
+--- /dev/null
++++ b/supabase/migrations/20261112120000_clash_fighter_reward_kinds.sql
+@@ -0,0 +1,24 @@
++-- ============================================================================
++-- CLASH 2.0 · CANDIDATE — Fighter reward vocabulary (enum only)
++-- ----------------------------------------------------------------------------
++-- Enum-only migration, on purpose. Postgres forbids *using* a label added by
++-- `alter type ... add value` in the same transaction that added it, and each
++-- Supabase migration file is one transaction (same constraint documented in
++-- 20261002150000_live_arena_enums.sql). The settlement body that writes these
++-- labels therefore lives in the following file, after this one has committed.
++--
++-- PRODUCT POLICY (owner-approved 2026-11-12, text-debate beta):
++--   Winning debater    +40 reputation, 0 coins
++--   Losing debater     +15 reputation, 0 coins
++--   Both on DRAW       +15 reputation each, 0 coins
++--   CANCELLED          no reward
++-- The existing juror economy is NOT changed by this migration.
++--
++-- WHY DISTINCT KINDS: fighters and jurors previously shared one vocabulary, so
++-- a ledger row could not be attributed to an actor. `clash_fighter_win` and
++-- `clash_fighter_participation` make every fighter credit auditable by kind
++-- alone and leave all three historical juror kinds untouched.
++-- ============================================================================
++
++alter type public.reputation_kind add value if not exists 'clash_fighter_win';
++alter type public.reputation_kind add value if not exists 'clash_fighter_participation';
+diff --git a/supabase/migrations/20261112120100_clash_fighter_rewards.sql b/supabase/migrations/20261112120100_clash_fighter_rewards.sql
+new file mode 100644
+index 0000000..e2c5095
+--- /dev/null
++++ b/supabase/migrations/20261112120100_clash_fighter_rewards.sql
+@@ -0,0 +1,219 @@
++-- ============================================================================
++-- CLASH 2.0 · CANDIDATE — Award the two fighters on settlement
++-- ----------------------------------------------------------------------------
++-- Baseline: 36dccade5f5b7a7ae62c77f966d3b519d34723ee
++-- Prereq:   20261112120000_clash_fighter_reward_kinds.sql (enum committed first)
++--
++-- Minimum forward-only change. The existing juror loop, verdict insert, tally,
++-- locking, cancellation and notifications are copied VERBATIM from
++-- settle_clash_legacy (20260927010000_clash_draw.sql:31-150). The ONLY addition
++-- is one fighter-reward block inserted after the juror loop and before the
++-- status flip.
++--
++-- WHY A FORWARD REDEFINITION OF settle_clash_legacy:
++--   settle_clash_legacy is the single authoritative duel settlement path. Every
++--   caller (settle_clash wrapper, settle_arena_room dispatcher, settle_due_clashes
++--   cron) reaches it, so patching it once covers every entry point. Its EXECUTE
++--   privilege stays revoked; only SECURITY DEFINER callers can invoke it.
++--
++-- WHY THE REWARD IS NOT EMITTED FROM A TRIGGER ON public.verdicts:
++--   Several existing suites INSERT verdict rows directly to exercise follower
++--   notifications (093_clash_follows.sql:133,149,167 et al). A trigger there
++--   would credit fighters in those fixtures, and would also rely on a naked
++--   insert being a trustworthy settlement signal. Awarding inside the locked
++--   settlement transaction is the narrower and safer seam.
++--
++-- CONCURRENCY / IDEMPOTENCY:
++--   1. `for update of c` on public.clashes is unchanged, so concurrent
++--      settlements still serialize; the second waiter observes status='settled'
++--      and early-returns at the existing guard before any reward runs.
++--   2. The verdict insert's `on conflict do nothing` is unchanged.
++--   3. The fighter block is additionally self-guarding: it skips if either
++--      fighter already holds a fighter kind for this clash. That makes the block
++--      safe even on a path that somehow bypasses the terminal-state early return.
++--   4. arena_room_id is left NULL. Duel rooms must keep zero room-scoped ledger
++--      rows (asserted by 054_arena_duel_foundation.sql:149); room-scoped awards
++--      belong to the separate group engine.
++--
++-- NO HISTORICAL BACKFILL: already-settled clashes early-return and are never
++-- re-awarded. The accepted nine-duel fixture is untouched.
++-- ============================================================================
++
++begin;
++
++create or replace function public.settle_clash_legacy(p_clash_id text)
++returns jsonb
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  v_clash record;
++  v_a integer;
++  v_b integer;
++  v_total integer;
++  v_winner public.verdict_winner;
++  v_margin integer;
++  v_agreement numeric(5,4);
++  v_label text;
++  j record;
++  v_fighter_win integer := 40;
++  v_fighter_part integer := 15;
++begin
++  -- Lock the clash row so concurrent settlements serialize and never double-award.
++  select c.id, c.take_id, c.challenger_id, c.status, c.closes_at, t.author_id
++    into v_clash from public.clashes c join public.takes t on t.id = c.take_id
++   where c.id = p_clash_id for update of c;
++
++  if v_clash.id is null then
++    raise exception 'clash does not exist' using errcode = 'P0002';
++  end if;
++
++  if v_clash.status = 'settled' then
++    return (select jsonb_build_object(
++      'clash_id', clash_id, 'winner_side', winner_side, 'side_a_score', side_a_score,
++      'side_b_score', side_b_score, 'jury_size', jury_size, 'agreement', agreement,
++      'margin', margin, 'verdict_label', verdict_label
++    ) from public.verdicts where clash_id = p_clash_id);
++  end if;
++
++  if v_clash.closes_at > now() then
++    raise exception 'clash has not closed yet' using errcode = 'P0006';
++  end if;
++
++  select count(*) filter (where side = 'A'), count(*) filter (where side = 'B')
++    into v_a, v_b from public.judgements where clash_id = p_clash_id;
++
++  v_total := v_a + v_b;
++
++  if v_total = 0 then
++    update public.clashes set status = 'cancelled' where id = p_clash_id;
++    return jsonb_build_object('clash_id', p_clash_id, 'status', 'cancelled', 'jury_size', 0);
++  end if;
++
++  -- A tie is a genuine DRAW: neither side wins, and there is no random tie-break.
++  v_winner := case
++    when v_a > v_b then 'A'
++    when v_b > v_a then 'B'
++    else 'DRAW' end;
++  v_margin := abs(v_a - v_b);
++  v_agreement := round(greatest(v_a, v_b)::numeric / v_total, 4);
++  v_label := case
++    when v_winner = 'DRAW' then 'DRAW'
++    when v_margin <= 1 then 'SPLIT DECISION'
++    when v_margin <= 3 then 'CLEAR DECISION'
++    else 'LANDSLIDE' end;
++
++  insert into public.verdicts (clash_id, winner_side, side_a_score, side_b_score, jury_size, agreement, margin, verdict_label)
++  values (p_clash_id, v_winner, v_a, v_b, v_total, v_agreement, v_margin, v_label)
++  on conflict (clash_id) do nothing;
++
++  -- Reward each juror and record the immutable ledger. (UNCHANGED)
++  for j in select juror_id, side from public.judgements where clash_id = p_clash_id loop
++    if v_winner = 'DRAW' then
++      -- Draw: participation only — no win bonus, no dissent, no coins, no streak change.
++      insert into public.reputation_events (id, profile_id, clash_id, kind, reputation_delta, coins_delta)
++      values ('re_' || lower(substr(md5(random()::text || clock_timestamp()::text), 1, 16)),
++              j.juror_id, p_clash_id, 'clash_participation', 15, 0);
++      update public.profiles
++         set reputation = reputation + 15,
++             rank       = public.rank_for_rep(reputation + 15)
++       where id = j.juror_id;
++    elsif j.side::text = v_winner::text then
++      insert into public.reputation_events (id, profile_id, clash_id, kind, reputation_delta, coins_delta)
++      values ('re_' || lower(substr(md5(random()::text || clock_timestamp()::text), 1, 16)),
++              j.juror_id, p_clash_id, 'clash_participation', 15, 0);
++      insert into public.reputation_events (id, profile_id, clash_id, kind, reputation_delta, coins_delta)
++      values ('re_' || lower(substr(md5(random()::text || clock_timestamp()::text), 1, 16)),
++              j.juror_id, p_clash_id, 'clash_win', 105, 40);
++      update public.profiles
++         set reputation = reputation + 120,
++             coins      = coins + 40,
++             streak     = streak + 1,
++             rank       = public.rank_for_rep(reputation + 120)
++       where id = j.juror_id;
++    else
++      insert into public.reputation_events (id, profile_id, clash_id, kind, reputation_delta, coins_delta)
++      values ('re_' || lower(substr(md5(random()::text || clock_timestamp()::text), 1, 16)),
++              j.juror_id, p_clash_id, 'clash_participation', 15, 0);
++      insert into public.reputation_events (id, profile_id, clash_id, kind, reputation_delta, coins_delta)
++      values ('re_' || lower(substr(md5(random()::text || clock_timestamp()::text), 1, 16)),
++              j.juror_id, p_clash_id, 'clash_dissent', 10, 18);
++      update public.profiles
++         set reputation = reputation + 25,
++             coins      = coins + 18,
++             streak     = 0,
++             rank       = public.rank_for_rep(reputation + 25)
++       where id = j.juror_id;
++    end if;
++
++    perform public.clash_notify(j.juror_id, null, 'reputation', p_clash_id);
++  end loop;
++
++  -- ── NEW: fighter rewards (owner-approved policy) ──────────────────────────
++  -- Winner +40, loser +15, both +15 on DRAW, 0 coins in every case, no streak
++  -- change. arena_room_id stays NULL (duel rooms own no room-scoped awards).
++  -- Self-guarding so a replayed settlement can never double-credit a fighter.
++  if not exists (
++    select 1 from public.reputation_events e
++     where e.clash_id = p_clash_id
++       and e.kind in ('clash_fighter_win', 'clash_fighter_participation')
++  ) then
++    insert into public.reputation_events (id, profile_id, clash_id, arena_room_id, kind, reputation_delta, coins_delta)
++    select 're_' || lower(substr(md5(random()::text || clock_timestamp()::text), 1, 16)),
++           f.profile_id, p_clash_id, null, f.kind, f.delta, 0
++      from (values
++        (v_clash.author_id,
++         case when v_winner = 'A' then 'clash_fighter_win'::public.reputation_kind
++              else 'clash_fighter_participation'::public.reputation_kind end,
++         case when v_winner = 'A' then v_fighter_win else v_fighter_part end),
++        (v_clash.challenger_id,
++         case when v_winner = 'B' then 'clash_fighter_win'::public.reputation_kind
++              else 'clash_fighter_participation'::public.reputation_kind end,
++         case when v_winner = 'B' then v_fighter_win else v_fighter_part end)
++      ) as f(profile_id, kind, delta)
++     where f.profile_id is not null;
++
++    -- Aggregate first: even if a malformed row ever shared both fighter ids,
++    -- this update would touch that profile exactly once with the summed delta
++    -- instead of arbitrarily picking one VALUES row.
++    update public.profiles p
++       set reputation = p.reputation + f.delta,
++           rank       = public.rank_for_rep(p.reputation + f.delta)
++      from (
++        select profile_id, sum(delta)::integer as delta
++          from (values
++            (v_clash.author_id,
++             case when v_winner = 'A' then v_fighter_win else v_fighter_part end),
++            (v_clash.challenger_id,
++             case when v_winner = 'B' then v_fighter_win else v_fighter_part end)
++          ) as f(profile_id, delta)
++         group by profile_id
++      ) as f
++     where p.id = f.profile_id;
++
++    -- Same notification contract jurors already receive, so the result screen's
++    -- unread badge is truthful for fighters too.
++    perform public.clash_notify(v_clash.author_id, null, 'reputation', p_clash_id);
++    perform public.clash_notify(v_clash.challenger_id, null, 'reputation', p_clash_id);
++  end if;
++
++  -- Result notifications to both debaters. (UNCHANGED)
++  perform public.clash_notify(v_clash.author_id, null, 'clash_result', p_clash_id);
++  perform public.clash_notify(v_clash.challenger_id, null, 'clash_result', p_clash_id);
++
++  update public.clashes set status = 'settled', settled_at = now() where id = p_clash_id;
++
++  return jsonb_build_object(
++    'clash_id', p_clash_id, 'winner_side', v_winner, 'side_a_score', v_a,
++    'side_b_score', v_b, 'jury_size', v_total, 'agreement', v_agreement,
++    'margin', v_margin, 'verdict_label', v_label
++  );
++end;
++$$;
++
++-- Privileges unchanged: private helper reachable only from SECURITY DEFINER
++-- callers (settle_clash wrapper, settle_arena_room dispatcher, settle_due_clashes).
++revoke all on function public.settle_clash_legacy(text) from public, anon, authenticated, service_role;
++
++commit;
+diff --git a/supabase/tests/002_clash_engine.sql b/supabase/tests/002_clash_engine.sql
+index adcf46d..8783ae0 100644
+--- a/supabase/tests/002_clash_engine.sql
++++ b/supabase/tests/002_clash_engine.sql
+@@ -135,20 +135,45 @@ select is((select side_b_score from public.verdicts where clash_id = (select id
+ select is((select jury_size from public.verdicts where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 3, 'jury size 3');
+ 
+ -- reward ledger: 2 rows per juror, matching the contract
+-select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 6, '6 ledger rows');
++select is((select count(*)::int from public.reputation_events where kind in ('clash_fighter_win','clash_fighter_participation') and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 2, '2 fighter reward rows');
++select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 8, '8 ledger rows (6 juror + 2 fighter)');
+ select is((select count(*)::int from public.reputation_events where kind = 'clash_participation' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 3, '3 participation events');
+ select is((select count(*)::int from public.reputation_events where kind = 'clash_win' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 2, '2 win events');
+ select is((select count(*)::int from public.reputation_events where kind = 'clash_dissent' and clash_id = (select id from public.clashes where take_id = 't-test-clash')), 1, '1 dissent event');
+ 
+ -- derived profile state (winner +120/+40/streak+1, minority +25/+18/streak 0)
+-select is((select reputation from public.profiles where id = 't-j1'), 120, 'j1 reputation +120');
++select is((select reputation from public.profiles where id = 't-j1'), 120, 'winning juror reputation +120 (juror economy unchanged)');
+ select is((select coins from public.profiles where id = 't-j1'), 40, 'j1 coins +40');
+ select is((select streak from public.profiles where id = 't-j1'), 1, 'j1 streak 1');
+-select is((select reputation from public.profiles where id = 't-j2'), 25, 'j2 reputation +25');
++select is((select reputation from public.profiles where id = 't-j2'), 25, 'dissenting juror reputation +25 (juror economy unchanged)');
+ select is((select coins from public.profiles where id = 't-j2'), 18, 'j2 coins +18');
+ select is((select streak from public.profiles where id = 't-j2'), 0, 'j2 streak 0');
+ select is((select rank::text from public.profiles where id = 't-j1'), 'Rookie', 'rank derived from reputation');
+ 
++-- fighter policy (2026-11-12): winner +40, loser +15, zero coins.
++-- Side A is the take author (app/clash/[takeId].tsx:117 — sideAText is the
++-- take's own text), and side A won this fixture, so the AUTHOR is the winner.
++select is((select reputation from public.profiles where id = 't-author'), 40,
++  'winning debater (author, side A) receives +40');
++select is((select reputation from public.profiles where id = 't-challenger'), 15,
++  'losing debater (challenger, side B) receives +15 participation');
++select is((select coins from public.profiles where id = 't-author'), 0,
++  'winning debater receives no coins');
++select is((select streak from public.profiles where id = 't-author'), 0,
++  'winning debater streak is untouched');
++select is((select kind::text from public.reputation_events
++            where clash_id = (select id from public.clashes where take_id = 't-test-clash')
++              and profile_id = 't-author' and kind like 'clash_fighter%'), 'clash_fighter_win',
++  'winner is paid under clash_fighter_win');
++select is((select kind::text from public.reputation_events
++            where clash_id = (select id from public.clashes where take_id = 't-test-clash')
++              and profile_id = 't-challenger' and kind like 'clash_fighter%'), 'clash_fighter_participation',
++  'loser is paid under clash_fighter_participation');
++select is((select count(*)::int from public.reputation_events
++            where clash_id = (select id from public.clashes where take_id = 't-test-clash')
++              and kind like 'clash_fighter%' and coins_delta <> 0), 0,
++  'no fighter award carries coins');
++
+ -- client cannot write economy columns or forge the ledger
+ select set_config('role', 'authenticated', true);
+ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000c","role":"authenticated"}', true);
+@@ -161,14 +186,14 @@ reset role;
+ -- idempotent settlement: re-settle neither duplicates nor re-awards
+ select lives_ok($$ select public.settle_clash((select id from public.clashes where take_id = 't-test-clash')) $$, 're-settle is idempotent');
+ select is((select count(*)::int from public.verdicts where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 1, 'still one verdict');
+-select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 6, 'still 6 ledger rows');
++select is((select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 't-test-clash')), 8, 'still 8 ledger rows after replay');
+ select is((select reputation from public.profiles where id = 't-j1'), 120, 'j1 reputation unchanged');
+ 
+ -- notifications are server-created only
+-select is((select count(*)::int from public.notifications where entity_id = (select id from public.clashes where take_id = 't-test-clash')), 6, '6 clash notifications');
++select is((select count(*)::int from public.notifications where entity_id = (select id from public.clashes where take_id = 't-test-clash')), 8, '8 clash notifications (2 extra fighter reputation notices)');
+ select is((select count(*)::int from public.notifications where kind = 'clash_started' and recipient_id = 't-author'), 1, 'clash_started to author');
+ select is((select count(*)::int from public.notifications where kind = 'clash_result' and entity_id = (select id from public.clashes where take_id = 't-test-clash')), 2, 'clash_result to both debaters');
+-select is((select count(*)::int from public.notifications where kind = 'reputation' and entity_id = (select id from public.clashes where take_id = 't-test-clash')), 3, 'reputation to each juror');
++select is((select count(*)::int from public.notifications where kind = 'reputation' and entity_id = (select id from public.clashes where take_id = 't-test-clash')), 5, 'reputation notice to each juror and each fighter');
+ select set_config('role', 'authenticated', true);
+ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000c","role":"authenticated"}', true);
+ select throws_ok($$ insert into public.notifications (id, recipient_id, kind) values ('n-forge', 't-j1', 'clash_result') $$, '42501', null, 'client cannot forge notifications');
+diff --git a/supabase/tests/008_clash_draw.sql b/supabase/tests/008_clash_draw.sql
+index 07d4da0..ba8d6ac 100644
+--- a/supabase/tests/008_clash_draw.sql
++++ b/supabase/tests/008_clash_draw.sql
+@@ -89,7 +89,9 @@ select is((select margin from public.verdicts where clash_id=(select id from pub
+ select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_win'), 0, 'draw awards no clash_win (no side wins)');
+ select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_dissent'), 0, 'draw awards no dissent');
+ select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_participation'), 4, 'draw keeps 4 participation events');
+-select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 4, 'draw writes exactly 4 ledger rows');
++select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 6, 'draw writes exactly 6 ledger rows (4 jurors + 2 fighters)');
++select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_fighter_participation'), 2, 'draw pays both fighters participation');
++select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_fighter_win'), 0, 'draw pays no fighter win');
+ select is((select coalesce(sum(coins_delta),0)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 0, 'draw awards no coins');
+ select is((select reputation from public.profiles where id='td-j1'), 15, 'A voter gets participation only');
+ select is((select coins from public.profiles where id='td-j1'), 0, 'A voter gets no coins');
+@@ -99,20 +101,24 @@ select is((select streak from public.profiles where id='td-j1'), 0, 'draw does n
+ 
+ -- draw still notifies both debaters, and jurors, without naming a winner
+ select is((select count(*)::int from public.notifications where entity_id=(select id from public.clashes where take_id='td-take-draw') and kind='clash_result'), 2, 'draw notifies both debaters');
+-select is((select count(*)::int from public.notifications where entity_id=(select id from public.clashes where take_id='td-take-draw') and kind='reputation'), 4, 'juror reputation notifications');
++select is((select count(*)::int from public.notifications where entity_id=(select id from public.clashes where take_id='td-take-draw') and kind='reputation'), 6, 'juror and fighter reputation notifications');
+ 
+ -- idempotent re-settlement: one verdict, no duplicate ledger rows, no double reward
+ select lives_ok($$ select public.settle_clash((select id from public.clashes where take_id='td-take-draw')) $$, 're-settle draw clash');
+ reset role;
+ select is((select count(*)::int from public.verdicts where clash_id=(select id from public.clashes where take_id='td-take-draw')), 1, 're-settle keeps exactly one verdict');
+-select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 4, 're-settle writes no duplicate ledger rows');
++select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-draw')), 6, 're-settle writes no duplicate ledger rows');
+ select is((select reputation from public.profiles where id='td-j1'), 15, 're-settle awards no duplicate reputation');
+ 
+ -- ── B majority still settles B ──────────────────────────────────────────────
+ select lives_ok($$ select public.settle_clash((select id from public.clashes where take_id='td-take-bwin')) $$, 'settle B-majority clash');
+ reset role;
+ select is((select winner_side::text from public.verdicts where clash_id=(select id from public.clashes where take_id='td-take-bwin')), 'B', 'B majority settles B');
+-select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin')), 6, 'B-win keeps 6 ledger rows');
++select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin')), 8, 'B-win keeps 8 ledger rows (6 jurors + 2 fighters)');
++-- running totals: the DRAW already paid both 15, so after this B-win the author
++-- (side A, the loser) holds 30 and the challenger (side B) holds 55.
++select is((select reputation from public.profiles where id='td-author'), 30, 'B-win pays the author (side A) only participation');
++select is((select reputation from public.profiles where id='td-challenger'), 55, 'B-win pays the challenger (side B) the win bonus');
+ select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin') and kind='clash_win'), 2, 'B-win keeps 2 win events');
+ select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin') and kind='clash_dissent'), 1, 'B-win keeps 1 dissent event');
+ select is((select coalesce(sum(coins_delta),0)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-bwin')), 98, 'B-win coin contract unchanged');
+@@ -121,7 +127,10 @@ select is((select coalesce(sum(coins_delta),0)::int from public.reputation_event
+ select lives_ok($$ select public.settle_clash((select id from public.clashes where take_id='td-take-awin')) $$, 'settle A-majority clash');
+ reset role;
+ select is((select winner_side::text from public.verdicts where clash_id=(select id from public.clashes where take_id='td-take-awin')), 'A', 'A majority settles A');
+-select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin')), 6, 'A-win keeps 6 ledger rows');
++select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin')), 8, 'A-win keeps 8 ledger rows (6 jurors + 2 fighters)');
++select is((select reputation from public.profiles where id='td-author'), 70, 'A-win pays the author (side A) the +40 win bonus');
++select is((select reputation from public.profiles where id='td-challenger'), 70, 'each debater holds 70 across the three clashes');
++select is((select count(*)::int from public.reputation_events where kind like 'clash_fighter%' and coins_delta<>0), 0, 'no fighter award anywhere carries coins');
+ select is((select count(*)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin') and kind='clash_win'), 2, 'A-win keeps 2 win events');
+ select is((select coalesce(sum(coins_delta),0)::int from public.reputation_events where clash_id=(select id from public.clashes where take_id='td-take-awin')), 98, 'A-win coin contract unchanged');
+ 
+diff --git a/supabase/tests/010_clash_scheduler.sql b/supabase/tests/010_clash_scheduler.sql
+index ad810b9..6479440 100644
+--- a/supabase/tests/010_clash_scheduler.sql
++++ b/supabase/tests/010_clash_scheduler.sql
+@@ -89,12 +89,27 @@ select is((public.run_maintenance(10))->>'clashes_settled', '0', 're-running mai
+ select is((select count(*)::int from public.verdicts where clash_id = (select id from public.clashes where take_id = 'ts-take-a')), 1, 'verdict count stays 1');
+ select is(
+   (select count(*)::int from public.reputation_events where clash_id = (select id from public.clashes where take_id = 'ts-take-a')),
++  4,
++  'reputation ledger does not duplicate (1 juror 2 rows + 2 fighter rows)'
++);
++select is(
++  (select count(*)::int from public.reputation_events
++    where clash_id = (select id from public.clashes where take_id = 'ts-take-a')
++      and kind in ('clash_fighter_win','clash_fighter_participation')),
+   2,
+-  'reputation ledger does not duplicate'
++  'scheduled path pays both fighters exactly once'
++);
++select is(
++  (select reputation from public.profiles where id = 'ts-author'), 40,
++  'scheduled path pays the winning debater +40'
++);
++select is(
++  (select reputation from public.profiles where id = 'ts-chall'), 15,
++  'scheduled path pays the losing debater +15'
+ );
+ select is(
+   (select count(*)::int from public.notifications where entity_id = (select id from public.clashes where take_id = 'ts-take-a')),
+-  4,
++  6,
+   'notifications do not duplicate'
+ );
+ 
+diff --git a/supabase/tests/075_maintenance_failure_recovery.sql b/supabase/tests/075_maintenance_failure_recovery.sql
+index 04f4bdf..43772b9 100644
+--- a/supabase/tests/075_maintenance_failure_recovery.sql
++++ b/supabase/tests/075_maintenance_failure_recovery.sql
+@@ -61,14 +61,15 @@ select is((select result->>'partial_failure' from recovered_run),'false','recove
+ select is((select status::text from clashes where id=pg_temp.c()),'settled','next existing maintenance run settles failed Clash');
+ select is((select status::text from arena_rooms where id=pg_temp.r()),'SETTLED','recovery reaches coherent terminal Room');
+ select is((select count(*)::int from verdicts where clash_id=pg_temp.c()),1,'one verdict after recovery');
+-select is((select count(*)::int from reputation_events where clash_id=pg_temp.c()),2,'one participation and win award after recovery');
+-select is((select count(*)::int from notifications where entity_id=pg_temp.c()),3,'one juror and two fighter notifications after recovery');
++select is((select count(*)::int from reputation_events where clash_id=pg_temp.c()),4,'one participation and win award per juror, plus two fighter awards, after recovery');
++select is((select count(*)::int from reputation_events where clash_id=pg_temp.c() and kind in('clash_fighter_win','clash_fighter_participation')),2,'recovery pays both fighters once');
++select is((select count(*)::int from notifications where entity_id=pg_temp.c()),5,'one juror, two result and two fighter notifications after recovery');
+ select is((select p.reputation-o.reputation from profiles p cross join recovery_original o where id='recovery-j'),120,'one winning jury reputation award');
+ select is((select count(*)::int from arena_maintenance_failures where item_id in(pg_temp.c(),pg_temp.r()) and retry_status='resolved' and resolved_at is not null),2,'terminal recovery resolves both diagnostic categories');
+ select is(settle_clash(pg_temp.c())->>'winner_side','A','direct settled retry returns original verdict');
+ select run_maintenance(500);
+-select is((select count(*)::int from reputation_events where clash_id=pg_temp.c()),2,'maintenance and direct retries do not duplicate awards');
+-select is((select count(*)::int from notifications where entity_id=pg_temp.c()),3,'maintenance and direct retries do not duplicate notifications');
++select is((select count(*)::int from reputation_events where clash_id=pg_temp.c()),4,'maintenance and direct retries do not duplicate awards');
++select is((select count(*)::int from notifications where entity_id=pg_temp.c()),5,'maintenance and direct retries do not duplicate notifications');
+ -- Legacy GROUP failures are isolated and recover through the same existing batch.
+ insert into arena_daily_topics(id,title,status,opens_at,final_arguments_at,judging_at,closes_at)
+  values('recovery-group-topic','Group recovery rollback fixture','closed',now()-interval '31 minutes',now()-interval '11 minutes',now()-interval '6 minutes',now()-interval '1 minute');
+diff --git a/supabase/tests/beta_fighter_rewards.pgtap.sql b/supabase/tests/beta_fighter_rewards.pgtap.sql
+new file mode 100644
+index 0000000..1ae0588
+--- /dev/null
++++ b/supabase/tests/beta_fighter_rewards.pgtap.sql
+@@ -0,0 +1,169 @@
++-- ============================================================================
++-- CLASH 2.0 · CANDIDATE — Fighter reward regression (pgTAP)
++-- ----------------------------------------------------------------------------
++-- Baseline: 36dccade5f5b7a7ae62c77f966d3b519d34723ee
++-- Covers the owner-approved 2026-11-12 fighter policy:
++--   WIN  → winner +40 (clash_fighter_win), loser +15 (clash_fighter_participation)
++--   DRAW → both +15 (clash_fighter_participation)
++--   CANCELLED (0 ballots) → nobody paid
++--   Coins: 0 in every fighter case. Juror payouts unchanged.
++--   Idempotent across replay; no backfill of settled history.
++--
++-- Self-contained: build fixtures as table owner, drive settlement through the
++-- real public.settle_clash wrapper, and clean up nothing (pgTAP rolls back).
++-- ============================================================================
++
++begin;
++select plan(35);
++
++-- ── Fixtures ────────────────────────────────────────────────────────────────
++insert into auth.users (id) values
++  ('00000000-0000-0000-0000-00000000f101'),
++  ('00000000-0000-0000-0000-00000000f102'),
++  ('00000000-0000-0000-0000-00000000f103'),
++  ('00000000-0000-0000-0000-00000000f104'),
++  ('00000000-0000-0000-0000-00000000f105');
++
++update public.profiles set id='fw-author',     handle='fw_author',     name='FW Author',
++       role='viewer', reputation=0, coins=0, streak=0
++ where auth_user_id='00000000-0000-0000-0000-00000000f101';
++update public.profiles set id='fw-challenger', handle='fw_challenger', name='FW Challenger',
++       role='viewer', reputation=0, coins=0, streak=0
++ where auth_user_id='00000000-0000-0000-0000-00000000f102';
++update public.profiles set id='fw-j1', handle='fw_j1', name='FW J1',
++       role='viewer', reputation=0, coins=0, streak=0
++ where auth_user_id='00000000-0000-0000-0000-00000000f103';
++update public.profiles set id='fw-j2', handle='fw_j2', name='FW J2',
++       role='viewer', reputation=0, coins=0, streak=0
++ where auth_user_id='00000000-0000-0000-0000-00000000f104';
++update public.profiles set id='fw-j3', handle='fw_j3', name='FW J3',
++       role='viewer', reputation=0, coins=0, streak=0
++ where auth_user_id='00000000-0000-0000-0000-00000000f105';
++
++insert into public.takes (id, author_id, hood, text, status, expires_at) values
++  ('fw-take-a', 'fw-author', 'techtakes', 'Fighter reward A-majority fixture.', 'active', now() + interval '24 hours'),
++  ('fw-take-b', 'fw-author', 'techtakes', 'Fighter reward B-majority fixture.', 'active', now() + interval '24 hours'),
++  ('fw-take-d', 'fw-author', 'techtakes', 'Fighter reward DRAW fixture.',       'active', now() + interval '24 hours'),
++  ('fw-take-c', 'fw-author', 'techtakes', 'Fighter reward CANCELLED fixture.',  'active', now() + interval '24 hours');
++
++insert into public.clashes (id, take_id, challenger_id, status, opens_at, closes_at) values
++  ('fw-clash-a', 'fw-take-a', 'fw-challenger', 'open', now() - interval '10 min', now() - interval '1 min'),
++  ('fw-clash-b', 'fw-take-b', 'fw-challenger', 'open', now() - interval '10 min', now() - interval '1 min'),
++  ('fw-clash-d', 'fw-take-d', 'fw-challenger', 'open', now() - interval '10 min', now() - interval '1 min'),
++  ('fw-clash-c', 'fw-take-c', 'fw-challenger', 'open', now() - interval '10 min', now() - interval '1 min');
++
++-- A-majority (side A = the take author): j1,j2 vote A ; j3 votes B
++insert into public.judgements (clash_id, juror_id, side) values
++  ('fw-clash-a','fw-j1','A'), ('fw-clash-a','fw-j2','A'), ('fw-clash-a','fw-j3','B');
++
++-- B-majority: j1,j2 vote B ; j3 votes A
++insert into public.judgements (clash_id, juror_id, side) values
++  ('fw-clash-b','fw-j1','B'), ('fw-clash-b','fw-j2','B'), ('fw-clash-b','fw-j3','A');
++
++-- DRAW: a genuine 1–1 tie, so j3 sits this one out entirely.
++insert into public.judgements (clash_id, juror_id, side) values
++  ('fw-clash-d','fw-j1','A'), ('fw-clash-d','fw-j2','B');
++
++-- fw-clash-c intentionally has no ballots → CANCELLED
++
++-- ── 1. Vocabulary is distinct and auditable ────────────────────────────────
++select has_column('public','reputation_events','kind','ledger keeps its kind column');
++select is(
++  (select array_agg(l order by l)::text[]
++     from unnest(enum_range(null::public.reputation_kind)) l
++    where l::text like 'clash_fighter%'),
++  array['clash_fighter_participation','clash_fighter_win']::public.reputation_kind[],
++  'two dedicated fighter reward kinds exist');
++select is(
++  (select count(*)::int from unnest(enum_range(null::public.reputation_kind)) l
++    where l::text in ('clash_participation','clash_win','clash_dissent')),
++  3, 'the three historical juror kinds are untouched');
++
++-- ── 2. A-majority settlement ───────────────────────────────────────────────
++select lives_ok($$ select public.settle_clash('fw-clash-a') $$, 'A-majority settle runs');
++select is((select winner_side::text from public.verdicts where clash_id='fw-clash-a'), 'A',
++  'A-majority settles A');
++
++select is((select reputation_delta from public.reputation_events
++            where clash_id='fw-clash-a' and profile_id='fw-author' and kind='clash_fighter_win'),
++  40, 'winning debater (author, side A) earns +40');
++select is((select coins_delta from public.reputation_events
++            where clash_id='fw-clash-a' and profile_id='fw-author' and kind='clash_fighter_win'),
++  0, 'winning debater earns 0 coins');
++select is((select reputation_delta from public.reputation_events
++            where clash_id='fw-clash-a' and profile_id='fw-challenger' and kind='clash_fighter_participation'),
++  15, 'losing debater (challenger, side B) earns +15');
++select is((select coins_delta from public.reputation_events
++            where clash_id='fw-clash-a' and profile_id='fw-challenger' and kind='clash_fighter_participation'),
++  0, 'losing debater earns 0 coins');
++
++select is((select reputation from public.profiles where id='fw-author'), 40,
++  'author (side A, winner) profile reputation = +40');
++select is((select reputation from public.profiles where id='fw-challenger'), 15,
++  'challenger (side B, loser) profile reputation = +15');
++select is((select coins from public.profiles where id='fw-author'), 0,
++  'author profile coins unchanged');
++select is((select streak from public.profiles where id='fw-author'), 0,
++  'fighter win does not touch streak');
++
++-- ── 3. Juror economy unchanged ─────────────────────────────────────────────
++select is((select reputation from public.profiles where id='fw-j1'), 120,
++  'winning juror still +120');
++select is((select coins from public.profiles where id='fw-j1'), 40,
++  'winning juror still +40 coins');
++select is((select reputation from public.profiles where id='fw-j3'), 25,
++  'dissenting juror still +25');
++select is((select coins from public.profiles where id='fw-j3'), 18,
++  'dissenting juror still +18 coins');
++
++-- ── 4. Room scope must not leak into duel rooms ────────────────────────────
++select is((select count(*)::int from public.reputation_events
++            where clash_id='fw-clash-a' and arena_room_id is not null),
++  0, 'fighter awards carry no arena_room_id');
++
++-- ── 5. Idempotency ─────────────────────────────────────────────────────────
++select lives_ok($$ select public.settle_clash('fw-clash-a') $$, 're-settle runs');
++select is((select count(*)::int from public.reputation_events
++            where clash_id='fw-clash-a' and kind in ('clash_fighter_win','clash_fighter_participation')),
++  2, 're-settle writes no duplicate fighter rows');
++select is((select reputation from public.profiles where id='fw-author'), 40,
++  're-settle does not re-award the winner');
++select is((select count(*)::int from public.verdicts where clash_id='fw-clash-a'), 1,
++  're-settle keeps exactly one verdict');
++
++-- ── 6. B-majority pays the challenger ──────────────────────────────────────
++select lives_ok($$ select public.settle_clash('fw-clash-b') $$, 'B-majority settle runs');
++select is((select reputation_delta from public.reputation_events
++            where clash_id='fw-clash-b' and profile_id='fw-challenger' and kind='clash_fighter_win'),
++  40, 'challenger (side B) wins +40 when side B wins');
++select is((select reputation_delta from public.reputation_events
++            where clash_id='fw-clash-b' and profile_id='fw-author' and kind='clash_fighter_participation'),
++  15, 'author (side A) earns +15 participation when side B wins');
++
++-- ── 7. DRAW pays both, equally, without a winner ───────────────────────────
++select is((select count(*)::int from public.judgements where clash_id='fw-clash-d'), 2,
++  'draw fixture really is a 1-1 tie');
++select lives_ok($$ select public.settle_clash('fw-clash-d') $$, 'DRAW settle runs');
++select is((select winner_side::text from public.verdicts where clash_id='fw-clash-d'), 'DRAW',
++  'tie settles DRAW with no fabricated winner');
++select is((select count(*)::int from public.reputation_events
++            where clash_id='fw-clash-d' and kind='clash_fighter_win'), 0,
++  'draw grants no fighter win kind');
++select is((select count(*)::int from public.reputation_events
++            where clash_id='fw-clash-d' and kind='clash_fighter_participation'), 2,
++  'draw grants participation to exactly two fighters');
++select is((select sum(reputation_delta)::int from public.reputation_events
++            where clash_id='fw-clash-d' and kind='clash_fighter_participation'), 30,
++  'draw pays +15 each (30 total)');
++select is((select coalesce(sum(coins_delta),0)::int from public.reputation_events
++            where clash_id='fw-clash-d'), 0, 'draw pays no coins to anyone');
++
++-- ── 8. CANCELLED pays nobody ───────────────────────────────────────────────
++select lives_ok($$ select public.settle_clash('fw-clash-c') $$, 'zero-ballot settle runs');
++select is((select status::text from public.clashes where id='fw-clash-c'), 'cancelled',
++  'zero ballots still cancels');
++select is((select count(*)::int from public.reputation_events where clash_id='fw-clash-c'), 0,
++  'cancelled clash writes no fighter rewards');
++
++select * from finish();
++rollback;
+diff --git a/utils/reputation.test.ts b/utils/reputation.test.ts
+index c5abff5..3b51875 100644
+--- a/utils/reputation.test.ts
++++ b/utils/reputation.test.ts
+@@ -1,26 +1,46 @@
+ /** Reputation and rank rules (spec §11 / §10). Pure arithmetic — no network, no device. */
+ import assert from 'node:assert/strict';
+ import { describe, it } from 'node:test';
+-import { XP, CLASH_WIN_TOTAL, awardDescription, rankFor, nextRank, rankProgress, RANKS } from './reputation.ts';
++import {
++  XP, CLASH_WIN_TOTAL, JUROR_CLASH_WIN_TOTAL, FIGHTER_CLASH_WIN_TOTAL,
++  FIGHTER_CLASH_LOSS_TOTAL, awardDescription, rankFor, nextRank, rankProgress, RANKS,
++} from './reputation.ts';
+ 
+ describe('clash reward totals', () => {
+-  it('a won clash pays exactly the spec total of 120', () => {
++  it('a won clash pays a winning-side juror exactly 120', () => {
+     assert.equal(XP.participate, 15);
+     assert.equal(XP.winBonus, 105);
++    assert.equal(JUROR_CLASH_WIN_TOTAL, 120);
++  });
++
++  it('keeps the deprecated CLASH_WIN_TOTAL aliased to the JUROR total', () => {
++    assert.equal(CLASH_WIN_TOTAL, JUROR_CLASH_WIN_TOTAL);
+     assert.equal(CLASH_WIN_TOTAL, 120);
+   });
+ 
++  it('pays a winning debater +40, not the juror 120', () => {
++    assert.equal(XP.fighterWin, 40);
++    assert.equal(FIGHTER_CLASH_WIN_TOTAL, 40);
++    assert.notEqual(FIGHTER_CLASH_WIN_TOTAL, JUROR_CLASH_WIN_TOTAL);
++  });
++
++  it('pays a losing debater +15, the same as a DRAW debater', () => {
++    assert.equal(XP.fighterParticipate, 15);
++    assert.equal(FIGHTER_CLASH_LOSS_TOTAL, 15);
++    assert.equal(FIGHTER_CLASH_LOSS_TOTAL, XP.fighterParticipate);
++    assert.ok(FIGHTER_CLASH_LOSS_TOTAL < FIGHTER_CLASH_WIN_TOTAL);
++  });
++
+   it('participation alone is paid without the win bonus', () => {
+     assert.equal(XP.participate, 15);
+     assert.equal(XP.participate + XP.winBonus, CLASH_WIN_TOTAL);
+   });
+ 
+-  it('a lost clash pays participation only — the win bonus is never granted', () => {
+-    // Losing earns XP.participate and nothing else; a win is participate + winBonus.
+-    const loss = XP.participate;
+-    const win = CLASH_WIN_TOTAL;
+-    assert.equal(win - loss, XP.winBonus);
+-    assert.ok(loss < win);
++  it('a dissenting juror earns participation + dissent, never the win bonus', () => {
++    const dissent = XP.participate + XP.dissent;
++    assert.equal(dissent, 25);
++    assert.equal(JUROR_CLASH_WIN_TOTAL - dissent, 95);
++    assert.ok(dissent < JUROR_CLASH_WIN_TOTAL);
+   });
+ 
+   it('dissenting ballots pay the documented dissent credit', () => {
+diff --git a/utils/reputation.ts b/utils/reputation.ts
+index 0c69cd6..3b4bac9 100644
+--- a/utils/reputation.ts
++++ b/utils/reputation.ts
+@@ -1,30 +1,72 @@
+ import type { Alignment, RankName } from '../store/types';
+ 
+-/** Reputation awarded per interaction (spec §11). */
++/**
++ * Reputation awarded per interaction.
++ *
++ * ACTOR SEPARATION (2026-11-12): a Clash pays two different groups, and they are
++ * NOT paid the same. These constants mirror the server ledger exactly:
++ *
++ *   FIGHTERS — the two debaters (settle_clash_legacy, kinds
++ *   `clash_fighter_win` / `clash_fighter_participation`):
++ *     win  +40 rep, 0 coins
++ *     loss +15 rep, 0 coins
++ *     draw +15 rep each, 0 coins
++ *
++ *   JURORS — the people who voted (kinds `clash_win` / `clash_dissent` /
++ *   `clash_participation`):
++ *     winning side +120 rep, +40 coins, streak +1
++ *     dissenting   +25 rep, +18 coins, streak reset
++ *     draw         +15 rep, no coins, streak unchanged
++ *
++ * Fighter awards never carry coins and never change a streak. Do not collapse
++ * these two groups into one "clash reward" number — that conflation is exactly
++ * what made the previous 120 ambiguous.
++ */
+ export const XP = {
+-  /** "Participating: +15 XP". */
++  // ── Fighter awards (debate participation) ──────────────────────────────────
++  /** Winning debater: `clash_fighter_win`. */
++  fighterWin: 40,
++  /** Losing debater, and each debater on a DRAW: `clash_fighter_participation`. */
++  fighterParticipate: 15,
++
++  // ── Juror awards (voting) ──────────────────────────────────────────────────
++  /** Winning-side juror: `clash_participation` + `clash_win` = 120. */
+   participate: 15,
+-  /** Win bonus on top of participation — 15 + 105 = the spec's +120 for a won clash. */
++  /** Win bonus on top of participation — 15 + 105 = 120 for a winning-side juror. */
+   winBonus: 105,
+-  /** Prototype tuning: a small credit for filing a dissenting ballot, so judging still pays. */
++  /** Dissenting juror credit: `clash_dissent` (+18 coins on the server). */
+   dissent: 10,
++
++  // ── Other ──────────────────────────────────────────────────────────────────
+   /** "Creating popular Take: +30 XP". */
+   popularTake: 30,
+   /** "Entering Hall of Fame: +500 XP" (Phase 2). */
+   hallOfFame: 500,
+ } as const;
+ 
+-/** "Winning Clash: +120 XP" — participation plus the win bonus. */
+-export const CLASH_WIN_TOTAL = XP.participate + XP.winBonus;
++/** "Winning Clash: +120 XP" for a WINNING-SIDE JUROR — participation + bonus. */
++export const JUROR_CLASH_WIN_TOTAL = XP.participate + XP.winBonus;
++
++/** Total for a winning debater. Fighter awards carry no coins. */
++export const FIGHTER_CLASH_WIN_TOTAL = XP.fighterWin;
+ 
+-/** Human label for how a ballot compared to the settled winner (display only). */
++/** Total for a losing debater, identical to a DRAW debater. */
++export const FIGHTER_CLASH_LOSS_TOTAL = XP.fighterParticipate;
++
++/**
++ * @deprecated Ambiguous name. The value is the JUROR total (120), not a
++ * fighter's. Use {@link JUROR_CLASH_WIN_TOTAL} or
++ * {@link FIGHTER_CLASH_WIN_TOTAL} so the actor is explicit.
++ */
++export const CLASH_WIN_TOTAL = JUROR_CLASH_WIN_TOTAL;
++
++/** Human label for how a JUROR's ballot compared to the settled winner. */
+ export function awardDescription(alignment: Alignment): string {
+   if (alignment === 'majority') return 'Your judgement matched the jury';
+   if (alignment === 'minority') return 'You backed the losing side — dissent logged';
+   return 'You abstained, so the jury decided';
+ }
+ 
+-
+ export interface RankStep {
+   name: RankName;
+   /** Reputation required to hold this rank. */
