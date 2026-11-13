@@ -249,7 +249,17 @@ describe('journey regressions found during the audit', () => {
     const start = room.indexOf('onWatch={');
     assert.ok(start > -1, 'the duel experience lost its admission handler');
     const body = room.slice(start, room.indexOf('onBack=', start));
-    assert.match(body, /watchAsSpectator\(\)/, 'the duel path bypasses the shared operation');
+    /*
+     * The duel path passes its intent. `{ historyView }` is what tells the model
+     * this tap is a request to read settled history — the SQL permits watching a
+     * settled duel, and without the intent the shared operation would refuse the
+     * very action the screen advertises.
+     */
+    assert.match(
+      body,
+      /watchAsSpectator\(\{ historyView \}\)/,
+      'the duel path bypasses the shared operation',
+    );
     assert.doesNotMatch(body, /watchRoom\(/, 'the duel path still calls the RPC raw');
   });
 
@@ -264,10 +274,23 @@ describe('journey regressions found during the audit', () => {
     const start = hook.indexOf('const watchAsSpectator');
     const body = hook.slice(start, hook.indexOf('}, [', start));
     assert.match(body, /roomRef\.current/, 'no call-time state read');
-    assert.match(body, /'SETTLED'/, 'terminal state is not re-checked');
-    assert.match(body, /'CANCELLED'/);
+    /*
+     * The guard used to special-case `SETTLED` (and `CANCELLED`) inline. That was
+     * too strict in one direction — a settled canonical duel is history the SQL
+     * lets a spectator watch — and too loose in another: anything it did not name
+     * fell through to the RPC. It now asks the same model the screen renders from,
+     * passing the caller's intent, so eligibility cannot drift from the contract
+     * in either direction. Pin the delegation, not a status list.
+     */
+    assert.match(body, /admissionFor\(/, 'the call-time guard does not consult the model');
+    assert.match(body, /intent/, 'the caller intent is not passed to the model');
+    assert.doesNotMatch(
+      body,
+      /current\.status === '(SETTLED|CANCELLED)'/,
+      'the guard hardcodes a status the model already owns',
+    );
     // The refusal must come *before* the RPC, or it guards nothing.
-    const guardAt = body.indexOf("current.status === 'SETTLED'");
+    const guardAt = body.indexOf('!decision.enabled');
     const rpcAt = body.indexOf('await watchRoom(');
     assert.ok(guardAt > -1 && rpcAt > guardAt, 'the guard runs after the RPC');
   });

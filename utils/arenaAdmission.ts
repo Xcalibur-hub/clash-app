@@ -31,7 +31,12 @@
  * the three populations.
  */
 
-import { canUpgradeToDebater, type RoomPhase, type ViewerStanding } from './arenaRoomEligibility.ts';
+import {
+  canUpgradeToDebater,
+  canWatchRoom,
+  type RoomPhase,
+  type ViewerStanding,
+} from './arenaRoomEligibility.ts';
 
 /**
  * The operation that turns this viewer into a participant.
@@ -85,6 +90,30 @@ function phaseAdmitsParticipants(phase: RoomPhase): boolean {
 }
 
 /**
+ * Why the caller is asking.
+ *
+ * The SQL contract does not distinguish these — `watch_arena_room` permits a
+ * settled room — but the *product* does:
+ *
+ *   · `live`    — a room in play. Admission gains both reading and a path to
+ *                 taking part.
+ *   · `history` — a canonical duel opened after settlement. Admission is the only
+ *                 way to read the transcript, and it grants reading only.
+ *
+ * A settled GROUP room is neither: it already shows its verdict to everybody, so
+ * admission there is noise rather than access. Defaulting to `live` keeps that
+ * behaviour unchanged, and only a caller that says `history` unlocks the settled
+ * case.
+ */
+export interface AdmissionIntent {
+  /**
+   * True when the room is being opened as settled history (a canonical duel),
+   * rather than as a live room whose result happens to be available.
+   */
+  historyView?: boolean;
+}
+
+/**
  * The admission that this viewer can actually perform right now.
  *
  * The five cases from the report, in the order they are checked:
@@ -95,13 +124,40 @@ function phaseAdmitsParticipants(phase: RoomPhase): boolean {
  *   4. existing debater           → none, already admitted
  *   5. full / terminal / rejected → none, with the specific reason
  */
-export function admissionFor(phase: RoomPhase, standing: ViewerStanding): AdmissionDecision {
+export function admissionFor(
+  phase: RoomPhase,
+  standing: ViewerStanding,
+  intent: AdmissionIntent = {},
+): AdmissionDecision {
+  const historyView = intent.historyView === true;
+
   // ---- 5a. Terminal phases -------------------------------------------------
-  if (phase === 'SETTLED') {
-    return blocked('This clash is decided. The result and what comes next are below.', 'settled');
-  }
+  /*
+   * CANCELLED is refused by the server outright, so no intent can change it:
+   *   `if v_room.status = 'CANCELLED' then raise 'this room is not available'`.
+   */
   if (phase === 'CANCELLED') {
     return blocked('This room closed without a verdict.', 'cancelled');
+  }
+
+  /*
+   * SETTLED depends on intent, and the ordering here is the whole fix.
+   *
+   * The previous version refused SETTLED for *everyone*, before it ever looked at
+   * who was asking. But `watch_arena_room` says:
+   *
+   *   -- Closed topics may still be watched if the room settled (public result).
+   *
+   * A canonical settled duel renders "Watch Clash" (`duelPresentation().canWatch`
+   * is true when `duel.status === 'settled'`), and tapping it hit this guard and
+   * returned before the RPC was ever called — so a capability the server grants
+   * was hidden from the only people who could use it.
+   *
+   * The guard was not wrong in spirit; it was a *group-room* rule applied to
+   * both experiences. Both now diverge on the caller's stated intent.
+   */
+  if (phase === 'SETTLED' && !historyView) {
+    return blocked('This clash is decided. The result and what comes next are below.', 'settled');
   }
 
   // ---- 1. Signed out -------------------------------------------------------
@@ -116,7 +172,14 @@ export function admissionFor(phase: RoomPhase, standing: ViewerStanding): Admiss
   // non-CANCELLED room. It takes NO stance and consumes NO capacity, which is
   // exactly why it is a different target from the upgrade.
   if (standing.kind === 'non_member') {
-    if (!phaseAdmitsParticipants(phase)) {
+    /*
+     * `canWatchRoom` is the SQL predicate — every phase except CANCELLED, which
+     * was already handled above. Using it here rather than the argument window is
+     * what makes settled history reachable: `phaseAdmitsParticipants` answers a
+     * different question ("can someone join the debate"), and admission is not
+     * that.
+     */
+    if (!canWatchRoom(phase)) {
       return blocked('This room is not open to new spectators right now.', 'not_open');
     }
     return decide('watch', 'watch_confirm');

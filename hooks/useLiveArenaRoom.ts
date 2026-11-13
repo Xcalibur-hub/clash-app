@@ -37,7 +37,7 @@ import {
   type SubmitArenaEvidenceInput,
 } from '../services/liveArenaService';
 import { errorText, SupabaseError } from '../services/supabaseClient';
-import { admissionFor } from '../utils/arenaAdmission';
+import { admissionFor, type AdmissionIntent } from '../utils/arenaAdmission';
 import { showNotice, useClash } from '../store';
 import {
   createTranscriptUpdater,
@@ -87,11 +87,15 @@ export interface LiveArenaRoomController {
   /** Spectator â†’ debater in-place. Refreshes room state on success. */
   upgradeToDebater: (stance: Stance) => Promise<boolean>;
   /**
-   * Non-member â†’ spectator. `watch_arena_room`, which takes no stance and
+   * Non-member → spectator via `watch_arena_room`, which takes no stance and
    * consumes no capacity. This is NOT `upgradeToDebater`: that RPC requires an
    * existing participant row and refuses a non-member with 42501.
+   *
+   * `intent.historyView` tells admission that a SETTLED room is being opened as
+   * history rather than as a live room whose result happens to be on screen. The
+   * SQL permits settled watching; the product only wants it for the history case.
    */
-  watchAsSpectator: () => Promise<boolean>;
+  watchAsSpectator: (intent?: AdmissionIntent) => Promise<boolean>;
   /** True after `watch_arena_room` failed in a way the viewer can retry. */
   watchFailed: boolean;
 }
@@ -1015,7 +1019,7 @@ export function useLiveArenaRoom(
    * Folding them together is what produced the integration blocker, so they are
    * kept structurally distinct rather than branch-ed at a shared call site.
    */
-  const watchAsSpectator = React.useCallback(async (): Promise<boolean> => {
+  const watchAsSpectator = React.useCallback(async (intent: AdmissionIntent = {}): Promise<boolean> => {
     const session = sessionRef.current;
     if (session.roomId !== roomId || !liveSession(session)) return false;
 
@@ -1034,14 +1038,33 @@ export function useLiveArenaRoom(
      */
     const current = roomRef.current;
     if (current) {
-      if (current.status === 'SETTLED' || current.status === 'CANCELLED') {
-        if (mounted.current) setWatchFailed(true);
-        dispatch(showNotice(admissionFor(current.status, {
+      /*
+       * Ask the model with the *caller's* intent. A settled canonical duel is
+       * history the SQL permits watching; a settled group room is a result already
+       * on screen. Passing the intent through — rather than testing the status
+       * directly — is what stops this guard re-introducing the regression it was
+       * added to make precise.
+       */
+      const decision = admissionFor(
+        current.status,
+        {
           kind: current.viewer != null ? 'member' : 'non_member',
           role: current.viewer?.role ?? null,
           hasSideVote: current.viewer?.hasSideVote === true,
           hasArgumentVote: current.viewer?.hasArgumentVote === true,
-        }).reason ?? 'This room is no longer open.'));
+        },
+        intent,
+      );
+      /*
+       * Refuse whatever the model refuses — not just CANCELLED. The earlier
+       * version special-cased one status and let everything else fall through,
+       * which would have admitted a settled group room: a room whose verdict is
+       * already on screen and which the product does not offer as a watch. The
+       * model is the single source of truth here, so ask it and obey it.
+       */
+      if (!decision.enabled) {
+        if (mounted.current) setWatchFailed(true);
+        dispatch(showNotice(decision.reason ?? 'This room is no longer open.'));
         return false;
       }
       /*

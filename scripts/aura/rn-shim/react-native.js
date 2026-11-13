@@ -84,4 +84,14 @@ module.exports = {
   TurboModuleRegistry: { get: () => null, getEnforcing: () => ({}) },
   AppRegistry: { registerComponent: () => {}, registerRunnable: () => {}, runApplication: () => {} },
   DeviceEventEmitter: { addListener: () => ({ remove() {} }), removeAllListeners() {} },
+  /*
+   * `useLiveArenaRoom` reads `AppState.currentState` and subscribes for
+   * foreground/background transitions. Static markup never observes a change, so
+   * the shim reports a permanently active app and an inert subscription.
+   */
+  AppState: {
+    currentState: 'active',
+    addEventListener: () => ({ remove() {} }),
+    removeEventListener: () => {},
+  },
 };

@@ -623,9 +623,17 @@ function RoomScope(): React.JSX.Element {
    * memo is the authority, so a phase transition re-renders the sheet into its
    * blocked state instead of leaving a confirm button that the server will reject.
    */
+  /*
+   * A settled canonical duel is history: `watch_arena_room` permits watching it,
+   * and admission is the only way to read the transcript. A settled GROUP room is
+   * not — it already shows its verdict to everyone. `isDuel` is the distinction,
+   * and it is stated once here so the sheet, its handler and the model cannot
+   * disagree about which one they are looking at.
+   */
+  const historyView = isDuel;
   const admission = React.useMemo(
-    () => (room ? admissionFor(room.status, viewerStanding) : null),
-    [room, viewerStanding],
+    () => (room ? admissionFor(room.status, viewerStanding, { historyView }) : null),
+    [room, viewerStanding, historyView],
   );
   /** Non-null when the open watch sheet can no longer be confirmed. */
   const watchBlockedReason = React.useMemo(() => {
@@ -910,11 +918,17 @@ function RoomScope(): React.JSX.Element {
        */
       onWatch={async () => {
         if (!requireAuth()) return;
-        // One operation, one path: this is the same callback the group room uses,
-        // so the duel experience inherits its error and retry handling rather than
-        // calling `watchRoom` raw and letting a refusal become an unhandled
-        // rejection.
-        const ok = await watchAsSpectator();
+        /*
+         * `historyView` is what makes a settled duel watchable.
+         *
+         * This handler belongs to `DuelRoomExperience`, so it is a canonical duel
+         * by construction — no group room can reach it. `canWatch` is true for a
+         * settled duel (`duelPresentation`), and the SQL permits settled watching,
+         * so the only thing that used to block this was the frontend's blanket
+         * SETTLED refusal. The intent states which of the two situations this is;
+         * a settled group room never gets here, so its behaviour is unchanged.
+         */
+        const ok = await watchAsSpectator({ historyView });
         if (ok) void loadPresence();
       }}
       onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
@@ -1266,7 +1280,9 @@ function RoomScope(): React.JSX.Element {
         }}
         onConfirm={() => {
           setJoining(true);
-          void watchAsSpectator()
+          // Same intent the sheet's blocked state was derived from. A history
+          // viewer must be admitted from a settled duel; a group reader must not.
+          void watchAsSpectator({ historyView })
             .then((ok) => {
               if (ok) {
                 setWatchOpen(false);
