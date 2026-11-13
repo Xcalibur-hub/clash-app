@@ -30,3 +30,6 @@ supabase/.branches/
 /ios/
 .aura-render-check.cjs
 .aura-hook-harness.cjs
+.aura-hook-harness-mutant.cjs
+hooks/.aura-mutant-*.ts
+scripts/aura/hook-harness/.aura-mutant-*.cjs
