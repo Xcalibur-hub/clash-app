@@ -13,6 +13,7 @@ npx esbuild scripts/aura/render-check.tsx --bundle --platform=node --format=cjs 
   --alias:@sentry/react-native="$PWD/$SHIM/noop.js" \
   --alias:@react-native-async-storage/async-storage="$PWD/$SHIM/noop.js" \
   --alias:@expo-google-fonts/inter="$PWD/$SHIM/fonts.js" \
+  --alias:expo-linear-gradient="$PWD/$SHIM/linear-gradient.js" \
   --alias:lucide-react-native/icons/arrow-big-up="$PWD/$SHIM/icons.js" \
   --alias:lucide-react-native/icons/arrow-left="$PWD/$SHIM/icons.js" \
   --alias:lucide-react-native/icons/arrow-right="$PWD/$SHIM/icons.js" \

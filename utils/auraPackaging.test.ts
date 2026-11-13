@@ -34,6 +34,12 @@ const MUST_SHIP = [
   'components/navigation/dockMetrics.ts',
   'theme/typeRamp.ts',
   'utils/arenaHierarchy.ts',
+  // The Phase 2 review fix: eligibility is now one pure, server-authoritative
+  // module. If a release build ever omitted it the ActionRegion would not compile,
+  // so it belongs on the must-ship list with the rest.
+  'utils/arenaRoomEligibility.ts',
+  'utils/arenaResultConsolidation.test.ts',
+  'utils/arenaRoomEligibility.test.ts',
 ];
 
 describe('AURA packaging', () => {

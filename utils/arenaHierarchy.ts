@@ -46,8 +46,14 @@ export const REGION_ORDER: readonly HierarchyRegion[] = [
   'result',
 ];
 
-export type RoomPhase = 'OPEN' | 'FINAL_ARGUMENTS' | 'JUDGING' | 'SETTLED' | 'CANCELLED';
-export type ViewerRole = 'debater' | 'spectator';
+/*
+ * Phase and role are re-exported from `arenaRoomEligibility` rather than declared
+ * again. Two identical unions in two files is how the label and the button drift
+ * apart; there is one definition of each.
+ */
+export type { RoomPhase, ViewerRole } from './arenaRoomEligibility.ts';
+import type { RoomPhase, ViewerRole } from './arenaRoomEligibility.ts';
+import { primaryRoomAction } from './arenaRoomEligibility.ts';
 
 /**
  * What the viewer can do in this phase.
@@ -93,12 +99,27 @@ export interface RegionPlan {
 export interface ArenaHierarchyInput {
   phase: RoomPhase;
   role: ViewerRole;
-  /** True when the viewer may cast a ballot in this room right now. */
+  /**
+   * True when the viewer may cast a ballot in this room right now.
+   *
+   * Retained for the plan/label API, but it is **not trusted on its own**:
+   * `permittedAction` derives a ballot from server-authoritative standing, so a
+   * caller that flips this flag cannot cause a spectator to be offered a vote.
+   */
   mayJudge?: boolean;
   /** True when a next clash is actually available to start. */
   hasNextClash?: boolean;
   /** Signed-out viewers can watch but never act. */
   signedIn?: boolean;
+  /** Membership as the server reported it. Absent means "not a member". */
+  isMember?: boolean;
+  /** True when the server says this participant already recorded a side vote. */
+  hasSideVote?: boolean;
+  /**
+   * True when `participant_count >= capacity`, using `upgrade_arena_spectator`'s
+   * own test. Passed through so the UI hides the upgrade the RPC would reject.
+   */
+  roomFull?: boolean;
 }
 
 /**
@@ -108,27 +129,52 @@ export interface ArenaHierarchyInput {
  * a screen from presenting three competing calls to action.
  */
 export function permittedAction(input: ArenaHierarchyInput): PermittedAction {
-  const { phase, role, mayJudge = false, hasNextClash = false, signedIn = true } = input;
+  const { phase, role, hasNextClash = false, signedIn = true, isMember, hasSideVote, roomFull } =
+    input;
+
   // Signed-out viewers can still read a room; they just cannot act in it.
   if (!signedIn) return 'watch';
 
-  switch (phase) {
-    case 'OPEN':
-      // A fighter argues; a spectator without a side is invited to pick one.
-      if (role === 'debater') return 'argue';
+  /*
+   * This function used to *re-derive* eligibility from `(phase, role, mayJudge)`.
+   * That is exactly the review's issue 3: `mayJudge` was computed by the screen
+   * (`role === 'debater' && !hasSideVote`), the server independently applied
+   * `submit_arena_side_vote`'s rules, and the two disagreed — so the UI advertised
+   * ballots the RPC would always reject.
+   *
+   * It now defers to `primaryRoomAction()`, the same function the action region
+   * renders from, so the label, the button and the RPC cannot diverge. The
+   * `mayJudge` flag is deliberately ignored: only membership plus recorded-vote
+   * state decide whether a ballot is offered.
+   */
+  const offer = primaryRoomAction(phase, {
+    // `isMember` is authoritative when supplied; otherwise a participant role is
+    // the strongest evidence available, and a signed-in non-member gets null role.
+    isMember: isMember ?? role != null,
+    role,
+    hasSideVote: hasSideVote === true,
+    hasArgumentVote: false,
+    roomFull: roomFull === true,
+  });
+
+  switch (offer.action) {
+    case 'argue':
+      return 'argue';
+    case 'final_argument':
+      return 'final_argument';
+    case 'cast_verdict':
+      return 'vote';
+    case 'join_debate':
       return 'join_side';
-    case 'FINAL_ARGUMENTS':
-      return role === 'debater' ? 'final_argument' : 'watch';
-    case 'JUDGING':
-      // Judging is the whole point of this phase; fighters who still hold a
-      // ballot may vote, but the crowd's ballot is the primary action.
-      return mayJudge ? 'vote' : 'watch';
-    case 'SETTLED':
-      return hasNextClash ? 'start_next' : 'watch';
-    case 'CANCELLED':
-      return 'none';
-    default:
-      return 'none';
+    case 'open_judging':
+      // Judging is open but this viewer holds no ballot: following it is the action.
+      return 'watch';
+    case 'none':
+      // A settled room can still offer the next clash, which lives outside the
+      // ballot model and so is taken from the caller.
+      if (phase === 'SETTLED') return hasNextClash ? 'start_next' : 'watch';
+      // CANCELLED is terminal; every live phase with no ballot offer is readable.
+      return phase === 'CANCELLED' ? 'none' : 'watch';
   }
 }
 
@@ -159,6 +205,50 @@ export function permittedActionLabel(action: PermittedAction): string {
  * renders — the previews are generated from the same function the app uses, so
  * they cannot drift into a prettier fiction.
  */
+/**
+ * True when the room owes the viewer an explicit statement about acting.
+ *
+ * The Phase 2 rule was "a spectator gets no action region in FINAL_ARGUMENTS or
+ * JUDGING", on the theory that an absent region is better than an empty one. The
+ * review showed the flaw: in JUDGING a spectator was shown *nothing*, so they could
+ * not tell whether they had been excluded or whether the app had broken. Silence
+ * is not the same as absence.
+ *
+ * The region is now present whenever the viewer could plausibly act **or has a fact
+ * to report**, and the region itself renders either a control or a sentence. So
+ * "no ballot for you" is stated, not omitted — and a settled room, where the result
+ * region already owns the screen, still reserves nothing.
+ */
+export function needsActionRegion(input: ArenaHierarchyInput): boolean {
+  const { phase, role, signedIn = true, isMember, hasSideVote, roomFull } = input;
+  // Signed-out readers get the room, not a pseudo-action: every offer would end at
+  // an auth wall, and building an in-room sign-in flow is out of scope here.
+  if (!signedIn) return false;
+
+  const standing = {
+    isMember: isMember ?? role != null,
+    role,
+    hasSideVote: hasSideVote === true,
+    // Voting on someone else's argument is a separate grant, and no caller of this
+    // function is the argument-vote surface; it is never part of the offer here.
+    hasArgumentVote: false,
+    roomFull: roomFull === true,
+  };
+
+  // There is a real control to offer.
+  if (primaryRoomAction(phase, standing).action !== 'none') return true;
+
+  // There is a fact the viewer is owed:
+  //   JUDGING — "you may not vote" is surprising and must be said out loud.
+  //   OPEN    — a non-member needs the invitation to join.
+  if (phase === 'JUDGING') return true;
+  if (phase === 'OPEN' && !standing.isMember) return true;
+
+  // FINAL_ARGUMENTS, SETTLED and CANCELLED with nothing to offer stay silent: the
+  // floor and the result regions already answer the viewer's question.
+  return false;
+}
+
 export function arenaRegionPlan(input: ArenaHierarchyInput): RegionPlan[] {
   const { phase, role } = input;
   const action = permittedAction(input);
@@ -172,14 +262,17 @@ export function arenaRegionPlan(input: ArenaHierarchyInput): RegionPlan[] {
   //    outranks it and the proposition steps back to context.
   plan.push({ region: 'subject', key: 'subject', lens: 'official', emphasis: phase === 'SETTLED' ? 1 : 3 });
 
-  // 3. The action, immediately after what it acts on. Never for `none`/`watch`:
-  //    a spectator has nothing to do, and a disabled-looking composer is worse
-  //    than no composer. Picking a side is a lighter gesture than writing an
-  //    argument, so it is deliberately one step down in weight.
-  if (action === 'argue' || action === 'final_argument' || action === 'vote') {
-    plan.push({ region: 'action', key: 'action', lens: 'official', emphasis: 3 });
-  } else if (action === 'join_side') {
-    plan.push({ region: 'action', key: 'action', lens: 'official', emphasis: 2 });
+  // 3. The action, immediately after what it acts on.
+  //
+  //    The region is present whenever `needsActionRegion()` says the viewer is owed
+  //    a statement, and the region renders a control OR a sentence — never a dead
+  //    button. That replaced a rule which simply omitted the region for spectators
+  //    in JUDGING, leaving them unable to tell "you may not vote" from "the app is
+  //    broken". Picking a side is a lighter gesture than writing an argument, so it
+  //    is deliberately one step down in weight.
+  if (needsActionRegion(input)) {
+    const primary = action === 'argue' || action === 'final_argument' || action === 'vote';
+    plan.push({ region: 'action', key: 'action', lens: 'official', emphasis: primary ? 3 : 2 });
   }
 
   // 4. The floor. Same region, different lens: officials for fighters, the crowd

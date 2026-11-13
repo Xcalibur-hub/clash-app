@@ -1,85 +1,99 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { radius, space, typeScale, useThemeColors } from '../../theme';
+import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { AppText } from '../shared/AppText';
 import {
-  permittedAction,
-  permittedActionLabel,
-  type ArenaHierarchyInput,
-  type PermittedAction,
-} from '../../utils/arenaHierarchy';
+  primaryRoomAction,
+  type RoomAction,
+  type RoomPhase,
+  type ViewerStanding,
+} from '../../utils/arenaRoomEligibility';
 
 /**
- * The one thing you may do right now.
+ * The one thing you may do right now — or a sentence explaining why there isn't.
  *
- * ## Why a dedicated region
+ * ## The defect this replaces
  *
- * In the old room screen the permitted action was wherever the composer happened
- * to sit: a text field pinned to the bottom for fighters, a "Join a side" bar for
- * spectators, a ballot buried in a sheet during judging. Nothing on screen said
- * *which* of those applied, and a spectator in JUDGING could not tell whether
- * their ballot had already been cast.
+ * Phase 2 mounted this region with a "Cast your verdict" button whose handler was
+ * `if (action === 'vote') { return; }`. Tapping the most prominent control on the
+ * screen did nothing at all. It also advertised ballots to spectators, whom
+ * `submit_arena_side_vote` refuses outright, and to debaters who had already
+ * voted, which the server rejects with `side vote already recorded`.
  *
- * This region states the action in the second person, above the content it acts
- * on, and is the only filled element on the screen. It renders nothing when there
- * is nothing to do — an empty reservation would read as a broken control.
+ * ## The rule now
  *
- * The region never invents capability: it is driven by `permittedAction()`, the
- * same pure function the tests exercise and the same one the screens use to
- * decide what to mount. A disabled state is only shown when the server has
- * already told us the action is unavailable (`reason`).
+ * The region is a pure projection of `primaryRoomAction()` — the same function the
+ * unit tests exercise and the same one the screen uses to decide what to mount.
+ * It can therefore only present an action the database would accept:
+ *
+ *   · enabled  → a real control, and `onAction` must end somewhere that performs it
+ *   · disabled → **no button at all**; a short sentence instead
+ *
+ * `target` names the surface that owns the action (`composer`, `join_sheet`,
+ * `judging_panel`), so the screen cannot wire the CTA to a no-op without the
+ * `target` being visibly wrong.
  */
-export interface ActionRegionProps extends ArenaHierarchyInput {
-  /** Why the action is unavailable, when the server says it is. */
-  reason?: string | null;
-  /** True while an action is in flight — shows the label dimmed, not a spinner. */
+export interface ActionRegionProps {
+  phase: RoomPhase;
+  standing: ViewerStanding;
+  /** True while a related request is in flight. */
   busy?: boolean;
-  onPress: (action: PermittedAction) => void;
+  /**
+   * Perform the offered action. Called only when the offer is enabled, and always
+   * with a non-null target.
+   */
+  onAction: (action: Exclude<RoomAction, 'none'>, target: 'composer' | 'join_sheet' | 'judging_panel') => void;
 }
 
-export function ActionRegion({
-  reason,
-  busy = false,
-  onPress,
-  ...input
-}: ActionRegionProps): React.JSX.Element | null {
+export function ActionRegion({ phase, standing, busy = false, onAction }: ActionRegionProps): React.JSX.Element | null {
   const t = useThemeColors();
-  const action = permittedAction(input);
+  const offer = primaryRoomAction(phase, standing);
 
-  // Nothing to offer: no region, no hole.
-  if (action === 'none' || action === 'watch') return null;
+  // Nothing to say and nothing to do: no region, no hole. This only happens if the
+  // caller passes a phase the model treats as silent, which it currently never
+  // does — kept as a guard rather than an assumption.
+  if (!offer.enabled && !offer.reason) return null;
 
-  const label = permittedActionLabel(action);
-  const disabled = Boolean(reason) || busy;
+  // A disabled offer is a sentence, not a button. This is the core of blocker 1:
+  // a greyed-out control still reads as "something should happen here".
+  if (!offer.enabled) {
+    return (
+      <View style={styles.wrap}>
+        <AppText style={[typeScale.meta, styles.reason, { color: t.textMuted }]}>
+          {offer.reason}
+        </AppText>
+      </View>
+    );
+  }
+
+  const target = offer.target;
+  // `primaryRoomAction` guarantees a target whenever `enabled` is true; this
+  // narrows it for the type checker without asserting at the call site.
+  if (target === null) return null;
 
   return (
     <View style={styles.wrap}>
       <Pressable
-        onPress={() => onPress(action)}
-        disabled={disabled}
+        onPress={() => onAction(offer.action as Exclude<RoomAction, 'none'>, target)}
+        disabled={busy}
         accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityHint={reason ?? undefined}
-        accessibilityState={{ disabled, busy }}
+        accessibilityLabel={offer.label}
+        accessibilityState={{ disabled: busy, busy }}
         style={({ pressed }) => [
           styles.button,
           {
-            backgroundColor: disabled ? t.surfaceMuted : t.textPrimary,
-            opacity: pressed && !disabled ? 0.92 : 1,
+            backgroundColor: busy ? t.surfaceMuted : t.textPrimary,
+            opacity: pressed && !busy ? 0.92 : 1,
           },
         ]}
       >
-        <AppText style={[typeScale.button, { color: disabled ? t.textMuted : t.background }]}>
-          {label}
+        <AppText style={[typeScale.button, { color: busy ? t.textMuted : t.background }]}>
+          {offer.label}
         </AppText>
       </Pressable>
-      {/*
-        The reason is stated in words rather than implied by a greyed-out button.
-        "Waiting for the other side" tells the user what to do; a dimmed pill does
-        not.
-      */}
-      {reason ? (
-        <AppText style={[typeScale.meta, styles.reason, { color: t.textMuted }]}>{reason}</AppText>
+      {/* A reason alongside an enabled action is context, not a block. */}
+      {offer.reason ? (
+        <AppText style={[typeScale.meta, styles.reason, { color: t.textMuted }]}>{offer.reason}</AppText>
       ) : null}
     </View>
   );
@@ -87,7 +101,8 @@ export function ActionRegion({
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingHorizontal: space.lg,
+    paddingHorizontal: layout.screenX,
+    paddingVertical: space.xs,
     gap: space.xs,
   },
   button: {

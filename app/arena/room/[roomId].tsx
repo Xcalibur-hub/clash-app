@@ -24,6 +24,7 @@ import { LiveRoomEventBanner } from '../../../components/liveArena/LiveRoomEvent
 import { ClashHeader } from '../../../components/arena/ClashHeader';
 import { VerdictRegion } from '../../../components/arena/VerdictRegion';
 import { ActionRegion } from '../../../components/arena/ActionRegion';
+import type { ViewerStanding } from '../../../utils/arenaRoomEligibility';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
 import { DuelRoomOutcome } from '../../../components/liveArena/DuelRoomOutcome';
 import { DuelRoomExperience } from '../../../components/liveArena/DuelRoomExperience';
@@ -31,7 +32,6 @@ import { isCanonicalDuel, duelPresentation } from '../../../utils/duelPresentati
 import { submitJudgement } from '../../../services/clashEngineService';
 import { LiveRoomMessage } from '../../../components/liveArena/LiveRoomMessage';
 import { LiveRoomPulseStrip } from '../../../components/liveArena/LiveRoomPulseStrip';
-import { LiveRoomResultReveal } from '../../../components/liveArena/LiveRoomResultReveal';
 import { LiveRoomSkeleton } from '../../../components/liveArena/LiveRoomSkeleton';
 import { LiveRoomTypingCue } from '../../../components/liveArena/LiveRoomTypingCue';
 import { RoomCastStrip } from '../../../components/liveArena/RoomCastStrip';
@@ -571,6 +571,27 @@ function RoomScope(): React.JSX.Element {
     : room?.viewer?.role === 'debater';
   const isSpectator = room?.viewer?.role === 'spectator';
 
+  /**
+   * The viewer's standing, in the terms the eligibility model speaks.
+   *
+   * `room.viewer` is non-null exactly when the server found a participant row
+   * (`isMember: true` on the type, `arena_is_room_member` on the server), so its
+   * presence *is* membership. Everything else is copied, not inferred.
+   *
+   * `roomFull` uses `upgrade_arena_spectator`'s own test —
+   * `participant_count >= capacity` — so the UI and the RPC agree on "full".
+   */
+  const viewerStanding: ViewerStanding = React.useMemo(
+    () => ({
+      isMember: room?.viewer != null,
+      role: room?.viewer?.role ?? null,
+      hasSideVote: room?.viewer?.hasSideVote === true,
+      hasArgumentVote: room?.viewer?.hasArgumentVote === true,
+      roomFull: room != null ? room.participantCount >= room.capacity : false,
+    }),
+    [room],
+  );
+
   const openProfile = React.useCallback(
     (profileId: string) => router.push(`/profile/${profileId}`),
     [router],
@@ -939,36 +960,20 @@ function RoomScope(): React.JSX.Element {
             ListHeaderComponent={
               <>
                 {/*
-                  The verdict at display weight, above the transcript.
+                  The verdict — one authoritative result experience.
 
-                  `LiveRoomResultReveal` already renders the outcome, but as a
-                  card whose headline was three uppercase labels at kicker size.
-                  The result is the reason anybody stayed in the room, so it also
-                  gets this region: one serif statement of who won, the split as a
-                  single bar, and the viewer's own reward — before the arguments
-                  that produced it.
+                  Phase 2 rendered BOTH this region and `LiveRoomResultReveal`, so
+                  the settled screen stated the outcome twice: once as a large
+                  headline, then again as "Side A 62% / Agree took it". Two
+                  headlines for one result is a bug, not emphasis.
 
-                  Both read the same `room.result`; nothing is computed here. The
-                  region is skipped entirely when the server has not returned a
-                  winning side (a cancelled room), rather than showing a fake 50/50.
+                  `VerdictRegion` now *is* the result surface: it owns share,
+                  Mindshift, best argument, the crowd moment, the viewer's own
+                  recorded journey, the final-stance prompt and the next-clash
+                  action — everything the old card did — so there is exactly one
+                  component rendering a verdict. The duplicate import is gone.
                 */}
-                {room.result ? (
-                  <VerdictRegion
-                    winningSide={room.result.winningSide}
-                    splitA={
-                      room.result.agreeVotes + room.result.disagreeVotes > 0
-                        ? room.result.agreeVotes /
-                          (room.result.agreeVotes + room.result.disagreeVotes)
-                        : null
-                    }
-                    stanceA="Agree"
-                    stanceB="Disagree"
-                    detail={`${room.result.participantCount.toLocaleString()} participated · ${
-                      room.result.agreeVotes + room.result.disagreeVotes
-                    } judgements cast`}
-                  />
-                ) : null}
-                <LiveRoomResultReveal
+                <VerdictRegion
                   result={room.result}
                   stats={stats}
                   viewer={room.viewer}
@@ -1059,40 +1064,43 @@ function RoomScope(): React.JSX.Element {
               <View style={styles.flex} />
             )}
             {/*
-              The permitted action, stated before the composer.
+              The permitted action, projected from the server contract.
 
-              This is the region the room was missing: a spectator could not tell
-              from the screen whether they should pick a side, wait, or never join,
-              and a fighter in FINAL_ARGUMENTS had no cue that the phase had
-              changed under them. It reads the same `room` the composer does and
-              renders nothing when there is nothing to do — the composer and the
-              join bar below remain the actual controls, so this adds hierarchy
-              without taking over behaviour.
+              Two review defects are fixed here at once:
+
+              1. The Phase 2 "Cast your verdict" button had a handler that returned
+                 immediately — the most prominent control on screen did nothing.
+                 `primaryRoomAction()` now returns a `target`, and every branch below
+                 performs that target: the composer, the join sheet, or the judging
+                 panel (which is the control that actually records the ballot).
+
+              3. The old region advertised ballots to spectators and to debaters
+                 who had already voted. `submit_arena_side_vote` refuses both, so
+                 the UI promised actions that could never succeed. Eligibility now
+                 comes from the same pure function the tests exercise, so an
+                 unavailable action is a sentence, never a dead button.
             */}
             {!settled && !isDuel ? (
               <ActionRegion
                 phase={room.status}
-                role={room.viewer?.role ?? 'spectator'}
-                signedIn={room.viewer !== null}
-                mayJudge={room.viewer?.role === 'debater' && room.viewer?.hasSideVote !== true}
-                hasNextClash={false}
-                reason={
-                  room.status === 'FINAL_ARGUMENTS' && room.viewer?.role !== 'debater'
-                    ? 'Fighters make the closing argument. You can still react.'
-                    : null
-                }
+                standing={viewerStanding}
                 busy={sending || joining || voting}
-                onPress={(action) => {
+                onAction={(action, target) => {
                   hapticTap();
-                  if (action === 'join_side') {
+                  if (target === 'join_sheet') {
                     setJoinOpen(true);
                     return;
                   }
-                  if (action === 'vote') {
-                    // Scrolls nowhere: the judging panel is mounted in `bottom`
-                    // for fighters. The haptic is the acknowledgement.
+                  if (target === 'judging_panel') {
+                    // The ballot lives in the judging panel mounted in `bottom`.
+                    // Bring it into view rather than acknowledging into the void.
+                    listRef.current?.scrollToEnd({ animated: true });
                     return;
                   }
+                  // target === 'composer' — focus the argument input.
+                  // Both 'argue' and 'final_argument' are posts, so both hand off
+                  // to the composer — which is also the surface that enforces the
+                  // OPEN / FINAL_ARGUMENTS window server-side.
                   setComposerFocus((n) => n + 1);
                 }}
               />

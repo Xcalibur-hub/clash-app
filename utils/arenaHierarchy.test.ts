@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  needsActionRegion,
   REGION_ORDER,
   roomPhaseForTopicPhase,
   arenaRegionPlan,
@@ -42,15 +43,50 @@ describe('Arena hierarchy', () => {
     }
   });
 
-  it('gives a spectator no action hole in the phases where they cannot act', () => {
-    for (const phase of ['FINAL_ARGUMENTS', 'JUDGING'] as const) {
-      const plan = arenaRegionPlan({ phase, role: 'spectator' });
-      assert.equal(
-        plan.some((p) => p.region === 'action'),
-        false,
-        `${phase}: a spectator gets an action region they cannot use`,
-      );
-    }
+  it('offers a spectator the upgrade they can actually take, and nothing when full', () => {
+    /*
+     * The Phase 2 version of this test asserted that a spectator in
+     * FINAL_ARGUMENTS could never act, and that the action region therefore had to
+     * be absent. That premise was itself the bug: `upgrade_arena_spectator` permits
+     * a spectator to join the debate while `status in ('OPEN','FINAL_ARGUMENTS',
+     * 'JUDGING')` and the room is not full. The UI hid a control the server would
+     * have accepted.
+     *
+     * Coverage is widened, not narrowed: the offer must now exist when it is legal
+     * and must disappear when the room is full.
+     */
+    const open = { phase: 'FINAL_ARGUMENTS', role: 'spectator' } as const;
+    assert.equal(permittedAction(open), 'join_side');
+    assert.equal(arenaRegionPlan(open).some((p) => p.region === 'action'), true);
+
+    const full = { phase: 'FINAL_ARGUMENTS', role: 'spectator', roomFull: true } as const;
+    assert.equal(permittedAction(full), 'watch');
+    assert.equal(arenaRegionPlan(full).some((p) => p.region === 'action'), false);
+    // A full room also removes the OPEN-phase invitation, for the same reason.
+    assert.equal(permittedAction({ phase: 'OPEN', role: 'spectator', roomFull: true }), 'watch');
+  });
+
+  it('states the exclusion during JUDGING instead of leaving a silent gap', () => {
+    /*
+     * Phase 2 treated JUDGING like FINAL_ARGUMENTS and dropped the region for
+     * spectators. The review showed why that is wrong: "you may not vote" and "the
+     * app failed to render your ballot" look identical when nothing is drawn.
+     *
+     * The region is therefore present, and `permittedAction` stays `watch` — the
+     * region renders a sentence, not a control. Both halves are asserted so neither
+     * can regress into the other defect.
+     */
+    const spectator = { phase: 'JUDGING', role: 'spectator' } as const;
+    assert.equal(needsActionRegion(spectator), true, 'JUDGING must explain itself to a spectator');
+    assert.equal(
+      permittedAction(spectator),
+      'watch',
+      'explaining the exclusion must not become advertising a ballot',
+    );
+    assert.equal(arenaRegionPlan(spectator).some((p) => p.region === 'action'), true);
+
+    // ...while a debater who still holds a ballot gets the real offer.
+    assert.equal(permittedAction({ ...spectator, role: 'debater', isMember: true }), 'vote');
   });
 
   it('gives a fighter the floor action during open and final arguments', () => {

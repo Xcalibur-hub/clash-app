@@ -24,6 +24,8 @@ import { darkTheme } from '../../theme/palettes';
 import { buildTypeScale, resolveFontStacks, typeScale as defaultRamp } from '../../theme/typeRamp';
 import { ClashHeader } from '../../components/arena/ClashHeader';
 import { ActionRegion } from '../../components/arena/ActionRegion';
+import type { ViewerStanding } from '../../utils/arenaRoomEligibility';
+import type { ArenaRoomViewer } from '../../services/liveArenaService';
 import { VerdictRegion } from '../../components/arena/VerdictRegion';
 import { LiveClashFeature } from '../../components/arena/LiveClashFeature';
 
@@ -131,33 +133,113 @@ check('names both sides before the argument uses them', header.includes('Agree')
 check('folds room / audience / clock into one subordinate line', header.includes('12 arguing'));
 check('back affordance is labelled', /accessibilityLabel="Back to Arena"/.test(header));
 
-console.log('\n[ActionRegion — one permitted action]');
-const fighterAction = html(<ActionRegion phase="OPEN" role="debater" onPress={() => {}} />);
-const spectatorAction = html(<ActionRegion phase="OPEN" role="spectator" onPress={() => {}} />);
-const judgingAction = html(<ActionRegion phase="JUDGING" role="spectator" mayJudge onPress={() => {}} />);
-const settledAction = html(<ActionRegion phase="SETTLED" role="spectator" onPress={() => {}} />);
-check('fighter is invited to argue', fighterAction.includes('Make your argument'));
-check('spectator is invited to pick a side, not to argue', spectatorAction.includes('Pick a side'));
-check('judging invites a verdict when one is permitted', judgingAction.includes('Cast your verdict'));
-check('a settled room reserves no action hole', settledAction === '');
+console.log('\n[ActionRegion — one permitted action, never a dead control]');
+/*
+ * These cases are the review's issue 1 and issue 3, exercised through the real
+ * component rather than only the model: a spectator must never be offered a
+ * ballot, and every control that IS offered must name a destination that performs
+ * it.
+ */
+const debater: ViewerStanding = { isMember: true, role: 'debater', hasSideVote: false, hasArgumentVote: false };
+const voted: ViewerStanding = { ...debater, hasSideVote: true };
+const spectator: ViewerStanding = { isMember: true, role: 'spectator', hasSideVote: false, hasArgumentVote: false };
+const outsider: ViewerStanding = { isMember: false, role: null, hasSideVote: false, hasArgumentVote: false };
 
-console.log('\n[VerdictRegion — the result]');
+const seen: { action: string; target: string | null }[] = [];
+const record = (action: string, target: string | null) => seen.push({ action, target });
+const fighterAction = html(<ActionRegion phase="OPEN" standing={debater} onAction={record} />);
+const spectatorOpen = html(<ActionRegion phase="OPEN" standing={spectator} onAction={record} />);
+const spectatorJudging = html(<ActionRegion phase="JUDGING" standing={spectator} onAction={record} />);
+const judgedAction = html(<ActionRegion phase="JUDGING" standing={voted} onAction={record} />);
+const verdictAction = html(<ActionRegion phase="JUDGING" standing={debater} onAction={record} />);
+const outsiderAction = html(<ActionRegion phase="OPEN" standing={outsider} onAction={record} />);
+const settledAction = html(<ActionRegion phase="SETTLED" standing={spectator} onAction={record} />);
+
+check('fighter is invited to argue', fighterAction.includes('Make your argument'));
+check('spectator is invited to pick a side, not to argue', spectatorOpen.includes('Pick a side'));
+check('a debater is invited to cast a verdict', verdictAction.includes('Cast your verdict'));
+check(
+  'a spectator is NEVER offered a ballot',
+  !spectatorJudging.includes('Cast your verdict'),
+  spectatorJudging.slice(0, 120),
+);
+check(
+  'a spectator is told why, instead of shown a dead control',
+  spectatorJudging.includes('Fighters judge this room'),
+);
+check('an already-recorded ballot says so', judgedAction.includes('Your verdict is recorded'));
+check('a settled room explains itself rather than leaving a gap', settledAction.includes('This clash is decided'));
+check('a non-member is invited to join, not to vote', outsiderAction.includes('Join this clash'));
+check(
+  'no unavailable state renders a button at all',
+  [spectatorJudging, judgedAction, settledAction].every((h) => !/accessibilityRole="button"/.test(h)),
+);
+
+console.log('\n[VerdictRegion — the single result surface]');
+const RESULT = {
+  roomId: 'ar_1',
+  winningSide: 'AGREE' as const,
+  agreeVotes: 62,
+  disagreeVotes: 38,
+  participantCount: 101,
+  mindshiftChangedCount: 18,
+  mindshiftCompletedCount: 100,
+  mindshiftChangedPercent: 18,
+  settledAt: 0,
+  bestArgumentMessageId: 'm1',
+  bestArgumentAuthor: { id: 'p1', name: 'Ito Lab', handle: 'ito', avatarTint: '#B4552F', rank: 'Contender' },
+  bestArgumentBody: 'Read receipts are the most honest document a team produces.',
+};
+const viewer: ArenaRoomViewer = {
+  isMember: true,
+  role: 'debater',
+  stance: 'AGREE',
+  finalStance: 'DISAGREE',
+  finalRecordedAt: 1,
+  joinedAt: 0,
+  hasSideVote: true,
+  hasArgumentVote: true,
+};
 const verdict = html(
-  <VerdictRegion
-    winningSide="AGREE"
-    splitA={0.62}
-    stanceA="Agree"
-    stanceB="Disagree"
-    detail="Agree took it — 62 of 100 judgements."
-    rewardLine="+120 reputation"
-  />,
+  <VerdictRegion result={RESULT} stats={null} viewer={viewer} onRecordFinal={() => {}} onNextClash={() => {}} />,
 );
 check('names the winning side', verdict.includes('Agree'));
 check('shows the split in both directions', verdict.includes('62%') && verdict.includes('38%'));
 check('explains the split to screen readers', /Ballot split/.test(verdict));
-check('surfaces the reward line', verdict.includes('+120 reputation'));
-const draw = html(<VerdictRegion winningSide="DRAW" splitA={0.5} stanceA="Agree" stanceB="Disagree" />);
+check('states the tally once, not twice', (verdict.match(/62 of 100 judgements/g) ?? []).length === 1);
+check('keeps the share action', verdict.includes('Share result'));
+check('keeps the next-clash action', verdict.includes('NEXT CLASH'));
+check('keeps the best argument', verdict.includes('BEST ARGUMENT') && verdict.includes('Ito Lab'));
+check('states the best-argument award that settlement actually pays', verdict.includes('+40 REP'));
+check('keeps Mindshift', verdict.includes('BIGGEST MINDSHIFT') && verdict.includes('18%'));
+check('keeps the viewer journey', verdict.includes('YOUR JOURNEY') && verdict.includes('Disagree'));
+check(
+  'does not invent a per-room reward the API cannot provide',
+  !/\+120 reputation/.test(verdict),
+);
+
+const draw = html(
+  <VerdictRegion
+    result={{ ...RESULT, winningSide: 'DRAW', agreeVotes: 50, disagreeVotes: 50 }}
+    stats={null}
+    viewer={null}
+    onRecordFinal={() => {}}
+  />,
+);
 check('a draw is a first-class outcome', draw.includes('A draw') && draw.includes('THE ROOM SPLIT'));
+
+const noMindshift = html(
+  <VerdictRegion
+    result={{ ...RESULT, mindshiftChangedPercent: null }}
+    stats={{ changedPercent: null } as never}
+    viewer={null}
+    onRecordFinal={() => {}}
+  />,
+);
+check(
+  'nobody finishing is not rendered as 0% movement',
+  !noMindshift.includes('BIGGEST MINDSHIFT'),
+);
 
 console.log('\n[LiveClashFeature — Arena discovery]');
 const feature = html(
