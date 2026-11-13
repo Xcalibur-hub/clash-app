@@ -461,7 +461,7 @@ export default function WorldScreen(): React.JSX.Element {
             <BackIcon size={20} color={t.textPrimary} />
           </Pressable>
 
-          <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+          <Text style={[styles.brand, { color: t.textPrimary }]}>
             World
           </Text>
 
@@ -492,7 +492,7 @@ export default function WorldScreen(): React.JSX.Element {
 
         {privacyOpen ? (
           <Text
-            allowFontScaling={false}
+           
             style={[
               styles.privacy,
               {
@@ -518,7 +518,7 @@ export default function WorldScreen(): React.JSX.Element {
 
         {locationDenied ? (
           <Text
-            allowFontScaling={false}
+           
             style={[
               styles.banner,
               {
@@ -548,7 +548,7 @@ export default function WorldScreen(): React.JSX.Element {
             accessibilityLabel="Search this area"
           >
             <Text
-              allowFontScaling={false}
+             
               style={[styles.searchAreaText, { color: light ? '#F5F5F7' : '#111113' }]}
             >
               {searching ? 'Searching…' : 'Search this area'}
@@ -567,10 +567,10 @@ export default function WorldScreen(): React.JSX.Element {
               },
             ]}
           >
-            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
               {filter === 'nearby' ? 'No Drops in this area' : filter === 'mission' ? (primaryMission ? 'No Mission Drops yet' : 'No active Mission') : 'No recent Drops yet'}
             </Text>
-            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textSecondary }]}>
+            <Text style={[styles.emptyBody, { color: t.textSecondary }]}>
               {filter === 'nearby'
                 ? 'Try another part of the map or browse recent Drops.'
                 : filter === 'mission'
@@ -585,7 +585,7 @@ export default function WorldScreen(): React.JSX.Element {
                 accessibilityLabel={filter === 'recent' ? 'Explore map area' : 'Browse recent Drops'}
               >
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.emptyCtaText, { color: light ? '#F5F5F7' : '#111113' }]}
                 >
                   {filter === 'recent' ? 'Explore map area' : 'Browse recent'}
@@ -598,7 +598,7 @@ export default function WorldScreen(): React.JSX.Element {
                   accessibilityRole="button"
                   accessibilityLabel="Join this week's Mission"
                 >
-                  <Text allowFontScaling={false} style={[styles.emptyCtaText, { color: t.textPrimary }]}>
+                  <Text style={[styles.emptyCtaText, { color: t.textPrimary }]}>
                     Join Mission
                   </Text>
                 </Pressable>
@@ -644,7 +644,7 @@ export default function WorldScreen(): React.JSX.Element {
                     accessibilityLabel={item.label}
                   >
                     <Text
-                      allowFontScaling={false}
+                     
                       style={[
                         styles.filterText,
                         { color: active ? (light ? '#F5F5F7' : t.textPrimary) : t.textMuted },

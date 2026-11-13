@@ -55,7 +55,7 @@ export const ContactSheet = React.memo(function ContactSheet({
                   badge={String(i + 1).padStart(2, '0')}
                   onPress={() => onOpen(item.id)}
                 />
-                <Text allowFontScaling={false} style={[styles.caption, { color: t.textMuted }]} numberOfLines={2}>
+                <Text style={[styles.caption, { color: t.textMuted }]} numberOfLines={2}>
                   {item.title}
                 </Text>
               </View>

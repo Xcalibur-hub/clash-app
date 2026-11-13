@@ -30,7 +30,7 @@ export function SignOutSheet({ visible, onClose }: SignOutSheetProps): React.JSX
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close menu" />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + space.md }]}>
-        <Text allowFontScaling={false} style={styles.title}>
+        <Text style={styles.title}>
           Account
         </Text>
         <Pressable
@@ -43,12 +43,12 @@ export function SignOutSheet({ visible, onClose }: SignOutSheetProps): React.JSX
           accessibilityLabel="Sign out"
           style={styles.row}
         >
-          <Text allowFontScaling={false} style={styles.signOut}>
+          <Text style={styles.signOut}>
             Sign out
           </Text>
         </Pressable>
         <Pressable onPress={onClose} accessibilityRole="button" style={styles.row}>
-          <Text allowFontScaling={false} style={styles.cancel}>
+          <Text style={styles.cancel}>
             Cancel
           </Text>
         </Pressable>

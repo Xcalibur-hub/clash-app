@@ -55,11 +55,11 @@ export function ClashStickerRow({
               compact && styles.chipCompact,
             ]}
           >
-            <Text allowFontScaling={false} style={styles.emoji}>
+            <Text style={styles.emoji}>
               {reaction.emoji}
             </Text>
             <Text
-              allowFontScaling={false}
+             
               style={[styles.stamp, { color: t.textMuted }]}
               numberOfLines={1}
             >

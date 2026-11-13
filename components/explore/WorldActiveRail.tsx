@@ -25,10 +25,10 @@ export function WorldActiveRail({
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+        <Text style={[styles.label, { color: t.textMuted }]}>
           Happening now
         </Text>
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+        <Text style={[styles.label, { color: t.textMuted }]}>
           Public profiles
         </Text>
       </View>
@@ -62,7 +62,7 @@ export function WorldActiveRail({
               }
             >
               <Text
-                allowFontScaling={false}
+               
                 numberOfLines={1}
                 style={[styles.name, { color: on ? t.background : t.textPrimary }]}
               >
@@ -70,7 +70,7 @@ export function WorldActiveRail({
               </Text>
               {country.activityCount != null ? (
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[
                     styles.count,
                     { color: on ? t.background : t.textMuted },

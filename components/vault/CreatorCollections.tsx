@@ -141,10 +141,10 @@ export function CreatorCollections(): React.JSX.Element {
           },
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+        <Text style={[styles.brand, { color: t.textPrimary }]}>
           Collections
         </Text>
-        <Text allowFontScaling={false} style={[styles.tagline, { color: t.textSecondary }]}>
+        <Text style={[styles.tagline, { color: t.textSecondary }]}>
           Permanent chapters. Drops expire — these stay.
         </Text>
 
@@ -194,17 +194,17 @@ export function CreatorCollections(): React.JSX.Element {
                 >
                   <View style={styles.cardHead}>
                     <View style={styles.cardHeadText}>
-                      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+                      <Text style={[styles.kicker, { color: t.textMuted }]}>
                         COLLECTION
                       </Text>
                       <Text
-                        allowFontScaling={false}
+                       
                         style={[styles.cardTitle, { color: t.textPrimary }]}
                         numberOfLines={1}
                       >
                         {collection.title}
                       </Text>
-                      <Text allowFontScaling={false} style={[styles.cardMeta, { color: t.textMuted }]}>
+                      <Text style={[styles.cardMeta, { color: t.textMuted }]}>
                         {drops.length === 1 ? '1 moment' : `${drops.length} moments`}
                       </Text>
                     </View>
@@ -221,7 +221,7 @@ export function CreatorCollections(): React.JSX.Element {
                       {drops.map((drop) => (
                         <View key={drop.id} style={styles.item}>
                           <Text
-                            allowFontScaling={false}
+                           
                             style={[styles.itemText, { color: t.textSecondary }]}
                             numberOfLines={1}
                           >
@@ -233,7 +233,7 @@ export function CreatorCollections(): React.JSX.Element {
                             accessibilityLabel="Remove from collection"
                             hitSlop={8}
                           >
-                            <Text allowFontScaling={false} style={[styles.removeText, { color: t.danger }]}>
+                            <Text style={[styles.removeText, { color: t.danger }]}>
                               Remove
                             </Text>
                           </Pressable>
@@ -241,7 +241,7 @@ export function CreatorCollections(): React.JSX.Element {
                       ))}
                     </View>
                   ) : (
-                    <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+                    <Text style={[styles.empty, { color: t.textMuted }]}>
                       Nothing saved yet.
                     </Text>
                   )}
@@ -290,18 +290,18 @@ function AddDropSheet({
               },
             ]}
           >
-            <Text allowFontScaling={false} style={[styles.sheetTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.sheetTitle, { color: t.textPrimary }]}>
               Add to {collectionTitle}
             </Text>
             {drops.length === 0 ? (
-              <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+              <Text style={[styles.empty, { color: t.textMuted }]}>
                 No Drops left to add.
               </Text>
             ) : (
               drops.map((drop) => (
                 <View key={drop.id} style={styles.item}>
                   <Text
-                    allowFontScaling={false}
+                   
                     style={[styles.itemText, { color: t.textSecondary }]}
                     numberOfLines={1}
                   >
@@ -316,7 +316,7 @@ function AddDropSheet({
                     accessibilityLabel={`Add ${drop.caption}`}
                     hitSlop={8}
                   >
-                    <Text allowFontScaling={false} style={[styles.addText, { color: t.textPrimary }]}>
+                    <Text style={[styles.addText, { color: t.textPrimary }]}>
                       Add
                     </Text>
                   </Pressable>

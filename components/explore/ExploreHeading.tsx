@@ -22,7 +22,7 @@ export function ExploreHeading({
     <View style={[styles.wrap, style]}>
       <View style={styles.row}>
         <View style={styles.titleWrap}>
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             {title}
           </Text>
           {marked ? <Underline size={64} color={t.textPrimary} opacity={0.2} style={styles.mark} /> : null}

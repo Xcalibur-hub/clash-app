@@ -29,13 +29,13 @@ export function WorldHeroCopy({
 }: WorldHeroCopyProps): React.JSX.Element {
   return (
     <View style={styles.copy}>
-      <Text allowFontScaling={false} style={styles.eyebrow}>
+      <Text style={styles.eyebrow}>
         {eyebrow}
       </Text>
-      <Text allowFontScaling={false} style={styles.name} numberOfLines={2}>
+      <Text style={styles.name} numberOfLines={2}>
         {creatorName}
       </Text>
-      <Text allowFontScaling={false} style={styles.identity} numberOfLines={2}>
+      <Text style={styles.identity} numberOfLines={2}>
         {identity}
       </Text>
       <View style={styles.actions}>
@@ -65,7 +65,7 @@ export function WorldHeroCopy({
                 onPress={onSubscribe ?? (() => undefined)}
               />
             ) : (
-              <Text allowFontScaling={false} style={styles.subscribed}>
+              <Text style={styles.subscribed}>
                 Inside this world
               </Text>
             )}

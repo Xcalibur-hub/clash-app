@@ -54,7 +54,7 @@ export function ArgumentHistorySheet({
       <View style={styles.backdrop}>
         <View style={[styles.sheet, { backgroundColor: t.background }]}>
           <View style={styles.head}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Argument history
             </Text>
             <Pressable

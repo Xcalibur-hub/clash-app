@@ -74,14 +74,14 @@ export const WorldCollage = React.memo(function WorldCollage({
                 />
               </View>
               <View style={styles.leadCopy}>
-                <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+                <Text style={[styles.kicker, { color: t.textMuted }]}>
                   WORLD
                 </Text>
-                <Text allowFontScaling={false} style={[styles.leadName, { color: t.textPrimary }]} numberOfLines={1}>
+                <Text style={[styles.leadName, { color: t.textPrimary }]} numberOfLines={1}>
                   {world.name}
                 </Text>
                 {meta ? (
-                  <Text allowFontScaling={false} style={[styles.meta, { color: t.textSecondary }]} numberOfLines={2}>
+                  <Text style={[styles.meta, { color: t.textSecondary }]} numberOfLines={2}>
                     {meta}
                   </Text>
                 ) : null}
@@ -132,11 +132,11 @@ export const WorldCollage = React.memo(function WorldCollage({
                 />
               </View>
               <View style={[styles.clusterCopy, { alignItems: 'flex-start' }]}>
-                <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+                <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
                   {world.name}
                 </Text>
                 {meta ? (
-                  <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
+                  <Text style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
                     {meta}
                   </Text>
                 ) : null}
@@ -178,11 +178,11 @@ export const WorldCollage = React.memo(function WorldCollage({
             />
             {outside ? (
               <View style={[styles.floatCopy, right ? styles.floatCopyRight : null]}>
-                <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+                <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
                   {world.name}
                 </Text>
                 {meta ? (
-                  <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
+                  <Text style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
                     {meta}
                   </Text>
                 ) : null}

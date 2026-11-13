@@ -143,7 +143,7 @@ export function EvidenceComposerSheet({
             </View>
 
             <View style={styles.titleRow}>
-              <Text allowFontScaling={false} style={[styles.heading, { color: t.textPrimary }]}>
+              <Text style={[styles.heading, { color: t.textPrimary }]}>
                 Add proof
               </Text>
               <Pressable
@@ -213,7 +213,7 @@ export function EvidenceComposerSheet({
                     accessibilityLabel="Evidence link"
                   />
                   <Text
-                    allowFontScaling={false}
+                   
                     style={[
                       styles.hint,
                       { color: trimmedUrl && !urlLooksValid ? t.danger : t.textMuted },
@@ -236,7 +236,7 @@ export function EvidenceComposerSheet({
                       <PickButton label="Choose video" onPress={() => void pick('video')} />
                     </View>
                   )}
-                  <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+                  <Text style={[styles.hint, { color: t.textMuted }]}>
                     Uploads are public to the room and stay attached to your name.
                   </Text>
                 </>
@@ -252,7 +252,7 @@ export function EvidenceComposerSheet({
                 {busy ? (
                   <ActivityIndicator size="small" color={t.pillText} />
                 ) : (
-                  <Text allowFontScaling={false} style={[styles.submitText, { color: t.pillText }]}>
+                  <Text style={[styles.submitText, { color: t.pillText }]}>
                     Add evidence
                   </Text>
                 )}
@@ -290,7 +290,7 @@ function ModeChip({
       ]}
     >
       <Text
-        allowFontScaling={false}
+       
         style={[styles.modeText, { color: active ? t.textPrimary : t.textMuted }]}
       >
         {label}
@@ -308,7 +308,7 @@ function PickButton({ label, onPress }: { label: string; onPress: () => void }):
       accessibilityLabel={label}
       style={[styles.pick, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}
     >
-      <Text allowFontScaling={false} style={[styles.pickText, { color: t.textPrimary }]}>
+      <Text style={[styles.pickText, { color: t.textPrimary }]}>
         {label}
       </Text>
     </Pressable>

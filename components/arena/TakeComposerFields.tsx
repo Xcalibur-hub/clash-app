@@ -56,7 +56,7 @@ export function TakeComposerFields({
         />
         <View style={styles.counterRow}>
           <Text
-            allowFontScaling={false}
+           
             style={[styles.counter, { color: overLimit ? t.danger : t.textMuted }]}
             accessibilityLabel={`${charsLeft} of ${maxChars} characters left`}
           >
@@ -67,7 +67,7 @@ export function TakeComposerFields({
 
       <MediaAttachRow onPick={onAttach} />
 
-      <Text allowFontScaling={false} style={[styles.sectionLabel, { color: t.textMuted }]}>
+      <Text style={[styles.sectionLabel, { color: t.textMuted }]}>
         DROP INTO
       </Text>
       <HoodSelector value={hood} onChange={onChangeHood} hoods={hoods} />

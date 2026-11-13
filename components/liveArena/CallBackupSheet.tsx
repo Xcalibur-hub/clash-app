@@ -48,28 +48,28 @@ export function CallBackupSheet({
       <View style={styles.backdrop}>
         <View style={[styles.sheet, { backgroundColor: t.background, borderColor: t.border }]}>
           <ScrollView contentContainerStyle={styles.content}>
-            <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+            <Text style={[styles.kicker, { color: t.textMuted }]}>
               CALL BACKUP
             </Text>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Bring someone into the fight
             </Text>
             {signalSent ? (
-              <Text allowFontScaling={false} style={[styles.signal, { color: t.textPrimary }]}>
+              <Text style={[styles.signal, { color: t.textPrimary }]}>
                 Backup signal sent
               </Text>
             ) : (
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+              <Text style={[styles.body, { color: t.textSecondary }]}>
                 Call a respected voice. They choose whether to join — and which side.
               </Text>
             )}
 
             {loading ? (
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+              <Text style={[styles.body, { color: t.textMuted }]}>
                 Finding the right person…
               </Text>
             ) : candidates.length === 0 ? (
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+              <Text style={[styles.body, { color: t.textMuted }]}>
                 Nobody is available to call right now.
               </Text>
             ) : (
@@ -86,14 +86,14 @@ export function CallBackupSheet({
                       <Avatar name={name} tint={tint} size={40} />
                       <View style={styles.rowCopy}>
                         <Text
-                          allowFontScaling={false}
+                         
                           style={[styles.rowName, { color: t.textPrimary }]}
                           numberOfLines={1}
                         >
                           {handle ? `@${handle}` : name}
                         </Text>
                         <Text
-                          allowFontScaling={false}
+                         
                           style={[styles.rowMeta, { color: t.textMuted }]}
                           numberOfLines={2}
                         >
@@ -119,7 +119,7 @@ export function CallBackupSheet({
               accessibilityRole="button"
               accessibilityLabel="Who can call you"
             >
-              <Text allowFontScaling={false} style={[styles.prefsToggle, { color: t.textMuted }]}>
+              <Text style={[styles.prefsToggle, { color: t.textMuted }]}>
                 {prefsOpen ? 'Hide who can call you' : 'Who can call you'}
               </Text>
             </Pressable>
@@ -144,7 +144,7 @@ export function CallBackupSheet({
                       ]}
                     >
                       <Text
-                        allowFontScaling={false}
+                       
                         style={[
                           styles.policyText,
                           { color: active ? t.textPrimary : t.textMuted },

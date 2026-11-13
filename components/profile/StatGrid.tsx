@@ -28,10 +28,10 @@ export function StatGrid({ viewer }: { viewer: User }): React.JSX.Element {
     <GlassCard level="soft" corner={radius.card} contentStyle={styles.grid}>
       {statList(viewer).map((stat) => (
         <View key={stat.label} style={styles.cell}>
-          <Text allowFontScaling={false} style={[styles.value, { color: stat.tone }]}>
+          <Text style={[styles.value, { color: stat.tone }]}>
             {stat.value}
           </Text>
-          <Text allowFontScaling={false} style={styles.label}>
+          <Text style={styles.label}>
             {stat.label}
           </Text>
         </View>

@@ -62,14 +62,14 @@ export function ClashPersonalState({ side }: { side: Side }): React.JSX.Element 
         <Animated.View style={checkStyle}>
           <VerifiedIcon size={22} color={tone} strokeWidth={2.4} />
         </Animated.View>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: tone }]}>
+        <Text style={[styles.kicker, { color: tone }]}>
           Judgement locked
         </Text>
       </View>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         You backed Side {side}
       </Text>
-      <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+      <Text style={[styles.body, { color: t.textMuted }]}>
         Results reveal when judging closes.
       </Text>
     </Animated.View>

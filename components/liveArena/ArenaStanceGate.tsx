@@ -41,25 +41,25 @@ export function ArenaStanceGate({
       <View style={styles.head}>
         <LivePulse />
         {typeof secondsRemaining === 'number' ? (
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text style={[styles.meta, { color: t.textMuted }]}>
             {secondsLabel(secondsRemaining)} left
           </Text>
         ) : null}
       </View>
 
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         {title}
       </Text>
 
       {description ? (
-        <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]}>
+        <Text style={[styles.description, { color: t.textSecondary }]}>
           {description}
         </Text>
       ) : null}
 
       <View style={[styles.panel, { backgroundColor: softFill(t), borderColor: t.border }]}>
         <StanceChoiceRow prompt="What do you believe?" disabled={busy} onChoose={onChoose} />
-        <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+        <Text style={[styles.note, { color: t.textMuted }]}>
           Your stance stays private. Nobody in the room ever sees how you answered.
         </Text>
       </View>
@@ -72,14 +72,14 @@ export function ArenaStanceGate({
           accessibilityLabel="Watch without taking a side"
           style={styles.watchHit}
         >
-          <Text allowFontScaling={false} style={[styles.watch, { color: t.textSecondary }]}>
+          <Text style={[styles.watch, { color: t.textSecondary }]}>
             Watch without taking a side
           </Text>
         </Pressable>
       ) : null}
 
       {typeof participantCount === 'number' && participantCount > 0 ? (
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {participantCount} already arguing
         </Text>
       ) : null}

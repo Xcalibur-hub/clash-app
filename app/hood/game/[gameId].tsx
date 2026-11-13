@@ -117,7 +117,7 @@ export default function HoodGameScreen(): React.JSX.Element {
           >
             <BackIcon size={20} color={ink.primary} />
           </Pressable>
-          <Text allowFontScaling={false} style={styles.eyebrow}>PLAY</Text>
+          <Text style={styles.eyebrow}>PLAY</Text>
           <View style={styles.slot} />
         </View>
 
@@ -130,8 +130,8 @@ export default function HoodGameScreen(): React.JSX.Element {
 
         {game.mayResolve ? (
           <View style={styles.resolveBox}>
-            <Text allowFontScaling={false} style={styles.resolveTitle}>Resolve outcome</Text>
-            <Text allowFontScaling={false} style={styles.resolveBody}>
+            <Text style={styles.resolveTitle}>Resolve outcome</Text>
+            <Text style={styles.resolveBody}>
               Pick the correct option. This cannot be changed after publish.
             </Text>
             {game.options.map((option) => (

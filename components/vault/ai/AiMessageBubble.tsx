@@ -33,11 +33,11 @@ export function AiMessageBubble({ message, onReport }: AiMessageBubbleProps): Re
       ]}
     >
       {provenance ? (
-        <Text allowFontScaling={false} style={[styles.provenance, { color: t.textMuted }]}>
+        <Text style={[styles.provenance, { color: t.textMuted }]}>
           {provenance}
         </Text>
       ) : null}
-      <Text allowFontScaling={false} style={[styles.body, { color: t.textPrimary }]}>
+      <Text style={[styles.body, { color: t.textPrimary }]}>
         {clampReply(message.body)}
       </Text>
     </View>

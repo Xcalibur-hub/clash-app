@@ -39,22 +39,22 @@ export function ProfileIdentity({
   return (
     <View style={s.hero}>
       <Avatar name={viewer.name} tint={viewer.tint} size={88} />
-      <Text allowFontScaling={false} style={s.handle}>
+      <Text style={s.handle}>
         {`@${viewer.handle}`}
       </Text>
       <Chip label={viewer.rank.toUpperCase()} icon={CrownIcon} tone="gold" />
       {viewer.bio ? (
-        <Text allowFontScaling={false} style={s.bio}>
+        <Text style={s.bio}>
           {viewer.bio}
         </Text>
       ) : null}
       <View style={s.stats}>
         {stats.map((stat) => (
           <View key={stat.key} style={s.stat}>
-            <Text allowFontScaling={false} style={s.statValue}>
+            <Text style={s.statValue}>
               {stat.value}
             </Text>
-            <Text allowFontScaling={false} style={s.statLabel}>
+            <Text style={s.statLabel}>
               {stat.label.toUpperCase()}
             </Text>
           </View>

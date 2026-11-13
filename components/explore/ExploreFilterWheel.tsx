@@ -99,7 +99,7 @@ export function ExploreFilterWheel({
               accessibilityLabel={forYouFilterAccessibilityLabel(item.label, on)}
             >
               <Text
-                allowFontScaling={false}
+               
                 style={[
                   styles.label,
                   {

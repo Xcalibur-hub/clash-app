@@ -110,10 +110,10 @@ export function AiStudio(): React.JSX.Element {
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+      <Text style={[styles.section, { color: t.textMuted }]}>
         CREATOR AI
       </Text>
-      <Text allowFontScaling={false} style={[styles.blurb, { color: t.textSecondary }]}>
+      <Text style={[styles.blurb, { color: t.textSecondary }]}>
         An AI version of you, built only from material you approve. Fans always see that it is an
         AI, and it never speaks as you.
       </Text>
@@ -122,11 +122,11 @@ export function AiStudio(): React.JSX.Element {
         <View style={[styles.row, { borderColor: t.border, backgroundColor: t.surface }]}>
           <View style={styles.rowHead}>
             <SparklesIcon size={15} color={t.textSecondary} strokeWidth={2.2} />
-            <Text allowFontScaling={false} style={[styles.rowTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.rowTitle, { color: t.textPrimary }]}>
               {config.displayName}
             </Text>
           </View>
-          <Text allowFontScaling={false} style={[styles.rowMeta, { color: t.textMuted }]}>
+          <Text style={[styles.rowMeta, { color: t.textMuted }]}>
             {[
               enabled ? 'Live for fans' : 'Switched off',
               config.access === 'SUBSCRIBER' ? 'Members only' : 'Open to everyone',
@@ -166,7 +166,7 @@ export function AiStudio(): React.JSX.Element {
           </View>
         </View>
       ) : (
-        <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+        <Text style={[styles.empty, { color: t.textMuted }]}>
           You have not created your AI yet.
         </Text>
       )}
@@ -211,14 +211,14 @@ export function AiStudio(): React.JSX.Element {
               style={[styles.knowledge, { borderColor: t.border, backgroundColor: t.surface }]}
             >
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.rowTitle, { color: t.textPrimary }]}
                 numberOfLines={1}
               >
                 {entry.title}
               </Text>
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.rowMeta, { color: t.textMuted }]}
                 numberOfLines={2}
               >

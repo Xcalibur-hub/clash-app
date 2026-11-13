@@ -60,7 +60,7 @@ export function ClashResultShare({
 
   return (
     <View style={[styles.card, { backgroundColor: fill }]}>
-      <Text allowFontScaling={false} style={[styles.brand, { color: mutedInk }]}>
+      <Text style={[styles.brand, { color: mutedInk }]}>
         CLASH  /  THE FINAL WORD
       </Text>
       <Text allowFontScaling style={[styles.headline, { color: ink }]}>
@@ -69,11 +69,11 @@ export function ClashResultShare({
       <Text allowFontScaling style={[styles.meta, { color: mutedInk }]} numberOfLines={3}>
         {blindHidden ? 'Blind Clash result' : `${sideAText}  ·  ${sideBText}`}
       </Text>
-      <Text allowFontScaling={false} style={[styles.stats, { color: ink }]}>
+      <Text style={[styles.stats, { color: ink }]}>
         {pct}% · {verdict.jurySize.toLocaleString('en-IN')} judgments
       </Text>
       {myBallot ? (
-        <Text allowFontScaling={false} style={[styles.ballot, { color: mutedInk }]}>
+        <Text style={[styles.ballot, { color: mutedInk }]}>
           You backed Side {myBallot}
         </Text>
       ) : null}

@@ -31,10 +31,10 @@ export function TopRebuttalPreview({
     >
       <CommentIcon size={13} color={ink.quaternary} strokeWidth={2.2} />
       <View style={styles.body}>
-        <Text allowFontScaling={false} style={styles.meta} numberOfLines={1}>
+        <Text style={styles.meta} numberOfLines={1}>
           Top reply · @{author?.handle ?? 'challenger'} · {compact(comment.upvotes)}
         </Text>
-        <Text allowFontScaling={false} style={styles.quote} numberOfLines={2}>
+        <Text style={styles.quote} numberOfLines={2}>
           {comment.text}
         </Text>
       </View>

@@ -44,7 +44,7 @@ export function CommunityActionSheet({
         </Animated.View>
         <Animated.View entering={FadeInUp.duration(180)} style={[styles.sheet, { paddingBottom: insets.bottom + space.md }]}>
           <View style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textMuted }]} numberOfLines={2}>
+            <Text style={[styles.title, { color: t.textMuted }]} numberOfLines={2}>
               {title}
             </Text>
             {actions.map((action) => (
@@ -59,7 +59,7 @@ export function CommunityActionSheet({
                 style={[styles.row, { borderColor: t.border }]}
               >
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.rowLabel, { color: action.destructive ? t.danger : t.textPrimary }]}
                 >
                   {action.label}

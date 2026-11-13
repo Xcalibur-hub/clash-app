@@ -77,7 +77,7 @@ export function GlowButton({
         ]}
       >
         {Icon ? <Icon size={compact ? 15 : 17} color={palette.icon} strokeWidth={2.4} /> : null}
-        <Text allowFontScaling={false} style={[typeScale.button, { color: palette.text }]}>
+        <Text style={[typeScale.button, { color: palette.text }]}>
           {label}
         </Text>
       </Pressable>

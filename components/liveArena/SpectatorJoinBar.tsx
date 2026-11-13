@@ -58,7 +58,7 @@ export function SpectatorJoinBar({
           },
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
+        <Text style={[styles.watching, { color: t.textMuted }]}>
           {roomFull
             ? 'This room filled up while you were watching.'
             : roomIndex != null
@@ -79,7 +79,7 @@ export function SpectatorJoinBar({
             {busy ? (
               <ActivityIndicator color={t.clashText} />
             ) : (
-              <Text allowFontScaling={false} style={[styles.ctaText, { color: t.clashText }]}>
+              <Text style={[styles.ctaText, { color: t.clashText }]}>
                 PICK A SIDE
               </Text>
             )}
@@ -114,16 +114,16 @@ export function JoinDebateSheet({
           style={[styles.sheet, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}
           onPress={() => undefined}
         >
-          <Text allowFontScaling={false} style={[styles.sheetKicker, { color: t.textMuted }]}>
+          <Text style={[styles.sheetKicker, { color: t.textMuted }]}>
             {roomIndex != null ? `ENTER CLASH · Room ${roomIndex}` : 'ENTER CLASH'}
           </Text>
-          <Text allowFontScaling={false} style={[styles.sheetTitle, { color: t.textPrimary }]}>
+          <Text style={[styles.sheetTitle, { color: t.textPrimary }]}>
             Pick a side
           </Text>
-          <Text allowFontScaling={false} style={[styles.sheetHint, { color: t.textMuted }]}>
+          <Text style={[styles.sheetHint, { color: t.textMuted }]}>
             Private stance. React anytime — judging comes later.
           </Text>
-          <Text allowFontScaling={false} style={[styles.sheetBody, { color: t.textMuted }]}>
+          <Text style={[styles.sheetBody, { color: t.textMuted }]}>
             Your stance stays private. Capacity is checked by the server.
           </Text>
           <View style={styles.choices}>
@@ -184,7 +184,7 @@ function StanceChoice({
           },
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.choiceText, { color: t.textPrimary }]}>
+        <Text style={[styles.choiceText, { color: t.textPrimary }]}>
           {label}
         </Text>
       </Animated.View>

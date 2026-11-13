@@ -16,7 +16,7 @@ export function QuickReactionRow({ onPick, disabled }: QuickReactionRowProps): R
   const t = useThemeColors();
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+      <Text style={[styles.hint, { color: t.textMuted }]}>
         React for fun — not a vote
       </Text>
       <View style={styles.row}>
@@ -32,7 +32,7 @@ export function QuickReactionRow({ onPick, disabled }: QuickReactionRowProps): R
             accessibilityLabel={`React ${emoji}`}
             style={[styles.chip, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}
           >
-            <Text allowFontScaling={false} style={styles.emoji}>
+            <Text style={styles.emoji}>
               {emoji}
             </Text>
           </Pressable>

@@ -49,14 +49,14 @@ export function LiveChapter({
   return (
     <View style={[styles.wrap, { borderColor: t.border, borderRadius: radius }]}>
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: isLive ? '#E5484D' : t.textMuted }]}>
+        <Text style={[styles.kicker, { color: isLive ? '#E5484D' : t.textMuted }]}>
           {liveStatusLabel(session.status)}
         </Text>
-        <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
+        <Text style={[styles.headline, { color: t.textPrimary }]}>
           {isLive ? `${who} IS LIVE` : when ? `NEXT LIVE · ${when}` : 'NEXT LIVE'}
         </Text>
         {session.title ? (
-          <Text allowFontScaling={false} style={[styles.subline, { color: t.textSecondary }]}>
+          <Text style={[styles.subline, { color: t.textSecondary }]}>
             {session.title}
           </Text>
         ) : null}

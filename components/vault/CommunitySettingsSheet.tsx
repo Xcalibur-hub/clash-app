@@ -54,7 +54,7 @@ export function CommunitySettingsSheet({
         </Animated.View>
         <Animated.View entering={FadeInUp.duration(200)} style={styles.sheet}>
           <View style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               {initial ? 'Community settings' : 'Open a community'}
             </Text>
             <TextInput
@@ -81,10 +81,10 @@ export function CommunitySettingsSheet({
             <CommunityAccessPicker value={accessType} onChange={setAccessType} />
             <View style={styles.switchRow}>
               <View style={styles.switchCopy}>
-                <Text allowFontScaling={false} style={[styles.pillLabel, { color: t.textPrimary }]}>
+                <Text style={[styles.pillLabel, { color: t.textPrimary }]}>
                   Allow pseudonymous posting
                 </Text>
-                <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+                <Text style={[styles.hint, { color: t.textMuted }]}>
                   Members appear under a stable alias.
                 </Text>
               </View>

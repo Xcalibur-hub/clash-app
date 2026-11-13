@@ -4,7 +4,6 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
   type ListRenderItemInfo,
 } from 'react-native';
@@ -25,6 +24,7 @@ import { buildHomeRows, type HomeRow } from '../../utils/vaultHomeRows';
 import { duration, layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { dockBottomPadding } from '../navigation/dockConfig';
 import { EmptyState } from '../shared/EmptyState';
+import { AppText } from '../shared/AppText';
 import { VaultIcon } from '../shared/icons';
 import { VaultScopeControl } from './VaultScopeControl';
 import { HomeRowView } from './world/HomeRowView';
@@ -118,21 +118,27 @@ export function VaultHome(): React.JSX.Element {
     if (item.kind === 'masthead') {
       return (
         <Animated.View entering={reduced ? undefined : FadeIn.duration(duration.base)} style={styles.masthead}>
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-            VAULT
-          </Text>
+          <AppText style={[styles.eyebrow, { color: t.textMuted }]}>THE VAULT</AppText>
           <View style={styles.mastheadRow}>
-            <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
+            <AppText style={[styles.headline, { color: t.textPrimary }]} accessibilityRole="header">
               Enter their world
-            </Text>
+            </AppText>
             {model?.canCreate ? (
-              <Pressable onPress={() => void onCreate()} hitSlop={12} accessibilityLabel="Create Drop">
-                <Text allowFontScaling={false} style={[styles.createLink, { color: t.textMuted }]}>
-                  Create
-                </Text>
+              <Pressable
+                onPress={() => void onCreate()}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Create Drop"
+                style={({ pressed }) => [
+                  styles.createBtn,
+                  { borderColor: t.borderStrong, opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <AppText style={[styles.createLink, { color: t.textPrimary }]}>Create</AppText>
               </Pressable>
             ) : null}
           </View>
+          <View style={[styles.mastheadRule, { backgroundColor: t.brand }]} />
         </Animated.View>
       );
     }
@@ -151,12 +157,10 @@ export function VaultHome(): React.JSX.Element {
     return (
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
         <View style={styles.content}>
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-            VAULT
-          </Text>
-          <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
+          <AppText style={[styles.eyebrow, { color: t.textMuted }]}>THE VAULT</AppText>
+          <AppText style={[styles.headline, { color: t.textPrimary }]} accessibilityRole="header">
             Enter their world
-          </Text>
+          </AppText>
           <VaultHomeSkeleton tint={t.surfaceMuted} />
         </View>
       </View>
@@ -167,9 +171,7 @@ export function VaultHome(): React.JSX.Element {
     return (
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
         <View style={styles.content}>
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
-            VAULT
-          </Text>
+          <AppText style={[styles.eyebrow, { color: t.textMuted }]}>THE VAULT</AppText>
           <EmptyState
             icon={VaultIcon}
             title="Vault unavailable"
@@ -220,9 +222,16 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: layout.screenX, gap: space.md },
   masthead: { gap: 4 },
   mastheadRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md },
-  eyebrow: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
-  headline: { ...typeScale.display, fontSize: 30, lineHeight: 34, fontWeight: '800', letterSpacing: -1, flex: 1 },
-  createLink: { ...typeScale.meta, fontWeight: '600' },
+  eyebrow: { ...typeScale.kicker, color: '#8A8A93' },
+  headline: { ...typeScale.editorialLg, flex: 1 },
+  mastheadRule: { width: 26, height: 2, borderRadius: 1, marginTop: 10 },
+  createBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  createLink: { ...typeScale.label },
   skeletonWrap: { gap: space.xs, marginTop: space.md },
   skeletonHero: { height: 320, borderRadius: radius.xxl },
   skeletonRow: { flexDirection: 'row', gap: space.xs, minHeight: 200 },

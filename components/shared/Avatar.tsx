@@ -34,7 +34,7 @@ export function Avatar({ name, tint, size = 40, style }: AvatarProps): React.JSX
         end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <Text style={[styles.initials, { fontSize: Math.round(size * 0.36) }]} allowFontScaling={false}>
+      <Text style={[styles.initials, { fontSize: Math.round(size * 0.36) }]}>
         {initials(name)}
       </Text>
     </View>

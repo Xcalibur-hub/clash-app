@@ -54,16 +54,16 @@ export function TakeStoryBeat({
       style={[styles.wrap, { borderLeftColor: rail }]}
     >
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: muted }]}>
+        <Text style={[styles.kicker, { color: muted }]}>
           {kicker}
         </Text>
         {clashCount > 0 ? (
-          <Text allowFontScaling={false} style={[styles.clash, { color: muted }]}>
+          <Text style={[styles.clash, { color: muted }]}>
             {`⚔ ${compact(clashCount)}`}
           </Text>
         ) : null}
       </View>
-      <Text allowFontScaling={false} style={[styles.meta, { color: muted }]} numberOfLines={1}>
+      <Text style={[styles.meta, { color: muted }]} numberOfLines={1}>
         @{handle}
         {comment.upvotes > 0 ? ` · ${compact(comment.upvotes)}` : ''}
       </Text>
@@ -75,7 +75,7 @@ export function TakeStoryBeat({
         />
       ) : null}
       {comment.text ? (
-        <Text allowFontScaling={false} style={[styles.quote, { color: ink }]} numberOfLines={2}>
+        <Text style={[styles.quote, { color: ink }]} numberOfLines={2}>
           {comment.text}
         </Text>
       ) : null}

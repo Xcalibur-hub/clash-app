@@ -27,17 +27,17 @@ export function ReputationBar({ reputation, rank, streak = 0 }: ReputationBarPro
       style={styles.wrap}
       accessibilityLabel={`Reputation ${formatReputation(reputation)}, rank ${label}`}
     >
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         REPUTATION
       </Text>
-      <Text allowFontScaling={false} style={[styles.score, { color: t.textPrimary }]}>
+      <Text style={[styles.score, { color: t.textPrimary }]}>
         {formatReputation(reputation)}
       </Text>
-      <Text allowFontScaling={false} style={[styles.rank, { color: t.textPrimary }]}>
+      <Text style={[styles.rank, { color: t.textPrimary }]}>
         {label}
       </Text>
       {streak > 0 ? (
-        <Text allowFontScaling={false} style={[styles.streak, { color: t.textMuted }]}>
+        <Text style={[styles.streak, { color: t.textMuted }]}>
           {streak} day streak
         </Text>
       ) : null}
@@ -45,11 +45,11 @@ export function ReputationBar({ reputation, rank, streak = 0 }: ReputationBarPro
       <View style={[styles.rule, { backgroundColor: t.border }]} />
 
       {next ? (
-        <Text allowFontScaling={false} style={[styles.next, { color: t.textMuted }]}>
+        <Text style={[styles.next, { color: t.textMuted }]}>
           {formatReputation(toNext)} to {next.name}
         </Text>
       ) : (
-        <Text allowFontScaling={false} style={[styles.next, { color: t.textMuted }]}>
+        <Text style={[styles.next, { color: t.textMuted }]}>
           {derived.blurb}
         </Text>
       )}

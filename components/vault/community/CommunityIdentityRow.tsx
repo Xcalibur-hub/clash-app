@@ -30,7 +30,7 @@ export function CommunityIdentityRow({
   const nameColor = view.pseudonymous ? t.textSecondary : t.textPrimary;
 
   const nameNode = (
-    <Text allowFontScaling={false} style={[styles.name, { color: nameColor }]} numberOfLines={1}>
+    <Text style={[styles.name, { color: nameColor }]} numberOfLines={1}>
       {view.label}
     </Text>
   );
@@ -48,12 +48,12 @@ export function CommunityIdentityRow({
             nameNode
           )}
           {view.pseudonymous ? (
-            <Text allowFontScaling={false} style={[styles.aliasTag, { color: t.textMuted }]}>
+            <Text style={[styles.aliasTag, { color: t.textMuted }]}>
               alias
             </Text>
           ) : null}
         </View>
-        <Text allowFontScaling={false} style={[styles.time, { color: t.textMuted }]}>
+        <Text style={[styles.time, { color: t.textMuted }]}>
           {timeAgo(createdAt)}
         </Text>
       </View>

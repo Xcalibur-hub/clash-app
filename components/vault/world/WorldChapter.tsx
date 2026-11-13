@@ -120,22 +120,22 @@ export const WorldChapter = React.memo(function WorldChapter({
                 onPress={() => onOpenCourse(course.id)}
               />
               <View style={styles.courseCopy}>
-                <Text allowFontScaling={false} style={[styles.courseIndex, { color: t.textMuted }]}>
+                <Text style={[styles.courseIndex, { color: t.textMuted }]}>
                   {String(index + 1).padStart(2, '0')}
                 </Text>
                 <View style={styles.courseText}>
-                  <Text allowFontScaling={false} style={[styles.courseKicker, { color: t.textMuted }]}>
+                  <Text style={[styles.courseKicker, { color: t.textMuted }]}>
                     MASTERCLASS
                   </Text>
                   <Text
-                    allowFontScaling={false}
+                   
                     style={[styles.courseTitle, { color: t.textPrimary }]}
                     numberOfLines={2}
                   >
                     {course.title}
                   </Text>
                   {course.meta ? (
-                    <Text allowFontScaling={false} style={[styles.courseMeta, { color: t.textMuted }]} numberOfLines={1}>
+                    <Text style={[styles.courseMeta, { color: t.textMuted }]} numberOfLines={1}>
                       {course.meta}
                     </Text>
                   ) : null}

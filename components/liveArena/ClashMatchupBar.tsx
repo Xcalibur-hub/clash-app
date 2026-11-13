@@ -54,7 +54,7 @@ function DuelMatchup({
           <React.Fragment key={side}>
             {index === 1 ? (
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.duelVs, stage && { marginTop: metrics.vsMarginTop, fontSize: 13 }, { color: t.textMuted }]}
                 accessibilityLabel="versus"
               >
@@ -95,7 +95,7 @@ function DuelMatchup({
                   @{fighter.handle}
                 </Text>
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.duelSideLabel, { color: t.textMuted }]}
                 >
                   Fighter {side}
@@ -151,30 +151,30 @@ export function ClashMatchupBar({
     <View style={[styles.wrap, room && styles.wrapRoom]}>
       <View style={styles.row}>
         <View style={[styles.side, { backgroundColor: a.soft, borderColor: a.ink }]}>
-          <Text allowFontScaling={false} style={[styles.sideKey, { color: a.ink }]}>
+          <Text style={[styles.sideKey, { color: a.ink }]}>
             {fighterAName ? 'FIGHTER A' : a.label}
           </Text>
-          <Text allowFontScaling={false} style={[styles.sideName, { color: t.textPrimary }]}>
+          <Text style={[styles.sideName, { color: t.textPrimary }]}>
             {fighterAName ?? a.stanceLabel}
           </Text>
           {showSplit ? (
-            <Text allowFontScaling={false} style={[styles.pct, { color: a.ink }]}>
+            <Text style={[styles.pct, { color: a.ink }]}>
               {Math.round(agreeShare! * 100)}%
             </Text>
           ) : null}
         </View>
-        <Text allowFontScaling={false} style={[styles.vs, { color: t.textMuted }]}>
+        <Text style={[styles.vs, { color: t.textMuted }]}>
           VS
         </Text>
         <View style={[styles.side, { backgroundColor: b.soft, borderColor: b.ink }]}>
-          <Text allowFontScaling={false} style={[styles.sideKey, { color: b.ink }]}>
+          <Text style={[styles.sideKey, { color: b.ink }]}>
             {fighterBName ? 'FIGHTER B' : b.label}
           </Text>
-          <Text allowFontScaling={false} style={[styles.sideName, { color: t.textPrimary }]}>
+          <Text style={[styles.sideName, { color: t.textPrimary }]}>
             {fighterBName ?? b.stanceLabel}
           </Text>
           {showSplit ? (
-            <Text allowFontScaling={false} style={[styles.pct, { color: b.ink }]}>
+            <Text style={[styles.pct, { color: b.ink }]}>
               {Math.round((1 - agreeShare!) * 100)}%
             </Text>
           ) : null}
@@ -203,7 +203,7 @@ export function ClashMatchupBar({
         </View>
       )}
       {storyBeat ? (
-        <Text allowFontScaling={false} style={[styles.beat, { color: t.textSecondary }]} numberOfLines={2}>
+        <Text style={[styles.beat, { color: t.textSecondary }]} numberOfLines={2}>
           {storyBeat}
         </Text>
       ) : null}

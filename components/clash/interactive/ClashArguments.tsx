@@ -30,16 +30,16 @@ export function ClashArguments({ items, onMakeArgument, actionLabel = 'Make an a
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.heading, { color: t.textMuted }]}>
+      <Text style={[styles.heading, { color: t.textMuted }]}>
         Arguments
       </Text>
 
       {items.length === 0 ? (
         <View style={[styles.empty, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
-          <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+          <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
             No arguments yet
           </Text>
-          <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+          <Text style={[styles.emptyBody, { color: t.textMuted }]}>
             {actionLabel === 'Make an argument' ? 'Be the first to make the case.' : 'Read the original Take and its replies.'}
           </Text>
           {onMakeArgument ? (
@@ -71,7 +71,7 @@ export function ClashArguments({ items, onMakeArgument, actionLabel = 'Make an a
                     <View style={styles.identity}>
                       <Avatar name={item.author.name} tint={item.author.tint} size={26} />
                       <Text
-                        allowFontScaling={false}
+                       
                         style={[styles.handle, { color: t.textPrimary }]}
                         numberOfLines={1}
                       >
@@ -79,12 +79,12 @@ export function ClashArguments({ items, onMakeArgument, actionLabel = 'Make an a
                       </Text>
                     </View>
                   ) : (
-                    <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]}>
+                    <Text style={[styles.handle, { color: t.textMuted }]}>
                       Argument
                     </Text>
                   )}
                   {item.side && tone ? (
-                    <Text allowFontScaling={false} style={[styles.sideTag, { color: tone }]}>
+                    <Text style={[styles.sideTag, { color: tone }]}>
                       Side {item.side}
                     </Text>
                   ) : null}
@@ -92,7 +92,7 @@ export function ClashArguments({ items, onMakeArgument, actionLabel = 'Make an a
                 <Text allowFontScaling style={[styles.text, { color: t.textPrimary }]}>
                   {item.comment.text}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+                <Text style={[styles.meta, { color: t.textMuted }]}>
                   {item.comment.upvotes} {item.comment.upvotes === 1 ? 'upvote' : 'upvotes'}
                 </Text>
               </View>

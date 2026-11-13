@@ -58,7 +58,7 @@ export function MeetButton({
           disabled && styles.disabled,
         ]}
       >
-        <Text allowFontScaling={false} style={[typeScale.button, { color: palette.text }]}>
+        <Text style={[typeScale.button, { color: palette.text }]}>
           {label}
         </Text>
       </Pressable>

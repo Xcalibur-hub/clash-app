@@ -199,16 +199,16 @@ export default function SponsorStudioHome(): React.JSX.Element {
           </Pressable>
         </View>
 
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           Sponsor Studio
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
           {advertiser.name}
         </Text>
         <View style={styles.metaRow}>
           <StatusPill label={advertiser.status} tone={statusTone(advertiser.status)} />
           {advertisers.length > 1 ? (
-            <Text allowFontScaling={false} style={[styles.metaHint, { color: t.textMuted }]}>
+            <Text style={[styles.metaHint, { color: t.textMuted }]}>
               {advertisers.length} workspaces
             </Text>
           ) : null}
@@ -216,7 +216,7 @@ export default function SponsorStudioHome(): React.JSX.Element {
 
         {advertiser.status === 'DRAFT' ? (
           <View style={[styles.banner, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
-            <Text allowFontScaling={false} style={[styles.bannerText, { color: t.textSecondary }]}>
+            <Text style={[styles.bannerText, { color: t.textSecondary }]}>
               Activate your workspace before going live with campaigns.
             </Text>
             <GlowButton
@@ -230,7 +230,7 @@ export default function SponsorStudioHome(): React.JSX.Element {
         ) : null}
 
         {error ? (
-          <Text allowFontScaling={false} style={[styles.errorLine, { color: t.textSecondary }]}>
+          <Text style={[styles.errorLine, { color: t.textSecondary }]}>
             {error}
           </Text>
         ) : null}
@@ -260,10 +260,10 @@ export default function SponsorStudioHome(): React.JSX.Element {
         <StudioSection title="Campaigns">
           {campaigns.length === 0 ? (
             <View style={[styles.emptyCard, { borderColor: t.border }]}>
-              <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+              <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
                 Launch your first campaign
               </Text>
-              <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+              <Text style={[styles.emptyBody, { color: t.textMuted }]}>
                 Draft a referral campaign, assign creators, then go live.
               </Text>
               <GlowButton
@@ -328,22 +328,22 @@ function CampaignCard({
       ]}
     >
       <View style={styles.cardTop}>
-        <Text allowFontScaling={false} style={[styles.cardTitle, { color: t.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.cardTitle, { color: t.textPrimary }]} numberOfLines={2}>
           {item.title}
         </Text>
         <StatusPill label={item.status} tone={statusTone(item.status)} />
       </View>
-      <Text allowFontScaling={false} style={[styles.cardMeta, { color: t.textMuted }]}>
+      <Text style={[styles.cardMeta, { color: t.textMuted }]}>
         {item.campaignType.replace(/_/g, ' ')} · {item.currency} · {formatRange(item.startsAt, item.endsAt)}
       </Text>
       <View style={styles.cardStats}>
-        <Text allowFontScaling={false} style={[styles.cardStat, { color: t.textSecondary }]}>
+        <Text style={[styles.cardStat, { color: t.textSecondary }]}>
           {item.clicks.toLocaleString('en-IN')} clicks
         </Text>
-        <Text allowFontScaling={false} style={[styles.cardStat, { color: t.textSecondary }]}>
+        <Text style={[styles.cardStat, { color: t.textSecondary }]}>
           {item.conversions.toLocaleString('en-IN')} conv
         </Text>
-        <Text allowFontScaling={false} style={[styles.cardStat, { color: t.textSecondary }]}>
+        <Text style={[styles.cardStat, { color: t.textSecondary }]}>
           {formatMinorCurrency(item.grossRevenueMinor, item.currency)}
         </Text>
       </View>

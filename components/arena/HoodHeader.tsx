@@ -25,20 +25,20 @@ export function HoodHeader({
 }: HoodHeaderProps): React.JSX.Element {
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={styles.name}>
+      <Text style={styles.name}>
         h/{hood.name}
       </Text>
-      <Text allowFontScaling={false} style={styles.description}>
+      <Text style={styles.description}>
         {hood.description}
       </Text>
       <View style={styles.stats}>
-        <Text allowFontScaling={false} style={styles.stat}>
+        <Text style={styles.stat}>
           {memberCount === null ? 'Members unavailable' : `${compact(memberCount)} members`}
         </Text>
-        <Text allowFontScaling={false} style={styles.dot}>
+        <Text style={styles.dot}>
           ·
         </Text>
-        <Text allowFontScaling={false} style={styles.stat}>
+        <Text style={styles.stat}>
           {liveCount === null ? 'Live takes unavailable' : `${liveCount} live takes`}
         </Text>
       </View>
@@ -52,7 +52,7 @@ export function HoodHeader({
       />
       <View style={styles.rules}>
         {hood.rules.map((rule, index) => (
-          <Text allowFontScaling={false} key={rule} style={styles.rule} numberOfLines={1}>
+          <Text key={rule} style={styles.rule} numberOfLines={1}>
             {`${index + 1}. ${rule}`}
           </Text>
         ))}

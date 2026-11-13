@@ -68,7 +68,7 @@ export function WorldDropPreview({ drop, onView, onDismiss }: WorldDropPreviewPr
         {isVideo ? (
           <View style={styles.videoChip}>
             <PlayIcon size={11} color="#F5F5F7" strokeWidth={2.4} />
-            <Text allowFontScaling={false} style={styles.videoChipText}>
+            <Text style={styles.videoChipText}>
               Video
             </Text>
           </View>
@@ -76,14 +76,14 @@ export function WorldDropPreview({ drop, onView, onDismiss }: WorldDropPreviewPr
       </View>
 
       <View style={styles.body}>
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {handle} · {distance}
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
           {title}
         </Text>
         {drop.mission && drop.caption.trim() ? (
-          <Text allowFontScaling={false} style={[styles.caption, { color: t.textSecondary }]} numberOfLines={2}>
+          <Text style={[styles.caption, { color: t.textSecondary }]} numberOfLines={2}>
             {drop.caption}
           </Text>
         ) : null}
@@ -101,7 +101,7 @@ export function WorldDropPreview({ drop, onView, onDismiss }: WorldDropPreviewPr
           accessibilityLabel="Open Drop"
         >
           <Text
-            allowFontScaling={false}
+           
             style={[
               styles.openText,
               { color: t.scheme === 'light' ? '#F5F5F7' : '#111113' },

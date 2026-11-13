@@ -19,10 +19,10 @@ export function WorldMissionCard({
 }: WorldMissionCardProps): React.JSX.Element {
   return (
     <View style={styles.card} accessibilityLabel={`Mission. ${mission.title}`}>
-      <Text allowFontScaling={false} style={styles.eyebrow}>THIS WEEK</Text>
-      <Text allowFontScaling={false} style={styles.title}>{mission.title}</Text>
-      <Text allowFontScaling={false} style={styles.prompt}>{mission.prompt}</Text>
-      <Text allowFontScaling={false} style={styles.meta}>
+      <Text style={styles.eyebrow}>THIS WEEK</Text>
+      <Text style={styles.title}>{mission.title}</Text>
+      <Text style={styles.prompt}>{mission.prompt}</Text>
+      <Text style={styles.meta}>
         {timeLeftLabel(mission.endsAt, now).replace(' left', '')} remaining
       </Text>
       {onParticipate ? (

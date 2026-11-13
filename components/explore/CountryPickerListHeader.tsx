@@ -21,11 +21,11 @@ function SectionHead({ label, hint }: { label: string; hint: string | null }): R
   const t = useThemeColors();
   return (
     <View style={styles.sectionHead}>
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+      <Text style={[styles.section, { color: t.textMuted }]}>
         {label}
       </Text>
       {hint ? (
-        <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+        <Text style={[styles.section, { color: t.textMuted }]}>
           {hint}
         </Text>
       ) : null}

@@ -26,7 +26,7 @@ export default function PublicProfileRoute(): React.JSX.Element {
         >
           <BackIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           Profile
         </Text>
       </View>

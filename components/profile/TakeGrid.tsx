@@ -53,7 +53,7 @@ export function TakeGrid({ takes, now, onPress }: TakeGridProps): React.JSX.Elem
                   <PlayIcon size={13} color={ink.primary} strokeWidth={2.6} />
                 </View>
               ) : null}
-              <Text allowFontScaling={false} numberOfLines={3} style={s.caption}>
+              <Text numberOfLines={3} style={s.caption}>
                 {take.text}
               </Text>
             </Pressable>
@@ -68,10 +68,10 @@ export function TakeGrid({ takes, now, onPress }: TakeGridProps): React.JSX.Elem
           accessibilityLabel={`Your take: ${take.text}`}
           style={s.row}
         >
-          <Text allowFontScaling={false} numberOfLines={2} style={s.rowText}>
+          <Text numberOfLines={2} style={s.rowText}>
             {take.text}
           </Text>
-          <Text allowFontScaling={false} style={s.rowMeta}>
+          <Text style={s.rowMeta}>
             {`${HOOD_LABEL[take.hood]} · ${timeLeftLabel(take.expiresAt, now)}`}
           </Text>
         </Pressable>

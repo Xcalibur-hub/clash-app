@@ -40,7 +40,7 @@ export function DigitalModeSwitch({
             style={[styles.tab, on && { backgroundColor: t.surface, borderColor: t.border }]}
           >
             <Text
-              allowFontScaling={false}
+             
               style={[styles.label, { color: on ? t.textPrimary : t.textMuted }]}
             >
               {digitalRoomModeLabel(mode)}

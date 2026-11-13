@@ -52,10 +52,10 @@ export function CreatorDropRow({ drop, onOpen, onPublish, onRemove }: CreatorDro
       )}
 
       <View style={styles.body}>
-        <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.caption, { color: t.textPrimary }]} numberOfLines={2}>
           {drop.caption}
         </Text>
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {[statusLabel, isSubscriber ? 'Subscriber' : 'Free', expiry].filter(Boolean).join(' · ')}
         </Text>
 
@@ -70,7 +70,7 @@ export function CreatorDropRow({ drop, onOpen, onPublish, onRemove }: CreatorDro
               accessibilityLabel="Publish drop"
               style={[styles.action, { backgroundColor: t.textPrimary }]}
             >
-              <Text allowFontScaling={false} style={[styles.actionPrimary, { color: t.textInverse }]}>
+              <Text style={[styles.actionPrimary, { color: t.textInverse }]}>
                 Publish
               </Text>
             </Pressable>
@@ -85,7 +85,7 @@ export function CreatorDropRow({ drop, onOpen, onPublish, onRemove }: CreatorDro
               accessibilityLabel="Remove drop"
               style={[styles.action, { borderColor: t.border, borderWidth: StyleSheet.hairlineWidth }]}
             >
-              <Text allowFontScaling={false} style={[styles.actionSecondary, { color: t.danger }]}>
+              <Text style={[styles.actionSecondary, { color: t.danger }]}>
                 Remove
               </Text>
             </Pressable>

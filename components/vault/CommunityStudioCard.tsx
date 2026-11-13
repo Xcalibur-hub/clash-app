@@ -28,29 +28,29 @@ export function CommunityStudioCard({
     : '';
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+      <Text style={[styles.section, { color: t.textMuted }]}>
         COMMUNITY
       </Text>
       <View style={[styles.card, { borderColor: t.border, backgroundColor: t.surface }]}>
         <View style={styles.head}>
           <CreatorsIcon size={18} color={t.textSecondary} strokeWidth={2.2} />
-          <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+          <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
             {community ? community.name : 'No community yet'}
           </Text>
         </View>
         {community ? (
           <>
-            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+            <Text style={[styles.meta, { color: t.textMuted }]}>
               {meta}
             </Text>
             {community.description ? (
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]} numberOfLines={2}>
+              <Text style={[styles.body, { color: t.textSecondary }]} numberOfLines={2}>
                 {community.description}
               </Text>
             ) : null}
           </>
         ) : (
-          <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+          <Text style={[styles.body, { color: t.textSecondary }]}>
             Give your fans a room inside your world — announcements and discussion.
           </Text>
         )}

@@ -73,11 +73,11 @@ export function HoldToTalkControl({
             { backgroundColor: listening ? t.textPrimary : t.textMuted },
           ]}
         />
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textPrimary }]}>
+        <Text style={[styles.label, { color: t.textPrimary }]}>
           {listening ? 'LISTENING' : available ? 'HOLD TO TALK' : 'VOICE OFF'}
         </Text>
       </Pressable>
-      <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+      <Text style={[styles.note, { color: t.textMuted }]}>
         {note}
       </Text>
     </View>

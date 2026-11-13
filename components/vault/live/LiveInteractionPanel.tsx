@@ -44,17 +44,17 @@ export function LiveInteractionPanel({
   return (
     <View style={[styles.wrap, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           {interactionTypeLabel(interaction.type).toUpperCase()}
         </Text>
         {left != null && interaction.status === 'OPEN' ? (
-          <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          <Text style={[styles.kicker, { color: t.textMuted }]}>
             {left}s
           </Text>
         ) : null}
       </View>
 
-      <Text allowFontScaling={false} style={[styles.prompt, { color: t.textPrimary }]}>
+      <Text style={[styles.prompt, { color: t.textPrimary }]}>
         {interaction.prompt}
       </Text>
 
@@ -71,7 +71,7 @@ export function LiveInteractionPanel({
               ]}
             />
           </View>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textSecondary }]}>
+          <Text style={[styles.meta, { color: t.textSecondary }]}>
             {interaction.status === 'TRIGGERED'
               ? `${liveActionLabel(interaction.actionKind ?? 'HOLD_FRAME')} — triggered by the crowd`
               : `${interaction.totalVotes} / ${interaction.threshold ?? 0} · ${thresholdRemaining(
@@ -137,15 +137,15 @@ export function LiveInteractionPanel({
                   />
                 ) : null}
                 <View style={styles.optionRow}>
-                  <Text allowFontScaling={false} style={[styles.optionLabel, { color: t.textPrimary }]}>
+                  <Text style={[styles.optionLabel, { color: t.textPrimary }]}>
                     {option.label}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.optionCount, { color: t.textMuted }]}>
+                  <Text style={[styles.optionCount, { color: t.textMuted }]}>
                     {reveal ? `${Math.round(share * 100)}%` : mine ? 'YOUR VOTE' : ''}
                   </Text>
                 </View>
                 {reveal ? (
-                  <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+                  <Text style={[styles.meta, { color: t.textMuted }]}>
                     {count} {count === 1 ? 'vote' : 'votes'}
                   </Text>
                 ) : null}
@@ -156,7 +156,7 @@ export function LiveInteractionPanel({
       ) : null}
 
       {!interaction.canParticipate && interaction.status === 'OPEN' ? (
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {hasReachedThreshold(interaction.totalVotes, interaction.threshold)
             ? 'Threshold reached'
             : (blockedNote ?? 'Watching only')}

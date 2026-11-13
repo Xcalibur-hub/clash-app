@@ -29,11 +29,11 @@ export function WorldContentRow({
       accessibilityLabel={`${kind}: ${title}`}
     >
       <View style={styles.copy}>
-        <Text allowFontScaling={false} style={[styles.kind, { color: t.textMuted }]}>
+        <Text style={[styles.kind, { color: t.textMuted }]}>
           {kind}
         </Text>
         <Text
-          allowFontScaling={false}
+         
           numberOfLines={1}
           style={[styles.title, { color: t.textPrimary }]}
         >
@@ -41,7 +41,7 @@ export function WorldContentRow({
         </Text>
       </View>
       {meta ? (
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {meta}
         </Text>
       ) : null}

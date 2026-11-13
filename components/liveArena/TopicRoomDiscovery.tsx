@@ -77,19 +77,19 @@ export function TopicRoomDiscovery({
       <View style={styles.topicHead}>
         <View style={styles.liveRow}>
           <LivePulse />
-          <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          <Text style={[styles.kicker, { color: t.textMuted }]}>
             Live Topic
           </Text>
         </View>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           {topic.title}
         </Text>
         {topic.description ? (
-          <Text allowFontScaling={false} style={[styles.description, { color: t.textSecondary }]}>
+          <Text style={[styles.description, { color: t.textSecondary }]}>
             {topic.description}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {topic.participantCount} participating
           {topic.activeRoomCount > 0 ? ` · ${topic.activeRoomCount} rooms` : ''}
           {topic.secondsRemaining > 0 ? ` · ${phaseLabel(topic.phase)}` : ''}
@@ -98,22 +98,22 @@ export function TopicRoomDiscovery({
 
       {assigned ? (
         <View style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-          <Text allowFontScaling={false} style={[styles.cardKicker, { color: t.textMuted }]}>
+          <Text style={[styles.cardKicker, { color: t.textMuted }]}>
             Your Room
           </Text>
-          <Text allowFontScaling={false} style={[styles.roomTitle, { color: t.textPrimary }]}>
+          <Text style={[styles.roomTitle, { color: t.textPrimary }]}>
             {assigned.roomIndex != null ? `Room ${assigned.roomIndex}` : 'Your room'}
           </Text>
-          <Text allowFontScaling={false} style={[styles.roomMeta, { color: t.textSecondary }]}>
+          <Text style={[styles.roomMeta, { color: t.textSecondary }]}>
             {assigned.participantCount} joined
             {assigned.capacity != null ? ` · ${assigned.capacity} capacity` : ''}
           </Text>
           {topic.viewerStance ? (
-            <Text allowFontScaling={false} style={[styles.privateNote, { color: t.textMuted }]}>
+            <Text style={[styles.privateNote, { color: t.textMuted }]}>
               You · {STANCE_LABEL[topic.viewerStance]} · private
             </Text>
           ) : isSpectator ? (
-            <Text allowFontScaling={false} style={[styles.privateNote, { color: t.textMuted }]}>
+            <Text style={[styles.privateNote, { color: t.textMuted }]}>
               Watching
             </Text>
           ) : null}
@@ -143,10 +143,10 @@ export function TopicRoomDiscovery({
         </View>
       ) : (
         <View style={[styles.card, { backgroundColor: softFill(t), borderColor: t.border }]}>
-          <Text allowFontScaling={false} style={[styles.cardKicker, { color: t.textMuted }]}>
+          <Text style={[styles.cardKicker, { color: t.textMuted }]}>
             Join the debate
           </Text>
-          <Text allowFontScaling={false} style={[styles.joinCopy, { color: t.textSecondary }]}>
+          <Text style={[styles.joinCopy, { color: t.textSecondary }]}>
             Pick a private stance to get placed in a room. Nobody sees how you answered.
           </Text>
           <StanceChoiceRow prompt="What do you believe?" disabled={busy} onChoose={onJoinDebate} />
@@ -160,7 +160,7 @@ export function TopicRoomDiscovery({
             accessibilityLabel="Watch a live room"
             style={styles.watchHit}
           >
-            <Text allowFontScaling={false} style={[styles.watch, { color: t.textSecondary }]}>
+            <Text style={[styles.watch, { color: t.textSecondary }]}>
               Or pick a room below to watch
             </Text>
           </Pressable>
@@ -171,7 +171,7 @@ export function TopicRoomDiscovery({
         <ActivityIndicator color={t.textMuted} style={styles.loader} />
       ) : watchableRooms.length > 0 ? (
         <View style={styles.listBlock}>
-          <Text allowFontScaling={false} style={[styles.listTitle, { color: t.textMuted }]}>
+          <Text style={[styles.listTitle, { color: t.textMuted }]}>
             Active rooms
           </Text>
           {watchableRooms.map((room) => {
@@ -208,21 +208,21 @@ export function TopicRoomDiscovery({
               >
                 <View style={styles.roomRowLeft}>
                   <Text
-                    allowFontScaling={false}
+                   
                     style={[styles.roomRowTitle, { color: t.textPrimary }]}
                   >
                     Room {room.roomIndex}
                     {mine ? ' · Yours' : ''}
                   </Text>
                   <Text
-                    allowFontScaling={false}
+                   
                     style={[styles.roomRowMeta, { color: full ? t.textSecondary : t.textMuted }]}
                   >
                     {meta}
                   </Text>
                 </View>
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.roomRowCta, { color: t.textPrimary }]}
                 >
                   {cta}
@@ -231,7 +231,7 @@ export function TopicRoomDiscovery({
             );
           })}
           {isDebater ? (
-            <Text allowFontScaling={false} style={[styles.debaterNote, { color: t.textMuted }]}>
+            <Text style={[styles.debaterNote, { color: t.textMuted }]}>
               You’re debating in your assigned Clash — pick Enter Clash above.
             </Text>
           ) : null}
@@ -262,7 +262,7 @@ function PrimaryCta({
       accessibilityLabel={label}
       style={[styles.primary, { backgroundColor: t.clashFill, opacity: busy ? 0.6 : 1 }]}
     >
-      <Text allowFontScaling={false} style={[styles.primaryText, { color: t.clashText }]}>
+      <Text style={[styles.primaryText, { color: t.clashText }]}>
         {label}
       </Text>
     </Pressable>
@@ -290,7 +290,7 @@ function SecondaryCta({
       accessibilityLabel={label}
       style={[styles.secondary, { borderColor: t.borderStrong }]}
     >
-      <Text allowFontScaling={false} style={[styles.secondaryText, { color: t.textPrimary }]}>
+      <Text style={[styles.secondaryText, { color: t.textPrimary }]}>
         {label}
       </Text>
     </Pressable>

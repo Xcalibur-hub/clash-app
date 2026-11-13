@@ -35,7 +35,7 @@ export function ArenaStackProgress({ index, total }: ArenaStackProgressProps): R
 
   return (
     <Text
-      allowFontScaling={false}
+     
       style={[styles.count, { color: t.textMuted }]}
       accessibilityLabel={`Card ${index + 1} of ${total}`}
     >

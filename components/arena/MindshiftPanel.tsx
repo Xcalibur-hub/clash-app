@@ -51,10 +51,10 @@ export function MindshiftPanel({ takeId, offerFinal = false }: MindshiftPanelPro
         />
       ) : !showResult ? (
         <View style={styles.held}>
-          <Text allowFontScaling={false} style={[styles.heldLabel, { color: t.textMuted }]}>
+          <Text style={[styles.heldLabel, { color: t.textMuted }]}>
             YOUR STANCE
           </Text>
-          <Text allowFontScaling={false} style={[styles.heldValue, { color: t.textPrimary }]}>
+          <Text style={[styles.heldValue, { color: t.textPrimary }]}>
             {LABELS[initial]}
           </Text>
         </View>
@@ -74,36 +74,36 @@ export function MindshiftPanel({ takeId, offerFinal = false }: MindshiftPanelPro
           style={styles.journey}
         >
           <View style={styles.journeyCol}>
-            <Text allowFontScaling={false} style={[styles.journeyLabel, { color: t.textMuted }]}>
+            <Text style={[styles.journeyLabel, { color: t.textMuted }]}>
               YOU STARTED
             </Text>
-            <Text allowFontScaling={false} style={[styles.journeyValue, { color: t.textSecondary }]}>
+            <Text style={[styles.journeyValue, { color: t.textSecondary }]}>
               {LABELS[initial].toUpperCase()}
             </Text>
           </View>
-          <Text allowFontScaling={false} style={[styles.arrow, { color: t.borderStrong }]}>
+          <Text style={[styles.arrow, { color: t.borderStrong }]}>
             ↓
           </Text>
           <View style={styles.journeyCol}>
-            <Text allowFontScaling={false} style={[styles.journeyLabel, { color: t.textMuted }]}>
+            <Text style={[styles.journeyLabel, { color: t.textMuted }]}>
               YOU ENDED
             </Text>
-            <Text allowFontScaling={false} style={[styles.journeyValue, { color: t.textPrimary }]}>
+            <Text style={[styles.journeyValue, { color: t.textPrimary }]}>
               {LABELS[final].toUpperCase()}
             </Text>
           </View>
 
           {canShowAggregate ? (
             <Animated.View entering={reduced ? undefined : FadeIn.delay(80).duration(200)} style={styles.aggregate}>
-              <Text allowFontScaling={false} style={[styles.pct, { color: t.textPrimary }]}>
+              <Text style={[styles.pct, { color: t.textPrimary }]}>
                 {stats!.changedPercent}%
               </Text>
-              <Text allowFontScaling={false} style={[styles.pctSub, { color: t.textMuted }]}>
+              <Text style={[styles.pctSub, { color: t.textMuted }]}>
                 changed their mind
               </Text>
             </Animated.View>
           ) : showResult && stats !== null && stats.completedParticipants < MINDSHIFT_MIN_COMPLETED ? (
-            <Text allowFontScaling={false} style={[styles.low, { color: t.textMuted }]}>
+            <Text style={[styles.low, { color: t.textMuted }]}>
               Not enough responses yet
             </Text>
           ) : null}

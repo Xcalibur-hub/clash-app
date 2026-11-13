@@ -52,11 +52,11 @@ export function DailyArenaCard({
         ]}
       >
         <View style={styles.head}>
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+          <Text style={[styles.eyebrow, { color: t.textMuted }]}>
             TODAY'S ARENA
           </Text>
           {closed ? (
-            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+            <Text style={[styles.meta, { color: t.textMuted }]}>
               Closed
             </Text>
           ) : (
@@ -64,13 +64,13 @@ export function DailyArenaCard({
           )}
         </View>
 
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           {topic.title}
         </Text>
 
         {topic.description ? (
           <Text
-            allowFontScaling={false}
+           
             numberOfLines={2}
             style={[styles.description, { color: t.textSecondary }]}
           >
@@ -79,13 +79,13 @@ export function DailyArenaCard({
         ) : null}
 
         <View style={styles.statRow}>
-          <Text allowFontScaling={false} style={[styles.stat, { color: t.textSecondary }]}>
+          <Text style={[styles.stat, { color: t.textSecondary }]}>
             {plural(topic.participantCount, 'person participating', 'people participating')}
           </Text>
-          <Text allowFontScaling={false} style={[styles.dot, { color: t.textMuted }]}>
+          <Text style={[styles.dot, { color: t.textMuted }]}>
             ·
           </Text>
-          <Text allowFontScaling={false} style={[styles.stat, { color: t.textSecondary }]}>
+          <Text style={[styles.stat, { color: t.textSecondary }]}>
             {closed ? phaseLabel(topic.phase) : `${secondsLabel(topic.secondsRemaining)} left`}
           </Text>
         </View>
@@ -96,7 +96,7 @@ export function DailyArenaCard({
               <View
                 style={[styles.stanceChip, { backgroundColor: softFill(t), borderColor: t.border }]}
               >
-                <Text allowFontScaling={false} style={[styles.stanceChipText, { color: t.textSecondary }]}>
+                <Text style={[styles.stanceChipText, { color: t.textSecondary }]}>
                   Your stance · {STANCE_LABEL[topic.viewerStance]}
                 </Text>
               </View>
@@ -110,14 +110,14 @@ export function DailyArenaCard({
               accessibilityLabel={settled ? 'See the verdict' : 'Enter Clash'}
               style={[styles.primary, { backgroundColor: t.pill }]}
             >
-              <Text allowFontScaling={false} style={[styles.primaryText, { color: t.pillText }]}>
+              <Text style={[styles.primaryText, { color: t.pillText }]}>
                 {settled ? 'See the verdict' : 'Enter Clash'}
               </Text>
             </Pressable>
           </View>
         ) : canJoin ? (
           <View style={styles.gate}>
-            <Text allowFontScaling={false} style={[styles.prompt, { color: t.textMuted }]}>
+            <Text style={[styles.prompt, { color: t.textMuted }]}>
               What do you believe?
             </Text>
             <View style={styles.choices}>
@@ -136,7 +136,7 @@ export function DailyArenaCard({
             accessibilityLabel="See how it ended"
             style={[styles.secondary, { borderColor: t.borderStrong }]}
           >
-            <Text allowFontScaling={false} style={[styles.secondaryText, { color: t.textPrimary }]}>
+            <Text style={[styles.secondaryText, { color: t.textPrimary }]}>
               See how it ended
             </Text>
           </Pressable>
@@ -164,7 +164,7 @@ function ChoiceButton({
       accessibilityLabel={label}
       style={[styles.choice, { backgroundColor: t.surfaceMuted, borderColor: t.borderStrong }]}
     >
-      <Text allowFontScaling={false} style={[styles.choiceText, { color: t.textPrimary }]}>
+      <Text style={[styles.choiceText, { color: t.textPrimary }]}>
         {label}
       </Text>
     </Pressable>

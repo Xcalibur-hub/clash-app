@@ -355,10 +355,10 @@ export default function ClashScreen(): React.JSX.Element {
             <BackIcon size={20} color={t.textPrimary} />
           </Pressable>
           <View style={styles.titleBlock}>
-            <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textPrimary }]}>
+            <Text style={[styles.eyebrow, { color: t.textPrimary }]}>
               {blind ? 'BLIND CLASH' : 'THE CLASH'}
             </Text>
-            <Text allowFontScaling={false} style={[styles.subEyebrow, { color: t.textMuted }]}>
+            <Text style={[styles.subEyebrow, { color: t.textMuted }]}>
               PICK A SIDE · MAKE IT COUNT
             </Text>
             <ClashCountdown
@@ -423,19 +423,19 @@ export default function ClashScreen(): React.JSX.Element {
           </>
         ) : cancelled ? (
           <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
-            <Text allowFontScaling={false} style={[styles.noticeText, { color: t.textMuted }]}>
+            <Text style={[styles.noticeText, { color: t.textMuted }]}>
               No community verdict was reached for this Clash.
             </Text>
           </View>
         ) : closed ? (
           <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
-            <Text allowFontScaling={false} style={[styles.noticeText, { color: t.textMuted }]}>
+            <Text style={[styles.noticeText, { color: t.textMuted }]}>
               Judging closed · result pending…
             </Text>
           </View>
         ) : view.isParticipant ? (
           <View style={[styles.noticeBox, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
-            <Text allowFontScaling={false} style={[styles.noticeText, { color: t.textMuted }]}>
+            <Text style={[styles.noticeText, { color: t.textMuted }]}>
               Participants can’t judge their own Clash.
             </Text>
           </View>
@@ -468,7 +468,7 @@ export default function ClashScreen(): React.JSX.Element {
         />
 
         {error ? (
-          <Text allowFontScaling={false} style={[styles.inlineError, { color: t.textSecondary }]}>
+          <Text style={[styles.inlineError, { color: t.textSecondary }]}>
             {error}
           </Text>
         ) : null}

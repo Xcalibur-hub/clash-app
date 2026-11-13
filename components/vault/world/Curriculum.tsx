@@ -39,26 +39,26 @@ export const Curriculum = React.memo(function Curriculum({
           accessibilityLabel={item.title}
           style={[styles.row, { borderColor: t.border }]}
         >
-          <Text allowFontScaling={false} style={[styles.index, { color: t.textMuted }]}>
+          <Text style={[styles.index, { color: t.textMuted }]}>
             {String(index + 1).padStart(2, '0')}
           </Text>
           <View style={styles.body}>
             <Text
-              allowFontScaling={false}
+             
               style={[styles.title, { color: item.locked ? t.textMuted : t.textPrimary }]}
               numberOfLines={2}
             >
               {item.title}
             </Text>
             {item.meta ? (
-              <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
+              <Text style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
                 {item.meta}
               </Text>
             ) : null}
           </View>
           {item.locked ? <LockIcon size={15} color={t.textMuted} strokeWidth={2.2} /> : null}
           {item.done ? (
-            <Text allowFontScaling={false} style={[styles.done, { color: t.textMuted }]}>
+            <Text style={[styles.done, { color: t.textMuted }]}>
               DONE
             </Text>
           ) : null}

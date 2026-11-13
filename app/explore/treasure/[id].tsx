@@ -197,7 +197,7 @@ function TreasureDetailScreen(): React.JSX.Element {
   if (!detail) {
     return (
       <View style={[styles.center, { backgroundColor: t.background, paddingTop: insets.top }]}>
-        <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+        <Text style={{ color: t.textMuted }}>
           {error ?? 'Treasure not found'}
         </Text>
         <GlowButton label="Back" onPress={() => router.back()} tone="glass" compact />
@@ -228,33 +228,33 @@ function TreasureDetailScreen(): React.JSX.Element {
           accessibilityRole="button"
           accessibilityLabel="Back"
         >
-          <Text allowFontScaling={false} style={styles.backLabel}>
+          <Text style={styles.backLabel}>
             ←
           </Text>
         </Pressable>
         <View style={[styles.heroCopy, { paddingTop: insets.top + 56 }]}>
-          <Text allowFontScaling={false} style={styles.scope}>
+          <Text style={styles.scope}>
             {detail.huntType}
             {detail.countryCode ? ` · ${detail.countryCode}` : ''}
           </Text>
-          <Text allowFontScaling={false} style={styles.title}>
+          <Text style={styles.title}>
             {detail.title}
           </Text>
           {detail.host ? (
             <Pressable onPress={() => router.push(`/profile/${detail.host!.id}` as never)}>
-              <Text allowFontScaling={false} style={styles.host}>
+              <Text style={styles.host}>
                 @{detail.host.handle}
               </Text>
             </Pressable>
           ) : null}
-          <Text allowFontScaling={false} style={styles.meta}>
+          <Text style={styles.meta}>
             {timeLeftLabel(detail.endsAt, now)} · {giftsLabel}
           </Text>
         </View>
       </View>
 
       <View style={styles.body}>
-        <Text allowFontScaling={false} style={[styles.teaser, { color: t.textSecondary }]}>
+        <Text style={[styles.teaser, { color: t.textSecondary }]}>
           {detail.teaser}
         </Text>
 
@@ -271,10 +271,10 @@ function TreasureDetailScreen(): React.JSX.Element {
 
         {detail.joined && detail.currentClue && !detail.completed ? (
           <View style={[styles.clueCard, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
-            <Text allowFontScaling={false} style={[styles.clueKicker, { color: t.textMuted }]}>
+            <Text style={[styles.clueKicker, { color: t.textMuted }]}>
               CLUE {detail.currentClue.sortOrder}
             </Text>
-            <Text allowFontScaling={false} style={[styles.cluePrompt, { color: t.textPrimary }]}>
+            <Text style={[styles.cluePrompt, { color: t.textPrimary }]}>
               {detail.currentClue.prompt}
             </Text>
 
@@ -289,7 +289,7 @@ function TreasureDetailScreen(): React.JSX.Element {
                     }}
                     style={[styles.choice, { borderColor: t.border }]}
                   >
-                    <Text allowFontScaling={false} style={{ color: t.textPrimary, fontWeight: '600' }}>
+                    <Text style={{ color: t.textPrimary, fontWeight: '600' }}>
                       {choice}
                     </Text>
                   </Pressable>
@@ -352,18 +352,18 @@ function TreasureDetailScreen(): React.JSX.Element {
         ) : null}
 
         {detail.claimed ? (
-          <Text allowFontScaling={false} style={{ color: t.success, fontWeight: '700' }}>
+          <Text style={{ color: t.success, fontWeight: '700' }}>
             Reward claimed — wear it well.
           </Text>
         ) : null}
 
         {feedback ? (
-          <Text allowFontScaling={false} style={{ color: t.textSecondary }}>
+          <Text style={{ color: t.textSecondary }}>
             {feedback}
           </Text>
         ) : null}
         {error ? (
-          <Text allowFontScaling={false} style={{ color: t.danger }}>
+          <Text style={{ color: t.danger }}>
             {error}
           </Text>
         ) : null}

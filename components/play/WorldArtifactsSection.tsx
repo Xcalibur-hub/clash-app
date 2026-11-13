@@ -31,10 +31,10 @@ export function WorldArtifactsSection(): React.JSX.Element | null {
 
   return (
     <View style={styles.section}>
-      <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
+      <Text style={[styles.sectionTitle, { color: t.textPrimary }]}>
         Artifacts
       </Text>
-      <Text allowFontScaling={false} style={[styles.count, { color: t.textMuted }]}>
+      <Text style={[styles.count, { color: t.textMuted }]}>
         {artifactCountLabel(items.length)}
       </Text>
       <View style={styles.grid}>
@@ -55,13 +55,13 @@ export function WorldArtifactsSection(): React.JSX.Element | null {
                 />
               )}
               <View style={styles.tileCopy}>
-                <Text allowFontScaling={false} style={[styles.tileKicker, { color: t.textMuted }]}>
+                <Text style={[styles.tileKicker, { color: t.textMuted }]}>
                   {dropTypeLabel(artifact.dropType).toUpperCase()}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.tileTitle, { color: t.textPrimary }]} numberOfLines={2}>
+                <Text style={[styles.tileTitle, { color: t.textPrimary }]} numberOfLines={2}>
                   {artifact.caption}
                 </Text>
-                <Text allowFontScaling={false} style={{ color: t.textMuted }} numberOfLines={1}>
+                <Text style={{ color: t.textMuted }} numberOfLines={1}>
                   {[rewardTypeLabel(artifact.rewardType), artifact.creatorName].filter(Boolean).join(' · ')}
                 </Text>
               </View>

@@ -71,8 +71,8 @@ export function CityDonut({ cities, orders }: {
           {slices}
         </Svg>
         <View style={styles.center} pointerEvents="none">
-          <Text allowFontScaling={false} style={styles.orders}>{orders.toLocaleString('en-IN')}</Text>
-          <Text allowFontScaling={false} style={styles.ordersLabel}>ORDERS</Text>
+          <Text style={styles.orders}>{orders.toLocaleString('en-IN')}</Text>
+          <Text style={styles.ordersLabel}>ORDERS</Text>
         </View>
       </Animated.View>
       <View style={styles.legend}>
@@ -80,13 +80,13 @@ export function CityDonut({ cities, orders }: {
           <View key={share.city} style={styles.row}>
             <View style={styles.labelRow}>
               <View style={[styles.dot, { backgroundColor: CITY_TINT[share.city] }]} />
-              <Text allowFontScaling={false} style={styles.city}>{share.city}</Text>
+              <Text style={styles.city}>{share.city}</Text>
             </View>
-            <Text allowFontScaling={false} style={styles.share}>{share.share}%</Text>
+            <Text style={styles.share}>{share.share}%</Text>
             <View style={styles.bar}>
               <View style={[styles.fill, { width: `${share.share}%`, backgroundColor: withAlpha(CITY_TINT[share.city], 0.9) }]} />
             </View>
-            <Text allowFontScaling={false} style={styles.count}>
+            <Text style={styles.count}>
               {`${Math.round((orders * share.share) / 100).toLocaleString('en-IN')} orders`}
             </Text>
           </View>

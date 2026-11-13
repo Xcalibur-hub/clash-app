@@ -75,14 +75,14 @@ export function LiveArgumentPreview({
           exiting={reduced ? undefined : FadeOut.duration(280)}
           style={[styles.burst, { backgroundColor: withAlpha(t.textPrimary, 0.06) }]}
         >
-          <Text allowFontScaling={false} numberOfLines={2} style={[styles.burstText, { color: t.textPrimary }]}>
+          <Text numberOfLines={2} style={[styles.burstText, { color: t.textPrimary }]}>
             {burstText}
           </Text>
         </Animated.View>
       ) : null}
 
       {!primary ? (
-        <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+        <Text style={[styles.empty, { color: t.textMuted }]}>
           {emptyLabel}
         </Text>
       ) : (
@@ -95,7 +95,7 @@ export function LiveArgumentPreview({
           />
           {secondary ? (
             <>
-              <Text allowFontScaling={false} style={[styles.vs, { color: t.textMuted }]}>
+              <Text style={[styles.vs, { color: t.textMuted }]}>
                 ⚔
               </Text>
               <ExcerptBlock
@@ -114,7 +114,7 @@ export function LiveArgumentPreview({
           {signals.slice(0, 2).map((s) => (
             <Text
               key={s.emoji}
-              allowFontScaling={false}
+             
               style={[styles.signal, { color: t.textSecondary }]}
             >
               {s.emoji} × {s.count}
@@ -155,10 +155,10 @@ function ExcerptBlock({
         {gif ? (
           <Image source={{ uri: gif }} style={styles.gif} resizeMode="cover" />
         ) : null}
-        <Text allowFontScaling={false} numberOfLines={3} style={[styles.quote, { color: t.textPrimary }]}>
+        <Text numberOfLines={3} style={[styles.quote, { color: t.textPrimary }]}>
           {body}
         </Text>
-        <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]}>
+        <Text style={[styles.handle, { color: t.textMuted }]}>
           @{excerpt.handle}
         </Text>
       </View>

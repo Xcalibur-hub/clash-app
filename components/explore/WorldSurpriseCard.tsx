@@ -25,14 +25,14 @@ export function WorldSurpriseCard({ onPress }: WorldSurpriseCardProps): React.JS
         <SparklesIcon size={16} color={t.accent} strokeWidth={2.2} />
       </View>
       <View style={styles.copy}>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           Surprise me
         </Text>
-        <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+        <Text style={[styles.body, { color: t.textMuted }]}>
           Spin to a country you have not opened yet.
         </Text>
       </View>
-      <Text allowFontScaling={false} style={[styles.cta, { color: t.accent }]}>
+      <Text style={[styles.cta, { color: t.accent }]}>
         Shuffle
       </Text>
     </PressableScale>

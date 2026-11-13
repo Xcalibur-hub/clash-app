@@ -27,7 +27,7 @@ export function RoomCastStrip({ leaders }: RoomCastStripProps): React.JSX.Elemen
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         ON THE FLOOR
       </Text>
       <ScrollView
@@ -44,10 +44,10 @@ export function RoomCastStrip({ leaders }: RoomCastStripProps): React.JSX.Elemen
             >
               <Avatar name={author.name} tint={author.avatarTint} size={28} />
               <View style={styles.copy}>
-                <Text allowFontScaling={false} style={[styles.role, { color: t.textMuted }]} numberOfLines={1}>
+                <Text style={[styles.role, { color: t.textMuted }]} numberOfLines={1}>
                   {ROLE_LABEL[leader.category]}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+                <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
                   @{author.handle || author.name}
                 </Text>
               </View>

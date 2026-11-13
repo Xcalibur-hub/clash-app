@@ -49,11 +49,11 @@ export const WorldDropsChapter = React.memo(function WorldDropsChapter({
       >
         <View style={styles.head}>
           <CompassIcon size={15} color="rgba(250,250,248,0.7)" strokeWidth={2.2} />
-          <Text allowFontScaling={false} style={styles.kicker}>
+          <Text style={styles.kicker}>
             HIDDEN IN THE WORLD
           </Text>
         </View>
-        <Text allowFontScaling={false} style={styles.count}>
+        <Text style={styles.count}>
           {hiddenChapterLine(items.length)}
         </Text>
         <View style={styles.artifacts}>
@@ -81,7 +81,7 @@ export const WorldDropsChapter = React.memo(function WorldDropsChapter({
             </View>
           ))}
         </View>
-        <Text allowFontScaling={false} style={styles.types} numberOfLines={1}>
+        <Text style={styles.types} numberOfLines={1}>
           {Array.from(new Set(items.map((item) => dropTypeLabel(item.type)))).join(' · ')}
         </Text>
         <View style={styles.action}>

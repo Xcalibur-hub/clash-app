@@ -61,13 +61,13 @@ export function OnboardSayDemo({ active }: { active: boolean }): React.JSX.Eleme
           cardStyle,
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.hood, { color: t.textMuted }]}>
+        <Text style={[styles.hood, { color: t.textMuted }]}>
           TECHTAKES
         </Text>
         <Text allowFontScaling style={[styles.take, { color: t.textPrimary }]}>
           “AI won't replace developers. Developers using AI will.”
         </Text>
-        <Text allowFontScaling={false} style={[styles.metaText, { color: t.textMuted }]}>
+        <Text style={[styles.metaText, { color: t.textMuted }]}>
           @maya · just now
         </Text>
       </Animated.View>
@@ -79,7 +79,7 @@ export function OnboardSayDemo({ active }: { active: boolean }): React.JSX.Eleme
           reactStyle,
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.reactText, { color: t.textSecondary }]}>
+        <Text style={[styles.reactText, { color: t.textSecondary }]}>
           12 people reacting · 3 ready to Clash
         </Text>
       </Animated.View>
@@ -131,7 +131,7 @@ export function OnboardChallengeDemo({ active }: { active: boolean }): React.JSX
           leftStyle,
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.sideLabel, { color: duel.a }]}>
+        <Text style={[styles.sideLabel, { color: duel.a }]}>
           A
         </Text>
         <Text allowFontScaling style={[styles.sideBody, { color: t.textPrimary }]}>
@@ -140,7 +140,7 @@ export function OnboardChallengeDemo({ active }: { active: boolean }): React.JSX
       </Animated.View>
 
       <Animated.View style={[styles.vsChip, { backgroundColor: t.clashFill }, vsStyle]}>
-        <Text allowFontScaling={false} style={[styles.vsText, { color: t.clashText }]}>
+        <Text style={[styles.vsText, { color: t.clashText }]}>
           VS
         </Text>
       </Animated.View>
@@ -152,7 +152,7 @@ export function OnboardChallengeDemo({ active }: { active: boolean }): React.JSX
           rightStyle,
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.sideLabel, { color: duel.b }]}>
+        <Text style={[styles.sideLabel, { color: duel.b }]}>
           B
         </Text>
         <Text allowFontScaling style={[styles.sideBody, { color: t.textPrimary }]}>
@@ -251,10 +251,10 @@ export function OnboardJudgeDemo({ active }: { active: boolean }): React.JSX.Ele
             aStyle,
           ]}
         >
-          <Text allowFontScaling={false} style={[styles.sideLabel, { color: duel.a }]}>
+          <Text style={[styles.sideLabel, { color: duel.a }]}>
             A
           </Text>
-          <Text allowFontScaling={false} style={[styles.judgeHint, { color: t.textSecondary }]}>
+          <Text style={[styles.judgeHint, { color: t.textSecondary }]}>
             Tap to judge
           </Text>
         </Animated.View>
@@ -268,10 +268,10 @@ export function OnboardJudgeDemo({ active }: { active: boolean }): React.JSX.Ele
             bStyle,
           ]}
         >
-          <Text allowFontScaling={false} style={[styles.sideLabel, { color: duel.b }]}>
+          <Text style={[styles.sideLabel, { color: duel.b }]}>
             B
           </Text>
-          <Text allowFontScaling={false} style={[styles.judgeHint, { color: t.textSecondary }]}>
+          <Text style={[styles.judgeHint, { color: t.textSecondary }]}>
             Tap to judge
           </Text>
         </Animated.View>
@@ -281,7 +281,7 @@ export function OnboardJudgeDemo({ active }: { active: boolean }): React.JSX.Ele
         <Animated.View style={[styles.verdict, verdictStyle]}>
           <View style={styles.bars}>
             <View style={styles.barCol}>
-              <Text allowFontScaling={false} style={[styles.pct, { color: duel.a }]}>
+              <Text style={[styles.pct, { color: duel.a }]}>
                 {pctA}%
               </Text>
               <View style={[styles.barTrack, { backgroundColor: t.surfaceMuted }]}>
@@ -289,7 +289,7 @@ export function OnboardJudgeDemo({ active }: { active: boolean }): React.JSX.Ele
               </View>
             </View>
             <View style={styles.barCol}>
-              <Text allowFontScaling={false} style={[styles.pct, { color: duel.b }]}>
+              <Text style={[styles.pct, { color: duel.b }]}>
                 {pctB}%
               </Text>
               <View style={[styles.barTrack, { backgroundColor: t.surfaceMuted }]}>
@@ -297,7 +297,7 @@ export function OnboardJudgeDemo({ active }: { active: boolean }): React.JSX.Ele
               </View>
             </View>
           </View>
-          <Text allowFontScaling={false} style={[styles.verdictLabel, { color: t.textPrimary }]}>
+          <Text style={[styles.verdictLabel, { color: t.textPrimary }]}>
             Side A holds up
           </Text>
         </Animated.View>

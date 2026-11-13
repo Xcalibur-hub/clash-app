@@ -107,14 +107,14 @@ export function TakeMedia({
         <View style={styles.play} pointerEvents="none">
           <PlayIcon size={20} color="#FAFAF8" strokeWidth={2.4} />
           {!showImage ? (
-            <Text allowFontScaling={false} style={styles.videoLabel}>
+            <Text style={styles.videoLabel}>
               VIDEO
             </Text>
           ) : null}
         </View>
       ) : null}
       {media.caption ? (
-        <Text allowFontScaling={false} style={[styles.caption, { color: detail ? t.textPrimary : '#FAFAF8' }]}>
+        <Text style={[styles.caption, { color: detail ? t.textPrimary : '#FAFAF8' }]}>
           {media.caption}
         </Text>
       ) : null}

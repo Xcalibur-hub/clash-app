@@ -93,7 +93,7 @@ export function PostActionsSheet({
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close menu" />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + space.md }]}>
-        <Text allowFontScaling={false} style={styles.title}>
+        <Text style={styles.title}>
           {reporting ? 'Report' : target.name}
         </Text>
         {reporting ? (
@@ -107,7 +107,7 @@ export function PostActionsSheet({
                 accessibilityLabel={`Report: ${reason.label}`}
                 style={styles.row}
               >
-                <Text allowFontScaling={false} style={styles.rowText}>
+                <Text style={styles.rowText}>
                   {reason.label}
                 </Text>
               </Pressable>
@@ -152,7 +152,7 @@ function Row({ label, onPress, danger = false, disabled = false }: { label: stri
       accessibilityLabel={label}
       style={styles.row}
     >
-      <Text allowFontScaling={false} style={[styles.rowText, danger && styles.danger]}>
+      <Text style={[styles.rowText, danger && styles.danger]}>
         {label}
       </Text>
     </Pressable>

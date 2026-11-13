@@ -46,14 +46,14 @@ function Toggle({
       style={[styles.toggle, { borderColor: t.border, opacity: disabled ? 0.5 : 1 }]}
     >
       <View style={styles.toggleCopy}>
-        <Text allowFontScaling={false} style={[styles.toggleLabel, { color: t.textPrimary }]}>
+        <Text style={[styles.toggleLabel, { color: t.textPrimary }]}>
           {label}
         </Text>
-        <Text allowFontScaling={false} style={[styles.toggleBody, { color: t.textMuted }]}>
+        <Text style={[styles.toggleBody, { color: t.textMuted }]}>
           {body}
         </Text>
       </View>
-      <Text allowFontScaling={false} style={[styles.toggleValue, { color: t.textPrimary }]}>
+      <Text style={[styles.toggleValue, { color: t.textPrimary }]}>
         {value ? 'ON' : 'OFF'}
       </Text>
     </Pressable>
@@ -116,18 +116,18 @@ export function DigitalCreatorConnectSheet({
       <View style={styles.backdrop}>
         <View style={[styles.sheet, { backgroundColor: t.background, borderColor: t.border }]}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+            <Text style={[styles.kicker, { color: t.textMuted }]}>
               DIGITAL VERSION
             </Text>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Connect your authorized model
             </Text>
-            <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+            <Text style={[styles.body, { color: t.textSecondary }]}>
               CLASH never trains or clones a likeness. You authorize an avatar or voice with a
               provider you own, then paste that reference here. No provider key ever touches CLASH.
             </Text>
 
-            <Text allowFontScaling={false} style={[styles.fieldLabel, { color: t.textMuted }]}>
+            <Text style={[styles.fieldLabel, { color: t.textMuted }]}>
               PROVIDER
             </Text>
             <TextInput
@@ -140,7 +140,7 @@ export function DigitalCreatorConnectSheet({
               style={inputStyle}
             />
 
-            <Text allowFontScaling={false} style={[styles.fieldLabel, { color: t.textMuted }]}>
+            <Text style={[styles.fieldLabel, { color: t.textMuted }]}>
               MODEL REFERENCE
             </Text>
             <TextInput
@@ -153,7 +153,7 @@ export function DigitalCreatorConnectSheet({
               style={inputStyle}
             />
 
-            <Text allowFontScaling={false} style={[styles.fieldLabel, { color: t.textMuted }]}>
+            <Text style={[styles.fieldLabel, { color: t.textMuted }]}>
               VOICE REFERENCE (OPTIONAL)
             </Text>
             <TextInput
@@ -166,7 +166,7 @@ export function DigitalCreatorConnectSheet({
               style={inputStyle}
             />
 
-            <Text allowFontScaling={false} style={[styles.fieldLabel, { color: t.textMuted }]}>
+            <Text style={[styles.fieldLabel, { color: t.textMuted }]}>
               DIGITAL NAME
             </Text>
             <TextInput
@@ -212,10 +212,10 @@ export function DigitalCreatorConnectSheet({
               accessibilityLabel="Likeness and voice rights confirmation"
               style={[styles.consent, { borderColor: t.border }]}
             >
-              <Text allowFontScaling={false} style={[styles.consentMark, { color: t.textPrimary }]}>
+              <Text style={[styles.consentMark, { color: t.textPrimary }]}>
                 {consent ? '[x]' : '[ ]'}
               </Text>
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+              <Text style={[styles.body, { color: t.textSecondary }]}>
                 {likenessConsentCopy()}
               </Text>
             </Pressable>

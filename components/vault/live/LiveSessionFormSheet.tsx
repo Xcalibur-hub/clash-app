@@ -53,7 +53,7 @@ function PermissionChip({
         },
       ]}
     >
-      <Text allowFontScaling={false} style={[styles.chipLabel, { color: t.textPrimary }]}>
+      <Text style={[styles.chipLabel, { color: t.textPrimary }]}>
         {on ? `✓ ${label}` : label}
       </Text>
     </Pressable>
@@ -114,7 +114,7 @@ export function LiveSessionFormSheet({
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close">
         <Pressable style={[styles.sheet, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Go live
             </Text>
             <TextInput
@@ -156,7 +156,7 @@ export function LiveSessionFormSheet({
 
 
             <View style={styles.perms}>
-              <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+              <Text style={[styles.label, { color: t.textMuted }]}>
                 WHAT THEY CAN DO
               </Text>
               <View style={styles.chips}>
@@ -196,7 +196,7 @@ export function LiveSessionFormSheet({
                 style={inputStyle}
               />
             ) : (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              <Text style={[styles.hint, { color: t.textMuted }]}>
                 No provider attached yet: the room shows the cover as a standby feed.
               </Text>
             )}

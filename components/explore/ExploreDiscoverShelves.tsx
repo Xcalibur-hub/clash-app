@@ -91,7 +91,7 @@ export function ExploreDiscoverShelves({
             accessibilityLabel="See all live activity"
             style={styles.action}
           >
-            <Text allowFontScaling={false} style={[styles.actionText, { color: t.textMuted }]}>
+            <Text style={[styles.actionText, { color: t.textMuted }]}>
               SEE ALL
             </Text>
           </Pressable>

@@ -24,17 +24,17 @@ export const SeriesComposition = React.memo(function SeriesComposition({
     <View style={styles.stack}>
       {collections.map((collection) => (
         <View key={collection.id} style={styles.series}>
-          <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          <Text style={[styles.kicker, { color: t.textMuted }]}>
             SERIES
           </Text>
           <Text
-            allowFontScaling={false}
+           
             style={[styles.title, { color: t.textPrimary }]}
             numberOfLines={2}
           >
             {collection.title}
           </Text>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text style={[styles.meta, { color: t.textMuted }]}>
             {`${collection.count} episode${collection.count === 1 ? '' : 's'}`}
           </Text>
           <PosterStrip
@@ -51,7 +51,7 @@ export const SeriesComposition = React.memo(function SeriesComposition({
           />
           {collection.description ? (
             <Text
-              allowFontScaling={false}
+             
               style={[styles.desc, { color: t.textSecondary }]}
               numberOfLines={2}
             >

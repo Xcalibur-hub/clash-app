@@ -80,13 +80,13 @@ export function LiveStage({
               style={styles.dot}
             />
           ) : null}
-          <Text allowFontScaling={false} style={styles.badgeLabel}>
+          <Text style={styles.badgeLabel}>
             {liveStatusLabel(session.status)}
           </Text>
         </View>
         {session.access === 'SUBSCRIBER' ? (
           <View style={[styles.accessChip, { borderColor: 'rgba(255,255,255,0.35)' }]}>
-            <Text allowFontScaling={false} style={styles.badgeLabel}>
+            <Text style={styles.badgeLabel}>
               MEMBERS
             </Text>
           </View>
@@ -94,10 +94,10 @@ export function LiveStage({
       </View>
 
       <View style={styles.bottom}>
-        <Text allowFontScaling={false} style={styles.creator} numberOfLines={1}>
+        <Text style={styles.creator} numberOfLines={1}>
           {session.creatorName ?? 'Creator'}
         </Text>
-        <Text allowFontScaling={false} style={styles.meta} numberOfLines={1}>
+        <Text style={styles.meta} numberOfLines={1}>
           {[isLive ? watchingLabel(watching) : source.note, session.creatorHandle ? `@${session.creatorHandle}` : null]
             .filter(Boolean)
             .join(' · ')}

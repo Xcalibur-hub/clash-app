@@ -137,14 +137,14 @@ export function DropComposer(): React.JSX.Element {
         ]}
       >
         <VaultActionButton label="Back" tone="quiet" compact onPress={() => router.back()} style={styles.back} />
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           YOUR VAULT
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           New Drop
         </Text>
 
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+        <Text style={[styles.label, { color: t.textMuted }]}>
           Access
         </Text>
         <View style={styles.segment} accessibilityRole="radiogroup" accessibilityLabel="Drop access level">
@@ -176,7 +176,7 @@ export function DropComposer(): React.JSX.Element {
                   strokeWidth={2.4}
                 />
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[
                     styles.segmentLabel,
                     {
@@ -194,13 +194,13 @@ export function DropComposer(): React.JSX.Element {
             );
           })}
         </View>
-        <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+        <Text style={[styles.hint, { color: t.textMuted }]}>
           {accessLevel === 'free'
             ? 'Anyone can open this Drop. It disappears after 7 days.'
             : 'Only entitled subscribers can open this. Private media stays private.'}
         </Text>
 
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+        <Text style={[styles.label, { color: t.textMuted }]}>
           Caption
         </Text>
         <TextInput
@@ -220,11 +220,11 @@ export function DropComposer(): React.JSX.Element {
             },
           ]}
         />
-        <Text allowFontScaling={false} style={[styles.counter, { color: t.textMuted }]}>
+        <Text style={[styles.counter, { color: t.textMuted }]}>
           {caption.length}/{MAX_CAPTION}
         </Text>
 
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+        <Text style={[styles.label, { color: t.textMuted }]}>
           Media
         </Text>
         {media ? (
@@ -236,7 +236,7 @@ export function DropComposer(): React.JSX.Element {
               accessibilityLabel="Remove media"
               style={[styles.removeMedia, { backgroundColor: 'rgba(9,9,11,0.7)' }]}
             >
-              <Text allowFontScaling={false} style={styles.removeMediaText}>
+              <Text style={styles.removeMediaText}>
                 Remove
               </Text>
             </Pressable>

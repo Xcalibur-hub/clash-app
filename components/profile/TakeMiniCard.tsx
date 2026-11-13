@@ -26,10 +26,10 @@ export function TakeMiniCard({ take, now, onPress }: TakeMiniCardProps): React.J
       accessibilityHint="Opens the clash on this take"
       style={[styles.row, { borderBottomColor: t.border }]}
     >
-      <Text allowFontScaling={false} style={[styles.text, { color: t.textPrimary }]} numberOfLines={3}>
+      <Text style={[styles.text, { color: t.textPrimary }]} numberOfLines={3}>
         {take.text}
       </Text>
-      <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+      <Text style={[styles.meta, { color: t.textMuted }]}>
         {[
           HOOD_LABEL[take.hood],
           timeLeftLabel(take.expiresAt, now),

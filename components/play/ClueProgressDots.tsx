@@ -30,7 +30,7 @@ export function ClueProgressDots({
           );
         })}
       </View>
-      <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+      <Text style={[styles.label, { color: t.textMuted }]}>
         {solved} / {total} clues solved
       </Text>
     </View>

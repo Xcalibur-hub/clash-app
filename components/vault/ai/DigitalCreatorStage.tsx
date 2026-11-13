@@ -67,17 +67,17 @@ export function DigitalCreatorStage({
 
       <View style={styles.overlayTop}>
         <View style={[styles.plate, { backgroundColor: t.surface, borderColor: t.border }]}>
-          <Text allowFontScaling={false} style={[styles.plateText, { color: t.textPrimary }]}>
+          <Text style={[styles.plateText, { color: t.textPrimary }]}>
             {copy.kicker}
           </Text>
         </View>
       </View>
 
       <View style={styles.overlayBottom}>
-        <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
+        <Text style={[styles.headline, { color: t.textPrimary }]}>
           {copy.headline.toUpperCase()}
         </Text>
-        <Text allowFontScaling={false} style={[styles.note, { color: t.textSecondary }]}>
+        <Text style={[styles.note, { color: t.textSecondary }]}>
           {copy.note}
         </Text>
         {busy ? (
@@ -86,7 +86,7 @@ export function DigitalCreatorStage({
           </View>
         ) : null}
         {audioUrl ? (
-          <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+          <Text style={[styles.note, { color: t.textMuted }]}>
             Speaking now.
           </Text>
         ) : null}

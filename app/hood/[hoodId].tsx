@@ -258,7 +258,7 @@ export default function HoodScreen(): React.JSX.Element {
               <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} style={styles.backBtn}>
                 <BackIcon size={20} color={ink.primary} />
               </Pressable>
-              <Text allowFontScaling={false} style={styles.eyebrow}>HOOD</Text>
+              <Text style={styles.eyebrow}>HOOD</Text>
               <View style={styles.slot} />
             </View>
             <HoodHeader
@@ -273,7 +273,7 @@ export default function HoodScreen(): React.JSX.Element {
             {(activeGame || isModerator) ? (
               <View style={styles.play}>
                 <View style={styles.playHead}>
-                  <Text allowFontScaling={false} style={styles.playEyebrow}>PLAY</Text>
+                  <Text style={styles.playEyebrow}>PLAY</Text>
                   {isModerator ? (
                     <Pressable
                       onPress={() => {
@@ -285,7 +285,7 @@ export default function HoodScreen(): React.JSX.Element {
                       accessibilityLabel="Create Prediction"
                       hitSlop={8}
                     >
-                      <Text allowFontScaling={false} style={styles.createLink}>Create Prediction</Text>
+                      <Text style={styles.createLink}>Create Prediction</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -299,7 +299,7 @@ export default function HoodScreen(): React.JSX.Element {
                     onOpen={() => router.push(`/hood/game/${activeGame.id}`)}
                   />
                 ) : (
-                  <Text allowFontScaling={false} style={styles.playEmpty}>
+                  <Text style={styles.playEmpty}>
                     No live prediction yet.
                   </Text>
                 )}

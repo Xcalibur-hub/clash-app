@@ -104,16 +104,16 @@ export function WorldDropsStudio(): React.JSX.Element {
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+      <Text style={[styles.section, { color: t.textMuted }]}>
         WORLD DROPS
       </Text>
-      <Text allowFontScaling={false} style={[styles.blurb, { color: t.textSecondary }]}>
+      <Text style={[styles.blurb, { color: t.textSecondary }]}>
         Hide something in CLASH World. Fans discover it, claim it, and the reward leads back here.
       </Text>
       <VaultActionButton label="Place a World Drop" onPress={() => setFormOpen(true)} />
 
       {drops.length === 0 ? (
-        <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+        <Text style={[styles.empty, { color: t.textMuted }]}>
           Nothing hidden yet.
         </Text>
       ) : (
@@ -122,11 +122,11 @@ export function WorldDropsStudio(): React.JSX.Element {
             <View key={drop.id} style={[styles.row, { borderColor: t.border, backgroundColor: t.surface }]}>
               <View style={styles.rowHead}>
                 <WorldIcon size={15} color={t.textSecondary} strokeWidth={2.2} />
-                <Text allowFontScaling={false} style={[styles.rowTitle, { color: t.textPrimary }]} numberOfLines={1}>
+                <Text style={[styles.rowTitle, { color: t.textPrimary }]} numberOfLines={1}>
                   {drop.caption}
                 </Text>
               </View>
-              <Text allowFontScaling={false} style={[styles.rowMeta, { color: t.textMuted }]} numberOfLines={1}>
+              <Text style={[styles.rowMeta, { color: t.textMuted }]} numberOfLines={1}>
                 {[
                   dropTypeLabel(drop.dropType),
                   rewardTypeLabel(drop.rewardType),

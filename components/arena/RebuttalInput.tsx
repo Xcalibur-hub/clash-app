@@ -293,7 +293,7 @@ export function RebuttalInput({
             hitSlop={8}
             style={{ minHeight: arena.hit, justifyContent: 'center' }}
           >
-            <Text allowFontScaling={false} style={[styles.cancel, { color: t.textSecondary }]}>
+            <Text style={[styles.cancel, { color: t.textSecondary }]}>
               Cancel
             </Text>
           </Pressable>

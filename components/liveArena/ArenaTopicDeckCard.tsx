@@ -141,26 +141,26 @@ export function ArenaTopicDeckCard({
         <View style={[styles.accentStrip, { backgroundColor: accent.ink }]} />
         <View style={styles.peekHead}>
           {closed ? (
-            <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
+            <Text style={[styles.metaCaps, { color: t.textMuted }]}>
               Closed
             </Text>
           ) : (
             <LivePulse size={6} color={accent.ink} />
           )}
           {hood ? (
-            <Text allowFontScaling={false} style={[styles.metaCaps, { color: accent.ink }]}>
+            <Text style={[styles.metaCaps, { color: accent.ink }]}>
               · {hood}
             </Text>
           ) : null}
         </View>
         <Text
-          allowFontScaling={false}
+         
           numberOfLines={3}
           style={[styles.peekTitle, { color: t.textPrimary }]}
         >
           {topic.title}
         </Text>
-        <Text allowFontScaling={false} style={[styles.peekMeta, { color: t.textSecondary }]}>
+        <Text style={[styles.peekMeta, { color: t.textSecondary }]}>
           {plural(topic.participantCount, 'arguing now', 'arguing now')}
         </Text>
       </Pressable>
@@ -199,7 +199,7 @@ export function ArenaTopicDeckCard({
         <View style={styles.activeHead}>
           <View style={styles.peekHead}>
             {closed ? (
-              <Text allowFontScaling={false} style={[styles.metaCaps, { color: t.textMuted }]}>
+              <Text style={[styles.metaCaps, { color: t.textMuted }]}>
                 Closed
               </Text>
             ) : (
@@ -207,13 +207,13 @@ export function ArenaTopicDeckCard({
             )}
             {hood ? (
               <View style={[styles.hoodChip, { backgroundColor: accent.soft }]}>
-                <Text allowFontScaling={false} style={[styles.hoodChipText, { color: accent.ink }]}>
+                <Text style={[styles.hoodChipText, { color: accent.ink }]}>
                   {hood}
                 </Text>
               </View>
             ) : null}
           </View>
-          <Text allowFontScaling={false} style={[styles.timeMeta, { color: t.textSecondary }]}>
+          <Text style={[styles.timeMeta, { color: t.textSecondary }]}>
             {closed
               ? phaseLabel(topic.phase)
               : topic.phase === 'final_arguments'
@@ -224,7 +224,7 @@ export function ArenaTopicDeckCard({
 
         <Animated.View entering={reduced ? undefined : FadeIn.delay(180).duration(320)}>
           <Text
-            allowFontScaling={false}
+           
             numberOfLines={3}
             style={[styles.activeTitle, { color: t.textPrimary }]}
           >
@@ -272,7 +272,7 @@ export function ArenaTopicDeckCard({
               ))}
             </View>
           ) : null}
-          <Text allowFontScaling={false} style={[styles.participant, { color: t.textSecondary }]}>
+          <Text style={[styles.participant, { color: t.textSecondary }]}>
             {plural(topic.participantCount, 'in the fight', 'in the fight')}
           </Text>
         </View>
@@ -283,7 +283,7 @@ export function ArenaTopicDeckCard({
           ) : isDebater ? (
             <View style={styles.joinedBlock}>
               {stance ? (
-                <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
+                <Text style={[styles.youStance, { color: t.textMuted }]}>
                   You · {STANCE_LABEL[stance]} · Fighter
                 </Text>
               ) : null}
@@ -291,7 +291,7 @@ export function ArenaTopicDeckCard({
             </View>
           ) : isSpectator ? (
             <View style={styles.joinedBlock}>
-              <Text allowFontScaling={false} style={[styles.youStance, { color: t.textMuted }]}>
+              <Text style={[styles.youStance, { color: t.textMuted }]}>
                 Watcher
               </Text>
               <PrimaryButton label="WATCH CLASH" onPress={onEnter} />
@@ -299,7 +299,7 @@ export function ArenaTopicDeckCard({
             </View>
           ) : canJoin ? (
             <View style={styles.gate}>
-              <Text allowFontScaling={false} style={[styles.gateHint, { color: t.textMuted }]}>
+              <Text style={[styles.gateHint, { color: t.textMuted }]}>
                 Pick a side to fight · or just watch
               </Text>
               <View style={[styles.stanceRow, { backgroundColor: softFill(t) }]}>
@@ -319,7 +319,7 @@ export function ArenaTopicDeckCard({
                 hitSlop={10}
                 style={styles.watchLink}
               >
-                <Text allowFontScaling={false} style={[styles.watchText, { color: accent.ink }]}>
+                <Text style={[styles.watchText, { color: accent.ink }]}>
                   WATCH CLASH →
                 </Text>
               </Pressable>
@@ -456,7 +456,7 @@ function PrimaryButton({ label, onPress }: { label: string; onPress: () => void 
       accessibilityLabel={label}
       style={[styles.primary, { backgroundColor: t.pill }]}
     >
-      <Text allowFontScaling={false} style={[styles.primaryText, { color: t.pillText }]}>
+      <Text style={[styles.primaryText, { color: t.pillText }]}>
         {label}
       </Text>
     </PressableScale>
@@ -481,7 +481,7 @@ function SecondaryButton({
       accessibilityLabel={label}
       style={[styles.secondary, { borderColor: t.borderStrong }]}
     >
-      <Text allowFontScaling={false} style={[styles.secondaryText, { color: t.textPrimary }]}>
+      <Text style={[styles.secondaryText, { color: t.textPrimary }]}>
         {label}
       </Text>
     </PressableScale>
@@ -506,7 +506,7 @@ function StancePill({
       accessibilityLabel={label}
       style={styles.stancePill}
     >
-      <Text allowFontScaling={false} style={[styles.stancePillText, { color: t.textPrimary }]}>
+      <Text style={[styles.stancePillText, { color: t.textPrimary }]}>
         {label}
       </Text>
     </PressableScale>

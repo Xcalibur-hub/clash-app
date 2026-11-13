@@ -36,17 +36,17 @@ export function WorldSection(): React.JSX.Element {
           <WorldIcon size={20} color={t.textPrimary} strokeWidth={2.2} />
         </View>
         <View style={styles.copy}>
-          <Text allowFontScaling={false} style={[styles.kicker, { color: t.accent }]}>
+          <Text style={[styles.kicker, { color: t.accent }]}>
             MISSIONS
           </Text>
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             This week’s missions
           </Text>
-          <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+          <Text style={[styles.body, { color: t.textMuted }]}>
             Post a photo around an approximate area. No live tracking.
           </Text>
         </View>
-        <Text allowFontScaling={false} style={[styles.cta, { color: t.textSecondary }]}>
+        <Text style={[styles.cta, { color: t.textSecondary }]}>
           Explore →
         </Text>
       </PressableScale>

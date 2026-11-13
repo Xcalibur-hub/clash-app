@@ -47,7 +47,7 @@ export function ArenaTopicDeckPagination({
 
   return (
     <Text
-      allowFontScaling={false}
+     
       style={[styles.count, { color: t.textMuted }]}
       accessibilityLabel={`Topic ${index + 1} of ${total}`}
     >

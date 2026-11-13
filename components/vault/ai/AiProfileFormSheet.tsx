@@ -61,10 +61,10 @@ export function AiProfileFormSheet({
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close">
         <Pressable style={[styles.sheet, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Your AI
             </Text>
-            <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+            <Text style={[styles.hint, { color: t.textMuted }]}>
               Name it as an AI — for example “Maya AI”. It may never claim to be you.
             </Text>
             <TextInput
@@ -111,7 +111,7 @@ export function AiProfileFormSheet({
             />
 
             <View style={styles.starters}>
-              <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+              <Text style={[styles.label, { color: t.textMuted }]}>
                 SUGGESTED PROMPTS
               </Text>
               {starters.map((starter, index) => (

@@ -166,7 +166,7 @@ export default function CreatorAiScreen(): React.JSX.Element {
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
-            <Text allowFontScaling={false} style={[styles.back, { color: t.textMuted }]}>
+            <Text style={[styles.back, { color: t.textMuted }]}>
               ← Back
             </Text>
           </Pressable>
@@ -177,7 +177,7 @@ export default function CreatorAiScreen(): React.JSX.Element {
               accessibilityRole="button"
               accessibilityLabel="Open the creator world"
             >
-              <Text allowFontScaling={false} style={[styles.back, { color: t.textMuted }]}>
+              <Text style={[styles.back, { color: t.textMuted }]}>
                 Their world
               </Text>
             </Pressable>
@@ -191,10 +191,10 @@ export default function CreatorAiScreen(): React.JSX.Element {
             <View style={[styles.art, { backgroundColor: profile.creatorTint ?? t.surfaceMuted }]} />
           )}
           <View style={styles.lockupCopy}>
-            <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
+            <Text style={[styles.name, { color: t.textPrimary }]}>
               {profile.displayName}
             </Text>
-            <Text allowFontScaling={false} style={[styles.access, { color: t.textMuted }]}>
+            <Text style={[styles.access, { color: t.textMuted }]}>
               {profile.access === 'SUBSCRIBER' ? 'MEMBERS ONLY' : 'OPEN TO EVERYONE'}
             </Text>
           </View>
@@ -205,10 +205,10 @@ export default function CreatorAiScreen(): React.JSX.Element {
 
         {profile.welcomeMessage.length > 0 ? (
           <View style={[styles.welcome, { borderColor: t.border }]}>
-            <Text allowFontScaling={false} style={[styles.welcomeLabel, { color: t.textMuted }]}>
+            <Text style={[styles.welcomeLabel, { color: t.textMuted }]}>
               WELCOME NOTE · WRITTEN BY {aiDisclosureLabel(profile.creatorName).replace('AI VERSION OF ', '')}
             </Text>
-            <Text allowFontScaling={false} style={[styles.welcomeBody, { color: t.textSecondary }]}>
+            <Text style={[styles.welcomeBody, { color: t.textSecondary }]}>
               {profile.welcomeMessage}
             </Text>
           </View>
@@ -221,7 +221,7 @@ export default function CreatorAiScreen(): React.JSX.Element {
             accessibilityRole="button"
             accessibilityLabel="Load older messages"
           >
-            <Text allowFontScaling={false} style={[styles.more, { color: t.textMuted }]}>
+            <Text style={[styles.more, { color: t.textMuted }]}>
               {ai.loadingOlder ? 'Loading…' : 'Load older messages'}
             </Text>
           </Pressable>
@@ -236,7 +236,7 @@ export default function CreatorAiScreen(): React.JSX.Element {
         ))}
 
         {!gating.canChat ? (
-          <Text allowFontScaling={false} style={[styles.quiet, { color: t.textMuted }]}>
+          <Text style={[styles.quiet, { color: t.textMuted }]}>
             {gating.isOwner
               ? 'This is your own AI room. Use Preview in Studio.'
               : gating.enabled

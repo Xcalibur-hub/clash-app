@@ -113,7 +113,7 @@ export function LiveRoomHeader({
           <BackIcon size={20} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
         <Text
-          allowFontScaling={false}
+         
           numberOfLines={2}
           style={[styles.title, { color: t.textPrimary }]}
         >
@@ -123,7 +123,7 @@ export function LiveRoomHeader({
 
       <View style={styles.metaRow}>
         {live ? <LivePulse /> : null}
-        <Text allowFontScaling={false} style={[styles.liveLine, { color: t.textSecondary }]}>
+        <Text style={[styles.liveLine, { color: t.textSecondary }]}>
           {live ? 'LIVE' : room.status === 'SETTLED' ? 'DECIDED' : 'ROOM'}
           {roomIndex != null ? ` · Room ${roomIndex}` : ''}
           {` · ${crowdLine}`}
@@ -135,7 +135,7 @@ export function LiveRoomHeader({
             accessibilityRole="text"
             accessibilityLabel={`Your role: ${roleLine}`}
           >
-            <Text allowFontScaling={false} style={[styles.roleChipText, { color: t.textSecondary }]}>
+            <Text style={[styles.roleChipText, { color: t.textSecondary }]}>
               {roleLine}
             </Text>
           </View>
@@ -151,7 +151,7 @@ export function LiveRoomHeader({
             accessibilityLabel="Open Room Pulse"
             style={[styles.pulseBtn, { borderColor: t.borderStrong, backgroundColor: t.surfaceElevated }]}
           >
-            <Text allowFontScaling={false} style={[styles.pulseBtnText, { color: t.textPrimary }]}>
+            <Text style={[styles.pulseBtnText, { color: t.textPrimary }]}>
               PULSE
             </Text>
             <View style={[styles.pulseDot, { backgroundColor: t.textPrimary }]} />

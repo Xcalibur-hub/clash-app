@@ -54,10 +54,10 @@ export function CrewDiscoveryRow({ crew, onPress, rising }: CrewDiscoveryRowProp
           size={48}
         />
         <View style={styles.meta}>
-          <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+          <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
             {crew.name}
           </Text>
-          <Text allowFontScaling={false} style={[styles.sub, { color: t.textMuted }]} numberOfLines={1}>
+          <Text style={[styles.sub, { color: t.textMuted }]} numberOfLines={1}>
             {specialty}
             {' · '}
             {formatCrewMembers(crew.memberCount)}
@@ -66,7 +66,7 @@ export function CrewDiscoveryRow({ crew, onPress, rising }: CrewDiscoveryRowProp
           </Text>
         </View>
         {crew.streak >= 2 ? (
-          <Text allowFontScaling={false} style={[styles.streak, { color: accent.ink }]}>
+          <Text style={[styles.streak, { color: accent.ink }]}>
             {crew.streak} streak
           </Text>
         ) : null}
@@ -108,13 +108,13 @@ export function CrewFeatured({ crew, onPress }: CrewFeaturedProps): React.JSX.El
           size={72}
         />
         <View style={styles.featuredMeta}>
-          <Text allowFontScaling={false} style={[styles.featuredEyebrow, { color: accent.ink }]}>
+          <Text style={[styles.featuredEyebrow, { color: accent.ink }]}>
             MAKE YOUR CREW FAMOUS
           </Text>
-          <Text allowFontScaling={false} style={[styles.featuredName, { color: t.textPrimary }]} numberOfLines={1}>
+          <Text style={[styles.featuredName, { color: t.textPrimary }]} numberOfLines={1}>
             {crew.name}
           </Text>
-          <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]} numberOfLines={2}>
+          <Text style={[styles.sub, { color: t.textSecondary }]} numberOfLines={2}>
             {crew.bio.trim() || `${specialty} Crew · ${formatCrewMembers(crew.memberCount)}`}
           </Text>
         </View>

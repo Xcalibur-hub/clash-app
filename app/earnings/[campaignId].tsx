@@ -148,13 +148,13 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
           <StatusPill label={campaign.campaignStatus} tone={statusTone(campaign.campaignStatus)} />
         </View>
 
-        <Text allowFontScaling={false} style={[styles.brand, { color: t.textMuted }]}>
+        <Text style={[styles.brand, { color: t.textMuted }]}>
           {campaign.advertiserName}
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={3}>
+        <Text style={[styles.title, { color: t.textPrimary }]} numberOfLines={3}>
           {campaign.campaignTitle}
         </Text>
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textSecondary }]}>
+        <Text style={[styles.meta, { color: t.textSecondary }]}>
           {formatCampaignPeriod(campaign.startsAt, campaign.endsAt)} ·{' '}
           {formatCommissionLabel(
             campaign.commissionType,
@@ -164,7 +164,7 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
         </Text>
 
         {error ? (
-          <Text allowFontScaling={false} style={[styles.error, { color: t.textSecondary }]}>
+          <Text style={[styles.error, { color: t.textSecondary }]}>
             {error}
           </Text>
         ) : null}
@@ -186,7 +186,7 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
             />
           </View>
           {(campaign.rejectedCommissionMinor > 0 || campaign.voidCommissionMinor > 0) ? (
-            <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+            <Text style={[styles.note, { color: t.textMuted }]}>
               {campaign.rejectedCommissionMinor > 0
                 ? `${formatMinorCurrency(campaign.rejectedCommissionMinor, campaign.currency)} rejected`
                 : ''}
@@ -196,27 +196,27 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
                 : ''}
             </Text>
           ) : null}
-          <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+          <Text style={[styles.note, { color: t.textMuted }]}>
             Payments are not enabled yet.
           </Text>
         </StudioSection>
 
         <StudioSection title="Referral links">
           {links.length === 0 ? (
-            <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+            <Text style={[styles.note, { color: t.textMuted }]}>
               No referral links yet. Your brand partner can generate one for you.
             </Text>
           ) : (
             links.map((link) => (
               <View key={link.id} style={[styles.asset, { borderColor: t.border }]}>
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.assetTitle, { color: t.textPrimary }]}
                   numberOfLines={2}
                 >
                   {link.shareUrl}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.assetMeta, { color: t.textMuted }]}>
+                <Text style={[styles.assetMeta, { color: t.textMuted }]}>
                   {link.status}
                 </Text>
                 <View style={styles.assetActions}>
@@ -250,16 +250,16 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
 
         <StudioSection title="Coupon codes">
           {coupons.length === 0 ? (
-            <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+            <Text style={[styles.note, { color: t.textMuted }]}>
               No coupon codes assigned to you for this campaign.
             </Text>
           ) : (
             coupons.map((c) => (
               <View key={c.id} style={[styles.asset, { borderColor: t.border }]}>
-                <Text allowFontScaling={false} style={[styles.couponCode, { color: t.textPrimary }]}>
+                <Text style={[styles.couponCode, { color: t.textPrimary }]}>
                   {c.code}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.assetMeta, { color: t.textMuted }]}>
+                <Text style={[styles.assetMeta, { color: t.textMuted }]}>
                   {c.status}
                   {c.maxRedemptions != null
                     ? ` · ${c.redemptionCount} / ${c.maxRedemptions} redemptions`
@@ -305,10 +305,10 @@ function Stat({ label, value }: { label: string; value: string }): React.JSX.Ele
   const t = useThemeColors();
   return (
     <View style={[styles.stat, { borderColor: t.border }]}>
-      <Text allowFontScaling={false} style={[styles.statValue, { color: t.textPrimary }]}>
+      <Text style={[styles.statValue, { color: t.textPrimary }]}>
         {value}
       </Text>
-      <Text allowFontScaling={false} style={[styles.statLabel, { color: t.textMuted }]}>
+      <Text style={[styles.statLabel, { color: t.textMuted }]}>
         {label}
       </Text>
     </View>

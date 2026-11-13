@@ -196,7 +196,7 @@ export function LiveRoomComposer({
   if (disabled) {
     return (
       <View style={[styles.closed, { backgroundColor: t.surfaceElevated, borderColor: t.border, borderWidth: StyleSheet.hairlineWidth }]}>
-        <Text allowFontScaling={false} style={[styles.closedText, { color: t.textMuted }]}>
+        <Text style={[styles.closedText, { color: t.textMuted }]}>
           {disabledReason ?? 'This room is no longer accepting arguments.'}
         </Text>
       </View>
@@ -207,7 +207,7 @@ export function LiveRoomComposer({
     <View style={[styles.wrap, duelChrome && styles.wrapDuel]}>
       {replyingTo ? (
         <View style={styles.replyRow}>
-          <Text allowFontScaling={false} style={[styles.replyLabel, { color: t.textMuted }]}>
+          <Text style={[styles.replyLabel, { color: t.textMuted }]}>
             Replying to {replyingTo}
           </Text>
           <Pressable
@@ -220,7 +220,7 @@ export function LiveRoomComposer({
             accessibilityRole="button"
             accessibilityLabel="Cancel reply"
           >
-            <Text allowFontScaling={false} style={[styles.cancel, { color: t.textSecondary }]}>
+            <Text style={[styles.cancel, { color: t.textSecondary }]}>
               Cancel
             </Text>
           </Pressable>
@@ -340,7 +340,7 @@ export function LiveRoomComposer({
               accessibilityLabel="Add proof"
               style={[styles.proof, { borderColor: t.border }]}
             >
-              <Text allowFontScaling={false} style={[styles.proofText, { color: t.textSecondary }]}>
+              <Text style={[styles.proofText, { color: t.textSecondary }]}>
                 Add Proof
               </Text>
             </Pressable>
@@ -351,7 +351,7 @@ export function LiveRoomComposer({
               <ActivityIndicator size="small" color={t.textMuted} />
             ) : (
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.count, { color: remaining <= 40 ? t.accent : t.textMuted }]}
               >
                 {remaining}
@@ -364,7 +364,7 @@ export function LiveRoomComposer({
               accessibilityLabel="Send argument"
               style={[styles.send, { backgroundColor: t.pill }, !canSend && styles.off]}
             >
-              <Text allowFontScaling={false} style={[styles.sendText, { color: t.pillText }]}>
+              <Text style={[styles.sendText, { color: t.pillText }]}>
                 ↑
               </Text>
             </Pressable>

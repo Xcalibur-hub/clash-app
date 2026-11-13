@@ -50,10 +50,10 @@ export function LiveRoomJudgingPanel({
   if (!viewer) {
     return (
       <View style={[styles.panel, { backgroundColor: t.surface, borderColor: t.border }]}>
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           JUDGING
         </Text>
-        <Text allowFontScaling={false} style={[styles.note, { color: t.textSecondary }]}>
+        <Text style={[styles.note, { color: t.textSecondary }]}>
           This room is being judged by the people who argued in it.
         </Text>
       </View>
@@ -72,34 +72,34 @@ export function LiveRoomJudgingPanel({
       ]}
     >
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           JUDGE THIS CLASH
         </Text>
         {room.secondsRemaining > 0 ? (
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textPrimary }]}>
+          <Text style={[styles.meta, { color: t.textPrimary }]}>
             {secondsLabel(room.secondsRemaining)} left
           </Text>
         ) : null}
       </View>
 
-      <Text allowFontScaling={false} style={[styles.ceremony, { color: t.textPrimary }]}>
+      <Text style={[styles.ceremony, { color: t.textPrimary }]}>
         Who made the better case?
       </Text>
-      <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+      <Text style={[styles.note, { color: t.textMuted }]}>
         This is judgement — not a reaction. Ballots stay private until the room settles.
       </Text>
 
       {!isDebater ? (
-        <Text allowFontScaling={false} style={[styles.note, { color: t.textSecondary }]}>
+        <Text style={[styles.note, { color: t.textSecondary }]}>
           Only fighters vote in this room. Keep watching the ceremony.
         </Text>
       ) : (
         <>
-          <Text allowFontScaling={false} style={[styles.question, { color: t.textPrimary }]}>
+          <Text style={[styles.question, { color: t.textPrimary }]}>
             WHO COOKED?
           </Text>
           {hasSideVote ? (
-            <Text allowFontScaling={false} style={[styles.recorded, { color: t.textMuted }]}>
+            <Text style={[styles.recorded, { color: t.textMuted }]}>
               Your judgement is in. Results open when the room settles.
             </Text>
           ) : (
@@ -125,15 +125,15 @@ export function LiveRoomJudgingPanel({
 
           <View style={[styles.divider, { backgroundColor: t.border }]} />
 
-          <Text allowFontScaling={false} style={[styles.question, { color: t.textPrimary }]}>
+          <Text style={[styles.question, { color: t.textPrimary }]}>
             Best argument
           </Text>
           {hasArgumentVote ? (
-            <Text allowFontScaling={false} style={[styles.recorded, { color: t.textMuted }]}>
+            <Text style={[styles.recorded, { color: t.textMuted }]}>
               Your best-argument vote is in.
             </Text>
           ) : candidates.length === 0 ? (
-            <Text allowFontScaling={false} style={[styles.recorded, { color: t.textMuted }]}>
+            <Text style={[styles.recorded, { color: t.textMuted }]}>
               Nothing to pick yet — you cannot vote for your own argument.
             </Text>
           ) : (
@@ -170,7 +170,7 @@ export function LiveRoomJudgingPanel({
                           size={20}
                         />
                         <Text
-                          allowFontScaling={false}
+                         
                           numberOfLines={1}
                           style={[styles.candidateName, { color: t.textSecondary }]}
                         >
@@ -178,7 +178,7 @@ export function LiveRoomJudgingPanel({
                         </Text>
                       </View>
                       <Text
-                        allowFontScaling={false}
+                       
                         numberOfLines={4}
                         style={[styles.candidateBody, { color: t.textPrimary }]}
                       >
@@ -204,7 +204,7 @@ export function LiveRoomJudgingPanel({
                   (!picked || busy) && styles.off,
                 ]}
               >
-                <Text allowFontScaling={false} style={[styles.submitText, { color: t.pillText }]}>
+                <Text style={[styles.submitText, { color: t.pillText }]}>
                   Lock in best argument
                 </Text>
               </Pressable>
@@ -238,7 +238,7 @@ function SideButton({
         disabled && styles.off,
       ]}
     >
-      <Text allowFontScaling={false} style={[styles.sideText, { color: t.textPrimary }]}>
+      <Text style={[styles.sideText, { color: t.textPrimary }]}>
         {label}
       </Text>
     </Pressable>

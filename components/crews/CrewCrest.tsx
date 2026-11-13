@@ -91,7 +91,7 @@ export function CrewCrest({
             ]}
           />
           <Text
-            allowFontScaling={false}
+           
             style={[styles.mark, { fontSize: Math.round(size * 0.34), color: colors.background }]}
           >
             {mark}

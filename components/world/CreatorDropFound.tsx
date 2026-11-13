@@ -33,10 +33,10 @@ export function CreatorDropFound({
 
   return (
     <Animated.View entering={reduced ? undefined : FadeIn.duration(duration.base)} style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.found, { color: t.textMuted }]}>
+      <Text style={[styles.found, { color: t.textMuted }]}>
         FOUND
       </Text>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         {`${who}’S ${dropTypeLabel(drop.dropType).toUpperCase()}`}
       </Text>
       <Animated.View entering={reduced ? undefined : FadeInUp.duration(duration.slow)}>
@@ -49,7 +49,7 @@ export function CreatorDropFound({
           title={drop.caption}
         />
       </Animated.View>
-      <Text allowFontScaling={false} style={[styles.note, { color: t.textSecondary }]}>
+      <Text style={[styles.note, { color: t.textSecondary }]}>
         Added to your collection.
       </Text>
       <View style={styles.actions}>
@@ -68,7 +68,7 @@ export function CreatorDropFound({
         accessibilityLabel="Share your find"
         hitSlop={8}
       >
-        <Text allowFontScaling={false} style={[styles.share, { color: t.textMuted }]}>
+        <Text style={[styles.share, { color: t.textMuted }]}>
           Share your find
         </Text>
       </Pressable>

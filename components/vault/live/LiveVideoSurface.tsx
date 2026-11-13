@@ -72,7 +72,7 @@ export function LiveVideoSurface({
         accessibilityLabel={muted ? 'Unmute live sound' : 'Mute live sound'}
         style={[styles.chip, { backgroundColor: 'rgba(0,0,0,0.55)', borderColor: 'rgba(255,255,255,0.25)' }]}
       >
-        <Text allowFontScaling={false} style={[styles.chipLabel, { color: t.textInverse }]}>
+        <Text style={[styles.chipLabel, { color: t.textInverse }]}>
           {muted ? 'UNMUTE' : 'MUTE'}
         </Text>
       </Pressable>

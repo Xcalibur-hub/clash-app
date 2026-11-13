@@ -59,12 +59,12 @@ export function LiveEvidenceCard({
       accessibilityLabel={`Evidence. ${evidence.title}`}
     >
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           EVIDENCE
         </Text>
         {evidence.author ? (
           <Text
-            allowFontScaling={false}
+           
             numberOfLines={1}
             style={[styles.by, { color: t.textMuted }]}
           >
@@ -74,7 +74,7 @@ export function LiveEvidenceCard({
       </View>
 
       <Text
-        allowFontScaling={false}
+       
         numberOfLines={3}
         style={[styles.title, { color: t.textPrimary }]}
       >
@@ -88,7 +88,7 @@ export function LiveEvidenceCard({
           accessibilityLabel={`Open source on ${host}`}
           hitSlop={4}
         >
-          <Text allowFontScaling={false} numberOfLines={1} style={[styles.host, { color: t.accent }]}>
+          <Text numberOfLines={1} style={[styles.host, { color: t.accent }]}>
             {host}
           </Text>
         </Pressable>
@@ -130,12 +130,12 @@ export function LiveEvidenceCard({
               },
             ]}
           >
-            <Text allowFontScaling={false} style={[styles.chipText, { color: t.textSecondary }]}>
+            <Text style={[styles.chipText, { color: t.textSecondary }]}>
               Useful · {evidence.usefulCount}
             </Text>
           </Pressable>
         ) : (
-          <Text allowFontScaling={false} style={[styles.count, { color: t.textMuted }]}>
+          <Text style={[styles.count, { color: t.textMuted }]}>
             {evidence.usefulCount} found this useful
           </Text>
         )}
@@ -150,7 +150,7 @@ export function LiveEvidenceCard({
             accessibilityRole="button"
             accessibilityLabel="Challenge this evidence"
           >
-            <Text allowFontScaling={false} style={[styles.link, { color: t.textMuted }]}>
+            <Text style={[styles.link, { color: t.textMuted }]}>
               Challenge
             </Text>
           </Pressable>
@@ -166,7 +166,7 @@ export function LiveEvidenceCard({
             accessibilityRole="button"
             accessibilityLabel="Report this evidence"
           >
-            <Text allowFontScaling={false} style={[styles.link, { color: t.textMuted }]}>
+            <Text style={[styles.link, { color: t.textMuted }]}>
               Report
             </Text>
           </Pressable>

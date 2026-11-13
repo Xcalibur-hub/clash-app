@@ -67,10 +67,10 @@ export function PeopleSection(): React.JSX.Element | null {
             ]}
           >
             <Avatar name={user.name} tint={user.tint} size={48} />
-            <Text allowFontScaling={false} numberOfLines={1} style={[styles.handle, { color: t.textPrimary }]}>
+            <Text numberOfLines={1} style={[styles.handle, { color: t.textPrimary }]}>
               @{user.handle}
             </Text>
-            <Text allowFontScaling={false} numberOfLines={1} style={[styles.meta, { color: t.textMuted }]}>
+            <Text numberOfLines={1} style={[styles.meta, { color: t.textMuted }]}>
               {formatReputation(user.reputation)} XP
             </Text>
           </PressableScale>

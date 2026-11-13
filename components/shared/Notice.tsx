@@ -26,7 +26,7 @@ export function Notice({ offset = 0 }: { offset?: number }): React.JSX.Element {
       accessibilityLabel={notice.message}
     >
       <View style={styles.pill}>
-        <Text allowFontScaling={false} style={styles.text}>
+        <Text style={styles.text}>
           {notice.message}
         </Text>
       </View>

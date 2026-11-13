@@ -14,7 +14,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
   const t = useThemeColors();
   return (
     <View style={styles.group}>
-      <Text allowFontScaling={false} style={[styles.groupLabel, { color: t.textMuted }]}>
+      <Text style={[styles.groupLabel, { color: t.textMuted }]}>
         {label}
       </Text>
       {children}

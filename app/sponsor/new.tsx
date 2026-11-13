@@ -183,13 +183,13 @@ export default function SponsorNewScreen(): React.JSX.Element {
           <BackIcon size={18} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
 
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           Sponsor Studio
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           {showAdvertiserForm ? 'Create your sponsor workspace' : 'New campaign'}
         </Text>
-        <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]}>
+        <Text style={[styles.sub, { color: t.textSecondary }]}>
           {showAdvertiserForm
             ? 'Name your brand workspace. You can activate it before going live.'
             : 'Draft starts inactive. Activate when creators and links are ready.'}
@@ -226,7 +226,7 @@ export default function SponsorNewScreen(): React.JSX.Element {
               accessibilityLabel="Workspace slug"
             />
             {error ? (
-              <Text allowFontScaling={false} style={[styles.error, { color: t.textSecondary }]}>
+              <Text style={[styles.error, { color: t.textSecondary }]}>
                 {error}
               </Text>
             ) : null}
@@ -272,7 +272,7 @@ export default function SponsorNewScreen(): React.JSX.Element {
               accessibilityLabel="Currency"
             />
             {error ? (
-              <Text allowFontScaling={false} style={[styles.error, { color: t.textSecondary }]}>
+              <Text style={[styles.error, { color: t.textSecondary }]}>
                 {error}
               </Text>
             ) : null}
@@ -291,7 +291,7 @@ export default function SponsorNewScreen(): React.JSX.Element {
 function FieldLabel({ label }: { label: string }): React.JSX.Element {
   const t = useThemeColors();
   return (
-    <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+    <Text style={[styles.label, { color: t.textMuted }]}>
       {label}
     </Text>
   );

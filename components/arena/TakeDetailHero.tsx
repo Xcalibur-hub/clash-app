@@ -109,7 +109,7 @@ export function TakeDetailHero({
           </Text>
           <View style={styles.authorRow}>
             <Avatar name={author.name} tint={author.tint} size={26} />
-            <Text allowFontScaling={false} style={styles.authorMeta} numberOfLines={1}>
+            <Text style={styles.authorMeta} numberOfLines={1}>
               @{author.handle}
               {isViewer ? ' · You' : ''} · {hood}
             </Text>

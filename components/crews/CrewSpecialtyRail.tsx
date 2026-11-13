@@ -84,7 +84,7 @@ function SpecialtyChip({
         ]}
       >
         <Text
-          allowFontScaling={false}
+         
           style={[
             styles.label,
             {

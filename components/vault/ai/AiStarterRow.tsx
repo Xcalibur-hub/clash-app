@@ -40,7 +40,7 @@ export function AiStarterRow({
             { borderColor: t.border, backgroundColor: t.surface, opacity: disabled ? 0.5 : 1 },
           ]}
         >
-          <Text allowFontScaling={false} style={[styles.label, { color: t.textPrimary }]}>
+          <Text style={[styles.label, { color: t.textPrimary }]}>
             {starter}
           </Text>
         </Pressable>

@@ -25,7 +25,7 @@ export function ClashJudgeControls({
   const t = useThemeColors();
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         CAST YOUR VOTE
       </Text>
       <View style={styles.row}>
@@ -84,10 +84,10 @@ function JudgeButton({
         },
       ]}
     >
-      <Text allowFontScaling={false} style={[styles.btnLabel, { color: tone }]}>
+      <Text style={[styles.btnLabel, { color: tone }]}>
         {pending ? 'LOCKING…' : `VOTE SIDE ${side} ↗`}
       </Text>
-      <Text allowFontScaling={false} style={[styles.btnHandle, { color: t.textMuted }]} numberOfLines={1}>
+      <Text style={[styles.btnHandle, { color: t.textMuted }]} numberOfLines={1}>
         {handle ? `@${handle}` : `VOTE SIDE ${side}`}
       </Text>
     </PressableScale>

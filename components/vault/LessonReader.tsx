@@ -102,10 +102,10 @@ export function LessonReader({
         showsVerticalScrollIndicator={false}
       >
         <BackChip onPress={() => router.back()} />
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           LESSON {String(lesson.position).padStart(2, '0')}
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           {lesson.title}
         </Text>
 
@@ -114,10 +114,10 @@ export function LessonReader({
             {mediaUrl ? (
               <Image source={{ uri: mediaUrl }} style={styles.preview} resizeMode="cover" />
             ) : null}
-            <Text allowFontScaling={false} style={[styles.lockedTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.lockedTitle, { color: t.textPrimary }]}>
               {lesson.previewAllowed ? 'Preview' : 'Locked'}
             </Text>
-            <Text allowFontScaling={false} style={[styles.lockedBody, { color: t.textSecondary }]}>
+            <Text style={[styles.lockedBody, { color: t.textSecondary }]}>
               Full lesson content stays protected until you have access.
             </Text>
             <VaultActionButton
@@ -132,7 +132,7 @@ export function LessonReader({
               lesson.contentType === 'video' ? (
                 <View style={[styles.video, { backgroundColor: t.surfaceMuted }]}>
                   <PlayIcon size={28} color={t.textPrimary} strokeWidth={2.2} />
-                  <Text allowFontScaling={false} style={[styles.videoNote, { color: t.textMuted }]}>
+                  <Text style={[styles.videoNote, { color: t.textMuted }]}>
                     Video playback arrives with the media player.
                   </Text>
                 </View>
@@ -141,7 +141,7 @@ export function LessonReader({
               )
             ) : null}
             {lesson.bodyText ? (
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+              <Text style={[styles.body, { color: t.textSecondary }]}>
                 {lesson.bodyText}
               </Text>
             ) : null}

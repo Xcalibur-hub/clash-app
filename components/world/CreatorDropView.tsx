@@ -92,7 +92,7 @@ export function CreatorDropView({ drop, onClose }: CreatorDropViewProps): React.
         accessibilityRole="button"
         accessibilityLabel="Back"
       >
-        <Text allowFontScaling={false} style={[styles.back, { color: t.textMuted }]}>
+        <Text style={[styles.back, { color: t.textMuted }]}>
           ← Back
         </Text>
       </Pressable>
@@ -103,34 +103,34 @@ export function CreatorDropView({ drop, onClose }: CreatorDropViewProps): React.
         <View style={[styles.hero, styles.heroFallback, { backgroundColor: drop.creatorTint ?? t.surfaceMuted }]} />
       )}
 
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         {dropDiscoveryHint({ dropType: drop.dropType, locationLabel: drop.locationLabel })}
       </Text>
-      <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
+      <Text style={[styles.headline, { color: t.textPrimary }]}>
         {dropDiscoveryLine({ creatorName: drop.creatorName, dropType: drop.dropType })}
       </Text>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         {drop.caption}
       </Text>
 
       {drop.clue ? (
         <View style={[styles.clue, { borderColor: t.borderStrong }]}>
-          <Text allowFontScaling={false} style={[styles.clueKicker, { color: t.textMuted }]}>
+          <Text style={[styles.clueKicker, { color: t.textMuted }]}>
             CLUE
           </Text>
-          <Text allowFontScaling={false} style={[styles.clueBody, { color: t.textSecondary }]}>
+          <Text style={[styles.clueBody, { color: t.textSecondary }]}>
             {drop.clue}
           </Text>
         </View>
       ) : null}
 
-      <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+      <Text style={[styles.meta, { color: t.textMuted }]}>
         {[rewardTypeLabel(drop.rewardType), drop.distanceBand, expiry, drop.publishedAt ? `${timeAgo(drop.publishedAt)} ago` : null]
           .filter(Boolean)
           .join(' · ')}
       </Text>
       {dropIsEndingSoon(drop.expiresAt) ? (
-        <Text allowFontScaling={false} style={[styles.ending, { color: t.danger }]}>
+        <Text style={[styles.ending, { color: t.danger }]}>
           Ending soon
         </Text>
       ) : null}
@@ -156,7 +156,7 @@ export function CreatorDropView({ drop, onClose }: CreatorDropViewProps): React.
             onPress={() => void runClaim()}
           />
         ) : (
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text style={[styles.meta, { color: t.textMuted }]}>
             This one is not available to you.
           </Text>
         )}

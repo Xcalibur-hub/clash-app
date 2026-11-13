@@ -36,12 +36,12 @@ export function ClashNativeStickerCard({
     >
       <View style={[styles.glow, { backgroundColor: accent.deep }]} />
       {sticker.emoji ? (
-        <Text allowFontScaling={false} style={[styles.emoji, compact && styles.emojiSm, tall && styles.emojiLg]}>
+        <Text style={[styles.emoji, compact && styles.emojiSm, tall && styles.emojiLg]}>
           {sticker.emoji}
         </Text>
       ) : null}
       <Text
-        allowFontScaling={false}
+       
         style={[
           styles.label,
           compact && styles.labelSm,
@@ -53,7 +53,7 @@ export function ClashNativeStickerCard({
       >
         {sticker.label}
       </Text>
-      <Text allowFontScaling={false} style={[styles.brand, { color: t.textMuted }]}>
+      <Text style={[styles.brand, { color: t.textMuted }]}>
         CLASH
       </Text>
     </View>

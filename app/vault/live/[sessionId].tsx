@@ -88,7 +88,7 @@ export default function CreatorLiveScreen(): React.JSX.Element {
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
-            <Text allowFontScaling={false} style={[styles.back, { color: t.textMuted }]}>
+            <Text style={[styles.back, { color: t.textMuted }]}>
               ← Back
             </Text>
           </Pressable>
@@ -99,7 +99,7 @@ export default function CreatorLiveScreen(): React.JSX.Element {
               accessibilityRole="button"
               accessibilityLabel="Report this session"
             >
-              <Text allowFontScaling={false} style={[styles.back, { color: t.textMuted }]}>
+              <Text style={[styles.back, { color: t.textMuted }]}>
                 Report
               </Text>
             </Pressable>
@@ -123,7 +123,7 @@ export default function CreatorLiveScreen(): React.JSX.Element {
             onVote={(optionId) => void live.vote(live.featured?.id ?? '', optionId)}
           />
         ) : (
-          <Text allowFontScaling={false} style={[styles.quiet, { color: t.textMuted }]}>
+          <Text style={[styles.quiet, { color: t.textMuted }]}>
             {session.status === 'LIVE'
               ? 'Waiting for the creator to open something.'
               : session.status === 'SCHEDULED'

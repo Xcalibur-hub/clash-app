@@ -118,7 +118,7 @@ export const WorldClusterMarker = React.memo(function WorldClusterMarker({
       zIndex={5}
     >
       <View style={styles.cluster} accessible accessibilityLabel={`${count} World Drops`}>
-        <Text allowFontScaling={false} style={styles.clusterText}>
+        <Text style={styles.clusterText}>
           {count > 99 ? '99+' : String(count)}
         </Text>
       </View>

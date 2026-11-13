@@ -91,7 +91,7 @@ export const MemberConstellation = React.memo(function MemberConstellation({
               },
             ]}
           >
-            <Text allowFontScaling={false} style={[styles.moreText, { color: t.textSecondary }]}>
+            <Text style={[styles.moreText, { color: t.textSecondary }]}>
               +{extra > 99 ? '99' : extra}
             </Text>
           </View>

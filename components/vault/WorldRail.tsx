@@ -37,7 +37,7 @@ export const WorldRail = React.memo(function WorldRail({
           <View style={[styles.ring, { borderColor: item.tint }]}>
             <Avatar name={item.name} tint={item.tint} size={52} />
           </View>
-          <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+          <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
             {item.name}
           </Text>
         </PressableScale>

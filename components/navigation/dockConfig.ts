@@ -10,8 +10,14 @@ import {
   VaultIcon,
 } from '../shared/icons';
 
-/** Visual height of the floating capsule dock (icons + padding). */
-export const DOCK_HEIGHT = 52;
+/**
+ * Visual height of the floating dock plate (icons + padding).
+ *
+ * AURA raised this from 52 to 56 for a less cramped plate. Scroll clearance is
+ * derived from this constant, so every screen's bottom padding follows
+ * automatically — never hardcode the dock height at a call site.
+ */
+export const DOCK_HEIGHT = 56;
 
 /**
  * Breathing room above the dock top edge (not including safe-area inset).

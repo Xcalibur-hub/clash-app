@@ -48,7 +48,7 @@ export function LiveRoomTypingCue({
       accessibilityRole="text"
       accessibilityLabel={label}
     >
-      <Text allowFontScaling={false} style={[styles.text, { color: t.textMuted }]}>
+      <Text style={[styles.text, { color: t.textMuted }]}>
         {label}
       </Text>
     </View>

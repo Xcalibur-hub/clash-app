@@ -53,20 +53,20 @@ export default function SplashScreen(): React.JSX.Element {
     <AuroraBackground>
       <View style={styles.wrap}>
         <Animated.View style={[styles.markWrap, markStyle]}>
-          <Text allowFontScaling={false} style={styles.wordmark}>
+          <Text style={styles.wordmark}>
             CLASH
           </Text>
           <Burst size={22} color={ink.primary} opacity={0.5} style={styles.burst} />
         </Animated.View>
 
         <Animated.View style={[styles.subWrap, subStyle]}>
-          <Text allowFontScaling={false} style={styles.subtitle}>
+          <Text style={styles.subtitle}>
             Make a take. Start a clash.
           </Text>
           <View style={styles.track}>
             <Animated.View style={[styles.fill, barStyle]} />
           </View>
-          <Text allowFontScaling={false} style={styles.tagline}>
+          <Text style={styles.tagline}>
             MAKE YOUR TAKE.
           </Text>
         </Animated.View>

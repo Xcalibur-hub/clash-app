@@ -174,11 +174,11 @@ export function TrendingBattlesChart({
   return (
     <View style={styles.wrap}>
       <View style={styles.meta}>
-        <Text allowFontScaling={false} style={[styles.axis, { color: t.textMuted }]}>
+        <Text style={[styles.axis, { color: t.textMuted }]}>
           {caption ? caption.kicker : 'RANK'}
         </Text>
         {scrubBucketT != null ? (
-          <Text allowFontScaling={false} style={[styles.value, { color: t.textPrimary }]}>
+          <Text style={[styles.value, { color: t.textPrimary }]}>
             {formatClock(scrubBucketT)}
           </Text>
         ) : null}
@@ -186,7 +186,7 @@ export function TrendingBattlesChart({
 
       {caption ? (
         <Text
-          allowFontScaling={false}
+         
           style={[styles.earlyNote, { color: t.textMuted }]}
           accessibilityLiveRegion="polite"
         >
@@ -329,7 +329,7 @@ export function TrendingBattlesChart({
           {scrubLeaders.map((row) => (
             <Text
               key={row.topicId}
-              allowFontScaling={false}
+             
               style={[styles.scrubRow, { color: t.textSecondary }]}
               numberOfLines={1}
             >
@@ -340,10 +340,10 @@ export function TrendingBattlesChart({
       ) : null}
 
       <View style={[styles.timeRow, { paddingLeft: PAD.left, paddingRight: PAD.right }]}>
-        <Text allowFontScaling={false} style={[styles.axis, { color: t.textMuted }]}>
+        <Text style={[styles.axis, { color: t.textMuted }]}>
           EARLIER
         </Text>
-        <Text allowFontScaling={false} style={[styles.axis, { color: t.textMuted }]}>
+        <Text style={[styles.axis, { color: t.textMuted }]}>
           NOW
         </Text>
       </View>

@@ -71,7 +71,7 @@ export function HoodsSection({ profileId, signedIn }: HoodsSectionProps): React.
         <ActivityIndicator color={t.textMuted} style={styles.spinner} />
       ) : failed ? (
         <Pressable onPress={() => void load()} accessibilityRole="button" accessibilityLabel="Retry loading Hoods">
-          <Text allowFontScaling={false} style={[styles.retry, { color: t.textSecondary }]}>
+          <Text style={[styles.retry, { color: t.textSecondary }]}>
             Couldn’t load Hoods. Tap to retry.
           </Text>
         </Pressable>
@@ -94,13 +94,13 @@ export function HoodsSection({ profileId, signedIn }: HoodsSectionProps): React.
               ]}
             >
               <View style={styles.info}>
-                <Text allowFontScaling={false} numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
+                <Text numberOfLines={1} style={[styles.name, { color: t.textPrimary }]}>
                   {summary.hood.name}
                 </Text>
-                <Text allowFontScaling={false} numberOfLines={2} style={[styles.tagline, { color: t.textSecondary }]}>
+                <Text numberOfLines={2} style={[styles.tagline, { color: t.textSecondary }]}>
                   {summary.hood.tagline}
                 </Text>
-                <Text allowFontScaling={false} numberOfLines={1} style={[styles.meta, { color: t.textMuted }]}>
+                <Text numberOfLines={1} style={[styles.meta, { color: t.textMuted }]}>
                   {compact(summary.memberCount)} members · {summary.liveCount} live
                 </Text>
               </View>
@@ -119,7 +119,7 @@ export function HoodsSection({ profileId, signedIn }: HoodsSectionProps): React.
                   ]}
                 >
                   <Text
-                    allowFontScaling={false}
+                   
                     style={[
                       styles.joinText,
                       { color: summary.joined ? t.textSecondary : t.pillText },
@@ -128,7 +128,7 @@ export function HoodsSection({ profileId, signedIn }: HoodsSectionProps): React.
                     {summary.joined ? 'Joined' : 'Join'}
                   </Text>
                 </Pressable>
-                <Text allowFontScaling={false} style={[styles.enter, { color: t.textMuted }]}>
+                <Text style={[styles.enter, { color: t.textMuted }]}>
                   Enter →
                 </Text>
               </View>

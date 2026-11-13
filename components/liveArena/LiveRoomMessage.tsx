@@ -109,7 +109,7 @@ export function LiveRoomMessage({
   if (message.kind === 'system') {
     return (
       <View style={styles.systemWrap}>
-        <Text allowFontScaling={false} style={[styles.system, { color: t.textMuted }]}>
+        <Text style={[styles.system, { color: t.textMuted }]}>
           {message.body}
         </Text>
       </View>
@@ -222,7 +222,7 @@ export function LiveRoomMessage({
         ]}
       >
         {highlighted && highlightLabel ? (
-          <Text allowFontScaling={false} style={[styles.topLabel, { color: t.textMuted }]}>
+          <Text style={[styles.topLabel, { color: t.textMuted }]}>
             {highlightLabel}
           </Text>
         ) : null}
@@ -248,17 +248,17 @@ export function LiveRoomMessage({
                 </Text>
               </Text>
             ) : (
-              <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
+              <Text style={[styles.name, { color: t.textPrimary }]}>
                 {author?.handle ? `@${author.handle}` : author?.name ?? 'Someone'}
               </Text>
             )}
           </Pressable>
           {own && ownStance ? (
-            <Text allowFontScaling={false} style={[styles.stanceCue, { color: t.textMuted }]}>
+            <Text style={[styles.stanceCue, { color: t.textMuted }]}>
               · {STANCE_LABEL[ownStance]}
             </Text>
           ) : null}
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text style={[styles.meta, { color: t.textMuted }]}>
             {pending ? 'sending…' : duelFighter ? duelTimestamp(message.createdAt) : timeAgo(message.createdAt, now)}
           </Text>
           {onReport ? (
@@ -282,7 +282,7 @@ export function LiveRoomMessage({
             <View style={[styles.connector, { backgroundColor: t.borderStrong }]} />
             <View style={[styles.quote, { backgroundColor: softFill(t), borderColor: t.border }]}>
               <Text
-                allowFontScaling={false}
+               
                 numberOfLines={2}
                 style={[styles.quoteText, { color: t.textMuted }]}
               >
@@ -350,11 +350,11 @@ export function LiveRoomMessage({
                 },
               ]}
             >
-              <Text allowFontScaling={false} style={styles.chipEmoji}>
+              <Text style={styles.chipEmoji}>
                 {DEFAULT_REACTION}
               </Text>
               {cooked && cooked.count > 0 ? (
-                <Text allowFontScaling={false} style={[styles.chipCount, { color: t.textSecondary }]}>
+                <Text style={[styles.chipCount, { color: t.textSecondary }]}>
                   {cooked.count}
                 </Text>
               ) : null}
@@ -382,10 +382,10 @@ export function LiveRoomMessage({
                   },
                 ]}
               >
-                <Text allowFontScaling={false} style={styles.chipEmoji}>
+                <Text style={styles.chipEmoji}>
                   {reaction.emoji}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.chipCount, { color: t.textMuted }]}>
+                <Text style={[styles.chipCount, { color: t.textMuted }]}>
                   {reaction.count}
                 </Text>
               </Pressable>
@@ -401,14 +401,14 @@ export function LiveRoomMessage({
               accessibilityRole="button"
               accessibilityLabel="Open reaction picker"
             >
-              <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
+              <Text style={[styles.action, { color: t.textMuted }]}>
                 + React
               </Text>
             </Pressable>
           ) : null}
 
           {!showReactButton && reactionTotal > 0 && message.reactions.length === 0 ? (
-            <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
+            <Text style={[styles.action, { color: t.textMuted }]}>
               {DEFAULT_REACTION} {reactionTotal}
             </Text>
           ) : null}
@@ -424,18 +424,18 @@ export function LiveRoomMessage({
               accessibilityLabel="Reply to this argument"
               style={duelFighter ? { minHeight: 44, justifyContent: 'center' } : undefined}
             >
-              <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
+              <Text style={[styles.action, { color: t.textMuted }]}>
                 Reply
               </Text>
             </Pressable>
           ) : null}
           {replyTotal > 0 && !message.parentMessageId ? (
-            <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
+            <Text style={[styles.action, { color: t.textMuted }]}>
               ↩ {replyTotal} response{replyTotal === 1 ? '' : 's'}
             </Text>
           ) : null}
           {message.argumentVotes !== null && message.argumentVotes > 0 ? (
-            <Text allowFontScaling={false} style={[styles.action, { color: t.textMuted }]}>
+            <Text style={[styles.action, { color: t.textMuted }]}>
               {message.argumentVotes} best-argument
               {message.argumentVotes === 1 ? ' vote' : ' votes'}
             </Text>
@@ -449,11 +449,11 @@ export function LiveRoomMessage({
                 key={reply.id}
                 style={[styles.nestedRow, { borderColor: t.border, backgroundColor: softFill(t) }]}
               >
-                <Text allowFontScaling={false} style={[styles.nestedName, { color: t.textPrimary }]}>
+                <Text style={[styles.nestedName, { color: t.textPrimary }]}>
                   {reply.author?.name ?? 'Someone'}
                 </Text>
                 <Text
-                  allowFontScaling={false}
+                 
                   numberOfLines={3}
                   style={[styles.nestedBody, { color: t.textSecondary }]}
                 >
@@ -476,7 +476,7 @@ export function LiveRoomMessage({
                 accessibilityRole="button"
                 accessibilityLabel={`View ${hiddenReplyCount} more responses`}
               >
-                <Text allowFontScaling={false} style={[styles.moreReplies, { color: t.textPrimary }]}>
+                <Text style={[styles.moreReplies, { color: t.textPrimary }]}>
                   View {hiddenReplyCount} more response{hiddenReplyCount === 1 ? '' : 's'}
                 </Text>
               </Pressable>

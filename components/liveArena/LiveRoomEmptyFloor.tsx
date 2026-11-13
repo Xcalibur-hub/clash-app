@@ -39,7 +39,7 @@ export function LiveRoomEmptyFloor({
             <View key={person.id} style={styles.person}>
               <Avatar name={person.name} tint={person.avatarTint} size={36} />
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.initial, { color: t.textMuted }]}
                 numberOfLines={1}
               >
@@ -50,13 +50,13 @@ export function LiveRoomEmptyFloor({
         </View>
       ) : null}
 
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         {participantCount > 0 ? `${participantCount} joined` : 'Live room'}
       </Text>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         The floor is open
       </Text>
-      <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+      <Text style={[styles.body, { color: t.textSecondary }]}>
         {isDebater
           ? 'No arguments yet. Start the room.'
           : 'No arguments yet.'}
@@ -72,7 +72,7 @@ export function LiveRoomEmptyFloor({
           accessibilityLabel="Start an argument"
           style={[styles.cta, { backgroundColor: t.clashFill }]}
         >
-          <Text allowFontScaling={false} style={[styles.ctaText, { color: t.clashText }]}>
+          <Text style={[styles.ctaText, { color: t.clashText }]}>
             OPEN THE FLOOR
           </Text>
         </Pressable>
@@ -88,7 +88,7 @@ export function LiveRoomEmptyFloor({
           accessibilityLabel="Pick a side"
           style={[styles.cta, { backgroundColor: softFill(t), borderColor: t.borderStrong, borderWidth: StyleSheet.hairlineWidth }]}
         >
-          <Text allowFontScaling={false} style={[styles.ctaTextAlt, { color: t.textPrimary }]}>
+          <Text style={[styles.ctaTextAlt, { color: t.textPrimary }]}>
             PICK A SIDE
           </Text>
         </Pressable>

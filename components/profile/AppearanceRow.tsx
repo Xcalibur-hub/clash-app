@@ -16,7 +16,7 @@ export function AppearanceRow(): React.JSX.Element {
   const t = useThemeColors();
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+      <Text style={[styles.label, { color: t.textMuted }]}>
         APPEARANCE
       </Text>
       <SegmentedTabs<ThemeMode>

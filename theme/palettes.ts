@@ -34,6 +34,34 @@ export interface SemanticTheme {
   clashText: string;
   shadowColor: string;
   shadowOpacity: number;
+
+  /* ── AURA additions ───────────────────────────────────────────────────────
+   * Additive only: every field above is unchanged, so the 352 existing
+   * components keep compiling. These exist so new surfaces can express
+   * editorial hierarchy without inventing literals. */
+
+  /** Faintest wash, for inset rows and skeletons. */
+  surfaceSunken: string;
+  /** Hairline that separates two surfaces of equal tone. */
+  divider: string;
+  /** Text on `surfaceSunken`. */
+  textOnSunken: string;
+  /** Primary brand ink — the Arena signature. */
+  brand: string;
+  brandSoft: string;
+  /** Editorial/hero accent, used sparingly for one moment per screen. */
+  signature: string;
+  signatureSoft: string;
+  /** Gold reserved for achievement (verdicts, rank, trophies). */
+  gold: string;
+  goldSoft: string;
+  /** Side A / Side B — warm vs cool, instantly separable, never neon. */
+  sideA: string;
+  sideASoft: string;
+  sideB: string;
+  sideBSoft: string;
+  /** Focus ring for keyboard / switch access. */
+  focusRing: string;
 }
 
 /** Warm-white editorial light — not sterile pure white. */
@@ -65,14 +93,29 @@ export const lightTheme: SemanticTheme = {
   clashText: '#FAFAF8',
   shadowColor: '#111113',
   shadowOpacity: 0.1,
+
+  surfaceSunken: '#EDEAE3',
+  divider: 'rgba(17,17,19,0.05)',
+  textOnSunken: '#3F3F46',
+  brand: '#B4552F',
+  brandSoft: 'rgba(180,85,47,0.10)',
+  signature: '#1E5F58',
+  signatureSoft: 'rgba(30,95,88,0.10)',
+  gold: '#8A6A2F',
+  goldSoft: 'rgba(138,106,47,0.12)',
+  sideA: '#B4552F',
+  sideASoft: 'rgba(180,85,47,0.10)',
+  sideB: '#2C5A86',
+  sideBSoft: 'rgba(44,90,134,0.10)',
+  focusRing: '#1E5F58',
 };
 
 /** Matte obsidian dark — rich near-black, no neon. */
 export const darkTheme: SemanticTheme = {
   scheme: 'dark',
-  background: '#09090B',
-  surface: '#111113',
-  surfaceElevated: '#18181B',
+  background: '#0B0A09',
+  surface: '#131211',
+  surfaceElevated: '#1A1917',
   surfaceMuted: 'rgba(255,255,255,0.04)',
   textPrimary: '#F5F5F5',
   textSecondary: '#A1A1AA',
@@ -96,6 +139,21 @@ export const darkTheme: SemanticTheme = {
   clashText: '#09090B',
   shadowColor: '#000000',
   shadowOpacity: 0.35,
+
+  surfaceSunken: 'rgba(255,255,255,0.02)',
+  divider: 'rgba(255,255,255,0.05)',
+  textOnSunken: '#8E8B94',
+  brand: '#E0885E',
+  brandSoft: 'rgba(224,136,94,0.12)',
+  signature: '#6FB8AB',
+  signatureSoft: 'rgba(111,184,171,0.12)',
+  gold: '#D6B478',
+  goldSoft: 'rgba(214,180,120,0.14)',
+  sideA: '#E0885E',
+  sideASoft: 'rgba(224,136,94,0.12)',
+  sideB: '#7FA6CE',
+  sideBSoft: 'rgba(127,166,206,0.12)',
+  focusRing: '#6FB8AB',
 };
 
 export function paletteFor(scheme: ColorScheme): SemanticTheme {

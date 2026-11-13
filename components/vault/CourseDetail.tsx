@@ -111,14 +111,14 @@ export function CourseDetail({ courseId }: { courseId: string }): React.JSX.Elem
         accessibilityRole="button"
         accessibilityLabel={`${n} ${item.title}`}
       >
-        <Text allowFontScaling={false} style={[styles.lessonIndex, { color: t.textMuted }]}>
+        <Text style={[styles.lessonIndex, { color: t.textMuted }]}>
           {n}
         </Text>
         <View style={styles.lessonText}>
-          <Text allowFontScaling={false} style={[styles.lessonTitle, { color: t.textPrimary }]} numberOfLines={2}>
+          <Text style={[styles.lessonTitle, { color: t.textPrimary }]} numberOfLines={2}>
             {item.title}
           </Text>
-          <Text allowFontScaling={false} style={[styles.lessonMeta, { color: t.textMuted }]}>
+          <Text style={[styles.lessonMeta, { color: t.textMuted }]}>
             {state}
           </Text>
         </View>
@@ -139,24 +139,24 @@ export function CourseDetail({ courseId }: { courseId: string }): React.JSX.Elem
             <View style={[styles.hero, { backgroundColor: t.surfaceMuted }]}>
               {cover ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
               <View style={styles.scrim} />
-              <Text allowFontScaling={false} style={styles.kicker}>
+              <Text style={styles.kicker}>
                 MASTERCLASS
               </Text>
-              <Text allowFontScaling={false} style={styles.title}>
+              <Text style={styles.title}>
                 {course.title}
               </Text>
             </View>
             {creator ? (
-              <Text allowFontScaling={false} style={[styles.byline, { color: t.textMuted }]}>
+              <Text style={[styles.byline, { color: t.textMuted }]}>
                 by {creator.name} · {price}
               </Text>
             ) : null}
             {course.description ? (
-              <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+              <Text style={[styles.body, { color: t.textSecondary }]}>
                 {course.description}
               </Text>
             ) : null}
-            <Text allowFontScaling={false} style={[styles.progress, { color: t.textMuted }]}>
+            <Text style={[styles.progress, { color: t.textMuted }]}>
               {doneCount} / {lessons.length} lessons
             </Text>
             {firstOpen ? (

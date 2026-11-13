@@ -24,7 +24,7 @@ export function HoodStrip(): React.JSX.Element {
             },
           ]}
         >
-          <Text allowFontScaling={false} style={[styles.label, { color: t.pillInactiveText }]}>
+          <Text style={[styles.label, { color: t.pillInactiveText }]}>
             {hood.name}
           </Text>
         </Pressable>

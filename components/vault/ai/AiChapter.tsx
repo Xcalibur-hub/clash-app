@@ -52,13 +52,13 @@ export function AiChapter({
     <View style={[styles.wrap, { borderColor: t.border, borderRadius: radius }]}>
       <View style={styles.row}>
         <View style={styles.copy}>
-          <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          <Text style={[styles.kicker, { color: t.textMuted }]}>
             {digital?.configured ? digitalDisclosurePlate(digitalName, profile.creatorName) : copy.kicker}
           </Text>
-          <Text allowFontScaling={false} style={[styles.headline, { color: t.textPrimary }]}>
+          <Text style={[styles.headline, { color: t.textPrimary }]}>
             {headline}
           </Text>
-          <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+          <Text style={[styles.body, { color: t.textSecondary }]}>
             {digital?.configured && !digital.available
               ? digitalUnavailableNote(null)
               : profile.description ||
@@ -80,7 +80,7 @@ export function AiChapter({
       {profile.starters.length > 0 ? (
         <View style={styles.starters}>
           {profile.starters.slice(0, 2).map((starter) => (
-            <Text key={starter} allowFontScaling={false} style={[styles.starter, { color: t.textMuted }]}>
+            <Text key={starter} style={[styles.starter, { color: t.textMuted }]}>
               {`“${starter}”`}
             </Text>
           ))}

@@ -76,7 +76,7 @@ export function CommentMedia({
     >
       {isGif && !playGif ? (
         <View style={[StyleSheet.absoluteFill, styles.gifPaused, { backgroundColor: t.surfaceMuted }]}>
-          <Text allowFontScaling={false} style={[styles.gifPausedText, { color: t.textMuted }]}>
+          <Text style={[styles.gifPausedText, { color: t.textMuted }]}>
             GIF
           </Text>
         </View>
@@ -94,7 +94,7 @@ export function CommentMedia({
       ) : null}
       {isGif ? (
         <View style={styles.gifBadge} pointerEvents="none">
-          <Text allowFontScaling={false} style={styles.gifBadgeText}>
+          <Text style={styles.gifBadgeText}>
             GIF
           </Text>
         </View>

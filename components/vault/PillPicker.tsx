@@ -25,7 +25,7 @@ export function PillPicker<T extends string | number>({
   const t = useThemeColors();
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+      <Text style={[styles.label, { color: t.textMuted }]}>
         {label.toUpperCase()}
       </Text>
       <View style={styles.row}>
@@ -48,7 +48,7 @@ export function PillPicker<T extends string | number>({
                 },
               ]}
             >
-              <Text allowFontScaling={false} style={[styles.pillLabel, { color: t.textPrimary }]} numberOfLines={1}>
+              <Text style={[styles.pillLabel, { color: t.textPrimary }]} numberOfLines={1}>
                 {option.label}
               </Text>
             </Pressable>

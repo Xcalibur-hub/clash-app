@@ -73,13 +73,13 @@ export function CommunityHero({
           <BackIcon size={18} color="#FAFAF8" strokeWidth={2.2} />
         </Pressable>
         <View style={styles.copy}>
-          <Text allowFontScaling={false} style={styles.kind}>
+          <Text style={styles.kind}>
             {firstName ? `THE ROOM · ${firstName.toUpperCase()}` : 'COMMUNITY'}
           </Text>
-          <Text allowFontScaling={false} style={styles.name} numberOfLines={2}>
+          <Text style={styles.name} numberOfLines={2}>
             {name}
           </Text>
-          <Text allowFontScaling={false} style={styles.access}>
+          <Text style={styles.access}>
             {communityAccessLabel(accessType)}
           </Text>
         </View>
@@ -87,7 +87,7 @@ export function CommunityHero({
 
       <Animated.View entering={reduced ? undefined : FadeInUp.duration(duration.base)} style={styles.overlap}>
         {description ? (
-          <Text allowFontScaling={false} style={[styles.desc, { color: t.textSecondary }]} numberOfLines={3}>
+          <Text style={[styles.desc, { color: t.textSecondary }]} numberOfLines={3}>
             {description}
           </Text>
         ) : null}
@@ -95,13 +95,13 @@ export function CommunityHero({
           <MemberConstellation anonymousCount={memberCount} tint={tint} total={memberCount} size={32} />
         </View>
         <View style={styles.metaRow}>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text style={[styles.meta, { color: t.textMuted }]}>
             {communityMemberLabel(memberCount)}
           </Text>
-          <Text allowFontScaling={false} style={[styles.dot, { color: t.textMuted }]}>
+          <Text style={[styles.dot, { color: t.textMuted }]}>
             ·
           </Text>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+          <Text style={[styles.meta, { color: t.textMuted }]}>
             {communityActiveLabel(activeToday)}
           </Text>
         </View>

@@ -450,10 +450,10 @@ export function ExpressiveMediaTray({
           accessibilityRole="button"
           accessibilityLabel="Upload meme image"
         >
-          <Text allowFontScaling={false} style={[styles.uploadText, { color: t.textSecondary }]}>
+          <Text style={[styles.uploadText, { color: t.textSecondary }]}>
             + Upload
           </Text>
-          <Text allowFontScaling={false} style={[styles.uploadHint, { color: t.textMuted }]}>
+          <Text style={[styles.uploadHint, { color: t.textMuted }]}>
             Image meme
           </Text>
         </Pressable>
@@ -549,7 +549,7 @@ export function ExpressiveMediaTray({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.root, { backgroundColor: t.background, paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             Express
           </Text>
           <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
@@ -570,7 +570,7 @@ export function ExpressiveMediaTray({
               style={[styles.mainTab, mainTab === tab && { borderBottomColor: t.accent }]}
             >
               <Text
-                allowFontScaling={false}
+               
                 style={[
                   styles.mainTabText,
                   { color: mainTab === tab ? t.textPrimary : t.textMuted },
@@ -593,7 +593,7 @@ export function ExpressiveMediaTray({
               style={[styles.subChip, { backgroundColor: subTab === tab ? t.surfaceMuted : 'transparent' }]}
             >
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.subChipText, { color: subTab === tab ? t.textPrimary : t.textMuted }]}
               >
                 {tab[0].toUpperCase() + tab.slice(1)}
@@ -625,10 +625,10 @@ export function ExpressiveMediaTray({
 
         {gifsBlocked && bodyState === 'unconfigured' ? (
           <View style={styles.center}>
-            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
               GIF search isn’t set up
             </Text>
-            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+            <Text style={[styles.emptyBody, { color: t.textMuted }]}>
               {gifStatus.setupHint} Stickers and image memes still work without it.
             </Text>
             <View style={styles.ctaRow}>
@@ -640,7 +640,7 @@ export function ExpressiveMediaTray({
                 }}
                 style={[styles.cta, { backgroundColor: t.pill }]}
               >
-                <Text allowFontScaling={false} style={[styles.ctaText, { color: t.pillText }]}>
+                <Text style={[styles.ctaText, { color: t.pillText }]}>
                   Open stickers
                 </Text>
               </Pressable>
@@ -652,7 +652,7 @@ export function ExpressiveMediaTray({
                 }}
                 style={[styles.cta, { borderColor: t.border, borderWidth: StyleSheet.hairlineWidth }]}
               >
-                <Text allowFontScaling={false} style={[styles.ctaText, { color: t.textPrimary }]}>
+                <Text style={[styles.ctaText, { color: t.textPrimary }]}>
                   Upload a meme
                 </Text>
               </Pressable>
@@ -660,10 +660,10 @@ export function ExpressiveMediaTray({
           </View>
         ) : memesSearchBlocked ? (
           <View style={styles.center}>
-            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
               GIF meme search needs {gifStatus.label}
             </Text>
-            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+            <Text style={[styles.emptyBody, { color: t.textMuted }]}>
               {gifStatus.setupHint} You can still upload image memes from Trending.
             </Text>
             <Pressable
@@ -673,7 +673,7 @@ export function ExpressiveMediaTray({
               }}
               style={[styles.cta, { backgroundColor: t.pill, marginTop: space.md }]}
             >
-              <Text allowFontScaling={false} style={[styles.ctaText, { color: t.pillText }]}>
+              <Text style={[styles.ctaText, { color: t.pillText }]}>
                 Back to trending memes
               </Text>
             </Pressable>
@@ -684,25 +684,25 @@ export function ExpressiveMediaTray({
           </View>
         ) : bodyState === 'empty' ? (
           <View style={styles.center}>
-            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+            <Text style={[styles.emptyBody, { color: t.textMuted }]}>
               {emptyCopy()}
             </Text>
           </View>
         ) : bodyState === 'error' ? (
           <View style={styles.center}>
-            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+            <Text style={[styles.emptyBody, { color: t.textMuted }]}>
               Could not load media. Try again.
             </Text>
           </View>
         ) : (
           <>
             {mainTab === 'memes' && subTab === 'trending' && trendingMemes.length === 0 ? (
-              <Text allowFontScaling={false} style={[styles.banner, { color: t.textMuted }]}>
+              <Text style={[styles.banner, { color: t.textMuted }]}>
                 Upload an image meme — trending fills from real Arena reactions, not fake counts.
               </Text>
             ) : null}
             {mainTab === 'stickers' && subTab === 'trending' ? (
-              <Text allowFontScaling={false} style={[styles.banner, { color: t.textMuted }]}>
+              <Text style={[styles.banner, { color: t.textMuted }]}>
                 CLASH stickers · works offline from the GIF provider
                 {gifStatus.configured ? ` · + ${gifStatus.label}` : ''}
               </Text>
@@ -733,7 +733,7 @@ export function ExpressiveMediaTray({
             />
           </>
         )}
-        <Text allowFontScaling={false} style={[styles.attribution, { color: t.textMuted }]}>
+        <Text style={[styles.attribution, { color: t.textMuted }]}>
           {gifStatus.configured
             ? `GIFs via ${gifStatus.label} · CLASH stickers & memes`
             : 'CLASH stickers & memes · GIF search not configured'}

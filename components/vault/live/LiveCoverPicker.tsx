@@ -74,7 +74,7 @@ export function LiveCoverPicker({
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+      <Text style={[styles.label, { color: t.textMuted }]}>
         COVER (OPTIONAL)
       </Text>
       {previewUri ? (

@@ -98,13 +98,13 @@ export default function CreateCrewScreen(): React.JSX.Element {
         <Pressable onPress={() => router.back()} accessibilityLabel="Go back" style={styles.back}>
           <BackIcon size={22} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
-        <Text allowFontScaling={false} style={[styles.barTitle, { color: t.textPrimary }]}>
+        <Text style={[styles.barTitle, { color: t.textPrimary }]}>
           Create group
         </Text>
       </View>
 
       {error ? (
-        <Text allowFontScaling={false} style={[styles.errorBanner, { color: t.textMuted }]}>
+        <Text style={[styles.errorBanner, { color: t.textMuted }]}>
           {error}
         </Text>
       ) : null}
@@ -121,7 +121,7 @@ export default function CreateCrewScreen(): React.JSX.Element {
             specialties={specialties}
             size={72}
           />
-          <Text allowFontScaling={false} style={[styles.previewHint, { color: t.textMuted }]}>
+          <Text style={[styles.previewHint, { color: t.textMuted }]}>
             Crest is automatic for now — your name is the identity.
           </Text>
         </View>
@@ -175,7 +175,7 @@ export default function CreateCrewScreen(): React.JSX.Element {
           />
         </Field>
 
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textSecondary }]}>
+        <Text style={[styles.label, { color: t.textSecondary }]}>
           Specialties · up to 4
         </Text>
         <View style={styles.specialtyRow}>
@@ -196,7 +196,7 @@ export default function CreateCrewScreen(): React.JSX.Element {
                 ]}
               >
                 <Text
-                  allowFontScaling={false}
+                 
                   style={{
                     ...typeScale.label,
                     fontSize: 13,
@@ -211,7 +211,7 @@ export default function CreateCrewScreen(): React.JSX.Element {
           })}
         </View>
 
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textSecondary, marginTop: space.md }]}>
+        <Text style={[styles.label, { color: t.textSecondary, marginTop: space.md }]}>
           Who can join
         </Text>
         <View style={styles.modeRow}>
@@ -234,10 +234,10 @@ export default function CreateCrewScreen(): React.JSX.Element {
                   },
                 ]}
               >
-                <Text allowFontScaling={false} style={[styles.modeLabel, { color: t.textPrimary }]}>
+                <Text style={[styles.modeLabel, { color: t.textPrimary }]}>
                   {m.label}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.modeHint, { color: t.textMuted }]}>
+                <Text style={[styles.modeHint, { color: t.textMuted }]}>
                   {m.hint}
                 </Text>
               </Pressable>
@@ -261,7 +261,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   const t = useThemeColors();
   return (
     <View style={styles.field}>
-      <Text allowFontScaling={false} style={[styles.label, { color: t.textSecondary }]}>
+      <Text style={[styles.label, { color: t.textSecondary }]}>
         {label}
       </Text>
       {children}

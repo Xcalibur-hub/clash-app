@@ -127,7 +127,7 @@ export function CommunityThread({
               accessibilityRole="button"
               accessibilityLabel="Add a reply"
             >
-              <Text allowFontScaling={false} style={[styles.replyCtaLabel, { color: t.textSecondary }]}>
+              <Text style={[styles.replyCtaLabel, { color: t.textSecondary }]}>
                 Add a reply
               </Text>
             </Pressable>

@@ -67,21 +67,21 @@ export const FeaturedWorld = React.memo(function FeaturedWorld({
         <LinearGradient colors={['rgba(0,0,0,0.18)', 'transparent', 'rgba(0,0,0,0.88)']} style={StyleSheet.absoluteFill} />
 
         <View style={styles.copy}>
-          <Text allowFontScaling={false} style={styles.kind}>
+          <Text style={styles.kind}>
             FEATURED WORLD
           </Text>
-          <Text allowFontScaling={false} style={styles.name} numberOfLines={1}>
+          <Text style={styles.name} numberOfLines={1}>
             {creator.name}
           </Text>
           {happening ? (
-            <Text allowFontScaling={false} style={styles.happening} numberOfLines={2}>
+            <Text style={styles.happening} numberOfLines={2}>
               {happening}
             </Text>
           ) : null}
-          <Text allowFontScaling={false} style={styles.identity} numberOfLines={1}>
+          <Text style={styles.identity} numberOfLines={1}>
             {identity}
           </Text>
-          <Text allowFontScaling={false} style={styles.enter}>
+          <Text style={styles.enter}>
             ENTER →
           </Text>
         </View>

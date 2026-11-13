@@ -29,10 +29,10 @@ export function LiveCrowdOverlay({ banner }: LiveCrowdOverlayProps): React.JSX.E
       accessibilityLiveRegion="polite"
     >
       <View style={styles.plate}>
-        <Text allowFontScaling={false} style={styles.label}>
+        <Text style={styles.label}>
           {banner.actionKind ? liveActionLabel(banner.actionKind).toUpperCase() : 'ACTION'}
         </Text>
-        <Text allowFontScaling={false} style={styles.sub}>
+        <Text style={styles.sub}>
           triggered by the crowd
         </Text>
       </View>

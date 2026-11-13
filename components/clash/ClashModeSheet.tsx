@@ -80,27 +80,27 @@ export function ClashModeSheet({
           onStartShouldSetResponder={() => true}
           accessibilityViewIsModal
         >
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             Start a Clash
           </Text>
 
           <View style={styles.versus}>
             <View style={[styles.sideChip, { backgroundColor: 'rgba(165,128,255,0.14)', borderColor: SIDE_A }]}>
-              <Text allowFontScaling={false} style={[styles.sideLabel, { color: SIDE_A }]}>
+              <Text style={[styles.sideLabel, { color: SIDE_A }]}>
                 SIDE A
               </Text>
-              <Text allowFontScaling={false} style={[styles.sideBody, { color: t.textPrimary }]}>
+              <Text style={[styles.sideBody, { color: t.textPrimary }]}>
                 This Take
               </Text>
             </View>
-            <Text allowFontScaling={false} style={[styles.vs, { color: t.textMuted }]}>
+            <Text style={[styles.vs, { color: t.textMuted }]}>
               VS
             </Text>
             <View style={[styles.sideChip, { backgroundColor: 'rgba(61,139,255,0.14)', borderColor: SIDE_B }]}>
-              <Text allowFontScaling={false} style={[styles.sideLabel, { color: SIDE_B }]}>
+              <Text style={[styles.sideLabel, { color: SIDE_B }]}>
                 SIDE B
               </Text>
-              <Text allowFontScaling={false} style={[styles.sideBody, { color: t.textPrimary }]}>
+              <Text style={[styles.sideBody, { color: t.textPrimary }]}>
                 Challenger
               </Text>
             </View>
@@ -121,10 +121,10 @@ export function ClashModeSheet({
               },
             ]}
           >
-            <Text allowFontScaling={false} style={[styles.optionTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.optionTitle, { color: t.textPrimary }]}>
               Standard Clash
             </Text>
-            <Text allowFontScaling={false} style={[styles.optionBody, { color: t.textMuted }]}>
+            <Text style={[styles.optionBody, { color: t.textMuted }]}>
               Identities are visible while judging.
             </Text>
           </Pressable>
@@ -144,10 +144,10 @@ export function ClashModeSheet({
               },
             ]}
           >
-            <Text allowFontScaling={false} style={[styles.optionTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.optionTitle, { color: t.textPrimary }]}>
               Blind Clash
             </Text>
-            <Text allowFontScaling={false} style={[styles.optionBody, { color: t.textMuted }]}>
+            <Text style={[styles.optionBody, { color: t.textMuted }]}>
               Participants stay hidden until you judge.
             </Text>
           </Pressable>
@@ -155,7 +155,7 @@ export function ClashModeSheet({
           {submitting ? (
             <View style={styles.statusRow} accessibilityLiveRegion="polite">
               <ActivityIndicator size="small" color={t.textPrimary} />
-              <Text allowFontScaling={false} style={[styles.statusText, { color: t.textSecondary }]}>
+              <Text style={[styles.statusText, { color: t.textSecondary }]}>
                 Starting Clash…
               </Text>
             </View>
@@ -163,7 +163,7 @@ export function ClashModeSheet({
 
           {error && !submitting ? (
             <Text
-              allowFontScaling={false}
+             
               style={[styles.error, { color: t.danger, backgroundColor: t.surfaceMuted }]}
               accessibilityLiveRegion="assertive"
               accessibilityRole="alert"

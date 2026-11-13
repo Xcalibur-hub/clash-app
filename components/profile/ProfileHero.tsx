@@ -14,11 +14,11 @@ export function ProfileHero({ viewer }: { viewer: User }): React.JSX.Element {
   return (
     <View style={styles.wrap}>
       <Avatar name={viewer.name} tint={viewer.tint} size={88} />
-      <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={2}>
+      <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={2}>
         {viewer.name}
       </Text>
       <View style={styles.handleRow}>
-        <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]}>
+        <Text style={[styles.handle, { color: t.textMuted }]}>
           @{viewer.handle}
         </Text>
         <Underline size={64} opacity={0.22} color={t.textPrimary} style={styles.handleMark} />
@@ -27,7 +27,7 @@ export function ProfileHero({ viewer }: { viewer: User }): React.JSX.Element {
         <Text style={[styles.bio, { color: t.textPrimary }]}>{viewer.bio}</Text>
       ) : null}
       {viewer.hood !== 'for-you' ? (
-        <Text allowFontScaling={false} style={[styles.hood, { color: t.textSecondary }]}>
+        <Text style={[styles.hood, { color: t.textSecondary }]}>
           {HOOD_LABEL[viewer.hood]}
         </Text>
       ) : null}

@@ -46,14 +46,14 @@ export const GalleryShelf = React.memo(function GalleryShelf({
               />
             </View>
             <View style={[styles.label, right && styles.labelRight]}>
-              <Text allowFontScaling={false} style={[styles.index, { color: t.textMuted }]}>
+              <Text style={[styles.index, { color: t.textMuted }]}>
                 {String(index + 1).padStart(2, '0')}
               </Text>
-              <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
+              <Text style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
                 {item.title}
               </Text>
               {item.meta ? (
-                <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
+                <Text style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
                   {item.meta}
                 </Text>
               ) : null}

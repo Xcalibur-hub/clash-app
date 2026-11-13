@@ -37,7 +37,7 @@ export function TakeHeader({ author, take, isViewer, onMore }: TakeHeaderProps):
         <Avatar name={author.name} tint={author.tint} size={36} />
       </Pressable>
       <View style={styles.names}>
-        <Text allowFontScaling={false} style={[styles.primary, { color: t.textPrimary }]} numberOfLines={1}>
+        <Text style={[styles.primary, { color: t.textPrimary }]} numberOfLines={1}>
           {author.name}
           <Text
             style={{ color: t.textSecondary, fontWeight: '600' }}
@@ -48,7 +48,7 @@ export function TakeHeader({ author, take, isViewer, onMore }: TakeHeaderProps):
             {HOOD_LABEL[take.hood]}
           </Text>
         </Text>
-        <Text allowFontScaling={false} style={[styles.secondary, { color: t.textMuted }]} numberOfLines={1}>
+        <Text style={[styles.secondary, { color: t.textMuted }]} numberOfLines={1}>
           @{author.handle} · {timeAgo(take.createdAt)}
           {isViewer ? ' · You' : ''}
           {' · '}

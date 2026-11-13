@@ -255,10 +255,10 @@ export function CreatorStudio(): React.JSX.Element {
           },
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+        <Text style={[styles.brand, { color: t.textPrimary }]}>
           Studio
         </Text>
-        <Text allowFontScaling={false} style={[styles.tagline, { color: t.textSecondary }]}>
+        <Text style={[styles.tagline, { color: t.textSecondary }]}>
           Manage Drops, services, courses, and shop.
         </Text>
 
@@ -341,7 +341,7 @@ export function CreatorStudio(): React.JSX.Element {
             ))}
             {requests.length > 0 ? (
               <>
-                <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+                <Text style={[styles.section, { color: t.textMuted }]}>
                   REQUESTS
                 </Text>
                 {requests.map((req) => (
@@ -349,10 +349,10 @@ export function CreatorStudio(): React.JSX.Element {
                     key={req.id}
                     style={[styles.request, { borderColor: t.border, backgroundColor: t.surface }]}
                   >
-                    <Text allowFontScaling={false} style={[styles.rowTitle, { color: t.textPrimary }]} numberOfLines={2}>
+                    <Text style={[styles.rowTitle, { color: t.textPrimary }]} numberOfLines={2}>
                       {req.message}
                     </Text>
-                    <Text allowFontScaling={false} style={[styles.rowMeta, { color: t.textMuted }]}>
+                    <Text style={[styles.rowMeta, { color: t.textMuted }]}>
                       {req.status}
                     </Text>
                     {req.status === 'requested' ? (
@@ -477,7 +477,7 @@ export function CreatorStudio(): React.JSX.Element {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setCreateOpen(false)} />
           <Animated.View entering={FadeInUp.duration(duration.base)} style={styles.sheet}>
             <View style={[styles.sheetCard, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-              <Text allowFontScaling={false} style={[styles.sheetTitle, { color: t.textPrimary }]}>
+              <Text style={[styles.sheetTitle, { color: t.textPrimary }]}>
                 Create {createKind}
               </Text>
               <TextInput
@@ -527,10 +527,10 @@ function StudioRow({
   return (
     <View style={[styles.row, { borderColor: t.border, backgroundColor: t.surface }]}>
       <Pressable onPress={onOpen} style={styles.rowMain}>
-        <Text allowFontScaling={false} style={[styles.rowTitle, { color: t.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.rowTitle, { color: t.textPrimary }]} numberOfLines={2}>
           {title}
         </Text>
-        <Text allowFontScaling={false} style={[styles.rowMeta, { color: t.textMuted }]}>
+        <Text style={[styles.rowMeta, { color: t.textMuted }]}>
           {meta}
         </Text>
       </Pressable>

@@ -78,18 +78,18 @@ export function NotificationRow({ notification, actor, onPress }: NotificationRo
       )}
       <View style={styles.body}>
         <Text
-          allowFontScaling={false}
+         
           style={[styles.title, { color: unread ? t.textPrimary : t.textMuted }, unread && styles.titleUnread]}
           numberOfLines={2}
         >
           {title}
         </Text>
         {subtitle ? (
-          <Text allowFontScaling={false} style={[styles.subtitle, { color: t.textMuted }]} numberOfLines={1}>
+          <Text style={[styles.subtitle, { color: t.textMuted }]} numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={[styles.time, { color: t.textMuted }]}>
+        <Text style={[styles.time, { color: t.textMuted }]}>
           {timeAgo(notification.createdAt)}
         </Text>
       </View>

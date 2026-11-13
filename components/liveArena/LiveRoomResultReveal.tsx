@@ -122,18 +122,18 @@ export function LiveRoomResultReveal({
           revealed,
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           {roomIndex != null ? `ROOM ${roomIndex} DECIDED` : '◆ ROOM DECIDED'}
         </Text>
         {topicTitle ? (
-          <Text allowFontScaling={false} style={[styles.topic, { color: t.textSecondary }]} numberOfLines={2}>
+          <Text style={[styles.topic, { color: t.textSecondary }]} numberOfLines={2}>
             {topicTitle}
           </Text>
         ) : null}
 
         <View style={styles.headline}>
           <Text
-            allowFontScaling={false}
+           
             style={[styles.side, { color: winnerTone?.ink ?? t.textPrimary }]}
           >
             {isDraw
@@ -143,13 +143,13 @@ export function LiveRoomResultReveal({
                 : 'SIDE B WON'}
           </Text>
           {!isDraw && winnerPercent !== null ? (
-            <Text allowFontScaling={false} style={[styles.percent, { color: winnerTone?.ink ?? t.textSecondary }]}>
+            <Text style={[styles.percent, { color: winnerTone?.ink ?? t.textSecondary }]}>
               {winnerPercent}%
             </Text>
           ) : null}
         </View>
 
-        <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]}>
+        <Text style={[styles.sub, { color: t.textSecondary }]}>
           {isDraw
             ? totalVotes === 0
               ? 'Nobody cast a side vote.'
@@ -159,7 +159,7 @@ export function LiveRoomResultReveal({
 
         <ClashMatchupBar size="room" agreeShare={agreeShare} />
 
-        <Text allowFontScaling={false} style={[styles.sub, { color: t.textMuted }]}>
+        <Text style={[styles.sub, { color: t.textMuted }]}>
           {result.participantCount.toLocaleString()} participants
         </Text>
         <GlowButton label="Share result" onPress={() => void onShare()} compact tone="glass" />
@@ -173,7 +173,7 @@ export function LiveRoomResultReveal({
           entering={reduced ? undefined : FadeIn.delay(220).duration(260)}
           style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }]}
         >
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+          <Text style={[styles.eyebrow, { color: t.textMuted }]}>
             BEST ARGUMENT
           </Text>
           {result.bestArgumentAuthor ? (
@@ -183,13 +183,13 @@ export function LiveRoomResultReveal({
                 tint={result.bestArgumentAuthor.avatarTint}
                 size={24}
               />
-              <Text allowFontScaling={false} style={[styles.authorName, { color: t.textPrimary }]}>
+              <Text style={[styles.authorName, { color: t.textPrimary }]}>
                 {result.bestArgumentAuthor.name}
               </Text>
             </View>
           ) : null}
           {result.bestArgumentBody ? (
-            <Text allowFontScaling={false} style={[styles.quote, { color: t.textPrimary }]}>
+            <Text style={[styles.quote, { color: t.textPrimary }]}>
               {result.bestArgumentBody}
             </Text>
           ) : null}
@@ -201,13 +201,13 @@ export function LiveRoomResultReveal({
           entering={reduced ? undefined : FadeIn.delay(320).duration(260)}
           style={[styles.card, { backgroundColor: softFill(t), borderColor: t.border }]}
         >
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+          <Text style={[styles.eyebrow, { color: t.textMuted }]}>
             BIGGEST MINDSHIFT
           </Text>
-          <Text allowFontScaling={false} style={[styles.mindshift, { color: t.textPrimary }]}>
+          <Text style={[styles.mindshift, { color: t.textPrimary }]}>
             {changedPercent}%
           </Text>
-          <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]}>
+          <Text style={[styles.sub, { color: t.textSecondary }]}>
             changed their mind in this room
           </Text>
         </Animated.View>
@@ -218,15 +218,15 @@ export function LiveRoomResultReveal({
           entering={reduced ? undefined : FadeIn.delay(360).duration(260)}
           style={[styles.card, { backgroundColor: softFill(t), borderColor: t.borderStrong }]}
         >
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+          <Text style={[styles.eyebrow, { color: t.textMuted }]}>
             💀 CROWD MOMENT
           </Text>
           {crowdMoment.author ? (
-            <Text allowFontScaling={false} style={[styles.authorName, { color: t.textPrimary }]}>
+            <Text style={[styles.authorName, { color: t.textPrimary }]}>
               {crowdMoment.author}
             </Text>
           ) : null}
-          <Text allowFontScaling={false} style={[styles.quote, { color: t.textPrimary }]}>
+          <Text style={[styles.quote, { color: t.textPrimary }]}>
             {crowdMoment.preview}
           </Text>
         </Animated.View>
@@ -239,16 +239,16 @@ export function LiveRoomResultReveal({
             disabled={busy}
             onChoose={onRecordFinal}
           />
-          <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+          <Text style={[styles.note, { color: t.textMuted }]}>
             Recorded once, and only as an aggregate. Nobody sees your answer.
           </Text>
         </View>
       ) : viewer?.finalStance && viewer.stance ? (
         <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }]}>
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+          <Text style={[styles.eyebrow, { color: t.textMuted }]}>
             YOUR JOURNEY
           </Text>
-          <Text allowFontScaling={false} style={[styles.journey, { color: t.textPrimary }]}>
+          <Text style={[styles.journey, { color: t.textPrimary }]}>
             {STANCE_LABEL[viewer.stance]} → {STANCE_LABEL[viewer.finalStance]}
           </Text>
         </View>

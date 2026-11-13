@@ -25,3 +25,26 @@ export const spring = {
 export const scale = {
   press: 0.985,
 } as const;
+
+/**
+ * AURA motion grammar.
+ *
+ * One rule: motion communicates *state change*, never decoration. Distances are
+ * small (6–14dp) so an entrance reads as "settled into place" rather than a
+ * performance, and every value here is gated by `useReducedMotion()` at the
+ * component that consumes it.
+ */
+export const presence = {
+  /** New content arriving into a list. */
+  enter: { from: { opacity: 0, translateY: 8 }, duration: 240 },
+  /** Content leaving — faster than entering, so removal feels decisive. */
+  exit: { to: { opacity: 0, translateY: -4 }, duration: 160 },
+  /** Sheets and docks. */
+  overlay: { from: { opacity: 0, translateY: 14 }, duration: 280 },
+  /** Press feedback scale on large surfaces. */
+  pressLarge: 0.99,
+  /** Stagger between siblings in a stack (ms). */
+  stagger: 40,
+  /** Maximum siblings that may stagger; beyond this they animate together. */
+  staggerMax: 4,
+} as const;

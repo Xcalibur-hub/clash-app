@@ -112,7 +112,7 @@ export function CommunityFeed({
         );
       case 'empty':
         return (
-          <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+          <Text style={[styles.empty, { color: t.textMuted }]}>
             No discussions yet. Start the first one.
           </Text>
         );

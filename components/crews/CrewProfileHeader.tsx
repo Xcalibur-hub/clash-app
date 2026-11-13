@@ -95,7 +95,7 @@ export function CrewProfileHeader({
           avatarUrl={crew.avatarUrl}
           size={28}
         />
-        <Text allowFontScaling={false} style={[styles.compactName, { color: t.textPrimary }]} numberOfLines={1}>
+        <Text style={[styles.compactName, { color: t.textPrimary }]} numberOfLines={1}>
           {crew.name}
         </Text>
       </Animated.View>
@@ -119,14 +119,14 @@ export function CrewProfileHeader({
             avatarUrl={crew.avatarUrl}
             size={88}
           />
-          <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
+          <Text style={[styles.name, { color: t.textPrimary }]}>
             {crew.name}
           </Text>
-          <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]}>
+          <Text style={[styles.handle, { color: t.textMuted }]}>
             @{crew.slug}
           </Text>
           {crew.bio.trim() ? (
-            <Text allowFontScaling={false} style={[styles.bio, { color: t.textSecondary }]}>
+            <Text style={[styles.bio, { color: t.textSecondary }]}>
               {crew.bio.trim()}
             </Text>
           ) : null}
@@ -135,7 +135,7 @@ export function CrewProfileHeader({
             {chips.map((chip) => (
               <Text
                 key={chip}
-                allowFontScaling={false}
+               
                 style={[styles.chip, { color: t.textSecondary, borderColor: t.border }]}
               >
                 {chip}
@@ -143,7 +143,7 @@ export function CrewProfileHeader({
             ))}
           </View>
 
-          <Text allowFontScaling={false} style={[styles.stats, { color: t.textMuted }]}>
+          <Text style={[styles.stats, { color: t.textMuted }]}>
             {formatCrewMembers(crew.memberCount)}
             {crew.wins + crew.losses > 0
               ? ` · ${crew.wins}–${crew.losses}`
@@ -166,7 +166,7 @@ export function CrewProfileHeader({
 
       {members.length > 0 ? (
         <View style={[styles.members, { borderTopColor: t.border }]}>
-          <Text allowFontScaling={false} style={[styles.membersTitle, { color: t.textSecondary }]}>
+          <Text style={[styles.membersTitle, { color: t.textSecondary }]}>
             MEMBERS
           </Text>
           {members.map((m) => (
@@ -179,10 +179,10 @@ export function CrewProfileHeader({
             >
               <Avatar name={m.name} tint={m.tint} size={40} />
               <View style={styles.memberMeta}>
-                <Text allowFontScaling={false} style={[styles.memberName, { color: t.textPrimary }]} numberOfLines={1}>
+                <Text style={[styles.memberName, { color: t.textPrimary }]} numberOfLines={1}>
                   {m.name}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.memberHandle, { color: t.textMuted }]} numberOfLines={1}>
+                <Text style={[styles.memberHandle, { color: t.textMuted }]} numberOfLines={1}>
                   @{m.handle}
                   {m.role === 'OWNER' ? ' · Owner' : m.role === 'MODERATOR' ? ' · Mod' : ''}
                 </Text>

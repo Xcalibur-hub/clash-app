@@ -178,7 +178,7 @@ export function GifPickerSheet({
             <View style={[styles.handle, { backgroundColor: t.borderStrong }]} />
           </View>
           <View style={styles.titleRow}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               GIFs
             </Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
@@ -203,10 +203,10 @@ export function GifPickerSheet({
 
           {state === 'unconfigured' ? (
             <View style={styles.message}>
-              <Text allowFontScaling={false} style={[styles.messageTitle, { color: t.textPrimary }]}>
+              <Text style={[styles.messageTitle, { color: t.textPrimary }]}>
                 GIF search isn’t set up
               </Text>
-              <Text allowFontScaling={false} style={[styles.messageBody, { color: t.textMuted }]}>
+              <Text style={[styles.messageBody, { color: t.textMuted }]}>
                 {getGifProviderStatus().setupHint}
               </Text>
             </View>
@@ -216,10 +216,10 @@ export function GifPickerSheet({
             </View>
           ) : state === 'error' ? (
             <View style={styles.message}>
-              <Text allowFontScaling={false} style={[styles.messageTitle, { color: t.textPrimary }]}>
+              <Text style={[styles.messageTitle, { color: t.textPrimary }]}>
                 Couldn't load GIFs
               </Text>
-              <Text allowFontScaling={false} style={[styles.messageBody, { color: t.textMuted }]}>
+              <Text style={[styles.messageBody, { color: t.textMuted }]}>
                 {error}
               </Text>
               <Pressable
@@ -228,17 +228,17 @@ export function GifPickerSheet({
                 }}
                 style={[styles.retry, { backgroundColor: t.clashFill }]}
               >
-                <Text allowFontScaling={false} style={[styles.retryText, { color: t.clashText }]}>
+                <Text style={[styles.retryText, { color: t.clashText }]}>
                   Retry
                 </Text>
               </Pressable>
             </View>
           ) : state === 'empty' ? (
             <View style={styles.message}>
-              <Text allowFontScaling={false} style={[styles.messageTitle, { color: t.textPrimary }]}>
+              <Text style={[styles.messageTitle, { color: t.textPrimary }]}>
                 No GIFs found
               </Text>
-              <Text allowFontScaling={false} style={[styles.messageBody, { color: t.textMuted }]}>
+              <Text style={[styles.messageBody, { color: t.textMuted }]}>
                 Try a different search.
               </Text>
             </View>
@@ -262,7 +262,7 @@ export function GifPickerSheet({
                 ) : (
                   <View>
                     {error?<Pressable accessibilityRole="button" onPress={()=>void load(debounced,next??undefined,true)} style={styles.retry}><Text style={{color:t.textSecondary}}>Couldn’t load more GIFs. Tap to retry.</Text></Pressable>:null}
-                    <Text allowFontScaling={false} style={[styles.credit, { color: t.textMuted }]}>Powered by Tenor</Text>
+                    <Text style={[styles.credit, { color: t.textMuted }]}>Powered by Tenor</Text>
                   </View>
                 )
               }

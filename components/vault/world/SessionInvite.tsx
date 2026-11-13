@@ -55,26 +55,26 @@ export const SessionInvite = React.memo(function SessionInvite({
             onPress={() => onOpen(item.id)}
           />
           <View style={styles.body}>
-            <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+            <Text style={[styles.kicker, { color: t.textMuted }]}>
               {`WORK WITH ${first.toUpperCase()}`}
             </Text>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={3}>
+            <Text style={[styles.title, { color: t.textPrimary }]} numberOfLines={3}>
               {item.title}
             </Text>
             {item.subtitle ? (
-              <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]} numberOfLines={2}>
+              <Text style={[styles.sub, { color: t.textSecondary }]} numberOfLines={2}>
                 {item.subtitle}
               </Text>
             ) : null}
             <View style={styles.footer}>
               {item.meta ? (
-                <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
+                <Text style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
                   {item.meta}
                 </Text>
               ) : (
                 <View />
               )}
-              <Text allowFontScaling={false} style={[styles.cta, { color: t.textPrimary }]}>
+              <Text style={[styles.cta, { color: t.textPrimary }]}>
                 REQUEST SESSION →
               </Text>
             </View>

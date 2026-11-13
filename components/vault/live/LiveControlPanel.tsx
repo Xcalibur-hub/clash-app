@@ -46,10 +46,10 @@ export function LiveControlPanel({
 
   return (
     <View style={[styles.wrap, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         {`YOUR SESSION · ${liveStatusLabel(session.status)}`}
       </Text>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         {session.title}
       </Text>
 
@@ -68,11 +68,11 @@ export function LiveControlPanel({
       {fired.length > 0 ? (
         <View style={styles.fired}>
           {fired.slice(0, 3).map((item) => (
-            <Text key={item.id} allowFontScaling={false} style={[styles.firedLine, { color: t.textPrimary }]}>
+            <Text key={item.id} style={[styles.firedLine, { color: t.textPrimary }]}>
               {`${item.actionKind ? liveActionLabel(item.actionKind) : 'Action'} — triggered by the crowd (${item.totalVotes}/${item.threshold ?? 0})`}
             </Text>
           ))}
-          <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+          <Text style={[styles.note, { color: t.textMuted }]}>
             {`Verifying the adapter: the server emitted ${
               fired[0]?.actionKind ?? 'an approved action'
             } and nothing else.`}
@@ -84,10 +84,10 @@ export function LiveControlPanel({
         <View style={styles.list}>
           {open.map((item) => (
             <View key={item.id} style={[styles.item, { borderColor: t.border }]}>
-              <Text allowFontScaling={false} style={[styles.itemTitle, { color: t.textPrimary }]} numberOfLines={1}>
+              <Text style={[styles.itemTitle, { color: t.textPrimary }]} numberOfLines={1}>
                 {`${interactionTypeLabel(item.type)} · ${item.prompt}`}
               </Text>
-              <Text allowFontScaling={false} style={[styles.note, { color: t.textMuted }]}>
+              <Text style={[styles.note, { color: t.textMuted }]}>
                 {item.threshold != null
                   ? `${item.totalVotes}/${item.threshold} · ${Math.round(
                       thresholdProgress(item.totalVotes, item.threshold) * 100,

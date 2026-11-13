@@ -111,14 +111,14 @@ export function ExploreMediaTile({
           style={styles.scrim}
         />
         <View style={styles.copy}>
-          <Text allowFontScaling={false} style={styles.kind}>
+          <Text style={styles.kind}>
             {kind}
           </Text>
-          <Text allowFontScaling={false} style={styles.title} numberOfLines={span === 'hero' ? 3 : 2}>
+          <Text style={styles.title} numberOfLines={span === 'hero' ? 3 : 2}>
             {title}
           </Text>
           {subtitle ? (
-            <Text allowFontScaling={false} style={styles.sub} numberOfLines={1}>
+            <Text style={styles.sub} numberOfLines={1}>
               {subtitle}
             </Text>
           ) : null}

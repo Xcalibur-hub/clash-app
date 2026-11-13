@@ -80,7 +80,7 @@ export function ClashCountdown({
     if (compact) {
       return (
         <Animated.View style={pulse} accessibilityLiveRegion="polite" accessibilityLabel={`${remSec} seconds remaining`}>
-          <Text allowFontScaling={false} style={[styles.compact, { color: t.accent }]}>
+          <Text style={[styles.compact, { color: t.accent }]}>
             Final · {remSec}
           </Text>
         </Animated.View>
@@ -92,10 +92,10 @@ export function ClashCountdown({
         accessibilityLiveRegion="polite"
         accessibilityLabel={`${remSec} seconds remaining`}
       >
-        <Text allowFontScaling={false} style={[styles.criticalNum, { color: t.textPrimary }]}>
+        <Text style={[styles.criticalNum, { color: t.textPrimary }]}>
           {remSec}
         </Text>
-        <Text allowFontScaling={false} style={[styles.criticalHint, { color: t.accent }]}>
+        <Text style={[styles.criticalHint, { color: t.accent }]}>
           Final seconds
         </Text>
       </Animated.View>
@@ -115,7 +115,7 @@ export function ClashCountdown({
 
     return (
       <Text
-        allowFontScaling={false}
+       
         style={[styles.compact, { color: tone }]}
         accessibilityLiveRegion="polite"
         accessibilityLabel={status}
@@ -153,7 +153,7 @@ export function ClashCountdown({
             : `Time remaining ${label}`
       }
     >
-      <Text allowFontScaling={false} style={[styles.label, { color: tone }]}>
+      <Text style={[styles.label, { color: tone }]}>
         {label}
       </Text>
     </View>

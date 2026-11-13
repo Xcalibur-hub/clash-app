@@ -23,7 +23,7 @@ export function ProfileTakeItem({ take, onOpen }: { take: Take; onOpen: () => vo
       <Text style={[styles.body, { color: t.textPrimary }]} numberOfLines={4}>
         {take.text}
       </Text>
-      <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+      <Text style={[styles.meta, { color: t.textMuted }]}>
         {[
           HOOD_LABEL[take.hood],
           timeAgo(take.createdAt),
@@ -54,11 +54,11 @@ export function ProfileReplyItem({ reply, onOpen }: { reply: ProfileReply; onOpe
         {reply.comment.text}
       </Text>
       {reply.take ? (
-        <Text allowFontScaling={false} style={[styles.context, { color: t.textSecondary }]} numberOfLines={1}>
+        <Text style={[styles.context, { color: t.textSecondary }]} numberOfLines={1}>
           on “{reply.take.text}”
         </Text>
       ) : null}
-      <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+      <Text style={[styles.meta, { color: t.textMuted }]}>
         {[
           reply.comment.upvotes > 0 ? `${reply.comment.upvotes} upvotes` : null,
           timeAgo(reply.comment.createdAt),
@@ -123,7 +123,7 @@ export function ProfileClashRow({
       style={[styles.row, { borderBottomColor: t.border }]}
     >
       <Text
-        allowFontScaling={false}
+       
         style={[
           styles.clashKicker,
           { color: isWin ? t.textPrimary : t.textMuted },
@@ -133,22 +133,22 @@ export function ProfileClashRow({
       </Text>
 
       {clash.takeText ? (
-        <Text allowFontScaling={false} style={[styles.clashQuote, { color: t.textPrimary }]} numberOfLines={3}>
+        <Text style={[styles.clashQuote, { color: t.textPrimary }]} numberOfLines={3}>
           “{clash.takeText}”
         </Text>
       ) : null}
 
       {share ? (
-        <Text allowFontScaling={false} style={[styles.share, { color: t.textSecondary }]}>
+        <Text style={[styles.share, { color: t.textSecondary }]}>
           {share}
         </Text>
       ) : clash.verdict ? (
-        <Text allowFontScaling={false} style={[styles.share, { color: t.textSecondary }]}>
+        <Text style={[styles.share, { color: t.textSecondary }]}>
           {clash.verdict.sideAScore}–{clash.verdict.sideBScore} · {clash.verdict.verdictLabel}
         </Text>
       ) : null}
 
-      <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+      <Text style={[styles.meta, { color: t.textMuted }]}>
         {[
           opponent ? `vs @${opponent.handle}` : 'hidden opponent',
           timeAgo(clash.clash.createdAt),

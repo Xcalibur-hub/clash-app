@@ -28,3 +28,4 @@ supabase/.branches/
 # Expo generated native projects
 /android/
 /ios/
+.aura-render-check.cjs

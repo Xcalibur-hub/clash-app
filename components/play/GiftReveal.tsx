@@ -30,20 +30,20 @@ export function GiftReveal({
         colors={['#1A1712', '#2A2418', '#121214']}
         style={StyleSheet.absoluteFill}
       />
-      <Animated.Text entering={FadeInUp.delay(80)} allowFontScaling={false} style={styles.kicker}>
+      <Animated.Text entering={FadeInUp.delay(80)} style={styles.kicker}>
         YOU FOUND IT
       </Animated.Text>
       <Animated.View entering={ZoomIn.delay(160).springify()} style={styles.gift}>
         <LinearGradient colors={['#E8D5A3', '#B8954A']} style={styles.giftInner}>
-          <Text allowFontScaling={false} style={styles.giftMark}>
+          <Text style={styles.giftMark}>
             ✦
           </Text>
         </LinearGradient>
       </Animated.View>
-      <Animated.Text entering={FadeInUp.delay(220)} allowFontScaling={false} style={styles.title}>
+      <Animated.Text entering={FadeInUp.delay(220)} style={styles.title}>
         {label}
       </Animated.Text>
-      <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+      <Text style={[styles.meta, { color: t.textMuted }]}>
         {rewardType.replace(/_/g, ' ')}
       </Text>
       <Pressable
@@ -53,7 +53,7 @@ export function GiftReveal({
         accessibilityRole="button"
         accessibilityLabel={claimed ? 'Reward claimed' : 'Claim reward'}
       >
-        <Text allowFontScaling={false} style={styles.claimLabel}>
+        <Text style={styles.claimLabel}>
           {claimed ? 'Claimed' : claiming ? 'Claiming…' : 'Claim'}
         </Text>
       </Pressable>

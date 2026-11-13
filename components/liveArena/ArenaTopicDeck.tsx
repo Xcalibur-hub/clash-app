@@ -205,10 +205,10 @@ export function ArenaTopicDeck({
   return (
     <View style={styles.section}>
       <View style={styles.header}>
-        <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
+        <Text style={[styles.sectionTitle, { color: t.textPrimary }]}>
           TODAY'S ARENA
         </Text>
-        <Text allowFontScaling={false} style={[styles.sectionSub, { color: t.textMuted }]}>
+        <Text style={[styles.sectionSub, { color: t.textMuted }]}>
           Debates happening right now
         </Text>
         {showFilters ? (
@@ -237,7 +237,7 @@ export function ArenaTopicDeck({
 
       {filtered.length === 0 ? (
         <View style={[styles.empty, { backgroundColor: t.surfaceMuted }]}>
-          <Text allowFontScaling={false} style={[styles.emptyText, { color: t.textMuted }]}>
+          <Text style={[styles.emptyText, { color: t.textMuted }]}>
             No live topics in this category.
           </Text>
         </View>
@@ -312,7 +312,7 @@ export function ArenaTopicDeck({
                 accessibilityLabel="Previous arena topic"
                 style={[styles.tapHit, { opacity: index <= 0 ? 0.35 : 1 }]}
               >
-                <Text allowFontScaling={false} style={[styles.tapLabel, { color: t.textSecondary }]}>
+                <Text style={[styles.tapLabel, { color: t.textSecondary }]}>
                   Previous
                 </Text>
               </Pressable>
@@ -323,7 +323,7 @@ export function ArenaTopicDeck({
                 accessibilityLabel="Next arena topic"
                 style={[styles.tapHit, { opacity: index >= filtered.length - 1 ? 0.35 : 1 }]}
               >
-                <Text allowFontScaling={false} style={[styles.tapLabel, { color: t.textSecondary }]}>
+                <Text style={[styles.tapLabel, { color: t.textSecondary }]}>
                   Next
                 </Text>
               </Pressable>
@@ -510,7 +510,7 @@ function FilterChip({
       ]}
     >
       <Text
-        allowFontScaling={false}
+       
         style={[styles.chipText, { color: active ? t.pillText : t.textSecondary }]}
       >
         {label}

@@ -32,7 +32,7 @@ export function CommunityIdentityPill({
       ]}
     >
       <Text
-        allowFontScaling={false}
+       
         style={[styles.label, { color: active ? activeText : t.textSecondary }]}
         numberOfLines={1}
       >

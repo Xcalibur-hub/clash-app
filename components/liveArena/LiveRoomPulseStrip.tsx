@@ -53,10 +53,10 @@ export function LiveRoomPulseStrip({
         accessibilityLabel="Open Room Pulse"
         style={styles.head}
       >
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           LIVE BATTLE
         </Text>
-        <Text allowFontScaling={false} style={[styles.more, { color: t.textSecondary }]}>
+        <Text style={[styles.more, { color: t.textSecondary }]}>
           Full pulse →
         </Text>
       </Pressable>

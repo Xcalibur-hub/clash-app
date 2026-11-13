@@ -37,16 +37,16 @@ export function DigitalVersionPanel({
 
   return (
     <View style={[styles.wrap, { borderColor: t.border }]}>
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         DIGITAL VERSION
       </Text>
 
       {config.connected ? (
         <>
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             {config.displayName ?? plate}
           </Text>
-          <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+          <Text style={[styles.body, { color: t.textSecondary }]}>
             Provider connected. CLASH does not train or clone your likeness: rendering happens with
             the model you authorized.
           </Text>
@@ -54,11 +54,11 @@ export function DigitalVersionPanel({
           <View style={styles.rows}>
             {rows.map((row) => (
               <View key={row.key} style={styles.row}>
-                <Text allowFontScaling={false} style={[styles.rowLabel, { color: t.textSecondary }]}>
+                <Text style={[styles.rowLabel, { color: t.textSecondary }]}>
                   {row.label}
                 </Text>
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.rowValue, { color: row.on ? t.textPrimary : t.textMuted }]}
                 >
                   {row.on ? 'ON' : 'OFF'}
@@ -80,7 +80,7 @@ export function DigitalVersionPanel({
         </>
       ) : (
         <>
-          <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+          <Text style={[styles.body, { color: t.textSecondary }]}>
             Bring your AI to life with your authorized avatar and voice.
           </Text>
           <VaultActionButton label="Connect" compact onPress={onConnect} />

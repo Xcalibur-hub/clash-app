@@ -29,22 +29,22 @@ export function ChapterHeading({
   return (
     <View style={[styles.wrap, style]}>
       {eyebrow ? (
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           {eyebrow}
         </Text>
       ) : null}
       <View style={styles.row}>
         {index != null ? (
-          <Text allowFontScaling={false} style={[styles.index, { color: t.textMuted }]}>
+          <Text style={[styles.index, { color: t.textMuted }]}>
             {String(index).padStart(2, '0')}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
           {title}
         </Text>
         {trailing ??
           (count != null ? (
-            <Text allowFontScaling={false} style={[styles.count, { color: t.textMuted }]}>
+            <Text style={[styles.count, { color: t.textMuted }]}>
               {String(count)}
             </Text>
           ) : null)}

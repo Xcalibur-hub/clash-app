@@ -32,10 +32,10 @@ export function WinGrid({ wins, onPress }: WinGridProps): React.JSX.Element {
             style={s.tile}
           >
             <TrophyIcon size={14} color={sideColor} strokeWidth={2.4} />
-            <Text allowFontScaling={false} style={[s.score, { color: sideColor }]}>
+            <Text style={[s.score, { color: sideColor }]}>
               {`${entry.result.score.a}–${entry.result.score.b}`}
             </Text>
-            <Text allowFontScaling={false} style={s.meta}>
+            <Text style={s.meta}>
               {`+${entry.result.reputation} REP`}
             </Text>
           </Pressable>

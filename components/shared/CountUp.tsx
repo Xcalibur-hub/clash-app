@@ -39,7 +39,7 @@ export function CountUp({
   }, [value, durationMs, reduced]);
 
   return (
-    <Text allowFontScaling={false} style={style} accessibilityLabel={accessibilityLabel}>
+    <Text style={style} accessibilityLabel={accessibilityLabel}>
       {display}
       {suffix}
     </Text>

@@ -10,6 +10,8 @@ import { GlowButton } from '../shared/GlowButton';
 import { Underline } from '../shared/Doodles';
 import { MoreIcon } from '../shared/icons';
 import { ReputationBar } from './ReputationBar';
+import { AppText } from '../shared/AppText';
+import { EditorialStat } from '../shared/Editorial';
 
 export interface ProfileHeaderProps {
   profile: User;
@@ -55,14 +57,18 @@ export function ProfileHeader({
           </Pressable>
         </View>
 
-        <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={2}>
+        <AppText
+          style={[styles.name, { color: t.textPrimary }]}
+          numberOfLines={2}
+          accessibilityRole="header"
+        >
           {profile.name}
-        </Text>
+        </AppText>
 
         <View style={styles.handleRow}>
-          <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
+          <AppText style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
             @{profile.handle}
-          </Text>
+          </AppText>
           <Underline size={64} opacity={0.22} color={t.textPrimary} style={styles.handleMark} />
         </View>
 
@@ -71,9 +77,9 @@ export function ProfileHeader({
         ) : null}
 
         {profile.hood !== 'for-you' ? (
-          <Text allowFontScaling={false} style={[styles.hood, { color: t.textSecondary }]}>
+          <AppText style={[styles.hood, { color: t.textSecondary }]}>
             {HOOD_LABEL[profile.hood]}
-          </Text>
+          </AppText>
         ) : null}
 
         <View style={styles.actionRow}>
@@ -101,28 +107,17 @@ export function ProfileHeader({
       <ReputationBar reputation={profile.reputation} rank={profile.rank} streak={profile.streak} />
 
       <View style={[styles.social, { borderTopColor: t.border }]}>
-        <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
-          <Text style={[styles.socialValue, { color: t.textPrimary }]}>{compact(followerCount)}</Text>
-          {'  followers'}
-        </Text>
-        <Text allowFontScaling={false} style={[styles.socialDot, { color: t.textMuted }]}>
-          ·
-        </Text>
-        <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
-          <Text style={[styles.socialValue, { color: t.textPrimary }]}>{compact(followingCount)}</Text>
-          {'  following'}
-        </Text>
+        <EditorialStat value={compact(followerCount)} label="FOLLOWERS" />
+        <View style={[styles.socialSeam, { backgroundColor: t.divider }]} />
+        <EditorialStat value={compact(followingCount)} label="FOLLOWING" />
         {profile.reputation > 0 ? (
           <>
-            <Text allowFontScaling={false} style={[styles.socialDot, { color: t.textMuted }]}>
-              ·
-            </Text>
-            <Text allowFontScaling={false} style={[styles.socialText, { color: t.textMuted }]}>
-              <Text style={[styles.socialValue, { color: t.textPrimary }]}>
-                {formatReputation(profile.reputation)}
-              </Text>
-              {'  rep'}
-            </Text>
+            <View style={[styles.socialSeam, { backgroundColor: t.divider }]} />
+            <EditorialStat
+              value={formatReputation(profile.reputation)}
+              label="REPUTATION"
+              tone={t.gold}
+            />
           </>
         ) : null}
       </View>
@@ -146,31 +141,25 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   name: {
-    ...typeScale.title,
-    fontSize: 26,
-    lineHeight: 32,
-    letterSpacing: -0.6,
-    marginTop: space.xs,
+    ...typeScale.editorialLg,
+    marginTop: space.sm,
   },
   handleRow: {
     position: 'relative',
     alignSelf: 'flex-start',
     paddingBottom: 5,
   },
-  handle: { ...typeScale.meta, fontSize: 15 },
+  handle: { ...typeScale.meta, fontSize: 14 },
   handleMark: { position: 'absolute', bottom: -1, left: 0 },
   bio: { ...typeScale.body, marginTop: 2 },
   hood: { ...typeScale.meta },
   actionRow: { marginTop: space.xs },
   social: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
+    alignItems: 'flex-start',
+    gap: space.lg,
     paddingTop: space.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  socialText: { ...typeScale.meta },
-  socialValue: { ...typeScale.label, fontWeight: '600' },
-  socialDot: { ...typeScale.meta },
+  socialSeam: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginTop: 4 },
 });

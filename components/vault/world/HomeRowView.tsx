@@ -81,10 +81,10 @@ export const HomeRowView = React.memo(function HomeRowView({
     case 'empty_following':
       return (
         <View style={styles.quiet}>
-          <Text allowFontScaling={false} style={[styles.quietTitle, { color: t.textPrimary }]}>
+          <Text style={[styles.quietTitle, { color: t.textPrimary }]}>
             Your Vault is quiet
           </Text>
-          <Text allowFontScaling={false} style={[styles.quietBody, { color: t.textMuted }]}>
+          <Text style={[styles.quietBody, { color: t.textMuted }]}>
             Follow creators to see their Drops, Collections and experiences here.
           </Text>
           <VaultActionButton label="Discover creators" onPress={onDiscover} />

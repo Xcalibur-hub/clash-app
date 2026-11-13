@@ -291,10 +291,10 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
             accessibilityLabel={vaultLabel}
           >
             <View style={styles.vaultCopy}>
-              <Text allowFontScaling={false} style={[styles.vaultKicker, { color: theme.textMuted }]}>
+              <Text style={[styles.vaultKicker, { color: theme.textMuted }]}>
                 VAULT
               </Text>
-              <Text allowFontScaling={false} style={[styles.vaultTitle, { color: theme.textPrimary }]}>
+              <Text style={[styles.vaultTitle, { color: theme.textPrimary }]}>
                 {vaultLabel} →
               </Text>
             </View>

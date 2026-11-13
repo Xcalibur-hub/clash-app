@@ -127,11 +127,11 @@ export function BattleEventBurst({
             cooldownMs={400}
           />
         ) : (
-          <Text allowFontScaling={false} style={[styles.mark, { color: accent.ink }]}>
+          <Text style={[styles.mark, { color: accent.ink }]}>
             {mark}
           </Text>
         )}
-        <Text allowFontScaling={false} style={[styles.label, { color: accent.ink }]}>
+        <Text style={[styles.label, { color: accent.ink }]}>
           {labelFor(kind)}
         </Text>
       </Animated.View>

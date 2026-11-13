@@ -32,10 +32,10 @@ export function AiProviderNotice({
       ]}
       accessibilityLiveRegion="polite"
     >
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         {notice.title}
       </Text>
-      <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+      <Text style={[styles.body, { color: t.textSecondary }]}>
         {notice.body}
       </Text>
     </View>

@@ -65,7 +65,7 @@ export function VaultFormSheet({
               ]}
             >
               <View style={styles.head}>
-                <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+                <Text style={[styles.title, { color: t.textPrimary }]}>
                   {mode === 'create' ? 'Open your Vault' : 'Edit Vault'}
                 </Text>
                 <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
@@ -73,7 +73,7 @@ export function VaultFormSheet({
                 </Pressable>
               </View>
 
-              <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+              <Text style={[styles.label, { color: t.textMuted }]}>
                 Title
               </Text>
               <TextInput
@@ -93,7 +93,7 @@ export function VaultFormSheet({
                 ]}
               />
 
-              <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+              <Text style={[styles.label, { color: t.textMuted }]}>
                 Description
               </Text>
               <TextInput

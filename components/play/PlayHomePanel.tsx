@@ -29,7 +29,7 @@ function Rail({
   if (!children || (Array.isArray(children) && children.length === 0)) return null;
   return (
     <View style={styles.railBlock}>
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textPrimary }]}>
+      <Text style={[styles.section, { color: t.textPrimary }]}>
         {title}
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
@@ -134,7 +134,7 @@ export function PlayHomePanel(): React.JSX.Element {
   return (
     <View style={styles.root}>
       <View style={styles.titleRow}>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           PLAY
         </Text>
         <Pressable
@@ -145,7 +145,7 @@ export function PlayHomePanel(): React.JSX.Element {
           accessibilityRole="button"
           accessibilityLabel="My Play"
         >
-          <Text allowFontScaling={false} style={[styles.myPlay, { color: t.textMuted }]}>
+          <Text style={[styles.myPlay, { color: t.textMuted }]}>
             My Play
           </Text>
         </Pressable>
@@ -172,7 +172,7 @@ export function PlayHomePanel(): React.JSX.Element {
               accessibilityLabel={label}
             >
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.tabLabel, { color: on ? t.background : t.textMuted }]}
               >
                 {label}
@@ -186,7 +186,7 @@ export function PlayHomePanel(): React.JSX.Element {
 
       {loading ? <ActivityIndicator color={t.textPrimary} style={{ marginTop: space.lg }} /> : null}
       {error ? (
-        <Text allowFontScaling={false} style={{ color: t.danger }}>
+        <Text style={{ color: t.danger }}>
           {error}
         </Text>
       ) : null}
@@ -194,7 +194,7 @@ export function PlayHomePanel(): React.JSX.Element {
       {!loading && !error && tab === 'challenges' ? (
         <>
           {(home?.challenges.length ?? 0) === 0 ? (
-            <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+            <Text style={{ color: t.textMuted }}>
               No active challenges right now. Check back soon.
             </Text>
           ) : null}
@@ -234,7 +234,7 @@ export function PlayHomePanel(): React.JSX.Element {
       {!loading && !error && tab === 'treasure' ? (
         <>
           {(home?.treasures.length ?? 0) === 0 ? (
-            <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+            <Text style={{ color: t.textMuted }}>
               No treasure hunts right now. New clues drop soon.
             </Text>
           ) : null}

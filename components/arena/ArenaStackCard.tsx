@@ -126,7 +126,7 @@ function ArenaStackCardBase({
           </Pressable>
 
           <View style={styles.meta} pointerEvents="box-none">
-            <Text allowFontScaling={false} style={styles.hood} numberOfLines={1}>
+            <Text style={styles.hood} numberOfLines={1}>
               {HOOD_LABEL[take.hood]}
             </Text>
             <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open take">
@@ -134,7 +134,7 @@ function ArenaStackCardBase({
                 {headline}
               </Text>
             </Pressable>
-            <Text allowFontScaling={false} style={styles.byline} numberOfLines={1}>
+            <Text style={styles.byline} numberOfLines={1}>
               @{author.handle} · {timeAgo(take.createdAt)}
             </Text>
 
@@ -151,7 +151,7 @@ function ArenaStackCardBase({
                   style={styles.statBtn}
                 >
                   <ArrowBigUpIcon size={15} color="#FFFFFF" strokeWidth={hasReacted ? 2.6 : 2.1} />
-                  <Text allowFontScaling={false} style={styles.statText}>
+                  <Text style={styles.statText}>
                     {compact(take.reactions)}
                   </Text>
                 </Pressable>
@@ -165,7 +165,7 @@ function ArenaStackCardBase({
                   style={styles.statBtn}
                 >
                   <CommentIcon size={14} color="#FFFFFF" strokeWidth={2.1} />
-                  <Text allowFontScaling={false} style={styles.statText}>
+                  <Text style={styles.statText}>
                     {compact(commentCount)}
                   </Text>
                 </Pressable>
@@ -181,7 +181,7 @@ function ArenaStackCardBase({
                 style={[styles.clash, { backgroundColor: t.clashFill }]}
               >
                 <ArenaIcon size={12} color={t.clashText} strokeWidth={2.6} />
-                <Text allowFontScaling={false} style={[styles.clashText, { color: t.clashText }]}>
+                <Text style={[styles.clashText, { color: t.clashText }]}>
                   CLASH
                 </Text>
               </PressableScale>

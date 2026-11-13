@@ -222,13 +222,13 @@ export default function ArenaTopicScreen(): React.JSX.Element {
       >
         {closed ? (
           <View style={styles.closed}>
-            <Text allowFontScaling={false} style={[styles.closedEyebrow, { color: t.textMuted }]}>
+            <Text style={[styles.closedEyebrow, { color: t.textMuted }]}>
               {phaseLabel(topic.phase).toUpperCase()}
             </Text>
-            <Text allowFontScaling={false} style={[styles.closedTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.closedTitle, { color: t.textPrimary }]}>
               {topic.title}
             </Text>
-            <Text allowFontScaling={false} style={[styles.closedBody, { color: t.textSecondary }]}>
+            <Text style={[styles.closedBody, { color: t.textSecondary }]}>
               {topic.participantCount} people argued this one. A new Topic opens every day.
             </Text>
             {topic.viewerRoomId ? (
@@ -241,7 +241,7 @@ export default function ArenaTopicScreen(): React.JSX.Element {
                 accessibilityRole="button"
                 accessibilityLabel="See your room result"
               >
-                <Text allowFontScaling={false} style={[styles.resultCtaText, { color: t.clashText }]}>
+                <Text style={[styles.resultCtaText, { color: t.clashText }]}>
                   See your room
                 </Text>
               </Pressable>
@@ -277,7 +277,7 @@ export default function ArenaTopicScreen(): React.JSX.Element {
         {joining ? (
           <View style={styles.joining}>
             <ActivityIndicator color={t.textMuted} />
-            <Text allowFontScaling={false} style={[styles.joiningText, { color: t.textMuted }]}>
+            <Text style={[styles.joiningText, { color: t.textMuted }]}>
               Finding you a room…
             </Text>
           </View>

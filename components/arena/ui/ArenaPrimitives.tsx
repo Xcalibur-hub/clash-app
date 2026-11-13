@@ -46,7 +46,7 @@ export function ArenaIdentity({ name, detail, side }: { name: string; detail?: s
 export function ArenaAvatar({ name, side, size = 36 }: { name: string; side?: ArenaSideKey; size?: number }): React.JSX.Element {
   const t = useThemeColors(), c = arenaColors(t), tone = side ? arenaSideTone(side, t.scheme) : null;
   return <View accessibilityElementsHidden importantForAccessibility="no" style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.inset, borderColor: tone?.ink ?? c.strongLine }]}>
-    <Text allowFontScaling={false} style={[arena.type.label, { fontSize: Math.round(size * 0.34), color: c.ink }]}>{name.trim().split(/\s+/).slice(0, 2).map(s => s[0]).join('')}</Text>
+    <Text style={[arena.type.label, { fontSize: Math.round(size * 0.34), color: c.ink }]}>{name.trim().split(/\s+/).slice(0, 2).map(s => s[0]).join('')}</Text>
   </View>;
 }
 

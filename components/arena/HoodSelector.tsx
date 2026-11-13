@@ -36,7 +36,7 @@ export function HoodSelector({ value, onChange, hoods = FEED_SCOPES }: HoodSelec
             accessibilityLabel={`${HOOD_LABEL[hood]} feed`}
             style={[styles.chip, active && styles.chipActive]}
           >
-            <Text allowFontScaling={false} style={[styles.label, active && styles.labelActive]}>
+            <Text style={[styles.label, active && styles.labelActive]}>
               {HOOD_LABEL[hood]}
             </Text>
           </Pressable>

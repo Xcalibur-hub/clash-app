@@ -210,7 +210,7 @@ export function AppSidebar(): React.JSX.Element | null {
           accessibilityLabel="CLASH menu"
         >
           <View style={s.brandRow}>
-            <Text allowFontScaling={false} style={s.brand}>
+            <Text style={s.brand}>
               CLASH
             </Text>
             <Pressable
@@ -235,10 +235,10 @@ export function AppSidebar(): React.JSX.Element | null {
           >
             <Avatar name={viewer.name} tint={viewer.tint} size={36} />
             <View style={s.identityText}>
-              <Text allowFontScaling={false} style={s.name} numberOfLines={1}>
+              <Text style={s.name} numberOfLines={1}>
                 {viewer.name}
               </Text>
-              <Text allowFontScaling={false} style={s.handle} numberOfLines={1}>
+              <Text style={s.handle} numberOfLines={1}>
                 @{viewer.handle}
               </Text>
             </View>
@@ -277,7 +277,7 @@ export function AppSidebar(): React.JSX.Element | null {
               ))}
             </View>
             <View style={s.footer}>
-              <Text allowFontScaling={false} style={s.version}>
+              <Text style={s.version}>
                 CLASH 2.0.0
               </Text>
             </View>
@@ -307,7 +307,7 @@ function NavRow({
       style={({ pressed }) => [s.row, active && s.rowActive, pressed && s.pressed]}
     >
       <Icon size={22} color={DRAWER_ICON} strokeWidth={1.9} />
-      <Text allowFontScaling={false} style={s.rowLabel} numberOfLines={1}>
+      <Text style={s.rowLabel} numberOfLines={1}>
         {item.label}
       </Text>
     </Pressable>

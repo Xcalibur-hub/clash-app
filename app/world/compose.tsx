@@ -158,14 +158,14 @@ export default function WorldComposeScreen(): React.JSX.Element {
           >
             <BackIcon size={20} color={ink.primary} />
           </Pressable>
-          <Text allowFontScaling={false} style={styles.eyebrow}>PARTICIPATE</Text>
+          <Text style={styles.eyebrow}>PARTICIPATE</Text>
           <View style={styles.slot} />
         </View>
 
         {mission ? (
           <View style={styles.mission}>
-            <Text allowFontScaling={false} style={styles.missionTitle}>{mission.title}</Text>
-            <Text allowFontScaling={false} style={styles.missionPrompt}>{mission.prompt}</Text>
+            <Text style={styles.missionTitle}>{mission.title}</Text>
+            <Text style={styles.missionPrompt}>{mission.prompt}</Text>
           </View>
         ) : (
           <ActivityIndicator color={ink.primary} />
@@ -173,18 +173,18 @@ export default function WorldComposeScreen(): React.JSX.Element {
 
         {step === 'explain' ? (
           <View style={styles.explain}>
-            <Text allowFontScaling={false} style={styles.explainTitle}>How location works</Text>
-            <Text allowFontScaling={false} style={styles.explainBody}>
+            <Text style={styles.explainTitle}>How location works</Text>
+            <Text style={styles.explainBody}>
               When you publish, CLASH takes a one-shot foreground location and stores an approximate area — not your exact coordinates.
             </Text>
-            <Text allowFontScaling={false} style={styles.explainBody}>
+            <Text style={styles.explainBody}>
               CLASH stores an approximate area, not your exact location. There is no background tracking and no live “you are here” marker.
             </Text>
             <GlowButton label="Continue" tone="light" onPress={() => void continueAfterExplain()} />
           </View>
         ) : (
           <View style={styles.compose}>
-            <Text allowFontScaling={false} style={styles.label}>Media</Text>
+            <Text style={styles.label}>Media</Text>
             <View style={styles.mediaRow}>
               <Pressable
                 onPress={() => void attach('image')}
@@ -193,7 +193,7 @@ export default function WorldComposeScreen(): React.JSX.Element {
                 accessibilityLabel="Choose photo"
               >
                 <ImageIcon size={18} color={ink.primary} />
-                <Text allowFontScaling={false} style={styles.mediaLabel}>Photo</Text>
+                <Text style={styles.mediaLabel}>Photo</Text>
               </Pressable>
               <Pressable
                 onPress={() => void attach('video')}
@@ -202,7 +202,7 @@ export default function WorldComposeScreen(): React.JSX.Element {
                 accessibilityLabel="Choose video"
               >
                 <VideoIcon size={18} color={ink.primary} />
-                <Text allowFontScaling={false} style={styles.mediaLabel}>Video</Text>
+                <Text style={styles.mediaLabel}>Video</Text>
               </Pressable>
             </View>
             {media ? (
@@ -210,12 +210,12 @@ export default function WorldComposeScreen(): React.JSX.Element {
                 {media.kind === 'image' ? (
                   <Image source={{ uri: media.uri }} style={styles.previewImage} resizeMode="cover" />
                 ) : (
-                  <Text allowFontScaling={false} style={styles.meta}>Video selected</Text>
+                  <Text style={styles.meta}>Video selected</Text>
                 )}
               </View>
             ) : null}
 
-            <Text allowFontScaling={false} style={styles.label}>Caption</Text>
+            <Text style={styles.label}>Caption</Text>
             <TextInput
               value={caption}
               onChangeText={setCaption}
@@ -226,7 +226,7 @@ export default function WorldComposeScreen(): React.JSX.Element {
               style={styles.input}
               accessibilityLabel="Caption"
             />
-            <Text allowFontScaling={false} style={styles.meta}>
+            <Text style={styles.meta}>
               Publishing uses a one-shot foreground location. Approximate area only.
             </Text>
             <GlowButton

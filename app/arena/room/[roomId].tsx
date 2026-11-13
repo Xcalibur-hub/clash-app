@@ -951,7 +951,7 @@ function RoomScope(): React.JSX.Element {
           <>
             {threadLocked ? (
               <View style={styles.locked}>
-                <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
+                <Text style={[styles.lockedText, { color: t.textMuted }]}>
                   Join this room to read the conversation.
                 </Text>
               </View>
@@ -1027,11 +1027,11 @@ function RoomScope(): React.JSX.Element {
                     }}
                   />
                   {backup.load?.saturated ? (
-                    <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
+                    <Text style={[styles.lockedText, { color: t.textMuted }]}>
                       {`Room full · ${backup.load.spectatorCount} spectators joined`}
                     </Text>
                   ) : (
-                    <Text allowFontScaling={false} style={[styles.lockedText, { color: t.textMuted }]}>
+                    <Text style={[styles.lockedText, { color: t.textMuted }]}>
                       Bring someone into the fight
                     </Text>
                   )}

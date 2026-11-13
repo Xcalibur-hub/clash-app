@@ -59,7 +59,7 @@ export function AiKnowledgeSheet({
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close">
         <Pressable style={[styles.sheet, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               What should it know?
             </Text>
             <PillPicker
@@ -99,7 +99,7 @@ export function AiKnowledgeSheet({
                 />
               </>
             ) : options.length === 0 ? (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              <Text style={[styles.hint, { color: t.textMuted }]}>
                 {`You have no ${
                   kind === 'VAULT_DROP'
                     ? 'published Drops'

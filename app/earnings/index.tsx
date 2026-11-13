@@ -132,43 +132,43 @@ export default function CreatorEarningsHome(): React.JSX.Element {
       >
         <BackBtn onPress={() => router.back()} />
 
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           Earnings
         </Text>
 
         {empty ? (
           <View style={[styles.emptyBlock, { borderColor: t.border }]}>
-            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
               No campaigns yet.
             </Text>
-            <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+            <Text style={[styles.emptyBody, { color: t.textMuted }]}>
               Brand collaborations assigned to you will appear here.
             </Text>
           </View>
         ) : summary ? (
           <>
             <Text
-              allowFontScaling={false}
+             
               style={[styles.heroAmount, { color: t.textPrimary }]}
               accessibilityRole="header"
             >
               {formatMinorCurrency(summary.totalEarnedMinor, summary.currency)}
             </Text>
-            <Text allowFontScaling={false} style={[styles.heroSub, { color: t.textSecondary }]}>
+            <Text style={[styles.heroSub, { color: t.textSecondary }]}>
               earned through CLASH
             </Text>
             <View style={styles.heroSplit}>
-              <Text allowFontScaling={false} style={[styles.splitLine, { color: t.textSecondary }]}>
+              <Text style={[styles.splitLine, { color: t.textSecondary }]}>
                 {formatMinorCurrency(summary.approvedCommissionMinor, summary.currency)} approved
               </Text>
-              <Text allowFontScaling={false} style={[styles.splitDot, { color: t.textMuted }]}>
+              <Text style={[styles.splitDot, { color: t.textMuted }]}>
                 ·
               </Text>
-              <Text allowFontScaling={false} style={[styles.splitLine, { color: t.textSecondary }]}>
+              <Text style={[styles.splitLine, { color: t.textSecondary }]}>
                 {formatMinorCurrency(summary.pendingCommissionMinor, summary.currency)} pending
               </Text>
             </View>
-            <Text allowFontScaling={false} style={[styles.payoutNote, { color: t.textMuted }]}>
+            <Text style={[styles.payoutNote, { color: t.textMuted }]}>
               Payments are not enabled yet.
             </Text>
 
@@ -185,7 +185,7 @@ export default function CreatorEarningsHome(): React.JSX.Element {
             </View>
 
             {(summary.rejectedCommissionMinor > 0 || summary.voidCommissionMinor > 0) ? (
-              <Text allowFontScaling={false} style={[styles.ledgerNote, { color: t.textMuted }]}>
+              <Text style={[styles.ledgerNote, { color: t.textMuted }]}>
                 {summary.rejectedCommissionMinor > 0
                   ? `${formatMinorCurrency(summary.rejectedCommissionMinor, summary.currency)} rejected`
                   : null}
@@ -200,7 +200,7 @@ export default function CreatorEarningsHome(): React.JSX.Element {
 
         {!empty ? (
           <View style={styles.listHead}>
-            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
+            <Text style={[styles.sectionTitle, { color: t.textPrimary }]}>
               Campaigns
             </Text>
           </View>
@@ -226,10 +226,10 @@ function Metric({ label, value }: { label: string; value: string }): React.JSX.E
   const t = useThemeColors();
   return (
     <View style={[styles.metric, { borderColor: t.border }]}>
-      <Text allowFontScaling={false} style={[styles.metricValue, { color: t.textPrimary }]}>
+      <Text style={[styles.metricValue, { color: t.textPrimary }]}>
         {value}
       </Text>
-      <Text allowFontScaling={false} style={[styles.metricLabel, { color: t.textMuted }]}>
+      <Text style={[styles.metricLabel, { color: t.textMuted }]}>
         {label}
       </Text>
     </View>
@@ -256,27 +256,27 @@ function CampaignCard({
     >
       <View style={styles.cardTop}>
         <View style={{ flex: 1, gap: 4 }}>
-          <Text allowFontScaling={false} style={[styles.cardBrand, { color: t.textMuted }]} numberOfLines={1}>
+          <Text style={[styles.cardBrand, { color: t.textMuted }]} numberOfLines={1}>
             {item.advertiserName}
           </Text>
-          <Text allowFontScaling={false} style={[styles.cardTitle, { color: t.textPrimary }]} numberOfLines={2}>
+          <Text style={[styles.cardTitle, { color: t.textPrimary }]} numberOfLines={2}>
             {item.campaignTitle}
           </Text>
         </View>
         <StatusPill label={item.campaignStatus} tone={statusTone(item.campaignStatus)} />
       </View>
-      <Text allowFontScaling={false} style={[styles.cardMeta, { color: t.textMuted }]}>
+      <Text style={[styles.cardMeta, { color: t.textMuted }]}>
         {formatCampaignPeriod(item.startsAt, item.endsAt)}
       </Text>
-      <Text allowFontScaling={false} style={[styles.cardStats, { color: t.textSecondary }]}>
+      <Text style={[styles.cardStats, { color: t.textSecondary }]}>
         {item.clicks.toLocaleString('en-IN')} clicks ·{' '}
         {item.attributedConversions.toLocaleString('en-IN')} conversions
       </Text>
       <View style={styles.cardFooter}>
-        <Text allowFontScaling={false} style={[styles.cardEarn, { color: t.textPrimary }]}>
+        <Text style={[styles.cardEarn, { color: t.textPrimary }]}>
           {formatMinorCurrency(item.pendingCommissionMinor, item.currency)} pending
         </Text>
-        <Text allowFontScaling={false} style={[styles.cardComm, { color: t.textMuted }]}>
+        <Text style={[styles.cardComm, { color: t.textMuted }]}>
           {formatCommissionLabel(item.commissionType, item.commissionValue, item.currency)}
         </Text>
       </View>

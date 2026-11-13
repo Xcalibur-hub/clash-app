@@ -128,10 +128,10 @@ export function ServiceDetail({ serviceId }: { serviceId: string }): React.JSX.E
         <View style={[styles.hero, { backgroundColor: t.surfaceMuted }]}>
           {cover ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
           <View style={styles.scrim} />
-          <Text allowFontScaling={false} style={styles.kicker}>
+          <Text style={styles.kicker}>
             SESSION
           </Text>
-          <Text allowFontScaling={false} style={styles.title}>
+          <Text style={styles.title}>
             {service.title}
           </Text>
         </View>
@@ -140,10 +140,10 @@ export function ServiceDetail({ serviceId }: { serviceId: string }): React.JSX.E
           <Pressable style={styles.identity} onPress={() => router.push(`/vault/${creator.id}`)}>
             <Avatar name={creator.name} tint={creator.tint} size={44} />
             <View>
-              <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]}>
+              <Text style={[styles.name, { color: t.textPrimary }]}>
                 {creator.name}
               </Text>
-              <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]}>
+              <Text style={[styles.handle, { color: t.textMuted }]}>
                 @{creator.handle}
               </Text>
             </View>
@@ -151,11 +151,11 @@ export function ServiceDetail({ serviceId }: { serviceId: string }): React.JSX.E
         ) : null}
 
         {service.description ? (
-          <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+          <Text style={[styles.body, { color: t.textSecondary }]}>
             {service.description}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {delivery} · {price}
         </Text>
 
@@ -168,7 +168,7 @@ export function ServiceDetail({ serviceId }: { serviceId: string }): React.JSX.E
           />
         ) : null}
 
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+        <Text style={[styles.label, { color: t.textMuted }]}>
           Request
         </Text>
         <TextInput

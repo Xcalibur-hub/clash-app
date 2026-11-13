@@ -34,7 +34,7 @@ export function LiveRoomPresenceStrip({
           <View key={person.id} style={styles.chip}>
             <Avatar name={person.name} tint={person.avatarTint} size={30} />
             <Text
-              allowFontScaling={false}
+             
               style={[styles.label, { color: person.isViewer ? t.textPrimary : t.textMuted }]}
               numberOfLines={1}
             >
@@ -43,16 +43,16 @@ export function LiveRoomPresenceStrip({
           </View>
         ))}
         {overflow > 0 ? (
-          <Text allowFontScaling={false} style={[styles.more, { color: t.textMuted }]}>
+          <Text style={[styles.more, { color: t.textMuted }]}>
             +{overflow}
           </Text>
         ) : null}
       </View>
-      <Text allowFontScaling={false} style={[styles.you, { color: t.textMuted }]}>
+      <Text style={[styles.you, { color: t.textMuted }]}>
         {crowdAudienceLabel({ participantCount }) ?? `${participantCount} joined`}
       </Text>
       {viewerRole === 'debater' && viewerStance ? (
-        <Text allowFontScaling={false} style={[styles.you, { color: t.textMuted }]}>
+        <Text style={[styles.you, { color: t.textMuted }]}>
           You · {STANCE_LABEL[viewerStance]}
         </Text>
       ) : null}

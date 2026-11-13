@@ -24,7 +24,7 @@ export function CommunityAccessPicker({
   const t = useThemeColors();
   return (
     <>
-      <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+      <Text style={[styles.label, { color: t.textMuted }]}>
         ACCESS
       </Text>
       <View style={styles.pills}>
@@ -45,13 +45,13 @@ export function CommunityAccessPicker({
               },
             ]}
           >
-            <Text allowFontScaling={false} style={[styles.pillLabel, { color: t.textPrimary }]}>
+            <Text style={[styles.pillLabel, { color: t.textPrimary }]}>
               {communityAccessLabel(type)}
             </Text>
           </Pressable>
         ))}
       </View>
-      <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+      <Text style={[styles.hint, { color: t.textMuted }]}>
         {communityAccessRule(value)}
       </Text>
     </>

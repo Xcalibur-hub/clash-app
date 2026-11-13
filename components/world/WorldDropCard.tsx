@@ -37,21 +37,21 @@ export function WorldDropCard({ drop, now = Date.now() }: WorldDropCardProps): R
       </View>
 
       <View style={styles.body}>
-        <Text allowFontScaling={false} style={styles.author}>{author}</Text>
+        <Text style={styles.author}>{author}</Text>
         {drop.caption ? (
-          <Text allowFontScaling={false} style={styles.caption} numberOfLines={3}>
+          <Text style={styles.caption} numberOfLines={3}>
             {drop.caption}
           </Text>
         ) : null}
         <View style={styles.metaRow}>
           <MapPinIcon size={14} color={ink.tertiary} strokeWidth={2} />
-          <Text allowFontScaling={false} style={styles.meta}>{place}</Text>
+          <Text style={styles.meta}>{place}</Text>
           {expiry ? (
-            <Text allowFontScaling={false} style={styles.meta}>· {expiry}</Text>
+            <Text style={styles.meta}>· {expiry}</Text>
           ) : null}
         </View>
         {drop.mission ? (
-          <Text allowFontScaling={false} style={styles.mission}>
+          <Text style={styles.mission}>
             Mission · {drop.mission.title}
           </Text>
         ) : null}

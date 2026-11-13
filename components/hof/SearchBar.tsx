@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
+import { Pressable, StyleSheet, TextInput } from 'react-native';
 import { action, ink, radius, space, typeScale } from '../../theme';
 import { CloseIcon, SearchIcon } from '../shared/icons';
 import { IconButton } from '../shared/IconButton';

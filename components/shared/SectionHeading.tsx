@@ -24,12 +24,12 @@ export function SectionHeading({
   return (
     <View style={[styles.wrap, style]}>
       <View style={styles.row}>
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           {eyebrow}
         </Text>
         {accessory}
       </View>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         {title}
       </Text>
     </View>

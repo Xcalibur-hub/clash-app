@@ -127,10 +127,10 @@ export function CreatorVaultHome(): React.JSX.Element {
           },
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+        <Text style={[styles.brand, { color: t.textPrimary }]}>
           Vault
         </Text>
-        <Text allowFontScaling={false} style={[styles.tagline, { color: t.textSecondary }]}>
+        <Text style={[styles.tagline, { color: t.textSecondary }]}>
           Follow creators beyond the feed.
         </Text>
 
@@ -147,14 +147,14 @@ export function CreatorVaultHome(): React.JSX.Element {
                 },
               ]}
             >
-              <Text allowFontScaling={false} style={[styles.spaceKicker, { color: t.textMuted }]}>
+              <Text style={[styles.spaceKicker, { color: t.textMuted }]}>
                 YOUR SPACE
               </Text>
-              <Text allowFontScaling={false} style={[styles.spaceTitle, { color: t.textPrimary }]}>
+              <Text style={[styles.spaceTitle, { color: t.textPrimary }]}>
                 {vault.title}
               </Text>
               {vault.description ? (
-                <Text allowFontScaling={false} style={[styles.spaceBody, { color: t.textSecondary }]}>
+                <Text style={[styles.spaceBody, { color: t.textSecondary }]}>
                   {vault.description}
                 </Text>
               ) : null}
@@ -187,7 +187,7 @@ export function CreatorVaultHome(): React.JSX.Element {
               />
             ) : (
               <View style={styles.list}>
-                <Text allowFontScaling={false} style={[styles.sectionLabel, { color: t.textMuted }]}>
+                <Text style={[styles.sectionLabel, { color: t.textMuted }]}>
                   Drops · disappear after 7 days
                 </Text>
                 {drops.map((drop) => (
@@ -216,7 +216,7 @@ export function CreatorVaultHome(): React.JSX.Element {
         )}
 
         {!vault && profile ? (
-          <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+          <Text style={[styles.hint, { color: t.textMuted }]}>
             Visit creators from Explore or Profile to enter their Vaults.
           </Text>
         ) : null}

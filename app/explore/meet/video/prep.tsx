@@ -89,13 +89,13 @@ export default function MeetVideoPrepScreen(): React.JSX.Element {
   if (search.phase === 'searching') {
     return (
       <View style={[styles.root, { backgroundColor: '#0A0A0C', paddingTop: insets.top + 24 }]}>
-        <Text allowFontScaling={false} style={styles.kicker}>
+        <Text style={styles.kicker}>
           VIDEO MEET
         </Text>
-        <Text allowFontScaling={false} style={styles.title}>
+        <Text style={styles.title}>
           Finding someone…
         </Text>
-        <Text allowFontScaling={false} style={styles.meta}>
+        <Text style={styles.meta}>
           {prefs.mode === 'ANYWHERE' ? 'Anywhere' : prefs.mode}
         </Text>
         <MeetButton
@@ -114,13 +114,13 @@ export default function MeetVideoPrepScreen(): React.JSX.Element {
       <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back">
         <Text style={styles.back}>← Back</Text>
       </Pressable>
-      <Text allowFontScaling={false} style={styles.kicker}>
+      <Text style={styles.kicker}>
         VIDEO MEET
       </Text>
-      <Text allowFontScaling={false} style={styles.title}>
+      <Text style={styles.title}>
         Ready when you are
       </Text>
-      <Text allowFontScaling={false} style={styles.meta}>
+      <Text style={styles.meta}>
         You&apos;ll connect to someone new. Leave or Next anytime. Report and block are always
         available.
       </Text>

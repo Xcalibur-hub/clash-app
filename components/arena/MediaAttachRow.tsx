@@ -36,7 +36,7 @@ export function MediaAttachRow({ onPick }: MediaAttachRowProps): React.JSX.Eleme
           ]}
         >
           <Icon size={16} color={t.textSecondary} strokeWidth={2.4} />
-          <Text allowFontScaling={false} style={[styles.label, { color: t.textSecondary }]}>
+          <Text style={[styles.label, { color: t.textSecondary }]}>
             {label}
           </Text>
         </Pressable>

@@ -65,7 +65,7 @@ export function VaultActionButton({
         style,
       ]}
     >
-      <Text allowFontScaling={false} style={[styles.label, { color: labelColor }]}>
+      <Text style={[styles.label, { color: labelColor }]}>
         {label}
       </Text>
     </PressableScale>

@@ -41,24 +41,24 @@ export function SubscriptionInfoSheet({
               },
             ]}
           >
-            <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+            <Text style={[styles.kicker, { color: t.textMuted }]}>
               JOIN {creatorName.toUpperCase()}'S VAULT
             </Text>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Unlock this world
             </Text>
             <View style={styles.benefits}>
               {benefits.map((benefit) => (
                 <Text
                   key={benefit}
-                  allowFontScaling={false}
+                 
                   style={[styles.benefit, { color: t.textSecondary }]}
                 >
                   {benefit}
                 </Text>
               ))}
             </View>
-            <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+            <Text style={[styles.body, { color: t.textMuted }]}>
               Subscriptions aren't available in this build yet. Nothing was charged, and no access
               was granted.
             </Text>

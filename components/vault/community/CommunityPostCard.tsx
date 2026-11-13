@@ -35,7 +35,7 @@ export function CommunityPostCard({
         createdAt={post.createdAt}
         onPressProfile={onOpenProfile}
       />
-      <Text allowFontScaling={false} style={[styles.body, { color: t.textPrimary }]}>
+      <Text style={[styles.body, { color: t.textPrimary }]}>
         {post.body}
       </Text>
       {mediaUrl ? (
@@ -53,7 +53,7 @@ export function CommunityPostCard({
           style={styles.action}
         >
           <CommentIcon size={16} color={t.textSecondary} strokeWidth={2} />
-          <Text allowFontScaling={false} style={[styles.actionLabel, { color: t.textSecondary }]}>
+          <Text style={[styles.actionLabel, { color: t.textSecondary }]}>
             {communityReplyCountLabel(post.replyCount)}
           </Text>
         </Pressable>

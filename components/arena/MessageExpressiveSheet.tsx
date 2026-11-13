@@ -70,13 +70,13 @@ function Action({
       accessibilityLabel={label}
     >
       <Text
-        allowFontScaling={false}
+       
         style={[styles.actionText, { color: destructive ? t.danger : t.textPrimary }]}
       >
         {label}
       </Text>
       {hint ? (
-        <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+        <Text style={[styles.hint, { color: t.textMuted }]}>
           {hint}
         </Text>
       ) : null}

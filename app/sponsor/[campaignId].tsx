@@ -311,14 +311,14 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
           <StatusPill label={meta.status} tone={statusTone(meta.status)} />
         </View>
 
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           {meta.campaignType.replace(/_/g, ' ')} · {meta.currency}
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={3}>
+        <Text style={[styles.title, { color: t.textPrimary }]} numberOfLines={3}>
           {meta.title}
         </Text>
         {meta.description ? (
-          <Text allowFontScaling={false} style={[styles.sub, { color: t.textSecondary }]}>
+          <Text style={[styles.sub, { color: t.textSecondary }]}>
             {meta.description}
           </Text>
         ) : null}
@@ -363,7 +363,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
         </View>
 
         {error ? (
-          <Text allowFontScaling={false} style={[styles.error, { color: t.textSecondary }]}>
+          <Text style={[styles.error, { color: t.textSecondary }]}>
             {error}
           </Text>
         ) : null}
@@ -387,7 +387,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                 ]}
               >
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.tabLabel, { color: active ? t.textPrimary : t.textMuted }]}
                 >
                   {item.label}
@@ -417,7 +417,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
               />
             </View>
             {summary.attributedConversions === 0 ? (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              <Text style={[styles.hint, { color: t.textMuted }]}>
                 No attributed conversions yet
               </Text>
             ) : null}
@@ -427,7 +427,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
         {tab === 'creators' ? (
           <StudioSection title="Assigned creators">
             {creators.length === 0 ? (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              <Text style={[styles.hint, { color: t.textMuted }]}>
                 Assign a creator to start generating referral traffic
               </Text>
             ) : (
@@ -436,13 +436,13 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                   key={row.creatorProfileId}
                   style={[styles.rowCard, { borderColor: t.border }]}
                 >
-                  <Text allowFontScaling={false} style={[styles.rowTitle, { color: t.textPrimary }]}>
+                  <Text style={[styles.rowTitle, { color: t.textPrimary }]}>
                     {row.creatorName || row.creatorHandle}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.rowMeta, { color: t.textMuted }]}>
+                  <Text style={[styles.rowMeta, { color: t.textMuted }]}>
                     @{row.creatorHandle} · {commissionLabel(row)} · {row.assignmentStatus}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.rowMeta, { color: t.textSecondary }]}>
+                  <Text style={[styles.rowMeta, { color: t.textSecondary }]}>
                     {row.clicks.toLocaleString('en-IN')} clicks ·{' '}
                     {row.attributedConversions.toLocaleString('en-IN')} attributed ·{' '}
                     {formatMinorCurrency(row.commissionAccruedMinor, meta.currency)} accrued
@@ -452,7 +452,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                     style={styles.inlineAction}
                   >
                     <ShareIcon size={14} color={t.accent} strokeWidth={2.2} />
-                    <Text allowFontScaling={false} style={[styles.inlineActionText, { color: t.accent }]}>
+                    <Text style={[styles.inlineActionText, { color: t.accent }]}>
                       Generate referral link
                     </Text>
                   </Pressable>
@@ -460,7 +460,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
               ))
             )}
 
-            <Text allowFontScaling={false} style={[styles.formHeading, { color: t.textPrimary }]}>
+            <Text style={[styles.formHeading, { color: t.textPrimary }]}>
               Assign creator
             </Text>
             <TextInput
@@ -483,13 +483,13 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                 }}
                 style={[styles.hit, { borderColor: t.border }]}
               >
-                <Text allowFontScaling={false} style={{ color: t.textPrimary, ...typeScale.body }}>
+                <Text style={{ color: t.textPrimary, ...typeScale.body }}>
                   {u.name} · @{u.handle}
                 </Text>
               </Pressable>
             ))}
             {picked ? (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textSecondary }]}>
+              <Text style={[styles.hint, { color: t.textSecondary }]}>
                 Selected @{picked.handle}
               </Text>
             ) : null}
@@ -516,7 +516,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                     },
                   ]}
                 >
-                  <Text allowFontScaling={false} style={{ color: t.textPrimary, ...typeScale.caption }}>
+                  <Text style={{ color: t.textPrimary, ...typeScale.caption }}>
                     {label}
                   </Text>
                 </Pressable>
@@ -524,7 +524,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
             </View>
             {commissionType !== 'NONE' ? (
               <>
-                <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+                <Text style={[styles.hint, { color: t.textMuted }]}>
                   {commissionType === 'PERCENTAGE'
                     ? 'Enter percent (e.g. 12.5). Stored as basis points.'
                     : `Enter fixed amount in ${meta.currency} (e.g. 50.00).`}
@@ -552,7 +552,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
         {tab === 'links' ? (
           <StudioSection title="Referral links">
             {links.length === 0 ? (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              <Text style={[styles.hint, { color: t.textMuted }]}>
                 Generate a link from the Creators tab after assigning someone.
               </Text>
             ) : (
@@ -562,10 +562,10 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                   onPress={() => void Share.share({ message: link.shareUrl })}
                   style={[styles.rowCard, { borderColor: t.border }]}
                 >
-                  <Text allowFontScaling={false} style={[styles.rowTitle, { color: t.textPrimary }]} numberOfLines={1}>
+                  <Text style={[styles.rowTitle, { color: t.textPrimary }]} numberOfLines={1}>
                     {link.shareUrl}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.rowMeta, { color: t.textMuted }]}>
+                  <Text style={[styles.rowMeta, { color: t.textMuted }]}>
                     {link.status} · tap to share
                   </Text>
                 </Pressable>
@@ -578,16 +578,16 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
           <StudioSection title="Coupons">
             {coupons.map((c) => (
               <View key={c.id} style={[styles.rowCard, { borderColor: t.border }]}>
-                <Text allowFontScaling={false} style={[styles.rowTitle, { color: t.textPrimary }]}>
+                <Text style={[styles.rowTitle, { color: t.textPrimary }]}>
                   {c.code}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.rowMeta, { color: t.textMuted }]}>
+                <Text style={[styles.rowMeta, { color: t.textMuted }]}>
                   {c.status} · {c.redemptionCount}
                   {c.maxRedemptions != null ? ` / ${c.maxRedemptions}` : ''} redemptions
                 </Text>
               </View>
             ))}
-            <Text allowFontScaling={false} style={[styles.formHeading, { color: t.textPrimary }]}>
+            <Text style={[styles.formHeading, { color: t.textPrimary }]}>
               New coupon
             </Text>
             {creators.length > 0 ? (
@@ -606,14 +606,14 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                       },
                     ]}
                   >
-                    <Text allowFontScaling={false} style={{ color: t.textPrimary, ...typeScale.caption }}>
+                    <Text style={{ color: t.textPrimary, ...typeScale.caption }}>
                       @{c.creatorHandle}
                     </Text>
                   </Pressable>
                 ))}
               </View>
             ) : (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              <Text style={[styles.hint, { color: t.textMuted }]}>
                 Assign a creator to start generating referral traffic
               </Text>
             )}
@@ -627,7 +627,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
               accessibilityLabel="Coupon code"
             />
             {couponCode.trim() ? (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              <Text style={[styles.hint, { color: t.textMuted }]}>
                 Preview: {previewCouponCode(couponCode)}
               </Text>
             ) : null}
@@ -643,7 +643,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
         {tab === 'geography' ? (
           <StudioSection title="Where conversions are happening">
             {geo.length === 0 ? (
-              <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+              <Text style={[styles.hint, { color: t.textMuted }]}>
                 Not enough regional conversion data yet.
               </Text>
             ) : (
@@ -652,13 +652,13 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                   key={`${bucket.coarseBucket}-${bucket.regionLabel}`}
                   style={[styles.geoRow, { borderColor: t.border }]}
                 >
-                  <Text allowFontScaling={false} style={[styles.geoTitle, { color: t.textPrimary }]}>
+                  <Text style={[styles.geoTitle, { color: t.textPrimary }]}>
                     {bucket.regionLabel || bucket.coarseBucket}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.geoMeta, { color: t.textSecondary }]}>
+                  <Text style={[styles.geoMeta, { color: t.textSecondary }]}>
                     {bucket.conversionCount.toLocaleString('en-IN')} conversions
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.geoMeta, { color: t.textMuted }]}>
+                  <Text style={[styles.geoMeta, { color: t.textMuted }]}>
                     {formatMinorCurrency(bucket.grossRevenueMinor, meta.currency)} revenue
                   </Text>
                 </View>

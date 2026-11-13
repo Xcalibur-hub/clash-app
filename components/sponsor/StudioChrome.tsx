@@ -18,7 +18,7 @@ export function StatusPill({
   const fg = tone === 'good' ? t.accent : tone === 'warn' ? t.textSecondary : t.textMuted;
   return (
     <View style={[styles.pill, { backgroundColor: bg, borderColor: t.border }]}>
-      <Text allowFontScaling={false} style={[styles.pillText, { color: fg }]}>
+      <Text style={[styles.pillText, { color: fg }]}>
         {label}
       </Text>
     </View>
@@ -35,10 +35,10 @@ export function MetricCell({
   const t = useThemeColors();
   return (
     <View style={[styles.metric, { borderColor: t.border }]}>
-      <Text allowFontScaling={false} style={[styles.metricValue, { color: t.textPrimary }]}>
+      <Text style={[styles.metricValue, { color: t.textPrimary }]}>
         {value}
       </Text>
-      <Text allowFontScaling={false} style={[styles.metricLabel, { color: t.textMuted }]}>
+      <Text style={[styles.metricLabel, { color: t.textMuted }]}>
         {label}
       </Text>
     </View>
@@ -55,7 +55,7 @@ export function StudioSection({
   const t = useThemeColors();
   return (
     <View style={styles.section}>
-      <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
+      <Text style={[styles.sectionTitle, { color: t.textPrimary }]}>
         {title}
       </Text>
       {children}

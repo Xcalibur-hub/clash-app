@@ -63,7 +63,7 @@ export function ClashEventHeader({
           style={styles.statusGroup}
         >
           <Text
-            allowFontScaling={false}
+           
             style={[styles.status, { color: live ? t.textPrimary : t.textSecondary }]}
           >
             {statusLabel}
@@ -77,7 +77,7 @@ export function ClashEventHeader({
                 style={[styles.phaseChip, { backgroundColor: chipFill(t), borderColor: t.border }]}
               >
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.phaseChipText, { color: t.textSecondary }]}
                 >
                   {phaseLabel}
@@ -87,10 +87,10 @@ export function ClashEventHeader({
           ) : null}
           {audienceLabel !== null ? (
             <>
-              <Text allowFontScaling={false} style={[styles.sep, { color: t.textMuted }]}>
+              <Text style={[styles.sep, { color: t.textMuted }]}>
                 ·
               </Text>
-              <Text allowFontScaling={false} style={[styles.watching, { color: t.textMuted }]}>
+              <Text style={[styles.watching, { color: t.textMuted }]}>
                 {audienceLabel}
               </Text>
             </>
@@ -104,7 +104,7 @@ export function ClashEventHeader({
         style={styles.hit}
         onPress={onMore}
       >
-        <Text allowFontScaling={false} style={[styles.more, { color: t.textMuted }]}>
+        <Text style={[styles.more, { color: t.textMuted }]}>
           •••
         </Text>
       </Pressable>

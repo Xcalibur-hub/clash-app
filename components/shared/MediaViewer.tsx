@@ -42,7 +42,7 @@ export function MediaViewer({
           style={[styles.close, { top: insets.top + 12 }]}
           hitSlop={12}
         >
-          <Text allowFontScaling={false} style={styles.closeLabel}>
+          <Text style={styles.closeLabel}>
             Close
           </Text>
         </Pressable>

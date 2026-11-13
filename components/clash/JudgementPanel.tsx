@@ -17,7 +17,7 @@ export interface JudgementPanelProps {
 export function JudgementPanel({ sideAHandle, sideBHandle, busy, onJudge }: JudgementPanelProps): React.JSX.Element {
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={styles.prompt}>
+      <Text style={styles.prompt}>
         Which argument made the stronger case?
       </Text>
       <View style={styles.row}>
@@ -48,15 +48,15 @@ function JudgeButton({
       accessibilityLabel={handle ? `Vote for Side ${side}, ${handle}` : `Vote for Side ${side}`}
       style={[styles.btn, { borderColor: tone, backgroundColor: soft }, busy && styles.busy]}
     >
-      <Text allowFontScaling={false} style={[styles.btnLabel, { color: tone }]}>
+      <Text style={[styles.btnLabel, { color: tone }]}>
         JUDGE {side}
       </Text>
       {handle ? (
-        <Text allowFontScaling={false} style={styles.btnHandle} numberOfLines={1}>
+        <Text style={styles.btnHandle} numberOfLines={1}>
           @{handle}
         </Text>
       ) : (
-        <Text allowFontScaling={false} style={styles.btnHandle} numberOfLines={1}>
+        <Text style={styles.btnHandle} numberOfLines={1}>
           Side {side}
         </Text>
       )}
@@ -70,10 +70,10 @@ export function LockedJudgement({ side }: { side: Side }): React.JSX.Element {
   return (
     <View style={[styles.locked, { borderColor: tone }]}>
       <VerifiedIcon size={18} color={tone} strokeWidth={2.4} />
-      <Text allowFontScaling={false} style={styles.lockedTitle}>
+      <Text style={styles.lockedTitle}>
         Judgement locked
       </Text>
-      <Text allowFontScaling={false} style={styles.lockedBody}>
+      <Text style={styles.lockedBody}>
         You backed Side {side}. The result is revealed when judging closes.
       </Text>
     </View>

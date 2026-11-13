@@ -28,12 +28,12 @@ export function AiDisclosure({
     >
       <View style={styles.row}>
         <View style={[styles.dot, { backgroundColor: t.textPrimary }]} />
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textPrimary }]}>
+        <Text style={[styles.label, { color: t.textPrimary }]}>
           {aiDisclosureLabel(creatorName)}
         </Text>
       </View>
       {variant === 'full' ? (
-        <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+        <Text style={[styles.body, { color: t.textSecondary }]}>
           {aiDisclosureDetail({ displayName, creatorName })}
         </Text>
       ) : null}

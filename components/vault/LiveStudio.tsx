@@ -76,17 +76,17 @@ export function LiveStudio(): React.JSX.Element {
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textMuted }]}>
+      <Text style={[styles.section, { color: t.textMuted }]}>
         LIVE
       </Text>
-      <Text allowFontScaling={false} style={[styles.blurb, { color: t.textSecondary }]}>
+      <Text style={[styles.blurb, { color: t.textSecondary }]}>
         Go live, then open polls, choices and crowd actions. Viewers can only affect what you
         allow — the server counts every vote.
       </Text>
       <VaultActionButton label="Go live" onPress={() => setFormOpen(true)} />
 
       {sessions.length === 0 ? (
-        <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+        <Text style={[styles.empty, { color: t.textMuted }]}>
           No sessions yet.
         </Text>
       ) : (
@@ -99,7 +99,7 @@ export function LiveStudio(): React.JSX.Element {
               <View style={styles.rowHead}>
                 <WorldIcon size={15} color={t.textSecondary} strokeWidth={2.2} />
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[styles.rowTitle, { color: t.textPrimary }]}
                   numberOfLines={1}
                 >
@@ -107,7 +107,7 @@ export function LiveStudio(): React.JSX.Element {
                 </Text>
               </View>
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.rowMeta, { color: t.textMuted }]}
                 numberOfLines={1}
               >

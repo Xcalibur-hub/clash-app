@@ -67,7 +67,7 @@ export function ClashMatchup({
       >
         <View style={[styles.rule, { backgroundColor: dark ? '#BCA1D8' : '#BA91CF' }]} />
         <View style={[styles.vsPlate, { backgroundColor: dark ? '#F6D87B' : '#FFDE76' }]}>
-          <Text allowFontScaling={false} style={styles.vsText}>VS</Text>
+          <Text style={styles.vsText}>VS</Text>
         </View>
         <View style={[styles.rule, { backgroundColor: dark ? '#E9A58F' : '#E59B85' }]} />
       </View>

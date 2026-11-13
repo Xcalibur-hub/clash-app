@@ -33,7 +33,7 @@ export function CountryPickerRow({
         {name}
       </Text>
       {meta ? (
-        <Text allowFontScaling={false} style={[styles.code, { color: t.textMuted }]}>
+        <Text style={[styles.code, { color: t.textMuted }]}>
           {meta}
         </Text>
       ) : null}

@@ -25,7 +25,7 @@ export function ClashStatus({ kind, closesAt, now }: ClashStatusProps): React.JS
   return (
     <View style={[styles.wrap, open && styles.open, kind === 'settled' && styles.settled]}>
       <Text
-        allowFontScaling={false}
+       
         style={[styles.label, open && styles.labelOpen]}
         accessibilityLiveRegion="polite"
       >

@@ -95,7 +95,7 @@ export function EditProfileSheet({ visible, profile, onClose, onSaved }: EditPro
             },
           ]}
         >
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             Edit profile
           </Text>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -185,7 +185,7 @@ export function EditProfileSheet({ visible, profile, onClose, onSaved }: EditPro
                       ]}
                     >
                       <Text
-                        allowFontScaling={false}
+                       
                         style={[
                           styles.hoodText,
                           {
@@ -228,7 +228,7 @@ function Field({
 }): React.JSX.Element {
   return (
     <View style={styles.field}>
-      <Text allowFontScaling={false} style={[styles.label, { color: muted }]}>
+      <Text style={[styles.label, { color: muted }]}>
         {label.toUpperCase()}
       </Text>
       {children}

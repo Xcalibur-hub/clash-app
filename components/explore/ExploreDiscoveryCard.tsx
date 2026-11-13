@@ -74,19 +74,19 @@ export function ExploreDiscoveryCard({
       )}
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.78)']} style={styles.scrim} />
       <View style={styles.copy}>
-        <Text allowFontScaling={false} style={styles.kind}>
+        <Text style={styles.kind}>
           {KIND_LABEL[kind]}
         </Text>
-        <Text allowFontScaling={false} style={styles.title} numberOfLines={3}>
+        <Text style={styles.title} numberOfLines={3}>
           {title}
         </Text>
         {subtitle ? (
-          <Text allowFontScaling={false} style={styles.sub} numberOfLines={1}>
+          <Text style={styles.sub} numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
         {meta ? (
-          <Text allowFontScaling={false} style={styles.meta} numberOfLines={1}>
+          <Text style={styles.meta} numberOfLines={1}>
             {meta}
           </Text>
         ) : null}

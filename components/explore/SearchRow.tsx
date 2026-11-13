@@ -43,11 +43,11 @@ export function SearchRow({
         </View>
       ) : null}
       <View style={styles.body}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[styles.title, { color: t.textPrimary }]}>
+        <Text numberOfLines={1} style={[styles.title, { color: t.textPrimary }]}>
           {title}
         </Text>
         {meta ? (
-          <Text allowFontScaling={false} numberOfLines={1} style={[styles.meta, { color: t.textMuted }]}>
+          <Text numberOfLines={1} style={[styles.meta, { color: t.textMuted }]}>
             {meta}
           </Text>
         ) : null}

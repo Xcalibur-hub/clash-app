@@ -29,7 +29,7 @@ export function StanceChoiceRow({ prompt, disabled, onChoose }: StanceChoiceRowP
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.prompt, { color: t.textSecondary }]}>
+      <Text style={[styles.prompt, { color: t.textSecondary }]}>
         {prompt}
       </Text>
       <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={prompt}>
@@ -88,7 +88,7 @@ function StanceChip({
           },
         ]}
       >
-        <Text allowFontScaling={false} style={[styles.label, { color: t.textPrimary }]}>
+        <Text style={[styles.label, { color: t.textPrimary }]}>
           {label}
         </Text>
       </Animated.View>

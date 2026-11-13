@@ -45,17 +45,17 @@ export function ArenaCrewsEntry(): React.JSX.Element {
           ]}
         >
           <View style={styles.copy}>
-            <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+            <Text style={[styles.eyebrow, { color: t.textMuted }]}>
               CREWS
             </Text>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Make your Crew famous
             </Text>
-            <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+            <Text style={[styles.body, { color: t.textSecondary }]}>
               Find your people. Put a name behind your takes.
             </Text>
           </View>
-          <Text allowFontScaling={false} style={[styles.cta, { color: t.textPrimary }]}>
+          <Text style={[styles.cta, { color: t.textPrimary }]}>
             Explore
           </Text>
         </Animated.View>

@@ -71,7 +71,7 @@ export function PredictionComposerSheet({
             ]}
             accessibilityViewIsModal
           >
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Create Prediction
             </Text>
             <TextInput
@@ -122,7 +122,7 @@ export function PredictionComposerSheet({
                   accessibilityLabel="Add option"
                   hitSlop={8}
                 >
-                  <Text allowFontScaling={false} style={[styles.link, { color: t.textSecondary }]}>
+                  <Text style={[styles.link, { color: t.textSecondary }]}>
                     Add option
                   </Text>
                 </Pressable>
@@ -139,14 +139,14 @@ export function PredictionComposerSheet({
                   accessibilityLabel="Remove last option"
                   hitSlop={8}
                 >
-                  <Text allowFontScaling={false} style={[styles.link, { color: t.textSecondary }]}>
+                  <Text style={[styles.link, { color: t.textSecondary }]}>
                     Remove
                   </Text>
                 </Pressable>
               ) : null}
             </View>
 
-            <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+            <Text style={[styles.label, { color: t.textMuted }]}>
               Closes in
             </Text>
             <View style={styles.chips}>
@@ -175,7 +175,7 @@ export function PredictionComposerSheet({
                     accessibilityLabel={choice.label}
                   >
                     <Text
-                      allowFontScaling={false}
+                     
                       style={[
                         styles.chipText,
                         {

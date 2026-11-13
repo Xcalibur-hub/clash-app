@@ -68,7 +68,7 @@ export function DigitalRoom({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           {`TALK TO ${profile.displayName.toUpperCase().replace(/^DIGITAL\s+/, '')}`}
         </Text>
         <Pressable
@@ -80,7 +80,7 @@ export function DigitalRoom({
           accessibilityRole="button"
           accessibilityLabel="Close talk mode"
         >
-          <Text allowFontScaling={false} style={[styles.exit, { color: t.textMuted }]}>
+          <Text style={[styles.exit, { color: t.textMuted }]}>
             Close
           </Text>
         </Pressable>
@@ -110,7 +110,7 @@ export function DigitalRoom({
 
       <DigitalModeSwitch modes={modes} active={mode} onChange={onModeChange} />
 
-      <Text allowFontScaling={false} style={[styles.modeHint, { color: t.textMuted }]}>
+      <Text style={[styles.modeHint, { color: t.textMuted }]}>
         {`${digitalRoomModeLabel(mode)} · the reply always comes from ${profile.displayName}'s Creator AI.`}
       </Text>
 

@@ -48,23 +48,23 @@ export function ClashSide({
         }
       >
         <View style={styles.head}>
-          <Text allowFontScaling={false} style={[styles.sideLabel, { color: tone }]}>
+          <Text style={[styles.sideLabel, { color: tone }]}>
             SIDE {side}
           </Text>
           {winner ? (
-            <Text allowFontScaling={false} style={[styles.winner, { color: tone }]}>
+            <Text style={[styles.winner, { color: tone }]}>
               WINNER
             </Text>
           ) : null}
         </View>
         {hidden ? (
-          <Text allowFontScaling={false} style={styles.hiddenName}>
+          <Text style={styles.hiddenName}>
             Participant {side}
           </Text>
         ) : (
           <View style={styles.identity}>
             <Avatar name={author.name} tint={author.tint} size={32} />
-            <Text allowFontScaling={false} style={styles.handle} numberOfLines={1}>
+            <Text style={styles.handle} numberOfLines={1}>
               @{author.handle}
             </Text>
           </View>

@@ -30,29 +30,29 @@ export function WinCard({ entry, winnerHandle, onPress }: WinCardProps): React.J
       <View style={styles.head}>
         <View style={[styles.ribbon, { backgroundColor: sideSoft, borderColor: sideColor }]}>
           <TrophyIcon size={13} color={sideColor} strokeWidth={2.4} />
-          <Text allowFontScaling={false} style={[styles.ribbonText, { color: sideColor }]}>
+          <Text style={[styles.ribbonText, { color: sideColor }]}>
             {`TAKE ${entry.result.winningSide} WON · ${entry.result.score.a}—${entry.result.score.b}`}
           </Text>
         </View>
         <ChevronIcon size={16} color={ink.quaternary} strokeWidth={2.4} />
       </View>
 
-      <Text allowFontScaling={false} style={styles.text} numberOfLines={2}>
+      <Text style={styles.text} numberOfLines={2}>
         {entry.take.text}
       </Text>
-      <Text allowFontScaling={false} style={styles.handle}>{`@${winnerHandle}`}</Text>
+      <Text style={styles.handle}>{`@${winnerHandle}`}</Text>
 
       <View style={styles.rewards}>
         <Chip label={`${entry.result.verdict}`} tone={sideTone === 'a' ? 'a' : 'b'} />
         <View style={styles.reward}>
           <ZapIcon size={12} color={accent.violet} strokeWidth={2.6} />
-          <Text allowFontScaling={false} style={styles.rewardText}>
+          <Text style={styles.rewardText}>
             {`+${entry.result.reputation} REP`}
           </Text>
         </View>
         <View style={styles.reward}>
           <CoinIcon size={12} color={accent.gold} strokeWidth={2.6} />
-          <Text allowFontScaling={false} style={styles.rewardText}>
+          <Text style={styles.rewardText}>
             {`+${entry.result.coins}`}
           </Text>
         </View>

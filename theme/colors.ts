@@ -6,13 +6,13 @@
 
 export const color = {
   /** Primary app background. */
-  bg: '#09090B',
+  bg: '#0B0A09',
   /** Primary solid surface (cards, bars). */
-  surface: '#111113',
+  surface: '#131211',
   /** Elevated solid surface (sheets, menus). */
-  elevated: '#18181B',
+  elevated: '#1A1917',
   /** Modal / overlay scrim. */
-  scrim: 'rgba(9,9,11,0.72)',
+  scrim: 'rgba(11,10,9,0.72)',
 } as const;
 
 /** Translucent fills + hairlines that make glass read as glass. */
@@ -55,7 +55,7 @@ export const card = {
   /** Opaque primary surface. */
   solid: '#111113',
   /** Elevated surface for sheets/menus. */
-  elevated: '#18181B',
+  elevated: '#1A1917',
   /** The hairline that draws the card edge. */
   border: 'rgba(255,255,255,0.06)',
   /** Subtle translucent alternative. */
@@ -77,10 +77,13 @@ export const action = {
 
 /** Duel accents. A and B must always be distinguishable at a glance. */
 export const accent = {
-  a: '#A580FF',
-  b: '#3D8BFF',
-  gold: '#C9A96A',
-  violet: '#A580FF',
+  /** Side A — ember clay. Warm, confident, never neon. */
+  a: '#E0885E',
+  /** Side B — deep steel. Cool counterweight to A. */
+  b: '#7FA6CE',
+  gold: '#D6B478',
+  /** Signature teal — reserved for one moment per screen. */
+  violet: '#6FB8AB',
   mint: '#3FBF8F',
   danger: '#E5484D',
 } as const;
@@ -91,22 +94,22 @@ export const accent = {
  * Clash, so "which side am I backing?" is answerable from colour alone.
  */
 export const duel = {
-  a: '#A580FF',
-  aSoft: 'rgba(165,128,255,0.12)',
-  aLine: 'rgba(165,128,255,0.32)',
-  b: '#3D8BFF',
-  bSoft: 'rgba(61,139,255,0.12)',
-  bLine: 'rgba(61,139,255,0.32)',
+  a: '#E0885E',
+  aSoft: 'rgba(224,136,94,0.12)',
+  aLine: 'rgba(224,136,94,0.32)',
+  b: '#7FA6CE',
+  bSoft: 'rgba(127,166,206,0.12)',
+  bLine: 'rgba(127,166,206,0.32)',
 } as const;
 
 /** Low-alpha companions to the accents (chip fills, borders, glows). */
 export const tint = {
-  aSoft: 'rgba(165,128,255,0.12)',
-  aLine: 'rgba(165,128,255,0.32)',
-  bSoft: 'rgba(61,139,255,0.12)',
-  bLine: 'rgba(61,139,255,0.32)',
-  goldSoft: 'rgba(201,169,106,0.14)',
-  violetSoft: 'rgba(165,128,255,0.12)',
+  aSoft: 'rgba(224,136,94,0.12)',
+  aLine: 'rgba(224,136,94,0.32)',
+  bSoft: 'rgba(127,166,206,0.12)',
+  bLine: 'rgba(127,166,206,0.32)',
+  goldSoft: 'rgba(214,180,120,0.14)',
+  violetSoft: 'rgba(111,184,171,0.12)',
   mintSoft: 'rgba(63,191,143,0.14)',
   neutralSoft: 'rgba(255,255,255,0.05)',
 } as const;
@@ -117,9 +120,9 @@ export const gradient: Record<
   'sideA' | 'sideB' | 'gold' | 'glass' | 'violet',
   GradientColors
 > = {
-  sideA: ['#8B7BD8', '#6C63C9'],
-  sideB: ['#5B8FD6', '#4A6FA8'],
-  gold: ['#C9B88A', '#A98F5F'],
+  sideA: ['#E0885E', '#C2683F'],
+  sideB: ['#7FA6CE', '#5C82A6'],
+  gold: ['#D6B478', '#B08F52'],
   glass: ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.01)'],
-  violet: ['#8B7BD8', '#6C63C9'],
+  violet: ['#6FB8AB', '#4E8F84'],
 } as const;

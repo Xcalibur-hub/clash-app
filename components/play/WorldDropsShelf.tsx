@@ -30,7 +30,7 @@ export function WorldDropsShelf(): React.JSX.Element | null {
 
   return (
     <View style={styles.block}>
-      <Text allowFontScaling={false} style={[styles.section, { color: t.textPrimary }]}>
+      <Text style={[styles.section, { color: t.textPrimary }]}>
         Hidden in the world
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>

@@ -34,7 +34,7 @@ export function CommunityReplyList({
 
   if (replies.length === 0) {
     return (
-      <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+      <Text style={[styles.empty, { color: t.textMuted }]}>
         No replies yet.
       </Text>
     );
@@ -49,7 +49,7 @@ export function CommunityReplyList({
             createdAt={reply.createdAt}
             onPressProfile={onOpenProfile ? () => onOpenProfile(reply) : undefined}
           />
-          <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+          <Text style={[styles.body, { color: t.textSecondary }]}>
             {reply.body}
           </Text>
           <View style={styles.actions}>
@@ -63,7 +63,7 @@ export function CommunityReplyList({
                 accessibilityRole="button"
                 accessibilityLabel="Reply"
               >
-                <Text allowFontScaling={false} style={[styles.actionLabel, { color: t.textSecondary }]}>
+                <Text style={[styles.actionLabel, { color: t.textSecondary }]}>
                   Reply
                 </Text>
               </Pressable>

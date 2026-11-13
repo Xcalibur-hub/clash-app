@@ -61,11 +61,11 @@ export const PosterStrip = React.memo(function PosterStrip({
               badge={String(index + 1).padStart(2, '0')}
               onPress={() => onOpen(item.id)}
             />
-            <Text allowFontScaling={false} style={[styles.caption, { color: t.textSecondary }]} numberOfLines={2}>
+            <Text style={[styles.caption, { color: t.textSecondary }]} numberOfLines={2}>
               {item.title}
             </Text>
             {item.meta ? (
-              <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
+              <Text style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
                 {item.meta}
               </Text>
             ) : null}

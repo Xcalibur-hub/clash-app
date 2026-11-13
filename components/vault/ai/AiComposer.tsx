@@ -64,7 +64,7 @@ export function AiComposer({
         ]}
       >
         <Text
-          allowFontScaling={false}
+         
           style={[
             styles.sendLabel,
             { color: canSend && t.scheme === 'light' ? t.textInverse : t.textPrimary },

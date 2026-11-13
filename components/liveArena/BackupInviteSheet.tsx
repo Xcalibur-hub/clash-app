@@ -46,16 +46,16 @@ export function BackupInviteSheet({
       <View style={styles.backdrop}>
         <View style={[styles.sheet, { backgroundColor: t.background, borderColor: t.border }]}>
           <View style={styles.content}>
-            <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+            <Text style={[styles.kicker, { color: t.textMuted }]}>
               {incomingCallHeadline(roomIndex)}
             </Text>
-            <Text allowFontScaling={false} style={[styles.topic, { color: t.textPrimary }]}>
+            <Text style={[styles.topic, { color: t.textPrimary }]}>
               {incomingCallTopic(invite.topicTitle)}
             </Text>
-            <Text allowFontScaling={false} style={[styles.body, { color: t.textSecondary }]}>
+            <Text style={[styles.body, { color: t.textSecondary }]}>
               {incomingCallBody(invite.topicTitle, caller)}
             </Text>
-            <Text allowFontScaling={false} style={[styles.body, { color: t.textMuted }]}>
+            <Text style={[styles.body, { color: t.textMuted }]}>
               {invite.acceptingDebaters
                 ? seconds !== null
                   ? `${seconds}s left to answer.`
@@ -65,7 +65,7 @@ export function BackupInviteSheet({
 
             {invite.acceptingDebaters ? (
               <>
-                <Text allowFontScaling={false} style={[styles.stanceHint, { color: t.textMuted }]}>
+                <Text style={[styles.stanceHint, { color: t.textMuted }]}>
                   JOIN BATTLE — pick your stance
                 </Text>
                 <View style={styles.stances}>

@@ -60,10 +60,10 @@ export function LiveRoomEventBanner({
         },
       ]}
     >
-      <Text allowFontScaling={false} style={[styles.mark, { color: t.textMuted }]}>
+      <Text style={[styles.mark, { color: t.textMuted }]}>
         {markFor(event.kind)}
       </Text>
-      <Text allowFontScaling={false} style={[styles.text, { color: t.textPrimary }]}>
+      <Text style={[styles.text, { color: t.textPrimary }]}>
         {event.label}
       </Text>
     </Animated.View>

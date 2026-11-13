@@ -26,7 +26,7 @@ export function CommunityAnnouncementCard({
   return (
     <View style={[styles.note, { borderTopColor: t.textPrimary }]}>
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={[styles.pin, { color: t.textMuted }]}>
+        <Text style={[styles.pin, { color: t.textMuted }]}>
           {`PINNED · FROM ${firstName.toUpperCase()}`}
         </Text>
         {onMore ? (
@@ -43,11 +43,11 @@ export function CommunityAnnouncementCard({
           </Pressable>
         ) : null}
       </View>
-      <Text allowFontScaling={false} style={[styles.body, { color: t.textPrimary }]}>
+      <Text style={[styles.body, { color: t.textPrimary }]}>
         {post.body}
       </Text>
       {mediaUrl ? <Image source={{ uri: mediaUrl }} style={styles.image} resizeMode="cover" /> : null}
-      <Text allowFontScaling={false} style={[styles.time, { color: t.textMuted }]}>
+      <Text style={[styles.time, { color: t.textMuted }]}>
         {timeAgo(post.createdAt)}
       </Text>
     </View>

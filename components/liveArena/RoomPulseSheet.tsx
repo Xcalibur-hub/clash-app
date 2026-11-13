@@ -77,21 +77,21 @@ export function RoomPulseSheet({
           accessibilityViewIsModal
           accessibilityLabel={a11y}
         >
-          <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          <Text style={[styles.kicker, { color: t.textMuted }]}>
             {settled
               ? roomIndex != null
                 ? `Room ${roomIndex} — Final Pulse`
                 : 'Final Pulse'
               : 'Room Pulse'}
           </Text>
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             {settled ? 'How this battle landed' : 'What is happening in this battle'}
           </Text>
 
           {loading && leaders.length === 0 ? (
             <ActivityIndicator color={t.textPrimary} style={{ marginVertical: space.xl }} />
           ) : leaders.length === 0 ? (
-            <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+            <Text style={[styles.empty, { color: t.textMuted }]}>
               No qualifying candidates yet. Keep debating.
             </Text>
           ) : (
@@ -105,10 +105,10 @@ export function RoomPulseSheet({
           <View style={styles.list}>
             {leaders.map((leader) => (
               <View key={`row-${leader.category}`} style={styles.row}>
-                <Text allowFontScaling={false} style={[styles.cat, { color: t.textMuted }]}>
+                <Text style={[styles.cat, { color: t.textMuted }]}>
                   {leader.label}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.who, { color: t.textPrimary }]}>
+                <Text style={[styles.who, { color: t.textPrimary }]}>
                   {leader.author?.name ?? 'Someone'}
                 </Text>
               </View>
@@ -124,7 +124,7 @@ export function RoomPulseSheet({
             accessibilityRole="button"
             accessibilityLabel="Close Room Pulse"
           >
-            <Text allowFontScaling={false} style={[styles.closeText, { color: t.textPrimary }]}>
+            <Text style={[styles.closeText, { color: t.textPrimary }]}>
               Close
             </Text>
           </Pressable>
@@ -167,7 +167,7 @@ function PulseNode({ leader }: { leader: ArenaPulseLeader }): React.JSX.Element 
         },
       ]}
     >
-      <Text allowFontScaling={false} style={[styles.nodeCat, { color: t.textMuted }]}>
+      <Text style={[styles.nodeCat, { color: t.textMuted }]}>
         {leader.category === 'CROWD_FAVORITE'
           ? '💀 Crowd lost it'
           : leader.category === 'FAST_RISING'
@@ -179,7 +179,7 @@ function PulseNode({ leader }: { leader: ArenaPulseLeader }): React.JSX.Element 
         tint={leader.author?.avatarTint ?? '#A1A1AA'}
         size={34}
       />
-      <Text allowFontScaling={false} style={[styles.nodeName, { color: t.textPrimary }]} numberOfLines={1}>
+      <Text style={[styles.nodeName, { color: t.textPrimary }]} numberOfLines={1}>
         {leader.author?.name ?? 'Someone'}
       </Text>
     </Animated.View>

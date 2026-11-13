@@ -111,7 +111,7 @@ export function LiveInteractionFormSheet({
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close">
         <Pressable style={[styles.sheet, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Open an interaction
             </Text>
             <PillPicker
@@ -148,7 +148,7 @@ export function LiveInteractionFormSheet({
               </>
             ) : (
               <View style={styles.options}>
-                <Text allowFontScaling={false} style={[styles.label, { color: t.textMuted }]}>
+                <Text style={[styles.label, { color: t.textMuted }]}>
                   OPTIONS
                 </Text>
                 {labels.map((label, index) => (

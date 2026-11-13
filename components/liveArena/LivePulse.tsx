@@ -55,7 +55,7 @@ export function LivePulse({
         ]}
       />
       {dotOnly ? null : (
-        <Text allowFontScaling={false} style={[styles.label, { color }]}>
+        <Text style={[styles.label, { color }]}>
           LIVE
         </Text>
       )}

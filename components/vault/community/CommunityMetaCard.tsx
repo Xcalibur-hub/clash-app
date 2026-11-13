@@ -30,18 +30,18 @@ export function CommunityMetaCard({
       ]}
     >
       {description ? (
-        <Text allowFontScaling={false} style={[styles.desc, { color: t.textSecondary }]} numberOfLines={3}>
+        <Text style={[styles.desc, { color: t.textSecondary }]} numberOfLines={3}>
           {description}
         </Text>
       ) : null}
       <View style={styles.metaRow}>
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {communityMemberLabel(memberCount)}
         </Text>
-        <Text allowFontScaling={false} style={[styles.dot, { color: t.textMuted }]}>
+        <Text style={[styles.dot, { color: t.textMuted }]}>
           ·
         </Text>
-        <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+        <Text style={[styles.meta, { color: t.textMuted }]}>
           {communityActiveLabel(activeToday)}
         </Text>
       </View>

@@ -29,10 +29,10 @@ export function CommunityChapterCard({
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         {communityAccessLabel(summary.accessType).toUpperCase()}
       </Text>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
+      <Text style={[styles.title, { color: t.textPrimary }]} numberOfLines={2}>
         {summary.name}
       </Text>
 
@@ -46,15 +46,15 @@ export function CommunityChapterCard({
       </View>
 
       <View style={[styles.note, { borderLeftColor: t.borderStrong }]}>
-        <Text allowFontScaling={false} style={[styles.noteLabel, { color: t.textMuted }]}>
+        <Text style={[styles.noteLabel, { color: t.textMuted }]}>
           FROM {firstName.toUpperCase()}
         </Text>
-        <Text allowFontScaling={false} style={[styles.noteBody, { color: t.textSecondary }]} numberOfLines={3}>
+        <Text style={[styles.noteBody, { color: t.textSecondary }]} numberOfLines={3}>
           {note}
         </Text>
       </View>
 
-      <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]}>
+      <Text style={[styles.meta, { color: t.textMuted }]}>
         {`${communityMemberLabel(summary.memberCount)} · ${communityActiveLabel(summary.activeToday)}`}
       </Text>
 

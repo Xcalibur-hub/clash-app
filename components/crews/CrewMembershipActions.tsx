@@ -95,7 +95,7 @@ export function CrewMembershipActions({
               ]}
             >
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.followLabel, { color: following ? t.textPrimary : t.textSecondary }]}
               >
                 {following ? 'FOLLOWING' : 'FOLLOW'}
@@ -105,19 +105,19 @@ export function CrewMembershipActions({
         ) : null}
       </View>
       {notice ? (
-        <Text allowFontScaling={false} style={[styles.notice, { color: t.textMuted }]}>
+        <Text style={[styles.notice, { color: t.textMuted }]}>
           {notice}
         </Text>
       ) : action === 'blocked_other' ? (
-        <Text allowFontScaling={false} style={[styles.notice, { color: t.textMuted }]}>
+        <Text style={[styles.notice, { color: t.textMuted }]}>
           You already belong to a Crew. Leave it before joining another.
         </Text>
       ) : action === 'invite_only' ? (
-        <Text allowFontScaling={false} style={[styles.notice, { color: t.textMuted }]}>
+        <Text style={[styles.notice, { color: t.textMuted }]}>
           Membership is by invitation — follow them while you wait.
         </Text>
       ) : action === 'pending' ? (
-        <Text allowFontScaling={false} style={[styles.notice, { color: t.textMuted }]}>
+        <Text style={[styles.notice, { color: t.textMuted }]}>
           Request sent. Hang tight.
         </Text>
       ) : null}

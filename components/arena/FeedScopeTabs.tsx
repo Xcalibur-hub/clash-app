@@ -48,7 +48,7 @@ export function FeedScopeTabs({ value, onChange }: FeedScopeTabsProps): React.JS
             ]}
           >
             <Text
-              allowFontScaling={false}
+             
               style={[
                 styles.label,
                 { color: active ? t.pillText : t.pillInactiveText, fontWeight: active ? '700' : '500' },

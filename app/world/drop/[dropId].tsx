@@ -132,34 +132,34 @@ export default function WorldDropDetailScreen(): React.JSX.Element {
         </View>
 
         <View style={styles.body}>
-          <Text allowFontScaling={false} style={[styles.author, { color: t.textPrimary }]}>
+          <Text style={[styles.author, { color: t.textPrimary }]}>
             {authorName}
           </Text>
-          <Text allowFontScaling={false} style={[styles.meta, { color: t.textSecondary }]}>
+          <Text style={[styles.meta, { color: t.textSecondary }]}>
             {[handle, drop.distanceBand, posted ? `${posted} ago` : null].filter(Boolean).join(' · ')}
           </Text>
           {drop.mission ? (
-            <Text allowFontScaling={false} style={[styles.mission, { color: t.textMuted }]}>
+            <Text style={[styles.mission, { color: t.textMuted }]}>
               Mission · {drop.mission.title}
             </Text>
           ) : null}
           {drop.caption ? (
-            <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]}>
+            <Text style={[styles.caption, { color: t.textPrimary }]}>
               {drop.caption}
             </Text>
           ) : null}
           {drop.mission ? (
             <View style={[styles.context, { borderColor: t.border, backgroundColor: t.surfaceMuted }]}>
-              <Text allowFontScaling={false} style={[styles.contextEyebrow, { color: t.textMuted }]}>
+              <Text style={[styles.contextEyebrow, { color: t.textMuted }]}>
                 MISSION
               </Text>
-              <Text allowFontScaling={false} style={[styles.contextPrompt, { color: t.textSecondary }]}>
+              <Text style={[styles.contextPrompt, { color: t.textSecondary }]}>
                 {drop.mission.prompt}
               </Text>
             </View>
           ) : null}
           {expiry ? (
-            <Text allowFontScaling={false} style={[styles.expiry, { color: t.textMuted }]}>
+            <Text style={[styles.expiry, { color: t.textMuted }]}>
               {expiry}
             </Text>
           ) : null}

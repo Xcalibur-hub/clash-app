@@ -136,7 +136,7 @@ export const EditorialMedia = React.memo(function EditorialMedia({
         ) : null}
         {badge ? (
           <View style={styles.badge}>
-            <Text allowFontScaling={false} style={styles.badgeText}>
+            <Text style={styles.badgeText}>
               {badge}
             </Text>
           </View>
@@ -144,17 +144,17 @@ export const EditorialMedia = React.memo(function EditorialMedia({
         {hasCopy ? (
           <View style={styles.copy}>
             {kicker ? (
-              <Text allowFontScaling={false} style={styles.kicker} numberOfLines={1}>
+              <Text style={styles.kicker} numberOfLines={1}>
                 {kicker}
               </Text>
             ) : null}
             {title ? (
-              <Text allowFontScaling={false} style={styles.title} numberOfLines={2}>
+              <Text style={styles.title} numberOfLines={2}>
                 {title}
               </Text>
             ) : null}
             {meta ? (
-              <Text allowFontScaling={false} style={styles.meta} numberOfLines={1}>
+              <Text style={styles.meta} numberOfLines={1}>
                 {meta}
               </Text>
             ) : null}

@@ -145,13 +145,13 @@ export function MeetHomePanel(): React.JSX.Element {
   if (search.phase === 'matched' && matched) {
     return (
       <View style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           YOU&apos;RE CONNECTED
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           {matched.peerAlias}
         </Text>
-        <Text allowFontScaling={false} style={{ color: t.textSecondary }}>
+        <Text style={{ color: t.textSecondary }}>
           {matched.channel === 'VIDEO' ? 'Video' : 'Text'}
           {matched.sharedInterest
             ? ` · ${matched.sharedInterest}`
@@ -188,7 +188,7 @@ export function MeetHomePanel(): React.JSX.Element {
   if (search.phase === 'searching') {
     return (
       <View style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           MEET THE WORLD
         </Text>
         <Animated.View
@@ -201,10 +201,10 @@ export function MeetHomePanel(): React.JSX.Element {
             },
           ]}
         />
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           Finding someone…
         </Text>
-        <Text allowFontScaling={false} style={{ color: t.textSecondary, textAlign: 'center' }}>
+        <Text style={{ color: t.textSecondary, textAlign: 'center' }}>
           {channel === 'VIDEO' ? 'Video · ' : 'Text · '}
           {mode === 'INTERESTS' ? interest : MODES.find((m) => m.id === mode)?.label}
           {mode === 'COUNTRY'
@@ -213,7 +213,7 @@ export function MeetHomePanel(): React.JSX.Element {
               ? ' · Anywhere'
               : ''}
         </Text>
-        <Text allowFontScaling={false} style={{ color: t.textMuted, textAlign: 'center', fontSize: 13 }}>
+        <Text style={{ color: t.textMuted, textAlign: 'center', fontSize: 13 }}>
           Still looking… No bots. Real people only.
         </Text>
         <MeetButton
@@ -234,7 +234,7 @@ export function MeetHomePanel(): React.JSX.Element {
               void runSearch('ANYWHERE');
             }}
           >
-            <Text allowFontScaling={false} style={{ color: t.textMuted, fontWeight: '700' }}>
+            <Text style={{ color: t.textMuted, fontWeight: '700' }}>
               Try Anywhere
             </Text>
           </Pressable>
@@ -246,13 +246,13 @@ export function MeetHomePanel(): React.JSX.Element {
   if (phase === 'safety') {
     return (
       <View style={[styles.card, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           VIDEO MEET
         </Text>
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           Be respectful
         </Text>
-        <Text allowFontScaling={false} style={{ color: t.textSecondary, textAlign: 'center', lineHeight: 22 }}>
+        <Text style={{ color: t.textSecondary, textAlign: 'center', lineHeight: 22 }}>
           No sexual or abusive content. You can leave, block, or report instantly. Connections are
           pseudonymous — not completely anonymous.
         </Text>
@@ -284,14 +284,14 @@ export function MeetHomePanel(): React.JSX.Element {
     return (
       <View style={styles.root}>
         <Pressable onPress={() => setPhase('pick')}>
-          <Text allowFontScaling={false} style={{ color: t.textMuted, fontWeight: '700' }}>
+          <Text style={{ color: t.textMuted, fontWeight: '700' }}>
             ← Back
           </Text>
         </Pressable>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           {channel === 'VIDEO' ? 'VIDEO MEET' : 'TEXT MEET'}
         </Text>
-        <Text allowFontScaling={false} style={[styles.hero, { color: t.textPrimary }]}>
+        <Text style={[styles.hero, { color: t.textPrimary }]}>
           {channel === 'VIDEO' ? 'How do you want to meet?' : 'How do you want to chat?'}
         </Text>
 
@@ -316,13 +316,13 @@ export function MeetHomePanel(): React.JSX.Element {
                 accessibilityState={{ selected: on }}
               >
                 <Text
-                  allowFontScaling={false}
+                 
                   style={{ color: on ? t.background : t.textPrimary, fontWeight: '800' }}
                 >
                   {item.label}
                 </Text>
                 <Text
-                  allowFontScaling={false}
+                 
                   style={{ color: on ? 'rgba(255,255,255,0.7)' : t.textMuted, fontSize: 12 }}
                 >
                   {item.hint}
@@ -423,13 +423,13 @@ export function MeetHomePanel(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+      <Text style={[styles.kicker, { color: t.textMuted }]}>
         MEET THE WORLD
       </Text>
-      <Text allowFontScaling={false} style={[styles.hero, { color: t.textPrimary }]}>
+      <Text style={[styles.hero, { color: t.textPrimary }]}>
         Talk to someone new
       </Text>
-      <Text allowFontScaling={false} style={{ color: t.textSecondary, lineHeight: 20 }}>
+      <Text style={{ color: t.textSecondary, lineHeight: 20 }}>
         Pseudonymous to each other. Authenticated for safety.
       </Text>
 
@@ -440,14 +440,14 @@ export function MeetHomePanel(): React.JSX.Element {
         accessibilityLabel="Text. Start a chat"
       >
         <View style={{ flex: 1, gap: 4 }}>
-          <Text allowFontScaling={false} style={{ color: t.textPrimary, fontWeight: '800', fontSize: 18 }}>
+          <Text style={{ color: t.textPrimary, fontWeight: '800', fontSize: 18 }}>
             TEXT
           </Text>
-          <Text allowFontScaling={false} style={{ color: t.textSecondary }}>
+          <Text style={{ color: t.textSecondary }}>
             Chat anonymously
           </Text>
         </View>
-        <Text allowFontScaling={false} style={{ color: t.textMuted, fontWeight: '800' }}>
+        <Text style={{ color: t.textMuted, fontWeight: '800' }}>
           →
         </Text>
       </Pressable>
@@ -459,14 +459,14 @@ export function MeetHomePanel(): React.JSX.Element {
         accessibilityLabel="Video. Meet someone"
       >
         <View style={{ flex: 1, gap: 4 }}>
-          <Text allowFontScaling={false} style={{ color: t.textPrimary, fontWeight: '800', fontSize: 18 }}>
+          <Text style={{ color: t.textPrimary, fontWeight: '800', fontSize: 18 }}>
             VIDEO
           </Text>
-          <Text allowFontScaling={false} style={{ color: t.textSecondary }}>
+          <Text style={{ color: t.textSecondary }}>
             Meet face to face
           </Text>
         </View>
-        <Text allowFontScaling={false} style={{ color: t.textMuted, fontWeight: '800' }}>
+        <Text style={{ color: t.textMuted, fontWeight: '800' }}>
           →
         </Text>
       </Pressable>

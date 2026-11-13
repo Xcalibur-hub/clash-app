@@ -31,7 +31,7 @@ export function TakeMediaPreview({ media, onRemove }: TakeMediaPreviewProps): Re
             <PlayIcon size={22} color={ink.primary} strokeWidth={2.4} />
           </View>
           {media.durationMs ? (
-            <Text allowFontScaling={false} style={styles.duration}>
+            <Text style={styles.duration}>
               {formatDuration(media.durationMs)}
             </Text>
           ) : null}

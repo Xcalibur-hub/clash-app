@@ -91,10 +91,10 @@ function Header({ unreadCount, onMarkAll }: { unreadCount: number; onMarkAll: ()
     <View style={styles.header}>
       <View style={styles.headerTop}>
         <View>
-          <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+          <Text style={[styles.eyebrow, { color: t.textMuted }]}>
             ACTIVITY
           </Text>
-          <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+          <Text style={[styles.title, { color: t.textPrimary }]}>
             Notifications
           </Text>
         </View>
@@ -109,7 +109,7 @@ function Header({ unreadCount, onMarkAll }: { unreadCount: number; onMarkAll: ()
             hitSlop={8}
             style={styles.markAll}
           >
-            <Text allowFontScaling={false} style={[styles.markAllText, { color: t.textSecondary }]}>
+            <Text style={[styles.markAllText, { color: t.textSecondary }]}>
               Mark all read
             </Text>
           </Pressable>

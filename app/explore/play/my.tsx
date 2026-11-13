@@ -40,10 +40,10 @@ function Tile({
         <LinearGradient colors={['#2A2438', '#121214']} style={styles.tileMedia} />
       )}
       <View style={styles.tileCopy}>
-        <Text allowFontScaling={false} style={[styles.tileTitle, { color: t.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.tileTitle, { color: t.textPrimary }]} numberOfLines={2}>
           {title}
         </Text>
-        <Text allowFontScaling={false} style={{ color: t.textMuted }} numberOfLines={1}>
+        <Text style={{ color: t.textMuted }} numberOfLines={1}>
           {meta}
         </Text>
       </View>
@@ -96,14 +96,14 @@ function MyPlayScreen(): React.JSX.Element {
     >
       <View style={styles.header}>
         <GlowButton label="Back" onPress={() => router.back()} tone="glass" compact />
-        <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>
           MY PLAY
         </Text>
       </View>
 
       {loading ? <ActivityIndicator color={t.textPrimary} /> : null}
       {error ? (
-        <Text allowFontScaling={false} style={{ color: t.danger }}>
+        <Text style={{ color: t.danger }}>
           {error}
         </Text>
       ) : null}
@@ -194,11 +194,11 @@ function Section({
   const list = React.Children.toArray(children).filter(Boolean);
   return (
     <View style={styles.section}>
-      <Text allowFontScaling={false} style={[styles.sectionTitle, { color: t.textPrimary }]}>
+      <Text style={[styles.sectionTitle, { color: t.textPrimary }]}>
         {title}
       </Text>
       {list.length === 0 ? (
-        <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+        <Text style={{ color: t.textMuted }}>
           Nothing here yet.
         </Text>
       ) : (

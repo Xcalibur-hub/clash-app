@@ -36,13 +36,13 @@ export function PredictionCard({
       accessibilityLabel={`Prediction. ${game.question}`}
     >
       <View style={styles.head}>
-        <Text allowFontScaling={false} style={styles.eyebrow}>PREDICTION</Text>
+        <Text style={styles.eyebrow}>PREDICTION</Text>
         {game.status === 'RESOLVED' ? (
-          <Text allowFontScaling={false} style={styles.meta}>Resolved</Text>
+          <Text style={styles.meta}>Resolved</Text>
         ) : closed ? (
-          <Text allowFontScaling={false} style={styles.meta}>Closed</Text>
+          <Text style={styles.meta}>Closed</Text>
         ) : (
-          <Text allowFontScaling={false} style={styles.meta}>
+          <Text style={styles.meta}>
             Closes in {timeLeftLabel(game.closesAt, now).replace(' left', '')}
           </Text>
         )}
@@ -54,7 +54,7 @@ export function PredictionCard({
         accessibilityRole={onOpen ? 'button' : undefined}
         accessibilityLabel={game.question}
       >
-        <Text allowFontScaling={false} style={styles.question}>{game.question}</Text>
+        <Text style={styles.question}>{game.question}</Text>
       </Pressable>
 
       <View style={styles.options}>
@@ -81,14 +81,14 @@ export function PredictionCard({
               ]}
             >
               <Text
-                allowFontScaling={false}
+               
                 style={[styles.optionLabel, selected && styles.optionLabelOn]}
                 numberOfLines={2}
               >
                 {option.label}
               </Text>
               {showPercents && option.percent !== null ? (
-                <Text allowFontScaling={false} style={styles.percent}>{option.percent}%</Text>
+                <Text style={styles.percent}>{option.percent}%</Text>
               ) : null}
             </Pressable>
           );
@@ -96,29 +96,29 @@ export function PredictionCard({
       </View>
 
       {game.hasPredicted && game.viewerOptionId ? (
-        <Text allowFontScaling={false} style={styles.yours}>
+        <Text style={styles.yours}>
           You picked {game.options.find((o) => o.id === game.viewerOptionId)?.label ?? 'an option'}
         </Text>
       ) : null}
 
       {game.totalParticipants !== null && !showPercents ? (
-        <Text allowFontScaling={false} style={styles.meta}>
+        <Text style={styles.meta}>
           {game.totalParticipants} {game.totalParticipants === 1 ? 'prediction' : 'predictions'}
         </Text>
       ) : null}
 
       {!compact && game.status === 'RESOLVED' ? (
         <View style={styles.result}>
-          <Text allowFontScaling={false} style={styles.resultTitle}>
+          <Text style={styles.resultTitle}>
             {game.options.find((o) => o.isWinner)?.label ?? 'Result'} won
           </Text>
           {game.viewerCorrect !== null ? (
-            <Text allowFontScaling={false} style={styles.meta}>
+            <Text style={styles.meta}>
               {game.viewerCorrect ? 'You predicted correctly' : 'You predicted incorrectly'}
             </Text>
           ) : null}
           {game.correctPercent !== null && game.totalParticipants !== null ? (
-            <Text allowFontScaling={false} style={styles.resultPct}>
+            <Text style={styles.resultPct}>
               {game.correctPercent}% predicted correctly · {game.totalParticipants} participants
             </Text>
           ) : null}

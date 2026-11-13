@@ -18,7 +18,7 @@ export function CrewRisingStrip({ crews, onOpen }: CrewRisingStripProps): React.
 
   return (
     <View style={styles.wrap}>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textSecondary }]}>
+      <Text style={[styles.title, { color: t.textSecondary }]}>
         RISING THIS WEEK
       </Text>
       <ScrollView
@@ -46,13 +46,13 @@ export function CrewRisingStrip({ crews, onOpen }: CrewRisingStripProps): React.
               size={52}
             />
             <Text
-              allowFontScaling={false}
+             
               style={[styles.name, { color: t.textPrimary }]}
               numberOfLines={1}
             >
               {crew.name}
             </Text>
-            <Text allowFontScaling={false} style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
+            <Text style={[styles.meta, { color: t.textMuted }]} numberOfLines={1}>
               {formatCrewMembers(crew.memberCount)}
             </Text>
           </Pressable>

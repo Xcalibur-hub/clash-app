@@ -242,7 +242,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
   if (!detail) {
     return (
       <View style={[styles.center, { backgroundColor: t.background, paddingTop: insets.top }]}>
-        <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+        <Text style={{ color: t.textMuted }}>
           {error ?? 'Challenge not found'}
         </Text>
         <GlowButton label="Back" onPress={() => router.back()} tone="glass" compact />
@@ -278,26 +278,26 @@ function ChallengeDetailScreen(): React.JSX.Element {
                 accessibilityRole="button"
                 accessibilityLabel="Back"
               >
-                <Text allowFontScaling={false} style={styles.backLabel}>
+                <Text style={styles.backLabel}>
                   ←
                 </Text>
               </Pressable>
               <View style={[styles.heroCopy, { paddingTop: insets.top + 56 }]}>
-                <Text allowFontScaling={false} style={styles.scope}>
+                <Text style={styles.scope}>
                   {detail.challengeType}
                   {detail.countryCode ? ` · ${detail.countryCode}` : ''}
                 </Text>
-                <Text allowFontScaling={false} style={styles.title}>
+                <Text style={styles.title}>
                   {detail.title}
                 </Text>
                 {detail.host ? (
                   <Pressable onPress={() => router.push(`/profile/${detail.host!.id}` as never)}>
-                    <Text allowFontScaling={false} style={styles.host}>
+                    <Text style={styles.host}>
                       @{detail.host.handle}
                     </Text>
                   </Pressable>
                 ) : null}
-                <Text allowFontScaling={false} style={styles.meta}>
+                <Text style={styles.meta}>
                   {ended ? 'Ended' : timeLeftLabel(detail.endsAt, now)} · {detail.entryCount}{' '}
                   entries
                 </Text>
@@ -306,17 +306,17 @@ function ChallengeDetailScreen(): React.JSX.Element {
 
             <View style={styles.body}>
               {detail.description ? (
-                <Text allowFontScaling={false} style={[styles.desc, { color: t.textSecondary }]}>
+                <Text style={[styles.desc, { color: t.textSecondary }]}>
                   {detail.description}
                 </Text>
               ) : null}
 
               {complete ? (
                 <View style={[styles.resultCard, { borderColor: t.border, backgroundColor: t.surfaceElevated }]}>
-                  <Text allowFontScaling={false} style={[styles.resultKicker, { color: t.textMuted }]}>
+                  <Text style={[styles.resultKicker, { color: t.textMuted }]}>
                     CHALLENGE COMPLETE
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.resultTitle, { color: t.textPrimary }]}>
+                  <Text style={[styles.resultTitle, { color: t.textPrimary }]}>
                     Winner
                   </Text>
                   {detail.result?.winnerProfileId ? (
@@ -325,17 +325,17 @@ function ChallengeDetailScreen(): React.JSX.Element {
                         router.push(`/profile/${detail.result!.winnerProfileId}` as never)
                       }
                     >
-                      <Text allowFontScaling={false} style={{ color: t.textPrimary, fontWeight: '700' }}>
+                      <Text style={{ color: t.textPrimary, fontWeight: '700' }}>
                         View winner profile
                       </Text>
                     </Pressable>
                   ) : (
-                    <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+                    <Text style={{ color: t.textMuted }}>
                       No eligible entries
                     </Text>
                   )}
                   {detail.myEntryId ? (
-                    <Text allowFontScaling={false} style={{ color: t.textMuted, marginTop: space.sm }}>
+                    <Text style={{ color: t.textMuted, marginTop: space.sm }}>
                       Your entry is in the final board.
                     </Text>
                   ) : null}
@@ -383,7 +383,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
               ) : null}
 
               {error ? (
-                <Text allowFontScaling={false} style={{ color: '#C45C5C' }}>
+                <Text style={{ color: '#C45C5C' }}>
                   {error}
                 </Text>
               ) : null}
@@ -412,7 +412,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
                       ]}
                     >
                       <Text
-                        allowFontScaling={false}
+                       
                         style={{ color: on ? t.background : t.textPrimary, fontWeight: '700' }}
                       >
                         {label}
@@ -435,11 +435,11 @@ function ChallengeDetailScreen(): React.JSX.Element {
               <View style={[styles.entryMedia, { backgroundColor: '#1C2220' }]} />
             )}
             <View style={styles.entryCopy}>
-              <Text allowFontScaling={false} style={[styles.entryAuthor, { color: t.textPrimary }]}>
+              <Text style={[styles.entryAuthor, { color: t.textPrimary }]}>
                 @{item.author.handle}
               </Text>
               {item.caption ? (
-                <Text allowFontScaling={false} style={{ color: t.textMuted }} numberOfLines={2}>
+                <Text style={{ color: t.textMuted }} numberOfLines={2}>
                   {item.caption}
                 </Text>
               ) : null}
@@ -450,7 +450,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
                 }}
                 hitSlop={8}
               >
-                <Text allowFontScaling={false} style={{ color: item.reacted ? '#E8C97A' : t.textMuted }}>
+                <Text style={{ color: item.reacted ? '#E8C97A' : t.textMuted }}>
                   ♥ {item.reactionsCount}
                 </Text>
               </Pressable>
@@ -463,7 +463,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
         onEndReachedThreshold={0.4}
         ListEmptyComponent={
           <Text
-            allowFontScaling={false}
+           
             style={{ color: t.textMuted, paddingHorizontal: layout.screenX, marginTop: space.md }}
           >
             No entries yet — be the first.

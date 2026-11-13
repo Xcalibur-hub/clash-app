@@ -69,7 +69,7 @@ export function WorldDropFormSheet({
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close">
         <Pressable style={[styles.sheet, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
-            <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+            <Text style={[styles.title, { color: t.textPrimary }]}>
               Place a World Drop
             </Text>
             <TextInput

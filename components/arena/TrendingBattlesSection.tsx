@@ -108,13 +108,13 @@ export function TrendingBattlesSection({
         entering={reduced ? undefined : FadeIn.duration(240)}
         style={[styles.wrap, { borderColor: t.border, backgroundColor: t.background }]}
       >
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           WHAT THE INTERNET IS FIGHTING ABOUT
         </Text>
-        <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+        <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
           No live battles right now
         </Text>
-        <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textMuted }]}>
+        <Text style={[styles.emptyBody, { color: t.textMuted }]}>
           The ranking race starts the moment an Arena topic opens.
         </Text>
       </Animated.View>
@@ -141,12 +141,12 @@ export function TrendingBattlesSection({
       style={[styles.wrap, { borderColor: t.border, backgroundColor: t.background }]}
     >
       <View style={styles.headRow}>
-        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+        <Text style={[styles.kicker, { color: t.textMuted }]}>
           WHAT THE INTERNET IS FIGHTING ABOUT
         </Text>
         {demo ? (
           <Text
-            allowFontScaling={false}
+           
             style={[styles.demoBadge, { color: t.textMuted, borderColor: t.border }]}
             accessibilityLabel="Development preview using demo data"
           >
@@ -154,7 +154,7 @@ export function TrendingBattlesSection({
           </Text>
         ) : null}
       </View>
-      <Text allowFontScaling={false} style={[styles.title, { color: t.textPrimary }]}>
+      <Text style={[styles.title, { color: t.textPrimary }]}>
         What the internet is fighting about
       </Text>
 
@@ -169,7 +169,7 @@ export function TrendingBattlesSection({
 
       {__DEV__ && demo ? (
         <Text
-          allowFontScaling={false}
+         
           style={[styles.devDiag, { color: t.textMuted }]}
           accessibilityLabel={`Demo diagnostic: ${battles.length} topics, ${snapshotCount} snapshots, ${stage}`}
         >
@@ -183,7 +183,7 @@ export function TrendingBattlesSection({
         accessibilityLabel={`Selected topic rank ${selected.rank}. ${selected.title}`}
       >
         <Text
-          allowFontScaling={false}
+         
           style={[
             styles.previewRank,
             {
@@ -201,13 +201,13 @@ export function TrendingBattlesSection({
         </Text>
         <View style={styles.previewCopy}>
           <Text
-            allowFontScaling={false}
+           
             style={[styles.previewTitle, { color: t.textPrimary }]}
             numberOfLines={2}
           >
             {selected.title}
           </Text>
-          <Text allowFontScaling={false} style={[styles.previewMeta, { color: t.textMuted }]}>
+          <Text style={[styles.previewMeta, { color: t.textMuted }]}>
             {formatRankDelta(selected.rankDeltaKind, selected.rankDelta)}
             {` · ${momentumLabel(selected.momentum)}`}
             {selected.participantCount > 0 ? ` · ${selected.participantCount} joined` : ''}

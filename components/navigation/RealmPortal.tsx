@@ -102,10 +102,10 @@ export function RealmPortal({
             <View style={[styles.coreInner, { backgroundColor: tone }]} />
           </Animated.View>
           <Animated.View style={[styles.word, word]}>
-            <Text allowFontScaling={false} style={styles.eyebrow}>
+            <Text style={styles.eyebrow}>
               {direction === 'arena-to-vault' ? 'ENTERING' : 'RETURNING TO'}
             </Text>
-            <Text allowFontScaling={false} style={styles.title}>
+            <Text style={styles.title}>
               {title}
             </Text>
           </Animated.View>

@@ -49,7 +49,7 @@ export function BattleMoment({
       <View style={[styles.edge, { backgroundColor: accent.ink }]} />
       <View style={styles.copy}>
         <Text
-          allowFontScaling={false}
+         
           style={[styles.kicker, { color: accent.ink }]}
           numberOfLines={1}
         >
@@ -57,7 +57,7 @@ export function BattleMoment({
         </Text>
         {moment.who ? (
           <Text
-            allowFontScaling={false}
+           
             style={[styles.who, { color: t.textPrimary }]}
             numberOfLines={1}
           >
@@ -66,7 +66,7 @@ export function BattleMoment({
         ) : null}
         {moment.preview ? (
           <Text
-            allowFontScaling={false}
+           
             style={[
               styles.preview,
               { color: primary ? t.textPrimary : t.textSecondary },
@@ -78,7 +78,7 @@ export function BattleMoment({
           </Text>
         ) : null}
         {primary && moment.entertainment ? (
-          <Text allowFontScaling={false} style={[styles.hint, { color: t.textMuted }]}>
+          <Text style={[styles.hint, { color: t.textMuted }]}>
             Crowd signal · not a vote
           </Text>
         ) : null}

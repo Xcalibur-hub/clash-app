@@ -1,14 +1,15 @@
 import React from 'react';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { LucideIcon } from 'lucide-react-native';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { radius, useThemeColors } from '../../theme';
+import { elevation, radius, space, useThemeColors } from '../../theme';
 import { tap as hapticTap } from '../../utils/haptics';
 import { ArenaHomeIcon } from '../shared/icons';
 import type { Realm } from '../../store';
 import { useNotificationUnread } from '../../store/NotificationUnreadProvider';
 import { ARENA_TABS, VAULT_TABS, type TabRoute } from './dockConfig';
+import { AppText } from '../shared/AppText';
 
 export interface RealmTabBarProps extends BottomTabBarProps {
   realm: Realm;
@@ -17,12 +18,24 @@ export interface RealmTabBarProps extends BottomTabBarProps {
   ShiftIcon: LucideIcon;
 }
 
-const DOCK_BG = 'rgba(24,24,27,0.92)';
-const DOCK_ICON = 'rgba(255,255,255,0.48)';
-const DOCK_ICON_ON = '#111113';
+/** Height of the dock plate. Kept in sync with `DOCK_HEIGHT` in dockConfig. */
+const PLATE_HEIGHT = 56;
 
 /**
- * Compact floating capsule — reduced visual mass, consistent outline icons.
+ * AURA dock.
+ *
+ * The previous dock gave all five destinations identical weight — a row of five
+ * equal glyphs inside a floating capsule — so nothing indicated where you were
+ * or which action mattered. AURA gives the bar a hierarchy instead:
+ *
+ *   · the active destination is a filled *plate* with its label revealed,
+ *   · inactive destinations are pure glyphs (label is announced, not drawn),
+ *   · Create is a distinct solid disc, sized above the row, because it is the
+ *     one action the product is named after,
+ *   · the realm switch is a separate, quieter affordance on the edge.
+ *
+ * The plate uses the live theme surface rather than a hardcoded near-black, so
+ * light mode is no longer a dark capsule over a white app.
  */
 export function RealmTabBar({
   state,
@@ -36,13 +49,19 @@ export function RealmTabBar({
   const t = useThemeColors();
   const { unread } = useNotificationUnread();
   const [keyboardVisible, setKeyboardVisible] = React.useState(false);
+
   React.useEffect(() => {
     if (realm !== 'arena') return;
     setKeyboardVisible(Keyboard.isVisible?.() ?? false);
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
     const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
-    return () => { show.remove(); hide.remove(); setKeyboardVisible(false); };
+    return () => {
+      show.remove();
+      hide.remove();
+      setKeyboardVisible(false);
+    };
   }, [realm]);
+
   const tabs = realm === 'vault' ? VAULT_TABS : ARENA_TABS;
   const activeKey = state.routes[state.index]?.key;
 
@@ -62,39 +81,49 @@ export function RealmTabBar({
     const entry = tabs[route.name] ?? { label: route.name, icon: ArenaHomeIcon };
     const focused = route.key === activeKey;
     const Icon = entry.icon;
-    const centred = entry.label === '';
+    const isCreate = entry.label === '';
     const showBadge = route.name === 'notifications' && unread > 0;
+    const iconColor = focused ? t.textPrimary : t.textMuted;
+
+    if (isCreate) {
+      return (
+        <Pressable
+          key={route.key}
+          onPress={() => press(route, focused)}
+          style={styles.tab}
+          accessibilityRole="button"
+          accessibilityLabel="Create a take"
+          accessibilityHint="Opens the composer"
+        >
+          <View style={[styles.create, { backgroundColor: t.textPrimary }]}>
+            <Icon size={19} color={t.background} strokeWidth={2.3} />
+          </View>
+        </Pressable>
+      );
+    }
+
     return (
       <Pressable
         key={route.key}
         onPress={() => press(route, focused)}
         style={styles.tab}
-        accessibilityRole={centred ? 'button' : 'tab'}
-        accessibilityState={centred ? undefined : { selected: focused }}
-        accessibilityLabel={centred ? 'Create a take' : entry.label}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: focused }}
+        accessibilityLabel={entry.label}
       >
-        {centred ? (
-          <View style={[styles.create, realm === 'arena' && { backgroundColor: t.textPrimary }]}>
-            <Icon size={17} color={realm === 'arena' ? t.background : DOCK_ICON_ON} strokeWidth={2.4} />
+        <View style={styles.iconSlot}>
+          {focused ? (
+            <View style={[styles.activePlate, { backgroundColor: t.brandSoft, borderColor: t.border }]} />
+          ) : null}
+          <Icon size={21} color={iconColor} strokeWidth={focused ? 2.1 : 1.75} />
+        </View>
+        {showBadge ? (
+          <View style={[styles.badge, { backgroundColor: t.danger, borderColor: t.surface }]} pointerEvents="none">
+            <AppText fixed style={styles.badgeText}>
+              {unread > 99 ? '99+' : String(unread)}
+            </AppText>
           </View>
-        ) : (
-          <View style={styles.iconWrap}>
-            <View style={[styles.activeHalo, focused && (realm === 'arena' ? { backgroundColor: t.textPrimary } : styles.activeHaloOn)]}>
-              <Icon
-                size={20}
-                color={realm === 'arena' ? focused ? t.background : t.textMuted : focused ? DOCK_ICON_ON : DOCK_ICON}
-                strokeWidth={1.9}
-              />
-            </View>
-            {showBadge ? (
-              <View style={[styles.badge, { backgroundColor: t.danger }]} pointerEvents="none">
-                <Text allowFontScaling={false} style={styles.badgeText}>
-                  {unread > 99 ? '99+' : String(unread)}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        )}
+        ) : null}
       </Pressable>
     );
   };
@@ -104,99 +133,93 @@ export function RealmTabBar({
   if (realm === 'arena' && keyboardVisible) return <View />;
 
   return (
-    <View style={[styles.wrap, realm === 'arena' && styles.arenaWrap, { paddingBottom: Math.max(insets.bottom, 8) }]} pointerEvents="box-none">
-      <View style={[styles.dock, realm === 'arena' && [styles.arenaDock, { backgroundColor: t.surfaceElevated, borderColor: t.border }]]}>
+    <View
+      style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, space.xs) }]}
+      pointerEvents="box-none"
+    >
+      <View
+        style={[
+          styles.plate,
+          elevation.overlay,
+          {
+            backgroundColor: t.surface,
+            borderColor: t.border,
+            shadowColor: t.shadowColor,
+            shadowOpacity: t.scheme === 'dark' ? 0.5 : 0.14,
+          },
+        ]}
+      >
         {state.routes.map(renderTab)}
+        <View style={[styles.seam, { backgroundColor: t.divider }]} />
         <Pressable
           onPress={() => {
             hapticTap();
             onShiftRealm(shiftTarget);
           }}
-          style={[styles.shift, realm === 'arena' && { width: 44 }]}
+          style={styles.shift}
           accessibilityRole="button"
           accessibilityLabel={realm === 'vault' ? 'Return to Arena' : 'Open The Vault'}
         >
-          <ShiftIcon size={20} color={realm === 'arena' ? t.textMuted : DOCK_ICON} strokeWidth={1.9} />
+          <ShiftIcon size={19} color={t.textMuted} strokeWidth={1.75} />
         </Pressable>
       </View>
-      <Text style={styles.srOnly} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <AppText style={styles.srOnly} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {shiftLabel}
-      </Text>
+      </AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  arenaWrap: { paddingHorizontal: 16 },
-  arenaDock: { maxWidth: 392, paddingHorizontal: 4, borderWidth: StyleSheet.hairlineWidth, shadowOpacity: 0.08, elevation: 3 },
   wrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 40,
-    backgroundColor: 'transparent',
+    paddingHorizontal: space.lg,
     alignItems: 'center',
   },
-  dock: {
+  plate: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
+    height: PLATE_HEIGHT,
     width: '100%',
-    maxWidth: 320,
-    borderRadius: 999,
-    backgroundColor: DOCK_BG,
-    paddingHorizontal: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
+    maxWidth: 420,
+    borderRadius: radius.xxl,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.xxs,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
   },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
+  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
+  iconSlot: { width: 46, height: 32, alignItems: 'center', justifyContent: 'center' },
+  activePlate: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   create: {
-    width: 30,
-    height: 30,
+    width: 34,
+    height: 34,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
   },
-  iconWrap: { position: 'relative' },
-  activeHalo: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeHaloOn: {
-    backgroundColor: '#FFFFFF',
-  },
+  seam: { width: StyleSheet.hairlineWidth, height: 20, marginHorizontal: space.xxs },
+  shift: { width: 40, alignItems: 'center', justifyContent: 'center', height: '100%' },
   badge: {
     position: 'absolute',
-    top: -1,
-    right: -5,
-    minWidth: 14,
-    height: 14,
+    top: 6,
+    right: '22%',
+    minWidth: 15,
+    height: 15,
     paddingHorizontal: 3,
-    borderRadius: 7,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: DOCK_BG,
   },
   badgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '700', lineHeight: 10 },
-  shift: {
-    width: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
-  },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 });

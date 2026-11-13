@@ -45,14 +45,14 @@ export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX
         accessibilityLiveRegion="polite"
         accessibilityLabel="Clash phase: room closed, no verdict"
       >
-        <Text allowFontScaling={false} style={[styles.caption, { color: t.textMuted }]}>
+        <Text style={[styles.caption, { color: t.textMuted }]}>
           Room closed — no verdict
         </Text>
         <View style={styles.railRow} accessibilityRole="text" accessibilityLabel="Phase: Closed">
           <View style={styles.step}>
             <View style={[styles.dot, { backgroundColor: 'transparent', borderColor: t.borderStrong }]} />
             <Text
-              allowFontScaling={false}
+             
               style={[styles.label, { color: t.textMuted, fontWeight: '600' }]}
             >
               Closed
@@ -68,7 +68,7 @@ export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX
   return (
     <View style={styles.wrap} accessibilityLiveRegion="polite" accessibilityLabel={phaseAnnouncement(status)}>
       <Text
-        allowFontScaling={false}
+       
         style={[
           styles.caption,
           { color: urgent ? t.textPrimary : t.textMuted },
@@ -107,13 +107,13 @@ export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX
                   ]}
                 >
                   {step.key === 'SETTLED' && (current || done) ? (
-                    <Text allowFontScaling={false} style={styles.check}>
+                    <Text style={styles.check}>
                       ✓
                     </Text>
                   ) : null}
                 </View>
                 <Text
-                  allowFontScaling={false}
+                 
                   style={[
                     styles.label,
                     {

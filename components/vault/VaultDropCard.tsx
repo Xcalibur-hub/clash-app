@@ -76,7 +76,7 @@ export function VaultDropCard({
           hitSlop={8}
           style={styles.unlock}
         >
-          <Text allowFontScaling={false} style={[styles.unlockText, { color: t.textPrimary }]}>
+          <Text style={[styles.unlockText, { color: t.textPrimary }]}>
             Unlock →
           </Text>
         </Pressable>

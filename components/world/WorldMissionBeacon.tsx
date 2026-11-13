@@ -40,18 +40,18 @@ export function WorldMissionBeacon({
       accessibilityLabel={`This week's Mission: ${mission.title}`}
     >
       <View style={styles.copy}>
-        <Text allowFontScaling={false} style={[styles.eyebrow, { color: t.textMuted }]}>
+        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
           THIS WEEK
         </Text>
         <Text
-          allowFontScaling={false}
+         
           style={[styles.title, { color: t.textPrimary }]}
           numberOfLines={1}
         >
           {mission.title}
         </Text>
       </View>
-      <Text allowFontScaling={false} style={[styles.time, { color: t.textSecondary }]}>
+      <Text style={[styles.time, { color: t.textSecondary }]}>
         {left}
       </Text>
       <ArrowRightIcon size={16} color={t.textMuted} strokeWidth={2.1} />

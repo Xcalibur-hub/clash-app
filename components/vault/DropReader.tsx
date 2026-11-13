@@ -119,10 +119,10 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
       <View style={[styles.screen, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
         <BackChip onPress={() => router.back()} />
         <View style={styles.missing}>
-          <Text allowFontScaling={false} style={[styles.lockedTitle, { color: t.textPrimary }]}>
+          <Text style={[styles.lockedTitle, { color: t.textPrimary }]}>
             Drop unavailable
           </Text>
-          <Text allowFontScaling={false} style={[styles.lockedBody, { color: t.textSecondary }]}>
+          <Text style={[styles.lockedBody, { color: t.textSecondary }]}>
             This Drop may have expired or been removed.
           </Text>
         </View>
@@ -170,15 +170,15 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
               </View>
             ) : (
               <View style={[styles.lockedPlate, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
-                <Text allowFontScaling={false} style={[styles.lockedKicker, { color: t.textMuted }]}>
+                <Text style={[styles.lockedKicker, { color: t.textMuted }]}>
                   SUBSCRIBERS
                 </Text>
               </View>
             )}
-            <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]}>
+            <Text style={[styles.caption, { color: t.textPrimary }]}>
               {drop?.caption}
             </Text>
-            <Text allowFontScaling={false} style={[styles.accessLine, { color: t.textMuted }]}>
+            <Text style={[styles.accessLine, { color: t.textMuted }]}>
               Subscribers
             </Text>
             <VaultActionButton label="Unlock" onPress={() => setSubscribeOpen(true)} />
@@ -189,7 +189,7 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
               isVideo ? (
                 <View style={[styles.mediaHero, styles.videoHero, { backgroundColor: t.surfaceMuted }]}>
                   <PlayIcon size={30} color={t.textPrimary} strokeWidth={2.2} />
-                  <Text allowFontScaling={false} style={[styles.videoNote, { color: t.textMuted }]}>
+                  <Text style={[styles.videoNote, { color: t.textMuted }]}>
                     Video playback arrives with the media player.
                   </Text>
                 </View>
@@ -213,7 +213,7 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
               )
             ) : mediaError ? (
               <View style={[styles.lockedPlate, { backgroundColor: t.surfaceMuted, borderColor: t.border }]}>
-                <Text allowFontScaling={false} style={[styles.lockedTitle, { color: t.textPrimary }]}>
+                <Text style={[styles.lockedTitle, { color: t.textPrimary }]}>
                   {mediaError}
                 </Text>
                 <VaultActionButton
@@ -234,20 +234,20 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
               >
                 <Avatar name={creator.name} tint={creator.tint} size={44} />
                 <View style={styles.headText}>
-                  <Text allowFontScaling={false} style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
+                  <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>
                     {creator.name}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
+                  <Text style={[styles.handle, { color: t.textMuted }]} numberOfLines={1}>
                     @{creator.handle}
                   </Text>
                 </View>
               </Pressable>
             ) : null}
 
-            <Text allowFontScaling={false} style={[styles.caption, { color: t.textPrimary }]}>
+            <Text style={[styles.caption, { color: t.textPrimary }]}>
               {drop?.caption}
             </Text>
-            <Text allowFontScaling={false} style={[styles.accessLine, { color: t.textMuted }]}>
+            <Text style={[styles.accessLine, { color: t.textMuted }]}>
               {badge}
               {expiry ? ` · ${expiry}` : ''}
             </Text>
@@ -258,7 +258,7 @@ export function DropReader({ dropId }: DropReaderProps): React.JSX.Element {
                   if (first) router.push(`/vault/collection/${first}`);
                 }}
               >
-                <Text allowFontScaling={false} style={[styles.context, { color: t.textSecondary }]}>
+                <Text style={[styles.context, { color: t.textSecondary }]}>
                   {collectionHint}
                 </Text>
               </Pressable>

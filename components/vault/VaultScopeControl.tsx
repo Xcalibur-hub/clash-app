@@ -49,7 +49,7 @@ export function VaultScopeControl({ value, onChange }: VaultScopeControlProps): 
             ]}
           >
             <Text
-              allowFontScaling={false}
+             
               style={[
                 styles.label,
                 { color: active ? t.textPrimary : t.textMuted },

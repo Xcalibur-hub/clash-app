@@ -64,7 +64,7 @@ export function PopularTakesSection(): React.JSX.Element | null {
     return (
       <View style={styles.section}>
         <ExploreHeading title="Trending now" marked />
-        <Text allowFontScaling={false} style={[styles.empty, { color: t.textMuted }]}>
+        <Text style={[styles.empty, { color: t.textMuted }]}>
           Couldn’t load trending takes.
         </Text>
       </View>
@@ -134,13 +134,13 @@ export function PopularTakesSection(): React.JSX.Element | null {
                 pointerEvents="none"
               />
               <View style={styles.meta}>
-                <Text allowFontScaling={false} style={styles.hood} numberOfLines={1}>
+                <Text style={styles.hood} numberOfLines={1}>
                   {HOOD_LABEL[take.hood]}
                 </Text>
                 <Text allowFontScaling style={styles.headline} numberOfLines={textOnly ? 4 : 3}>
                   {take.text}
                 </Text>
-                <Text allowFontScaling={false} style={styles.byline} numberOfLines={1}>
+                <Text style={styles.byline} numberOfLines={1}>
                   @{author?.handle ?? 'unknown'} · {compact(take.reactions)} reactions
                 </Text>
               </View>

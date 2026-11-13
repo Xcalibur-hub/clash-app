@@ -128,19 +128,19 @@ export function ClashSideCard({
 
   const head = (
     <View style={styles.head}>
-      <Text allowFontScaling={false} style={[styles.sideLabel, { color: labelColor }]}>
+      <Text style={[styles.sideLabel, { color: labelColor }]}>
         {side === 'A' ? '01  ·  SIDE A' : '02  ·  SIDE B'}
       </Text>
       {winner ? (
-        <Text allowFontScaling={false} style={[styles.winner, { color: labelColor }]}>
+        <Text style={[styles.winner, { color: labelColor }]}>
           Wins
         </Text>
       ) : pending ? (
-        <Text allowFontScaling={false} style={[styles.pending, { color: metaColor }]}>
+        <Text style={[styles.pending, { color: metaColor }]}>
           Locking…
         </Text>
       ) : selectable ? (
-        <Text allowFontScaling={false} style={[styles.hint, { color: metaColor }]}>
+        <Text style={[styles.hint, { color: metaColor }]}>
           TAP TO VOTE ↗
         </Text>
       ) : null}
@@ -150,14 +150,14 @@ export function ClashSideCard({
   const identity = (
     <Animated.View style={identityStyle}>
       {hidden ? (
-        <Text allowFontScaling={false} style={[styles.hiddenName, { color: onMedia ? 'rgba(245,242,236,0.8)' : t.textSecondary }]}>
+        <Text style={[styles.hiddenName, { color: onMedia ? 'rgba(245,242,236,0.8)' : t.textSecondary }]}>
           Participant {side}
         </Text>
       ) : (
         <View style={styles.identity}>
           <Avatar name={author.name} tint={author.tint} size={32} />
           <Text
-            allowFontScaling={false}
+           
             style={[styles.handle, { color: bodyColor }]}
             numberOfLines={1}
           >
