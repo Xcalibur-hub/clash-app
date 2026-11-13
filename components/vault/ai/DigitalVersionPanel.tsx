@@ -58,7 +58,7 @@ export function DigitalVersionPanel({
                   {row.label}
                 </Text>
                 <Text
-                 
+
                   style={[styles.rowValue, { color: row.on ? t.textPrimary : t.textMuted }]}
                 >
                   {row.on ? 'ON' : 'OFF'}

@@ -21,7 +21,11 @@ import { AppText } from '../../components/shared/AppText';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { SectionHeader, EditorialCard, EditorialStat } from '../../components/shared/Editorial';
 import { darkTheme } from '../../theme/palettes';
-import { typeScale } from '../../theme/typeRamp';
+import { buildTypeScale, resolveFontStacks, typeScale as defaultRamp } from '../../theme/typeRamp';
+import { ClashHeader } from '../../components/arena/ClashHeader';
+import { ActionRegion } from '../../components/arena/ActionRegion';
+import { VerdictRegion } from '../../components/arena/VerdictRegion';
+import { LiveClashFeature } from '../../components/arena/LiveClashFeature';
 
 const html = (el: React.ReactElement): string => renderToStaticMarkup(el);
 
@@ -52,9 +56,13 @@ const es = html(
 check('renders title and body copy', es.includes('Nothing here yet') && es.includes('it lands here'));
 check('title carries the header role', /accessibilityRole="header"/.test(es));
 check('renders the quiet-state kicker', es.includes('NOTHING HERE YET'));
-check('alert variant uses distinct copy', (() => {
-  const alert = html(<EmptyState icon={(() => null) as never} title="T" body="B" variant="alert" />);
-  return alert.includes('SOMETHING WENT WRONG');
+check('error variant uses distinct copy', (() => {
+  const err = html(<EmptyState icon={(() => null) as never} title="T" body="B" variant="error" />);
+  return err.includes('COULD NOT LOAD');
+})());
+check('blocked variant does not claim something went wrong', (() => {
+  const blocked = html(<EmptyState icon={(() => null) as never} title="T" body="B" variant="blocked" />);
+  return blocked.includes('ACCESS REMOVED') && !blocked.includes('WENT WRONG');
 })());
 
 console.log('\n[Editorial]');
@@ -89,8 +97,86 @@ check(
   ed.length > 200 && /accessibilityRole="header"/.test(ed),
   `tree length ${ed.length}`,
 );
-check('editorial serif is the display family', typeScale.display.fontFamily === 'serif');
-check('UI family stays Inter', typeScale.button.fontFamily === 'Inter_600SemiBold');
+// Phase 1 blocker 7: the ramp used to be frozen on the generic 'serif' fallback,
+// so on iOS it named a font that does not exist. Assert the resolved iOS ramp.
+const iosRamp = buildTypeScale({
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+  mono: resolveFontStacks('ios').mono,
+  serif: resolveFontStacks('ios').serif,
+});
+check('iOS display family is a real serif name', iosRamp.display.fontFamily === 'New York');
+check('default ramp keeps the generic fallback for non-RN consumers', defaultRamp.display.fontFamily === 'serif');
+check('UI family stays Inter', iosRamp.button.fontFamily === 'Inter_600SemiBold');
+
+console.log('\n[ClashHeader — phase / subject hierarchy]');
+const header = html(
+  <ClashHeader
+    proposition="Remote work made teams more honest"
+    phase="OPEN"
+    role="debater"
+    stanceA="Agree"
+    stanceB="Disagree"
+    roomLabel="Room 3"
+    audienceLine="12 arguing · 40 watching"
+    clock="04:31"
+    onBack={() => {}}
+  />,
+);
+check('states the phase in words, not a dot', header.includes('THE FLOOR IS YOURS'));
+check('renders the proposition as content', header.includes('made teams more honest'));
+check('names both sides before the argument uses them', header.includes('Agree') && header.includes('Disagree'));
+check('folds room / audience / clock into one subordinate line', header.includes('12 arguing'));
+check('back affordance is labelled', /accessibilityLabel="Back to Arena"/.test(header));
+
+console.log('\n[ActionRegion — one permitted action]');
+const fighterAction = html(<ActionRegion phase="OPEN" role="debater" onPress={() => {}} />);
+const spectatorAction = html(<ActionRegion phase="OPEN" role="spectator" onPress={() => {}} />);
+const judgingAction = html(<ActionRegion phase="JUDGING" role="spectator" mayJudge onPress={() => {}} />);
+const settledAction = html(<ActionRegion phase="SETTLED" role="spectator" onPress={() => {}} />);
+check('fighter is invited to argue', fighterAction.includes('Make your argument'));
+check('spectator is invited to pick a side, not to argue', spectatorAction.includes('Pick a side'));
+check('judging invites a verdict when one is permitted', judgingAction.includes('Cast your verdict'));
+check('a settled room reserves no action hole', settledAction === '');
+
+console.log('\n[VerdictRegion — the result]');
+const verdict = html(
+  <VerdictRegion
+    winningSide="AGREE"
+    splitA={0.62}
+    stanceA="Agree"
+    stanceB="Disagree"
+    detail="Agree took it — 62 of 100 judgements."
+    rewardLine="+120 reputation"
+  />,
+);
+check('names the winning side', verdict.includes('Agree'));
+check('shows the split in both directions', verdict.includes('62%') && verdict.includes('38%'));
+check('explains the split to screen readers', /Ballot split/.test(verdict));
+check('surfaces the reward line', verdict.includes('+120 reputation'));
+const draw = html(<VerdictRegion winningSide="DRAW" splitA={0.5} stanceA="Agree" stanceB="Disagree" />);
+check('a draw is a first-class outcome', draw.includes('A draw') && draw.includes('THE ROOM SPLIT'));
+
+console.log('\n[LiveClashFeature — Arena discovery]');
+const feature = html(
+  <LiveClashFeature
+    proposition="Remote work made teams more honest"
+    phase="OPEN"
+    stanceA="Agree"
+    stanceB="Disagree"
+    participation="2.9k joined · 4 rooms"
+    clock="4:31"
+    onOpen={() => {}}
+    moreCount={3}
+    onOpenMore={() => {}}
+  />,
+);
+check('leads with the clash, not the feed', feature.includes('LIVE NOW'));
+check('uses the display proposition', feature.includes('Remote work made teams more honest'));
+check('reports participation from real data', feature.includes('2.9k joined'));
+check('offers the remaining clashes without inventing a count', feature.includes('3 more clashes live'));
 
 console.log(`\n${failures === 0 ? 'RESULT: PASS' : `RESULT: FAIL (${failures})`}`);
 process.exit(failures === 0 ? 0 : 1);

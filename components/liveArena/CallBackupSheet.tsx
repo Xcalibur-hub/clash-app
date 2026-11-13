@@ -86,14 +86,14 @@ export function CallBackupSheet({
                       <Avatar name={name} tint={tint} size={40} />
                       <View style={styles.rowCopy}>
                         <Text
-                         
+
                           style={[styles.rowName, { color: t.textPrimary }]}
                           numberOfLines={1}
                         >
                           {handle ? `@${handle}` : name}
                         </Text>
                         <Text
-                         
+
                           style={[styles.rowMeta, { color: t.textMuted }]}
                           numberOfLines={2}
                         >
@@ -144,7 +144,7 @@ export function CallBackupSheet({
                       ]}
                     >
                       <Text
-                       
+
                         style={[
                           styles.policyText,
                           { color: active ? t.textPrimary : t.textMuted },

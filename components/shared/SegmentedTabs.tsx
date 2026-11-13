@@ -58,7 +58,7 @@ export function SegmentedTabs<T extends string>({
             ]}
           >
             <Text
-             
+
               style={[
                 styles.label,
                 compact && styles.labelCompact,

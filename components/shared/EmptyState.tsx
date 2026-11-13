@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { radius, space, typeScale, useThemeColors } from '../../theme';
 import { GlowButton } from './GlowButton';
 import { AppText } from './AppText';
+import { emptyStateAccentKind, emptyStateEyebrow } from './emptyStateSemantics';
 
 export interface EmptyStateProps {
   icon: LucideIcon;
@@ -12,10 +13,21 @@ export interface EmptyStateProps {
   actionLabel?: string;
   onAction?: () => void;
   /**
-   * Visual register. `quiet` for genuinely-empty lists (first run, no results);
-   * `alert` for error surfaces so the two never look identical.
+   * What kind of state this is. The eyebrow, accent and icon treatment follow
+   * the kind, so the user can tell "nothing here yet" from "this failed" from
+   * "you are not allowed" at a glance.
+   *
+   *   quiet     — genuinely empty (first run, no results, end of feed)
+   *   error     — something failed and retrying may help (network, server)
+   *   offline   — the device has no connection; retry is pointless until it does
+   *   empty-err — reserved/no-op alias for `quiet`, kept for call-site clarity
+   *   denied    — the viewer lacks permission for this surface
+   *   blocked   — the viewer is actively blocked or removed by the owner
+   *
+   * `alert` is retained as a deprecated alias of `error` so existing call sites
+   * keep compiling; new call sites should name the actual state.
    */
-  variant?: 'quiet' | 'alert';
+  variant?: 'quiet' | 'error' | 'offline' | 'denied' | 'blocked' | 'alert';
 }
 
 /**
@@ -38,7 +50,10 @@ export function EmptyState({
   variant = 'quiet',
 }: EmptyStateProps): React.JSX.Element {
   const t = useThemeColors();
-  const accent = variant === 'alert' ? t.danger : t.brand;
+  // A denied/blocked surface is not an alarm: it is a fact. Colouring it danger
+  // tells the user something broke when nothing did, and draws attention to a
+  // restriction that should be quiet.
+  const accent = emptyStateAccentKind(variant) === 'danger' ? t.danger : t.brand;
 
   return (
     <View style={styles.wrap}>
@@ -54,9 +69,7 @@ export function EmptyState({
       />
       <View style={styles.iconRow}>
         <Icon size={18} color={t.textMuted} strokeWidth={1.75} />
-        <AppText style={[typeScale.kicker, { color: t.textMuted }]}>
-          {variant === 'alert' ? 'SOMETHING WENT WRONG' : 'NOTHING HERE YET'}
-        </AppText>
+        <AppText style={[typeScale.kicker, { color: t.textMuted }]}>{emptyStateEyebrow(variant)}</AppText>
       </View>
 
       <AppText style={[styles.title, { color: t.textPrimary }]} accessibilityRole="header">

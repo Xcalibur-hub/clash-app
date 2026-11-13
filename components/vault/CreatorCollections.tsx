@@ -198,7 +198,7 @@ export function CreatorCollections(): React.JSX.Element {
                         COLLECTION
                       </Text>
                       <Text
-                       
+
                         style={[styles.cardTitle, { color: t.textPrimary }]}
                         numberOfLines={1}
                       >
@@ -221,7 +221,7 @@ export function CreatorCollections(): React.JSX.Element {
                       {drops.map((drop) => (
                         <View key={drop.id} style={styles.item}>
                           <Text
-                           
+
                             style={[styles.itemText, { color: t.textSecondary }]}
                             numberOfLines={1}
                           >
@@ -301,7 +301,7 @@ function AddDropSheet({
               drops.map((drop) => (
                 <View key={drop.id} style={styles.item}>
                   <Text
-                   
+
                     style={[styles.itemText, { color: t.textSecondary }]}
                     numberOfLines={1}
                   >

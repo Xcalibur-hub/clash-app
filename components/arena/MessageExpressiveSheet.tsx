@@ -70,7 +70,7 @@ function Action({
       accessibilityLabel={label}
     >
       <Text
-       
+
         style={[styles.actionText, { color: destructive ? t.danger : t.textPrimary }]}
       >
         {label}

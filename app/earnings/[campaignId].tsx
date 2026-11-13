@@ -210,7 +210,7 @@ export default function CreatorEarningsCampaignDetail(): React.JSX.Element {
             links.map((link) => (
               <View key={link.id} style={[styles.asset, { borderColor: t.border }]}>
                 <Text
-                 
+
                   style={[styles.assetTitle, { color: t.textPrimary }]}
                   numberOfLines={2}
                 >

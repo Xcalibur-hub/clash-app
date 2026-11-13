@@ -39,7 +39,7 @@ export function LiveRoomEmptyFloor({
             <View key={person.id} style={styles.person}>
               <Avatar name={person.name} tint={person.avatarTint} size={36} />
               <Text
-               
+
                 style={[styles.initial, { color: t.textMuted }]}
                 numberOfLines={1}
               >

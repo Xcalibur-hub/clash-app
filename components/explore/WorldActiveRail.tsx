@@ -62,7 +62,7 @@ export function WorldActiveRail({
               }
             >
               <Text
-               
+
                 numberOfLines={1}
                 style={[styles.name, { color: on ? t.background : t.textPrimary }]}
               >
@@ -70,7 +70,7 @@ export function WorldActiveRail({
               </Text>
               {country.activityCount != null ? (
                 <Text
-                 
+
                   style={[
                     styles.count,
                     { color: on ? t.background : t.textMuted },

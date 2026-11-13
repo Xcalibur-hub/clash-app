@@ -59,7 +59,7 @@ export function ClashStickerRow({
               {reaction.emoji}
             </Text>
             <Text
-             
+
               style={[styles.stamp, { color: t.textMuted }]}
               numberOfLines={1}
             >

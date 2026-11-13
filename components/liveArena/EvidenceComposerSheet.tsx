@@ -213,7 +213,7 @@ export function EvidenceComposerSheet({
                     accessibilityLabel="Evidence link"
                   />
                   <Text
-                   
+
                     style={[
                       styles.hint,
                       { color: trimmedUrl && !urlLooksValid ? t.danger : t.textMuted },
@@ -290,7 +290,7 @@ function ModeChip({
       ]}
     >
       <Text
-       
+
         style={[styles.modeText, { color: active ? t.textPrimary : t.textMuted }]}
       >
         {label}

@@ -46,7 +46,7 @@ export function CrewRisingStrip({ crews, onOpen }: CrewRisingStripProps): React.
               size={52}
             />
             <Text
-             
+
               style={[styles.name, { color: t.textPrimary }]}
               numberOfLines={1}
             >

@@ -199,7 +199,12 @@ export function ProfileScreen({ profileId, hideSafeTop = false }: ProfileScreenP
   if (blocked) {
     return (
       <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-        <EmptyState icon={UserIcon} title="You blocked this user" body="Their profile and content are hidden." />
+        <EmptyState
+          icon={UserIcon}
+          variant="blocked"
+          title="You blocked this user"
+          body="Their profile and content are hidden. Unblock them from Settings to see it again."
+        />
       </View>
     );
   }

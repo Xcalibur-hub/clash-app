@@ -163,7 +163,7 @@ export function ClashModeSheet({
 
           {error && !submitting ? (
             <Text
-             
+
               style={[styles.error, { color: t.danger, backgroundColor: t.surfaceMuted }]}
               accessibilityLiveRegion="assertive"
               accessibilityRole="alert"

@@ -9,6 +9,13 @@ import { ArenaHomeIcon } from '../shared/icons';
 import type { Realm } from '../../store';
 import { useNotificationUnread } from '../../store/NotificationUnreadProvider';
 import { ARENA_TABS, VAULT_TABS, type TabRoute } from './dockConfig';
+import {
+  CREATE_DISC,
+  DOCK_LABEL_LINE,
+  PLATE_HEIGHT,
+  SHIFT_WIDTH,
+  dockLabelVisible,
+} from './dockMetrics';
 import { AppText } from '../shared/AppText';
 
 export interface RealmTabBarProps extends BottomTabBarProps {
@@ -18,8 +25,11 @@ export interface RealmTabBarProps extends BottomTabBarProps {
   ShiftIcon: LucideIcon;
 }
 
-/** Height of the dock plate. Kept in sync with `DOCK_HEIGHT` in dockConfig. */
-const PLATE_HEIGHT = 56;
+/**
+ * Geometry lives in `dockMetrics.ts` (pure, unit-tested). `DOCK_HEIGHT` in
+ * `dockConfig.ts` is derived from `PLATE_HEIGHT` so scroll clearance follows
+ * automatically.
+ */
 
 /**
  * AURA dock.
@@ -96,11 +106,13 @@ export function RealmTabBar({
           accessibilityHint="Opens the composer"
         >
           <View style={[styles.create, { backgroundColor: t.textPrimary }]}>
-            <Icon size={19} color={t.background} strokeWidth={2.3} />
+            <Icon size={21} color={t.background} strokeWidth={2.3} />
           </View>
         </Pressable>
       );
     }
+
+    const showLabel = dockLabelVisible(focused, isCreate);
 
     return (
       <Pressable
@@ -116,6 +128,23 @@ export function RealmTabBar({
             <View style={[styles.activePlate, { backgroundColor: t.brandSoft, borderColor: t.border }]} />
           ) : null}
           <Icon size={21} color={iconColor} strokeWidth={focused ? 2.1 : 1.75} />
+        </View>
+        {/*
+          Blocker 6: the label was promised in this component's own docstring and
+          never drawn. It is always *laid out* so the glyph row cannot jump as
+          focus moves; only the active tab paints text.
+        */}
+        <View style={styles.labelSlot}>
+          {showLabel ? (
+            <AppText
+              numberOfLines={1}
+              style={[styles.label, { color: t.textPrimary }]}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {entry.label}
+            </AppText>
+          ) : null}
         </View>
         {showBadge ? (
           <View style={[styles.badge, { backgroundColor: t.danger, borderColor: t.surface }]} pointerEvents="none">
@@ -192,22 +221,26 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 14 },
     elevation: 8,
   },
+  // Full plate height so the whole tab column is tappable, not just the glyph.
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
-  iconSlot: { width: 46, height: 32, alignItems: 'center', justifyContent: 'center' },
+  iconSlot: { width: 46, height: 26, alignItems: 'center', justifyContent: 'center' },
+  labelSlot: { height: DOCK_LABEL_LINE, justifyContent: 'center', marginTop: 2 },
+  label: { fontSize: 10, lineHeight: DOCK_LABEL_LINE, fontWeight: '600', letterSpacing: 0.1 },
   activePlate: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
   },
   create: {
-    width: 34,
-    height: 34,
+    width: CREATE_DISC,
+    height: CREATE_DISC,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   seam: { width: StyleSheet.hairlineWidth, height: 20, marginHorizontal: space.xxs },
-  shift: { width: 40, alignItems: 'center', justifyContent: 'center', height: '100%' },
+  // Was `width: 40` — below the 48dp minimum on an affordance used constantly.
+  shift: { width: SHIFT_WIDTH, alignItems: 'center', justifyContent: 'center', height: '100%' },
   badge: {
     position: 'absolute',
     top: 6,

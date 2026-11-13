@@ -176,7 +176,7 @@ export function DropComposer(): React.JSX.Element {
                   strokeWidth={2.4}
                 />
                 <Text
-                 
+
                   style={[
                     styles.segmentLabel,
                     {

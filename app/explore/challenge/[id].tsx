@@ -412,7 +412,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
                       ]}
                     >
                       <Text
-                       
+
                         style={{ color: on ? t.background : t.textPrimary, fontWeight: '700' }}
                       >
                         {label}
@@ -463,7 +463,7 @@ function ChallengeDetailScreen(): React.JSX.Element {
         onEndReachedThreshold={0.4}
         ListEmptyComponent={
           <Text
-           
+
             style={{ color: t.textMuted, paddingHorizontal: layout.screenX, marginTop: space.md }}
           >
             No entries yet — be the first.

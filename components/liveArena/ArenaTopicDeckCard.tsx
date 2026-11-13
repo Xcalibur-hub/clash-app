@@ -154,7 +154,7 @@ export function ArenaTopicDeckCard({
           ) : null}
         </View>
         <Text
-         
+
           numberOfLines={3}
           style={[styles.peekTitle, { color: t.textPrimary }]}
         >
@@ -224,7 +224,7 @@ export function ArenaTopicDeckCard({
 
         <Animated.View entering={reduced ? undefined : FadeIn.delay(180).duration(320)}>
           <Text
-           
+
             numberOfLines={3}
             style={[styles.activeTitle, { color: t.textPrimary }]}
           >

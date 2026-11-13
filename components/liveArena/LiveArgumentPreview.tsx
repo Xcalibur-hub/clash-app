@@ -114,7 +114,7 @@ export function LiveArgumentPreview({
           {signals.slice(0, 2).map((s) => (
             <Text
               key={s.emoji}
-             
+
               style={[styles.signal, { color: t.textSecondary }]}
             >
               {s.emoji} × {s.count}

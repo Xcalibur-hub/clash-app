@@ -185,7 +185,7 @@ export function EditProfileSheet({ visible, profile, onClose, onSaved }: EditPro
                       ]}
                     >
                       <Text
-                       
+
                         style={[
                           styles.hoodText,
                           {

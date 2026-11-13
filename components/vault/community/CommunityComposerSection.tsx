@@ -69,7 +69,7 @@ function TypePill({
         hapticTap();
         onPress();
       }}
-     
+
       accessibilityRole="button"
       accessibilityLabel={label}
       style={[

@@ -28,7 +28,7 @@ export const SeriesComposition = React.memo(function SeriesComposition({
             SERIES
           </Text>
           <Text
-           
+
             style={[styles.title, { color: t.textPrimary }]}
             numberOfLines={2}
           >
@@ -51,7 +51,7 @@ export const SeriesComposition = React.memo(function SeriesComposition({
           />
           {collection.description ? (
             <Text
-             
+
               style={[styles.desc, { color: t.textSecondary }]}
               numberOfLines={2}
             >

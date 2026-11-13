@@ -570,7 +570,7 @@ export function ExpressiveMediaTray({
               style={[styles.mainTab, mainTab === tab && { borderBottomColor: t.accent }]}
             >
               <Text
-               
+
                 style={[
                   styles.mainTabText,
                   { color: mainTab === tab ? t.textPrimary : t.textMuted },
@@ -593,7 +593,7 @@ export function ExpressiveMediaTray({
               style={[styles.subChip, { backgroundColor: subTab === tab ? t.surfaceMuted : 'transparent' }]}
             >
               <Text
-               
+
                 style={[styles.subChipText, { color: subTab === tab ? t.textPrimary : t.textMuted }]}
               >
                 {tab[0].toUpperCase() + tab.slice(1)}

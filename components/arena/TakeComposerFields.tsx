@@ -56,7 +56,7 @@ export function TakeComposerFields({
         />
         <View style={styles.counterRow}>
           <Text
-           
+
             style={[styles.counter, { color: overLimit ? t.danger : t.textMuted }]}
             accessibilityLabel={`${charsLeft} of ${maxChars} characters left`}
           >

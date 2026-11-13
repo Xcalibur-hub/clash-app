@@ -25,16 +25,22 @@ const read = (relative: string): string =>
 describe('UI Phase 4 Arena Home presentation', () => {
   it('orders the For You first viewport: live → fresh takes → scopes → feed', () => {
     assert.deepEqual([...ARENA_HOME_FIRST_VIEWPORT], [
-      'live_gateway',
+      'live_feature',
       'fresh_takes',
       'feed_scopes',
       'take_feed',
     ]);
     const home = read('app/(tabs)/index.tsx');
-    const liveAt = home.indexOf('<ArenaLiveGateway');
+    // Phase 2: the live slot is the editorial feature, not the old compact bar.
+    const liveAt = home.indexOf('<LiveClashFeature');
     const freshAt = home.indexOf('<FreshTakesSection');
     const scopesAt = home.indexOf('<ArenaDiscoveryRail');
     assert.ok(liveAt > 0 && freshAt > liveAt && scopesAt > freshAt);
+    assert.equal(
+      home.indexOf('<ArenaLiveGateway'),
+      -1,
+      'the compact gateway was replaced; seeing it again means the ordering regressed',
+    );
     assert.doesNotMatch(home, /THE CONVERSATION/);
     assert.doesNotMatch(home, /A fresh perspective\./);
     assert.match(home, /YOUR FEED · 24H/);

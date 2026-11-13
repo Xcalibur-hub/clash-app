@@ -11,20 +11,30 @@ const loaded = {
   bold: 'Inter_700Bold',
 } as const;
 
-/** Resolved by the platform at runtime; kept as a plain string so this module
- *  stays dependency-free and unit-testable. */
-const systemSans = 'System';
-
-/** Active font map — swapped to Inter once FontBootstrap loads faces. */
 /**
- * Editorial serif — the AURA display voice.
+ * Default platform families.
  *
- * Deliberately the *platform* serif rather than a bundled webfont: no extra
- * download, no font-swap flash, and each OS renders its own optical-size cut
- * (iOS New York, Android Noto Serif). This is what gives headlines, Vault
- * creator identity and verdict moments a voice that Inter alone cannot carry.
+ * These are *defaults*, not the final answer: `typography.ts` resolves the real
+ * stacks with `Platform.select` and calls `buildTypeScale()` with them. The
+ * defaults exist so this module stays dependency-free (no `react-native` import)
+ * and can be unit-tested under Node's type stripper.
+ *
+ * The values below are the cross-platform fallbacks. `'serif'` is the generic
+ * family that React Native maps per-OS on Android; iOS needs a real name
+ * (`New York`), which is exactly why the resolved map must be injected rather
+ * than frozen here. See `docs/aura/PHASE2-AUDIT.md` blocker 7.
  */
-const serifStack = 'serif';
+const defaultStacks = {
+  serif: 'serif',
+  mono: 'monospace',
+  systemSans: 'System',
+} as const;
+
+export type FontStacks = {
+  serif: string;
+  mono: string;
+  systemSans: string;
+};
 
 export const family = {
   regular: loaded.regular,
@@ -33,26 +43,40 @@ export const family = {
   bold: loaded.bold,
   /** Generic sans alias for legacy spreads — prefers Inter regular. */
   sans: loaded.regular,
-  mono: 'monospace',
-  systemSans,
+  mono: defaultStacks.mono,
+  systemSans: defaultStacks.systemSans,
   /** Platform serif — display/editorial only. */
-  serif: serifStack,
+  serif: defaultStacks.serif,
 } as const;
 
 /**
- * Coherent type ramp — calm, premium, not bold-everywhere.
- * Weights live mostly at 400–700; display uses tighter tracking.
+ * Build the type ramp from a resolved font-family map.
+ *
+ * This is a factory, not a constant, for one specific reason: the ramp embeds
+ * `fontFamily`, and the correct family is only known once `Platform.select` has
+ * run. Building the ramp here and then patching `family` afterwards (the Phase 1
+ * arrangement) left every step on the generic fallback — 291 call sites silently
+ * rendered in the wrong face. Passing the stacks in makes that class of bug
+ * impossible to express.
  */
-export const typeScale = {
+export function buildTypeScale(f: {
+  regular: string;
+  medium: string;
+  semibold: string;
+  bold: string;
+  mono: string;
+  serif: string;
+}): Record<string, TextStyle> {
+  return {
   display: {
-    fontFamily: family.serif,
+    fontFamily: f.serif,
     fontSize: 33,
     lineHeight: 39,
     fontWeight: '600' as '600',
     letterSpacing: -0.7,
   },
   title: {
-    fontFamily: family.semibold,
+    fontFamily: f.semibold,
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '600' as '600',
@@ -64,7 +88,7 @@ export const typeScale = {
    * verdict result) so no surface competes with itself.
    */
   displayLg: {
-    fontFamily: family.serif,
+    fontFamily: f.serif,
     fontSize: 42,
     lineHeight: 47,
     fontWeight: '600' as '600',
@@ -72,7 +96,7 @@ export const typeScale = {
   },
   /** Section-level editorial line — serif, one step above `section`. */
   editorialLg: {
-    fontFamily: family.serif,
+    fontFamily: f.serif,
     fontSize: 26,
     lineHeight: 32,
     fontWeight: '600' as '600',
@@ -80,7 +104,7 @@ export const typeScale = {
   },
   /** Oversized quiet numeral for stats, timers, scores. */
   numeral: {
-    fontFamily: family.serif,
+    fontFamily: f.serif,
     fontSize: 30,
     lineHeight: 34,
     fontWeight: '500' as '600',
@@ -88,105 +112,105 @@ export const typeScale = {
   },
   /** Small-caps style eyebrow: uppercase, wide tracking, for kickers only. */
   kicker: {
-    fontFamily: family.semibold,
+    fontFamily: f.semibold,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '600' as '600',
     letterSpacing: 1.4,
   },
   editorial: {
-    fontFamily: family.serif,
+    fontFamily: f.serif,
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '600' as '600',
     letterSpacing: -0.45,
   },
   section: {
-    fontFamily: family.semibold,
+    fontFamily: f.semibold,
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '600' as '600',
     letterSpacing: -0.3,
   },
   cardTitle: {
-    fontFamily: family.semibold,
+    fontFamily: f.semibold,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '600' as '600',
     letterSpacing: -0.2,
   },
   take: {
-    fontFamily: family.medium,
+    fontFamily: f.medium,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '500' as '600',
     letterSpacing: -0.15,
   },
   takeText: {
-    fontFamily: family.semibold,
+    fontFamily: f.semibold,
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '600' as '600',
     letterSpacing: -0.3,
   },
   body: {
-    fontFamily: family.regular,
+    fontFamily: f.regular,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '400' as '600',
     letterSpacing: -0.1,
   },
   bodyStrong: {
-    fontFamily: family.medium,
+    fontFamily: f.medium,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '500' as '600',
     letterSpacing: -0.1,
   },
   label: {
-    fontFamily: family.medium,
+    fontFamily: f.medium,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '500' as '600',
     letterSpacing: -0.05,
   },
   meta: {
-    fontFamily: family.regular,
+    fontFamily: f.regular,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '400' as '600',
     letterSpacing: 0,
   },
   data: {
-    fontFamily: family.mono,
+    fontFamily: f.mono,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '600' as '600',
     letterSpacing: 0.2,
   },
   dataLg: {
-    fontFamily: family.mono,
+    fontFamily: f.mono,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '600' as '600',
     letterSpacing: -0.2,
   },
   caption: {
-    fontFamily: family.medium,
+    fontFamily: f.medium,
     fontSize: 11,
     lineHeight: 15,
     fontWeight: '500' as '600',
     letterSpacing: 0.2,
   },
   eyebrow: {
-    fontFamily: family.medium,
+    fontFamily: f.medium,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '500' as '600',
     letterSpacing: 0.2,
   },
   button: {
-    fontFamily: family.semibold,
+    fontFamily: f.semibold,
     fontSize: 15,
     lineHeight: 20,
     fontWeight: '600' as '600',
@@ -194,12 +218,57 @@ export const typeScale = {
   },
   /** Sidebar / nav primary labels — ChatGPT-like density. */
   nav: {
-    fontFamily: family.medium,
+    fontFamily: f.medium,
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '500' as '600',
     letterSpacing: -0.2,
   },
-} as const satisfies Record<string, TextStyle>;
+
+  } as const satisfies Record<string, TextStyle>;
+}
+
+/**
+ * The ramp actually used by the app.
+ *
+ * `typography.ts` calls `buildTypeScale()` with `Platform.select` stacks and
+ * re-exports the result as `typeScale`; this default instance keeps every
+ * dependency-free consumer (unit tests, the render probe) working without a
+ * React Native runtime. Do **not** import `typeScale` from here in app code —
+ * import it from `../theme` so the platform-resolved version is used.
+ */
+export const typeScale = buildTypeScale({
+  regular: family.regular,
+  medium: family.medium,
+  semibold: family.semibold,
+  bold: family.bold,
+  mono: family.mono,
+  serif: family.serif,
+});
 
 export type TypeToken = keyof typeof typeScale;
+
+/**
+ * Resolve the platform font stacks from an OS name.
+ *
+ * Pure on purpose. `Platform.select` is just a lookup keyed by the running OS,
+ * so modelling it as a function of that key lets the *real* resolution be
+ * tested: `resolveFontStacks('ios').serif === 'New York'`. The Phase 1 test
+ * compared `typeScale.display.fontFamily` against `family.serif` where both were
+ * the same frozen generic string — it asserted self-consistency and stayed green
+ * while iOS silently rendered San Francisco.
+ */
+export function resolveFontStacks(os: 'ios' | 'android' | 'web' | 'windows' | 'macos'): FontStacks {
+  switch (os) {
+    case 'ios':
+      return { serif: 'New York', mono: 'Menlo', systemSans: 'System' };
+    case 'android':
+      return { serif: 'serif', mono: 'monospace', systemSans: 'sans-serif' };
+    case 'web':
+      return { serif: 'Georgia', mono: 'monospace', systemSans: 'System' };
+    case 'windows':
+    case 'macos':
+    default:
+      return { serif: 'Georgia', mono: 'monospace', systemSans: 'System' };
+  }
+}

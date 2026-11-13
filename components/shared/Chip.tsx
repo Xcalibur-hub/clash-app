@@ -44,7 +44,7 @@ export function Chip({
     >
       {Icon ? <Icon size={12} color={palette.text} strokeWidth={2.4} /> : null}
       <Text
-       
+
         style={[
           data ? typeScale.data : typeScale.caption,
           { color: palette.text },

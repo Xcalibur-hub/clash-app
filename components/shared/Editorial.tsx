@@ -133,18 +133,35 @@ export interface EditorialStatProps {
   tone?: string;
 }
 
-/** A quiet oversized numeral over a kicker — the app's stat idiom. */
+/**
+ * A quiet oversized numeral over a kicker — the app's stat idiom.
+ *
+ * **Wrapping.** Phase 1 blocker 2: three of these sit in a row in the profile
+ * header with hairline seams between them. With no `flexShrink` and no wrap, a
+ * five-digit reputation numeral at large OS text pushed the row past the screen
+ * edge, so the last stat was simply gone. The stat now shrinks within its row and
+ * the row wraps when even that is not enough; the numeral caps its growth so a
+ * number stays a number rather than a headline.
+ */
 export function EditorialStat({ value, label, tone }: EditorialStatProps): React.JSX.Element {
   const t = useThemeColors();
   return (
     <View style={styles.stat}>
-      <AppText style={[typeScale.numeral, { color: tone ?? t.textPrimary }]}>{value}</AppText>
-      <AppText style={[typeScale.kicker, { color: t.textMuted }]} numberOfLines={1}>
+      <AppText
+        maxFontSizeMultiplier={STAT_MAX_TEXT_SCALE}
+        style={[typeScale.numeral, { color: tone ?? t.textPrimary }]}
+      >
+        {value}
+      </AppText>
+      <AppText style={[typeScale.kicker, { color: t.textMuted }]} numberOfLines={2}>
         {label}
       </AppText>
     </View>
   );
 }
+
+/** Keeps a stat numeral legible but subordinate to the name it sits under. */
+export const STAT_MAX_TEXT_SCALE = 1.4;
 
 const styles = StyleSheet.create({
   headerRow: {
@@ -162,5 +179,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   pressed: { opacity: 0.86 },
-  stat: { gap: 2 },
+  stat: { gap: 2, flexShrink: 1, minWidth: 0 },
 });

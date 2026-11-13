@@ -492,7 +492,7 @@ export default function WorldScreen(): React.JSX.Element {
 
         {privacyOpen ? (
           <Text
-           
+
             style={[
               styles.privacy,
               {
@@ -518,7 +518,7 @@ export default function WorldScreen(): React.JSX.Element {
 
         {locationDenied ? (
           <Text
-           
+
             style={[
               styles.banner,
               {
@@ -548,7 +548,7 @@ export default function WorldScreen(): React.JSX.Element {
             accessibilityLabel="Search this area"
           >
             <Text
-             
+
               style={[styles.searchAreaText, { color: light ? '#F5F5F7' : '#111113' }]}
             >
               {searching ? 'Searching…' : 'Search this area'}
@@ -585,7 +585,7 @@ export default function WorldScreen(): React.JSX.Element {
                 accessibilityLabel={filter === 'recent' ? 'Explore map area' : 'Browse recent Drops'}
               >
                 <Text
-                 
+
                   style={[styles.emptyCtaText, { color: light ? '#F5F5F7' : '#111113' }]}
                 >
                   {filter === 'recent' ? 'Explore map area' : 'Browse recent'}
@@ -644,7 +644,7 @@ export default function WorldScreen(): React.JSX.Element {
                     accessibilityLabel={item.label}
                   >
                     <Text
-                     
+
                       style={[
                         styles.filterText,
                         { color: active ? (light ? '#F5F5F7' : t.textPrimary) : t.textMuted },

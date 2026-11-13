@@ -63,7 +63,7 @@ export function ClashEventHeader({
           style={styles.statusGroup}
         >
           <Text
-           
+
             style={[styles.status, { color: live ? t.textPrimary : t.textSecondary }]}
           >
             {statusLabel}
@@ -77,7 +77,7 @@ export function ClashEventHeader({
                 style={[styles.phaseChip, { backgroundColor: chipFill(t), borderColor: t.border }]}
               >
                 <Text
-                 
+
                   style={[styles.phaseChipText, { color: t.textSecondary }]}
                 >
                   {phaseLabel}

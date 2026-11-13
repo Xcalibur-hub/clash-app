@@ -20,7 +20,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-ROOT = Path("/home/user/aura")
+ROOT = Path("/home/user/aura2")
 OUT = ROOT / "docs/aura/preview"
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -87,10 +87,25 @@ def rgb(hex_or_rgba: str, on: str = "#000000") -> tuple:
 
 # ── drawing helpers ────────────────────────────────────────────────────────
 class Canvas:
-    def __init__(self, bg: str):
+    """Drawing surface for one preview.
+
+    `text_scale` emulates the OS "Larger Text" setting. It multiplies every font
+    size — and nothing else — which is exactly what React Native does when
+    `allowFontScaling` is true. That makes it an honest way to show what the
+    accessibility work actually changes: the same layout, larger words, and
+    whatever reflow the components now allow.
+
+    It is NOT a measurement engine: line breaking here is Pillow's, not Yoga's,
+    so a preview can show *pressure* (a heading that must wrap, a row that must
+    grow) but cannot prove the real layout survives. Layout claims are made from
+    the component code, not from these images.
+    """
+
+    def __init__(self, bg: str, text_scale: float = 1.0):
         self.img = Image.new("RGB", (W * SCALE, H * SCALE), rgb(bg))
         self.d = ImageDraw.Draw(self.img)
         self.bg = bg
+        self.text_scale = text_scale
 
     def rect(self, box, fill, radius=0, outline=None, width=1):
         x0, y0, x1, y1 = [v * SCALE for v in box]
@@ -102,7 +117,12 @@ class Canvas:
             width=int(width * SCALE),
         )
 
+    def measure(self, s, face, size):
+        """Rendered width in logical points, including the text-scale factor."""
+        return self.d.textlength(s, font=font(face, max(6, round(size * self.text_scale)))) / SCALE
+
     def text(self, xy, s, face, size, color, anchor="la", tracking=0.0):
+        size = max(6, round(size * self.text_scale))
         f = font(face, size)
         x, y = xy[0] * SCALE, xy[1] * SCALE
         if tracking:
@@ -122,7 +142,25 @@ class Canvas:
             return
         self.d.text((x, y), s, font=f, fill=rgb(color, self.bg), anchor=anchor)
 
+    def wrap_lines(self, s, face, size, max_w):
+        """The line breaks `wrap` would produce, without drawing. For measuring."""
+        size = max(6, round(size * self.text_scale))
+        f = font(face, size)
+        words, line, out = s.split(), "", []
+        for w in words:
+            trial = f"{line} {w}".strip()
+            if self.d.textlength(trial, font=f) > max_w * SCALE and line:
+                out.append(line)
+                line = w
+            else:
+                line = trial
+        if line:
+            out.append(line)
+        return out
+
     def wrap(self, xy, s, face, size, color, max_w, leading):
+        size = max(6, round(size * self.text_scale))
+        leading = round(leading * self.text_scale)
         f = font(face, size)
         words, line, y = s.split(), "", xy[1]
         x = xy[0]
@@ -359,71 +397,301 @@ def dock(c: Canvas, p: dict, active: str, vault: bool):
 
 
 def arena_verdict(scheme: str):
-    """The signature moment: a verdict reveal. This is where AURA has to earn it."""
+    """The verdict card, in the layout `LiveRoomResultReveal` actually renders.
+
+    Kept in sync with that component deliberately: the earlier version of this
+    scene showed a 2—1 scoreboard and a "settlement ledger" that the app has never
+    rendered. A preview that invents its own verdict layout is worse than no
+    preview, because a reviewer would approve a design that does not exist.
+
+    Every element below has a counterpart in the component:
+      rule → kicker → topic → headline (`displayLg`) + percentage (`numeral`)
+      → explanatory body → split bar (`ClashMatchupBar`) → participant count
+      → share / next-clash actions.
+    """
     p = palette(scheme)
     c = Canvas(p["background"])
     device_frame(c, p)
 
-    c.text((20, 74), "VERDICT", "semibold", 9, p["textMuted"], tracking=1.5)
-    y = 106
-    c.text((20, y), "Side A edged it", "serifBold", 30, p["textPrimary"])
-    y += 44
-    c.wrap((20, y), "One juror crossed. The closing argument carried the other two.", "regular", 13, p["textSecondary"], 320, 20)
-    y += 56
+    def card(y0, h):
+        c.rect((16, y0, W - 16, y0 + h), p["surface"], radius=20, outline=p["border"])
+        return y0 + 18
 
-    # the score — one giant editorial numeral pair, the hero
-    c.rect((20, y, W - 20, y + 146), p["surface"], radius=18, outline=p["border"])
-    c.text((60, y + 56), "2", "serifBold", 64, p["sideA"], anchor="mm")
-    c.text((W / 2, y + 50), "—", "serif", 30, p["textMuted"], anchor="mm")
-    c.text((W - 60, y + 56), "1", "serifBold", 64, p["sideB"], anchor="mm")
-    # Two short lines instead of one long tracked line: the previous single
-    # label overflowed the card at 390pt, which is exactly the kind of thing a
-    # real device check would catch and a mockup hides.
-    c.text((60, y + 102), "SIDE A", "semibold", 9, p["sideA"], anchor="mm", tracking=1.3)
-    c.text((60, y + 118), "Agree", "regular", 11, p["sideA"], anchor="mm")
-    c.text((W - 60, y + 102), "SIDE B", "semibold", 9, p["sideB"], anchor="mm", tracking=1.3)
-    c.text((W - 60, y + 118), "Disagree", "regular", 11, p["sideB"], anchor="mm")
-    c.text((W / 2, y + 136), "SPLIT DECISION · 3 JURORS", "medium", 9, p["textMuted"], anchor="mm", tracking=0.8)
-    y += 172
+    y = card(96, 320)
+    x0 = 34
+    c.rect((x0, y, x0 + 32, y + 3), p["sideA"], radius=2)
+    y += 18
+    c.text((x0, y), "ROOM 3 · DECIDED", "semibold", 9, p["textMuted"], tracking=1.3)
+    y += 16
+    c.text((x0, y), "Remote work made teams more honest", "regular", 11, p["textSecondary"])
+    y += 22
+    # headline + percentage on one line, as the component lays them out
+    c.text((x0, y), "Side A", "serifBold", 42, p["sideA"])
+    c.text((W - x0, y + 22), "62%", "serif", 30, p["sideA"], anchor="ra")
+    y += 54
+    y = c.wrap((x0, y), "Agree took it — 62 of 100 judgements.", "regular", 14, p["textSecondary"], W - 68, 20) + 12
+    # split bar (ClashMatchupBar)
+    c.rect((x0, y, x0 + (W - 68) * 0.62, y + 6), p["sideA"], radius=3)
+    c.rect((x0 + (W - 68) * 0.62 + 2, y, W - x0, y + 6), p["sideB"], radius=3)
+    y += 16
+    c.text((x0, y), "62% Agree", "regular", 10, p["sideA"])
+    c.text((W - x0, y), "38% Disagree", "regular", 10, p["sideB"], anchor="ra")
+    y += 22
+    c.text((x0, y), "101 participants", "regular", 11, p["textMuted"])
+    y += 24
+    # primary action (GlowButton default tone)
+    c.rect((x0, y, W - x0, y + 40), p["pill"], radius=20)
+    c.text(((x0 + W - x0) / 2, y + 20), "Share result", "semibold", 12, p["pillText"], anchor="mm")
+    y += 48
+    # secondary (compact, outlined)
+    c.rect((x0, y, W - x0, y + 38), p["surface"], radius=19, outline=p["border"])
+    c.text((W / 2, y + 19), "NEXT CLASH →", "semibold", 11, p["textPrimary"], anchor="mm")
 
-    # reward ledger, stated plainly
-    c.text((20, y), "SETTLEMENT", "semibold", 9, p["textMuted"], tracking=1.4)
+    # Best argument card — real: eyebrow, avatar + author, quote
+    y = 432
+    y = card(y, 104)
+    c.text((34, y), "BEST ARGUMENT", "semibold", 9, p["textMuted"], tracking=1.3)
     y += 20
-    rows = [
-        ("Mara Okonjo", "+40", "winner", p["gold"]),
-        ("Ito Lab", "+15", "participation", p["textSecondary"]),
-        ("Juror 1", "+120", "agreed", p["gold"]),
-    ]
-    for name, delta, note, tone in rows:
-        c.rect((20, y, W - 20, y + 52), p["surfaceSunken"], radius=10)
-        c.rect((34, y + 12, 62, y + 40), p["brandSoft"], radius=14)
-        c.text((48, y + 26), name[0], "serifBold", 14, p["brand"], anchor="mm")
-        c.text((76, y + 15), name, "semibold", 12, p["textPrimary"])
-        c.text((76, y + 31), note, "regular", 9, p["textMuted"])
-        c.text((W - 34, y + 26), delta, "serifBold", 17, tone, anchor="rm")
-        y += 60
+    c.rect((34, y, 58, y + 24), p["brandSoft"], radius=12)
+    c.text((46, y + 12), "I", "serifBold", 11, p["brand"], anchor="mm")
+    c.text((66, y + 6), "Ito Lab", "semibold", 11, p["textPrimary"])
+    y += 32
+    c.wrap((34, y), "Read receipts are the most honest document a team produces.", "regular", 13, p["textPrimary"], W - 68, 19)
 
-    # Every result screen needs a forward action: the journey is
-    # discover -> participate -> follow outcome -> *return*.
-    c.text((20, y), "What happens next", "kicker" and "semibold", 9, p["textMuted"], tracking=1.4)
+    # Mindshift card — aggregate only, never per-person
+    y = 556
+    y = card(y, 104)
+    c.text((34, y), "BIGGEST MINDSHIFT", "semibold", 9, p["textMuted"], tracking=1.3)
     y += 20
-    for label, primary in [("Share the verdict", True), ("Take the next clash", False)]:
-        if primary:
-            c.rect((20, y, W - 20, y + 44), p["pill"], radius=22)
-            c.text((W / 2, y + 22), label, "semibold", 12, p["pillText"], anchor="mm")
-        else:
-            c.rect((20, y, W - 20, y + 44), p["surface"], radius=22, outline=p["border"])
-            c.text((W / 2, y + 22), label, "semibold", 12, p["textPrimary"], anchor="mm")
-        y += 54
+    c.text((34, y), "18%", "serifBold", 30, p["textPrimary"])
+    y += 38
+    c.text((34, y), "changed their mind in this room", "regular", 12, p["textSecondary"])
 
     dock(c, p, active="Home", vault=False)
     c.save(f"arena-verdict-{scheme}.png", scheme)
 
 
+def clash_room(scheme: str, role: str, phase: str, text_scale: float = 1.0):
+    """The canonical clash room, in one phase, for one role.
+
+    Mirrors the implemented hierarchy: phase headline → proposition → sides →
+    action → floor → (result). Copy and structure come from the same strings the
+    components emit (`phaseHeadline`, the action labels), so the preview cannot
+    drift into a prettier fiction than the app.
+
+    Rendered for BOTH roles on purpose: "fighter and spectator are distinct but
+    share one grammar" is a claim that has to be visible, not asserted.
+    """
+    p = palette(scheme)
+    c = Canvas(p["background"], text_scale=text_scale)
+    device_frame(c, p)
+
+    y = 74
+    # back chevron
+    c.rect((16, y - 6, 44, y + 22), p["background"])
+    c.text((20, y), "←", "regular", 17, p["textPrimary"])
+    # A human label, not the raw `ArenaRoomStatus` enum: the app never prints
+    # "SETTLED" to a user, and a preview that does would document a screen that
+    # does not exist.
+    PHASE_LABEL = {
+        "OPEN": "LIVE",
+        "FINAL_ARGUMENTS": "FINAL ARGUMENTS",
+        "JUDGING": "JUDGING",
+        "SETTLED": "DECIDED",
+        "CANCELLED": "CLOSED",
+    }
+    c.text((W - 20, y + 2), PHASE_LABEL.get(phase, "LIVE"), "medium", 9, p["textMuted"], anchor="ra", tracking=1.2)
+
+    y += 36
+    settled = phase in ("SETTLED", "CANCELLED")
+    headline = {
+        ("OPEN", "debater"): "THE FLOOR IS YOURS",
+        ("OPEN", "spectator"): "THE FLOOR IS OPEN",
+        ("FINAL_ARGUMENTS", "debater"): "FINAL ARGUMENT",
+        ("FINAL_ARGUMENTS", "spectator"): "FINAL ARGUMENTS",
+        ("JUDGING", "debater"): "JUDGING IN PROGRESS",
+        ("JUDGING", "spectator"): "JUDGING IN PROGRESS",
+        ("SETTLED", "debater"): "VERDICT",
+        ("SETTLED", "spectator"): "VERDICT",
+    }.get((phase, role), "THE FLOOR IS OPEN")
+    if not settled:
+        c.rect((20, y + 4, 26, y + 10), p["sideA"], radius=3)
+        c.text((34, y), headline, "semibold", 9, p["textSecondary"], tracking=1.3)
+    else:
+        c.text((20, y), headline, "semibold", 9, p["brand"], tracking=1.3)
+    y += 22
+
+    # proposition — the display voice
+    y = c.wrap((20, y), "Remote work made teams more honest", "serifBold", 24, p["textPrimary"], 330, 30)
+
+    y += 12
+    # Sides as broadcast tags. Boxes are measured from the text, not fixed: at a
+    # large OS text size a fixed 72pt tag collides with its neighbour, and the
+    # real component wraps the row instead (ClashHeader has flexWrap on the
+    # container). Drawing fixed boxes here would document a bug the app does not
+    # have.
+    tag_h = max(24, round(24 * c.text_scale))
+    tx = 20
+    for key, stance, ink, soft in [
+        ("A", "Agree", p["sideA"], p["sideASoft"]),
+        ("B", "Disagree", p["sideB"], p["sideBSoft"]),
+    ]:
+        w = 10 + c.measure(key, "semibold", 10) + 4 + c.measure(stance, "regular", 11) + 8
+        if tx + w > W - 20:
+            y += tag_h + 6
+            tx = 20
+        c.rect((tx, y, tx + w, y + tag_h), soft, radius=6, outline=ink)
+        c.text((tx + 10, y + 7), key, "semibold", 10, ink, tracking=0.5)
+        c.text((tx + 10 + c.measure(key, "semibold", 10) + 4, y + 7), stance, "regular", 11, ink)
+        tx += w + 8
+    y += tag_h + 10
+
+    if not settled:
+        # Wrapped, because `ClashHeader` ellipsises rather than overflowing — a
+        # clipped clock reads as a layout bug in a review image.
+        y = c.wrap(
+            (20, y),
+            "Room 3  ·  12 arguing · 40 watching  ·  04:31",
+            "regular",
+            11,
+            p["textMuted"],
+            W - 40,
+            16,
+        ) + 8
+        # hairline phase progress
+        c.rect((20, y, W - 20, y + 2), p["divider"], radius=1)
+        frac = {"OPEN": 0.25, "FINAL_ARGUMENTS": 0.5, "JUDGING": 0.75}.get(phase, 0.25)
+        c.rect((20, y, 20 + (W - 40) * frac, y + 2), p["textPrimary"], radius=1)
+        y += 26
+    else:
+        y = c.wrap((20, y), "Room 3  ·  12 arguing · 40 watching", "regular", 11, p["textMuted"], W - 40, 16) + 8
+
+    # ── action region ────────────────────────────────────────────────────
+    label = None
+    if phase in ("OPEN", "FINAL_ARGUMENTS", "JUDGING"):
+        if role == "debater":
+            label = {"OPEN": "Make your argument", "FINAL_ARGUMENTS": "Final argument", "JUDGING": "Cast your verdict"}[phase]
+        elif phase == "OPEN":
+            label = "Pick a side"
+        elif phase == "JUDGING":
+            label = "Cast your verdict"
+    if label:
+        c.rect((20, y, W - 20, y + 50), p["textPrimary"], radius=14)
+        c.text((W / 2, y + 25), label, "semibold", 13, p["background"], anchor="mm")
+        y += 62
+
+    # ── result region ───────────────────────────────────────────────────
+    if settled:
+        c.rect((20, y + 6, 52, y + 9), p["sideA"], radius=2)
+        y += 24
+        c.text((20, y), "SIDE A TAKES IT", "semibold", 9, p["textMuted"], tracking=1.4)
+        y += 18
+        c.text((20, y), "Agree", "serifBold", 42, p["sideA"])
+        y += 54
+        c.text((20, y), "Agree took it — 62 of 100 judgements.", "regular", 14, p["textSecondary"])
+        y += 26
+        # split bar
+        c.rect((20, y, 20 + (W - 40) * 0.62, y + 6), p["sideA"], radius=3)
+        c.rect((20 + (W - 40) * 0.62 + 2, y, W - 20, y + 6), p["sideB"], radius=3)
+        y += 14
+        c.text((20, y), "62% Agree", "regular", 11, p["sideA"])
+        c.text((W - 20, y), "38% Disagree", "regular", 11, p["sideB"], anchor="ra")
+        y += 24
+        c.rect((20, y, 168, y + 30), p["goldSoft"], radius=8, outline=p["gold"])
+        c.text((34, y + 9), "+120 reputation", "medium", 11, p["gold"])
+        y += 44
+
+    # ── floor ───────────────────────────────────────────────────────────
+    # During JUDGING the floor is not a transcript — it is the ballot. Showing
+    # arguments here would document a screen that does not exist.
+    judging = phase == "JUDGING"
+    if judging:
+        c.text((20, y), "WHO MADE THE BETTER CASE?", "semibold", 9, p["textMuted"], tracking=1.3)
+        y += 20
+        c.rect((20, y, W - 20, y + 96), p["surfaceElevated"], radius=14, outline=p["border"])
+        c.text((34, y + 14), "Your verdict", "semibold", 12, p["textPrimary"])
+        for i, (lbl, col) in enumerate([("Side A · Agree", p["sideA"]), ("Side B · Disagree", p["sideB"])]):
+            bx = 34 + i * ((W - 68) / 2 + 8)
+            c.rect((bx, y + 36, bx + (W - 68) / 2 - 8, y + 76), p["surfaceSunken"], radius=22, outline=col)
+            c.text((bx + ((W - 68) / 2 - 8) / 2, y + 56), lbl, "medium", 11, col, anchor="mm")
+        c.text((34, y + 82), "Ballots stay private until the room settles.", "regular", 9, p["textMuted"])
+        y += 112
+        c.text((20, y), "BEST ARGUMENT", "semibold", 9, p["textMuted"], tracking=1.3)
+        y += 20
+        c.rect((20, y, W - 20, y + 56), p["surface"], radius=12, outline=p["border"])
+        c.text((34, y + 12), "Pick one argument — you cannot vote for your own.", "regular", 10, p["textMuted"])
+        c.text((34, y + 30), "2 candidates", "medium", 11, p["textPrimary"])
+        y += 68
+
+    floor_title = "THE CROWD" if role == "spectator" else "OFFICIAL ARGUMENTS"
+    if not judging:
+        c.text((20, y), floor_title, "semibold", 9, p["textMuted"], tracking=1.4)
+        y += 18
+    if not settled and role == "spectator":
+        rows = [
+            ("Mara Okonjo", "The honest part is that nobody could hide behind a hallway.", "3rd"),
+            ("Ito Lab", "Read receipts are the most honest document a team produces.", "2nd"),
+            ("Dara V", "Async made the politics visible, not worse.", "1st"),
+        ]
+    elif not settled:
+        rows = [
+            ("You", "The honest part is that nobody could hide behind a hallway.", "now"),
+            ("Ito Lab", "Read receipts are the most honest document a team produces.", "4m"),
+        ]
+    else:
+        rows = [("BEST ARGUMENT", "Read receipts are the most honest document a team produces.", "Ito Lab")]
+    for name, body, when in rows:
+        # Measure first, then draw the card around it. A fixed 62pt row clips the
+        # body at large text, which the real rows do not do.
+        lines = c.wrap_lines(body, "regular", 11, W - 100)
+        line_h = round(15 * c.text_scale)
+        card_h = 28 + len(lines) * line_h + 10
+        c.rect((20, y, W - 20, y + card_h), p["surface"], radius=12, outline=p["border"])
+        c.rect((32, y + 12, 56, y + 36), p["brandSoft"], radius=12)
+        c.text((44, y + 24), name[0], "serifBold", 12, p["brand"], anchor="mm")
+        c.text((66, y + 12), name, "semibold", 11, p["textPrimary"])
+        c.text((W - 32, y + 12), when, "regular", 9, p["textMuted"], anchor="ra")
+        c.wrap((66, y + 28), body, "regular", 11, p["textSecondary"], W - 100, 15)
+        y += card_h + 8
+
+    # One more argument, then the composer strip. The real screen has an input
+    # pinned above the dock, so a preview that leaves the lower half blank would
+    # misrepresent a populated room as an empty one.
+    if not settled and y < 560:
+        name, body, when = ("Anya Serra", "Disagreement is cheaper when it is written down.", "6m")
+        c.rect((20, y, W - 20, y + 62), p["surface"], radius=12, outline=p["border"])
+        c.rect((32, y + 12, 56, y + 36), p["brandSoft"], radius=12)
+        c.text((44, y + 24), name[0], "serifBold", 12, p["brand"], anchor="mm")
+        c.text((66, y + 12), name, "semibold", 11, p["textPrimary"])
+        c.text((W - 32, y + 12), when, "regular", 9, p["textMuted"], anchor="ra")
+        c.wrap((66, y + 28), body, "regular", 11, p["textSecondary"], W - 100, 15)
+        y += 70
+
+    # Composer / participation strip — real chrome, pinned above the dock.
+    if not settled and y < 620:
+        strip_y = 660
+        c.rect((20, strip_y, W - 20, strip_y + 46), p["inputBackground"], radius=23, outline=p["border"])
+        placeholder = (
+            "Add to the crowd…" if role == "spectator" else "Make your argument…"
+        )
+        c.text((38, strip_y + 16), placeholder, "regular", 12, p["textMuted"])
+
+    dock(c, p, active="Home", vault=False)
+    suffix = "" if text_scale == 1.0 else "-large-text"
+    c.save(f"clash-{role}-{phase.lower()}-{scheme}{suffix}.png", scheme)
+
+
 def gallery(scheme: str):
     """Mobile-readable contact sheet: 2 columns, big enough to judge at 390pt."""
     p = palette(scheme)
-    names = ["vault-home", "profile", "arena-verdict"]
+    names = [
+        "clash-debater-open",
+        "clash-spectator-open",
+        "clash-debater-judging",
+        "clash-spectator-settled",
+        "vault-home",
+        "arena-verdict",
+    ]
     tiles = [Image.open(OUT / f"{n}-{scheme}.png") for n in names]
 
     gut, label_h, head_h = 12, 24, 78
@@ -441,7 +709,14 @@ def gallery(scheme: str):
     sub = "design previews · not screenshots"
     d.text((gut, 32 + tfont.getbbox("A")[3]), sub, font=sfont, fill=rgb(p["textMuted"]))
 
-    titles = {"vault-home": "Vault home", "profile": "Profile / creator identity", "arena-verdict": "Arena verdict"}
+    titles = {
+        "clash-debater-open": "Clash · fighter, open floor",
+        "clash-spectator-open": "Clash · spectator, open floor",
+        "clash-debater-judging": "Clash · fighter judging",
+        "clash-spectator-settled": "Clash · spectator, settled",
+        "vault-home": "Vault home",
+        "arena-verdict": "Arena verdict",
+    }
     for i, (img, n) in enumerate(zip(tiles, names)):
         r, col = divmod(i, cols)
         x = gut + col * (tw + gut)
@@ -551,6 +826,17 @@ def main():
         vault_home(scheme)
         profile(scheme)
         arena_verdict(scheme)
+        # The canonical clash room, in the four states that matter, for both
+        # roles. These are the Phase 2 evidence: same grammar, distinct
+        # experiences.
+        clash_room(scheme, "debater", "OPEN")
+        clash_room(scheme, "spectator", "OPEN")
+        clash_room(scheme, "debater", "JUDGING")
+        clash_room(scheme, "spectator", "SETTLED")
+        # The accessibility claim, shown rather than asserted: the same room with
+        # the OS text size at ~160%.
+        clash_room(scheme, "spectator", "OPEN", text_scale=1.6)
+        clash_room(scheme, "debater", "OPEN", text_scale=1.6)
         gallery(scheme)
     tokens_sheet()
     print("done.")

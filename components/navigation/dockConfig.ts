@@ -1,5 +1,6 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { LucideIcon } from 'lucide-react-native';
+import { PLATE_HEIGHT } from './dockMetrics';
 import {
   ArenaHomeIcon,
   BookmarkIcon,
@@ -11,13 +12,14 @@ import {
 } from '../shared/icons';
 
 /**
- * Visual height of the floating dock plate (icons + padding).
+ * Visual height of the floating dock plate (glyph + active label + padding).
  *
- * AURA raised this from 52 to 56 for a less cramped plate. Scroll clearance is
- * derived from this constant, so every screen's bottom padding follows
+ * Derived from `PLATE_HEIGHT` in `dockMetrics.ts` rather than restated, because
+ * Phase 1 had the number written in two places that could drift apart. Scroll
+ * clearance follows from this constant, so every screen's bottom padding follows
  * automatically — never hardcode the dock height at a call site.
  */
-export const DOCK_HEIGHT = 56;
+export const DOCK_HEIGHT = PLATE_HEIGHT;
 
 /**
  * Breathing room above the dock top edge (not including safe-area inset).

@@ -95,7 +95,7 @@ export function CrewMembershipActions({
               ]}
             >
               <Text
-               
+
                 style={[styles.followLabel, { color: following ? t.textPrimary : t.textSecondary }]}
               >
                 {following ? 'FOLLOWING' : 'FOLLOW'}

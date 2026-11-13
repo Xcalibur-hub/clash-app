@@ -78,7 +78,7 @@ export function NotificationRow({ notification, actor, onPress }: NotificationRo
       )}
       <View style={styles.body}>
         <Text
-         
+
           style={[styles.title, { color: unread ? t.textPrimary : t.textMuted }, unread && styles.titleUnread]}
           numberOfLines={2}
         >

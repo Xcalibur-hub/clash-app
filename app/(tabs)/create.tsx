@@ -313,7 +313,7 @@ export default function CreateTakeScreen(): React.JSX.Element {
             accessibilityHint={kind==='question'?'Publishes a question with two choices':'Publishes your take'}
           />
           <Text
-           
+
             accessibilityLiveRegion="polite"
             style={[styles.disclaimer, { color: theme.textMuted }]}
           >

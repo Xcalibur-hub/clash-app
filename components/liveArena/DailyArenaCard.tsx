@@ -70,7 +70,7 @@ export function DailyArenaCard({
 
         {topic.description ? (
           <Text
-           
+
             numberOfLines={2}
             style={[styles.description, { color: t.textSecondary }]}
           >

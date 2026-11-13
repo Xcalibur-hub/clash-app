@@ -316,13 +316,13 @@ export function MeetHomePanel(): React.JSX.Element {
                 accessibilityState={{ selected: on }}
               >
                 <Text
-                 
+
                   style={{ color: on ? t.background : t.textPrimary, fontWeight: '800' }}
                 >
                   {item.label}
                 </Text>
                 <Text
-                 
+
                   style={{ color: on ? 'rgba(255,255,255,0.7)' : t.textMuted, fontSize: 12 }}
                 >
                   {item.hint}

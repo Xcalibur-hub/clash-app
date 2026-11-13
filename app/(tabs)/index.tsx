@@ -4,8 +4,10 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArenaTopBar } from '../../components/arena/ArenaTopBar';
-import { ArenaLiveGateway } from '../../components/arena/ArenaLiveGateway';
+import { LiveClashFeature } from '../../components/arena/LiveClashFeature';
 import { ArenaDiscoveryRail } from '../../components/arena/ArenaDiscoveryRail';
+import { roomPhaseForTopicPhase } from '../../utils/arenaHierarchy';
+import { compact } from '../../utils/format';
 import { ArenaSideRail } from '../../components/arena/ArenaSideRail';
 import { ArenaClashes } from '../../components/arena/ArenaClashes';
 import { ArenaCommunity } from '../../components/arena/ArenaCommunity';
@@ -393,10 +395,34 @@ export default function ArenaScreen(): React.JSX.Element {
     // Feed remains the primary list; chrome stays thin so Takes stay readable on A50.
     return (
       <View style={styles.hero}>
-        <ArenaLiveGateway
-          liveCount={liveTopicsLoading || liveTopicsError ? null : liveTopics.filter((topic) => topic.status === 'live' && (topic.phase === 'open' || topic.phase === 'final_arguments')).length}
-          onOpen={() => setArenaMode('clashes')}
-        />
+        {/*
+          Arena's front door.
+
+          This used to be a compact grey "live clashes" bar above a takes feed,
+          which framed CLASH as a social feed with debates attached. A live clash
+          is the event; takes are what people say about it. When something is live
+          it now leads the screen in the display voice, and the takes feed follows
+          underneath as commentary.
+
+          Everything below is read from the topic record the screen already
+          fetched — no invented score, and the tap opens the real room.
+        */}
+        {heroTopic && !liveTopicsLoading && !liveTopicsError ? (
+          <LiveClashFeature
+            proposition={heroTopic.title}
+            phase={roomPhaseForTopicPhase(heroTopic.phase)}
+            stanceA="Agree"
+            stanceB="Disagree"
+            participation={`${compact(heroTopic.participantCount)} joined · ${heroTopic.activeRoomCount} ${heroTopic.activeRoomCount === 1 ? 'room' : 'rooms'}`}
+            clock={heroTopic.secondsRemaining > 0 ? `${Math.floor(heroTopic.secondsRemaining / 60)}:${String(heroTopic.secondsRemaining % 60).padStart(2, '0')}` : null}
+            onOpen={() => {
+              if (heroTopic.viewerRoomId) openRoom(heroTopic.viewerRoomId);
+              else openTopic(heroTopic.id);
+            }}
+            moreCount={Math.max(0, liveTopics.filter((topic) => topic.status === 'live').length - 1)}
+            onOpenMore={() => setArenaMode('clashes')}
+          />
+        ) : null}
 
         <FreshTakesSection
           items={freshItems}
@@ -454,6 +480,7 @@ export default function ArenaScreen(): React.JSX.Element {
     if (state.arenaStatus === 'error') {
       return (
         <EmptyState
+          variant="error"
           icon={ArenaIcon}
           title="Couldn't load Arena."
           body="Check your connection and try again."
@@ -479,6 +506,7 @@ export default function ArenaScreen(): React.JSX.Element {
       if (followingError) {
         return (
           <EmptyState
+          variant="error"
             icon={ArenaIcon}
             title="Couldn't load your follows"
             body="Check your connection and try again."

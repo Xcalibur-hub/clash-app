@@ -157,7 +157,7 @@ export function ClashSideCard({
         <View style={styles.identity}>
           <Avatar name={author.name} tint={author.tint} size={32} />
           <Text
-           
+
             style={[styles.handle, { color: bodyColor }]}
             numberOfLines={1}
           >

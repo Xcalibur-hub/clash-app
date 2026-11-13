@@ -101,7 +101,7 @@ export function WorldDropPreview({ drop, onView, onDismiss }: WorldDropPreviewPr
           accessibilityLabel="Open Drop"
         >
           <Text
-           
+
             style={[
               styles.openText,
               { color: t.scheme === 'light' ? '#F5F5F7' : '#111113' },

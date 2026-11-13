@@ -21,10 +21,18 @@ export function arenaFreshStageHeight(width: number): number {
 
 /**
  * First-viewport stack order for For You Home.
- * Live entry stays visible without burying the primary Take feed.
+ *
+ * The ordering is the contract and it has not changed: a live clash leads, takes
+ * follow, then scopes, then the scrollable feed. What changed in Phase 2 is the
+ * *slot itself* — `live_gateway` was a compact grey bar that framed CLASH as a
+ * takes feed with debates attached. The slot is now `live_feature`, an editorial
+ * feature that gives the live clash the visual weight of the event it is.
+ *
+ * The token was renamed rather than reusing `live_gateway` so a reader cannot
+ * mistake this for the old component still being in place.
  */
 export const ARENA_HOME_FIRST_VIEWPORT = [
-  'live_gateway',
+  'live_feature',
   'fresh_takes',
   'feed_scopes',
   'take_feed',

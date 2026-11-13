@@ -123,7 +123,7 @@ export function ProfileClashRow({
       style={[styles.row, { borderBottomColor: t.border }]}
     >
       <Text
-       
+
         style={[
           styles.clashKicker,
           { color: isWin ? t.textPrimary : t.textMuted },

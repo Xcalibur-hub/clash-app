@@ -119,7 +119,7 @@ export function HoodsSection({ profileId, signedIn }: HoodsSectionProps): React.
                   ]}
                 >
                   <Text
-                   
+
                     style={[
                       styles.joinText,
                       { color: summary.joined ? t.textSecondary : t.pillText },

@@ -81,7 +81,7 @@ export function PredictionCard({
               ]}
             >
               <Text
-               
+
                 style={[styles.optionLabel, selected && styles.optionLabelOn]}
                 numberOfLines={2}
               >

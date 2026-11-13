@@ -51,7 +51,7 @@ export function SubscriptionInfoSheet({
               {benefits.map((benefit) => (
                 <Text
                   key={benefit}
-                 
+
                   style={[styles.benefit, { color: t.textSecondary }]}
                 >
                   {benefit}

@@ -387,7 +387,7 @@ export default function SponsorCampaignDetail(): React.JSX.Element {
                 ]}
               >
                 <Text
-                 
+
                   style={[styles.tabLabel, { color: active ? t.textPrimary : t.textMuted }]}
                 >
                   {item.label}

@@ -172,7 +172,7 @@ export function PlayHomePanel(): React.JSX.Element {
               accessibilityLabel={label}
             >
               <Text
-               
+
                 style={[styles.tabLabel, { color: on ? t.background : t.textMuted }]}
               >
                 {label}

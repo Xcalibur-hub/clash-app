@@ -208,21 +208,21 @@ export function TopicRoomDiscovery({
               >
                 <View style={styles.roomRowLeft}>
                   <Text
-                   
+
                     style={[styles.roomRowTitle, { color: t.textPrimary }]}
                   >
                     Room {room.roomIndex}
                     {mine ? ' · Yours' : ''}
                   </Text>
                   <Text
-                   
+
                     style={[styles.roomRowMeta, { color: full ? t.textSecondary : t.textMuted }]}
                   >
                     {meta}
                   </Text>
                 </View>
                 <Text
-                 
+
                   style={[styles.roomRowCta, { color: t.textPrimary }]}
                 >
                   {cta}

@@ -156,8 +156,14 @@ const styles = StyleSheet.create({
   actionRow: { marginTop: space.xs },
   social: {
     flexDirection: 'row',
+    // Blocker 2: three stats plus two hairline seams overflowed a narrow screen
+    // once a long reputation numeral met a large OS text size. Wrapping keeps
+    // every stat visible; `rowGap` separates the wrapped line without doubling
+    // the seam.
+    flexWrap: 'wrap',
     alignItems: 'flex-start',
     gap: space.lg,
+    rowGap: space.sm,
     paddingTop: space.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },

@@ -146,7 +146,7 @@ export function TrendingBattlesSection({
         </Text>
         {demo ? (
           <Text
-           
+
             style={[styles.demoBadge, { color: t.textMuted, borderColor: t.border }]}
             accessibilityLabel="Development preview using demo data"
           >
@@ -169,7 +169,7 @@ export function TrendingBattlesSection({
 
       {__DEV__ && demo ? (
         <Text
-         
+
           style={[styles.devDiag, { color: t.textMuted }]}
           accessibilityLabel={`Demo diagnostic: ${battles.length} topics, ${snapshotCount} snapshots, ${stage}`}
         >
@@ -183,7 +183,7 @@ export function TrendingBattlesSection({
         accessibilityLabel={`Selected topic rank ${selected.rank}. ${selected.title}`}
       >
         <Text
-         
+
           style={[
             styles.previewRank,
             {
@@ -201,7 +201,7 @@ export function TrendingBattlesSection({
         </Text>
         <View style={styles.previewCopy}>
           <Text
-           
+
             style={[styles.previewTitle, { color: t.textPrimary }]}
             numberOfLines={2}
           >

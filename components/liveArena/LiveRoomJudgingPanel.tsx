@@ -4,6 +4,7 @@ import type { ArenaMessage, ArenaRoom } from '../../services/liveArenaService';
 import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { judge as hapticJudge, tap as hapticTap } from '../../utils/haptics';
 import { Avatar } from '../shared/Avatar';
+import { AppText } from '../shared/AppText';
 import { secondsLabel, softFill } from './liveArenaStyles';
 
 /** How many recent arguments the best-argument picker offers. */
@@ -72,32 +73,34 @@ export function LiveRoomJudgingPanel({
       ]}
     >
       <View style={styles.head}>
-        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
-          JUDGE THIS CLASH
-        </Text>
+        <AppText style={[typeScale.kicker, { color: t.textMuted }]}>JUDGING</AppText>
         {room.secondsRemaining > 0 ? (
-          <Text style={[styles.meta, { color: t.textPrimary }]}>
+          <AppText style={[typeScale.meta, { color: t.textPrimary }]}>
             {secondsLabel(room.secondsRemaining)} left
-          </Text>
+          </AppText>
         ) : null}
       </View>
 
-      <Text style={[styles.ceremony, { color: t.textPrimary }]}>
+      {/*
+        The judging screen asks one question in the display voice. The previous
+        copy alternated between "Who made the better case?", "WHO COOKED?" and
+        "Who cooked?" within the same panel — three registers for one question,
+        none of them matching the editorial system the rest of Arena now speaks.
+      */}
+      <AppText style={[typeScale.editorial, styles.headline, { color: t.textPrimary }]}>
         Who made the better case?
-      </Text>
-      <Text style={[styles.note, { color: t.textMuted }]}>
-        This is judgement — not a reaction. Ballots stay private until the room settles.
-      </Text>
+      </AppText>
+      <AppText style={[typeScale.meta, { color: t.textSecondary }]}>
+        This is judgement, not a reaction. Ballots stay private until the room settles.
+      </AppText>
 
       {!isDebater ? (
-        <Text style={[styles.note, { color: t.textSecondary }]}>
-          Only fighters vote in this room. Keep watching the ceremony.
-        </Text>
+        <AppText style={[typeScale.meta, { color: t.textSecondary }]}>
+          Only the fighters in this room vote. You can keep watching the ceremony.
+        </AppText>
       ) : (
         <>
-          <Text style={[styles.question, { color: t.textPrimary }]}>
-            WHO COOKED?
-          </Text>
+          <AppText style={[typeScale.label, { color: t.textPrimary }]}>Your verdict</AppText>
           {hasSideVote ? (
             <Text style={[styles.recorded, { color: t.textMuted }]}>
               Your judgement is in. Results open when the room settles.
@@ -125,9 +128,7 @@ export function LiveRoomJudgingPanel({
 
           <View style={[styles.divider, { backgroundColor: t.border }]} />
 
-          <Text style={[styles.question, { color: t.textPrimary }]}>
-            Best argument
-          </Text>
+          <AppText style={[typeScale.label, { color: t.textPrimary }]}>Best argument</AppText>
           {hasArgumentVote ? (
             <Text style={[styles.recorded, { color: t.textMuted }]}>
               Your best-argument vote is in.
@@ -170,7 +171,7 @@ export function LiveRoomJudgingPanel({
                           size={20}
                         />
                         <Text
-                         
+
                           numberOfLines={1}
                           style={[styles.candidateName, { color: t.textSecondary }]}
                         >
@@ -178,7 +179,7 @@ export function LiveRoomJudgingPanel({
                         </Text>
                       </View>
                       <Text
-                       
+
                         numberOfLines={4}
                         style={[styles.candidateBody, { color: t.textPrimary }]}
                       >
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
   eyebrow: { ...typeScale.caption, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
   ceremony: { ...typeScale.meta, fontSize: 12, lineHeight: 17, marginBottom: 2 },
   meta: { ...typeScale.caption, fontSize: 11, fontWeight: '700' },
-  question: { ...typeScale.label, fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  headline: { marginTop: 2 },
   note: { ...typeScale.meta, fontSize: 13 },
   recorded: { ...typeScale.caption, fontSize: 11, lineHeight: 16 },
   sides: { flexDirection: 'row', gap: space.sm },

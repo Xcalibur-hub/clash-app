@@ -175,7 +175,7 @@ export function PredictionComposerSheet({
                     accessibilityLabel={choice.label}
                   >
                     <Text
-                     
+
                       style={[
                         styles.chipText,
                         {

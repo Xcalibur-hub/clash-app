@@ -19,6 +19,7 @@ import { layout, radius, space, typeScale, useThemeColors } from '../../theme';
 import { notify as hapticNotify, tap as hapticTap } from '../../utils/haptics';
 import { StanceChoiceRow } from '../arena/StanceChoiceRow';
 import { Avatar } from '../shared/Avatar';
+import { AppText } from '../shared/AppText';
 import { GlowButton } from '../shared/GlowButton';
 import { ClashMatchupBar } from './ClashMatchupBar';
 import { softFill, STANCE_LABEL, winningSideLabel } from './liveArenaStyles';
@@ -122,40 +123,48 @@ export function LiveRoomResultReveal({
           revealed,
         ]}
       >
-        <Text style={[styles.eyebrow, { color: t.textMuted }]}>
-          {roomIndex != null ? `ROOM ${roomIndex} DECIDED` : '◆ ROOM DECIDED'}
-        </Text>
+        {/*
+          The verdict headline, in the display voice.
+
+          It used to be an uppercase kicker ("◆ ROOM DECIDED"), a second uppercase
+          line ("SIDE A WON") and a bare percentage — three separate statements, all
+          at label weight, on the single screen in the product that should feel
+          like a result. The outcome now reads as one editorial sentence in the
+          serif, with the tally as quiet supporting fact rather than a competing
+          headline.
+        */}
+        <View style={[styles.verdictRule, { backgroundColor: winnerTone?.ink ?? t.textPrimary }]} />
+        <AppText style={[typeScale.kicker, { color: t.textMuted }]}>
+          {roomIndex != null ? `ROOM ${roomIndex} · DECIDED` : 'DECIDED'}
+        </AppText>
         {topicTitle ? (
-          <Text style={[styles.topic, { color: t.textSecondary }]} numberOfLines={2}>
+          <AppText style={[typeScale.meta, { color: t.textSecondary }]} numberOfLines={2}>
             {topicTitle}
-          </Text>
+          </AppText>
         ) : null}
 
         <View style={styles.headline}>
-          <Text
-           
-            style={[styles.side, { color: winnerTone?.ink ?? t.textPrimary }]}
-          >
+          <AppText style={[typeScale.displayLg, { color: winnerTone?.ink ?? t.textPrimary }]}>
             {isDraw
-              ? 'DRAW'
+              ? 'A draw'
               : result.winningSide === 'AGREE'
-                ? 'SIDE A WON'
-                : 'SIDE B WON'}
-          </Text>
+                ? 'Side A'
+                : 'Side B'}
+          </AppText>
           {!isDraw && winnerPercent !== null ? (
-            <Text style={[styles.percent, { color: winnerTone?.ink ?? t.textSecondary }]}>
-              {winnerPercent}%
-            </Text>
+            <AppText fixed style={[typeScale.numeral, { color: winnerTone?.ink ?? t.textSecondary }]}>
+              {`${winnerPercent}%`}
+            </AppText>
           ) : null}
         </View>
 
-        <Text style={[styles.sub, { color: t.textSecondary }]}>
+        <AppText style={[typeScale.body, { color: t.textSecondary }]}>
           {isDraw
             ? totalVotes === 0
               ? 'Nobody cast a side vote.'
               : 'The room split evenly.'
-            : `${winnerVotes} of ${totalVotes} judgements · ${winningSideLabel(result.winningSide)}`}
-        </Text>
+            : `${winningSideLabel(result.winningSide)} took it — ${winnerVotes} of ${totalVotes} judgements.`}
+        </AppText>
 
         <ClashMatchupBar size="room" agreeShare={agreeShare} />
 
@@ -258,6 +267,7 @@ export function LiveRoomResultReveal({
 }
 
 const styles = StyleSheet.create({
+  verdictRule: { width: 32, height: 3, borderRadius: 2, marginBottom: space.md },
   wrap: { paddingHorizontal: layout.screenX, paddingVertical: space.md, gap: space.sm },
   card: {
     padding: space.md,

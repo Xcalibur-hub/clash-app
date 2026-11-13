@@ -196,7 +196,7 @@ export default function CreateCrewScreen(): React.JSX.Element {
                 ]}
               >
                 <Text
-                 
+
                   style={{
                     ...typeScale.label,
                     fontSize: 13,

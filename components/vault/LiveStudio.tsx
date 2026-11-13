@@ -99,7 +99,7 @@ export function LiveStudio(): React.JSX.Element {
               <View style={styles.rowHead}>
                 <WorldIcon size={15} color={t.textSecondary} strokeWidth={2.2} />
                 <Text
-                 
+
                   style={[styles.rowTitle, { color: t.textPrimary }]}
                   numberOfLines={1}
                 >
@@ -107,7 +107,7 @@ export function LiveStudio(): React.JSX.Element {
                 </Text>
               </View>
               <Text
-               
+
                 style={[styles.rowMeta, { color: t.textMuted }]}
                 numberOfLines={1}
               >

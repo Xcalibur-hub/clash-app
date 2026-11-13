@@ -510,7 +510,7 @@ function FilterChip({
       ]}
     >
       <Text
-       
+
         style={[styles.chipText, { color: active ? t.pillText : t.textSecondary }]}
       >
         {label}

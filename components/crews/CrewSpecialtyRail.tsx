@@ -84,7 +84,7 @@ function SpecialtyChip({
         ]}
       >
         <Text
-         
+
           style={[
             styles.label,
             {

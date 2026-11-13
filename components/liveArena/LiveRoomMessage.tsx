@@ -282,7 +282,7 @@ export function LiveRoomMessage({
             <View style={[styles.connector, { backgroundColor: t.borderStrong }]} />
             <View style={[styles.quote, { backgroundColor: softFill(t), borderColor: t.border }]}>
               <Text
-               
+
                 numberOfLines={2}
                 style={[styles.quoteText, { color: t.textMuted }]}
               >
@@ -453,7 +453,7 @@ export function LiveRoomMessage({
                   {reply.author?.name ?? 'Someone'}
                 </Text>
                 <Text
-                 
+
                   numberOfLines={3}
                   style={[styles.nestedBody, { color: t.textSecondary }]}
                 >

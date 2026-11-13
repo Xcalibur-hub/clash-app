@@ -21,7 +21,9 @@ import { LiveRoomAtmosphere } from '../../../components/liveArena/LiveRoomAtmosp
 import { LiveRoomComposer } from '../../../components/liveArena/LiveRoomComposer';
 import { LiveRoomEmptyFloor } from '../../../components/liveArena/LiveRoomEmptyFloor';
 import { LiveRoomEventBanner } from '../../../components/liveArena/LiveRoomEventBanner';
-import { LiveRoomHeader } from '../../../components/liveArena/LiveRoomHeader';
+import { ClashHeader } from '../../../components/arena/ClashHeader';
+import { VerdictRegion } from '../../../components/arena/VerdictRegion';
+import { ActionRegion } from '../../../components/arena/ActionRegion';
 import { LiveRoomJudgingPanel } from '../../../components/liveArena/LiveRoomJudgingPanel';
 import { DuelRoomOutcome } from '../../../components/liveArena/DuelRoomOutcome';
 import { DuelRoomExperience } from '../../../components/liveArena/DuelRoomExperience';
@@ -867,22 +869,36 @@ function RoomScope(): React.JSX.Element {
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
       <LiveRoomAtmosphere topicId={room.topicId} hood={room.topic.hood} />
-      <LiveRoomHeader
-        room={room}
-        paddingTop={insets.top}
-        roomIndex={roomIndex ?? 0}
-        presence={presence}
-        debaterCount={backup.load?.debaterCount ?? null}
-        spectatorCount={backup.load?.spectatorCount ?? null}
-        scrollY={scrollY}
+      {/*
+        Canonical clash header.
+
+        Replaces the previous room header, whose single run-on meta line carried
+        phase, room number, fighter count, spectator count and the clock at
+        identical weight — so the phase, which decides what the viewer may
+        actually do, was the easiest thing on screen to miss. The phase is now a
+        written headline, the proposition sits in the editorial voice, and the
+        sides are named before the argument uses them.
+
+        Every value is read from `room`; nothing here is computed for effect.
+      */}
+      <ClashHeader
+        proposition={room.topic.title}
+        phase={room.status}
+        role={room.viewer?.role ?? 'spectator'}
+        roomLabel={roomIndex ? `Room ${roomIndex}` : undefined}
+        audienceLine={
+          backup.load
+            ? `${backup.load.debaterCount ?? 0} arguing · ${backup.load.spectatorCount ?? 0} watching`
+            : `${presence} here`
+        }
+        clock={
+          room.secondsRemaining > 0
+            ? `${Math.floor(room.secondsRemaining / 60)}:${String(room.secondsRemaining % 60).padStart(2, '0')}`
+            : null
+        }
         onBack={() => {
           if (router.canGoBack()) router.back();
           else router.replace('/(tabs)');
-        }}
-        onPulsePress={() => {
-          setPulseOpen(true);
-          analytics.track('room_pulse_opened', { realm: 'arena' });
-          void loadPulse();
         }}
       />
 
@@ -922,6 +938,36 @@ function RoomScope(): React.JSX.Element {
             removeClippedSubviews={Platform.OS === 'android'}
             ListHeaderComponent={
               <>
+                {/*
+                  The verdict at display weight, above the transcript.
+
+                  `LiveRoomResultReveal` already renders the outcome, but as a
+                  card whose headline was three uppercase labels at kicker size.
+                  The result is the reason anybody stayed in the room, so it also
+                  gets this region: one serif statement of who won, the split as a
+                  single bar, and the viewer's own reward — before the arguments
+                  that produced it.
+
+                  Both read the same `room.result`; nothing is computed here. The
+                  region is skipped entirely when the server has not returned a
+                  winning side (a cancelled room), rather than showing a fake 50/50.
+                */}
+                {room.result ? (
+                  <VerdictRegion
+                    winningSide={room.result.winningSide}
+                    splitA={
+                      room.result.agreeVotes + room.result.disagreeVotes > 0
+                        ? room.result.agreeVotes /
+                          (room.result.agreeVotes + room.result.disagreeVotes)
+                        : null
+                    }
+                    stanceA="Agree"
+                    stanceB="Disagree"
+                    detail={`${room.result.participantCount.toLocaleString()} participated · ${
+                      room.result.agreeVotes + room.result.disagreeVotes
+                    } judgements cast`}
+                  />
+                ) : null}
                 <LiveRoomResultReveal
                   result={room.result}
                   stats={stats}
@@ -1012,6 +1058,45 @@ function RoomScope(): React.JSX.Element {
             ) : (
               <View style={styles.flex} />
             )}
+            {/*
+              The permitted action, stated before the composer.
+
+              This is the region the room was missing: a spectator could not tell
+              from the screen whether they should pick a side, wait, or never join,
+              and a fighter in FINAL_ARGUMENTS had no cue that the phase had
+              changed under them. It reads the same `room` the composer does and
+              renders nothing when there is nothing to do — the composer and the
+              join bar below remain the actual controls, so this adds hierarchy
+              without taking over behaviour.
+            */}
+            {!settled && !isDuel ? (
+              <ActionRegion
+                phase={room.status}
+                role={room.viewer?.role ?? 'spectator'}
+                signedIn={room.viewer !== null}
+                mayJudge={room.viewer?.role === 'debater' && room.viewer?.hasSideVote !== true}
+                hasNextClash={false}
+                reason={
+                  room.status === 'FINAL_ARGUMENTS' && room.viewer?.role !== 'debater'
+                    ? 'Fighters make the closing argument. You can still react.'
+                    : null
+                }
+                busy={sending || joining || voting}
+                onPress={(action) => {
+                  hapticTap();
+                  if (action === 'join_side') {
+                    setJoinOpen(true);
+                    return;
+                  }
+                  if (action === 'vote') {
+                    // Scrolls nowhere: the judging panel is mounted in `bottom`
+                    // for fighters. The haptic is the acknowledgement.
+                    return;
+                  }
+                  setComposerFocus((n) => n + 1);
+                }}
+              />
+            ) : null}
             <View style={{ paddingBottom: keyboardOpen ? space.sm : Math.max(insets.bottom, space.sm) }}>
               {isDebater && accepting && !isDuel ? (
                 <View style={styles.backupBar}>

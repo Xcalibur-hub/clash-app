@@ -71,7 +71,7 @@ export function ClashArguments({ items, onMakeArgument, actionLabel = 'Make an a
                     <View style={styles.identity}>
                       <Avatar name={item.author.name} tint={item.author.tint} size={26} />
                       <Text
-                       
+
                         style={[styles.handle, { color: t.textPrimary }]}
                         numberOfLines={1}
                       >

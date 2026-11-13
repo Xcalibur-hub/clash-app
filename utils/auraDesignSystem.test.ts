@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { accent, duel, gradient } from '../theme/colors.ts';
-import { family, typeScale } from '../theme/typeRamp.ts';
+import { buildTypeScale, family, resolveFontStacks, typeScale } from '../theme/typeRamp.ts';
 import { darkTheme, lightTheme } from '../theme/palettes.ts';
 import { arenaSidesForTheme } from '../theme/arenaSides.ts';
 
@@ -138,6 +138,54 @@ describe('AURA typography voice', () => {
     assert.equal(typeScale.editorial.fontFamily, family.serif);
     assert.equal(typeScale.button.fontFamily, family.semibold);
     assert.equal(typeScale.body.fontFamily, family.regular);
+  });
+
+  /**
+   * Regression guard for Phase 1 blocker 7.
+   *
+   * The assertion above is self-consistency only: both sides came from the same
+   * frozen `family` object, so it passed while the ramp was stuck on the generic
+   * `'serif'` fallback. These assertions exercise the real resolution instead.
+   */
+  it('resolves real platform serif names rather than the generic fallback', () => {
+    assert.equal(resolveFontStacks('ios').serif, 'New York');
+    assert.equal(resolveFontStacks('android').serif, 'serif');
+    assert.equal(resolveFontStacks('ios').mono, 'Menlo');
+    assert.equal(resolveFontStacks('android').systemSans, 'sans-serif');
+  });
+
+  it('builds every ramp step from the stacks it is given', () => {
+    const resolved = buildTypeScale({
+      regular: 'R',
+      medium: 'M',
+      semibold: 'S',
+      bold: 'B',
+      mono: 'MONO',
+      serif: 'SERIF',
+    });
+    for (const step of Object.entries(resolved)) {
+      const [name, value] = step as [string, { fontFamily?: string }];
+      assert.ok(
+        ['R', 'M', 'S', 'B', 'MONO', 'SERIF'].includes(String(value.fontFamily)),
+        `${name} kept a non-injected font family: ${String(value.fontFamily)}`,
+      );
+    }
+    assert.equal(resolved.display.fontFamily, 'SERIF');
+    assert.equal(resolved.data.fontFamily, 'MONO');
+  });
+
+  it('never leaves a ramp step on the generic serif fallback on iOS', () => {
+    const iosStacks = resolveFontStacks('ios');
+    const iosRamp = buildTypeScale({
+      regular: family.regular,
+      medium: family.medium,
+      semibold: family.semibold,
+      bold: family.bold,
+      mono: iosStacks.mono,
+      serif: iosStacks.serif,
+    });
+    assert.equal(iosRamp.displayLg.fontFamily, 'New York');
+    assert.notEqual(iosRamp.displayLg.fontFamily, 'serif');
   });
 
   it('keeps the scale ordered from display down to caption', () => {

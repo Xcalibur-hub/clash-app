@@ -64,7 +64,7 @@ export function LiveEvidenceCard({
         </Text>
         {evidence.author ? (
           <Text
-           
+
             numberOfLines={1}
             style={[styles.by, { color: t.textMuted }]}
           >
@@ -74,7 +74,7 @@ export function LiveEvidenceCard({
       </View>
 
       <Text
-       
+
         numberOfLines={3}
         style={[styles.title, { color: t.textPrimary }]}
       >

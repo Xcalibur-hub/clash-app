@@ -41,7 +41,7 @@ export function ClashNativeStickerCard({
         </Text>
       ) : null}
       <Text
-       
+
         style={[
           styles.label,
           compact && styles.labelSm,

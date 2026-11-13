@@ -59,7 +59,7 @@ export function CommunityActionSheet({
                 style={[styles.row, { borderColor: t.border }]}
               >
                 <Text
-                 
+
                   style={[styles.rowLabel, { color: action.destructive ? t.danger : t.textPrimary }]}
                 >
                   {action.label}

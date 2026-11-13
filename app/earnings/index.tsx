@@ -148,7 +148,7 @@ export default function CreatorEarningsHome(): React.JSX.Element {
         ) : summary ? (
           <>
             <Text
-             
+
               style={[styles.heroAmount, { color: t.textPrimary }]}
               accessibilityRole="header"
             >

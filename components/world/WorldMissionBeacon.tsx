@@ -44,7 +44,7 @@ export function WorldMissionBeacon({
           THIS WEEK
         </Text>
         <Text
-         
+
           style={[styles.title, { color: t.textPrimary }]}
           numberOfLines={1}
         >

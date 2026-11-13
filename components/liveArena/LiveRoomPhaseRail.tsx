@@ -52,7 +52,7 @@ export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX
           <View style={styles.step}>
             <View style={[styles.dot, { backgroundColor: 'transparent', borderColor: t.borderStrong }]} />
             <Text
-             
+
               style={[styles.label, { color: t.textMuted, fontWeight: '600' }]}
             >
               Closed
@@ -68,7 +68,7 @@ export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX
   return (
     <View style={styles.wrap} accessibilityLiveRegion="polite" accessibilityLabel={phaseAnnouncement(status)}>
       <Text
-       
+
         style={[
           styles.caption,
           { color: urgent ? t.textPrimary : t.textMuted },
@@ -113,7 +113,7 @@ export function LiveRoomPhaseRail({ status }: LiveRoomPhaseRailProps): React.JSX
                   ) : null}
                 </View>
                 <Text
-                 
+
                   style={[
                     styles.label,
                     {

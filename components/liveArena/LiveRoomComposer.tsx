@@ -351,7 +351,7 @@ export function LiveRoomComposer({
               <ActivityIndicator size="small" color={t.textMuted} />
             ) : (
               <Text
-               
+
                 style={[styles.count, { color: remaining <= 40 ? t.accent : t.textMuted }]}
               >
                 {remaining}

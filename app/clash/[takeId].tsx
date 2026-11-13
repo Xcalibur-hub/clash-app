@@ -262,6 +262,7 @@ export default function ClashScreen(): React.JSX.Element {
     return (
       <View style={[styles.root, { backgroundColor: t.background, paddingTop: insets.top + space.md }]}>
         <EmptyState
+          variant="error"
           icon={ArenaIcon}
           title="Couldn't load this Clash."
           body="Check your connection and try again."

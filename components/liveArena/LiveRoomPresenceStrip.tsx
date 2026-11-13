@@ -34,7 +34,7 @@ export function LiveRoomPresenceStrip({
           <View key={person.id} style={styles.chip}>
             <Avatar name={person.name} tint={person.avatarTint} size={30} />
             <Text
-             
+
               style={[styles.label, { color: person.isViewer ? t.textPrimary : t.textMuted }]}
               numberOfLines={1}
             >

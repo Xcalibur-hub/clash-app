@@ -128,7 +128,7 @@ export const WorldChapter = React.memo(function WorldChapter({
                     MASTERCLASS
                   </Text>
                   <Text
-                   
+
                     style={[styles.courseTitle, { color: t.textPrimary }]}
                     numberOfLines={2}
                   >

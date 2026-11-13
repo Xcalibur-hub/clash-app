@@ -88,12 +88,26 @@ export function LiveRoomHeader({
             ? 'Live clash'
             : roomStatusLabel(room.status);
 
+  /**
+   * Collapse the detail block as the list scrolls.
+   *
+   * Phase 1 blocker 4: this interpolated `maxHeight` between a hardcoded 140 and
+   * 0. That is a fixed height by another name — with OS text scaling on (the AURA
+   * default) the title, meta line and role chip routinely exceed 140dp, and the
+   * excess was clipped with no affordance to reveal it. A short English title
+   * happened to fit; a long one or a large text setting silently lost content.
+   *
+   * The collapse is now driven by `translateY` and opacity on a container that is
+   * free to be as tall as its content, so nothing is ever cut: the block slides
+   * and fades out of the way as you scroll, which is the effect the fixed
+   * maxHeight was imitating.
+   */
   const detailStyle = useAnimatedStyle(() => {
-    if (reduced || !scrollY) return { opacity: 1, maxHeight: 140 };
+    if (reduced || !scrollY) return { opacity: 1, transform: [{ translateY: 0 }] };
     const y = Math.max(0, scrollY.value);
     return {
       opacity: interpolate(y, [0, 64], [1, 0], Extrapolation.CLAMP),
-      maxHeight: interpolate(y, [0, 64], [140, 0], Extrapolation.CLAMP),
+      transform: [{ translateY: interpolate(y, [0, 64], [0, -12], Extrapolation.CLAMP) }],
     };
   });
 
@@ -113,8 +127,9 @@ export function LiveRoomHeader({
           <BackIcon size={20} color={t.textPrimary} strokeWidth={2.2} />
         </Pressable>
         <Text
-         
-          numberOfLines={2}
+          // Was `numberOfLines={2}`: at a large OS text size a long challenge
+          // title was truncated with no way to read the rest. A room header is
+          // the one place the full title has to be available.
           style={[styles.title, { color: t.textPrimary }]}
         >
           {room.topic.title}
@@ -271,5 +286,7 @@ const styles = StyleSheet.create({
     paddingLeft: 28,
     paddingRight: 4,
   },
-  detail: { gap: space.sm, overflow: 'hidden', paddingLeft: 28 },
+  // No `overflow: 'hidden'` and no height bound: the block may be as tall as
+  // its scaled content (blocker 4). The slide/fade does the hiding instead.
+  detail: { gap: space.sm, paddingLeft: 28 },
 });

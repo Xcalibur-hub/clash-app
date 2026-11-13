@@ -115,7 +115,7 @@ export function ClashCountdown({
 
     return (
       <Text
-       
+
         style={[styles.compact, { color: tone }]}
         accessibilityLiveRegion="polite"
         accessibilityLabel={status}

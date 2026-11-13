@@ -33,7 +33,7 @@ export function WorldContentRow({
           {kind}
         </Text>
         <Text
-         
+
           numberOfLines={1}
           style={[styles.title, { color: t.textPrimary }]}
         >

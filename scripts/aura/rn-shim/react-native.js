@@ -44,7 +44,18 @@ const StyleSheet = {
 module.exports = {
   View: el('View'),
   Text: el('Text'),
-  Pressable: el('Pressable'),
+  /**
+   * Pressable accepts a *function* for `style` (`({pressed}) => style`). RN
+   * resolves it at render; the naive `el('Pressable')` passed the function
+   * straight to the DOM, which threw. Resolving it with `pressed: false` is the
+   * correct static equivalent — it yields the resting style, which is what a
+   * markup probe wants anyway (it cannot simulate a press).
+   */
+  Pressable: React.forwardRef(function Pressable(props, ref) {
+    const { style, ...rest } = props;
+    const resolved = typeof style === 'function' ? style({ pressed: false }) : style;
+    return React.createElement('Pressable', { ...rest, style: resolved, ref });
+  }),
   ScrollView: el('ScrollView'),
   Image: el('Image'),
   ActivityIndicator: el('ActivityIndicator'),

@@ -135,7 +135,7 @@ export function CrewProfileHeader({
             {chips.map((chip) => (
               <Text
                 key={chip}
-               
+
                 style={[styles.chip, { color: t.textSecondary, borderColor: t.border }]}
               >
                 {chip}

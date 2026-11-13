@@ -211,14 +211,14 @@ export function AiStudio(): React.JSX.Element {
               style={[styles.knowledge, { borderColor: t.border, backgroundColor: t.surface }]}
             >
               <Text
-               
+
                 style={[styles.rowTitle, { color: t.textPrimary }]}
                 numberOfLines={1}
               >
                 {entry.title}
               </Text>
               <Text
-               
+
                 style={[styles.rowMeta, { color: t.textMuted }]}
                 numberOfLines={2}
               >

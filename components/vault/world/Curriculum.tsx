@@ -44,7 +44,7 @@ export const Curriculum = React.memo(function Curriculum({
           </Text>
           <View style={styles.body}>
             <Text
-             
+
               style={[styles.title, { color: item.locked ? t.textMuted : t.textPrimary }]}
               numberOfLines={2}
             >

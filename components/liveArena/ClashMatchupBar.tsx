@@ -54,7 +54,7 @@ function DuelMatchup({
           <React.Fragment key={side}>
             {index === 1 ? (
               <Text
-               
+
                 style={[styles.duelVs, stage && { marginTop: metrics.vsMarginTop, fontSize: 13 }, { color: t.textMuted }]}
                 accessibilityLabel="versus"
               >
@@ -95,7 +95,7 @@ function DuelMatchup({
                   @{fighter.handle}
                 </Text>
                 <Text
-                 
+
                   style={[styles.duelSideLabel, { color: t.textMuted }]}
                 >
                   Fighter {side}

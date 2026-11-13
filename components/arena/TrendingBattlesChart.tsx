@@ -186,7 +186,7 @@ export function TrendingBattlesChart({
 
       {caption ? (
         <Text
-         
+
           style={[styles.earlyNote, { color: t.textMuted }]}
           accessibilityLiveRegion="polite"
         >
@@ -329,7 +329,7 @@ export function TrendingBattlesChart({
           {scrubLeaders.map((row) => (
             <Text
               key={row.topicId}
-             
+
               style={[styles.scrubRow, { color: t.textSecondary }]}
               numberOfLines={1}
             >
