@@ -507,7 +507,7 @@ console.log('\n[12] cross-file function resolution (catches a typo a parser cann
     'ConvertFrom-Json', 'ConvertTo-Json', 'ForEach-Object', 'Get-ChildItem', 'Get-Command',
     'Get-Date', 'Join-Path', 'New-Item', 'New-Object', 'Out-Null', 'Remove-Item',
     'Resolve-Path', 'Select-Object', 'Set-StrictMode', 'Sort-Object', 'Split-Path',
-    'Test-Path', 'Where-Object', 'Write-Host',
+    'Test-Path', 'Where-Object', 'Write-Host', 'Group-Object',
   ]);
   const allPs = [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1'];
   const codeAll = allPs.map((f) => psLex(read(join(CLOUD, f))).code).join('\n');
@@ -653,10 +653,13 @@ console.log('\n[15] self-test integrity - a dropped or crashed case cannot pass 
   check('the receipt is validated before it is written',
     selfTest.indexOf('$selfCheck = Test-SelfTestReceipt') > 0 &&
     selfTest.indexOf('$selfCheck = Test-SelfTestReceipt') < selfTest.indexOf('$sha = Write-EvidenceJson'));
+  const writeAt = selfTest.indexOf('$sha = Write-EvidenceJson');
+  const validateAt = selfTest.indexOf('$selfCheck = Test-SelfTestReceipt');
+  const rebuildAt = selfTest.indexOf('$doc = New-SelfTestDocument -Verdict $verdictValue', validateAt);
   check('a rejected run cannot leave a PASS receipt on disk',
+    validateAt > 0 && validateAt < writeAt && rebuildAt > validateAt && rebuildAt < writeAt &&
     /receipt rejected by the gate validator/.test(selfTest) &&
-    /\$doc = New-SelfTestDocument -Verdict \$verdictValue/.test(selfTest) &&
-    selfTest.indexOf("$verdictValue = 'FAIL'\n  $doc = New-SelfTestDocument") > 0);
+    /if \(\$null -ne \$selfCheck -and -not \$selfCheck\.ok\)/.test(selfTest));
   check('what landed on disk must match the run',
     /receiptConsistent/.test(selfTest) && /does not match the run/.test(selfTest));
   check('both consumers validate the receipt',
@@ -708,6 +711,104 @@ console.log('\n[15] self-test integrity - a dropped or crashed case cannot pass 
     check(`validator rejects: ${name}`, validate(d).length > 0);
   }
 }
+console.log('\n[16] inventory integrity - flat, unique, exact (Round 5)');
+{
+  const libNames = [...lib.match(/ClashSelfTestRequiredCases = @\(([\s\S]*?)\n\)/)[1].matchAll(/'([A-Za-z][A-Za-z0-9]*)'/g)].map((m) => m[1]);
+
+  // --- the defect: a unary comma wraps the array in a one-item shell ---------
+  // scan CODE: the fix documents the old construct in a comment, and a grep over
+  // raw text would flag the explanation instead of the implementation
+  const libCode = psLex(lib).code;
+  check('the inventory getter does not use a unary comma',
+    !/return\s*,\s*@/.test(libCode) && !/,\s*@\(\$script:ClashSelfTestRequiredCases\)/.test(libCode));
+  check('detector fires on the Round 5 construct', /return\s*,\s*@/.test('return ,@($script:ClashSelfTestRequiredCases)'));
+  check('the getter builds an explicit flat list',
+    /New-Object System.Collections.Generic.List\[string\]/.test(lib) && /\$flat\.ToArray\(\)/.test(lib));
+
+  // --- the inventory itself --------------------------------------------------
+  check('exactly 18 declared case names', libNames.length === 18, `${libNames.length}`);
+  check('all names are non-empty identifiers', libNames.every((n) => n.length > 0 && /^[A-Za-z][A-Za-z0-9]*$/.test(n)));
+  check('no duplicate case names', new Set(libNames).size === libNames.length);
+
+  // --- the harness asserts 18 before spawning anything ----------------------
+  const harnessCount = Number((selfTest.match(/-ExpectedCount 18/)?.[0] || '').replace(/\D/g, ''));
+  check('the harness asserts exactly 18', harnessCount === 18 && harnessCount === libNames.length);
+  const inventoryAt = selfTest.indexOf('Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 18');
+  const firstSpawnAt = selfTest.indexOf('Invoke-NativeProcess -FilePath');
+  const firstCaseAt = selfTest.indexOf("Add-Case 'zeroExitWithStderr'");
+  check('the inventory gate runs before any child process',
+    inventoryAt > 0 && inventoryAt < firstSpawnAt && inventoryAt < firstCaseAt);
+  check('a malformed inventory exits 1 with a non-PASS receipt',
+    inventoryAt > 0 && selfTest.indexOf('SELF-TEST REFUSED: the case inventory is malformed', inventoryAt) > inventoryAt &&
+    selfTest.indexOf("verdict           = 'FAIL'", inventoryAt) > inventoryAt &&
+    selfTest.indexOf('exit 1', inventoryAt) > inventoryAt);
+
+  // --- the same validator, exercised on a matrix ----------------------------
+  // mirrors Assert-SelfTestInventory: strings only, no nesting, unique, exact count
+  const validateInventory = (names, expected = 18) => {
+    const problems = [];
+    if (!Array.isArray(names) || names.length === 0) return ['empty'];
+    names.forEach((n, i) => {
+      if (n === null || n === undefined) problems.push(`null@${i}`);
+      else if (typeof n !== 'string') problems.push(`nested@${i}:${Array.isArray(n) ? 'array' : typeof n}`);
+      else if (n.trim() === '') problems.push(`empty@${i}`);
+      else if (n !== n.trim()) problems.push(`whitespace@${i}`);
+    });
+    const strings = names.filter((n) => typeof n === 'string');
+    const dupes = strings.filter((n, i) => strings.indexOf(n) !== i);
+    if (dupes.length) problems.push('duplicate:' + dupes.join(','));
+    if (strings.length !== expected) problems.push(`count:${strings.length}!=${expected}`);
+    const unknown = strings.filter((n) => !libNames.includes(n));
+    if (unknown.length) problems.push('unknown:' + unknown.join(','));
+    const missing = libNames.filter((n) => !strings.includes(n));
+    if (missing.length) problems.push('missing:' + missing.join(','));
+    return problems;
+  };
+  check('validator accepts the real inventory', validateInventory(libNames).length === 0,
+    validateInventory(libNames).join(','));
+  const cases = {
+    'nested one-item array (the Round 5 shape)': [libNames.slice()],
+    'nested at depth two': [libNames.slice(), libNames.slice()],
+    'single name': [libNames[0]],
+    'duplicate name': [...libNames.slice(0, 17), libNames[0]],
+    'blank name': [...libNames.slice(0, 17), '   '],
+    'null entry': [...libNames.slice(0, 17), null],
+    'non-string entry': [...libNames.slice(0, 17), 18],
+    'unknown name': [...libNames.slice(0, 17), 'inventedCase'],
+    'one short': libNames.slice(0, 17),
+    'one extra': [...libNames, 'extraCase'],
+    'empty inventory': [],
+  };
+  for (const [name, value] of Object.entries(cases)) {
+    check(`inventory validator rejects: ${name}`, validateInventory(value).length > 0);
+  }
+
+  // --- dictionary / serialization handling ---------------------------------
+  check('serialization is wrapped, not left to the trap',
+    /receipt serialization failed/.test(selfTest) &&
+    /catch \{[\s\S]{0,400}serializationError/.test(selfTest));
+  check('a serialization failure writes a FAIL document',
+    /serializationError = \$serializationError/.test(selfTest) &&
+    /cases             = @\{\}/.test(selfTest));
+  check('the refusal and failure receipts are non-PASS', (selfTest.match(/verdict\s*=\s*'FAIL'/g) || []).length >= 2);
+  check('the receipt validator checks the declared inventory too',
+    /declaredCheck = Assert-SelfTestInventory/.test(lib) && /declared inventory invalid/.test(lib));
+  check('the receipt validator rejects nested case entries',
+    /is not a record/.test(lib));
+
+  // a nested case entry inside an otherwise valid receipt must be rejected
+  const nestedReceipt = {
+    adapterId: 'clash-native-adapter', adapterVersion: '4.0.0', adapterSha256: 'a'.repeat(64),
+    powerShellVersion: '5.1.26100.9818', verdict: 'PASS', casesExecuted: 18,
+    problems: [], cases: Object.fromEntries(libNames.map((n) => [n, { passed: true }])),
+  };
+  nestedReceipt.cases[libNames[3]] = [{ passed: true }];
+  const nestedProblem = Object.entries(nestedReceipt.cases)
+    .some(([, v]) => Array.isArray(v) || typeof v !== 'object');
+  check('fixture: a nested case entry is detectable',
+    nestedProblem && /is not a record/.test(lib));
+}
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`${pass} passed, ${failures.length} failed`);
 // machine-readable contract for tools/run-tests.ps1: a launcher must not have to

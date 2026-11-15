@@ -117,6 +117,41 @@ $script:outFileFinal = $OutFile
 
 $requiredCases = @(Get-ClashSelfTestInventory)
 
+# Round 5: the inventory must be exactly 18 unique, non-empty strings, and that
+# is asserted before a single child process is started. A malformed inventory
+# (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 18
+if (-not $inventoryCheck.ok) {
+  $reasons = @()
+  foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
+  Write-Host 'SELF-TEST REFUSED: the case inventory is malformed. No child process was started.' -ForegroundColor Red
+  foreach ($line in $reasons) { Write-Host ('  - ' + $line) -ForegroundColor Red }
+  $observed = @()
+  foreach ($entry in @($requiredCases)) {
+    if ($entry -is [string]) { $observed += $entry }
+    elseif ($null -eq $entry) { $observed += '<null>' }
+    else { $observed += ('<' + $entry.GetType().Name + '>') }
+  }
+  $refusal = [ordered]@{
+    verdict           = 'FAIL'
+    utc               = (Get-Date).ToUniversalTime().ToString('o')
+    host              = $env:COMPUTERNAME
+    powerShellVersion = $script:psVersionFinal
+    adapterId         = $script:ClashAdapterId
+    adapterVersion    = $script:ClashAdapterVersion
+    adapterSha256     = $script:adapterShaFinal
+    casesExecuted     = 0
+    casesExpected     = 18
+    cases             = @{}
+    problems          = $reasons
+    inventoryObserved = $observed
+    refusal           = 'inventory validation failed before any child process'
+  }
+  [void](Write-EvidenceOrFallback -Path $OutFile -Label 'adapter-selftest-refused.json' -Text ($refusal | ConvertTo-Json -Depth 6))
+  $script:receiptWritten = $true
+  exit 1
+}
+
 # --------------------------------------------------------------- harness ----
 function New-CaseRecord {
   param([string]$Name, [bool]$Passed, $Detail = $null)
@@ -533,12 +568,38 @@ function New-SelfTestDocument {
 }
 
 $doc = New-SelfTestDocument -Verdict $verdictValue
-$roundTripDoc = ($doc | ConvertTo-Json -Depth 8) | ConvertFrom-Json
-$selfCheck = Test-SelfTestReceipt -Document $roundTripDoc -AdapterSha256 $script:adapterShaFinal
-if (-not $selfCheck.ok) {
+$selfCheck = $null
+try {
+  $roundTripDoc = ($doc | ConvertTo-Json -Depth 8) | ConvertFrom-Json
+  $selfCheck = Test-SelfTestReceipt -Document $roundTripDoc -AdapterSha256 $script:adapterShaFinal
+}
+catch {
+  # A serialization failure must not escape as an unexplained stack trace, and it
+  # must never leave a PASS receipt behind: fall back to a minimal FAIL document.
+  $serializationError = 'unknown'
+  try { $serializationError = Protect-Text $_.Exception.Message } catch { }
+  $script:problems += ('receipt serialization failed: ' + $serializationError)
+  $verdictValue = 'FAIL'
+  $selfCheck = [ordered]@{ ok = $false; problems = @('serialization failed') }
+  $doc = [ordered]@{
+    verdict           = 'FAIL'
+    utc               = (Get-Date).ToUniversalTime().ToString('o')
+    host              = $env:COMPUTERNAME
+    powerShellVersion = $script:psVersionFinal
+    adapterId         = $script:ClashAdapterId
+    adapterVersion    = $script:ClashAdapterVersion
+    adapterSha256     = $script:adapterShaFinal
+    casesExecuted     = @($script:cases.Keys).Count
+    casesExpected     = $requiredCases.Count
+    cases             = @{}
+    problems          = @($script:problems)
+    serializationError = $serializationError
+  }
+}
+if ($null -ne $selfCheck -and -not $selfCheck.ok) {
   foreach ($p in @($selfCheck.problems)) { $script:problems += ('receipt rejected by the gate validator: ' + $p) }
   $verdictValue = 'FAIL'
-  $doc = New-SelfTestDocument -Verdict $verdictValue
+  if (-not $doc.Contains('serializationError')) { $doc = New-SelfTestDocument -Verdict $verdictValue }
 }
 
 $dir = Split-Path -Parent $OutFile

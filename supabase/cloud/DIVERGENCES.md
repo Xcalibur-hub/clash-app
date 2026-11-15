@@ -208,6 +208,23 @@ produced by earlier versions are rejected rather than reinterpreted.
 
 ---
 
+## D-8 - The self-test inventory is flat and validated (Round 5)
+
+`Get-ClashSelfTestInventory` returned `,@($script:ClashSelfTestRequiredCases)`.
+The unary comma produces a one-element wrapper, and a caller capturing the value
+twice (a second `@()`, a parameter binding, a JSON round-trip) can end up with a
+nested array: one inventory item instead of 18, every case name rejected, and a
+serialization failure further on.
+
+It now returns an explicitly built flat `string[]`. `Assert-SelfTestInventory`
+rejects nesting, dictionaries, nulls, blanks, duplicates, unknown names, and any
+count other than 18; the harness runs it before starting any child process, and
+`Test-SelfTestReceipt` runs it on both the declared inventory and the receipt's
+case names. Receipt serialization is wrapped, so a failure produces a minimal
+FAIL document and exit 1 instead of an unexplained exception.
+
+---
+
 ## No other divergences
 
 | Pattern | Files | Executable? |

@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill. The runner proceeds only when the ledger is a **proven prefix** of the manifest — same versions *and* same stored hashes; any gap, mismatch or extra row is a hard stop |
-| **F9** no tests | none | `tests/verify-package.mjs`: **214 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **241 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 238 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 214 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 241 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -103,6 +103,22 @@ count disagreement), contradictory (FAIL verdict, non-empty `problems`) or bound
 to another adapter. The adapter version moved to `4.0.0`, so every receipt issued
 before this correction is rejected by version.
 
+### 1e. Round 5 (audit of `3f2e816`) - flat inventory
+
+`tools/lib/clash-native.ps1` returned the inventory as `return ,@(...)`. The unary
+comma emits a one-element wrapper whose element is the array, so a caller that
+captures the result a second time can hold a nested array: the harness sees one
+inventory item instead of 18, rejects every legitimate case name, and can fail
+while serialising.
+
+| Correction | Detail |
+|---|---|
+| flat return | the getter builds a `List[string]` and returns `.ToArray()`; no unary comma anywhere, and a detector forbids `return ,@` in code |
+| one inventory | `Assert-SelfTestInventory` is called by the harness, by `Test-SelfTestReceipt` on the **declared** list, and on the **receipt's** names |
+| asserted before children | the harness validates exactly 18 unique, non-empty strings *before* spawning any process; failure writes a FAIL receipt and exits 1 |
+| shape rejection | nested arrays, dictionaries, nulls, blanks, duplicates, unexpected names, short/extra inventories |
+| serialization | the receipt's `ConvertTo-Json`/`ConvertFrom-Json` round-trip is wrapped; a failure downgrades to a minimal FAIL document rather than escaping as a stack trace |
+
 Still unproven, and stated as such: the four scripts have **never run**, the SQL
 gates have **never run against the hosted database**, and the ledger/CLI
 interoperability is **documented, not executed**.
@@ -127,7 +143,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, proof-based resume
-tests/verify-package.mjs       offline test suite (214 assertions)
+tests/verify-package.mjs       offline test suite (241 assertions)
 checksums.sha256               238 files: originals + every package file
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

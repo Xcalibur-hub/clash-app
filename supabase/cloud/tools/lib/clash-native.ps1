@@ -488,8 +488,66 @@ $script:ClashSelfTestRequiredCases = @(
   'validatorRejectsTamperedReceipt'
 )
 
+# Returns a FLAT sequence of case-name strings.
+#
+# Round 5 defect: this used to be 'return ,@(...)'. The unary comma emits a
+# one-element wrapper whose element is the array, so a caller that captures the
+# result a second time (another @(), a pipeline, a JSON round-trip) can end up
+# holding a nested array: the harness then sees 1 inventory item instead of 18,
+# rejects every legitimate case name, and can fail later while serialising.
+# A flat array is the only shape this function may produce.
 function Get-ClashSelfTestInventory {
-  return ,@($script:ClashSelfTestRequiredCases)
+  $flat = New-Object System.Collections.Generic.List[string]
+  foreach ($name in $script:ClashSelfTestRequiredCases) { [void]$flat.Add([string]$name) }
+  return $flat.ToArray()
+}
+
+# Validates an inventory: non-empty strings only, no nested collections, no
+# duplicates, exact count, and nothing outside the declared list. Used by the
+# harness before it spawns any child process, by the receipt validator, and by
+# the offline tests.
+function Assert-SelfTestInventory {
+  param(
+    $Names,
+    [int]$ExpectedCount = 0
+  )
+  $problems = @()
+  $declared = @($script:ClashSelfTestRequiredCases)
+  if ($ExpectedCount -le 0) { $ExpectedCount = $declared.Count }
+
+  $items = @($Names)
+  if ($items.Count -eq 0) {
+    return [ordered]@{ ok = $false; problems = @('inventory is empty'); count = 0; expected = $ExpectedCount }
+  }
+
+  for ($i = 0; $i -lt $items.Count; $i++) {
+    $item = $items[$i]
+    if ($null -eq $item) { $problems += ('entry {0} is null' -f $i); continue }
+    if ($item -isnot [string] -and $item -is [System.Collections.IEnumerable]) {
+      $problems += ('entry {0} is a nested {1}, not a case name' -f $i, $item.GetType().Name)
+      continue
+    }
+    if ($item -is [System.Collections.IDictionary]) {
+      $problems += ('entry {0} is a dictionary, not a case name' -f $i)
+      continue
+    }
+    $text = [string]$item
+    if ([string]::IsNullOrWhiteSpace($text)) { $problems += ('entry {0} is empty' -f $i); continue }
+    if ($text -ne $text.Trim()) { $problems += ('entry {0} has surrounding whitespace' -f $i) }
+  }
+
+  $strings = @($items | Where-Object { $_ -is [string] } | ForEach-Object { [string]$_ })
+  $dupes = @($strings | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+  if ($dupes.Count -gt 0) { $problems += ('duplicate case names: ' + ($dupes -join ', ')) }
+  if ($strings.Count -ne $ExpectedCount) {
+    $problems += ('inventory holds {0} usable name(s), expected {1}' -f $strings.Count, $ExpectedCount)
+  }
+  $unknown = @($strings | Where-Object { $declared -notcontains $_ })
+  if ($unknown.Count -gt 0) { $problems += ('names outside the declared inventory: ' + ($unknown -join ', ')) }
+  $missing = @($declared | Where-Object { $strings -notcontains $_ })
+  if ($missing.Count -gt 0) { $problems += ('declared names absent from the inventory: ' + ($missing -join ', ')) }
+
+  return [ordered]@{ ok = ($problems.Count -eq 0); problems = $problems; count = $strings.Count; expected = $ExpectedCount }
 }
 
 # StrictMode 2.0 turns a missing property into a terminating error, and a
@@ -545,6 +603,12 @@ function Test-SelfTestReceipt {
     return [ordered]@{ ok = $false; problems = @('receipt is empty') }
   }
 
+  # the declared inventory itself must be valid before it is used to judge a receipt
+  $declaredCheck = Assert-SelfTestInventory -Names (Get-ClashSelfTestInventory)
+  if (-not $declaredCheck.ok) {
+    foreach ($p in @($declaredCheck.problems)) { $problems += ('declared inventory invalid: ' + $p) }
+  }
+
   $adapterId  = [string](Get-DocumentProperty -Object $Document -Name 'adapterId' -Default '')
   $adapterVer = [string](Get-DocumentProperty -Object $Document -Name 'adapterVersion' -Default '')
   $receiptSha = [string](Get-DocumentProperty -Object $Document -Name 'adapterSha256' -Default '')
@@ -580,6 +644,17 @@ function Test-SelfTestReceipt {
     $problems += 'receipt records no cases'
   }
   else {
+    $nameCheck = Assert-SelfTestInventory -Names $names -ExpectedCount $required.Count
+    if (-not $nameCheck.ok) {
+      foreach ($p in @($nameCheck.problems)) { $problems += ('receipt case names: ' + $p) }
+    }
+    foreach ($name in $required) {
+      $entry = Get-CaseEntry -Cases $cases -Name $name
+      if ($null -eq $entry) { continue }
+      if ($entry -is [string] -or ($entry -is [System.Collections.IEnumerable] -and $entry -isnot [System.Collections.IDictionary])) {
+        $problems += ("case '{0}' is not a record" -f $name)
+      }
+    }
     $missing = @($required | Where-Object { $names -notcontains $_ })
     if ($missing.Count -gt 0) {
       $problems += ('receipt is missing {0} case(s): {1}' -f $missing.Count, ($missing -join ', '))
