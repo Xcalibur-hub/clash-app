@@ -1,145 +1,131 @@
-# DIVERGENCES — cloud deployment, project `kgaqejgubjemdecifzew`
+# DIVERGENCES — cloud package for `kgaqejgubjemdecifzew`
 
 Source commit: `9569391e0950956682c522d2d118bc8a711169d2`
-Package generated from checkout: `0cd6c36aa4831cda115c293b74ba2bf98c6d22df`
 
-**Rule for this package:** every file under `supabase/migrations/` is applied
-byte-for-byte, with exactly one exception — file 13. This document is the
-authoritative record of that exception. No original file is edited, renamed,
-moved or deleted, and no migration is recorded as applied unless its SQL (or
-its documented variant) actually executed.
+Three recorded divergences: one substitution (D-1), one mechanical
+normalisation (D-2) and one retraction of an earlier claim of mine (D-3).
+No file under `supabase/migrations/` is edited, renamed or moved.
 
 ---
 
-## D-1 — `20260927030000_clash_scheduler.sql` (index 13 of 111)
+## D-1 — file 13 `20260927030000_clash_scheduler.sql` is substituted
 
 | Field | Value |
 |---|---|
-| Original path | `supabase/migrations/20260927030000_clash_scheduler.sql` |
-| Original size | 3 415 bytes / 67 lines |
-| Original sha256 | see `manifest.json` → `entries[12].sha256` |
-| Original ledger status | **DIVERGED — NOT APPLIED** |
-| Variant path | `supabase/cloud/migrations/20260927030000_clash_scheduler__cloud_nocron.sql` |
-| Variant sha256 | see `manifest.json` → `entries[12].variantSha256` |
-| Executed on cloud | **the variant only** |
+| Original | `supabase/migrations/20260927030000_clash_scheduler.sql` (3 415 bytes) |
+| Original sha256 | `manifest.json` → `entries[12].sha256` |
+| Original status | **NOT APPLIED** — executed identity recorded as the variant |
+| Executed source | `supabase/cloud/migrations/20260927030000_clash_scheduler__cloud_nocron.sql` |
+| Executed sha256 | `manifest.json` → `entries[12].normalizedSha256` |
+| Ledger `name` | `clash_scheduler__cloud_nocron` |
+| Ledger `statements[1]` | `sha256:<hash of the variant text>` — verifies what ran, not what was skipped |
 
 ### Why
 
-The original §1 runs:
-
-```sql
-do $$
-begin
-  execute 'create extension if not exists pg_cron';
-exception when others then
-  raise notice 'pg_cron could not be enabled here: %', sqlerrm;
-end $$;
-```
-
-It assumes the platform refuses the extension and the handler quietly absorbs
-the refusal. **On this project the platform does not refuse.** Verified from
-`pg_settings` (read-only):
+The original §1 runs `execute 'create extension if not exists pg_cron'` inside an
+`exception when others` block, assuming the platform refuses. It does not:
 
 ```
-supautils.privileged_extensions            → … pg_cron, postgis, pgcrypto …
+supautils.privileged_extensions            → … pg_cron …
 supautils.privileged_extensions_superuser  → supabase_admin
-supautils.extensions_parameter_overrides   → {"pg_cron":{"schema":"pg_catalog"}}
 ```
 
-`pg_cron` is a **privileged extension**, so `postgres` may install it. The
-exception handler never fires, `cron.schedule(text,text,text)` comes into
-existence, the §3 guard passes, and the job is created:
+pg_cron is privileged, so the extension installs, §3's guard passes and
+`clash-maintenance` is scheduled `* * * * *` → `public.run_maintenance(500)`
+every 60 seconds. Because `run_maintenance` is redefined by eight later
+migrations, that job keeps running the newest definition while fixtures and
+acceptance tests are in progress.
 
-```
-clash-maintenance | '* * * * *' | select public.run_maintenance(500)
-```
-
-That executes `run_maintenance(500)` **every 60 seconds**. Worse,
-`run_maintenance` is redefined by eight later migrations
-(`20260926170000`, `20260928040000`, `20260928120000`, `20260928130000`,
-`20261002150100`, `20261004150000`, `20261005130300`, `20261005140000`), so the
-job would keep executing the newest definition and would sweep Clashes, expire
-Takes and prune rate-limit history *during* fixture seeding and acceptance
-testing — silently invalidating the evidence those tests exist to produce.
-
-A post-deployment cron check is insufficient: the first sweep can run before an
-operator looks. The hazard is therefore removed **by construction**, not
-detected afterwards.
-
-### Exact comparison — nothing else changed
+### Exact comparison
 
 | Original lines | Content | In variant |
 |---|---|---|
-| 1–28 | Header comment block | **Replaced** by a cloud-specific header that names the base file and the reason |
-| 30–36 | §1 `do $$ … create extension if not exists pg_cron … $$;` | **Removed** |
-| 38–43 | §2 comment + two `REVOKE` statements | **Preserved verbatim** (the two statements; the comment is paraphrased into the variant header) |
-| 45–67 | §3 `do $$ … cron.schedule(…) … $$;` | **Removed** |
+| 1–28 | header comment | replaced by a cloud-specific header naming the base file |
+| 30–36 | §1 pg_cron install | **removed** |
+| 38–43 | §2 two REVOKEs | **preserved byte-identically** (verified by test) |
+| 45–67 | §3 schedule block | **removed** |
 
-Added (not present in the original):
+Added: a fail-closed guard that raises if `cron.schedule` or schema `cron`
+already exists, and a post-condition re-asserting pg_cron is still absent.
+Nothing else is lost: both REVOKE targets are created in file 6, and the same
+revokes are re-asserted by eight later migrations. No pgTAP test asserts the job.
 
-- a **fail-closed guard** that raises if `cron.schedule` or schema `cron` already
-  exists — so if pg_cron ever appears, this step aborts loudly instead of
-  silently skipping;
-- a **post-condition** re-asserting that pg_cron is still absent.
+### Ledger honesty
 
-### What is preserved, and why omitting §1/§3 loses nothing else
+Recording the version is what prevents `db push` from replaying the original.
+That is not a false claim *because* the ledger simultaneously records the
+variant as the executed identity (`name` + sha256 of the executed text), the
+variant's bytes are committed, and `90_verify.sql` check 6 fails closed unless
+the name is exactly `clash_scheduler__cloud_nocron`. An earlier package version
+stored `statements = null` here; the audit correctly rejected that as
+indistinguishable from "the original ran", and it has been replaced by the
+sha256 token above.
 
-- §2's two REVOKEs target functions created in
-  `20260926170000_production_hardening.sql` (file 6, earlier in the chain), so
-  they are valid at index 13. Confirmed by grep, not assumed.
-- The same two revokes are **re-asserted by eight later migrations**, so the
-  maintenance surface is server-only regardless of file 13.
-- The scheduler is the *only* thing lost. On this environment that is the
-  intent: acceptance must run against a database where nothing sweeps in the
-  background.
-- No pgTAP test asserts the cron job's existence (`grep -rln "cron.job|
-  clash-maintenance" supabase/tests/` → no matches), so no test suite breaks.
+---
 
-### Ledger honesty (see §4 of the package README)
+## D-2 — two migrations are normalised before wrapping (F2)
 
-`supabase_migrations.schema_migrations` is keyed by **version timestamp only**.
-The CLI compares *only* timestamps, so suppressing a future replay of the
-original requires the version `20260927030000` to be present in the ledger.
-Recording that version while executing variant text is a divergence, not a
-false claim — **provided** the ledger row's `name` records what ran, the
-variant's sha256 is archived in evidence, and this file exists. All three hold:
+| Version | File | Own `begin;` | Own `commit;` |
+|---|---|---|---|
+| `20261023130000` | `meet_rpc_permission_hardening.sql` | line 4 | line 31 |
+| `20261023140000` | `meet_private_typing.sql` | line 3 | line 87 |
 
-- ledger `name` for that version: `clash_scheduler__cloud_nocron`
-- ledger `statements` for that version: `null` (backfill shape), deliberately
-  overwriting what `repair` copies out of the local file
-- variant SQL archived under `evidence/<run>/03-divergence/`
-- this document, referenced by `manifest.json` → `entries[12].mode = "diverged"`
+Each wrapper must own exactly one transaction so the ledger insert commits with
+the migration. A file that opens and closes its own transaction would commit
+early and leave the ledger write outside it.
 
-**Why the overwrite is mandatory.** `supabase migration repair --status applied`
-populates `name` and `statements` from the local file at
-`supabase/migrations/<version>_<name>.sql`. For this version that file is the
-original scheduler — so an unmodified repair would write the *original's*
-statements into the ledger as though they had executed. `backfill-ledger.ps1`
-runs the annotation unconditionally after every repair, and exits non-zero if it
-cannot, because a ledger row misattributing D-1 is exactly the false record this
-package exists to prevent.
+**Transformation:** standalone lines matching `^\s*(begin|commit)\s*;\s*$` are
+removed. Nothing else is touched — comments, `notify pgrst,'reload schema'`,
+and every DDL statement are preserved in order. The wrapper supplies `begin;`
+and `commit;`.
 
-### Residual hazard
+**Recorded, not hidden:** `manifest.json` marks both entries
+`normalisation: "strip-begin-commit"`, and their ledger identity token is the
+sha256 of the *normalised* text (what actually executed). The originals remain
+byte-identical on disk and are verified by `check-manifest.ps1`.
 
-Because the original's version IS in the ledger after backfill, `db push` will
-not replay it. But if anyone ever runs `supabase migration repair --status
-reverted 20260927030000` — or drops the ledger — the next `db push` applies the
-**original** and installs pg_cron. `README.md` lists this as STOP condition S7.
+`tests/verify-package.mjs` asserts that exactly these two needed normalisation
+and that their wrappers contain no second top-level `begin;`.
+
+---
+
+## D-3 — correction: migration 4 DOES create the Storage buckets and policies
+
+My earlier package claimed migration 4 skips its Storage section on hosted
+projects, and shipped a `10_storage_bootstrap.sql` to compensate. **That was
+wrong**, and the Codex audit was right.
+
+The actual guard in `20260926150000_media_storage.sql` is:
+
+```sql
+if to_regclass('storage.buckets') is null or to_regclass('storage.objects') is null then
+  raise notice '… skipping bucket+policy bootstrap (local reset; restored by seed/config)';
+  return;
+end if;
+
+insert into storage.buckets … on conflict (id) do nothing;
+create policy "media objects are publicly readable" …   -- and four more
+```
+
+It returns early only when the Storage tables are **missing** (a local-reset
+race). On hosted Supabase the tables always exist, so migration 4 creates both
+buckets and all five policies.
+
+**Remediation (F4):** `storage/10_storage_bootstrap.sql` is **deleted**. The
+package now performs **no Storage writes of its own** — asserted by the test
+suite over every hand-written SQL file. Configuration is verified instead, in
+`verify/95_storage_config.sql` (bucket count, public flags, 100 MB limit, 8-entry
+MIME allowlist, five named `storage.objects` policies).
 
 ---
 
 ## No other divergences
 
-Verified by exhaustive grep across all 111 files:
-
-| Pattern | Files matched | Executable? |
+| Pattern | Files | Executable? |
 |---|---|---|
-| `create extension` | `20260928130000` (postgis), `20260930110000` (pgcrypto), `20261004120000` (pgcrypto), `20260927030000` (pg_cron) | postgis **already installed** → no-op; pgcrypto trusted → allowed; pg_cron → **excluded (D-1)** |
-| `cron.schedule` / `cron.unschedule` / `cron.job` | `20260927030000` only | excluded (D-1) |
-| `pg_cron` (any form) | `20260926170000:366-367`, `20260928020000:13`, `20260928040000:11`, `20261002150100:2261`, `20261022120000:22,208` | **all inside `--` comments** — no execution |
-| `alter table realtime.*` / `alter table storage.*` | none | — |
+| `create extension` | `20260928130000` (postgis — already installed), `20260930110000` + `20261004120000` (pgcrypto, trusted), `20260927030000` (pg_cron) | pg_cron excluded by D-1; the rest no-op |
+| `cron.schedule` / `cron.unschedule` / `cron.job` | `20260927030000` only | excluded by D-1 |
+| `pg_cron` mentions elsewhere | `20260926170000:366-367`, `20260928020000:13`, `20260928040000:11`, `20261002150100:2261`, `20261022120000:22,208` | all inside `--` comments |
+| `alter table realtime.*` / `storage.*` | none | — |
 | `alter system` / `create role` / `create database` | none | — |
-
-The one non-migration divergence — Storage buckets and policies, which
-migration 4 deliberately skips on hosted projects — is handled by
-`storage/10_storage_bootstrap.sql` and documented there.
+| `CONCURRENTLY` | none | every wrapper is safely transactional |
