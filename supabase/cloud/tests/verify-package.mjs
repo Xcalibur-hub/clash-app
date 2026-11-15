@@ -360,7 +360,13 @@ check('credential-bearing arguments are refused before spawn', /Assert-NoCredent
 
 hdr(7, 'checksums');
 if (existsSync(join(CLOUD, 'checksums.sha256'))) {
-  const lines = read(join(CLOUD, 'checksums.sha256')).trim().split('\n');
+  // Round 11: split on /\r?\n/, not on '\n'. On a Windows checkout git may hand
+  // this file back with CRLF (it carries no eol attribute); splitting on '\n'
+  // then leaves a trailing '\r' on every path, existsSync() sees a filename that
+  // does not exist, and all 240 entries report as corrupt. The file contents were
+  // always normalised (nsha/lf); only the list itself was not. Found by the
+  // windows-2022 gate, invisible on Linux.
+  const lines = read(join(CLOUD, 'checksums.sha256')).trim().split(/\r?\n/);
   const bad = lines.filter((l) => {
     const [h, p] = l.split('  ');
     return !existsSync(join(ROOT, p)) || nsha(join(ROOT, p)) !== h;

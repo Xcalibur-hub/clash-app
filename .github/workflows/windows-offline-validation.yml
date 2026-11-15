@@ -249,8 +249,14 @@ jobs:
           foreach ($f in @(Get-ChildItem -Path 'supabase/cloud/evidence' -Filter '*-manifest-check.json' -File -ErrorAction SilentlyContinue)) {
           $d = [System.IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json; $level = 'error'; if ([string]$d.status -eq 'PASS') { $level = 'notice' };
           $lines += ($level + '|manifest receipt status=' + $d.status + ' entries=' + $d.entries + ' checksumFiles=' + $d.checksumFiles + ' problems=' + ((@($d.problems)) -join ' | ')) };
+          $sumPath = 'supabase/cloud/checksums.sha256';
+          if (Test-Path -LiteralPath $sumPath) { $t = [System.IO.File]::ReadAllText($sumPath);
+          $rows = @($t -split [char]10 | Where-Object { $_ -match '\S' });
+          $lines += ('notice|checksum file lines=' + $rows.Count + ' crlfPairs=' + ([regex]::Matches($t, '\r\n')).Count) };
           if ($lines.Count -eq 0) { $lines += 'error|no receipts were written at all: treat as FAIL, never as unknown' };
-          foreach ($l in $lines) { $parts = $l.Split('|'); Write-Host ('::' + $parts[0] + '::CLASH-EVIDENCE ' + ($parts[1] -replace '\r?\n', ' ')) } }
+          foreach ($l in $lines) { $i = $l.IndexOf('|'); $level = $l.Substring(0, $i);
+          $message = $l.Substring($i + 1) -replace '\r?\n', ' ';
+          Write-Host ('::' + $level + '::CLASH-EVIDENCE ' + $message) } }
           catch { Write-Host ('::error::CLASH-EVIDENCE-READER ' + ($_.Exception.Message -replace '\r?\n', ' ')) }"
 
       - name: Upload diagnostic evidence (no secrets are produced or uploaded)
