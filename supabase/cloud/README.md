@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **323 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **344 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 323 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 344 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -176,6 +176,21 @@ The adapter is `4.1.0` and the native self-test is 24 cases (was 18). Its receip
 must be regenerated before `deploy.ps1` will run: an old receipt is bound to the
 old adapter hash and is refused.
 
+### 1h. Round 9 (audit of `52b50a6`) - fail-closed ledger parsing
+
+| # | Defect | Fix |
+|---|---|---|
+| B1 (critical) | both tools parsed the ledger with `if ($parts.Count -ge 2) { $ledger[$k] = $v }`. Every other nonblank row was dropped silently, so an unparseable listing became an EMPTY ledger and the fresh-only gate passed | one shared parser, `ConvertFrom-ClashLedgerOutput`, used by the runner and by `check-ledger.ps1`: exactly two fields, a 14-digit version that exists in the manifest, a `sha256:<64 hex>` identity, no duplicate version, no stray output, and an empty listing when the table is absent. Any problem stops the runner **before step 0 creates a table** |
+| B2 | with the ledger table ABSENT, `check-ledger.ps1` skipped the branch that assigns the query result and then read it under StrictMode, so the receipt crashed instead of recording a clean-empty ledger | the ledger-query result starts as `$null`; the branch-dependent receipt fields come from `New-LedgerAuditFields`, which records the presence probe that actually ran and marks the ledger query `not issued: table absent` |
+| B3 | `Get-PgSqlState` existed but neither command builder requested verbose diagnostics, so a normal ERROR line carried no SQLSTATE | both add `-v VERBOSITY=verbose`; claim collisions and probe failures now record a real state |
+| - | step 0 used `if not exists` and never checked the keys of a pre-existing table | after step 0 the runner reads `pg_constraint` and requires exactly `ledger=version;claim=claim_key` |
+| - | claim release accepted exit 0 without proving which row was removed | release uses `delete … returning run_id` and requires **exactly one** returned row equal to this run's id |
+| - | stale-claim instructions did not require proving the previous writer was gone | `ROLLBACK.md` T1.1 now demands an `pg_stat_activity` check, evidence for the abandoned run, a `check-ledger.ps1` verdict and a single-row `RETURNING` delete |
+
+Adapter `4.2.0` (was `4.1.0`), native self-test 26 cases (was 24): both additions
+execute the real parser and the real receipt-field builder, so a malformed
+listing or an ABSENT ledger is exercised in PowerShell, not just in JavaScript.
+
 Still unproven, and stated as such: the four scripts have **never run**, the SQL
 gates have **never run against the hosted database**, and the ledger/CLI
 interoperability is **documented, not executed**.
@@ -200,7 +215,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (323 assertions)
+tests/verify-package.mjs       offline test suite (344 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

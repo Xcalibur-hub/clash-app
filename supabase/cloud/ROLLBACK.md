@@ -76,14 +76,60 @@ key, receives SQLSTATE `23505`, and stops before executing anything. The claim i
 deleted only after postflight passes.
 
 A crashed run therefore leaves a claim behind, and the next run stops with
-`03c-writer-claim-stop.json`. That is deliberate: it forces someone to look at the
-evidence before reusing the project. Clearing it is a manual, reviewed action:
+`03c-writer-claim-stop.json` or `06-claim-release-ownership-stop.json`. That is
+deliberate: it forces someone to look at the evidence before reusing the project.
 
-```sql
--- Only after the evidence for the abandoned run has been read and the database
--- state is understood. This deletes a coordination row, nothing else.
-delete from supabase_migrations.clash_deploy_claim where claim_key = 'clash-cloud-deploy';
-```
+Clearing a claim is a **manual, reviewed action** and it requires proof that the
+previous writer is inactive. A claim row is not evidence of a crash any more than
+its absence is evidence of a finished run.
+
+**Required proof, recorded in the evidence directory, before any deletion:**
+
+1. **Identify the abandoned run.** The claim's `run_id` and `started_utc` name it:
+
+   ```sql
+   select claim_key, run_id, started_utc from supabase_migrations.clash_deploy_claim;
+   ```
+
+   Find the matching `evidence/<stamp>-attempt-<n>/` directory, read
+   `00-baseline.json` … `99-runner-exception.json`, and confirm which version
+   stopped it. Do not continue if that directory is missing.
+
+2. **Prove no writer is active.** Nothing may be running against this database
+   from the deployment user, and no other session may be holding work:
+
+   ```sql
+   select pid, state, backend_start, query_start, left(coalesce(query, ''), 80) as query
+     from pg_stat_activity
+    where datname = current_database()
+      and pid <> pg_backend_pid();
+   ```
+
+   Every row must be `state = 'idle'` (or the result must be empty). A row in
+   `active`, `idle in transaction` or any other state means a backend may still
+   commit - **stop, do not delete the claim**, and investigate.
+
+3. **Confirm the ledger matches the note.** `check-ledger.ps1` must be run first
+   and its verdict recorded. An `EMPTY` or `CONSISTENT` verdict is the only
+   starting point; `PROBLEM` or `PARTIAL_PREFIX` means the database state is not
+   understood yet.
+
+4. **Delete exactly one row, and record it.** The delete must be filtered by the
+   claim key *and* the abandoned run id, and must return exactly one row:
+
+   ```sql
+   delete from supabase_migrations.clash_deploy_claim
+    where claim_key = 'clash-cloud-deploy'
+      and run_id = '<run_id from step 1>'
+   returning run_id;
+   ```
+
+   Zero rows returned means the row is not the one you inspected: stop and redo
+   step 1. More than one row is impossible under the primary key and means the
+   table is not the one this package created.
+
+Nothing in this package performs steps 1–4, and no report from this package
+authorises them.
 
 ## T2 — Discard and recreate (after any doubt)
 

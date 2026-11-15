@@ -120,7 +120,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 18 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 24
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 26
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -141,7 +141,7 @@ if (-not $inventoryCheck.ok) {
     adapterVersion    = $script:ClashAdapterVersion
     adapterSha256     = $script:adapterShaFinal
     casesExecuted     = 0
-    casesExpected     = 24
+    casesExpected     = 26
     cases             = @{}
     problems          = $reasons
     inventoryObserved = $observed
@@ -654,6 +654,73 @@ Add-Case 'sqlStateExtracted' (
   legacy  = $stateLegacy
   missing = $stateMissing
   textOnly = $stateWrong
+}
+
+# ---- 25: the real ledger parser rejects malformed output (Round 9 B1) ------
+$parserEntries = @(
+  [pscustomobject]@{ version = '20260101000000'; normalizedSha256 = ('1' * 64) },
+  [pscustomobject]@{ version = '20260101000100'; normalizedSha256 = ('2' * 64) })
+$goodRow1 = '20260101000000|sha256:' + ('1' * 64)
+$goodRow2 = '20260101000100|sha256:' + ('2' * 64)
+$parseGood    = ConvertFrom-ClashLedgerOutput -Text ($goodRow1 + "`n" + $goodRow2 + "`n") -Entries $parserEntries
+$parseOnlyBad = ConvertFrom-ClashLedgerOutput -Text 'UNEXPECTED_NONEMPTY_LEDGER_OUTPUT' -Entries $parserEntries
+$parseMixed   = ConvertFrom-ClashLedgerOutput -Text ($goodRow1 + "`n" + 'garbage row' + "`n") -Entries $parserEntries
+$parseFields  = ConvertFrom-ClashLedgerOutput -Text '20260101000000|sha256:' -Entries $parserEntries
+$parseExtraField = ConvertFrom-ClashLedgerOutput -Text ($goodRow1 + '|extra') -Entries $parserEntries
+$parseDuplicate  = ConvertFrom-ClashLedgerOutput -Text ($goodRow1 + "`n" + $goodRow1) -Entries $parserEntries
+$parseBadVersion = ConvertFrom-ClashLedgerOutput -Text ('2026-01-01|sha256:' + ('1' * 64)) -Entries $parserEntries
+$parseUnknown    = ConvertFrom-ClashLedgerOutput -Text ('20990101000000|sha256:' + ('1' * 64)) -Entries $parserEntries
+$parseNullToken  = ConvertFrom-ClashLedgerOutput -Text '20260101000000|<null>' -Entries $parserEntries
+$parseBadToken   = ConvertFrom-ClashLedgerOutput -Text '20260101000000|sha256:xyz' -Entries $parserEntries
+$parseBlanks     = ConvertFrom-ClashLedgerOutput -Text ("`n`n  `n") -Entries $parserEntries
+$parseAbsentGarbage = ConvertFrom-ClashLedgerOutput -Text 'something' -Entries $parserEntries -TableAbsent $true
+Add-Case 'ledgerParserRejectsMalformedOutput' (
+  $parseGood.ok -and $parseGood.rows -eq 2 -and $parseGood.ledger.Count -eq 2 -and
+  -not $parseOnlyBad.ok -and @($parseOnlyBad.problems).Count -ge 1 -and
+  -not $parseMixed.ok -and @($parseMixed.problems).Count -ge 1 -and
+  -not $parseFields.ok -and -not $parseExtraField.ok -and
+  -not $parseDuplicate.ok -and @($parseDuplicate.duplicates).Count -eq 1 -and
+  -not $parseBadVersion.ok -and -not $parseUnknown.ok -and
+  -not $parseNullToken.ok -and -not $parseBadToken.ok -and
+  -not $parseAbsentGarbage.ok -and
+  $parseBlanks.ok -and $parseBlanks.rows -eq 0) @{
+  goodRows          = $parseGood.rows
+  onlyGarbage       = $parseOnlyBad.ok
+  mixed             = $parseMixed.ok
+  twoFields         = $parseFields.ok
+  threeFields       = $parseExtraField.ok
+  duplicateReported = @($parseDuplicate.duplicates)
+  badVersion        = $parseBadVersion.ok
+  unknownVersion    = $parseUnknown.ok
+  nullToken         = $parseNullToken.ok
+  blankLines        = $parseBlanks.ok
+}
+
+# ---- 26: ABSENT and PRESENT receipt fields both resolve (Round 9 B2) -------
+$stubPresenceAbsent = [pscustomobject]@{ exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''; stdOut = 'ABSENT'; stdErr = '' }
+$stubPresencePresent = [pscustomobject]@{ exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''; stdOut = 'PRESENT'; stdErr = '' }
+$stubLedger = [pscustomobject]@{ exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''; stdOut = ($goodRow1 + "`n" + $goodRow2); stdErr = '' }
+$stubCheck = Get-LedgerVerdict -Entries $parserEntries -Ledger $parseGood.ledger
+$absentFields = New-LedgerAuditFields -PresenceResult $stubPresenceAbsent -LedgerResult $null `
+                  -PresenceText 'ABSENT' -TableAbsent $true -Parse $parseBlanks -Check $null
+$presentFields = New-LedgerAuditFields -PresenceResult $stubPresencePresent -LedgerResult $stubLedger `
+                  -PresenceText 'PRESENT' -TableAbsent $false -Parse $parseGood -Check $stubCheck
+Add-Case 'absentAndPresentBranchesRecordActualResult' (
+  $absentFields.ledgerQuery -eq 'not issued: table absent' -and
+  $absentFields.nativeOutcome -eq 'SUCCEEDED' -and
+  $absentFields.presenceOutcome -eq 'SUCCEEDED' -and
+  $absentFields.exitCode -eq 0 -and $absentFields.rowsParsed -eq 0 -and
+  $absentFields.verdict -eq 'UNREADABLE' -and
+  $presentFields.ledgerQuery -eq 'issued' -and
+  $presentFields.rowsParsed -eq 2 -and
+  $presentFields.verdict -eq 'CONSISTENT' -and
+  $presentFields.parseOk -eq $true -and
+  @($presentFields.parseProblems).Count -eq 0) @{
+  absentQuery   = $absentFields.ledgerQuery
+  absentOutcome = $absentFields.nativeOutcome
+  absentRows    = $absentFields.rowsParsed
+  presentRows   = $presentFields.rowsParsed
+  presentVerdict = $presentFields.verdict
 }
 
 # ===========================================================================

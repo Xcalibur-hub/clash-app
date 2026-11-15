@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.1.0'
+$script:ClashAdapterVersion = '4.2.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -301,6 +301,127 @@ function Get-PgSqlState {
   $m = [regex]::Match($Text, 'SQLSTATE:\s*([0-9A-Z]{5})')
   if ($m.Success) { return $m.Groups[1].Value }
   return ''
+}
+
+# Parses the ledger listing produced by:
+#   select version || '|' || coalesce(statements[1],'<null>') from ... order by version;
+#
+# Round 9 (B1): the callers used to do `if ($parts.Count -ge 2) { $ledger[$k]=$v }`
+# in a loop. Every other nonblank row was dropped without a trace - so a child that
+# printed garbage, an extra field or a repeated version produced an empty or
+# silently-shortened hashtable that the verdict then called EMPTY/PASS. This
+# function is the only parser; it either returns a complete, unique, validated
+# hashtable or it reports problems, and every caller must STOP on problems.
+#
+# Strictness contract:
+#   * nonblank rows must have exactly two '|' fields
+#   * the version must be 14 digits and must exist in the manifest
+#   * the identity must be sha256:<64 lowercase hex>; '<null>' is a missing identity
+#   * a repeated version is recorded, never overwritten
+#   * blank lines (and the trailing newline psql always emits) are ignored
+#   * when the table was reported absent, the listing must be empty
+function ConvertFrom-ClashLedgerOutput {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text,
+    [Parameter(Mandatory = $true)]$Entries,
+    [bool]$TableAbsent = $false
+  )
+
+  $expected = @{}
+  foreach ($e in @($Entries)) { $expected[[string]$e.version] = 'sha256:' + [string]$e.normalizedSha256 }
+
+  $ledger     = @{}
+  $problems   = New-Object System.Collections.Generic.List[string]
+  $badFields  = New-Object System.Collections.Generic.List[string]
+  $badVersions = New-Object System.Collections.Generic.List[string]
+  $unknownVersions = New-Object System.Collections.Generic.List[string]
+  $badTokens  = New-Object System.Collections.Generic.List[string]
+  $duplicates = New-Object System.Collections.Generic.List[string]
+  $rows = 0
+  $lineNo = 0
+
+  foreach ($raw in ($Text -split "`r?`n")) {
+    $lineNo++
+    if ([string]::IsNullOrWhiteSpace($raw)) { continue }
+    $line = $raw.TrimEnd()
+    $parts = $line.Split('|')
+    if ($parts.Count -ne 2) {
+      $problems.Add(('row {0}: expected 2 fields, found {1}: {2}' -f $lineNo, $parts.Count, (Protect-Text $line)))
+      $badFields.Add($lineNo)
+      continue
+    }
+    $version = $parts[0]
+    $token   = $parts[1]
+    if ($version -notmatch '^\d{14}$') {
+      $problems.Add(('row {0}: version is not a 14-digit timestamp: {1}' -f $lineNo, (Protect-Text $version)))
+      $badVersions.Add($lineNo)
+      continue
+    }
+    if (-not $expected.ContainsKey($version)) {
+      $problems.Add(('row {0}: version {1} is not in the manifest' -f $lineNo, $version))
+      $unknownVersions.Add($version)
+      continue
+    }
+    if ($token -eq '<null>' -or $token -notmatch '^sha256:[0-9a-f]{64}$') {
+      $problems.Add(('row {0}: identity for {1} is missing or malformed' -f $lineNo, $version))
+      $badTokens.Add($version)
+      continue
+    }
+    if ($ledger.ContainsKey($version)) {
+      $problems.Add(('row {0}: version {1} appears more than once' -f $lineNo, $version))
+      $duplicates.Add($version)
+      continue
+    }
+    $ledger[$version] = $token
+    $rows++
+  }
+
+  if ($TableAbsent -and -not [string]::IsNullOrWhiteSpace($Text)) {
+    $problems.Add('the ledger table was reported absent but the listing was not empty')
+  }
+
+  return [ordered]@{
+    ok              = ($problems.Count -eq 0)
+    rows            = $rows
+    ledger          = $ledger
+    problems        = @($problems)
+    badFields       = @($badFields)
+    badVersions     = @($badVersions)
+    unknownVersions = @($unknownVersions)
+    badTokens       = @($badTokens)
+    duplicates      = @($duplicates)
+    tableAbsent     = $TableAbsent
+  }
+}
+
+# Receipt fields for check-ledger.ps1. Round 9 (B2): the ABSENT branch never
+# assigned the ledger-query result, and the receipt then read it under StrictMode
+# and crashed. The actual presence result is recorded instead, and the ledger
+# query is explicitly marked 'not issued' rather than being invented.
+function New-LedgerAuditFields {
+  param(
+    $PresenceResult = $null,
+    $LedgerResult = $null,
+    [string]$PresenceText = '',
+    [bool]$TableAbsent = $false,
+    $Parse = $null,
+    $Check = $null
+  )
+  $native = $PresenceResult
+  if ($null -ne $LedgerResult) { $native = $LedgerResult }
+  return [ordered]@{
+    presenceText  = [string]$PresenceText
+    tableAbsent   = $TableAbsent
+    ledgerQuery   = $(if ($null -ne $LedgerResult) { 'issued' } else { 'not issued: table absent' })
+    nativeOutcome = (Get-NativeOutcomeLabel $native)
+    exitCode      = $(if ($null -ne $native) { $native.exitCode } else { $null })
+    presenceOutcome = (Get-NativeOutcomeLabel $PresenceResult)
+    rowsParsed    = $(if ($null -ne $Parse) { $Parse.rows } else { 0 })
+    parseOk       = $(if ($null -ne $Parse) { $Parse.ok } else { $false })
+    parseProblems = $(if ($null -ne $Parse) { @($Parse.problems) } else { @() })
+    verdict       = $(if ($null -ne $Check) { [string]$Check.verdict } else { 'UNREADABLE' })
+    verdictDetail = $(if ($null -ne $Check) { [string]$Check.why } else { '' })
+  }
 }
 
 # Ledger classification. A ledger is only meaningful as an exact chronological
@@ -632,7 +753,9 @@ $script:ClashSelfTestRequiredCases = @(
   'receiptFailureStops',
   'connectionLossIsUnknown',
   'incompleteCaptureIsUnknown',
-  'sqlStateExtracted'
+  'sqlStateExtracted',
+  'ledgerParserRejectsMalformedOutput',
+  'absentAndPresentBranchesRecordActualResult'
 )
 
 # Returns a FLAT sequence of case-name strings.

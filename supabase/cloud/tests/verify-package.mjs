@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 19;
-const EXPECTED_CASES = 24;
-const EXPECTED_ASSERTIONS = 323;
+const EXPECTED_SECTIONS = 20;
+const EXPECTED_CASES = 26;
+const EXPECTED_ASSERTIONS = 344;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -1232,6 +1232,143 @@ hdr(19, 'deployment recovery safety - R1-R4 adversarial regressions (Round 8)');
   check('the wrapper documents why the conflict must abort',
     /CONCURRENCY \(Round 8\)/.test(read(join(GEN, manifest.entries[0].wrapperPath))) &&
     /on conflict do nothing/.test(read(join(GEN, manifest.entries[0].wrapperPath))));
+}
+
+hdr(20, 'fail-closed ledger parsing, branch safety, SQLSTATE (Round 9)');
+{
+  const deployCode = read(join(CLOUD, 'tools/deploy.ps1'));
+  const ledgerTool = read(join(CLOUD, 'tools/check-ledger.ps1'));
+  const rollbackDoc = read(join(CLOUD, 'ROLLBACK.md'));
+  const bootstrap = read(join(CLOUD, 'generated/000_ledger_bootstrap.sql'));
+
+  // ------------------------------------------------------------------ B1 ----
+  // Specification mirror of ConvertFrom-ClashLedgerOutput.
+  const parseLedger = (text, entries, { tableAbsent = false } = {}) => {
+    const expected = new Map(entries.map((e) => [e.version, `sha256:${e.normalizedSha256}`]));
+    const problems = []; const ledger = new Map();
+    const duplicates = []; const unknownVersions = []; const badTokens = []; const badVersions = [];
+    let lineNo = 0; let rows = 0;
+    for (const raw of String(text).split(/\r?\n/)) {
+      lineNo += 1;
+      if (raw.trim() === '') continue;
+      const line = raw.replace(/\s+$/, '');
+      const parts = line.split('|');
+      if (parts.length !== 2) { problems.push(`row ${lineNo}: fields ${parts.length}`); continue; }
+      const [version, token] = parts;
+      if (!/^\d{14}$/.test(version)) { problems.push(`row ${lineNo}: version`); badVersions.push(version); continue; }
+      if (!expected.has(version)) { problems.push(`row ${lineNo}: unknown ${version}`); unknownVersions.push(version); continue; }
+      if (token === '<null>' || !/^sha256:[0-9a-f]{64}$/.test(token)) { problems.push(`row ${lineNo}: identity`); badTokens.push(version); continue; }
+      if (ledger.has(version)) { problems.push(`row ${lineNo}: duplicate ${version}`); duplicates.push(version); continue; }
+      ledger.set(version, token); rows += 1;
+    }
+    if (tableAbsent && String(text).trim() !== '') problems.push('absent but not empty');
+    return { ok: problems.length === 0, rows, ledger, problems, duplicates, unknownVersions, badTokens, badVersions };
+  };
+  const entries3 = ['1', '2', '3'].map((c, i) => ({ version: `2026010100000${i}`, normalizedSha256: c.repeat(64) }));
+  const row = (e) => `${e.version}|sha256:${e.normalizedSha256}`;
+  const good = [row(entries3[0]), row(entries3[1])].join('\n') + '\n';
+  const cases = [
+    ['valid listing with a trailing newline', good, true],
+    ['malformed-only output', 'UNEXPECTED_NONEMPTY_LEDGER_OUTPUT', false],
+    ['mixed valid and malformed', `${row(entries3[0])}\ngarbage\n`, false],
+    ['one field', '20260101000000|sha256:', false],
+    ['three fields', `${row(entries3[0])}|extra`, false],
+    ['duplicate version', `${row(entries3[0])}\n${row(entries3[0])}`, false],
+    ['version is not a timestamp', `2026-01-01|sha256:${'1'.repeat(64)}`, false],
+    ['version is not in the manifest', `20990101000000|sha256:${'1'.repeat(64)}`, false],
+    ['null identity', '20260101000000|<null>', false],
+    ['malformed identity', '20260101000000|sha256:xyz', false],
+    ['whitespace only', '\n\n   \n', true],
+  ];
+  const mismatches = cases.filter(([, text, expected]) => parseLedger(text, entries3).ok !== expected)
+    .map(([name]) => name);
+  check('B1 mirror: the parser accepts exactly the valid shapes and rejects every malformed one',
+    mismatches.length === 0, mismatches.join(','));
+  check('B1 mirror: a duplicate version is reported, never overwritten',
+    parseLedger(`${row(entries3[0])}\n${row(entries3[0])}`, entries3).duplicates.length === 1);
+  check('B1 mirror: garbage output cannot become an empty ledger',
+    (() => { const r = parseLedger('UNEXPECTED_NONEMPTY_LEDGER_OUTPUT', entries3); return !r.ok && r.rows === 0 && r.ledger.size === 0; })());
+  check('B1 mirror: an absent table with non-empty output is rejected',
+    !parseLedger('something', entries3, { tableAbsent: true }).ok &&
+    parseLedger('', entries3, { tableAbsent: true }).ok);
+
+  check('B1: the parser lives in the adapter and both tools use it',
+    /function ConvertFrom-ClashLedgerOutput/.test(lib) &&
+    /ConvertFrom-ClashLedgerOutput -Text \$led\.stdOut -Entries \$entries/.test(deployCode) &&
+    /ConvertFrom-ClashLedgerOutput -Text \$r\.stdOut -Entries \$entries/.test(ledgerTool));
+  check('B1: no tool splits ledger rows inline any more',
+    !/\$parts = \$line\.Split\('\|'\)/.test(deployCode) && !/\$p = \$line\.Split\('\|'\)/.test(ledgerTool) &&
+    !/\$parts\.Count -ge 2/.test(deployCode) && !/\$p\.Count -ge 2/.test(ledgerTool));
+  check('B1: a parse failure stops the runner before step 0 creates anything',
+    deployCode.indexOf('03-ledger-parse-stop.json') > 0 &&
+    deployCode.indexOf('03-ledger-parse-stop.json') < deployCode.indexOf('gate 3b: step 0'));
+  check('B1: a parse failure makes the read-only helper exit 1',
+    /\$ledgerParse\.ok\) \{[\s\S]{0,400}exit 1/.test(ledgerTool));
+  check('B1: the parser validates against the manifest, not against itself',
+    /ConvertFrom-ClashLedgerOutput \{[\s\S]{0,400}\$expected\[\[string\]\$e\.version\]/.test(lib) &&
+    /is not in the manifest/.test(lib));
+  check('B1: executed PowerShell tests exercise the real parser',
+    /^Add-Case 'ledgerParserRejectsMalformedOutput'/m.test(selfTest) &&
+    /ConvertFrom-ClashLedgerOutput -Text 'UNEXPECTED_NONEMPTY_LEDGER_OUTPUT'/.test(selfTest) &&
+    /parseMixed\.ok/.test(selfTest) && /parseDuplicate\.duplicates/.test(selfTest));
+
+  // ------------------------------------------------------------------ B2 ----
+  check('B2: the read-only helper never touches an unset ledger result',
+    /\$r = \$null/.test(ledgerTool) &&
+    !/\$r\.exitCode/.test(ledgerTool) &&
+    /-LedgerResult \$r/.test(ledgerTool) &&
+    /\$null -ne \$LedgerResult/.test(read(join(CLOUD, 'tools/lib/clash-native.ps1'))),
+    'the receipt reads $r only through New-LedgerAuditFields');
+  check('B2: the ABSENT branch records the probe it actually ran',
+    /New-LedgerAuditFields/.test(ledgerTool) && /function New-LedgerAuditFields/.test(lib) &&
+    /not issued: table absent/.test(lib) &&
+    /presenceOutcome/.test(read(join(CLOUD, 'tools/lib/clash-native.ps1'))));
+  check('B2: executed PowerShell tests cover both branches',
+    /^Add-Case 'absentAndPresentBranchesRecordActualResult'/m.test(selfTest) &&
+    /absentFields\.ledgerQuery/.test(selfTest) && /presentFields\.ledgerQuery/.test(selfTest));
+  // mirror: the builder must not read a ledger result that does not exist
+  const auditFields = (presence, ledgerResult, parse, check2) => ({
+    ledgerQuery: ledgerResult === null ? 'not issued: table absent' : 'issued',
+    rowsParsed: parse ? parse.rows : 0,
+    verdict: check2 ? check2.verdict : 'UNREADABLE',
+  });
+  check('B2 mirror: the absent branch produces a receipt without a ledger query',
+    auditFields({}, null, { rows: 0 }, null).ledgerQuery === 'not issued: table absent' &&
+    auditFields({}, null, { rows: 0 }, null).verdict === 'UNREADABLE' &&
+    auditFields({}, {}, { rows: 2 }, { verdict: 'CONSISTENT' }).ledgerQuery === 'issued');
+
+  // ------------------------------------------------------------------ B3 ----
+  const deployCommon = deployCode.match(/\$common = @\([^)]*\)/);
+  const ledgerCommon = ledgerTool.match(/\$common = @\([^)]*\)/);
+  check('B3: both command builders request verbose SQLSTATE diagnostics',
+    Boolean(deployCommon) && Boolean(ledgerCommon) &&
+    /VERBOSITY=verbose/.test(deployCommon[0]) && /VERBOSITY=verbose/.test(ledgerCommon[0]) &&
+    /ON_ERROR_STOP=1/.test(deployCommon[0]) && /ON_ERROR_STOP=1/.test(ledgerCommon[0]));
+  check('B3: the SQLSTATE extractor handles real verbose psql output',
+    (() => {
+      const verbose = 'ERROR:  23505: duplicate key value violates unique constraint "clash_deploy_claim_pkey"\n'
+        + 'DETAIL:  Key (claim_key)=(clash-cloud-deploy) already exists.\n'
+        + 'LOCATION:  _bt_check_unique, nbtinsert.c:666';
+      const m = verbose.match(/ERROR:\s+([0-9A-Z]{5}):/);
+      return m !== null && m[1] === '23505';
+    })());
+  check('B3: the self-test covers a verbose error with DETAIL and LOCATION',
+    /ERROR:  23505: duplicate key/.test(selfTest) || /sqlStateExtracted/.test(selfTest));
+
+  // ------------------------------------- claim and schema structure audit ----
+  check('the bootstrap declares both primary keys',
+    /version\s+text not null primary key/.test(bootstrap) &&
+    /claim_key\s+text not null primary key/.test(bootstrap));
+  check('a pre-existing table is verified structurally, not trusted by name',
+    /'ledger=version;claim=claim_key'/.test(deployCode) &&
+    /pg_constraint/.test(deployCode) && /contype = 'p'/.test(deployCode) &&
+    deployCode.indexOf("'ledger=version;claim=claim_key'") < deployCode.indexOf('gate 3c: exclusive writer claim'));
+  check('claim release proves ownership and exactly one deleted row',
+    /delete from supabase_migrations\.clash_deploy_claim[\s\S]{0,200}returning run_id/.test(deployCode) &&
+    /\$releasedRows\.Count -eq 1/.test(deployCode) &&
+    /06-claim-release-ownership-stop\.json/.test(deployCode));
+  check('stale-claim clearance requires proof the previous writer is inactive',
+    /pg_stat_activity/.test(rollbackDoc) && /inactive/i.test(rollbackDoc));
 }
 
 {

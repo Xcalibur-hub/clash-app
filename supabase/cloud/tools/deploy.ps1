@@ -306,7 +306,10 @@ if ($integrityProblems.Count -gt 0) {
   Stop-Run ("package integrity failed ({0} problem(s)): {1}" -f $integrityProblems.Count, (($integrityProblems | Select-Object -First 6) -join '; ')) '01-integrity-fail.json'
 }
 
-$common = @('-X', '-q', '-v', 'ON_ERROR_STOP=1')
+# Round 9 (B3): VERBOSITY=verbose makes psql put the SQLSTATE into every ERROR
+# line, so Get-PgSqlState has something real to extract for claim collisions and
+# probe failures. It changes error text only, never successful query output.
+$common = @('-X', '-q', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose')
 
 # --------------------------------------------------- gate 2: preflight SQL ---
 $pf = Invoke-NativeProcess -FilePath $psqlPath `
@@ -359,6 +362,7 @@ if ($presenceText -ne 'ABSENT' -and $presenceText -ne 'PRESENT') {
 $ledgerAbsent = ($presenceText -eq 'ABSENT')
 
 $ledger = @{}
+$ledgerParse = $null
 if (-not $ledgerAbsent) {
   $ledSql = "select version || '|' || coalesce(statements[1],'<null>') from supabase_migrations.schema_migrations order by version;"
   $led = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-t', '-A', '-c', $ledSql)) `
@@ -373,10 +377,27 @@ if (-not $ledgerAbsent) {
     Stop-Run ("could not read the migration ledger ({0}, sqlstate '{1}'): {2}" -f `
         (Get-NativeOutcomeLabel $led), (Get-PgSqlState $led.stdErr), (Get-NativeErrorExcerpt $led)) '03-ledger-fail.json'
   }
-  foreach ($line in ($led.stdOut -split "`r?`n")) {
-    if ([string]::IsNullOrWhiteSpace($line)) { continue }
-    $parts = $line.Split('|')
-    if ($parts.Count -ge 2) { $ledger[$parts[0]] = $parts[1] }
+  # Round 9 (B1): one strict parser for both tools. Nothing is discarded: a row
+  # with the wrong field count, an invalid or unknown version, a malformed
+  # identity or a repeated version is a parse failure, and a parse failure stops
+  # here - before step 0 creates anything.
+  $ledgerParse = ConvertFrom-ClashLedgerOutput -Text $led.stdOut -Entries $entries
+  if (-not $ledgerParse.ok) {
+    New-PhaseReceipt '03-ledger-parse.json' @{
+      status   = 'STOP'
+      rows     = $ledgerParse.rows
+      problems = @($ledgerParse.problems)
+      rule     = 'every nonblank ledger row must be a complete, unique, manifest-known record'
+    }
+    Stop-Run ("the ledger listing could not be parsed ({0} problem(s)): {1}. Nothing was executed and no table was created." -f `
+        @($ledgerParse.problems).Count, ((@($ledgerParse.problems) | Select-Object -First 6) -join '; ')) '03-ledger-parse-stop.json'
+  }
+  $ledger = $ledgerParse.ledger
+}
+else {
+  $ledgerParse = ConvertFrom-ClashLedgerOutput -Text '' -Entries $entries -TableAbsent $true
+  if (-not $ledgerParse.ok) {
+    Stop-Run ("the absent-ledger path produced an inconsistent result: {0}" -f ((@($ledgerParse.problems)) -join '; ')) '03-ledger-parse-stop.json'
   }
 }
 
@@ -386,6 +407,7 @@ New-PhaseReceipt '03-ledger.json' @{
   verdict     = $ledgerVerdict.verdict
   detail      = $ledgerVerdict.why
   ledgerRows  = $ledgerVerdict.rows
+  rowsParsed  = $(if ($null -ne $ledgerParse) { $ledgerParse.rows } else { 0 })
   tableAbsent = $ledgerAbsent
   gaps        = @($ledgerVerdict.gaps)
   policy      = 'fresh-only: an empty ledger is required; there is no resume path'
@@ -438,6 +460,35 @@ if (-not (Test-NativeSuccess $recheck) -or -not [int]::TryParse($recheck.stdOut.
 if ($bootRows -ne 0) {
   Stop-Run ("step 0 created a ledger that is not empty ({0} rows). A bootstrap must never adopt existing rows silently." -f $bootRows) '03b-bootstrap-nonempty.json'
 }
+# Round 9: step 0 uses IF NOT EXISTS, which says nothing about a table that
+# already existed. The uniqueness and single-writer arguments depend on the
+# primary keys, so they are read back from the catalog instead of assumed.
+$structureSql = @"
+select 'ledger=' || coalesce((select string_agg(a.attname, ',' order by a.attname)
+    from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+   where c.contype = 'p' and c.conrelid = 'supabase_migrations.schema_migrations'::regclass), '<none>')
+    || ';claim=' || coalesce((select string_agg(a.attname, ',' order by a.attname)
+    from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+   where c.contype = 'p' and c.conrelid = 'supabase_migrations.clash_deploy_claim'::regclass), '<none>');
+"@
+$structure = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-t', '-A', '-c', $structureSql)) `
+               -Environment $policy.env -TimeoutSeconds 300
+[void](Write-Evidence -Path (Join-Path $run '02-ledger\structure.out') -Text $structure.stdOut)
+[void](Write-Evidence -Path (Join-Path $run '02-ledger\structure.err') -Text $structure.stdErr)
+$structureText = $structure.stdOut.Trim()
+if (-not (Test-NativeSuccess $structure) -or $structureText -ne 'ledger=version;claim=claim_key') {
+  New-PhaseReceipt '03b-schema.json' @{
+    status = 'STOP'; observed = $structureText; expected = 'ledger=version;claim=claim_key'
+    outcome = (Get-NativeOutcomeLabel $structure); sqlState = (Get-PgSqlState $structure.stdErr)
+    rule = 'the ledger version key and the single-row claim key must be primary keys'
+  }
+  Stop-Run ("the ledger or claim table does not carry the expected primary key (observed '{0}', expected 'ledger=version;claim=claim_key'; outcome {1}, sqlstate '{2}'). A pre-existing table is never trusted on its name alone." -f `
+      $structureText, (Get-NativeOutcomeLabel $structure), (Get-PgSqlState $structure.stdErr)) '03b-schema-stop.json'
+}
+New-PhaseReceipt '03b-schema.json' @{ status = 'PASS'; observed = $structureText }
+
 $bootOutcome = $(if ($ledgerAbsent) { 'CREATED' } else { 'NO-OP-ALREADY-CREATED' })
 New-PhaseReceipt '03b-bootstrap.json' @{
   status = 'PASS'; outcome = $bootOutcome; rowsAfterCreate = $bootRows
@@ -640,11 +691,25 @@ if (-not (Test-NativeSuccess $st) -or $stFailRows -gt 0) {
 # Postflight passed, so the deployment is complete; the claim is released so the
 # next fresh run can start. A failed release is a STOP: the database would keep
 # asserting "a writer is active" while the evidence says otherwise.
-$releaseSql = "delete from supabase_migrations.clash_deploy_claim where claim_key = 'clash-cloud-deploy' and run_id = '$runId';"
-$release = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-c', $releaseSql)) `
+# Round 9: RETURNING proves ownership - the delete must remove exactly the row
+# this run created, and nothing else. Exit 0 alone would accept a delete that
+# matched zero rows because another writer's claim is sitting there.
+$releaseSql = "delete from supabase_migrations.clash_deploy_claim where claim_key = 'clash-cloud-deploy' and run_id = '$runId' returning run_id;"
+$release = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-t', '-A', '-c', $releaseSql)) `
              -Environment $policy.env -TimeoutSeconds 300
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\claim-release.out') -Text $release.stdOut)
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\claim-release.err') -Text $release.stdErr)
+$releasedRows = @(($release.stdOut -split "`r?`n") | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$releasedOwned = ($releasedRows.Count -eq 1 -and $releasedRows[0].Trim() -eq $runId)
+New-PhaseReceipt '06-claim-release-ownership.json' @{
+  status = $(if ($releasedOwned) { 'PASS' } else { 'STOP' })
+  expectedRunId = $runId; returnedRows = $releasedRows.Count
+  returned = @($releasedRows | ForEach-Object { $_.Trim() })
+}
+if (Test-NativeSuccess $release -and -not $releasedOwned) {
+  Stop-Run ("the claim release did not remove exactly this run's row (returned {0} row(s), expected 1 matching {1}). All 111 migrations and postflight passed; the claim state needs human review (ROLLBACK.md T1.1)." -f `
+      $releasedRows.Count, $runId) '06-claim-release-ownership-stop.json'
+}
 if (-not (Test-NativeSuccess $release)) {
   New-PhaseReceipt '06-claim-release.json' @{
     status = 'STOP'; outcome = (Get-NativeOutcomeLabel $release)

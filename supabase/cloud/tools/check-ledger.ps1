@@ -74,7 +74,8 @@ try {
 }
 catch { Stop-Refused ("'{0}' not found on PATH." -f $Psql) }
 
-$common = @('-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1')
+# Round 9 (B3): verbose diagnostics so a failed probe carries its SQLSTATE.
+$common = @('-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose')
 
 # Presence is a catalog read, not an error to be interpreted. to_regclass returns
 # NULL for a missing relation, so a successful probe always answers the question.
@@ -96,6 +97,8 @@ if ($presence -ne 'ABSENT' -and $presence -ne 'PRESENT') {
 $tableAbsent = ($presence -eq 'ABSENT')
 
 $ledger = @{}
+$ledgerParse = $null
+$r = $null
 if ($presence -eq 'PRESENT') {
   $sql = "select version || '|' || coalesce(statements[1],'<null>') from supabase_migrations.schema_migrations order by version;"
   $r = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-c', $sql)) `
@@ -107,10 +110,23 @@ if ($presence -eq 'PRESENT') {
     Write-Host 'This is not an empty ledger. Resolve connectivity/TLS before drawing conclusions.' -ForegroundColor Red
     exit 1
   }
-  foreach ($line in ($r.stdOut -split "`r?`n")) {
-    if ([string]::IsNullOrWhiteSpace($line)) { continue }
-    $p = $line.Split('|')
-    if ($p.Count -ge 2) { $ledger[$p[0]] = $p[1] }
+  # Round 9 (B1): the same strict parser the runner uses. A malformed row is not
+  # skipped, it makes the listing unreadable.
+  $ledgerParse = ConvertFrom-ClashLedgerOutput -Text $r.stdOut -Entries $entries
+  if (-not $ledgerParse.ok) {
+    Write-Host ("LEDGER UNREADABLE: {0} problem(s) in the listing." -f @($ledgerParse.problems).Count) -ForegroundColor Red
+    foreach ($problem in @($ledgerParse.problems)) { Write-Host ("   ! {0}" -f $problem) -ForegroundColor Red }
+    exit 1
+  }
+  $ledger = $ledgerParse.ledger
+}
+else {
+  # B2: the ABSENT branch records its own result; it never pretends a ledger
+  # query ran, and it no longer leaves a variable unset for the receipt.
+  $ledgerParse = ConvertFrom-ClashLedgerOutput -Text '' -Entries $entries -TableAbsent $true
+  if (-not $ledgerParse.ok) {
+    Write-Host ("LEDGER UNREADABLE: the absent path is inconsistent: {0}" -f ((@($ledgerParse.problems)) -join '; ')) -ForegroundColor Red
+    exit 1
   }
 }
 
@@ -146,9 +162,6 @@ $doc = [ordered]@{
   mode               = $policy.mode
   readOnly           = $true
   statementsIssued   = 'select only'
-  tableAbsent        = $tableAbsent
-  nativeOutcome      = (Get-NativeOutcomeLabel $r)
-  exitCode           = $r.exitCode
   ledgerRows         = $check.rows
   failingTrace       = 'fresh-only: a non-empty ledger is never a resume instruction'
   missing            = @($check.missing).Count
@@ -162,6 +175,13 @@ $doc = [ordered]@{
   verdict            = $verdict
   verdictDetail      = $why
 }
+# Round 9 (B2): the branch-dependent fields come from one shared builder, so an
+# ABSENT run records the presence probe that actually ran and never touches an
+# unset ledger-query result.
+$auditFields = New-LedgerAuditFields -PresenceResult $probe -LedgerResult $r -PresenceText $presence `
+                 -TableAbsent $tableAbsent -Parse $ledgerParse -Check $check
+foreach ($auditKey in @($auditFields.Keys)) { $doc[$auditKey] = $auditFields[$auditKey] }
+
 $receiptPath = Join-Path $evDir ("{0}-ledger-audit.json" -f $stamp)
 $sha = Write-EvidenceJson -Path $receiptPath -Object $doc
 
