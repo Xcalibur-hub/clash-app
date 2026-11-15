@@ -37,7 +37,7 @@ const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 22;
 const EXPECTED_CASES = 46;
-const EXPECTED_ASSERTIONS = 383;
+const EXPECTED_ASSERTIONS = 384;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -1837,6 +1837,18 @@ hdr(22, 'verification report contract - the report IS the SQL (Round 12 / R11-C1
   check('the adapter refuses a report name it has no contract for',
     /no declared contract exists for/.test(libCode) &&
     /return \$null/.test(libCode));
+  // R12-C2 (found by the Windows gate, invisible offline): an OrderedDictionary
+  // exposes Item(object key) AND Item(int index); PowerShell binds the int one,
+  // so a per-ord lookaside map held as [ordered]@{} was read POSITIONALLY - ord 7
+  // returned the seventh row, and ord 19 of 19 threw ArgumentOutOfRangeException,
+  // which every non-empty report hit. The map must be a Hashtable and the lookup
+  // must be by ord. A static assertion is all this suite can do; the executed
+  // cases 34-46 are what prove the lookup.
+  check('the per-ord lookaside map is a Hashtable, never an OrderedDictionary',
+    /\$byOrd\s*=\s*@\{\}/.test(libCode) &&
+    !/\$byOrd\s*=\s*\[ordered\]@\{\}/.test(libCode) &&
+    /\$row\s*=\s*\$byOrd\[\$ord\]/.test(libCode) &&
+    /\$byOrd\[\$ord\]\s*=\s*\[ordered\]@\{/.test(libCode));
 
   // ------------------------------------------------------------ the harness --
   const newCases = ['verificationReportContractMatchesSql', 'verificationReportsProceedToComplete',

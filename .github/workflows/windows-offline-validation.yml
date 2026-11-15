@@ -5,7 +5,7 @@
 # --------------------
 # Every round before this one was validated on Linux, where Windows PowerShell
 # 5.1 does not exist. `tests/verify-package.mjs` proves the package statically
-# (383 assertions, a real lexer, a structural lint) and that is worth having, but
+# (384 assertions, a real lexer, a structural lint) and that is worth having, but
 # it cannot execute the one runtime the package ships for. Round 10 shipped a
 # defect of exactly that shape: in `tools/test-native-capture.ps1` a membership
 # test was written as
@@ -40,7 +40,7 @@
 # -----------
 # Each gate is its own step, so a non-zero exit stops every later gate. Nothing
 # here treats silence as success: the adapter gate asserts 46/46 executed cases
-# through the package's own validator, and the suite gate asserts 383 passed /
+# through the package's own validator, and the suite gate asserts 384 passed /
 # 0 failed / machine summary agreement, not merely "no output and exit 0".
 #
 # DIAGNOSTICS
@@ -192,7 +192,7 @@ jobs:
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
           -ExecutionPolicy Bypass -File supabase/cloud/tools/check-manifest.ps1
 
-      - name: Offline Node package suite through the adapter (383 assertions)
+      - name: Offline Node package suite through the adapter (384 assertions)
         shell: cmd
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
@@ -213,7 +213,7 @@ jobs:
           Write-Host ('MANIFEST RECEIPT OK entries=' + $d.entries + ' checksumFiles=' + $d.checksumFiles) }
           catch { Write-Host ('::error::CLASH-MANIFEST-RECEIPT ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
 
-      - name: Verify the suite receipt (383/383, machine summary agreed, adapter 4.4.0)
+      - name: Verify the suite receipt (384/384, machine summary agreed, adapter 4.4.0)
         shell: cmd
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
@@ -222,13 +222,13 @@ jobs:
           if ($receipts.Count -ne 1) { throw ('expected exactly 1 test-run receipt, found ' + $receipts.Count) };
           $d = [System.IO.File]::ReadAllText($receipts[0].FullName) | ConvertFrom-Json;
           if ([string]$d.status -ne 'PASS') { throw ('REFUSED: suite receipt status is ' + $d.status) };
-          if ([int]$d.passLines -ne 383) { throw ('REFUSED: ' + $d.passLines + ' assertion(s) passed, 383 are required') };
+          if ([int]$d.passLines -ne 384) { throw ('REFUSED: ' + $d.passLines + ' assertion(s) passed, 384 are required') };
           if ([int]$d.failLines -ne 0) { throw ('REFUSED: ' + $d.failLines + ' assertion(s) failed') };
-          if ([int]$d.assertionsExecuted -ne 383) { throw ('REFUSED: ' + $d.assertionsExecuted + ' assertion(s) executed, 383 are required') };
+          if ([int]$d.assertionsExecuted -ne 384) { throw ('REFUSED: ' + $d.assertionsExecuted + ' assertion(s) executed, 384 are required') };
           if (-not $d.machineReadable) { throw 'REFUSED: the suite summary line did not agree with its own PASS/FAIL counts' };
           if ([string]$d.adapter.version -ne '4.4.0') { throw ('REFUSED: the suite ran on adapter ' + $d.adapter.version) };
           if ([string]$d.outcome -ne 'SUCCEEDED') { throw ('REFUSED: native outcome was ' + $d.outcome) };
-          Write-Host ('SUITE RECEIPT OK 383/383 failures=0 machineReadable=' + $d.machineReadable + ' adapter=' + $d.adapter.version) }
+          Write-Host ('SUITE RECEIPT OK 384/384 failures=0 machineReadable=' + $d.machineReadable + ' adapter=' + $d.adapter.version) }
           catch { Write-Host ('::error::CLASH-SUITE-RECEIPT ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
 
       - name: Publish receipt state as annotations (always runs, never fails the job)

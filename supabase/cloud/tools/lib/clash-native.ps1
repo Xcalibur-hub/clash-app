@@ -832,7 +832,14 @@ function Test-VerifyReport {
   $failRows   = 0
   $infoRows   = 0
   $rowCount   = 0
-  $byOrd      = [ordered]@{}
+  # Round 12 (found by the Windows gate): this must be a Hashtable, not
+  # [ordered]@{}. An OrderedDictionary exposes TWO indexers - Item(object key)
+  # and Item(int index) - and PowerShell binds the int one, so $byOrd[$ord] was
+  # a POSITIONAL read: ord 7 returned the seventh row regardless of its ord, and
+  # ord 19 with 19 rows in the map threw ArgumentOutOfRangeException('index').
+  # Every non-empty report hit it, so every report was UNPROVEN by crash. A
+  # Hashtable has one object-key indexer, so the lookup means what it says.
+  $byOrd      = @{}
 
   $nativeOk = Test-NativeSuccess $Result
   $captureComplete = Test-NativeCaptureComplete $Result
