@@ -71,10 +71,18 @@ $sumFile = Join-Path $cloudRoot 'checksums.sha256'
 $sumCount = 0
 if (-not (Test-Path -LiteralPath $sumFile)) { Fail 'checksums.sha256 missing' }
 else {
+  $sumLineNo = 0
   foreach ($line in [System.IO.File]::ReadAllLines($sumFile)) {
+    $sumLineNo++
     if ([string]::IsNullOrWhiteSpace($line)) { continue }
     $parts = $line -split '\s{2}', 2
-    if ($parts.Count -ne 2) { continue }
+    # Round 13 (R12-C1 class): a line this parser cannot read used to be skipped,
+    # so a truncated or hand-edited list still passed as long as 200 well-formed
+    # lines survived. An unreadable line is a FAIL, never a skip.
+    if ($parts.Count -ne 2 -or $parts[0] -notmatch '^[0-9a-f]{64}$') {
+      Fail ("checksums.sha256 line {0} is not '<sha256>  <path>': {1}" -f $sumLineNo, $line.Trim())
+      continue
+    }
     $sumCount++
     $abs = Join-Path $repoRoot ($parts[1].Replace('/', [System.IO.Path]::DirectorySeparatorChar))
     if (-not (Test-Path -LiteralPath $abs)) { Fail ("checksum: missing {0}" -f $parts[1]); continue }

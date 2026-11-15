@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.4.0'
+$script:ClashAdapterVersion = '4.5.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -797,6 +797,56 @@ function Get-ClashVerifyContract {
   return $null
 }
 
+# ------------------------------------------------- verification report envelope --
+# What a verifier's stdout actually contains. psql's aligned output for ONE
+# result set is exactly:
+#
+#     <blank lines>
+#      ord | check_name | expected | actual | status      <- column header
+#     -----+------------+----------+--------+-------       <- dashed separator
+#      <data rows, one per check, five '|'-separated fields>
+#     (19 rows)                                            <- row-count footer
+#     <blank lines>
+#
+# The footer comes from psql's default footer (src/fe_utils/print.c,
+# footers_with_default: "(%lu rows)" / "(%lu row)"), which is emitted unless
+# -t/--tuples-only or "\pset footer off" is used. -q does NOT suppress it, and an
+# empty result set still prints "(0 rows)". verify/90_verify.sql and
+# verify/95_storage_config.sql are each one SELECT plus a DO guard, and the DO
+# block's NOTICE goes to stderr, so stdout is exactly this envelope.
+#
+# Round 13 (R12-C1): the parser used to skip every line it did not recognise, so
+# one extra malformed row - or any other unexpected output - was invisible and
+# the report could still be PASS. These helpers make the envelope explicit and
+# make anything outside it a problem.
+function Format-ReportLine {
+  param([string]$Line)
+  $t = [string](Protect-Text ([string]$Line).Trim())
+  if ($t.Length -gt 120) { $t = $t.Substring(0, 120) + '...' }
+  return $t
+}
+
+function Test-VerifyReportHeader {
+  param([string]$Line)
+  $fields = @(([string]$Line).Split('|'))
+  if ($fields.Count -ne 5) { return $false }
+  $names = @('ord', 'check_name', 'expected', 'actual', 'status')
+  for ($i = 0; $i -lt 5; $i++) {
+    if (([string]$fields[$i]).Trim() -ne $names[$i]) { return $false }
+  }
+  return $true
+}
+
+function Test-VerifyReportSeparator {
+  param([string]$Line)
+  $t = ([string]$Line).Trim()
+  if ($t -notmatch '^-+(\+-+)+$') { return $false }
+  $segments = @($t.Split('+'))
+  if ($segments.Count -ne 5) { return $false }
+  foreach ($segment in $segments) { if ($segment.Length -lt 3) { return $false } }
+  return $true
+}
+
 # Validates one rendered verification report against its contract.
 #
 # Accepts a report only when ALL of the following hold. Each failure is recorded
@@ -805,9 +855,15 @@ function Get-ClashVerifyContract {
 #     captured in full (Test-NativeSuccess) - otherwise the verdict is UNPROVEN,
 #     never PASS and never FAIL-on-content, because an ambiguous execution cannot
 #     be used to classify the database either way
+#   * stdout is the aligned psql envelope and NOTHING ELSE: the five-column
+#     header, the dashed separator, complete data rows, then exactly one terminal
+#     row-count footer whose number equals the parsed row count. Blank lines are
+#     allowed before the header and after the footer only. Anything else - an
+#     extra line, prose, a second footer, a filtered or truncated stream - is a
+#     reported problem, never skipped (R12-C1)
 #   * at least one row was rendered (an empty report is not a pass)
-#   * every row parses into exactly five fields with a numeric leading ord and a
-#     status of PASS/FAIL/INFO (malformed rows are reported, never skipped)
+#   * every data row parses into exactly five fields with a numeric leading ord
+#     and a status of PASS/FAIL/INFO (malformed rows are reported, never skipped)
 #   * no ord appears twice (duplicate)
 #   * the rendered ords are exactly the declared ords, with none missing and none
 #     unexpected, in ascending order (truncated / extra / reordered reports)
@@ -817,7 +873,8 @@ function Get-ClashVerifyContract {
 #     declared INFO row renders INFO, with the declared PASS and INFO counts
 # Returned fields: ok, verdict (PASS/FAIL/UNPROVEN), rows, passRows, failRows,
 # infoRows, gatingExpected, infoExpected, missing, unexpected, duplicates,
-# malformed, problems, outcome, nativeOk, captureComplete.
+# malformed, problems, outcome, nativeOk, captureComplete, headerSeen,
+# separatorSeen, footerSeen, footerRows, envelopeProblems.
 function Test-VerifyReport {
   param(
     [Parameter(Mandatory = $true)]$Result,
@@ -866,6 +923,11 @@ function Test-VerifyReport {
       outcome         = $outcome
       nativeOk        = $nativeOk
       captureComplete = $captureComplete
+      headerSeen      = $false
+      separatorSeen   = $false
+      footerSeen      = $false
+      footerRows      = -1
+      envelopeProblems = @()
     }
   }
 
@@ -878,44 +940,123 @@ function Test-VerifyReport {
     $text = [string](Get-DocumentProperty -Object $Result -Name 'stdOut' -Default '')
   }
 
+  # Explicit envelope state machine. States advance strictly forward:
+  #   preamble -> separator (header seen) -> body -> after-footer
+  # A blank line is legal in the preamble and after the footer; inside the body it
+  # is a problem. Every non-blank line is classified or reported - nothing is
+  # skipped, which is the whole point of Round 13.
+  $envelope    = New-Object System.Collections.Generic.List[string]
+  $state       = 'preamble'
+  $sawHeader   = $false
+  $sawSep      = $false
+  $sawFooter   = $false
+  $footerRows  = -1
+  $lineNo      = 0
+  $blankInside = 0
+
   foreach ($raw in ($text -split "`r?`n")) {
-    $line = [string]$raw
-    if ([string]::IsNullOrWhiteSpace($line)) { continue }
-    if (-not $line.Contains('|')) { continue }
-    $fields = @($line.Split('|'))
-    $first  = ([string]$fields[0]).Trim()
-    if ($first -notmatch '^\d+$') {
-      # A header or a rule line has a non-numeric first field. A line that still
-      # ends in a status token is a data row whose shape collapsed: report it.
-      if ($line -match '\|\s*(PASS|FAIL|INFO)\s*$') { $malformed += (Protect-Text $line.Trim()) }
+    $lineNo++
+    $line    = [string]$raw
+    $trimmed = $line.Trim()
+    if ($trimmed.Length -eq 0) {
+      if ($state -eq 'preamble' -or $state -eq 'after-footer') { continue }
+      $blankInside++
+      if ($blankInside -le 3) {
+        $envelope.Add(('line {0}: blank line inside the report body; the envelope is header, separator, data rows, row-count footer' -f $lineNo))
+      }
       continue
     }
-    $rowCount++
-    if ($fields.Count -ne 5) {
-      $malformed += ('{0} field(s): {1}' -f $fields.Count, (Protect-Text $line.Trim()))
+    if ($state -eq 'preamble') {
+      if (Test-VerifyReportHeader -Line $line) { $sawHeader = $true; $state = 'separator'; continue }
+      $envelope.Add(('line {0}: expected the column header ord | check_name | expected | actual | status; found: {1}' -f $lineNo, (Format-ReportLine $line)))
+      # keep going inside the body so one report can list every problem it has
+      $state = 'body'
       continue
     }
-    $ord      = [int]$first
-    $name     = ([string]$fields[1]).Trim()
-    $expected = ([string]$fields[2]).Trim()
-    $status   = ([string]$fields[4]).Trim()
-    if ($status -ne 'PASS' -and $status -ne 'FAIL' -and $status -ne 'INFO') {
-      $malformed += ('status {0}: {1}' -f (Protect-Text $status), (Protect-Text $line.Trim()))
+    if ($state -eq 'separator') {
+      if (Test-VerifyReportSeparator -Line $line) { $sawSep = $true; $state = 'body'; continue }
+      $envelope.Add(('line {0}: expected the dashed separator under the header (five columns); found: {1}' -f $lineNo, (Format-ReportLine $line)))
+      $state = 'body'
       continue
     }
-    if ($byOrd.Contains($ord)) { $duplicates += $ord; continue }
-    $byOrd[$ord] = [ordered]@{ ord = $ord; name = $name; expected = $expected; status = $status }
-    $order += $ord
-    if ($status -eq 'PASS') { $passRows++ }
-    elseif ($status -eq 'FAIL') { $failRows++ }
-    else { $infoRows++ }
+    if ($state -eq 'body') {
+      if ($trimmed -match '^\((\d+) rows?\)$') {
+        $footerRows = [int]$Matches[1]
+        $sawFooter  = $true
+        $state      = 'after-footer'
+        continue
+      }
+      if ($trimmed -match '^\(.*row') {
+        $envelope.Add(('line {0}: malformed row-count footer, expected "(N rows)": {1}' -f $lineNo, (Format-ReportLine $line)))
+        continue
+      }
+      $fields = @($line.Split('|'))
+      $first  = ''
+      $status = ''
+      if ($fields.Count -eq 5) {
+        $first  = ([string]$fields[0]).Trim()
+        $status = ([string]$fields[4]).Trim()
+      }
+      $ordinalOk = ($first -match '^\d+$')
+      $statusOk  = ($status -eq 'PASS' -or $status -eq 'FAIL' -or $status -eq 'INFO')
+      if (-not $ordinalOk) {
+        $envelope.Add(('line {0}: invalid ordinal in a data row (expected digits): {1}' -f $lineNo, (Format-ReportLine $line)))
+      }
+      if (-not $statusOk) {
+        $envelope.Add(('line {0}: invalid status in a data row (expected PASS, FAIL or INFO): {1}' -f $lineNo, (Format-ReportLine $line)))
+      }
+      if (-not $ordinalOk -or -not $statusOk) {
+        $malformed += (Format-ReportLine $line)
+        if ($fields.Count -ne 5) {
+          $envelope.Add(('line {0}: malformed data row: {1} field(s), expected 5: {2}' -f $lineNo, $fields.Count, (Format-ReportLine $line)))
+        }
+        continue
+      }
+      $rowCount++
+      $ord      = [int]$first
+      $name     = ([string]$fields[1]).Trim()
+      $expected = ([string]$fields[2]).Trim()
+      if ($byOrd.Contains($ord)) { $duplicates += $ord; continue }
+      $byOrd[$ord] = [ordered]@{ ord = $ord; name = $name; expected = $expected; status = $status }
+      $order += $ord
+      if ($status -eq 'PASS') { $passRows++ }
+      elseif ($status -eq 'FAIL') { $failRows++ }
+      else { $infoRows++ }
+      continue
+    }
+    # after the row-count footer only blank lines are legal
+    $envelope.Add(('line {0}: unexpected output after the row-count footer: {1}' -f $lineNo, (Format-ReportLine $line)))
   }
+
+  # Envelope completeness: reported in a fixed order so a STOP receipt leads with
+  # the reason the report could not be trusted at all.
+  $envelopeProblems = @()
+  if (-not $sawHeader) {
+    $envelopeProblems += ('the {0} report rendered no column header: an exit code without a rendered report is not a pass' -f $ReportName)
+  }
+  elseif (-not $sawSep) {
+    $envelopeProblems += ('the {0} report has no dashed separator under its header' -f $ReportName)
+  }
+  if (-not $sawFooter) {
+    $envelopeProblems += ('the {0} report has no row-count footer: the output is truncated or filtered and is not a pass' -f $ReportName)
+  }
+  elseif ($footerRows -ne $rowCount) {
+    $envelopeProblems += ('the {0} row-count footer says {1} row(s) but {2} data row(s) were parsed' -f $ReportName, $footerRows, $rowCount)
+  }
+  $envelopeList = @($envelope)
+  if ($envelopeList.Count -gt 12) {
+    $envelopeList = @($envelopeList[0..11]) + @(('... and {0} more unexpected line(s)' -f ($envelopeList.Count - 12)))
+  }
+  $envelopeProblems = @($envelopeProblems) + @($envelopeList)
 
   $declaredOrds = @($declared | ForEach-Object { [int]$_.ord })
   $seenOrds     = @($order | ForEach-Object { [int]$_ })
   $missing      = @($declaredOrds | Where-Object { -not $byOrd.Contains([int]$_) })
   $unexpected   = @($seenOrds | Where-Object { $declaredOrds -notcontains [int]$_ })
 
+  # Envelope problems lead: if the report is not even the expected shape, that is
+  # the first thing the operator has to see.
+  $problems = @($envelopeProblems)
   if ($rowCount -eq 0) {
     $problems += ('the {0} report rendered no verification rows at all; exit 0 without evidence is not a pass' -f $ReportName)
   }
@@ -993,6 +1134,11 @@ function Test-VerifyReport {
     outcome         = $outcome
     nativeOk        = $nativeOk
     captureComplete = $captureComplete
+    headerSeen      = $sawHeader
+    separatorSeen   = $sawSep
+    footerSeen      = $sawFooter
+    footerRows      = $footerRows
+    envelopeProblems = @($envelopeProblems)
   }
 }
 
@@ -1046,7 +1192,16 @@ $script:ClashSelfTestRequiredCases = @(
   'storageEmptyReportStops',
   'storageFailedRowStops',
   'storageMissingInfoRowStops',
-  'storageUnprovenStops'
+  'storageUnprovenStops',
+  'reportEnvelopeAcceptedForBothVerifiers',
+  'reportFooterCountMismatchStops',
+  'reportMissingFooterStops',
+  'reportMalformedFooterStops',
+  'reportUnexpectedTrailerStops',
+  'reportExtraJunkLineStops',
+  'reportInvalidOrdinalAndStatusStops',
+  'reportTruncatedMidRowStops',
+  'reportStorageTrailerStops'
 )
 
 # Returns a FLAT sequence of case-name strings.
@@ -1211,7 +1366,14 @@ function Test-SelfTestReceipt {
     }
     foreach ($name in $required) {
       $entry = Get-CaseEntry -Cases $cases -Name $name
-      if ($null -eq $entry) { continue }
+      if ($null -eq $entry) {
+        # Round 13 (R12-C1 class): a case recorded with no body was silently
+        # skipped here, so "present but null" could satisfy the name and count
+        # checks without ever being verified as passed. Absent cases are already
+        # reported by the missing-case check below; this covers present-but-empty.
+        if ($names -contains $name) { $problems += ("case '{0}' is present but has no body" -f $name) }
+        continue
+      }
       if ($entry -is [string] -or ($entry -is [System.Collections.IEnumerable] -and $entry -isnot [System.Collections.IDictionary])) {
         $problems += ("case '{0}' is not a record" -f $name)
       }

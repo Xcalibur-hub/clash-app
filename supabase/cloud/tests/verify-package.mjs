@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 22;
-const EXPECTED_CASES = 46;
-const EXPECTED_ASSERTIONS = 384;
+const EXPECTED_SECTIONS = 23;
+const EXPECTED_CASES = 55;
+const EXPECTED_ASSERTIONS = 395;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -1869,6 +1869,182 @@ hdr(22, 'verification report contract - the report IS the SQL (Round 12 / R11-C1
   check('the README documents the report contract',
     readmeText.includes('Get-ClashVerifyContract') && readmeText.includes('19 declared gating') &&
     readmeText.includes('6 gating checks plus') && readmeText.includes('before the writer claim is released'));
+}
+
+hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
+{
+  const libCode  = lf(read(join(CLOUD, 'tools/lib/clash-native.ps1')));
+  const selfTest = lf(read(join(CLOUD, 'tools/test-native-capture.ps1')));
+  const manifestTool = lf(read(join(CLOUD, 'tools/check-manifest.ps1')));
+  const readmeText = lf(read(join(CLOUD, 'README.md')));
+
+  // The supported stdout is the psql aligned envelope and nothing else:
+  // header, dashed separator, one complete row per check, one terminal
+  // "(N rows)" footer. psql emits that footer unless -t / \pset footer off is
+  // used (src/fe_utils/print.c footers_with_default); -q does not suppress it.
+  const CONTRACT = {
+    '90_verify.sql': libCode.match(/if \(\$ReportName -eq '90_verify\.sql'\) \{[\s\S]*?\n  \}/)[0],
+    '95_storage_config.sql': libCode.match(/if \(\$ReportName -eq '95_storage_config\.sql'\) \{[\s\S]*?\n  \}/)[0],
+  };
+  const checksOf = (report) => {
+    const re = /\[ordered\]@\{ ord = (\d+);\s*name = '((?:[^']|'')*)';\s*expected = '((?:[^']|'')*)';\s*info = \$(true|false) \}/g;
+    return [...CONTRACT[report].matchAll(re)].map((m) => ({
+      ord: Number(m[1]), name: m[2].replace(/''/g, "'"), expected: m[3].replace(/''/g, "'"), info: m[4] === 'true',
+    }));
+  };
+
+  // Fixture in the psql aligned shape (one space padding, '|' between columns,
+  // width+2 dashes per column, numeric column right aligned, "(N rows)").
+  const fixture = (report, { footerText = null, noFooter = false, trailer = null, junk = null, cutLast = 0 } = {}) => {
+    const checks = checksOf(report);
+    const header = ['ord', 'check_name', 'expected', 'actual', 'status'];
+    const body = checks.map((c) => [String(c.ord), c.name, c.expected, c.info ? 'INFO migration 20260926150000 owns bucket+policy creation' : c.expected, c.info ? 'INFO' : 'PASS']);
+    const widths = header.map((h, i) => Math.max(h.length, ...body.map((r) => r[i].length)));
+    const cell = (t, w, right) => (right ? String(t).padStart(w) : String(t).padEnd(w));
+    const line = (cells) => ` ${cells.map((c, i) => cell(c, widths[i], i === 0)).join(' | ')} `;
+    const lines = [line(header), widths.map((w) => '-'.repeat(w + 2)).join('+'), ...body.map(line)];
+    if (cutLast > 0) lines[lines.length - 1] = lines[lines.length - 1].slice(0, Math.max(0, lines[lines.length - 1].length - cutLast));
+    if (junk) lines.splice(3, 0, junk);
+    if (!noFooter) lines.push(footerText || `(${body.length} ${body.length === 1 ? 'row' : 'rows'})`);
+    if (trailer) lines.push(trailer);
+    return lines.join('\n') + '\n';
+  };
+
+  // Mirror of the deployed state machine, written from the rules rather than
+  // from the PowerShell source so the two have to agree independently.
+  const parseEnvelope = (text) => {
+    const problems = [];
+    const rows = [];
+    let state = 'preamble';
+    let sawHeader = false; let sawSep = false; let sawFooter = false; let footerRows = -1;
+    let blanksInside = 0;
+    text.split(/\r?\n/).forEach((raw, idx) => {
+      const lineNo = idx + 1;
+      const trimmed = raw.trim();
+      if (trimmed.length === 0) {
+        if (state === 'preamble' || state === 'after-footer') return;
+        blanksInside += 1;
+        if (blanksInside <= 3) problems.push(`line ${lineNo}: blank line inside the report body`);
+        return;
+      }
+      if (state === 'preamble') {
+        const f = raw.split('|').map((x) => x.trim());
+        if (f.length === 5 && f[0] === 'ord' && f[1] === 'check_name' && f[2] === 'expected' && f[3] === 'actual' && f[4] === 'status') {
+          sawHeader = true; state = 'separator'; return;
+        }
+        problems.push(`line ${lineNo}: expected the column header`); state = 'body'; return;
+      }
+      if (state === 'separator') {
+        const segs = trimmed.split('+');
+        if (/^-+(\+-+)+$/.test(trimmed) && segs.length === 5 && segs.every((x) => x.length >= 3)) {
+          sawSep = true; state = 'body'; return;
+        }
+        problems.push(`line ${lineNo}: expected the dashed separator`); state = 'body'; return;
+      }
+      if (state === 'body') {
+        const footer = trimmed.match(/^\((\d+) rows?\)$/);
+        if (footer) { footerRows = Number(footer[1]); sawFooter = true; state = 'after-footer'; return; }
+        if (/^\(.*row/.test(trimmed)) { problems.push(`line ${lineNo}: malformed row-count footer`); return; }
+        const fields = raw.split('|');
+        const first = fields.length === 5 ? fields[0].trim() : '';
+        const status = fields.length === 5 ? fields[4].trim() : '';
+        const ordinalOk = /^\d+$/.test(first);
+        const statusOk = ['PASS', 'FAIL', 'INFO'].includes(status);
+        if (!ordinalOk) problems.push(`line ${lineNo}: invalid ordinal in a data row`);
+        if (!statusOk) problems.push(`line ${lineNo}: invalid status in a data row`);
+        if (!ordinalOk || !statusOk) return;
+        rows.push({ ord: Number(first), name: fields[1].trim(), expected: fields[2].trim(), status });
+        return;
+      }
+      problems.push(`line ${lineNo}: unexpected output after the row-count footer`);
+    });
+    if (!sawHeader) problems.unshift('the report rendered no column header');
+    else if (!sawSep) problems.push('the report has no dashed separator');
+    if (!sawFooter) problems.push('the report has no row-count footer: the output is truncated');
+    else if (footerRows !== rows.length) problems.push(`the row-count footer says ${footerRows} row(s) but ${rows.length} data row(s) were parsed`);
+    return { rows, problems, sawHeader, sawSep, sawFooter, footerRows };
+  };
+
+  const scenarios = [
+    ['undamaged postflight envelope', '90_verify.sql', {}, 19, null],
+    ['footer says 20 rows over 19', '90_verify.sql', { footerText: '(20 rows)' }, 19, 'row-count footer says 20 row(s) but 19 data row(s)'],
+    ['no footer at all', '90_verify.sql', { noFooter: true }, 19, 'has no row-count footer'],
+    ['footer is malformed', '90_verify.sql', { footerText: '(19 row' }, 19, 'malformed row-count footer'],
+    ['prose after the footer', '90_verify.sql', { trailer: 'WARNING:  there is no transaction in progress' }, 19, 'unexpected output after the row-count footer'],
+    ['R12-C1: a line with no pipes at all', '90_verify.sql', { junk: 'postflight OK: every gating check passed' }, 19, 'invalid ordinal'],
+    ['invalid ordinal and invalid status together', '90_verify.sql', { junk: '   x | not a check | 1 | 2 | SKIPPED' }, 19, 'invalid status'],
+    ['stream cut inside the last row', '90_verify.sql', { noFooter: true, cutLast: 12 }, 18, 'has no row-count footer'],
+    ['undamaged storage envelope', '95_storage_config.sql', {}, 7, null],
+    ['storage envelope with a trailer', '95_storage_config.sql', { trailer: 'psql: warning: there is no transaction in progress' }, 7, 'unexpected output after the row-count footer'],
+  ];
+  const off = scenarios.filter(([, report, mut, expectedRows, needle]) => {
+    const parsed = parseEnvelope(fixture(report, mut));
+    if (parsed.rows.length !== expectedRows) return true;
+    if (needle === null) return parsed.problems.length !== 0 || !parsed.sawFooter || parsed.footerRows !== expectedRows;
+    return !parsed.problems.some((p) => p.includes(needle));
+  }).map(([name]) => name);
+  check('mirror: the envelope accepts a valid report and rejects every damaged one',
+    off.length === 0 && scenarios.length === 10, off.join('; '));
+  check('mirror: an undamaged report has a header, a separator and a footer that agree',
+    (() => {
+      const v = parseEnvelope(fixture('90_verify.sql'));
+      const st = parseEnvelope(fixture('95_storage_config.sql'));
+      return v.problems.length === 0 && st.problems.length === 0 && v.sawHeader && v.sawSep && v.sawFooter &&
+        v.footerRows === 19 && st.footerRows === 7 && v.rows.length === 19 && st.rows.length === 7;
+    })());
+  check('mirror: R12-C1 - a line the old parser skipped is now a rejection',
+    (() => {
+      const orphan = fixture('90_verify.sql', { junk: 'postflight OK: every gating check passed' });
+      const parsed = parseEnvelope(orphan);
+      // the 19 real rows and the footer still agree; only the extra line fails
+      return parsed.rows.length === 19 && parsed.footerRows === 19 && parsed.problems.length === 2;
+    })());
+
+  // ---------------------------------------------------------------- the code --
+  check('the adapter no longer skips a line it does not recognise',
+    !libCode.includes("if (-not $line.Contains('|')) { continue }") &&
+    !/if \(\$first -notmatch '\^\\\\d\+\$'\) \{[\s\S]{0,400}?continue/.test(libCode) &&
+    /function Test-VerifyReportHeader/.test(libCode) &&
+    /function Test-VerifyReportSeparator/.test(libCode) &&
+    /function Format-ReportLine/.test(libCode));
+  check('the envelope is explicit: header, separator, one footer, nothing after it',
+    /\(\\d\+\) rows\?/.test(libCode) &&
+    /malformed row-count footer/.test(libCode) &&
+    /unexpected output after the row-count footer/.test(libCode) &&
+    /has no row-count footer/.test(libCode) &&
+    /row-count footer says \{1\} row\(s\) but \{2\} data row\(s\)/.test(libCode) &&
+    /invalid ordinal in a data row/.test(libCode) &&
+    /invalid status in a data row/.test(libCode) &&
+    /footers_with_default/.test(libCode));
+  check('the envelope result is carried in the receipts',
+    /headerSeen\s+= \$vfReport\.headerSeen/.test(lf(read(join(CLOUD, 'tools/deploy.ps1')))) &&
+    /footerRows\s+= \$vfReport\.footerRows/.test(lf(read(join(CLOUD, 'tools/deploy.ps1')))) &&
+    /footerRows/.test(libCode));
+
+  // ------------------------------------------------------------- the harness --
+  const envelopeCases = ['reportEnvelopeAcceptedForBothVerifiers', 'reportFooterCountMismatchStops',
+    'reportMissingFooterStops', 'reportMalformedFooterStops', 'reportUnexpectedTrailerStops',
+    'reportExtraJunkLineStops', 'reportInvalidOrdinalAndStatusStops', 'reportTruncatedMidRowStops',
+    'reportStorageTrailerStops'];
+  check('all nine envelope cases exist in the harness and in the inventory',
+    envelopeCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest)) &&
+    envelopeCases.every((n) => libCode.includes(`'${n}'`)));
+  check('the harness builds its fixtures in the real psql envelope',
+    /function Format-ReportRow/.test(selfTest) &&
+    /\(N rows\)/.test(selfTest) &&
+    /\$separator \+= \('-' \* \(\[int\]\$w \+ 2\)\)/.test(selfTest) &&
+    /-FooterText/.test(selfTest) && /-NoFooter/.test(selfTest) &&
+    /-Trailer/.test(selfTest) && /-JunkLine/.test(selfTest));
+
+  // -------------------------------------------------- the sibling parsers ------
+  check('the manifest checker treats an unreadable checksum line as a failure',
+    /is not '<sha256>  <path>'/.test(manifestTool) &&
+    !/if \(\$parts\.Count -ne 2\) \{ continue \}/.test(manifestTool));
+  check('the receipt validator rejects a case recorded with no body',
+    /is present but has no body/.test(libCode));
+  check('the README documents the envelope',
+    readmeText.includes('(N rows)') && readmeText.includes('row-count footer') &&
+    readmeText.includes('header') && readmeText.includes('separator'));
 }
 
 {

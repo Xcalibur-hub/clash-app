@@ -117,10 +117,10 @@ $script:outFileFinal = $OutFile
 
 $requiredCases = @(Get-ClashSelfTestInventory)
 
-# Round 5: the inventory must be exactly 46 unique, non-empty strings, and that
+# Round 5: the inventory must be exactly 55 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 46
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 55
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -141,7 +141,7 @@ if (-not $inventoryCheck.ok) {
     adapterVersion    = $script:ClashAdapterVersion
     adapterSha256     = $script:adapterShaFinal
     casesExecuted     = 0
-    casesExpected     = 46
+    casesExpected     = 55
     cases             = @{}
     problems          = $reasons
     inventoryObserved = $observed
@@ -1217,9 +1217,34 @@ function Get-ReportIdentitiesFromSql {
   return $rows
 }
 
-# Builds a report that looks exactly like psql's aligned output for that script.
-# Variants are produced by omitting, duplicating, renaming, breaking or failing
-# individual rows, so every fixture differs from the contract in exactly one way.
+# psql aligned output, reproduced exactly. psql pads every cell with one space,
+# separates columns with '|', prints (width + 2) dashes per column under the
+# header, right-aligns numeric columns and left-aligns text columns, and appends
+# the default "(N rows)" footer (src/fe_utils/print.c, footers_with_default).
+# Building fixtures from that shape is what makes the strict parser in the
+# adapter testable: the envelope is part of the contract, not decoration.
+function Format-ReportCell {
+  param([string]$Text, [int]$Width, [bool]$Right)
+  $t = [string]$Text
+  if ($t.Length -gt $Width) { $Width = $t.Length }
+  if ($Right) { return $t.PadLeft($Width) }
+  return $t.PadRight($Width)
+}
+
+function Format-ReportRow {
+  param([string[]]$Cells, [int[]]$Widths)
+  $parts = @()
+  for ($i = 0; $i -lt $Widths.Count; $i++) {
+    $right = ($i -eq 0)   # ord is the only numeric column
+    $parts += (Format-ReportCell -Text ([string]$Cells[$i]) -Width ([int]$Widths[$i]) -Right $right)
+  }
+  return (' ' + ($parts -join ' | ') + ' ')
+}
+
+# Builds one verification report in that envelope. Variants are produced by
+# omitting, duplicating, renaming, breaking or failing a row, and by damaging the
+# envelope itself (footer, trailer, junk line, truncation), so every fixture
+# differs from a valid report in exactly one documented way.
 function New-VerifyReportText {
   param(
     [Parameter(Mandatory = $true)][string]$ReportName,
@@ -1227,15 +1252,19 @@ function New-VerifyReportText {
     [int[]]$OmitOrds = @(),
     [int[]]$DuplicateOrds = @(),
     [int[]]$BreakOrds = @(),
-    [hashtable]$RenameOrds = @{}
+    [hashtable]$RenameOrds = @{},
+    [string]$FooterText = '',
+    [switch]$NoFooter,
+    [string]$Trailer = '',
+    [string]$JunkLine = '',
+    [int]$CutLastChars = 0
   )
 
   $contract = Get-ClashVerifyContract -ReportName $ReportName
   if ($null -eq $contract) { throw ('no contract for ' + $ReportName) }
 
-  $lines = @()
-  $lines += ' ord |              check_name              |   expected   |   actual   | status'
-  $lines += '-----+--------------------------------------+--------------+------------+--------'
+  $header = @('ord', 'check_name', 'expected', 'actual', 'status')
+  $body = New-Object System.Collections.Generic.List[object]
   foreach ($c in @($contract.checks)) {
     $ord = [int]$c.ord
     if (@($OmitOrds) -contains $ord) { continue }
@@ -1248,15 +1277,61 @@ function New-VerifyReportText {
     if ($status -eq 'FAIL') { $actual = 'MISMATCH' }
     if ($status -eq 'INFO') { $actual = 'INFO migration 20260926150000 owns bucket+policy creation' }
     if (@($BreakOrds) -contains $ord) {
-      $lines += ('{0,4} | {1} | {2}' -f $ord, $name, $c.expected)
+      $body.Add(@([string]$ord, $name, [string]$c.expected))
       continue
     }
-    $lines += ('{0,4} | {1} | {2} | {3} | {4}' -f $ord, $name, $c.expected, $actual, $status)
+    $body.Add(@([string]$ord, $name, [string]$c.expected, $actual, $status))
     if (@($DuplicateOrds) -contains $ord) {
-      $lines += ('{0,4} | {1} | {2} | {3} | {4}' -f $ord, $name, $c.expected, $actual, $status)
+      $body.Add(@([string]$ord, $name, [string]$c.expected, $actual, $status))
     }
   }
+
+  $widths = @(0, 0, 0, 0, 0)
+  for ($i = 0; $i -lt 5; $i++) { $widths[$i] = ([string]$header[$i]).Length }
+  foreach ($row in $body) {
+    for ($i = 0; $i -lt 5; $i++) {
+      $len = ([string]$row[$i]).Length
+      if ($len -gt $widths[$i]) { $widths[$i] = $len }
+    }
+  }
+
+  $lines = New-Object System.Collections.Generic.List[string]
+  $lines.Add((Format-ReportRow -Cells $header -Widths $widths))
+  $separator = @()
+  foreach ($w in $widths) { $separator += ('-' * ([int]$w + 2)) }
+  $lines.Add(($separator -join '+'))
+  foreach ($row in $body) { $lines.Add((Format-ReportRow -Cells $row -Widths $widths)) }
+
+  if ($CutLastChars -gt 0 -and $lines.Count -gt 2) {
+    $lastIndex = $lines.Count - 1
+    $last = [string]$lines[$lastIndex]
+    if ($last.Length -gt $CutLastChars) { $lines[$lastIndex] = $last.Substring(0, $last.Length - $CutLastChars) }
+    else { $lines[$lastIndex] = '' }
+  }
+  if ($JunkLine.Length -gt 0) {
+    if ($lines.Count -gt 3) { $lines.Insert(3, $JunkLine) } else { $lines.Add($JunkLine) }
+  }
+
+  if (-not $NoFooter) {
+    if ($FooterText.Length -gt 0) {
+      $lines.Add($FooterText)
+    }
+    else {
+      $word = 'rows'
+      if ($body.Count -eq 1) { $word = 'row' }
+      $lines.Add(('({0} {1})' -f $body.Count, $word))
+    }
+  }
+  if ($Trailer.Length -gt 0) { $lines.Add($Trailer) }
   return ((@($lines) -join "`n") + "`n")
+}
+
+# Runs the adapter's parser on a synthetic native-success result, so an envelope
+# case can assert the verdict and the exact problem text without a child process.
+function Get-ReportParse {
+  param([string]$ReportName, [string]$Text)
+  $result = New-GateChildResult -Text $Text
+  return (Test-VerifyReport -Result $result -ReportName $ReportName)
 }
 
 function New-GateChildResult {
@@ -1551,7 +1626,7 @@ $malformedOutcome = Test-VerificationGateOutcome -Probe $gateMalformed `
 Add-Case 'postflightMalformedRowStops' (
   $malformedOutcome.ok -and
   [int]$gateMalformed.nativeCalls -eq 1 -and
-  [string]$gateMalformed.stopReason -match 'malformed row') (New-GateCaseDetail -Probe $gateMalformed -Outcome $malformedOutcome)
+  [string]$gateMalformed.stopReason -match 'malformed data row') (New-GateCaseDetail -Probe $gateMalformed -Outcome $malformedOutcome)
 
 # ---- 41: a check is renamed - the report is not the reviewed report -------
 $gateDrift = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -RenameOrds @{ 2 = 'ledger versions look about right' })))
@@ -1641,6 +1716,169 @@ Add-Case 'storageUnprovenStops' (
   [int]$gateStorageUnproven.nativeCalls -eq 2 -and
   [string]$gateStorageUnproven.stopReason -match 'verdict=UNPROVEN' -and
   -not $gateStorageUnproven.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateStorageUnproven -Outcome $storageUnprovenOutcome)
+
+# ===========================================================================
+# 47-55: the psql envelope, parsed strictly (Round 13 / R12-C1)
+# ===========================================================================
+# Supported stdout for a verifier is exactly: the five-column header, the dashed
+# separator, one complete row per check, one terminal "(N rows)" footer, and
+# nothing else. R12-C1 was that the parser skipped every line it did not
+# recognise, so an extra malformed row - or any other unexpected output - was
+# invisible and the report still passed. These cases parse real envelopes and
+# damaged ones, and prove the gate STOPS before the claim can be released.
+
+$repVerify  = New-VerifyReportText -ReportName '90_verify.sql'
+$repStorage = New-VerifyReportText -ReportName '95_storage_config.sql'
+
+# ---- 47: an undamaged envelope is accepted, for both verifiers ------------
+$parsedVerify  = Get-ReportParse -ReportName '90_verify.sql' -Text $repVerify
+$parsedStorage = Get-ReportParse -ReportName '95_storage_config.sql' -Text $repStorage
+Add-Case 'reportEnvelopeAcceptedForBothVerifiers' (
+  $parsedVerify.ok -and $parsedStorage.ok -and
+  [string]$parsedVerify.verdict -eq 'PASS' -and [string]$parsedStorage.verdict -eq 'PASS' -and
+  [int]$parsedVerify.rows -eq 19 -and [int]$parsedStorage.rows -eq 7 -and
+  $parsedVerify.headerSeen -and $parsedVerify.separatorSeen -and $parsedVerify.footerSeen -and
+  $parsedStorage.headerSeen -and $parsedStorage.separatorSeen -and $parsedStorage.footerSeen -and
+  [int]$parsedVerify.footerRows -eq 19 -and [int]$parsedStorage.footerRows -eq 7 -and
+  @($parsedVerify.envelopeProblems).Count -eq 0 -and
+  @($parsedStorage.envelopeProblems).Count -eq 0 -and
+  ($repVerify  -match '(?m)^\(19 rows\)$') -and
+  ($repStorage -match '(?m)^\(7 rows\)$') -and
+  ($repVerify  -match '(?m)^\s*ord\s*\|\s*check_name\s*\|\s*expected\s*\|\s*actual\s*\|\s*status\s*$')) @{
+  verifyRows   = $parsedVerify.rows
+  storageRows  = $parsedStorage.rows
+  verify       = [string]$parsedVerify.verdict
+  storage      = [string]$parsedStorage.verdict
+  note         = 'header, dashed separator, rows and the (N rows) footer, as psql prints them'
+}
+
+# ---- 48: the footer disagrees with the number of rows --------------------
+$badFooterText = New-VerifyReportText -ReportName '90_verify.sql' -FooterText '(20 rows)'
+$parsedBadFooter = Get-ReportParse -ReportName '90_verify.sql' -Text $badFooterText
+Add-Case 'reportFooterCountMismatchStops' (
+  -not $parsedBadFooter.ok -and
+  [string]$parsedBadFooter.verdict -eq 'FAIL' -and
+  [int]$parsedBadFooter.footerRows -eq 20 -and
+  [int]$parsedBadFooter.rows -eq 19 -and
+  ((@($parsedBadFooter.problems) -join ' ') -match 'row-count footer says 20 row\(s\) but 19 data row\(s\)')) @{
+  footerRows = $parsedBadFooter.footerRows
+  rows       = $parsedBadFooter.rows
+  verdict    = [string]$parsedBadFooter.verdict
+  note       = 'the footer is the report saying how many rows it printed; it is checked, not trusted'
+}
+
+# ---- 49: no footer at all - truncated or filtered, and the gate STOPS ----
+$noFooterText = New-VerifyReportText -ReportName '90_verify.sql' -NoFooter
+$parsedNoFooter = Get-ReportParse -ReportName '90_verify.sql' -Text $noFooterText
+$gateNoFooter = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text $noFooterText))
+$noFooterOutcome = Test-VerificationGateOutcome -Probe $gateNoFooter `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'reportMissingFooterStops' (
+  -not $parsedNoFooter.ok -and
+  -not $parsedNoFooter.footerSeen -and
+  ((@($parsedNoFooter.problems) -join ' ') -match 'has no row-count footer') -and
+  $noFooterOutcome.ok -and
+  [int]$gateNoFooter.nativeCalls -eq 1 -and
+  -not $gateNoFooter.receipts.Contains('06-claim-release.json') -and
+  -not $gateNoFooter.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateNoFooter -Outcome $noFooterOutcome `
+  -Note 'a truncated stream has no footer, so the claim is never released')
+
+# ---- 50: a footer that is present but malformed --------------------------
+$malformedFooterText = New-VerifyReportText -ReportName '90_verify.sql' -FooterText '(19 row'
+$parsedMalformedFooter = Get-ReportParse -ReportName '90_verify.sql' -Text $malformedFooterText
+Add-Case 'reportMalformedFooterStops' (
+  -not $parsedMalformedFooter.ok -and
+  [string]$parsedMalformedFooter.verdict -eq 'FAIL' -and
+  -not $parsedMalformedFooter.footerSeen -and
+  ((@($parsedMalformedFooter.problems) -join ' ') -match 'malformed row-count footer')) @{
+  verdict = [string]$parsedMalformedFooter.verdict
+  problems = @($parsedMalformedFooter.problems)
+}
+
+# ---- 51: output after the footer is never ignored ------------------------
+$trailerText = New-VerifyReportText -ReportName '90_verify.sql' -Trailer 'WARNING:  there is no transaction in progress'
+$parsedTrailer = Get-ReportParse -ReportName '90_verify.sql' -Text $trailerText
+$gateTrailer = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text $trailerText))
+$trailerOutcome = Test-VerificationGateOutcome -Probe $gateTrailer `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'reportUnexpectedTrailerStops' (
+  -not $parsedTrailer.ok -and
+  [string]$parsedTrailer.verdict -eq 'FAIL' -and
+  $parsedTrailer.footerSeen -and
+  [int]$parsedTrailer.rows -eq 19 -and
+  ((@($parsedTrailer.problems) -join ' ') -match 'unexpected output after the row-count footer') -and
+  $trailerOutcome.ok -and
+  -not $gateTrailer.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateTrailer -Outcome $trailerOutcome `
+  -Note 'a correct report followed by extra output is not a correct report')
+
+# ---- 52: R12-C1 itself - a line the old parser skipped -------------------
+$junkText = New-VerifyReportText -ReportName '90_verify.sql' -JunkLine 'postflight OK: every gating check passed'
+$parsedJunk = Get-ReportParse -ReportName '90_verify.sql' -Text $junkText
+Add-Case 'reportExtraJunkLineStops' (
+  -not $parsedJunk.ok -and
+  [string]$parsedJunk.verdict -eq 'FAIL' -and
+  [int]$parsedJunk.rows -eq 19 -and
+  [int]$parsedJunk.footerRows -eq 19 -and
+  ((@($parsedJunk.problems) -join ' ') -match 'invalid ordinal') -and
+  ((@($parsedJunk.problems) -join ' ') -match 'invalid status') -and
+  @($parsedJunk.envelopeProblems).Count -ge 2) @{
+  verdict  = [string]$parsedJunk.verdict
+  rows     = $parsedJunk.rows
+  problems = @($parsedJunk.problems)
+  note     = 'R12-C1: this line used to be skipped silently and the report still passed'
+}
+
+# ---- 53: invalid ordinal and invalid status on the SAME row --------------
+$badRowText = New-VerifyReportText -ReportName '90_verify.sql' -JunkLine '   x | not a check | 1 | 2 | SKIPPED'
+$parsedBadRow = Get-ReportParse -ReportName '90_verify.sql' -Text $badRowText
+Add-Case 'reportInvalidOrdinalAndStatusStops' (
+  -not $parsedBadRow.ok -and
+  [string]$parsedBadRow.verdict -eq 'FAIL' -and
+  ((@($parsedBadRow.problems) -join ' ') -match 'invalid ordinal') -and
+  ((@($parsedBadRow.problems) -join ' ') -match 'invalid status') -and
+  ((@($parsedBadRow.problems) -join ' ') -match 'malformed row')) @{
+  verdict  = [string]$parsedBadRow.verdict
+  problems = @($parsedBadRow.problems)
+  note     = 'both defects are reported for the same line, not just the first one'
+}
+
+# ---- 54: a stream cut in the middle of the last row ----------------------
+$cutText = New-VerifyReportText -ReportName '90_verify.sql' -NoFooter -CutLastChars 12
+$parsedCut = Get-ReportParse -ReportName '90_verify.sql' -Text $cutText
+Add-Case 'reportTruncatedMidRowStops' (
+  -not $parsedCut.ok -and
+  [string]$parsedCut.verdict -eq 'FAIL' -and
+  -not $parsedCut.footerSeen -and
+  [int]$parsedCut.rows -eq 18 -and
+  ((@($parsedCut.problems) -join ' ') -match 'has no row-count footer') -and
+  ((@($parsedCut.problems) -join ' ') -match 'invalid status')) @{
+  verdict  = [string]$parsedCut.verdict
+  rows     = $parsedCut.rows
+  problems = @($parsedCut.problems)
+}
+
+# ---- 55: the storage verifier obeys the same envelope --------------------
+$storageTrailerText = New-VerifyReportText -ReportName '95_storage_config.sql' -Trailer 'psql: warning: there is no transaction in progress'
+$gateStorageTrailer = Invoke-VerificationGateProbe -Results @(
+  (New-GateChildResult -Text $repVerify),
+  (New-GateChildResult -Text $storageTrailerText)
+)
+$storageTrailerOutcome = Test-VerificationGateOutcome -Probe $gateStorageTrailer `
+  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '05-storage-fail.json') `
+  -ExpectedStop '05-storage-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'FAIL' }
+Add-Case 'reportStorageTrailerStops' (
+  $storageTrailerOutcome.ok -and
+  [int]$gateStorageTrailer.nativeCalls -eq 2 -and
+  [string]$gateStorageTrailer.stopReason -match 'storage verification did not satisfy' -and
+  [string]$gateStorageTrailer.stopReason -match 'unexpected output after the row-count footer' -and
+  -not $gateStorageTrailer.receipts.Contains('06-claim-release.json') -and
+  -not $gateStorageTrailer.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateStorageTrailer -Outcome $storageTrailerOutcome `
+  -Note 'the storage verifier is held to the same envelope as the postflight')
 
 # ===========================================================================
 # verdict: inventory first, then the receipt, then the file on disk

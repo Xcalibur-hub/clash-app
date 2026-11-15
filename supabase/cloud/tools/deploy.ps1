@@ -679,6 +679,10 @@ New-PhaseReceipt '04-postflight.json' @{
   gatingExpected  = $vfReport.gatingExpected
   infoExpected    = $vfReport.infoExpected
   captureComplete = $vfReport.captureComplete
+  headerSeen      = $vfReport.headerSeen
+  separatorSeen   = $vfReport.separatorSeen
+  footerSeen      = $vfReport.footerSeen
+  footerRows      = $vfReport.footerRows
   reportContract  = '90_verify.sql'
   problems        = @($vfReport.problems)
   summary         = (Format-NativeSummary $vf)
@@ -717,6 +721,10 @@ New-PhaseReceipt '05-storage.json' @{
   gatingExpected  = $stReport.gatingExpected
   infoExpected    = $stReport.infoExpected
   captureComplete = $stReport.captureComplete
+  headerSeen      = $stReport.headerSeen
+  separatorSeen   = $stReport.separatorSeen
+  footerSeen      = $stReport.footerSeen
+  footerRows      = $stReport.footerRows
   reportContract  = '95_storage_config.sql'
   problems        = @($stReport.problems)
   summary         = (Format-NativeSummary $st)
