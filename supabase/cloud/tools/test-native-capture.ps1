@@ -1300,7 +1300,22 @@ function New-VerifyReportText {
   $separator = @()
   foreach ($w in $widths) { $separator += ('-' * ([int]$w + 2)) }
   $lines.Add(($separator -join '+'))
-  foreach ($row in $body) { $lines.Add((Format-ReportRow -Cells $row -Widths $widths)) }
+  foreach ($row in $body) {
+    if (@($row).Count -lt 5) {
+      # A damaged report can lose trailing columns: the row ends at its last real
+      # cell instead of being padded out to five. psql never renders this; it is
+      # what a truncated read, a bad filter or a hand-edited evidence file looks
+      # like, which is exactly what the parser must reject.
+      $short = @()
+      for ($i = 0; $i -lt @($row).Count; $i++) {
+        $short += (Format-ReportCell -Text ([string]$row[$i]) -Width ([int]$widths[$i]) -Right ($i -eq 0))
+      }
+      $lines.Add((' ' + ($short -join ' | ') + ' '))
+    }
+    else {
+      $lines.Add((Format-ReportRow -Cells $row -Widths $widths))
+    }
+  }
 
   if ($CutLastChars -gt 0 -and $lines.Count -gt 2) {
     $lastIndex = $lines.Count - 1
@@ -1481,7 +1496,7 @@ function New-GateCaseDetail {
   param($Probe, $Outcome, [string]$Note = '')
 
   $reason = [string]$Probe.stopReason
-  if ($reason.Length -gt 240) { $reason = $reason.Substring(0, 240) }
+  if ($reason.Length -gt 900) { $reason = $reason.Substring(0, 900) }
   $statusByReceipt = @{}
   foreach ($name in @($Probe.receipts.Keys)) {
     $statusByReceipt[[string]$name] = [string]$Probe.receipts[[string]$name]['status']

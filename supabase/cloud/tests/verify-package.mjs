@@ -2034,7 +2034,13 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
     /\(N rows\)/.test(selfTest) &&
     /\$separator \+= \('-' \* \(\[int\]\$w \+ 2\)\)/.test(selfTest) &&
     /-FooterText/.test(selfTest) && /-NoFooter/.test(selfTest) &&
-    /-Trailer/.test(selfTest) && /-JunkLine/.test(selfTest));
+    /-Trailer/.test(selfTest) && /-JunkLine/.test(selfTest) &&
+    // A short row must stay short: Format-ReportRow pads every column, so a row
+    // that "lost its status" was rendered as five cells with two blanks and the
+    // parser (correctly) called it an invalid status, not a malformed row. That
+    // cost a CI round; the bypass is now part of the contract.
+    selfTest.includes('@($row).Count -lt 5') &&
+    selfTest.includes("($short -join ' | ')"));
 
   // -------------------------------------------------- the sibling parsers ------
   check('the manifest checker treats an unreadable checksum line as a failure',
