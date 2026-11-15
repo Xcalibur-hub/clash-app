@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 21;
-const EXPECTED_CASES = 33;
-const EXPECTED_ASSERTIONS = 365;
+const EXPECTED_SECTIONS = 22;
+const EXPECTED_CASES = 46;
+const EXPECTED_ASSERTIONS = 383;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -1657,6 +1657,206 @@ hdr(21, 'claim release: the committed block, executed (Round 10)');
   check('mirror: a run that prints its own id but did not succeed is never a release',
     releaseBranch({ ...ok, timedOut: true }, [runId], runId) === 'release-fail' &&
     releaseBranch({ ...ok, captureNote: 'x' }, [runId], runId) === 'release-fail');
+}
+
+hdr(22, 'verification report contract - the report IS the SQL (Round 12 / R11-C1)');
+{
+  const deployCode = lf(read(join(CLOUD, 'tools/deploy.ps1')));
+  const selfTest   = lf(read(join(CLOUD, 'tools/test-native-capture.ps1')));
+  const libCode    = lf(read(join(CLOUD, 'tools/lib/clash-native.ps1')));
+  const readmeText = lf(read(join(CLOUD, 'README.md')));
+
+  // ---------------------------------------------------- what the SQL renders --
+  // The contract may not be invented: it is compared against the identities the
+  // renderer itself emits. Only the first contiguous run of ords counts; the
+  // guard block repeats the same list further down the file.
+  const IDENTITY = /select\s+(\d+)\s+as\s+ord,\s*'((?:[^']|'')*)'::text\s+as\s+check_name,\s*'((?:[^']|'')*)'::text\s+as\s+expected/g;
+  const sqlIdentities = (rel) => {
+    const text = read(join(CLOUD, rel));
+    IDENTITY.lastIndex = 0;
+    const rows = [];
+    let next = 1;
+    for (const m of text.matchAll(IDENTITY)) {
+      const ord = Number(m[1]);
+      if (ord !== next) break;
+      rows.push({ ord, name: m[2].replace(/''/g, "'"), expected: m[3].replace(/''/g, "'") });
+      next += 1;
+    }
+    return rows;
+  };
+  const verifyRows  = sqlIdentities('verify/90_verify.sql');
+  const storageRows = sqlIdentities('verify/95_storage_config.sql');
+
+  // ------------------------------------------------- what the adapter declares --
+  const contractOf = (report) => {
+    const start = libCode.indexOf(`if ($ReportName -eq '${report}') {`);
+    if (start < 0) return null;
+    const bounds = [libCode.indexOf('if ($ReportName -eq ', start + 10), libCode.indexOf('return $null', start)]
+      .filter((i) => i > start);
+    const blockText = libCode.slice(start, bounds.length ? Math.min(...bounds) : libCode.length);
+    const gating = Number((blockText.match(/gating = (\d+)/) || [])[1]);
+    const info   = Number((blockText.match(/\binfo\s+= (\d+)/) || [])[1]);
+    const checks = [];
+    const rowRe = /\[ordered\]@\{ ord = (\d+);\s*name = '((?:[^']|'')*)';\s*expected = '((?:[^']|'')*)';\s*info = \$(true|false) \}/g;
+    for (const m of blockText.matchAll(rowRe)) {
+      checks.push({ ord: Number(m[1]), name: m[2].replace(/''/g, "'"), expected: m[3].replace(/''/g, "'"), info: m[4] === 'true' });
+    }
+    return { report, gating, info, checks };
+  };
+  const verifyContract  = contractOf('90_verify.sql');
+  const storageContract = contractOf('95_storage_config.sql');
+
+  check('the renderer still emits 19 / 7 identities (the contract is compared to this, not to a copy)',
+    verifyRows.length === 19 && storageRows.length === 7, `${verifyRows.length}/${storageRows.length}`);
+  check('both contracts are declared in the adapter', verifyContract !== null && storageContract !== null);
+  check('the declared contract equals the SQL: ord, name and expected text, row for row',
+    verifyContract.checks.length === verifyRows.length &&
+    verifyContract.checks.every((c, i) => c.ord === verifyRows[i].ord && c.name === verifyRows[i].name &&
+      c.expected === verifyRows[i].expected) &&
+    storageContract.checks.length === storageRows.length &&
+    storageContract.checks.every((c, i) => c.ord === storageRows[i].ord && c.name === storageRows[i].name &&
+      c.expected === storageRows[i].expected));
+  check('the declared gating/INFO counts are the ones the SQL renders (19+0 and 6+1)',
+    verifyContract.gating === 19 && verifyContract.info === 0 &&
+    storageContract.gating === 6 && storageContract.info === 1 &&
+    verifyContract.checks.length === verifyContract.gating + verifyContract.info &&
+    storageContract.checks.length === storageContract.gating + storageContract.info);
+  check('the single INFO identity is the row the SQL itself labels INFO',
+    storageContract.checks.filter((c) => c.info).length === 1 &&
+    storageContract.checks.filter((c) => c.info)[0].name.startsWith('INFO') &&
+    verifyContract.checks.filter((c) => c.info).length === 0);
+
+  // ------------------------------------------------------- decision mirror ----
+  // Specification mirror of Test-VerifyReport. The executed PowerShell cases in
+  // test-native-capture.ps1 (34-46) prove the deployed expressions; this proves
+  // the rule they implement, on the same thirteen scenarios.
+  const reportRows = (contract, { omit = [], dup = [], break_ = [], rename = {}, fail = [] } = {}) => {
+    const rows = [];
+    for (const c of contract.checks) {
+      if (omit.includes(c.ord)) continue;
+      let status = c.info ? 'INFO' : 'PASS';
+      if (fail.includes(c.ord)) status = 'FAIL';
+      const name = rename[c.ord] || c.name;
+      if (break_.includes(c.ord)) { rows.push({ ord: c.ord, fields: 3, name, expected: c.expected, status: null, broken: true }); continue; }
+      rows.push({ ord: c.ord, fields: 5, name, expected: c.expected, status });
+      if (dup.includes(c.ord)) rows.push({ ord: c.ord, fields: 5, name, expected: c.expected, status });
+    }
+    return rows;
+  };
+  const evaluate = (rows, nativeOk, contract) => {
+    const problems = [];
+    const malformed = rows.filter((r) => r.broken || r.fields !== 5 || !['PASS', 'FAIL', 'INFO'].includes(r.status));
+    const seen = new Map();
+    const duplicates = [];
+    for (const r of rows) {
+      if (r.broken || r.fields !== 5) continue;
+      if (seen.has(r.ord)) { duplicates.push(r.ord); continue; }
+      seen.set(r.ord, r);
+    }
+    const declared = contract.checks.map((c) => c.ord);
+    const missing = declared.filter((o) => !seen.has(o));
+    const unexpected = [...seen.keys()].filter((o) => !declared.includes(o));
+    const gating = [...seen.values()].filter((r) => r.status === 'PASS' || r.status === 'FAIL');
+    const passRows = gating.filter((r) => r.status === 'PASS').length;
+    const failRows = gating.filter((r) => r.status === 'FAIL').length;
+    const infoRows = [...seen.values()].filter((r) => r.status === 'INFO').length;
+    if (rows.length === 0) problems.push('no rows');
+    if (!nativeOk) problems.push('not native success');
+    if (malformed.length) problems.push('malformed');
+    if (duplicates.length) problems.push('duplicate');
+    if (missing.length) problems.push('missing');
+    if (unexpected.length) problems.push('unexpected');
+    if (failRows > 0) problems.push('fail row');
+    if (passRows + failRows !== contract.gating) problems.push('gating count');
+    if (infoRows !== contract.info) problems.push('info count');
+    for (const c of contract.checks) {
+      const row = seen.get(c.ord);
+      if (!row) continue;
+      if (row.name !== c.name) problems.push('name drift');
+      if (row.expected !== c.expected) problems.push('expected drift');
+      if (c.info ? row.status !== 'INFO' : row.status !== 'PASS') problems.push('status');
+    }
+    let verdict = problems.length ? 'FAIL' : 'PASS';
+    if (!nativeOk) verdict = 'UNPROVEN';
+    return { verdict, problems, ok: verdict === 'PASS' };
+  };
+  const scenarios = [
+    ['verify report complete', read(join(CLOUD, 'verify/90_verify.sql')) && reportRows(verifyContract), true, verifyContract, 'PASS'],
+    ['verify report empty (exit 0, no output)', [], true, verifyContract, 'FAIL'],
+    ['verify report renders a FAIL row', reportRows(verifyContract, { fail: [7] }), true, verifyContract, 'FAIL'],
+    ['verify report truncated (18 of 19)', reportRows(verifyContract, { omit: [19] }), true, verifyContract, 'FAIL'],
+    ['verify report duplicates a check', reportRows(verifyContract, { dup: [5] }), true, verifyContract, 'FAIL'],
+    ['verify report row loses a column', reportRows(verifyContract, { break_: [3] }), true, verifyContract, 'FAIL'],
+    ['verify report renames a check', reportRows(verifyContract, { rename: { 2: 'roughly right' } }), true, verifyContract, 'FAIL'],
+    ['verify child exits nonzero with a complete report', reportRows(verifyContract), false, verifyContract, 'UNPROVEN'],
+    ['storage report complete', reportRows(storageContract), true, storageContract, 'PASS'],
+    ['storage report empty (exit 0, no output)', [], true, storageContract, 'FAIL'],
+    ['storage report renders a FAIL row', reportRows(storageContract, { fail: [4] }), true, storageContract, 'FAIL'],
+    ['storage report omits its INFO row', reportRows(storageContract, { omit: [7] }), true, storageContract, 'FAIL'],
+    ['storage child cannot be proven', reportRows(storageContract), false, storageContract, 'UNPROVEN'],
+  ];
+  const offScenario = scenarios.filter(([, rows, nativeOk, contract, expected]) => evaluate(rows, nativeOk, contract).verdict !== expected)
+    .map(([name, , , , expected]) => `${name} -> not ${expected}`);
+  check('mirror: the thirteen report scenarios decide the verdicts the adapter cases assert',
+    offScenario.length === 0, offScenario.join('; '));
+  check('mirror: an ambiguous execution is UNPROVEN, never PASS and never FAIL-on-content',
+    evaluate(reportRows(verifyContract), false, verifyContract).verdict === 'UNPROVEN' &&
+    evaluate([], false, verifyContract).verdict === 'UNPROVEN' &&
+    evaluate(reportRows(verifyContract, { fail: [7] }), false, verifyContract).verdict === 'UNPROVEN');
+  check('mirror: exit 0 with an empty report is a failure, not a pass',
+    evaluate([], true, verifyContract).ok === false &&
+    evaluate([], true, storageContract).ok === false);
+
+  // --------------------------------------------------------- the deployment --
+  check('gate 5 validates both reports through the shared function',
+    deployCode.includes("$vfReport = Test-VerifyReport -Result $vf -ReportName '90_verify.sql'") &&
+    deployCode.includes("$stReport = Test-VerifyReport -Result $st -ReportName '95_storage_config.sql'") &&
+    /function Test-VerifyReport/.test(libCode) && /function Get-ClashVerifyContract/.test(libCode));
+  const gate5 = deployCode.slice(deployCode.indexOf('gate 5: postflight'), deployCode.indexOf('$seal = Seal-Evidence'));
+  check('R11-C1: row counting is no longer the gate for postflight or storage',
+    !/\[regex\]::Matches/.test(gate5) && !/\$vfFailRows|\$stFailRows/.test(gate5) &&
+    // gate 2 keeps its own zero-row rule, so hardening gate 5 leaves no sibling open
+    /if \(\$pfFail -gt 0 -or \$pfPass -lt 1\)/.test(deployCode));
+  check('a report that does not hold never produces a PASS phase receipt',
+    /\$vfReport\.verdict/.test(deployCode) && /\$stReport\.verdict/.test(deployCode) &&
+    /if \(-not \$vfReport\.ok\) \{/.test(deployCode) && /if \(-not \$stReport\.ok\) \{/.test(deployCode) &&
+    /ok              = \(\$verdict -eq 'PASS'\)/.test(libCode));
+  check('both STOPs precede the assertion that the claim was never released',
+    deployCode.indexOf('04-postflight-fail.json') < deployCode.indexOf("$st = Invoke-NativeProcess") &&
+    deployCode.indexOf('05-storage-fail.json') < deployCode.indexOf('REFUSED: the claim release was reached without two proven verification reports') &&
+    deployCode.indexOf('REFUSED: the claim release was reached without two proven verification reports') <
+      deployCode.indexOf("delete from supabase_migrations.clash_deploy_claim") &&
+    deployCode.indexOf("delete from supabase_migrations.clash_deploy_claim") < deployCode.indexOf("'06-complete.json'"));
+  check('an incomplete report stops with wording that does not imply a rollback',
+    /claim stays held for human review/.test(deployCode) &&
+    /No rollback is implied/.test(deployCode) &&
+    !/rolled back/i.test(deployCode.slice(deployCode.indexOf('gate 5: postflight'), deployCode.indexOf('$seal = Seal-Evidence'))));
+  check('the verdict is forced to UNPROVEN whenever the child is not a proven success',
+    /if \(-not \$nativeOk\) \{ \$verdict = 'UNPROVEN' \}/.test(libCode) &&
+    /its evidence cannot be classified as PASS or FAIL/.test(libCode));
+  check('the adapter refuses a report name it has no contract for',
+    /no declared contract exists for/.test(libCode) &&
+    /return \$null/.test(libCode));
+
+  // ------------------------------------------------------------ the harness --
+  const newCases = ['verificationReportContractMatchesSql', 'verificationReportsProceedToComplete',
+    'postflightEmptyReportStops', 'postflightFailedRowStops', 'postflightTruncatedReportStops',
+    'postflightDuplicateRowStops', 'postflightMalformedRowStops', 'postflightIdentityDriftStops',
+    'postflightUnprovenStops', 'storageEmptyReportStops', 'storageFailedRowStops',
+    'storageMissingInfoRowStops', 'storageUnprovenStops'];
+  check('all thirteen report cases exist in the harness and in the inventory',
+    newCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest)) &&
+    newCases.every((n) => libCode.includes(`'${n}'`)));
+  check('the harness executes the committed gate 5 region instead of restating it',
+    /function Get-VerificationGateBlock/.test(selfTest) &&
+    /\$script:r12Block = \[scriptblock\]::Create/.test(selfTest) &&
+    /Test-VerifyReport -Result/.test(selfTest) &&
+    selfTest.includes("-ReportName '90_verify.sql'") &&
+    selfTest.includes("-ReportName '95_storage_config.sql'") &&
+    /function Invoke-VerificationGateProbe/.test(selfTest));
+  check('the README documents the report contract',
+    readmeText.includes('Get-ClashVerifyContract') && readmeText.includes('19 declared gating') &&
+    readmeText.includes('6 gating checks plus') && readmeText.includes('before the writer claim is released'));
 }
 
 {

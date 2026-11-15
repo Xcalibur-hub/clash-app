@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **365 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **383 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 365 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 383 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -193,6 +193,13 @@ listing or an ABSENT ledger is exercised in PowerShell, not just in JavaScript.
 
 Adapter `4.3.0` (was `4.2.0`), native self-test 33 cases (was 26).
 
+Adapter `4.4.0` (was `4.3.0`), native self-test 46 cases (was 33): the report
+contract (`Get-ClashVerifyContract`) and its enforcer (`Test-VerifyReport`) are
+certified on the runtime, and thirteen new cases execute the committed gate 5
+region of `deploy.ps1` - both reports complete, empty, truncated, duplicated,
+malformed, renamed, FAIL-rendering and unprovable - so "exit 0 with no rows" is
+a stopped run, not a COMPLETE.
+
 ### 1i. Round 10 (audit of `fd453b5`) - claim release could never succeed
 
 | # | Defect | Fix |
@@ -206,6 +213,15 @@ gates have **never run against the hosted database**, and the ledger/CLI
 interoperability is **documented, not executed**. The Round-10 PowerShell cases
 have not been executed on this machine either - they are executed by
 `test-native-capture.ps1` on the Windows host, and only that receipt counts.
+
+### 1j. Round 12 (audit of `3e95e2f`) - the verification gate accepted an empty report
+
+| # | Defect | Fix |
+|---|---|---|
+| R11-C1 (critical) | gate 5 counted FAIL rows only. A `psql` child that exited 0 with **zero** rendered rows satisfied `Test-NativeSuccess` and `failRows -eq 0`, so the run released the exclusive-writer claim and wrote `06-complete.json` on unproven evidence. Storage verification had no PASS/INFO contract at all | `Get-ClashVerifyContract` declares the exact report each script must render - 19 gating checks for `90_verify.sql`, 6 gating + 1 INFO for `95_storage_config.sql`, each with its ord, check name and expected text - and `Test-VerifyReport` accepts a report only when it renders exactly those identities, in order, with no missing, duplicated, malformed, undeclared or drifted row, correct gating/INFO counts and no gating FAIL. Both phase receipts now carry `verdict`, `rows`, `problems` and the contract size |
+| - | an ambiguous child could be read as a content failure | the verdict is forced to `UNPROVEN` whenever `Test-NativeSuccess` is false, so a timeout, launch error or partial capture is never PASS and never FAIL-on-content |
+| - | the STOP did not say whether the claim was still held | both STOPs state that no rollback is implied, that the claim stays held for human review (T1) and that completion is withheld; a third invariant STOP fires if the release is ever reached without two proven reports |
+| - | the offline suite could not see this: it only grepped `deploy.ps1` | section [22] compares the declared contract with the identities the SQL itself renders, mirrors the thirteen decisions, and `test-native-capture.ps1` executes the committed gate 5 region with the process and evidence layers stubbed (46 native cases) |
 
 ## 2. Layout
 
@@ -227,7 +243,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (365 assertions)
+tests/verify-package.mjs       offline test suite (383 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)
@@ -296,6 +312,16 @@ gate 4  111 wrappers: digest compared → execute → ledger read-back → class
 gate 5  postflight verification + storage verification
         seal EVIDENCE-MANIFEST.json, print the terminal receipt
 ```
+
+Gate 5 does not infer success from an exit code, and it does not count FAIL
+rows. Each verification report is checked against a contract declared in
+`tools/lib/clash-native.ps1` (`Get-ClashVerifyContract`, enforced by
+`Test-VerifyReport`): `90_verify.sql` must render exactly its 19 declared gating
+checks and no INFO row, `95_storage_config.sql` exactly its 6 gating checks plus
+its 1 INFO row, each with the declared ord, check name, expected text and status,
+with nothing missing, duplicated, malformed or undeclared. An empty, truncated,
+reordered or unproven report stops gate 5 before the writer claim is released, so
+`06-complete.json` is only written when both reports satisfy their contract.
 
 Step 0 is create-only and is **not** counted in the 111. The operator does not
 run it by hand: leaving it to a human was one of the unvalidated steps Round 2

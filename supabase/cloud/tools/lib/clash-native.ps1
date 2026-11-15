@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.3.0'
+$script:ClashAdapterVersion = '4.4.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -725,6 +725,270 @@ function Resolve-ExecutionPolicy {
   }
 }
 
+# ------------------------------------------- verification report contract ---
+# Round 12 (R11-C1): a psql exit code of 0 is NOT evidence that a verification
+# report was rendered. An invocation that produced no rows at all, half a report,
+# a duplicated check, a renamed check or a malformed row still exits 0 whenever
+# the child never reached the RAISE at the end of the file - and the runner used
+# to count only FAIL rows. Zero rows therefore read as success: the postflight
+# gate passed with no evidence, the writer claim was released and the receipt
+# said COMPLETE.
+#
+# The contract below is the exact set of checks the two committed scripts render,
+# in the order they render them, with the expected value each row must show. It
+# is DECLARED here, never inferred at run time, and two independent mirrors prove
+# it has not been invented or allowed to drift:
+#   * tests/verify-package.mjs extracts the identities from the SQL on Linux and
+#     fails when the declaration differs (offline, every run)
+#   * tools/test-native-capture.ps1 does the same on the Windows host and also
+#     executes deployed gates against complete and deliberately broken reports
+# ord, name and expected are transcribed from verify/90_verify.sql and
+# verify/95_storage_config.sql; 'info = $true' marks the row the script renders
+# as INFO (it is not a gating check).
+function Get-ClashVerifyContract {
+  param([Parameter(Mandatory = $true)][string]$ReportName)
+
+  if ($ReportName -eq '90_verify.sql') {
+    return [ordered]@{
+      report = '90_verify.sql'
+      path   = 'verify\90_verify.sql'
+      gating = 19
+      info   = 0
+      checks = @(
+        [ordered]@{ ord = 1;  name = 'ledger rows';                                        expected = '111';        info = $false }
+        [ordered]@{ ord = 2;  name = 'ledger versions match manifest exactly';             expected = '111';        info = $false }
+        [ordered]@{ ord = 3;  name = 'ledger has no extra versions';                       expected = '0';          info = $false }
+        [ordered]@{ ord = 4;  name = 'every ledger row stores a sha256';                   expected = '0';          info = $false }
+        [ordered]@{ ord = 5;  name = 'executed-text sha256 matches manifest for all';      expected = '0';          info = $false }
+        [ordered]@{ ord = 6;  name = 'file 13 recorded as the cloud variant';              expected = 'clash_scheduler__cloud_nocron'; info = $false }
+        [ordered]@{ ord = 7;  name = 'core tables present';                                expected = '8';          info = $false }
+        [ordered]@{ ord = 8;  name = 'RPC signatures exact';                               expected = '0';          info = $false }
+        [ordered]@{ ord = 9;  name = 'publication contains arena_room_messages';           expected = 'true';       info = $false }
+        [ordered]@{ ord = 10; name = 'realtime.messages policies count';                   expected = '>=5';        info = $false }
+        [ordered]@{ ord = 11; name = 'run_maintenance not executable by anon';             expected = 'false';      info = $false }
+        [ordered]@{ ord = 12; name = 'run_maintenance not executable by authenticated';    expected = 'false';      info = $false }
+        [ordered]@{ ord = 13; name = 'run_maintenance executable by service_role';         expected = 'true';       info = $false }
+        [ordered]@{ ord = 14; name = 'TRIPWIRE pg_cron absent';                            expected = 'ABSENT';     info = $false }
+        [ordered]@{ ord = 15; name = 'TRIPWIRE cron.schedule absent';                      expected = 'ABSENT';     info = $false }
+        [ordered]@{ ord = 16; name = 'TRIPWIRE schema cron absent';                        expected = 'ABSENT';     info = $false }
+        [ordered]@{ ord = 17; name = 'TRIPWIRE no cron job rows';                          expected = 'ABSENT';     info = $false }
+        [ordered]@{ ord = 18; name = 'realtime.messages RLS still enabled';                expected = 'true';       info = $false }
+        [ordered]@{ ord = 19; name = 'wal_level unchanged';                                expected = 'logical';    info = $false }
+      )
+    }
+  }
+  if ($ReportName -eq '95_storage_config.sql') {
+    return [ordered]@{
+      report = '95_storage_config.sql'
+      path   = 'verify\95_storage_config.sql'
+      gating = 6
+      info   = 1
+      checks = @(
+        [ordered]@{ ord = 1; name = 'bucket count for media';                        expected = '2';         info = $false }
+        [ordered]@{ ord = 2; name = 'public-media is public';                        expected = 'true';      info = $false }
+        [ordered]@{ ord = 3; name = 'private-media is private';                      expected = 'false';     info = $false }
+        [ordered]@{ ord = 4; name = 'file_size_limit';                               expected = '104857600'; info = $false }
+        [ordered]@{ ord = 5; name = 'mime allowlist length';                         expected = '8';         info = $false }
+        [ordered]@{ ord = 6; name = 'storage.objects policies';                      expected = '5';         info = $false }
+        [ordered]@{ ord = 7; name = 'INFO created by migration 4, not by this package'; expected = 'INFO';   info = $true }
+      )
+    }
+  }
+  return $null
+}
+
+# Validates one rendered verification report against its contract.
+#
+# Accepts a report only when ALL of the following hold. Each failure is recorded
+# as its own problem string, so the STOP receipt says which one it was:
+#   * the child definitely ran, finished, returned 0 and both streams were
+#     captured in full (Test-NativeSuccess) - otherwise the verdict is UNPROVEN,
+#     never PASS and never FAIL-on-content, because an ambiguous execution cannot
+#     be used to classify the database either way
+#   * at least one row was rendered (an empty report is not a pass)
+#   * every row parses into exactly five fields with a numeric leading ord and a
+#     status of PASS/FAIL/INFO (malformed rows are reported, never skipped)
+#   * no ord appears twice (duplicate)
+#   * the rendered ords are exactly the declared ords, with none missing and none
+#     unexpected, in ascending order (truncated / extra / reordered reports)
+#   * every row's check_name and expected text equal the declared identity
+#     (a drifted report is not the report that was reviewed)
+#   * every gating row is PASS (a rendered FAIL is a failure) and the single
+#     declared INFO row renders INFO, with the declared PASS and INFO counts
+# Returned fields: ok, verdict (PASS/FAIL/UNPROVEN), rows, passRows, failRows,
+# infoRows, gatingExpected, infoExpected, missing, unexpected, duplicates,
+# malformed, problems, outcome, nativeOk, captureComplete.
+function Test-VerifyReport {
+  param(
+    [Parameter(Mandatory = $true)]$Result,
+    [Parameter(Mandatory = $true)][string]$ReportName
+  )
+
+  $problems   = @()
+  $malformed  = @()
+  $duplicates = @()
+  $order      = @()
+  $passRows   = 0
+  $failRows   = 0
+  $infoRows   = 0
+  $rowCount   = 0
+  $byOrd      = [ordered]@{}
+
+  $nativeOk = Test-NativeSuccess $Result
+  $captureComplete = Test-NativeCaptureComplete $Result
+  $outcome = 'UNKNOWN'
+  if ($null -ne $Result) { $outcome = Get-NativeOutcomeLabel $Result }
+
+  $contract = Get-ClashVerifyContract -ReportName $ReportName
+  if ($null -eq $contract) {
+    return [ordered]@{
+      ok              = $false
+      verdict         = 'FAIL'
+      report          = $ReportName
+      rows            = 0
+      passRows        = 0
+      failRows        = 0
+      infoRows        = 0
+      gatingExpected  = 0
+      infoExpected    = 0
+      missing         = @()
+      unexpected      = @()
+      duplicates      = @()
+      malformed       = @()
+      problems        = @(("no declared contract exists for '{0}'" -f $ReportName))
+      outcome         = $outcome
+      nativeOk        = $nativeOk
+      captureComplete = $captureComplete
+    }
+  }
+
+  $declared      = @($contract.checks)
+  $gatingExpected = [int]$contract.gating
+  $infoExpected   = [int]$contract.info
+
+  $text = ''
+  if ($null -ne $Result -and $null -ne (Get-DocumentProperty -Object $Result -Name 'stdOut' -Default $null)) {
+    $text = [string](Get-DocumentProperty -Object $Result -Name 'stdOut' -Default '')
+  }
+
+  foreach ($raw in ($text -split "`r?`n")) {
+    $line = [string]$raw
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    if (-not $line.Contains('|')) { continue }
+    $fields = @($line.Split('|'))
+    $first  = ([string]$fields[0]).Trim()
+    if ($first -notmatch '^\d+$') {
+      # A header or a rule line has a non-numeric first field. A line that still
+      # ends in a status token is a data row whose shape collapsed: report it.
+      if ($line -match '\|\s*(PASS|FAIL|INFO)\s*$') { $malformed += (Protect-Text $line.Trim()) }
+      continue
+    }
+    $rowCount++
+    if ($fields.Count -ne 5) {
+      $malformed += ('{0} field(s): {1}' -f $fields.Count, (Protect-Text $line.Trim()))
+      continue
+    }
+    $ord      = [int]$first
+    $name     = ([string]$fields[1]).Trim()
+    $expected = ([string]$fields[2]).Trim()
+    $status   = ([string]$fields[4]).Trim()
+    if ($status -ne 'PASS' -and $status -ne 'FAIL' -and $status -ne 'INFO') {
+      $malformed += ('status {0}: {1}' -f (Protect-Text $status), (Protect-Text $line.Trim()))
+      continue
+    }
+    if ($byOrd.Contains($ord)) { $duplicates += $ord; continue }
+    $byOrd[$ord] = [ordered]@{ ord = $ord; name = $name; expected = $expected; status = $status }
+    $order += $ord
+    if ($status -eq 'PASS') { $passRows++ }
+    elseif ($status -eq 'FAIL') { $failRows++ }
+    else { $infoRows++ }
+  }
+
+  $declaredOrds = @($declared | ForEach-Object { [int]$_.ord })
+  $seenOrds     = @($order | ForEach-Object { [int]$_ })
+  $missing      = @($declaredOrds | Where-Object { -not $byOrd.Contains([int]$_) })
+  $unexpected   = @($seenOrds | Where-Object { $declaredOrds -notcontains [int]$_ })
+
+  if ($rowCount -eq 0) {
+    $problems += ('the {0} report rendered no verification rows at all; exit 0 without evidence is not a pass' -f $ReportName)
+  }
+  if (-not $nativeOk) {
+    $problems += ('the {0} verification child did not run to a proven success (outcome {1}); its evidence cannot be classified as PASS or FAIL' -f $ReportName, $outcome)
+  }
+  if ($malformed.Count -gt 0) {
+    # Sliced, not piped through Select-Object -First: under
+    # $ErrorActionPreference = 'Stop' a stopped pipeline can surface as a
+    # terminating error, and a diagnostic string must never abort the verdict.
+    $malformedSample = @($malformed)
+    if ($malformedSample.Count -gt 4) { $malformedSample = @($malformedSample[0..3]) }
+    $problems += ('{0} malformed row(s): {1}' -f $malformed.Count, ($malformedSample -join ' ; '))
+  }
+  if ($duplicates.Count -gt 0) {
+    $problems += ('{0} duplicated check ord(s): {1}' -f $duplicates.Count, (($duplicates | ForEach-Object { [string]$_ }) -join ','))
+  }
+  if ($missing.Count -gt 0) {
+    $problems += ('{0} declared check(s) missing from the report: ord {1}' -f $missing.Count, (($missing | ForEach-Object { [string]$_ }) -join ','))
+  }
+  if ($unexpected.Count -gt 0) {
+    $problems += ('{0} undeclared check(s) present in the report: ord {1}' -f $unexpected.Count, (($unexpected | ForEach-Object { [string]$_ }) -join ','))
+  }
+  for ($i = 1; $i -lt $order.Count; $i++) {
+    if ([int]$order[$i] -le [int]$order[$i - 1]) { $problems += 'the rendered rows are not in ascending ord order'; break }
+  }
+  if ($failRows -gt 0) {
+    $problems += ('{0} rendered check(s) FAILED' -f $failRows)
+  }
+  if (($passRows + $failRows) -ne $gatingExpected) {
+    $problems += ('{0} gating row(s) rendered; the contract requires exactly {1}' -f ($passRows + $failRows), $gatingExpected)
+  }
+  if ($infoRows -ne $infoExpected) {
+    $problems += ('{0} INFO row(s) rendered; the contract requires exactly {1}' -f $infoRows, $infoExpected)
+  }
+
+  foreach ($d in $declared) {
+    $ord = [int]$d.ord
+    if (-not $byOrd.Contains($ord)) { continue }
+    $row = $byOrd[$ord]
+    if ([string]$row.name -ne [string]$d.name) {
+      $problems += ("check {0}: name '{1}' is not the declared '{2}'" -f $ord, $row.name, $d.name)
+    }
+    if ([string]$row.expected -ne [string]$d.expected) {
+      $problems += ("check {0}: expected text '{1}' is not the declared '{2}'" -f $ord, $row.expected, $d.expected)
+    }
+    if ([bool]$d.info) {
+      if ([string]$row.status -ne 'INFO') { $problems += ("check {0} ({1}) rendered {2}; the contract requires INFO" -f $ord, $d.name, $row.status) }
+    }
+    else {
+      if ([string]$row.status -eq 'FAIL') { $problems += ("check {0} ({1}) rendered FAIL" -f $ord, $d.name) }
+      elseif ([string]$row.status -ne 'PASS') { $problems += ("check {0} ({1}) rendered {2}; the contract requires PASS" -f $ord, $d.name, $row.status) }
+    }
+  }
+
+  $verdict = 'PASS'
+  if ($problems.Count -gt 0) { $verdict = 'FAIL' }
+  if (-not $nativeOk) { $verdict = 'UNPROVEN' }
+
+  return [ordered]@{
+    ok              = ($verdict -eq 'PASS')
+    verdict         = $verdict
+    report          = $ReportName
+    rows            = $rowCount
+    passRows        = $passRows
+    failRows        = $failRows
+    infoRows        = $infoRows
+    gatingExpected  = $gatingExpected
+    infoExpected    = $infoExpected
+    missing         = @($missing | ForEach-Object { [int]$_ })
+    unexpected      = @($unexpected | ForEach-Object { [int]$_ })
+    duplicates      = @($duplicates | ForEach-Object { [int]$_ })
+    malformed       = @($malformed)
+    problems        = @($problems)
+    outcome         = $outcome
+    nativeOk        = $nativeOk
+    captureComplete = $captureComplete
+  }
+}
+
 # ------------------------------------------------------ self-test inventory ---
 # The complete set of cases tools/test-native-capture.ps1 must execute. The
 # harness checks that it ran exactly these, and the gate checks that the receipt
@@ -762,7 +1026,20 @@ $script:ClashSelfTestRequiredCases = @(
   'claimReleaseMultipleRowsStops',
   'claimReleaseNonZeroExitStops',
   'claimReleaseTimeoutStops',
-  'claimReleaseIncompleteCaptureStops'
+  'claimReleaseIncompleteCaptureStops',
+  'verificationReportContractMatchesSql',
+  'verificationReportsProceedToComplete',
+  'postflightEmptyReportStops',
+  'postflightFailedRowStops',
+  'postflightTruncatedReportStops',
+  'postflightDuplicateRowStops',
+  'postflightMalformedRowStops',
+  'postflightIdentityDriftStops',
+  'postflightUnprovenStops',
+  'storageEmptyReportStops',
+  'storageFailedRowStops',
+  'storageMissingInfoRowStops',
+  'storageUnprovenStops'
 )
 
 # Returns a FLAT sequence of case-name strings.

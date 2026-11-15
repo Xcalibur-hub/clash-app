@@ -661,15 +661,38 @@ $vf = Invoke-NativeProcess -FilePath $psqlPath `
         -Environment $policy.env -TimeoutSeconds $VerifyTimeoutSeconds
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\verify.out') -Text $vf.stdOut)
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\verify.err') -Text $vf.stdErr)
-$vfPassRows = ([regex]::Matches($vf.stdOut, '\|\s*PASS\s*$', 'Multiline')).Count
-$vfFailRows = ([regex]::Matches($vf.stdOut, '\|\s*FAIL\s*$', 'Multiline')).Count
+# Round 12 (R11-C1): counting FAIL rows was not a contract. Exit 0 with zero
+# rendered rows passed this gate, released the writer claim and wrote COMPLETE.
+# Test-VerifyReport requires native success AND the exact declared report: every
+# ord, name, expected text, status and count, with no missing, duplicate,
+# malformed or undeclared row. status is PASS only when that contract holds.
+$vfReport = Test-VerifyReport -Result $vf -ReportName '90_verify.sql'
 New-PhaseReceipt '04-postflight.json' @{
-  status = $(if (Test-NativeSuccess $vf) { 'PASS' } else { 'FAIL' })
-  outcome = (Get-NativeOutcomeLabel $vf); exitCode = $vf.exitCode; timedOut = $vf.timedOut
-  passRows = $vfPassRows; failRows = $vfFailRows; summary = (Format-NativeSummary $vf)
+  status          = $vfReport.verdict
+  outcome         = $vfReport.outcome
+  exitCode        = $vf.exitCode
+  timedOut        = $vf.timedOut
+  rows            = $vfReport.rows
+  passRows        = $vfReport.passRows
+  failRows        = $vfReport.failRows
+  infoRows        = $vfReport.infoRows
+  gatingExpected  = $vfReport.gatingExpected
+  infoExpected    = $vfReport.infoExpected
+  captureComplete = $vfReport.captureComplete
+  reportContract  = '90_verify.sql'
+  problems        = @($vfReport.problems)
+  summary         = (Format-NativeSummary $vf)
 }
-if (-not (Test-NativeSuccess $vf) -or $vfFailRows -gt 0) {
-  Stop-Run ("postflight verification failed: {0}; {1}" -f (Format-NativeSummary $vf), (Get-NativeErrorExcerpt $vf)) '04-postflight-fail.json'
+if (-not $vfReport.ok) {
+  # Requirement: an incomplete or unproven report must not imply rollback. The
+  # 111 wrappers already reported COMMITTED; what is missing is the proof that
+  # the schema is complete, so completion is withheld and the claim stays held.
+  # Sliced, not piped through Select-Object: this runs under 'Stop'.
+  $vfProblems = @($vfReport.problems)
+  if ($vfProblems.Count -gt 6) { $vfProblems = @($vfProblems[0..5]) }
+  Stop-Run ("postflight verification did not satisfy the report contract: verdict={0}; rows={1} ({2} PASS / {3} FAIL / {4} INFO; contract {5} gating + {6} INFO); problems: {7}. No rollback is implied - every wrapper reported COMMITTED, so the schema state is NOT assumed reverted; completion is withheld and the exclusive-writer claim stays held for human review (ROLLBACK.md T1). Detail: {8}" -f `
+      $vfReport.verdict, $vfReport.rows, $vfReport.passRows, $vfReport.failRows, $vfReport.infoRows, $vfReport.gatingExpected, $vfReport.infoExpected, `
+      ($vfProblems -join '; '), (Get-NativeErrorExcerpt $vf 400)) '04-postflight-fail.json'
 }
 
 $st = Invoke-NativeProcess -FilePath $psqlPath `
@@ -677,14 +700,41 @@ $st = Invoke-NativeProcess -FilePath $psqlPath `
         -Environment $policy.env -TimeoutSeconds $VerifyTimeoutSeconds
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\storage.out') -Text $st.stdOut)
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\storage.err') -Text $st.stdErr)
-$stFailRows = ([regex]::Matches($st.stdOut, '\|\s*FAIL\s*$', 'Multiline')).Count
+# Round 12 (R11-C1): storage verification had no PASS/INFO contract at all - it
+# only counted FAIL rows, so exit 0 with no output was a pass. Same rule as the
+# postflight gate: the declared 6 gating checks must render PASS and the declared
+# INFO row must render INFO, or this gate does not open.
+$stReport = Test-VerifyReport -Result $st -ReportName '95_storage_config.sql'
 New-PhaseReceipt '05-storage.json' @{
-  status = $(if (Test-NativeSuccess $st) { 'PASS' } else { 'FAIL' })
-  outcome = (Get-NativeOutcomeLabel $st); exitCode = $st.exitCode; timedOut = $st.timedOut
-  failRows = $stFailRows; summary = (Format-NativeSummary $st)
+  status          = $stReport.verdict
+  outcome         = $stReport.outcome
+  exitCode        = $st.exitCode
+  timedOut        = $st.timedOut
+  rows            = $stReport.rows
+  passRows        = $stReport.passRows
+  failRows        = $stReport.failRows
+  infoRows        = $stReport.infoRows
+  gatingExpected  = $stReport.gatingExpected
+  infoExpected    = $stReport.infoExpected
+  captureComplete = $stReport.captureComplete
+  reportContract  = '95_storage_config.sql'
+  problems        = @($stReport.problems)
+  summary         = (Format-NativeSummary $st)
 }
-if (-not (Test-NativeSuccess $st) -or $stFailRows -gt 0) {
-  Stop-Run ("storage configuration verification failed: {0}; {1}" -f (Format-NativeSummary $st), (Get-NativeErrorExcerpt $st)) '05-storage-fail.json'
+if (-not $stReport.ok) {
+  $stProblems = @($stReport.problems)
+  if ($stProblems.Count -gt 6) { $stProblems = @($stProblems[0..5]) }
+  Stop-Run ("storage verification did not satisfy the report contract: verdict={0}; rows={1} ({2} PASS / {3} FAIL / {4} INFO; contract {5} gating + {6} INFO); problems: {7}. The schema and its postflight report are proven, but the storage configuration is not, so completion is withheld and the exclusive-writer claim stays held for human review (ROLLBACK.md T1). Detail: {8}" -f `
+      $stReport.verdict, $stReport.rows, $stReport.passRows, $stReport.failRows, $stReport.infoRows, $stReport.gatingExpected, $stReport.infoExpected, `
+      ($stProblems -join '; '), (Get-NativeErrorExcerpt $st 400)) '05-storage-fail.json'
+}
+
+# Both verification contracts must hold before the claim is touched. The two STOPs
+# above already guarantee it; this restates the invariant where it matters, so a
+# future edit that reorders the gates fails here instead of releasing a claim on
+# unproven evidence.
+if (-not $vfReport.ok -or -not $stReport.ok) {
+  Stop-Run 'REFUSED: the claim release was reached without two proven verification reports. No claim was released and no completion receipt was written.' '05-storage-fail.json'
 }
 
 # ---------------------------------------- release the exclusive-writer claim --
@@ -711,7 +761,8 @@ New-PhaseReceipt '06-claim-release-ownership.json' @{
 # arguments to Test-NativeSuccess, so the condition collapsed to that function's
 # own result and a successful release entered this STOP branch. The runner could
 # therefore never reach COMPLETE on a correct deployment. Executed by
-# test-native-capture.ps1 cases 27-33 against this committed block.
+# test-native-capture.ps1 cases 27-33 (claim-release probe) and 34-46 (gate 5
+# report-contract probe) against this committed block.
 if ((Test-NativeSuccess $release) -and (-not $releasedOwned)) {
   Stop-Run ("the claim release did not remove exactly this run's row (returned {0} row(s), expected 1 matching {1}). All 111 migrations and postflight passed; the claim state needs human review (ROLLBACK.md T1.1)." -f `
       $releasedRows.Count, $runId) '06-claim-release-ownership-stop.json'

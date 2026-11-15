@@ -117,10 +117,10 @@ $script:outFileFinal = $OutFile
 
 $requiredCases = @(Get-ClashSelfTestInventory)
 
-# Round 5: the inventory must be exactly 18 unique, non-empty strings, and that
+# Round 5: the inventory must be exactly 46 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 33
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 46
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -141,7 +141,7 @@ if (-not $inventoryCheck.ok) {
     adapterVersion    = $script:ClashAdapterVersion
     adapterSha256     = $script:adapterShaFinal
     casesExecuted     = 0
-    casesExpected     = 33
+    casesExpected     = 46
     cases             = @{}
     problems          = $reasons
     inventoryObserved = $observed
@@ -1130,6 +1130,535 @@ Add-Case 'claimReleaseIncompleteCaptureStops' (
   stopName  = [string]$probePartial.stopName
   receipts  = @($partialOutcome.receipts)
   outcome   = [string]$partialFail['outcome']
+}
+
+# ===========================================================================
+# 34-46: gate 5 report contract, executed (Round 12 / R11-C1)
+# ===========================================================================
+# R11-C1: deploy.ps1 accepted a verification child that exited 0 with no
+# rendered rows, then released the writer claim and wrote COMPLETE. Counting
+# FAIL rows cannot detect that; only the declared report can. The cases below do
+# not restate the gates: they read deploy.ps1, extract the committed region from
+# the postflight invocation to the completion receipt, refuse the region unless
+# both Test-VerifyReport calls, both STOP names, the ownership-qualified release
+# and the COMPLETE receipt are present, and then EXECUTE it with only the child
+# process and evidence layers substituted. Every fixture is generated from the
+# adapter's own contract, so a fixture cannot drift from the reviewed identities.
+
+function Get-VerificationGateBlock {
+  param([string]$Path)
+
+  $lines   = [System.IO.File]::ReadAllLines($Path)
+  $startAt = -1
+  $endAt   = -1
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($startAt -lt 0 -and $lines[$i] -match '^\$vf = Invoke-NativeProcess -FilePath \$psqlPath') {
+      $startAt = $i
+      continue
+    }
+    if ($startAt -ge 0 -and $lines[$i] -match '^\$seal\s*=\s*Seal-Evidence\s+-Root\s+\$run\s*$') {
+      $endAt = $i
+      break
+    }
+  }
+  if ($startAt -lt 0 -or $endAt -le $startAt) {
+    throw ('verification gate block not found in {0} (start {1}, end {2})' -f $Path, $startAt, $endAt)
+  }
+
+  $text = (@($lines[$startAt..($endAt - 1)]) -join "`n")
+  $required = [ordered]@{
+    "Test-VerifyReport -Result `$vf -ReportName '90_verify.sql'"     = 1
+    "Test-VerifyReport -Result `$st -ReportName '95_storage_config.sql'" = 1
+    "'04-postflight.json'"                                          = 1
+    "'04-postflight-fail.json'"                                     = 1
+    "'05-storage.json'"                                             = 1
+    "'05-storage-fail.json'"                                        = 2
+    'delete from supabase_migrations.clash_deploy_claim'            = 1
+    'returning run_id'                                              = 1
+    "'06-complete.json'"                                            = 1
+  }
+  $problems = @()
+  foreach ($marker in @($required.Keys)) {
+    $hits = ([regex]::Matches($text, [regex]::Escape([string]$marker))).Count
+    if ($hits -ne [int]$required[$marker]) {
+      $problems += ('gate marker {0} appears {1} time(s), expected {2}' -f $marker, $hits, $required[$marker])
+    }
+  }
+  if (-not $text.Contains('if (-not $vfReport.ok)')) { $problems += 'the postflight gate does not test $vfReport.ok' }
+  if (-not $text.Contains('if (-not $stReport.ok)')) { $problems += 'the storage gate does not test $stReport.ok' }
+  if ([regex]::IsMatch($text, '(?m)^\s*exit\b')) { $problems += 'the extracted region contains an exit statement' }
+  if ($text.Contains('Seal-Evidence')) { $problems += 'the extracted region still seals evidence' }
+  if ($problems.Count -gt 0) { throw ('verification gate block rejected: ' + ($problems -join '; ')) }
+
+  return ([ordered]@{ text = $text; lines = ($endAt - $startAt); startLine = ($startAt + 1) })
+}
+
+# The identities actually rendered by an SQL file, in declaration order. The
+# first contiguous run of ords starting at 1 is the renderer; the guard block
+# repeats the same list later in the file.
+function Get-ReportIdentitiesFromSql {
+  param([string]$Path)
+
+  $text = [System.IO.File]::ReadAllText($Path)
+  $pattern = "select\s+(\d+)\s+as\s+ord,\s*'((?:[^']|'')*)'::text\s+as\s+check_name,\s*'((?:[^']|'')*)'::text\s+as\s+expected"
+  $found = [regex]::Matches($text, $pattern)
+  $rows = @()
+  $next = 1
+  foreach ($m in $found) {
+    $ord = [int]$m.Groups[1].Value
+    if ($ord -ne $next) { break }
+    $rows += [ordered]@{
+      ord      = $ord
+      name     = ([string]$m.Groups[2].Value).Replace("''", "'")
+      expected = ([string]$m.Groups[3].Value).Replace("''", "'")
+    }
+    $next++
+  }
+  return $rows
+}
+
+# Builds a report that looks exactly like psql's aligned output for that script.
+# Variants are produced by omitting, duplicating, renaming, breaking or failing
+# individual rows, so every fixture differs from the contract in exactly one way.
+function New-VerifyReportText {
+  param(
+    [Parameter(Mandatory = $true)][string]$ReportName,
+    [hashtable]$StatusByOrd = @{},
+    [int[]]$OmitOrds = @(),
+    [int[]]$DuplicateOrds = @(),
+    [int[]]$BreakOrds = @(),
+    [hashtable]$RenameOrds = @{}
+  )
+
+  $contract = Get-ClashVerifyContract -ReportName $ReportName
+  if ($null -eq $contract) { throw ('no contract for ' + $ReportName) }
+
+  $lines = @()
+  $lines += ' ord |              check_name              |   expected   |   actual   | status'
+  $lines += '-----+--------------------------------------+--------------+------------+--------'
+  foreach ($c in @($contract.checks)) {
+    $ord = [int]$c.ord
+    if (@($OmitOrds) -contains $ord) { continue }
+    $status = 'PASS'
+    if ([bool]$c.info) { $status = 'INFO' }
+    if ($StatusByOrd.ContainsKey($ord)) { $status = [string]$StatusByOrd[$ord] }
+    $name = [string]$c.name
+    if ($RenameOrds.ContainsKey($ord)) { $name = [string]$RenameOrds[$ord] }
+    $actual = [string]$c.expected
+    if ($status -eq 'FAIL') { $actual = 'MISMATCH' }
+    if ($status -eq 'INFO') { $actual = 'INFO migration 20260926150000 owns bucket+policy creation' }
+    if (@($BreakOrds) -contains $ord) {
+      $lines += ('{0,4} | {1} | {2}' -f $ord, $name, $c.expected)
+      continue
+    }
+    $lines += ('{0,4} | {1} | {2} | {3} | {4}' -f $ord, $name, $c.expected, $actual, $status)
+    if (@($DuplicateOrds) -contains $ord) {
+      $lines += ('{0,4} | {1} | {2} | {3} | {4}' -f $ord, $name, $c.expected, $actual, $status)
+    }
+  }
+  return ((@($lines) -join "`n") + "`n")
+}
+
+function New-GateChildResult {
+  param(
+    [AllowEmptyString()][string]$Text = '',
+    $ExitCode = 0,
+    [bool]$TimedOut = $false,
+    [string]$LaunchError = '',
+    [string]$CaptureNote = '',
+    [string]$StdErr = ''
+  )
+  $code = $ExitCode
+  if ($TimedOut) { $code = $null }
+  $launch = $null
+  if (-not [string]::IsNullOrWhiteSpace($LaunchError)) { $launch = $LaunchError }
+  return [ordered]@{
+    filePath = 'psql.exe'; argumentCount = 0; exitCode = $code; timedOut = $TimedOut
+    launchError = $launch; captureNote = $CaptureNote
+    stdOut = $Text; stdErr = $StdErr
+    startedUtc = 'probe'; finishedUtc = 'probe'; durationMs = 0
+  }
+}
+
+function Invoke-VerificationGateProbe {
+  param(
+    [object[]]$Results,
+    [string]$RunId = 'r12-verify-probe-0001'
+  )
+
+  $state = [ordered]@{
+    runId = $RunId; receipts = [ordered]@{}; stopName = ''; stopReason = ''
+    reachedComplete = $false; nativeCalls = 0; calls = @(); evidenceCalls = 0
+    threw = ''; blockLines = 0; blockStartLine = 0
+  }
+
+  try {
+    $blockInfo = Get-VerificationGateBlock -Path (Join-Path $pluginRoot 'deploy.ps1')
+    $state.blockLines     = [int]$blockInfo.lines
+    $state.blockStartLine = [int]$blockInfo.startLine
+
+    $common      = Get-DeployCommonArguments -Path (Join-Path $pluginRoot 'deploy.ps1')
+    $runId       = $RunId
+    $run         = 'C:\clash-probe-evidence\r12'
+    $psqlPath    = 'C:\clash-probe\psql.exe'
+    $cloudRoot   = 'C:\clash-probe\cloud'
+    $policy      = [pscustomobject]@{ env = @{} }
+    $applied     = 111
+    $treeHash    = 'probe-tree-hash'
+    $bootOutcome = 'CREATED'
+    $VerifyTimeoutSeconds = 900
+
+    $script:r12State = $state
+    $script:r12Queue = @($Results)
+    $script:r12Block = [scriptblock]::Create([string]$blockInfo.text)
+
+    & {
+      function Invoke-NativeProcess {
+        param($FilePath, $Arguments, $Environment, $TimeoutSeconds)
+        $script:r12State.nativeCalls = $script:r12State.nativeCalls + 1
+        $script:r12State.calls += (@($Arguments) -join ' ')
+        $index = $script:r12State.nativeCalls - 1
+        if ($index -ge @($script:r12Queue).Count) {
+          return [ordered]@{
+            filePath = 'psql.exe'; argumentCount = 0; exitCode = $null; timedOut = $false
+            launchError = 'probe result queue exhausted'; captureNote = ''
+            stdOut = ''; stdErr = ''; startedUtc = 'probe'; finishedUtc = 'probe'; durationMs = 0
+          }
+        }
+        return $script:r12Queue[$index]
+      }
+      function Write-Evidence {
+        param($Path, $Text)
+        $script:r12State.evidenceCalls = $script:r12State.evidenceCalls + 1
+        return [ordered]@{ ok = $true; path = [string]$Path; sha256 = ('0' * 64) }
+      }
+      function New-PhaseReceipt {
+        param([string]$Name, $Fields)
+        $copy = [ordered]@{}
+        foreach ($k in @($Fields.Keys)) { $copy[[string]$k] = $Fields[$k] }
+        $script:r12State.receipts[[string]$Name] = $copy
+      }
+      function Stop-Run {
+        param([string]$Reason, [string]$StopName = 'STOP.json')
+        $script:r12State.receipts[[string]$StopName] = [ordered]@{ status = 'STOPPED'; reason = [string]$Reason }
+        $script:r12State.stopName   = [string]$StopName
+        $script:r12State.stopReason = [string]$Reason
+        throw ('CLASH-PROBE-STOP:' + [string]$StopName)
+      }
+      & $script:r12Block
+      $script:r12State.reachedComplete = $script:r12State.receipts.Contains('06-complete.json')
+    }
+  }
+  catch {
+    $message = 'unknown'
+    try { $message = [string]$_.Exception.Message } catch { }
+    if ($message -notlike 'CLASH-PROBE-STOP:*') {
+      $state.threw = (Protect-Text $message)
+    }
+  }
+  return $state
+}
+
+function Get-GateReceiptStatus {
+  param($Probe, [string]$Name)
+  if ($Probe.receipts.Contains($Name)) { return [string]$Probe.receipts[$Name]['status'] }
+  return '<absent>'
+}
+
+function Test-VerificationGateOutcome {
+  param(
+    $Probe,
+    [string[]]$ExpectedReceipts,
+    [string]$ExpectedStop,
+    $ExpectedStatus = $null
+  )
+
+  $problems = @()
+  $names = @($Probe.receipts.Keys | ForEach-Object { [string]$_ })
+  $unexpected = @($names | Where-Object { $ExpectedReceipts -notcontains $_ })
+  $absent     = @($ExpectedReceipts | Where-Object { $names -notcontains $_ })
+  if ($unexpected.Count -gt 0) { $problems += ('unexpected receipt(s): ' + ($unexpected -join ',')) }
+  if ($absent.Count -gt 0) { $problems += ('missing receipt(s): ' + ($absent -join ',')) }
+  if ([string]$Probe.stopName -ne [string]$ExpectedStop) {
+    $problems += ("stopped with '{0}', expected '{1}'" -f $Probe.stopName, $ExpectedStop)
+  }
+  if ([string]$Probe.threw -ne '') { $problems += ('unexpected exception: ' + [string]$Probe.threw) }
+  $completeSeen = $false
+  if ($names -contains '06-complete.json') { $completeSeen = $true }
+  if ($completeSeen -ne [bool]$Probe.reachedComplete) {
+    $problems += 'reachedComplete disagrees with the receipts that were written'
+  }
+  if ($null -ne $ExpectedStatus) {
+    foreach ($key in @($ExpectedStatus.Keys)) {
+      $actual = (Get-GateReceiptStatus -Probe $Probe -Name ([string]$key))
+      if ($actual -ne [string]$ExpectedStatus[$key]) {
+        $problems += ("receipt {0} status '{1}', expected '{2}'" -f $key, $actual, $ExpectedStatus[$key])
+      }
+    }
+  }
+  return [ordered]@{ ok = ($problems.Count -eq 0); problems = $problems; receipts = $names }
+}
+
+$cloudPath = Split-Path -Parent $pluginRoot
+
+# ---- 34: the declared contract IS the SQL, not a copy of it ----------------
+$sqlVerifyRows  = @(Get-ReportIdentitiesFromSql -Path (Join-Path $cloudPath 'verify\90_verify.sql'))
+$sqlStorageRows = @(Get-ReportIdentitiesFromSql -Path (Join-Path $cloudPath 'verify\95_storage_config.sql'))
+$contractVerify  = Get-ClashVerifyContract -ReportName '90_verify.sql'
+$contractStorage = Get-ClashVerifyContract -ReportName '95_storage_config.sql'
+$contractProblems = @()
+if ($null -eq $contractVerify)  { $contractProblems += 'no contract is declared for 90_verify.sql' }
+if ($null -eq $contractStorage) { $contractProblems += 'no contract is declared for 95_storage_config.sql' }
+if ($contractProblems.Count -eq 0) {
+  $declaredVerify  = @($contractVerify.checks)
+  $declaredStorage = @($contractStorage.checks)
+  if ($sqlVerifyRows.Count -ne 19)  { $contractProblems += ('90_verify.sql renders {0} row(s), expected 19' -f $sqlVerifyRows.Count) }
+  if ($sqlStorageRows.Count -ne 7)  { $contractProblems += ('95_storage_config.sql renders {0} row(s), expected 7' -f $sqlStorageRows.Count) }
+  if ($declaredVerify.Count -ne $sqlVerifyRows.Count)   { $contractProblems += ('the 90_verify.sql contract declares {0} row(s), the SQL renders {1}' -f $declaredVerify.Count, $sqlVerifyRows.Count) }
+  if ($declaredStorage.Count -ne $sqlStorageRows.Count) { $contractProblems += ('the storage contract declares {0} row(s), the SQL renders {1}' -f $declaredStorage.Count, $sqlStorageRows.Count) }
+  if ([int]$contractVerify.gating -ne 19 -or [int]$contractVerify.info -ne 0)   { $contractProblems += 'the 90_verify.sql gating/INFO counts are not 19/0' }
+  if ([int]$contractStorage.gating -ne 6 -or [int]$contractStorage.info -ne 1)  { $contractProblems += 'the storage gating/INFO counts are not 6/1' }
+  foreach ($row in $sqlVerifyRows) {
+    $match = @($declaredVerify | Where-Object { [int]$_.ord -eq [int]$row.ord })
+    if ($match.Count -ne 1) { $contractProblems += ('90_verify.sql ord {0} is not declared exactly once' -f $row.ord); continue }
+    if ([string]$match[0].name -ne [string]$row.name)         { $contractProblems += ('90_verify.sql ord {0} name differs from the SQL' -f $row.ord) }
+    if ([string]$match[0].expected -ne [string]$row.expected) { $contractProblems += ('90_verify.sql ord {0} expected differs from the SQL' -f $row.ord) }
+  }
+  foreach ($row in $sqlStorageRows) {
+    $match = @($declaredStorage | Where-Object { [int]$_.ord -eq [int]$row.ord })
+    if ($match.Count -ne 1) { $contractProblems += ('storage ord {0} is not declared exactly once' -f $row.ord); continue }
+    if ([string]$match[0].name -ne [string]$row.name)         { $contractProblems += ('storage ord {0} name differs from the SQL' -f $row.ord) }
+    if ([string]$match[0].expected -ne [string]$row.expected) { $contractProblems += ('storage ord {0} expected differs from the SQL' -f $row.ord) }
+    $isInfo = ([string]$row.name -like 'INFO*')
+    if ([bool]$match[0].info -ne $isInfo) { $contractProblems += ('storage ord {0} INFO flag disagrees with the SQL name' -f $row.ord) }
+  }
+}
+Add-Case 'verificationReportContractMatchesSql' ($contractProblems.Count -eq 0) @{
+  verifyRows  = $sqlVerifyRows.Count
+  storageRows = $sqlStorageRows.Count
+  problems    = @($contractProblems)
+}
+
+# ---- 35: both reports complete -> claim released -> COMPLETE ---------------
+$probeRunId  = 'r12-verify-probe-0001'
+$verifyPass  = New-VerifyReportText -ReportName '90_verify.sql'
+$storagePass = New-VerifyReportText -ReportName '95_storage_config.sql'
+$gatePass = Invoke-VerificationGateProbe -RunId $probeRunId -Results @(
+  (New-GateChildResult -Text $verifyPass),
+  (New-GateChildResult -Text $storagePass),
+  (New-GateChildResult -Text ($probeRunId + "`n"))
+)
+$passOutcome = Test-VerificationGateOutcome -Probe $gatePass `
+  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '06-claim-release-ownership.json', '06-claim-release.json', '06-complete.json') `
+  -ExpectedStop '' `
+  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'PASS'; '06-claim-release-ownership.json' = 'PASS'; '06-claim-release.json' = 'PASS'; '06-complete.json' = 'COMPLETE' }
+$passCallCount = @($gatePass.calls).Count
+Add-Case 'verificationReportsProceedToComplete' (
+  $passOutcome.ok -and
+  [string]$gatePass.threw -eq '' -and
+  $gatePass.reachedComplete -eq $true -and
+  [int]$gatePass.nativeCalls -eq 3 -and $passCallCount -eq 3 -and
+  ([string]$gatePass.calls[0]) -match '90_verify\.sql' -and
+  ([string]$gatePass.calls[1]) -match '95_storage_config\.sql' -and
+  ([string]$gatePass.calls[2]) -match 'delete from supabase_migrations\.clash_deploy_claim' -and
+  ([string]$gatePass.calls[2]).Contains("run_id = '" + $probeRunId + "'") -and
+  [int]$gatePass.evidenceCalls -eq 6) @{
+  blockStartLine = $gatePass.blockStartLine
+  blockLines     = $gatePass.blockLines
+  nativeCalls    = $gatePass.nativeCalls
+  receipts       = @($passOutcome.receipts)
+  note           = 'the release is the third child and only after both contracts hold'
+}
+
+# ---- 36: postflight exits 0 with NO output --------------------------------
+$gateEmpty = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text ''))
+$emptyOutcome = Test-VerificationGateOutcome -Probe $gateEmpty `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'postflightEmptyReportStops' (
+  $emptyOutcome.ok -and
+  $gateEmpty.reachedComplete -eq $false -and
+  [int]$gateEmpty.nativeCalls -eq 1 -and
+  [string]$gateEmpty.stopReason -match 'rendered no verification rows' -and
+  [string]$gateEmpty.stopReason -match 'claim stays held' -and
+  ([string]$gateEmpty.stopReason) -notmatch '(?i)rolled\s*back' -and
+  -not $gateEmpty.receipts.Contains('06-claim-release.json')) @{
+  stopName     = [string]$gateEmpty.stopName
+  nativeCalls  = $gateEmpty.nativeCalls
+  status       = (Get-GateReceiptStatus -Probe $gateEmpty -Name '04-postflight.json')
+  receipts     = @($emptyOutcome.receipts)
+  note         = 'R11-C1: exit 0 with no rows used to pass this gate and release the claim'
+}
+
+# ---- 37: postflight exits 0 while rendering a FAIL row ---------------------
+$gateFailRow = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -StatusByOrd @{ 7 = 'FAIL' })))
+$failRowOutcome = Test-VerificationGateOutcome -Probe $gateFailRow `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'postflightFailedRowStops' (
+  $failRowOutcome.ok -and
+  $gateFailRow.reachedComplete -eq $false -and
+  [int]$gateFailRow.nativeCalls -eq 1 -and
+  [string]$gateFailRow.stopReason -match '1 rendered check\(s\) FAILED' -and
+  [string]$gateFailRow.stopReason -notmatch '(?i)rolled\s*back') @{
+  stopName = [string]$gateFailRow.stopName
+  status   = (Get-GateReceiptStatus -Probe $gateFailRow -Name '04-postflight.json')
+  receipts = @($failRowOutcome.receipts)
+}
+
+# ---- 38: postflight report is truncated (18 of 19 checks) ------------------
+$gateShort = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -OmitOrds @(19))))
+$shortOutcome = Test-VerificationGateOutcome -Probe $gateShort `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'postflightTruncatedReportStops' (
+  $shortOutcome.ok -and
+  [int]$gateShort.nativeCalls -eq 1 -and
+  [string]$gateShort.stopReason -match 'declared check\(s\) missing' -and
+  [string]$gateShort.stopReason -match 'gating row\(s\) rendered') @{
+  stopName = [string]$gateShort.stopName
+  receipts = @($shortOutcome.receipts)
+}
+
+# ---- 39: the same check is rendered twice --------------------------------
+$gateDuplicate = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -DuplicateOrds @(5))))
+$duplicateOutcome = Test-VerificationGateOutcome -Probe $gateDuplicate `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'postflightDuplicateRowStops' (
+  $duplicateOutcome.ok -and
+  [int]$gateDuplicate.nativeCalls -eq 1 -and
+  [string]$gateDuplicate.stopReason -match 'duplicated check ord') @{
+  stopName = [string]$gateDuplicate.stopName
+  receipts = @($duplicateOutcome.receipts)
+}
+
+# ---- 40: a row loses its status column (malformed shape) ------------------
+$gateMalformed = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -BreakOrds @(3))))
+$malformedOutcome = Test-VerificationGateOutcome -Probe $gateMalformed `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'postflightMalformedRowStops' (
+  $malformedOutcome.ok -and
+  [int]$gateMalformed.nativeCalls -eq 1 -and
+  [string]$gateMalformed.stopReason -match 'malformed row') @{
+  stopName = [string]$gateMalformed.stopName
+  receipts = @($malformedOutcome.receipts)
+}
+
+# ---- 41: a check is renamed - the report is not the reviewed report -------
+$gateDrift = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -RenameOrds @{ 2 = 'ledger versions look about right' })))
+$driftOutcome = Test-VerificationGateOutcome -Probe $gateDrift `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'postflightIdentityDriftStops' (
+  $driftOutcome.ok -and
+  [int]$gateDrift.nativeCalls -eq 1 -and
+  [string]$gateDrift.stopReason -match 'is not the declared') @{
+  stopName = [string]$gateDrift.stopName
+  receipts = @($driftOutcome.receipts)
+}
+
+# ---- 42: the child fails outright - UNPROVEN, never PASS and never FAIL ---
+$gateUnproven = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text $verifyPass -ExitCode 3 -StdErr 'ERROR:  57014: canceling statement due to statement timeout'))
+$unprovenOutcome = Test-VerificationGateOutcome -Probe $gateUnproven `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'UNPROVEN' }
+Add-Case 'postflightUnprovenStops' (
+  $unprovenOutcome.ok -and
+  [int]$gateUnproven.nativeCalls -eq 1 -and
+  [string]$gateUnproven.stopReason -match 'verdict=UNPROVEN' -and
+  -not $gateUnproven.receipts.Contains('06-claim-release.json') -and
+  -not $gateUnproven.receipts.Contains('06-complete.json')) @{
+  stopName = [string]$gateUnproven.stopName
+  status   = (Get-GateReceiptStatus -Probe $gateUnproven -Name '04-postflight.json')
+  receipts = @($unprovenOutcome.receipts)
+  note     = 'a nonzero exit is UNKNOWN, not a content failure and not a pass'
+}
+
+# ---- 43: storage exits 0 with NO output ----------------------------------
+$gateStorageEmpty = Invoke-VerificationGateProbe -Results @(
+  (New-GateChildResult -Text $verifyPass),
+  (New-GateChildResult -Text '')
+)
+$storageEmptyOutcome = Test-VerificationGateOutcome -Probe $gateStorageEmpty `
+  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '05-storage-fail.json') `
+  -ExpectedStop '05-storage-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'FAIL' }
+Add-Case 'storageEmptyReportStops' (
+  $storageEmptyOutcome.ok -and
+  $gateStorageEmpty.reachedComplete -eq $false -and
+  [int]$gateStorageEmpty.nativeCalls -eq 2 -and
+  [string]$gateStorageEmpty.stopReason -match 'storage verification did not satisfy' -and
+  ([string]$gateStorageEmpty.stopReason) -notmatch 'clash_deploy_claim' -and
+  -not $gateStorageEmpty.receipts.Contains('06-claim-release.json') -and
+  -not $gateStorageEmpty.receipts.Contains('06-complete.json')) @{
+  stopName    = [string]$gateStorageEmpty.stopName
+  nativeCalls = $gateStorageEmpty.nativeCalls
+  receipts    = @($storageEmptyOutcome.receipts)
+  note        = 'the claim is not released: the third child is never issued'
+}
+
+# ---- 44: storage exits 0 while rendering a FAIL row ----------------------
+$gateStorageFail = Invoke-VerificationGateProbe -Results @(
+  (New-GateChildResult -Text $verifyPass),
+  (New-GateChildResult -Text (New-VerifyReportText -ReportName '95_storage_config.sql' -StatusByOrd @{ 4 = 'FAIL' }))
+)
+$storageFailOutcome = Test-VerificationGateOutcome -Probe $gateStorageFail `
+  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '05-storage-fail.json') `
+  -ExpectedStop '05-storage-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'FAIL' }
+Add-Case 'storageFailedRowStops' (
+  $storageFailOutcome.ok -and
+  [int]$gateStorageFail.nativeCalls -eq 2 -and
+  [string]$gateStorageFail.stopReason -match '1 rendered check\(s\) FAILED' -and
+  -not $gateStorageFail.receipts.Contains('06-complete.json')) @{
+  stopName = [string]$gateStorageFail.stopName
+  receipts = @($storageFailOutcome.receipts)
+}
+
+# ---- 45: storage omits its INFO row (6 of 7) -----------------------------
+$gateStorageShort = Invoke-VerificationGateProbe -Results @(
+  (New-GateChildResult -Text $verifyPass),
+  (New-GateChildResult -Text (New-VerifyReportText -ReportName '95_storage_config.sql' -OmitOrds @(7)))
+)
+$storageShortOutcome = Test-VerificationGateOutcome -Probe $gateStorageShort `
+  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '05-storage-fail.json') `
+  -ExpectedStop '05-storage-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'FAIL' }
+Add-Case 'storageMissingInfoRowStops' (
+  $storageShortOutcome.ok -and
+  [int]$gateStorageShort.nativeCalls -eq 2 -and
+  [string]$gateStorageShort.stopReason -match 'INFO row\(s\) rendered' -and
+  -not $gateStorageShort.receipts.Contains('06-claim-release.json')) @{
+  stopName = [string]$gateStorageShort.stopName
+  receipts = @($storageShortOutcome.receipts)
+}
+
+# ---- 46: storage cannot be proven - UNPROVEN, claim retained -------------
+$gateStorageUnproven = Invoke-VerificationGateProbe -Results @(
+  (New-GateChildResult -Text $verifyPass),
+  (New-GateChildResult -Text $storagePass -ExitCode 2 -StdErr 'connection to server was lost')
+)
+$storageUnprovenOutcome = Test-VerificationGateOutcome -Probe $gateStorageUnproven `
+  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '05-storage-fail.json') `
+  -ExpectedStop '05-storage-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'UNPROVEN' }
+Add-Case 'storageUnprovenStops' (
+  $storageUnprovenOutcome.ok -and
+  [int]$gateStorageUnproven.nativeCalls -eq 2 -and
+  [string]$gateStorageUnproven.stopReason -match 'verdict=UNPROVEN' -and
+  -not $gateStorageUnproven.receipts.Contains('06-complete.json')) @{
+  stopName = [string]$gateStorageUnproven.stopName
+  status   = (Get-GateReceiptStatus -Probe $gateStorageUnproven -Name '05-storage.json')
+  receipts = @($storageUnprovenOutcome.receipts)
 }
 
 # ===========================================================================
