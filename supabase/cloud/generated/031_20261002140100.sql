@@ -13,6 +13,12 @@
 -- schema change nor its ledger row survives. A connection lost around COMMIT
 -- can leave the outcome unknown, which is why the runner classifies it from
 -- the ledger instead of claiming a rollback.
+--
+-- CONCURRENCY (Round 8): the ledger insert has NO conflict clause. If a row for
+-- this version already exists, the insert raises unique_violation, the whole
+-- transaction aborts and no statement of the migration survives. An
+-- 'on conflict do nothing' would have skipped the row while re-executing the
+-- migration body - the one case the read-back could not detect.
 -- ============================================================================
 begin;
 
@@ -304,7 +310,6 @@ values (
   'comment_gifs',
   array['sha256:7664381221383e3ca400cb550505a79e7bbf69e928f35143bbc8069a81674ea7'],
   'clash-cloud-wrapper-v1'
-)
-on conflict (version) do nothing;
+);
 
 commit;

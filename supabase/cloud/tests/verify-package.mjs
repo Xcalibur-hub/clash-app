@@ -35,8 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 18;
-const EXPECTED_ASSERTIONS = 289;
+const EXPECTED_SECTIONS = 19;
+const EXPECTED_CASES = 24;
+const EXPECTED_ASSERTIONS = 323;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -252,9 +253,19 @@ check('STOP stores AND prints the sanitised text', stopSafe > 0 && stopPrint > s
 check('no raw reason reaches the console', !deploy.includes('Write-Host ("STOP: {0}" -f $Reason)'));
 check('receipt written for the runner exception path',
   /catch \{ Stop-Refused/.test(deploy + ledger) && /STOPPED/.test(deploy));
+// Round 8 (R4): every required receipt goes through the writer that throws when
+// neither the run directory nor the fallback can be written. A bare
+// [void](Write-EvidenceOrFallback ...) is exactly the pattern the audit found.
+const requiredReceipts = (deploy.match(/\[void\]\(Write-RequiredReceipt/g) || []).length;
 check('per-migration outcome receipts survive an unwritable run directory',
-  (deploy.match(/Write-EvidenceOrFallback/g) || []).length >= 6 &&
-  !/Write-EvidenceJson/.test(deploy));
+  requiredReceipts >= 5 && !/Write-EvidenceJson/.test(deploy),
+  `${requiredReceipts} required receipts`);
+check('a receipt that cannot be persisted throws instead of returning an empty hash',
+  /function Write-RequiredReceipt/.test(deploy) && /throw \('required receipt could not be persisted/.test(deploy) &&
+  /function Add-Receipt/.test(lib) && /receipt persistence failed for/.test(lib) &&
+  /throw \('receipt persistence failed/.test(lib));
+check('no required receipt is cast to void through the swallowing writer',
+  !/\[void\]\(Write-EvidenceOrFallback -Path \(Join-Path \$run \("03-migrations/.test(deploy));
 check('a receipt that cannot be written is announced, never swallowed',
   /NO RECEIPT POSSIBLE/.test(lib) && /RECEIPT FALLBACK/.test(lib));
 check('an unhandled runner exception still writes a receipt and seals',
@@ -273,17 +284,25 @@ check('full package verified before the first database write', integrityGate > 0
 check('ledger read-back must equal the expected token', /probeVal -ne \$expectedTok/.test(deploy));
 check('wrapper digest is also cross-checked against checksums', /\$expected\[\$sumRel\] -ne \$actualWrapperSha/.test(deploy));
 
-// F4: classify, never narrate
-for (const label of ['COMMITTED', 'ROLLED_BACK_PROVEN', 'COMMITTED_WITH_ERROR', 'LEDGER_MISMATCH', 'UNKNOWN']) {
+// F4: classify, never narrate. Round 8 (R3) removed COMMITTED_WITH_ERROR: a row
+// present with the expected token is a COMMITTED transaction, whatever the exit
+// code said afterwards, and the old label implied an error had been survived.
+for (const label of ['COMMITTED', 'ROLLED_BACK_PROVEN', 'LEDGER_MISMATCH', 'UNKNOWN']) {
   check(`outcome label present: ${label}`, deploy.includes(label));
 }
 check('no unconditional rollback claim', !/rolled back/i.test(deploy) && !/rolled back/i.test(ledger));
 check('rollback is only claimed with a probe', /ROLLED_BACK_PROVEN'[\s\S]{0,300}transaction did not commit/.test(deploy));
-check('resume requires ledger proof', /ledger identity mismatch/.test(deploy) && /ledger gap/.test(deploy));
+// Round 8 (R2): there is no resume path to prove any more.
+check('the runner is fresh-only and refuses a non-empty ledger',
+  /fresh-only/.test(deploy) && /03-ledger-not-empty\.json/.test(deploy) &&
+  /\$ledgerVerdict\.verdict -ne 'EMPTY'/.test(deploy));
+check('no resume machinery remains',
+  !/\$startIndex/.test(deploy) && !/resumeFrom/.test(deploy) && !/resumedFromIndex/.test(deploy));
 
 // Round 2: "bootstrap invocation" was unvalidated. The runner owns step 0.
-check('runner executes step 0 itself when the ledger is absent',
-  /000_ledger_bootstrap\.sql/.test(deploy) && /if \(\$ledgerAbsent\)/.test(deploy));
+check('runner executes step 0 itself on every fresh run',
+  /000_ledger_bootstrap\.sql/.test(deploy) && /gate 3b: step 0/.test(deploy) &&
+  /\$bootOutcome = \$\(if \(\$ledgerAbsent\)/.test(deploy));
 check('step 0 digest is verified before it executes',
   deploy.indexOf("$expected[$bootstrapRel] -ne $bootSha") > 0 &&
   deploy.indexOf("$expected[$bootstrapRel] -ne $bootSha") < deploy.indexOf("-f', $bootstrapAbs)"));
@@ -352,7 +371,7 @@ if (existsSync(join(CLOUD, 'checksums.sha256'))) {
 hdr(8, 'failure injection — detectors must fire on corruption');
 {
   // 8a: a wrapper whose ledger insert was removed must be detected
-  const w = bodies['013'].replace(/insert into supabase_migrations\.schema_migrations[\s\S]*?on conflict \(version\) do nothing;/, '');
+  const w = bodies['013'].replace(/insert into supabase_migrations\.schema_migrations[\s\S]*?'clash-cloud-wrapper-v1'\n\);/, '');
   check('detects wrapper with no ledger insert', !w.includes('insert into supabase_migrations.schema_migrations'));
   // 8b: a tampered identity token must be detected
   const tampered = bodies['013'].replace(/sha256:[0-9a-f]{64}/, 'sha256:' + '0'.repeat(64));
@@ -756,14 +775,14 @@ hdr(16, 'inventory integrity - flat, unique, exact (Round 5)');
     /New-Object System.Collections.Generic.List\[string\]/.test(lib) && /\$flat\.ToArray\(\)/.test(lib));
 
   // --- the inventory itself --------------------------------------------------
-  check('exactly 18 declared case names', libNames.length === 18, `${libNames.length}`);
+  check(`exactly ${EXPECTED_CASES} declared case names`, libNames.length === EXPECTED_CASES, `${libNames.length}`);
   check('all names are non-empty identifiers', libNames.every((n) => n.length > 0 && /^[A-Za-z][A-Za-z0-9]*$/.test(n)));
   check('no duplicate case names', new Set(libNames).size === libNames.length);
 
   // --- the harness asserts 18 before spawning anything ----------------------
-  const harnessCount = Number((selfTest.match(/-ExpectedCount 18/)?.[0] || '').replace(/\D/g, ''));
-  check('the harness asserts exactly 18', harnessCount === 18 && harnessCount === libNames.length);
-  const inventoryAt = selfTest.indexOf('Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 18');
+  const harnessCount = Number((selfTest.match(/-ExpectedCount (\d+)/)?.[1] || ''));
+  check(`the harness asserts exactly ${EXPECTED_CASES}`, harnessCount === EXPECTED_CASES && harnessCount === libNames.length);
+  const inventoryAt = selfTest.indexOf('Assert-SelfTestInventory -Names $requiredCases -ExpectedCount');
   const firstSpawnAt = selfTest.indexOf('Invoke-NativeProcess -FilePath');
   const firstCaseAt = selfTest.indexOf("Add-Case 'zeroExitWithStderr'");
   check('the inventory gate runs before any child process',
@@ -775,7 +794,7 @@ hdr(16, 'inventory integrity - flat, unique, exact (Round 5)');
 
   // --- the same validator, exercised on a matrix ----------------------------
   // mirrors Assert-SelfTestInventory: strings only, no nesting, unique, exact count
-  const validateInventory = (names, expected = 18) => {
+  const validateInventory = (names, expected = EXPECTED_CASES) => {
     const problems = [];
     if (!Array.isArray(names) || names.length === 0) return ['empty'];
     names.forEach((n, i) => {
@@ -839,30 +858,8 @@ hdr(16, 'inventory integrity - flat, unique, exact (Round 5)');
     nestedProblem && /is not a record/.test(lib));
 }
 
-// strips JS comments and string literals so the detectors in [17] scan code,
-// not documentation (the fix documents the old construct in a comment)
-function jsCodeOnly(src) {
-  let out = '';
-  let i = 0;
-  while (i < src.length) {
-    const c = src[i]; const n = src[i + 1];
-    if (c === '/' && n === '/') { const j = src.indexOf('\n', i); i = j < 0 ? src.length : j; out += ' '; continue; }
-    if (c === '/' && n === '*') { const j = src.indexOf('*/', i + 2); i = j < 0 ? src.length : j + 2; out += ' '; continue; }
-    if (c === '`' || c === '"' || c === "'") {
-      const q = c; let j = i + 1; let closed = false;
-      while (j < src.length) {
-        if (src[j] === '\\') { j += 2; continue; }
-        if (src[j] === q) { closed = true; break; }
-        j++;
-      }
-      i = closed ? j + 1 : src.length; out += ' STRLIT '; continue;
-    }
-    out += c; i++;
-  }
-  return out;
-}
-
 hdr(17, 'platform path handling - drive letters, spaces, POSIX (Round 6)');
+const suiteSrc = read(join(CLOUD, 'tests/verify-package.mjs'));
 {
   // --- the reported failure, reproduced --------------------------------------
   const winUrl = 'file:///C:/Users/91962/Desktop/clash%20cloud/supabase/cloud/tests/verify-package.mjs';
@@ -933,7 +930,6 @@ hdr(17, 'platform path handling - drive letters, spaces, POSIX (Round 6)');
   let bootRejected = false;
   try { pathsFromModuleUrl('https://example.com/pkg/tests/x.mjs'); } catch { bootRejected = true; }
   check('a non-file module URL is rejected by the derivation', bootRejected);
-  const suiteSrc = read(join(CLOUD, 'tests/verify-package.mjs'));
   check('the suite exits nonzero on a bootstrap failure',
     suiteSrc.includes('CLASH-TEST-BOOTSTRAP-FAILED') && suiteSrc.includes('process.exit(1)'));
   check('no PASS summary can precede the bootstrap',
@@ -992,17 +988,54 @@ hdr(17, 'platform path handling - drive letters, spaces, POSIX (Round 6)');
     win32.dirname('C:\\Users\\91962\\clash cloud\\supabase\\cloud\\tests\\verify-package.mjs') ===
       'C:\\Users\\91962\\clash cloud\\supabase\\cloud\\tests' &&
     posix.dirname('C:\\Users\\91962\\clash cloud\\supabase\\cloud\\tests\\verify-package.mjs') === '.');
-  check('the live comparison no longer uses posix.dirname',
-    !/posix\.dirname\(/.test(jsCodeOnly(read(join(CLOUD, 'tests/verify-package.mjs')))));
+  // Ban the COMPOSITION, not the token: posix.dirname is legitimate on a POSIX
+  // literal (the pinning test above uses it), but never on a filesystem path
+  // derived at run time.
+  check('the live comparison never feeds a live path to posix.dirname',
+    !/posix\.dirname\(\s*(fileURLToPath|dirname|absolutise|\$)/.test(suiteSrc));
+  // The needle is assembled so this assertion cannot match its own source.
+  const backslashNeedle = ['CLOUD', '.includes(', String.fromCharCode(39), '\\', String.fromCharCode(39), ')'].join('');
   check('the live path assertion no longer forbids backslashes outright',
-    !/CLOUD\.includes\('\\\\'\)/.test(jsCodeOnly(read(join(CLOUD, 'tests/verify-package.mjs')))));
+    suiteSrc.split(backslashNeedle).length - 1 === 0);
 
   // --- static: no URL.pathname used for filesystem paths --------------------
-  const jsFiles = ['tests/verify-package.mjs', 'tests/paths.mjs', 'tools/build-package.mjs'];
-  const offenders = jsFiles.filter((f) => /\.pathname/.test(jsCodeOnly(read(join(CLOUD, f)))));
-  check('no filesystem path is derived from URL.pathname', offenders.length === 0, offenders.join(','));
+  // The production modules contain no fixtures, so a plain scan is sound there.
+  // The test file itself necessarily contains the ban and its fixtures, so it is
+  // checked structurally instead: import.meta.url may only reach the two
+  // reviewed conversions.
+  // Comment stripping, not full lexing: enough to ignore the explanation in a
+  // header comment, and it cannot silently swallow the file the way a desynced
+  // string lexer did (the Round 7 version passed only because of that desync).
+  const codeOnly = (src) => {
+    let out = ''; let i = 0;
+    while (i < src.length) {
+      const c = src[i]; const n = src[i + 1];
+      if (c === '/' && n === '/') { const j = src.indexOf('\n', i); i = j < 0 ? src.length : j; continue; }
+      if (c === '/' && n === '*') { const j = src.indexOf('*/', i + 2); i = j < 0 ? src.length : j + 2; continue; }
+      if (c === '"' || c === '\'' || c === '`') {
+        const q = c; let j = i + 1;
+        while (j < src.length) { if (src[j] === '\\') { j += 2; continue; } if (src[j] === q) { j++; break; } j++; }
+        out += src.slice(i, j); i = j; continue;
+      }
+      out += c; i++;
+    }
+    return out;
+  };
+  const productionModules = ['tests/paths.mjs', 'tools/build-package.mjs'];
+  const offenders = productionModules.filter((f) => /\.pathname/.test(codeOnly(read(join(CLOUD, f)))));
+  check('no production module derives a path from URL.pathname', offenders.length === 0, offenders.join(','));
   check('the detector fires on the old construct',
-    /\.pathname/.test(jsCodeOnly("const CLOUD = new URL('..', import.meta.url).pathname;")));
+    /\.pathname/.test("const CLOUD = new URL('..', import.meta.url).pathname;"));
+  // paths.mjs is header-heavy: the code is ~45% of the bytes. The guard only has
+  // to prove the stripper kept the code, not to pin a ratio.
+  const stripperSource = read(join(CLOUD, 'tests/paths.mjs'));
+  check('the comment stripper does not swallow the file',
+    codeOnly(stripperSource).length > stripperSource.length * 0.3 &&
+    codeOnly(stripperSource).includes('export function pathArtefacts'));
+  const derivationAt = suiteSrc.indexOf('pathsFromModuleUrl(import.meta.url)');
+  const fallbackAt = suiteSrc.indexOf('CLASH-TEST-BOOTSTRAP-FAILED');
+  check('the live derivation comes from the reviewed conversion, inside the bootstrap guard',
+    derivationAt > 0 && derivationAt < fallbackAt);
   check('every module that derives paths uses fileURLToPath',
     read(join(CLOUD, 'tests/paths.mjs')).includes('fileURLToPath') &&
     read(join(CLOUD, 'tests/verify-package.mjs')).includes('pathsFromModuleUrl') &&
@@ -1037,6 +1070,168 @@ hdr(18, 'documentation claims match the package (Round 7)');
   const staleFileClaims = [...readmeText.matchAll(/all (\d+) files/g)].map((m) => Number(m[1]))
     .filter((n) => n !== checksumCount);
   check('no stale "all N files" claim remains', staleFileClaims.length === 0, staleFileClaims.join(','));
+}
+
+hdr(19, 'deployment recovery safety - R1-R4 adversarial regressions (Round 8)');
+{
+  const deployCode = read(join(CLOUD, 'tools/deploy.ps1'));
+  const ledgerTool = read(join(CLOUD, 'tools/check-ledger.ps1'));
+  const rollbackDoc = read(join(CLOUD, 'ROLLBACK.md'));
+  const bootstrap = read(join(CLOUD, 'generated/000_ledger_bootstrap.sql'));
+
+  // ------------------------------------------------------------------ R1 ----
+  // Specification mirror: the rule the adapter implements, exercised on the
+  // states the audit found misclassified. This is a mirror, not proof of the
+  // PowerShell: the adapter's own cases run in test-native-capture.ps1.
+  const ledgerVerdict = (versions, ledger, { tableAbsent = false } = {}) => {
+    const gaps = []; const missing = []; const mismatch = []; const malformed = []; const extra = [];
+    let seenMissing = false; let prefix = 0;
+    for (const { version, token } of versions) {
+      if (!(version in ledger)) { seenMissing = true; missing.push(version); continue; }
+      const stored = ledger[version];
+      if (!/^sha256:[0-9a-f]{64}$/.test(stored)) malformed.push(version);
+      if (stored !== token) mismatch.push(version);
+      if (seenMissing) gaps.push(version); else prefix += 1;
+    }
+    const known = new Set(versions.map((v) => v.version));
+    Object.keys(ledger).forEach((k) => { if (!known.has(k)) extra.push(k); });
+    if (malformed.length) return { verdict: 'PROBLEM', gaps, missing, mismatch, malformed, extra, prefix };
+    if (extra.length) return { verdict: 'PROBLEM', gaps, missing, mismatch, malformed, extra, prefix };
+    if (mismatch.length) return { verdict: 'PROBLEM', gaps, missing, mismatch, malformed, extra, prefix };
+    if (gaps.length) return { verdict: 'PROBLEM', gaps, missing, mismatch, malformed, extra, prefix };
+    if (missing.length === versions.length) return { verdict: 'EMPTY', gaps, missing, mismatch, malformed, extra, prefix, tableAbsent };
+    if (missing.length === 0) return { verdict: 'CONSISTENT', gaps, missing, mismatch, malformed, extra, prefix };
+    return { verdict: 'PARTIAL_PREFIX', gaps, missing, mismatch, malformed, extra, prefix };
+  };
+  const V = ['1', '2', '3'].map((c, i) => ({
+    version: `2026010100000${i}`, token: `sha256:${c.repeat(64)}`,
+  }));
+  const full = Object.fromEntries(V.map((v) => [v.version, v.token]));
+  check('R1 mirror: a gap is PROBLEM, never a resumable prefix',
+    ledgerVerdict(V, { [V[0].version]: V[0].token, [V[2].version]: V[2].token }).verdict === 'PROBLEM');
+  check('R1 mirror: a strict prefix is PARTIAL_PREFIX and a full ledger is CONSISTENT',
+    ledgerVerdict(V, { [V[0].version]: V[0].token }).verdict === 'PARTIAL_PREFIX' &&
+    ledgerVerdict(V, full).verdict === 'CONSISTENT' &&
+    ledgerVerdict(V, {}).verdict === 'EMPTY' &&
+    ledgerVerdict(V, {}, { tableAbsent: true }).verdict === 'EMPTY');
+  check('R1 mirror: malformed, mismatched and unexpected rows are PROBLEM',
+    ledgerVerdict(V, { [V[0].version]: 'garbage' }).verdict === 'PROBLEM' &&
+    ledgerVerdict(V, { [V[0].version]: V[1].token }).verdict === 'PROBLEM' &&
+    ledgerVerdict(V, { ...full, '20250101000000': V[0].token }).verdict === 'PROBLEM');
+  check('R1: check-ledger classifies through the shared adapter function',
+    /Get-LedgerVerdict -Entries \$entries/.test(ledgerTool) && /function Get-LedgerVerdict/.test(lib));
+  check('R1: check-ledger exits nonzero for a gap',
+    /\$verdict -eq 'PROBLEM'[\s\S]{0,200}exit 1/.test(ledgerTool) && /\$check\.gaps/.test(ledgerTool));
+  check('R1: check-ledger refuses a partial prefix instead of advising a resume',
+    /\$verdict -eq 'PARTIAL_PREFIX'[\s\S]{0,300}exit 1/.test(ledgerTool) &&
+    /no resume path/.test(ledgerTool) &&
+    !/may continue from the first missing one/.test(ledgerTool));
+  check('R1: table presence is a catalog probe, not an error message',
+    /to_regclass\('supabase_migrations\.schema_migrations'\)/.test(ledgerTool) &&
+    !/stdErr -match "does not exist"/.test(ledgerTool) &&
+    !/stdErr -match "does not exist"/.test(deployCode));
+  check('R1: the adapter rejects malformed tokens explicitly',
+    /\^sha256:\[0-9a-f\]\{64\}\$/.test(lib) && /malformed/.test(lib));
+
+  // ------------------------------------------------------------------ R2 ----
+  check('R2: the runner is fresh-only and stops on any non-empty ledger',
+    /verdict -ne 'EMPTY'/.test(deployCode) && /03-ledger-not-empty\.json/.test(deployCode) &&
+    /no resume path, no backfill and no retry/.test(deployCode));
+  check('R2: no resume machinery survives in the runner',
+    !/\$startIndex/.test(deployCode) && !/resumeFrom/.test(deployCode) &&
+    !/resumedFromIndex/.test(deployCode) && !/ledger identity mismatch/.test(deployCode));
+  check('R2: the ledger gate runs before the first wrapper can execute',
+    deployCode.indexOf("03-ledger-not-empty.json") < deployCode.indexOf('gate 4: execute'));
+  check('R2: ROLLBACK.md no longer promises a resume',
+    !/T1 — Resume/.test(rollbackDoc) && !/proven prefix, so T1 applies/.test(rollbackDoc) &&
+    /fresh-only/i.test(rollbackDoc) && /no automated resume/i.test(rollbackDoc));
+
+  // ------------------------------------------------------------------ R3 ----
+  const exitClass = (r) => {
+    if (!r || r.launchError || r.timedOut || r.exitCode === null) return 'UNKNOWN';
+    if (r.captureNote) return 'UNKNOWN';
+    return ({ 0: 'COMPLETED', 1: 'PSQL_FATAL', 2: 'CONNECTION_LOST', 3: 'SCRIPT_ERROR' })[r.exitCode] || 'OTHER_EXIT';
+  };
+  const rollbackProvable = (r, readBackOk, rowAbsent) =>
+    readBackOk === true && rowAbsent === true && exitClass(r) === 'SCRIPT_ERROR';
+  const connLost = { exitCode: 2, timedOut: false, captureNote: '' };
+  const scriptErr = { exitCode: 3, timedOut: false, captureNote: '' };
+  const timeout = { exitCode: null, timedOut: true, captureNote: '' };
+  const partial = { exitCode: 0, timedOut: false, captureNote: 'stdout capture incomplete' };
+  check('R3 mirror: absence after a connection loss, timeout or partial capture is never a proven rollback',
+    exitClass(connLost) === 'CONNECTION_LOST' && exitClass(timeout) === 'UNKNOWN' && exitClass(partial) === 'UNKNOWN' &&
+    !rollbackProvable(connLost, true, true) && !rollbackProvable(timeout, true, true) &&
+    !rollbackProvable(partial, true, true));
+  check('R3 mirror: only a script error with a successful read-back proves a rollback',
+    rollbackProvable(scriptErr, true, true) && !rollbackProvable(scriptErr, false, true) &&
+    !rollbackProvable(scriptErr, true, false) && exitClass({ exitCode: 1, timedOut: false, captureNote: '' }) === 'PSQL_FATAL');
+  check('R3: the runner delegates the decision to Test-RollbackProvable',
+    /Test-RollbackProvable -Result \$mig -ReadBackOk \$probeOk -RowAbsent \$true/.test(deployCode) &&
+    /function Test-RollbackProvable/.test(lib));
+  check('R3: no unconditional ROLLED_BACK_PROVEN assignment remains',
+    !/-not \$rowPresent\)\s*\{ \$receipt\.outcome = 'ROLLED_BACK_PROVEN' \}/.test(deployCode) &&
+    /'ROLLED_BACK_PROVEN'/.test(deployCode));
+  check('R3: the exception text no longer claims that nothing was written',
+    !/This exception implies no database write/.test(deployCode) &&
+    /does NOT imply that no database write happened/.test(deployCode));
+  check('R3: UNKNOWN tells the operator the backend may still commit',
+    /may still commit/i.test(deployCode) || /original backend will not still commit/i.test(deployCode));
+
+  // ------------------------------------------------------------------ R4 ----
+  check('R4: a required receipt that cannot be persisted throws',
+    /function Write-RequiredReceipt/.test(deployCode) &&
+    /throw \('required receipt could not be persisted/.test(deployCode) &&
+    /if \(-not \$res\.ok\) \{\s*\n\s*throw \('receipt persistence failed/.test(lib));
+  check('R4: every JSON receipt in the migration loop is required',
+    (deployCode.match(/\[void\]\(Write-RequiredReceipt/g) || []).length >= 5 &&
+    !/\[void\]\(Write-EvidenceOrFallback -Path \(Join-Path \$run \("03-migrations/.test(deployCode));
+  check('R4: the fallback writer returns a structured failure and names it',
+    /ok = \$false; path = \$null/.test(lib) && /NO RECEIPT POSSIBLE/.test(lib));
+  check('R4: the self-test injects both-destination failure',
+    /ClashEvidenceFallbackDir/.test(lib) && /ClashEvidenceFallbackDir = Join-Path \$blockerPath 'fallback'/.test(selfTest) &&
+    /Add-Case 'receiptFailureStops'/.test(selfTest));
+
+  // ------------------------------------------------------- SQLSTATE + capture
+  check('SQLSTATE is extracted and message text is never used to classify',
+    /function Get-PgSqlState/.test(lib) && /ERROR:\\s\+\(\[0-9A-Z\]\{5\}\):/.test(lib) &&
+    !/does not exist"\) \{ \$tableAbsent/.test(ledgerTool));
+  check('incomplete capture fails closed',
+    /function Test-NativeCaptureComplete/.test(lib) &&
+    /UNKNOWN-CAPTURE-INCOMPLETE/.test(lib) &&
+    /if \(-not \[string\]::IsNullOrWhiteSpace\(\[string\]\$Result\.captureNote\)\) \{ return \$false \}/.test(lib));
+  check('the adapter self-test exercises capture, exit class, SQLSTATE and the ledger rule',
+    ['incompleteCaptureIsUnknown', 'connectionLossIsUnknown', 'sqlStateExtracted',
+     'ledgerGapIsProblem', 'ledgerMalformedIsProblem', 'receiptFailureStops']
+      .every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest)));
+
+  // ------------------------------------------------- exclusive writer ------
+  check('the claim table is created by step 0 with a primary key',
+    /create table if not exists supabase_migrations\.clash_deploy_claim/.test(bootstrap) &&
+    /claim_key\s+text not null primary key/.test(bootstrap));
+  check('the runner claims the writer before the first wrapper and releases it after postflight',
+    deployCode.indexOf("insert into supabase_migrations.clash_deploy_claim") > 0 &&
+    deployCode.indexOf("insert into supabase_migrations.clash_deploy_claim") < deployCode.indexOf('gate 4: execute') &&
+    deployCode.indexOf("delete from supabase_migrations.clash_deploy_claim") > deployCode.indexOf('gate 5: postflight'));
+  check('a claim collision is classified by SQLSTATE and stops',
+    /claimState = Get-PgSqlState \$claim\.stdErr/.test(deployCode) &&
+    /03c-writer-claim-stop\.json/.test(deployCode) &&
+    /exclusive writer/i.test(deployCode));
+  // Only the LEDGER INSERT is inspected: a migration body may legitimately use
+  // its own ON CONFLICT clause, and comments are stripped first.
+  const sqlCode = (text) => text.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+  const ledgerInsertOf = (text) => {
+    const i = text.indexOf('insert into supabase_migrations.schema_migrations');
+    if (i < 0) return null;
+    const j = text.indexOf(';', i);
+    return j < 0 ? null : text.slice(i, j + 1);
+  };
+  const wrapperCodes = manifest.entries.map((e) => sqlCode(read(join(GEN, e.wrapperPath))));
+  check('no wrapper swallows a duplicate ledger row',
+    wrapperCodes.every((t) => { const st = ledgerInsertOf(t); return st !== null && !/on conflict/i.test(st); }) &&
+    wrapperCodes.every((t) => (t.match(/insert into supabase_migrations\.schema_migrations/g) || []).length === 1));
+  check('the wrapper documents why the conflict must abort',
+    /CONCURRENCY \(Round 8\)/.test(read(join(GEN, manifest.entries[0].wrapperPath))) &&
+    /on conflict do nothing/.test(read(join(GEN, manifest.entries[0].wrapperPath))));
 }
 
 {

@@ -10,10 +10,13 @@
                    exit code read from Process.ExitCode. No '&', no '2>', no
                    '$LASTEXITCODE', no reliance on $ErrorActionPreference.
                    stderr content never decides success or failure.
-    F4             Nonzero exits are classified, not narrated. The runner never
-                   claims a rollback. Outcomes are COMMITTED, ROLLED_BACK_PROVEN
-                   (only when a read-only probe proves the row absent),
-                   COMMITTED_WITH_ERROR, LEDGER_MISMATCH or UNKNOWN.
+    F4             Nonzero exits are classified, not narrated. Outcomes are
+                   COMMITTED, ROLLED_BACK_PROVEN, LEDGER_MISMATCH or UNKNOWN.
+                   Round 8 (R3): ROLLED_BACK_PROVEN requires psql exit 3 (script
+                   error under ON_ERROR_STOP, so the wrapper's COMMIT was never
+                   reached) AND a successful fresh read-back showing the row
+                   absent. Absence after a connection loss, a timeout or an
+                   unreadable probe is UNKNOWN - never a proven rollback.
     F5             Every wrapper's expected digest is read from the manifest and
                    compared with the bytes on disk BEFORE execution; the whole
                    package is verified against checksums.sha256 before the first
@@ -23,8 +26,22 @@
                    any file is created; every artefact is created exclusively
                    (FileMode::CreateNew) and sealed by hash chain; STOP messages
                    are sanitised before being printed as well as stored.
-    F8             No retry, no repair, no resume-by-assumption. Resume proceeds
-                   only from a ledger proven to be an exact prefix.
+    F8             No retry, no repair, no resume. Round 8 (R2): this runner is
+                   FRESH-ONLY. It requires an empty ledger and stops on anything
+                   else. The advertised resume path could never be reached - the
+                   fresh-baseline preflight rejects a non-empty project before the
+                   prefix proof runs - so it was removed instead of guessed at.
+                   A partially applied database needs a reviewed recovery plan.
+    Round 8        R4: every required receipt must be persisted. If a receipt
+                   cannot be written to the run directory or to the fallback
+                   directory, Add-Receipt throws and the run stops; an empty
+                   hash chain can no longer be mistaken for success.
+    Round 8        Exclusive writer: before the first wrapper the runner claims
+                   supabase_migrations.clash_deploy_claim with a plain INSERT.
+                   A second concurrent runner collides on the primary key and
+                   stops. The claim is released only after postflight passes; a
+                   stale claim therefore blocks the next run until a human looks
+                   at it (ROLLBACK.md T1).
     Round 2        Project identity and TLS are enforced: -ProjectRef is
                    mandatory, the host must belong to that project, port and
                    user must match the connection mode, PGSSLMODE is forced to
@@ -100,7 +117,9 @@ trap {
     catch { }
     Write-Host ("Evidence: {0}" -f $run)
   }
-  Write-Host 'This exception implies no database write. Inspect the evidence, then use check-ledger.ps1 (read-only).' -ForegroundColor Red
+  Write-Host 'This exception does NOT imply that no database write happened: it can occur after a'
+  Write-Host 'COMMIT, while evidence is being written, or during a later phase. Treat the outcome as'
+  Write-Host 'UNKNOWN. Inspect the evidence and check-ledger.ps1 (read-only) before any retry.' -ForegroundColor Red
   exit 1
 }
 
@@ -163,6 +182,17 @@ function New-PhaseReceipt([string]$Name, [hashtable]$Fields) {
   $script:chain = Add-Receipt -Root $run -Name $Name -Fields $Fields -PrevSha $script:chain
 }
 
+# Round 8 (R4): a receipt that must exist. Write-EvidenceOrFallback already tries
+# the run directory and the per-machine fallback; when both fail this throws, the
+# trap fires, and the process exits 1. An empty hash is never returned.
+function Write-RequiredReceipt([string]$Path, [string]$Label, [string]$Text) {
+  $res = Write-EvidenceOrFallback -Path $Path -Label $Label -Text $Text
+  if (-not $res.ok) {
+    throw ('required receipt could not be persisted: {0} (attempts: {1})' -f $Label, (@($res.attempts) -join ' | '))
+  }
+  return [string]$res.sha256
+}
+
 function Stop-Run([string]$Reason, [string]$StopName = 'STOP.json') {
   $safe = Protect-Text $Reason
   New-PhaseReceipt $StopName @{
@@ -170,7 +200,7 @@ function Stop-Run([string]$Reason, [string]$StopName = 'STOP.json') {
     reason = $safe
     guidance = 'Do not retry, repair or re-run blindly. Resolve by inspection: check-ledger.ps1 is read-only.'
   }
-  [void](Write-EvidenceOrFallback -Path (Join-Path $run 'STOP.txt') -Label 'STOP.txt' -Text ("{0}`n{1}`n" -f (Get-Date).ToUniversalTime().ToString('o'), $safe))
+  [void](Write-RequiredReceipt -Path (Join-Path $run 'STOP.txt') -Label 'STOP.txt' -Text ("{0}`n{1}`n" -f (Get-Date).ToUniversalTime().ToString('o'), $safe))
   [void](Seal-Evidence -Root $run)
   Write-Host ''
   Write-Host ("STOP: {0}" -f $safe) -ForegroundColor Red
@@ -304,134 +334,146 @@ if ($pfFail -gt 0 -or $pfPass -lt 1) {
   Stop-Run ("preflight report shows {0} PASS / {1} FAIL rows although psql exited 0. Treating as failure." -f $pfPass, $pfFail) '02-preflight-rows.json'
 }
 
-# ------------------------------------------- gate 3: ledger prefix proof -----
-$ledSql = "select version || '|' || coalesce(statements[1],'<null>') from supabase_migrations.schema_migrations order by version;"
-$led = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-t', '-A', '-c', $ledSql)) `
-         -Environment $policy.env -TimeoutSeconds 300
-[void](Write-Evidence -Path (Join-Path $run '02-ledger\ledger.out') -Text $led.stdOut)
-[void](Write-Evidence -Path (Join-Path $run '02-ledger\ledger.err') -Text $led.stdErr)
+# ------------------------------------- gate 3: ledger must be empty (R2) -----
+# Round 8: this runner is fresh-only. The earlier "prefix proof" advertised a
+# resume that the fresh-baseline preflight made unreachable, and a gapped ledger
+# could be read as resumable. The gate now asks one question - is the ledger
+# empty? - and stops on every other state.
+$ledgerPresentSql = "select case when to_regclass('supabase_migrations.schema_migrations') is null then 'ABSENT' else 'PRESENT' end;"
+$presence = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-t', '-A', '-c', $ledgerPresentSql)) `
+              -Environment $policy.env -TimeoutSeconds 300
+[void](Write-Evidence -Path (Join-Path $run '02-ledger\presence.out') -Text $presence.stdOut)
+[void](Write-Evidence -Path (Join-Path $run '02-ledger\presence.err') -Text $presence.stdErr)
+if (-not (Test-NativeSuccess $presence)) {
+  New-PhaseReceipt '03-ledger-probe.json' @{
+    status = 'FAIL'; outcome = (Get-NativeOutcomeLabel $presence)
+    sqlState = (Get-PgSqlState $presence.stdErr); summary = (Format-NativeSummary $presence)
+  }
+  Stop-Run ("the ledger presence probe did not complete ({0}, sqlstate '{1}'): {2}. A failed probe is not an empty ledger." -f `
+      (Get-NativeOutcomeLabel $presence), (Get-PgSqlState $presence.stdErr), (Get-NativeErrorExcerpt $presence)) '03-ledger-probe-fail.json'
+}
+$presenceText = $presence.stdOut.Trim()
+if ($presenceText -ne 'ABSENT' -and $presenceText -ne 'PRESENT') {
+  Stop-Run ("the ledger presence probe returned '{0}' instead of ABSENT/PRESENT." -f $presenceText) '03-ledger-probe-weird.json'
+}
+$ledgerAbsent = ($presenceText -eq 'ABSENT')
 
 $ledger = @{}
-$ledgerAbsent = $false
-if (Test-NativeSuccess $led) {
+if (-not $ledgerAbsent) {
+  $ledSql = "select version || '|' || coalesce(statements[1],'<null>') from supabase_migrations.schema_migrations order by version;"
+  $led = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-t', '-A', '-c', $ledSql)) `
+           -Environment $policy.env -TimeoutSeconds 300
+  [void](Write-Evidence -Path (Join-Path $run '02-ledger\ledger.out') -Text $led.stdOut)
+  [void](Write-Evidence -Path (Join-Path $run '02-ledger\ledger.err') -Text $led.stdErr)
+  if (-not (Test-NativeSuccess $led)) {
+    New-PhaseReceipt '03-ledger.json' @{
+      status = 'FAIL'; outcome = (Get-NativeOutcomeLabel $led)
+      sqlState = (Get-PgSqlState $led.stdErr); summary = (Format-NativeSummary $led); detail = (Get-NativeErrorExcerpt $led)
+    }
+    Stop-Run ("could not read the migration ledger ({0}, sqlstate '{1}'): {2}" -f `
+        (Get-NativeOutcomeLabel $led), (Get-PgSqlState $led.stdErr), (Get-NativeErrorExcerpt $led)) '03-ledger-fail.json'
+  }
   foreach ($line in ($led.stdOut -split "`r?`n")) {
     if ([string]::IsNullOrWhiteSpace($line)) { continue }
-    $p = $line.Split('|')
-    if ($p.Count -ge 2) { $ledger[$p[0]] = $p[1] }
+    $parts = $line.Split('|')
+    if ($parts.Count -ge 2) { $ledger[$parts[0]] = $parts[1] }
   }
-}
-elseif ($led.stdErr -match "schema_migrations['""]*\s+does not exist|relation ""supabase_migrations\.schema_migrations"" does not exist") {
-  # the ledger table genuinely does not exist yet: a clean pre-deployment state
-  $ledgerAbsent = $true
-}
-else {
-  New-PhaseReceipt '03-ledger.json' @{
-    status = 'FAIL'; outcome = (Get-NativeOutcomeLabel $led); exitCode = $led.exitCode
-    summary = (Format-NativeSummary $led); detail = (Get-NativeErrorExcerpt $led)
-  }
-  Stop-Run ("could not read the migration ledger: {0}; {1}" -f (Format-NativeSummary $led), (Get-NativeErrorExcerpt $led)) '03-ledger-fail.json'
 }
 
-$startIndex = 1
-$missingSeen = $false
-$resumeFrom = $null
-for ($i = 0; $i -lt $entries.Count; $i++) {
-  $e = $entries[$i]
-  $want = 'sha256:' + $e.normalizedSha256
-  if ($ledger.ContainsKey($e.version)) {
-    if ($missingSeen) {
-      New-PhaseReceipt '03-ledger-gap-detail.json' @{ status = 'STOP'; gapAt = $e.version; rule = 'ledger must be a prefix' }
-      Stop-Run ("ledger gap: {0} is recorded but an earlier version is not. No resume." -f $e.version) '03-ledger-gap.json'
-    }
-    if ($ledger[$e.version] -ne $want) {
-      New-PhaseReceipt '03-ledger-mismatch-detail.json' @{
-        status = 'STOP'; version = $e.version; stored = $ledger[$e.version]; expected = $want
-      }
-      Stop-Run ("ledger identity mismatch for {0}: stored '{1}', manifest expects '{2}'. No resume." -f $e.version, $ledger[$e.version], $want) '03-ledger-mismatch.json'
-    }
-    $startIndex = $e.index + 1
-    $resumeFrom = $e.version
-  }
-  else { $missingSeen = $true }
-}
-$known = @{}
-foreach ($e in $entries) { $known[$e.version] = $true }
-foreach ($v in @($ledger.Keys)) {
-  if (-not $known.ContainsKey($v)) {
-    New-PhaseReceipt '03-ledger-extra-detail.json' @{ status = 'STOP'; unexpectedVersion = $v }
-    Stop-Run ("ledger contains version {0}, which the manifest does not describe. No resume." -f $v) '03-ledger-extra.json'
-  }
-}
+$ledgerVerdict = Get-LedgerVerdict -Entries $entries -Ledger $ledger -TableAbsent $ledgerAbsent
 New-PhaseReceipt '03-ledger.json' @{
-  status        = 'PASS'
-  ledgerRows    = $ledger.Count
-  tableAbsent   = $ledgerAbsent
-  resumeFromIndex = $startIndex
-  lastAppliedVersion = $(if ($resumeFrom) { $resumeFrom } else { '<none>' })
-  proof         = 'every recorded version matches the manifest identity and precedes every missing one'
+  status      = $(if ($ledgerVerdict.verdict -eq 'EMPTY') { 'PASS' } else { 'STOP' })
+  verdict     = $ledgerVerdict.verdict
+  detail      = $ledgerVerdict.why
+  ledgerRows  = $ledgerVerdict.rows
+  tableAbsent = $ledgerAbsent
+  gaps        = @($ledgerVerdict.gaps)
+  policy      = 'fresh-only: an empty ledger is required; there is no resume path'
+}
+if ($ledgerVerdict.verdict -ne 'EMPTY') {
+  Stop-Run ("the ledger is not empty (verdict {0}: {1}; {2} row(s)). This runner is fresh-only: it initialises an empty project and has no resume path, no backfill and no retry. A partially applied database requires a separately reviewed recovery plan." -f `
+      $ledgerVerdict.verdict, $ledgerVerdict.why, $ledgerVerdict.rows) '03-ledger-not-empty.json'
 }
 
 # --------------------------------- gate 3b: step 0 - the ledger table itself --
-# Round 2 listed "bootstrap invocation" as unvalidated. It is not left to the
-# operator: when the ledger table is absent the runner creates it from the
-# generated, digested step-0 file, then proves the table now exists and is empty.
+# Round 8 (R2): step 0 runs on every fresh deployment, not only when the ledger
+# table is missing. It is create-only, so an existing table is a no-op, and it
+# also guarantees that the exclusive-writer claim table exists before gate 3c.
 $bootstrapRel = 'supabase/cloud/generated/000_ledger_bootstrap.sql'
 $bootstrapAbs = Join-Path $genDir '000_ledger_bootstrap.sql'
-$bootOutcome  = 'SKIPPED-LEDGER-PRESENT'
-if ($ledgerAbsent) {
-  if (-not (Test-Path -LiteralPath $bootstrapAbs)) {
-    Stop-Run 'step 0 missing: generated/000_ledger_bootstrap.sql' '03b-bootstrap-missing.json'
-  }
-  $bootSha = Get-NormalizedSha256 -Path $bootstrapAbs
-  if ($expected[$bootstrapRel] -ne $bootSha) {
-    New-PhaseReceipt '03b-bootstrap-digest.json' @{
-      status = 'STOP'; expected = $expected[$bootstrapRel]; actual = $bootSha
-      rule = 'step 0 bytes changed after review'
-    }
-    Stop-Run ("step 0 digest mismatch: expected {0}, found {1}. Nothing was executed." -f $expected[$bootstrapRel], $bootSha) '03b-bootstrap-digest-stop.json'
-  }
-
-  $boot = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-f', $bootstrapAbs)) `
-            -Environment $policy.env -TimeoutSeconds $PreflightTimeoutSeconds
-  [void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap.out') -Text $boot.stdOut)
-  [void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap.err') -Text $boot.stdErr)
-  if (-not (Test-NativeSuccess $boot)) {
-    New-PhaseReceipt '03b-bootstrap.json' @{
-      status = 'FAIL'; outcome = (Get-NativeOutcomeLabel $boot); exitCode = $boot.exitCode
-      summary = (Format-NativeSummary $boot); detail = (Get-NativeErrorExcerpt $boot)
-    }
-    Stop-Run ("step 0 (ledger bootstrap) did not succeed: {0}; {1}" -f (Format-NativeSummary $boot), (Get-NativeErrorExcerpt $boot)) '03b-bootstrap-fail.json'
-  }
-
-  $recheck = Invoke-NativeProcess -FilePath $psqlPath `
-               -Arguments ($common + @('-t', '-A', '-c', 'select count(*) from supabase_migrations.schema_migrations;')) `
-               -Environment $policy.env -TimeoutSeconds 300
-  [void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap-recheck.out') -Text $recheck.stdOut)
-  [void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap-recheck.err') -Text $recheck.stdErr)
-  $bootRows = 0
-  if (-not (Test-NativeSuccess $recheck) -or -not [int]::TryParse($recheck.stdOut.Trim(), [ref]$bootRows)) {
-    Stop-Run ("step 0 ran but the ledger table cannot be read back: {0}; {1}" -f (Format-NativeSummary $recheck), (Get-NativeErrorExcerpt $recheck)) '03b-bootstrap-unproven.json'
-  }
-  if ($bootRows -ne 0) {
-    Stop-Run ("step 0 created a ledger that is not empty ({0} rows). A bootstrap must never adopt existing rows silently." -f $bootRows) '03b-bootstrap-nonempty.json'
-  }
-  New-PhaseReceipt '03b-bootstrap.json' @{
-    status = 'PASS'; outcome = 'CREATED'; rowsAfterCreate = $bootRows
-    bootstrapSha256 = $bootSha; exitCode = $boot.exitCode; durationMs = $boot.durationMs
-  }
-  $bootOutcome = 'CREATED'
+if (-not (Test-Path -LiteralPath $bootstrapAbs)) {
+  Stop-Run 'step 0 missing: generated/000_ledger_bootstrap.sql' '03b-bootstrap-missing.json'
 }
-else {
-  New-PhaseReceipt '03b-bootstrap.json' @{
-    status = 'PASS'; outcome = 'SKIPPED-LEDGER-PRESENT'
-    rule = 'step 0 is create-only; an existing ledger is never re-created'
+$bootSha = Get-NormalizedSha256 -Path $bootstrapAbs
+if ($expected[$bootstrapRel] -ne $bootSha) {
+  New-PhaseReceipt '03b-bootstrap-digest.json' @{
+    status = 'STOP'; expected = $expected[$bootstrapRel]; actual = $bootSha
+    rule = 'step 0 bytes changed after review'
   }
+  Stop-Run ("step 0 digest mismatch: expected {0}, found {1}. Nothing was executed." -f $expected[$bootstrapRel], $bootSha) '03b-bootstrap-digest-stop.json'
+}
+
+$boot = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-f', $bootstrapAbs)) `
+          -Environment $policy.env -TimeoutSeconds $PreflightTimeoutSeconds
+[void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap.out') -Text $boot.stdOut)
+[void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap.err') -Text $boot.stdErr)
+if (-not (Test-NativeSuccess $boot)) {
+  New-PhaseReceipt '03b-bootstrap.json' @{
+    status = 'FAIL'; outcome = (Get-NativeOutcomeLabel $boot); exitCode = $boot.exitCode
+    sqlState = (Get-PgSqlState $boot.stdErr)
+    summary = (Format-NativeSummary $boot); detail = (Get-NativeErrorExcerpt $boot)
+  }
+  Stop-Run ("step 0 (ledger bootstrap) did not succeed: {0}; {1}" -f (Format-NativeSummary $boot), (Get-NativeErrorExcerpt $boot)) '03b-bootstrap-fail.json'
+}
+
+$recheck = Invoke-NativeProcess -FilePath $psqlPath `
+             -Arguments ($common + @('-t', '-A', '-c', 'select count(*) from supabase_migrations.schema_migrations;')) `
+             -Environment $policy.env -TimeoutSeconds 300
+[void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap-recheck.out') -Text $recheck.stdOut)
+[void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap-recheck.err') -Text $recheck.stdErr)
+$bootRows = -1
+if (-not (Test-NativeSuccess $recheck) -or -not [int]::TryParse($recheck.stdOut.Trim(), [ref]$bootRows)) {
+  Stop-Run ("step 0 ran but the ledger table cannot be read back: {0}; {1}" -f (Format-NativeSummary $recheck), (Get-NativeErrorExcerpt $recheck)) '03b-bootstrap-unproven.json'
+}
+if ($bootRows -ne 0) {
+  Stop-Run ("step 0 created a ledger that is not empty ({0} rows). A bootstrap must never adopt existing rows silently." -f $bootRows) '03b-bootstrap-nonempty.json'
+}
+$bootOutcome = $(if ($ledgerAbsent) { 'CREATED' } else { 'NO-OP-ALREADY-CREATED' })
+New-PhaseReceipt '03b-bootstrap.json' @{
+  status = 'PASS'; outcome = $bootOutcome; rowsAfterCreate = $bootRows
+  bootstrapSha256 = $bootSha; exitCode = $boot.exitCode; durationMs = $boot.durationMs
+}
+
+# --------------------------------- gate 3c: exclusive writer claim (Round 8) --
+# A plain INSERT into a single-row claim table. Two runners started together
+# collide on the primary key (SQLSTATE 23505 -> exit 3) and the loser stops
+# before it can touch a single migration.
+$runId = [guid]::NewGuid().ToString()
+$claimSql = "insert into supabase_migrations.clash_deploy_claim (claim_key, run_id, started_utc) values ('clash-cloud-deploy', '$runId', now());"
+$claim = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-c', $claimSql)) `
+           -Environment $policy.env -TimeoutSeconds 300
+[void](Write-Evidence -Path (Join-Path $run '03-writer\claim.out') -Text $claim.stdOut)
+[void](Write-Evidence -Path (Join-Path $run '03-writer\claim.err') -Text $claim.stdErr)
+$claimState = Get-PgSqlState $claim.stdErr
+if (-not (Test-NativeSuccess $claim)) {
+  New-PhaseReceipt '03c-writer-claim.json' @{
+    status = 'STOP'; outcome = (Get-NativeOutcomeLabel $claim); sqlState = $claimState
+    runId = $runId; exitCode = $claim.exitCode
+    rule = 'exclusive writer: one runner at a time; a stale claim needs human review (ROLLBACK.md T1)'
+  }
+  Stop-Run ("the exclusive-writer claim could not be taken (outcome {0}, sqlstate '{1}'): {2}. Another runner may be active, or an earlier run left a stale claim. Nothing was executed." -f `
+      (Get-NativeOutcomeLabel $claim), $claimState, (Get-NativeErrorExcerpt $claim)) '03c-writer-claim-stop.json'
+}
+New-PhaseReceipt '03c-writer-claim.json' @{
+  status = 'PASS'; runId = $runId; sqlState = $claimState
+  rule = 'plain INSERT on a primary key: a concurrent runner collides here and stops'
 }
 
 # ------------------------------------------------------- gate 4: execute ----
 $applied = 0
 foreach ($e in $entries) {
-  if ($e.index -lt $startIndex) { continue }
+  # Fresh-only: gate 3 proved the ledger empty, so every entry executes. There is
+  # no start index and no skipped prefix.
 
   $label       = '{0:D3}-{1}' -f $e.index, $e.version
   $wrapperRel  = $e.wrapperPath
@@ -506,20 +548,20 @@ foreach ($e in $entries) {
       $receipt.outcome = 'UNKNOWN'
       $receipt.status  = 'UNPROVEN'
       $receipt.ledgerReadBack = 'PROBE FAILED'
-      [void](Write-EvidenceOrFallback -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
+      [void](Write-RequiredReceipt -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
       Stop-Run ("migration {0} exited 0 but the ledger read-back could not be performed ({1}). Outcome UNKNOWN; do not assume the row is present." -f $e.version, (Get-NativeOutcomeLabel $probe)) ("{0}-unproven.json" -f $label)
     }
     if (-not $rowPresent -or $probeVal -ne $expectedTok) {
       $receipt.outcome = 'LEDGER_MISMATCH'
       $receipt.status  = 'FAIL'
       $receipt.ledgerReadBack = ("expected {0} got '{1}'" -f $expectedTok, $probeVal)
-      [void](Write-EvidenceOrFallback -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
+      [void](Write-RequiredReceipt -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
       Stop-Run ("migration {0} exited 0 but the ledger row does not match: expected {1}, found '{2}'." -f $e.version, $expectedTok, $probeVal) ("{0}-ledger-mismatch.json" -f $label)
     }
     $receipt.outcome = 'COMMITTED'
     $receipt.ledgerReadBack = 'MATCH'
     $receipt.status = 'PASS'
-    [void](Write-EvidenceOrFallback -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
+    [void](Write-RequiredReceipt -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
     New-PhaseReceipt ("{0}-applied.json" -f $label) @{
       status = 'PASS'; version = $e.version; outcome = 'COMMITTED'
       wrapperSha256 = $actualWrapperSha; ledgerReadBack = 'MATCH'; exitCode = 0
@@ -529,20 +571,29 @@ foreach ($e in $entries) {
   }
 
   # Nonzero / timeout / launch failure: classify, never narrate.
-  if ($mig.launchError -or $mig.timedOut -or $null -eq $mig.exitCode) { $receipt.outcome = 'UNKNOWN' }
-  elseif (-not $probeOk)                                            { $receipt.outcome = 'UNKNOWN' }
-  elseif (-not $rowPresent)                                         { $receipt.outcome = 'ROLLED_BACK_PROVEN' }
-  elseif ($probeVal -eq $expectedTok)                               { $receipt.outcome = 'COMMITTED_WITH_ERROR' }
-  else                                                              { $receipt.outcome = 'LEDGER_MISMATCH' }
+  # Round 8 (R3): an absent row after a connection loss, a timeout or an
+  # unreadable probe proves nothing - the original backend may still commit - so
+  # only a script error under ON_ERROR_STOP (exit 3, COMMIT never reached) with a
+  # successful fresh read-back is accepted as a proven rollback.
+  $exitClass = Get-PsqlExitClass $mig
+  $captureOk = Test-NativeCaptureComplete $mig
+  $receipt.exitClass      = $exitClass
+  $receipt.captureComplete = $captureOk
+  $receipt.sqlState       = (Get-PgSqlState $mig.stdErr)
+
+  if ($rowPresent -and $probeVal -eq $expectedTok) { $receipt.outcome = 'COMMITTED' }
+  elseif ($rowPresent)                              { $receipt.outcome = 'LEDGER_MISMATCH' }
+  elseif (Test-RollbackProvable -Result $mig -ReadBackOk $probeOk -RowAbsent $true) { $receipt.outcome = 'ROLLED_BACK_PROVEN' }
+  else                                              { $receipt.outcome = 'UNKNOWN' }
 
   $explain = switch ($receipt.outcome) {
-    'ROLLED_BACK_PROVEN'    { 'the wrapper inserted no ledger row, and the insert shares the wrapper transaction: the transaction did not commit.' }
-    'COMMITTED_WITH_ERROR'  { 'the ledger row IS present with the expected identity: the wrapper committed and the error arrived afterwards. Do not re-run it.' }
-    'LEDGER_MISMATCH'       { 'a ledger row exists with an identity the manifest does not describe. Human decision required.' }
-    default                 { 'the commit outcome could not be established. Assume NOTHING: neither success nor rollback.' }
+    'ROLLED_BACK_PROVEN' { 'psql exited 3 (script error under ON_ERROR_STOP), so the COMMIT that ends the wrapper was never reached, and a fresh session shows no row: the transaction did not commit.' }
+    'COMMITTED'          { 'the ledger row IS present with the expected identity: the wrapper committed, whatever the exit code said afterwards. Do not re-run it.' }
+    'LEDGER_MISMATCH'    { 'a ledger row exists with an identity the manifest does not describe. Human decision required.' }
+    default              { 'the transaction outcome is NOT established: a connection loss, a timeout or an unreadable probe cannot prove that the original backend will not still commit. Treat this version as UNKNOWN and require human review.' }
   }
   $receipt.status = 'FAIL'
-  [void](Write-EvidenceOrFallback -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
+  [void](Write-RequiredReceipt -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
   New-PhaseReceipt ("{0}-failed.json" -f $label) @{
     status = 'FAIL'; version = $e.version; outcome = $receipt.outcome
     exitCode = $mig.exitCode; timedOut = $mig.timedOut
@@ -585,18 +636,39 @@ if (-not (Test-NativeSuccess $st) -or $stFailRows -gt 0) {
   Stop-Run ("storage configuration verification failed: {0}; {1}" -f (Format-NativeSummary $st), (Get-NativeErrorExcerpt $st)) '05-storage-fail.json'
 }
 
+# ---------------------------------------- release the exclusive-writer claim --
+# Postflight passed, so the deployment is complete; the claim is released so the
+# next fresh run can start. A failed release is a STOP: the database would keep
+# asserting "a writer is active" while the evidence says otherwise.
+$releaseSql = "delete from supabase_migrations.clash_deploy_claim where claim_key = 'clash-cloud-deploy' and run_id = '$runId';"
+$release = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-c', $releaseSql)) `
+             -Environment $policy.env -TimeoutSeconds 300
+[void](Write-Evidence -Path (Join-Path $run '04-postflight\claim-release.out') -Text $release.stdOut)
+[void](Write-Evidence -Path (Join-Path $run '04-postflight\claim-release.err') -Text $release.stdErr)
+if (-not (Test-NativeSuccess $release)) {
+  New-PhaseReceipt '06-claim-release.json' @{
+    status = 'STOP'; outcome = (Get-NativeOutcomeLabel $release)
+    sqlState = (Get-PgSqlState $release.stdErr); runId = $runId
+    rule = 'the deployment completed but the exclusive-writer claim could not be released'
+  }
+  Stop-Run ("all 111 migrations and postflight passed, but the exclusive-writer claim could not be released ({0}, sqlstate '{1}'): {2}. The next run will stop on the stale claim until a human clears it (ROLLBACK.md T1)." -f `
+      (Get-NativeOutcomeLabel $release), (Get-PgSqlState $release.stdErr), (Get-NativeErrorExcerpt $release)) '06-claim-release-fail.json'
+}
+New-PhaseReceipt '06-claim-release.json' @{ status = 'PASS'; runId = $runId; released = $true }
+
 # ------------------------------------------------------------- completion ---
 New-PhaseReceipt '06-complete.json' @{
   status = 'COMPLETE'
   appliedThisRun = $applied
-  resumedFromIndex = $startIndex
+  freshOnly = $true
+  writerRunId = $runId
   packageTreeHash = $treeHash
   step0Bootstrap  = $bootOutcome
   ledgerReadBack = '111/111 verified by 90_verify.sql'
 }
 $seal = Seal-Evidence -Root $run
 Write-Host ''
-Write-Host ("TERMINAL RECEIPT: COMPLETE applied={0} resumedFrom={1} seal={2} files={3}" -f $applied, $startIndex, $seal.sha256, $seal.fileCount) -ForegroundColor Green
+Write-Host ("TERMINAL RECEIPT: COMPLETE applied={0} freshOnly=true writerRunId={1} seal={2} files={3}" -f $applied, $runId, $seal.sha256, $seal.fileCount) -ForegroundColor Green
 Write-Host ("Evidence: {0}" -f $run)
 Write-Host 'Next: store the evidence directory as-is. Do not edit, re-run or repair.'
 exit 0

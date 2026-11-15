@@ -257,6 +257,33 @@ platform, so the suite is not silently host-dependent again.
 
 ---
 
+## D-10 - The ledger insert aborts on conflict (Round 8)
+
+Every wrapper previously ended its ledger insert with `on conflict (version) do
+nothing`. A conflicting row therefore skipped the insert while the migration body
+still executed, and the read-back that follows compares the stored token with the
+expected one - so a re-executed body could produce a matching row and a PASS.
+
+The insert now has no conflict clause: a duplicate version raises
+`unique_violation`, the whole wrapper transaction aborts, and no statement of that
+migration survives. Combined with the fresh-only gate this makes a second
+application of the same version impossible rather than merely unlikely.
+
+## D-11 - Fresh-only deployment, exclusive writer, no resume (Round 8)
+
+`deploy.ps1` initialises an empty project and refuses a non-empty ledger. There is
+no resume, no start index, no backfill and no retry; the resume that the earlier
+documentation described could never run, because the fresh-baseline preflight
+rejects any project that already has application objects.
+
+Before the first wrapper the runner inserts one row into
+`supabase_migrations.clash_deploy_claim` (primary key `claim_key`). A concurrent
+runner collides and stops before executing anything. The row is removed only after
+postflight passes, so an abandoned run leaves a claim that blocks the next run
+until a human reads the evidence and clears it (ROLLBACK.md T1.1).
+
+---
+
 ## No other divergences
 
 | Pattern | Files | Executable? |

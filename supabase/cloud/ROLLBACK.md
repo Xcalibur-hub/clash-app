@@ -1,9 +1,13 @@
 # ROLLBACK / RECOVERY
 
-The project started **verifiably empty** (0 public relations, 0 public
-functions, 0 auth users, 0 buckets, no `supabase_migrations` schema). That is
-what makes recovery simple: there is no application data to preserve, so the
-answer is always "discard or stop", never "surgically repair".
+The project starts **verifiably empty** (0 public relations, 0 public functions,
+0 auth users, 0 buckets, no `supabase_migrations` schema). There is no application
+data to preserve, which is why the only sanctioned outcomes are "stop" and
+"recreate": this package never repairs a partially applied database.
+
+Deployment is **fresh-only** and has **no automated resume**. A run that stops
+part-way leaves work for a human, and the evidence directory is the input to that
+decision.
 
 ---
 
@@ -21,28 +25,65 @@ in both. There is nothing to clean up and nothing to hand-repair.
 
 ### T0.1 — Read the outcome before deciding anything
 
-The runner records one of `COMMITTED`, `ROLLED_BACK_PROVEN`,
-`COMMITTED_WITH_ERROR`, `LEDGER_MISMATCH` or `UNKNOWN`. Only the middle two need
-operator judgement:
+The runner records one of `COMMITTED`, `ROLLED_BACK_PROVEN`, `LEDGER_MISMATCH` or
+`UNKNOWN`. Only `COMMITTED` and `ROLLED_BACK_PROVEN` are answers:
 
-* `ROLLED_BACK_PROVEN` — the read-only probe proved the ledger row absent. Fix
-  the cause, then re-run; the ledger is still a proven prefix, so T1 applies.
-* `COMMITTED_WITH_ERROR` — the row **is** present with the expected token, so the
-  transaction committed and the error arrived afterwards. **Do not re-run it.**
-  Confirm with `check-ledger.ps1`, then continue from the next index.
-* `UNKNOWN` — the commit outcome could not be established. Do not assume success
-  and do not assume rollback. Run `check-ledger.ps1` (SELECT only, safe), and
-  escalate; if the state cannot be proven, T2 is the only remaining option.
+* `COMMITTED` — the ledger row **is** present with the expected token. The
+  transaction committed, whatever the exit code said afterwards. **Do not re-run
+  it.** Confirm with `check-ledger.ps1`.
+* `ROLLED_BACK_PROVEN` — psql exited **3** (script error under `ON_ERROR_STOP`, so
+  the `COMMIT` that ends the wrapper was never reached) **and** a fresh session
+  showed the row absent. The version is genuinely not applied.
+* `LEDGER_MISMATCH` — a row exists with an identity the manifest does not
+  describe. Human decision required.
+* `UNKNOWN` — the commit outcome is **not** established. This covers connection
+  loss (psql exit 2), a timeout, a launch failure, incomplete output capture and
+  an unreadable probe. A missing ledger row in these states proves nothing: the
+  original backend may still commit. Do not assume success and do not assume
+  rollback.
 
-## T1 — Resume (only with proof)
+Round 8 removed the previous claim that an absent row after *any* failure is a
+proven rollback. It is not: absence observed from a new session says nothing
+about a backend that is still running or whose connection died mid-commit.
 
-Re-running `deploy.ps1` is safe *only* because it proves the ledger is an exact
-prefix of the manifest before skipping anything: same versions, same stored
-sha256 tokens, no gaps, no extra rows. If any of that is untrue it refuses.
+## T1 — There is no resume
 
-That is the whole recovery procedure for an interruption. There is deliberately
-no backfill script, no "mark as applied" helper and no automatic retry — the
-earlier design had all three and the audit rejected them (F1, F8).
+`deploy.ps1` is **fresh-only**. It requires an empty ledger, refuses a non-empty
+one, and has no start index, no skip-a-proven-prefix path, no backfill and no
+retry. The earlier resume design could never run: the fresh-baseline preflight
+rejects any project that already has application objects, so a partially applied
+database failed that gate before the prefix proof was reached. Rather than keep a
+path that cannot work, it was removed.
+
+Consequences for an interrupted run:
+
+1. Everything the runner did is still auditable — `evidence/<stamp>-attempt-1/`
+   holds one receipt per phase, sealed by hash chain.
+2. The database is in a partially applied state. The runner will refuse to touch
+   it, by design.
+3. Recovery is a **decision for a human**: either recreate the project (T2) or
+   have an authorised operator finish the remaining versions by hand, outside this
+   package, and then reconcile the ledger under review. Nothing in this package
+   automates that, and no report from this package should be read as authorising
+   it.
+
+### T1.1 — A stale exclusive-writer claim
+
+Before the first migration the runner inserts one row into
+`supabase_migrations.clash_deploy_claim` (primary key `claim_key`, value
+`clash-cloud-deploy`). A second runner started at the same time collides on that
+key, receives SQLSTATE `23505`, and stops before executing anything. The claim is
+deleted only after postflight passes.
+
+A crashed run therefore leaves a claim behind, and the next run stops with
+`03c-writer-claim-stop.json`. That is deliberate: it forces someone to look at the
+evidence before reusing the project. Clearing it is a manual, reviewed action:
+
+```sql
+-- Only after the evidence for the abandoned run has been read and the database
+-- state is understood. This deletes a coordination row, nothing else.
+delete from supabase_migrations.clash_deploy_claim where claim_key = 'clash-cloud-deploy';
+```
 
 ## T2 — Discard and recreate (after any doubt)
 

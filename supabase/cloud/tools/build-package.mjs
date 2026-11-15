@@ -195,6 +195,17 @@ alter table supabase_migrations.schema_migrations
   add column if not exists name text,
   add column if not exists created_by text,
   add column if not exists idempotency_key text;
+
+-- Round 8: exclusive-writer claim. One row, one key. deploy.ps1 inserts its run
+-- id here before the first migration; a second runner started at the same time
+-- collides on the primary key and stops instead of executing anything. The row
+-- is released only after postflight passes, so a crashed run leaves a claim that
+-- blocks the next run until a human inspects it (ROLLBACK.md T1).
+create table if not exists supabase_migrations.clash_deploy_claim (
+  claim_key   text not null primary key,
+  run_id      text not null,
+  started_utc timestamptz not null
+);
 `);
 
 for (const e of entries) {
@@ -215,6 +226,12 @@ for (const e of entries) {
 -- schema change nor its ledger row survives. A connection lost around COMMIT
 -- can leave the outcome unknown, which is why the runner classifies it from
 -- the ledger instead of claiming a rollback.
+--
+-- CONCURRENCY (Round 8): the ledger insert has NO conflict clause. If a row for
+-- this version already exists, the insert raises unique_violation, the whole
+-- transaction aborts and no statement of the migration survives. An
+-- 'on conflict do nothing' would have skipped the row while re-executing the
+-- migration body - the one case the read-back could not detect.
 -- ============================================================================
 begin;
 
@@ -226,8 +243,7 @@ values (
   '${e.ledgerName}',
   array['sha256:${e.normalizedSha256}'],
   'clash-cloud-wrapper-v1'
-)
-on conflict (version) do nothing;
+);
 
 commit;
 `;

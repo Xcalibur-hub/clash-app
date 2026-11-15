@@ -120,7 +120,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 18 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 18
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 24
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -141,7 +141,7 @@ if (-not $inventoryCheck.ok) {
     adapterVersion    = $script:ClashAdapterVersion
     adapterSha256     = $script:adapterShaFinal
     casesExecuted     = 0
-    casesExpected     = 18
+    casesExpected     = 24
     cases             = @{}
     problems          = $reasons
     inventoryObserved = $observed
@@ -526,6 +526,134 @@ Add-Case 'validatorRejectsTamperedReceipt' ($accepted.ok -eq $true -and $allTamp
   tamperedRejected   = $allTamperedRejected
   detail             = $tamperResults
   acceptedProblems   = @($accepted.problems)
+}
+
+# ---- 19/20: the ledger classifier (R1) -------------------------------------
+# A gapped ledger must never read as a resumable prefix. These run the exact
+# adapter function that check-ledger.ps1 and deploy.ps1 now share.
+$ledgerModel = @(
+  [pscustomobject]@{ version = '20260101000000'; normalizedSha256 = ('1' * 64) },
+  [pscustomobject]@{ version = '20260101000100'; normalizedSha256 = ('2' * 64) },
+  [pscustomobject]@{ version = '20260101000200'; normalizedSha256 = ('3' * 64) })
+$t1 = 'sha256:' + ('1' * 64)
+$t2 = 'sha256:' + ('2' * 64)
+$t3 = 'sha256:' + ('3' * 64)
+
+$gappy    = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{ '20260101000000' = $t1; '20260101000200' = $t3 }
+$complete = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{ '20260101000000' = $t1; '20260101000100' = $t2; '20260101000200' = $t3 }
+$partial  = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{ '20260101000000' = $t1 }
+$emptyOne = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{}
+$absent   = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{} -TableAbsent $true
+Add-Case 'ledgerGapIsProblem' (
+  $gappy.verdict -eq 'PROBLEM' -and
+  @($gappy.gaps).Count -eq 1 -and
+  [string]@($gappy.gaps)[0] -eq '20260101000200' -and
+  $complete.verdict -eq 'CONSISTENT' -and
+  $partial.verdict -eq 'PARTIAL_PREFIX' -and
+  $emptyOne.verdict -eq 'EMPTY' -and
+  $absent.verdict -eq 'EMPTY' -and $absent.tableAbsent -eq $true) @{
+  gapVerdict     = $gappy.verdict
+  gapDetail      = @($gappy.gaps)
+  completeVerdict = $complete.verdict
+  partialVerdict = $partial.verdict
+  emptyVerdict   = $emptyOne.verdict
+}
+
+$malformedRow   = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{ '20260101000000' = 'garbage' }
+$emptyToken     = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{ '20260101000000' = '' }
+$shortToken     = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{ '20260101000000' = ('sha256:' + ('1' * 63)) }
+$mismatchRow    = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{ '20260101000000' = $t2 }
+$extraRow       = Get-LedgerVerdict -Entries $ledgerModel -Ledger @{ '20250101000000' = $t1 }
+$missingParse   = 'ok'
+try { $null = Get-LedgerVerdict -Entries @() -Ledger @{} } catch { $missingParse = 'threw' }
+Add-Case 'ledgerMalformedIsProblem' (
+  $malformedRow.verdict -eq 'PROBLEM' -and @($malformedRow.malformed).Count -eq 1 -and
+  $emptyToken.verdict -eq 'PROBLEM' -and
+  $shortToken.verdict -eq 'PROBLEM' -and
+  $mismatchRow.verdict -eq 'PROBLEM' -and
+  $extraRow.verdict -eq 'PROBLEM' -and @($extraRow.extra).Count -eq 1) @{
+  malformed = @($malformedRow.malformed)
+  empty     = $emptyToken.verdict
+  short     = $shortToken.verdict
+  mismatch  = $mismatchRow.verdict
+  extra     = $extraRow.verdict
+}
+
+# ---- 21: a receipt that cannot be written anywhere must throw (R4) ---------
+$blockerDir = [System.IO.Path]::GetTempPath()
+$blockerPath = Join-Path $blockerDir ('clash-receipt-blocker-{0}.txt' -f ([guid]::NewGuid().ToString('N')))
+$bothFailedOk = $false
+$receiptThrew = $false
+$attempts = 0
+try {
+  [void](New-Item -ItemType File -Path $blockerPath -Force)
+  $previousFallback = $script:ClashEvidenceFallbackDir
+  try {
+    $script:ClashEvidenceFallbackDir = Join-Path $blockerPath 'fallback'
+    $failedWrite = Write-EvidenceOrFallback -Path (Join-Path $blockerPath 'primary.json') -Label 'injected-failure.json' -Text '{}'
+    $bothFailedOk = ($failedWrite.ok -eq $false)
+    $attempts = @($failedWrite.attempts).Count
+    try { [void](Add-Receipt -Root (Join-Path $blockerPath 'root') -Name 'injected.json' -Fields @{ status = 'FAIL' }) }
+    catch { $receiptThrew = $true }
+  }
+  finally { $script:ClashEvidenceFallbackDir = $previousFallback }
+}
+finally { Remove-Item -LiteralPath $blockerPath -Force -ErrorAction SilentlyContinue }
+Add-Case 'receiptFailureStops' ($bothFailedOk -and $receiptThrew -and $attempts -ge 2) @{
+  fallbackReportedFailure = $bothFailedOk
+  addReceiptThrew         = $receiptThrew
+  attemptsRecorded        = $attempts
+}
+
+# ---- 22: connection loss and ambiguous completion are UNKNOWN (R3) ---------
+$connLost = [pscustomobject]@{ exitCode = 2; timedOut = $false; launchError = $null; captureNote = ''; stdOut = ''; stdErr = 'connection to server was lost' }
+$scriptErr = [pscustomobject]@{ exitCode = 3; timedOut = $false; launchError = $null; captureNote = ''; stdOut = ''; stdErr = 'ERROR:  42P01: relation does not exist' }
+$timedOut = [pscustomobject]@{ exitCode = $null; timedOut = $true; launchError = $null; captureNote = ''; stdOut = ''; stdErr = '' }
+$noExit = [pscustomobject]@{ exitCode = $null; timedOut = $false; launchError = $null; captureNote = ''; stdOut = ''; stdErr = '' }
+Add-Case 'connectionLossIsUnknown' (
+  (Get-PsqlExitClass $connLost) -eq 'CONNECTION_LOST' -and
+  (Get-PsqlExitClass $scriptErr) -eq 'SCRIPT_ERROR' -and
+  (Get-PsqlExitClass $timedOut) -eq 'UNKNOWN' -and
+  (Get-PsqlExitClass $noExit) -eq 'UNKNOWN' -and
+  -not (Test-RollbackProvable -Result $connLost -ReadBackOk $true -RowAbsent $true) -and
+  -not (Test-RollbackProvable -Result $timedOut -ReadBackOk $true -RowAbsent $true) -and
+  -not (Test-RollbackProvable -Result $noExit -ReadBackOk $true -RowAbsent $true) -and
+  (Test-RollbackProvable -Result $scriptErr -ReadBackOk $true -RowAbsent $true) -and
+  -not (Test-RollbackProvable -Result $scriptErr -ReadBackOk $false -RowAbsent $true) -and
+  -not (Test-RollbackProvable -Result $scriptErr -ReadBackOk $true -RowAbsent $false)) @{
+  connectionLost = (Get-PsqlExitClass $connLost)
+  scriptError    = (Get-PsqlExitClass $scriptErr)
+  timeout        = (Get-PsqlExitClass $timedOut)
+  rollbackOnConnLoss = (Test-RollbackProvable -Result $connLost -ReadBackOk $true -RowAbsent $true)
+  rollbackOnScriptError = (Test-RollbackProvable -Result $scriptErr -ReadBackOk $true -RowAbsent $true)
+}
+
+# ---- 23: incomplete capture is UNKNOWN, never success ----------------------
+$partialOut = [pscustomobject]@{ exitCode = 0; timedOut = $false; launchError = $null; captureNote = 'stdout capture incomplete'; stdOut = ''; stdErr = '' }
+Add-Case 'incompleteCaptureIsUnknown' (
+  (Test-NativeSuccess $partialOut) -eq $false -and
+  (Test-NativeCaptureComplete $partialOut) -eq $false -and
+  (Get-PsqlExitClass $partialOut) -eq 'UNKNOWN' -and
+  (Get-NativeOutcomeLabel $partialOut) -eq 'UNKNOWN-CAPTURE-INCOMPLETE' -and
+  -not (Test-RollbackProvable -Result $partialOut -ReadBackOk $true -RowAbsent $true) -and
+  (Test-NativeSuccess ([pscustomobject]@{ exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''; stdOut = ''; stdErr = '' }))) @{
+  outcomeLabel = (Get-NativeOutcomeLabel $partialOut)
+  success      = (Test-NativeSuccess $partialOut)
+}
+
+# ---- 24: SQLSTATE is extracted, message text is not used --------------------
+$stateVerbose = Get-PgSqlState 'ERROR:  42P01: relation "supabase_migrations.schema_migrations" does not exist'
+$stateLegacy  = Get-PgSqlState 'SQLSTATE: 23505'
+$stateMissing = Get-PgSqlState 'ERROR:  something went wrong'
+$stateEmpty   = Get-PgSqlState ''
+$stateWrong   = Get-PgSqlState 'ERROR:  does not exist'
+Add-Case 'sqlStateExtracted' (
+  $stateVerbose -eq '42P01' -and $stateLegacy -eq '23505' -and
+  $stateMissing -eq '' -and $stateEmpty -eq '' -and $stateWrong -eq '') @{
+  verbose = $stateVerbose
+  legacy  = $stateLegacy
+  missing = $stateMissing
+  textOnly = $stateWrong
 }
 
 # ===========================================================================

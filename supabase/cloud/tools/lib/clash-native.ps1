@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.0.0'
+$script:ClashAdapterVersion = '4.1.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -225,15 +225,31 @@ function New-NotRunResult {
   }
 }
 
-# True only when the child definitely ran, definitely finished, and returned 0.
-# Everything else - launch failure, timeout, missing exit code - is UNKNOWN.
+# True only when the child definitely ran, definitely finished, returned 0 and
+# both streams were captured in full. Everything else - launch failure, timeout,
+# missing exit code, incomplete capture - is UNKNOWN.
+#
+# Round 8: incomplete capture used to be recorded in captureNote and then
+# ignored, so a truncated stdout could be parsed as a complete ledger listing.
 function Test-NativeSuccess {
   param($Result)
   if ($null -eq $Result) { return $false }
   if ($Result.launchError) { return $false }
   if ($Result.timedOut) { return $false }
   if ($null -eq $Result.exitCode) { return $false }
+  if (-not [string]::IsNullOrWhiteSpace([string]$Result.captureNote)) { return $false }
   return ([int]$Result.exitCode -eq 0)
+}
+
+# True only when the child ran to completion and both streams were fully
+# captured. Callers that interpret captured TEXT require this, not just success.
+function Test-NativeCaptureComplete {
+  param($Result)
+  if ($null -eq $Result) { return $false }
+  if ($Result.launchError) { return $false }
+  if ($Result.timedOut) { return $false }
+  if ($null -eq $Result.exitCode) { return $false }
+  return [string]::IsNullOrWhiteSpace([string]$Result.captureNote)
 }
 
 function Get-NativeOutcomeLabel {
@@ -242,8 +258,122 @@ function Get-NativeOutcomeLabel {
   if ($Result.launchError) { return 'UNKNOWN-NOT-RUN' }
   if ($Result.timedOut) { return 'UNKNOWN-TIMEOUT' }
   if ($null -eq $Result.exitCode) { return 'UNKNOWN-NO-EXIT-CODE' }
+  if (-not [string]::IsNullOrWhiteSpace([string]$Result.captureNote)) { return 'UNKNOWN-CAPTURE-INCOMPLETE' }
   if ([int]$Result.exitCode -eq 0) { return 'SUCCEEDED' }
   return 'FAILED-EXIT'
+}
+
+# psql exit classes. 0 = the script completed; 2 = the connection was lost;
+# 3 = script error with ON_ERROR_STOP; 1 and anything unexplained are not
+# interpreted by this package. No message text is consulted.
+function Get-PsqlExitClass {
+  param($Result)
+  if ($null -eq $Result) { return 'UNKNOWN' }
+  if ($Result.launchError -or $Result.timedOut -or $null -eq $Result.exitCode) { return 'UNKNOWN' }
+  if (-not [string]::IsNullOrWhiteSpace([string]$Result.captureNote)) { return 'UNKNOWN' }
+  switch ([int]$Result.exitCode) {
+    0 { return 'COMPLETED' }
+    1 { return 'PSQL_FATAL' }
+    2 { return 'CONNECTION_LOST' }
+    3 { return 'SCRIPT_ERROR' }
+    default { return 'OTHER_EXIT' }
+  }
+}
+
+# A rollback is PROVEN only when psql reported a script error under
+# ON_ERROR_STOP, so the COMMIT that ends the wrapper was never reached, and a
+# fresh session then shows no row. Absence after a connection loss, a timeout or
+# an unreadable probe proves nothing: the original backend may still commit.
+function Test-RollbackProvable {
+  param($Result, [bool]$ReadBackOk = $false, [bool]$RowAbsent = $false)
+  if (-not $ReadBackOk) { return $false }
+  if (-not $RowAbsent) { return $false }
+  return ((Get-PsqlExitClass $Result) -eq 'SCRIPT_ERROR')
+}
+
+# SQLSTATE from a verbose psql error: 'ERROR:  42P01: ...' or 'SQLSTATE: 42P01'.
+# Round 8: error text is never used to classify a database error.
+function Get-PgSqlState {
+  param([string]$Text)
+  if ([string]::IsNullOrWhiteSpace($Text)) { return '' }
+  $m = [regex]::Match($Text, 'ERROR:\s+([0-9A-Z]{5}):')
+  if ($m.Success) { return $m.Groups[1].Value }
+  $m = [regex]::Match($Text, 'SQLSTATE:\s*([0-9A-Z]{5})')
+  if ($m.Success) { return $m.Groups[1].Value }
+  return ''
+}
+
+# Ledger classification. A ledger is only meaningful as an exact chronological
+# prefix: every recorded version carries the manifest identity, no version is
+# recorded after a missing one, no unexpected version exists and no row is
+# malformed.
+#
+# Round 8 (R1): the previous check-ledger.ps1 counted missing rows and could
+# label a gapped ledger 'PREFIX', which reads like a resumable state.
+function Get-LedgerVerdict {
+  param(
+    [Parameter(Mandatory = $true)]$Entries,
+    [hashtable]$Ledger = @{},
+    [bool]$TableAbsent = $false
+  )
+  $missing   = New-Object System.Collections.Generic.List[string]
+  $mismatch  = New-Object System.Collections.Generic.List[string]
+  $gaps      = New-Object System.Collections.Generic.List[string]
+  $malformed = New-Object System.Collections.Generic.List[string]
+  $seenMissing = $false
+  $prefix = 0
+  $total = 0
+  foreach ($e in @($Entries)) {
+    $total++
+    $version = [string]$e.version
+    $want = 'sha256:' + [string]$e.normalizedSha256
+    if (-not $Ledger.ContainsKey($version)) {
+      $seenMissing = $true
+      [void]$missing.Add($version)
+      continue
+    }
+    $stored = [string]$Ledger[$version]
+    if ($stored -notmatch '^sha256:[0-9a-f]{64}$') { [void]$malformed.Add($version) }
+    if ($stored -ne $want) { [void]$mismatch.Add($version) }
+    if ($seenMissing) { [void]$gaps.Add($version) } else { $prefix++ }
+  }
+  $known = @{}
+  foreach ($e in @($Entries)) { $known[[string]$e.version] = $true }
+  $extra = New-Object System.Collections.Generic.List[string]
+  foreach ($k in @($Ledger.Keys)) { if (-not $known.ContainsKey([string]$k)) { [void]$extra.Add([string]$k) } }
+
+  $verdict = 'PROBLEM'
+  $why = ''
+  if ($malformed.Count -gt 0)     { $why = 'malformed ledger rows: ' + ($malformed -join ',') }
+  elseif ($extra.Count -gt 0)     { $why = 'unexpected ledger versions: ' + ($extra -join ',') }
+  elseif ($mismatch.Count -gt 0)  { $why = 'identity mismatch: ' + ($mismatch -join ',') }
+  elseif ($gaps.Count -gt 0)      { $why = 'chronological gap: recorded after a missing version: ' + ($gaps -join ',') }
+  elseif ($missing.Count -eq $total) {
+    $verdict = 'EMPTY'
+    $why = $(if ($TableAbsent) { 'ledger table absent; clean pre-deployment state' } else { 'no versions recorded; clean pre-deployment state' })
+  }
+  elseif ($missing.Count -eq 0) {
+    $verdict = 'CONSISTENT'
+    $why = 'all versions present with matching identities'
+  }
+  else {
+    $verdict = 'PARTIAL_PREFIX'
+    $why = ('{0} of {1} versions recorded as a strict prefix; this runner is fresh-only and will not resume' -f $prefix, $total)
+  }
+
+  return [ordered]@{
+    verdict     = $verdict
+    why         = $why
+    rows        = $Ledger.Count
+    prefix      = $prefix
+    total       = $total
+    missing     = @($missing)
+    mismatch    = @($mismatch)
+    gaps        = @($gaps)
+    malformed   = @($malformed)
+    extra       = @($extra)
+    tableAbsent = $TableAbsent
+  }
 }
 
 function Format-NativeSummary {
@@ -298,6 +428,10 @@ function Write-EvidenceJson {
 # writable. Order: the run directory, then a per-machine fallback directory under
 # TEMP, then console-only. The outcome is returned and always announced on the
 # terminal, so "the receipt failed" can never be mistaken for "nothing happened".
+# Round 8 (R4): the fallback directory is injectable so the self-test can prove
+# the both-destinations-failed path without touching the machine's TEMP root.
+$script:ClashEvidenceFallbackDir = $null
+
 function Write-EvidenceOrFallback {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
@@ -311,7 +445,8 @@ function Write-EvidenceOrFallback {
   }
   catch { $attempts += ('{0} : {1}' -f $Path, (Protect-Text $_.Exception.Message)) }
 
-  $fbDir = Join-Path $env:TEMP 'clash-evidence-fallback'
+  $fbDir = $script:ClashEvidenceFallbackDir
+  if ([string]::IsNullOrWhiteSpace($fbDir)) { $fbDir = Join-Path $env:TEMP 'clash-evidence-fallback' }
   try {
     if (-not (Test-Path -LiteralPath $fbDir)) { New-Item -ItemType Directory -Path $fbDir -Force | Out-Null }
     $fb = Join-Path $fbDir ('{0}-{1}.json' -f (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ'), $Label)
@@ -349,8 +484,14 @@ function Add-Receipt {
   $line = ('TERMINAL RECEIPT {0} status={1} sha256={2} path={3} fallback={4}' -f `
       $Name, $status, $(if ($res.sha256) { $res.sha256 } else { '<none>' }), $(if ($res.path) { $res.path } else { '<none>' }), $res.fallback)
   Write-Host $line
-  if ($res.sha256) { return $res.sha256 }
-  return ''
+  # Round 8 (R4): a receipt that cannot be written anywhere is a terminal
+  # condition, not an empty hash. Returning '' let a caller chain a run whose
+  # evidence does not exist and still print a success line.
+  if (-not $res.ok) {
+    throw ('receipt persistence failed for {0}: primary and fallback are both unwritable ({1}). The run must STOP.' -f `
+        $Name, (@($res.attempts) -join ' | '))
+  }
+  return [string]$res.sha256
 }
 
 # Final seal over every artefact of the run, chain-hashed in path order.
@@ -485,7 +626,13 @@ $script:ClashSelfTestRequiredCases = @(
   'unexpectedExceptionCannotPass',
   'droppedCaseFailsInventory',
   'nullDetailIsRecordedNotCrashed',
-  'validatorRejectsTamperedReceipt'
+  'validatorRejectsTamperedReceipt',
+  'ledgerGapIsProblem',
+  'ledgerMalformedIsProblem',
+  'receiptFailureStops',
+  'connectionLossIsUnknown',
+  'incompleteCaptureIsUnknown',
+  'sqlStateExtracted'
 )
 
 # Returns a FLAT sequence of case-name strings.

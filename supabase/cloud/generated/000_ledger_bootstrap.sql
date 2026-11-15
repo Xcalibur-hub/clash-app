@@ -18,3 +18,14 @@ alter table supabase_migrations.schema_migrations
   add column if not exists name text,
   add column if not exists created_by text,
   add column if not exists idempotency_key text;
+
+-- Round 8: exclusive-writer claim. One row, one key. deploy.ps1 inserts its run
+-- id here before the first migration; a second runner started at the same time
+-- collides on the primary key and stops instead of executing anything. The row
+-- is released only after postflight passes, so a crashed run leaves a claim that
+-- blocks the next run until a human inspects it (ROLLBACK.md T1).
+create table if not exists supabase_migrations.clash_deploy_claim (
+  claim_key   text not null primary key,
+  run_id      text not null,
+  started_utc timestamptz not null
+);
