@@ -294,6 +294,37 @@ function Write-EvidenceJson {
   return (Write-Evidence -Path $Path -Text ($Object | ConvertTo-Json -Depth 8))
 }
 
+# Guarantees a receipt exists even when the run's evidence directory is not
+# writable. Order: the run directory, then a per-machine fallback directory under
+# TEMP, then console-only. The outcome is returned and always announced on the
+# terminal, so "the receipt failed" can never be mistaken for "nothing happened".
+function Write-EvidenceOrFallback {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [string]$Text = '',
+    [string]$Label = 'receipt'
+  )
+  $attempts = @()
+  try {
+    $sha = Write-Evidence -Path $Path -Text $Text
+    return [ordered]@{ ok = $true; path = $Path; sha256 = $sha; fallback = $false; attempts = @() }
+  }
+  catch { $attempts += ('{0} : {1}' -f $Path, (Protect-Text $_.Exception.Message)) }
+
+  $fbDir = Join-Path $env:TEMP 'clash-evidence-fallback'
+  try {
+    if (-not (Test-Path -LiteralPath $fbDir)) { New-Item -ItemType Directory -Path $fbDir -Force | Out-Null }
+    $fb = Join-Path $fbDir ('{0}-{1}.json' -f (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ'), $Label)
+    $shaFb = Write-Evidence -Path $fb -Text $Text
+    Write-Host ('RECEIPT FALLBACK {0} -> {1}' -f $Label, $fb) -ForegroundColor Yellow
+    return [ordered]@{ ok = $true; path = $fb; sha256 = $shaFb; fallback = $true; attempts = @($attempts) }
+  }
+  catch { $attempts += ('fallback : {0}' -f (Protect-Text $_.Exception.Message)) }
+
+  Write-Host ('NO RECEIPT POSSIBLE for {0}: {1}' -f $Label, ($attempts -join ' | ')) -ForegroundColor Red
+  return [ordered]@{ ok = $false; path = $null; sha256 = $null; fallback = $false; attempts = @($attempts) }
+}
+
 # A receipt is one immutable JSON file plus one line on the terminal. Each
 # receipt carries the hash of the previous one, so the chain is tamper-evident
 # and a missing or reordered entry is visible.
@@ -313,10 +344,13 @@ function Add-Receipt {
   foreach ($k in @($Fields.Keys)) { $obj[$k] = $Fields[$k] }
 
   $path = Join-Path $Root $Name
-  $sha  = Write-EvidenceJson -Path $path -Object $obj
-  $line = ('RECEIPT {0} sha256={1} status={2}' -f $Name, $sha, $(if ($Fields.ContainsKey('status')) { $Fields.status } else { '-' }))
+  $res  = Write-EvidenceOrFallback -Path $path -Text ($obj | ConvertTo-Json -Depth 8) -Label $Name
+  $status = $(if ($Fields.ContainsKey('status')) { $Fields.status } else { '-' })
+  $line = ('TERMINAL RECEIPT {0} status={1} sha256={2} path={3} fallback={4}' -f `
+      $Name, $status, $(if ($res.sha256) { $res.sha256 } else { '<none>' }), $(if ($res.path) { $res.path } else { '<none>' }), $res.fallback)
   Write-Host $line
-  return $sha
+  if ($res.sha256) { return $res.sha256 }
+  return ''
 }
 
 # Final seal over every artefact of the run, chain-hashed in path order.
@@ -459,7 +493,10 @@ function Assert-AdapterSelfTest {
   if (-not $doc.PSObject.Properties['cases'] -or $null -eq $doc.cases) {
     throw 'Adapter self-test receipt carries no cases.'
   }
-  foreach ($case in @('zeroExitWithStderr', 'nonZeroExit', 'silentSuccess', 'stderrIsDataNotFailure')) {
+  foreach ($case in @('zeroExitWithStderr', 'nonZeroExit', 'silentSuccess', 'stderrIsDataNotFailure',
+                     'legacyPatternRaisesNativeCommandError', 'legacyPatternLosesExitCode',
+                     'adapterSurvivesSameChild', 'differentialProven',
+                     'receiptFallsBackWhenPathUnwritable')) {
     if (-not $doc.cases.PSObject.Properties[$case]) { throw ("Adapter self-test receipt is missing case '{0}'." -f $case) }
     if ($doc.cases.$case.passed -ne $true) { throw ("Adapter self-test case '{0}' did not pass." -f $case) }
   }

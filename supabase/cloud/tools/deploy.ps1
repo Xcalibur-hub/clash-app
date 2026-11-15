@@ -92,8 +92,8 @@ trap {
         New-PhaseReceipt '99-runner-exception.json' @{ status = 'EXCEPTION'; message = $m }
       }
       else {
-        [void](Write-EvidenceJson -Path (Join-Path $run '99-runner-exception.json') -Object ([ordered]@{
-              status = 'EXCEPTION'; message = $m; utc = (Get-Date).ToUniversalTime().ToString('o') }))
+        [void](Write-EvidenceOrFallback -Path (Join-Path $run '99-runner-exception.json') -Label '99-runner-exception.json' -Text (([ordered]@{
+                status = 'EXCEPTION'; message = $m; utc = (Get-Date).ToUniversalTime().ToString('o') }) | ConvertTo-Json -Depth 6))
       }
       [void](Seal-Evidence -Root $run)
     }
@@ -170,7 +170,7 @@ function Stop-Run([string]$Reason, [string]$StopName = 'STOP.json') {
     reason = $safe
     guidance = 'Do not retry, repair or re-run blindly. Resolve by inspection: check-ledger.ps1 is read-only.'
   }
-  [void](Write-Evidence -Path (Join-Path $run 'STOP.txt') -Text ("{0}`n{1}`n" -f (Get-Date).ToUniversalTime().ToString('o'), $safe))
+  [void](Write-EvidenceOrFallback -Path (Join-Path $run 'STOP.txt') -Label 'STOP.txt' -Text ("{0}`n{1}`n" -f (Get-Date).ToUniversalTime().ToString('o'), $safe))
   [void](Seal-Evidence -Root $run)
   Write-Host ''
   Write-Host ("STOP: {0}" -f $safe) -ForegroundColor Red
@@ -506,20 +506,20 @@ foreach ($e in $entries) {
       $receipt.outcome = 'UNKNOWN'
       $receipt.status  = 'UNPROVEN'
       $receipt.ledgerReadBack = 'PROBE FAILED'
-      [void](Write-EvidenceJson -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Object $receipt)
+      [void](Write-EvidenceOrFallback -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
       Stop-Run ("migration {0} exited 0 but the ledger read-back could not be performed ({1}). Outcome UNKNOWN; do not assume the row is present." -f $e.version, (Get-NativeOutcomeLabel $probe)) ("{0}-unproven.json" -f $label)
     }
     if (-not $rowPresent -or $probeVal -ne $expectedTok) {
       $receipt.outcome = 'LEDGER_MISMATCH'
       $receipt.status  = 'FAIL'
       $receipt.ledgerReadBack = ("expected {0} got '{1}'" -f $expectedTok, $probeVal)
-      [void](Write-EvidenceJson -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Object $receipt)
+      [void](Write-EvidenceOrFallback -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
       Stop-Run ("migration {0} exited 0 but the ledger row does not match: expected {1}, found '{2}'." -f $e.version, $expectedTok, $probeVal) ("{0}-ledger-mismatch.json" -f $label)
     }
     $receipt.outcome = 'COMMITTED'
     $receipt.ledgerReadBack = 'MATCH'
     $receipt.status = 'PASS'
-    [void](Write-EvidenceJson -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Object $receipt)
+    [void](Write-EvidenceOrFallback -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
     New-PhaseReceipt ("{0}-applied.json" -f $label) @{
       status = 'PASS'; version = $e.version; outcome = 'COMMITTED'
       wrapperSha256 = $actualWrapperSha; ledgerReadBack = 'MATCH'; exitCode = 0
@@ -542,7 +542,7 @@ foreach ($e in $entries) {
     default                 { 'the commit outcome could not be established. Assume NOTHING: neither success nor rollback.' }
   }
   $receipt.status = 'FAIL'
-  [void](Write-EvidenceJson -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Object $receipt)
+  [void](Write-EvidenceOrFallback -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
   New-PhaseReceipt ("{0}-failed.json" -f $label) @{
     status = 'FAIL'; version = $e.version; outcome = $receipt.outcome
     exitCode = $mig.exitCode; timedOut = $mig.timedOut
@@ -591,6 +591,7 @@ New-PhaseReceipt '06-complete.json' @{
   appliedThisRun = $applied
   resumedFromIndex = $startIndex
   packageTreeHash = $treeHash
+  step0Bootstrap  = $bootOutcome
   ledgerReadBack = '111/111 verified by 90_verify.sql'
 }
 $seal = Seal-Evidence -Root $run

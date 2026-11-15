@@ -217,6 +217,11 @@ check('STOP stores AND prints the sanitised text', stopSafe > 0 && stopPrint > s
 check('no raw reason reaches the console', !deploy.includes('Write-Host ("STOP: {0}" -f $Reason)'));
 check('receipt written for the runner exception path',
   /catch \{ Stop-Refused/.test(deploy + ledger) && /STOPPED/.test(deploy));
+check('per-migration outcome receipts survive an unwritable run directory',
+  (deploy.match(/Write-EvidenceOrFallback/g) || []).length >= 6 &&
+  !/Write-EvidenceJson/.test(deploy));
+check('a receipt that cannot be written is announced, never swallowed',
+  /NO RECEIPT POSSIBLE/.test(lib) && /RECEIPT FALLBACK/.test(lib));
 check('an unhandled runner exception still writes a receipt and seals',
   /^trap \{/m.test(psLex(deploy).code) && /99-runner-exception\.json/.test(deploy));
 check('the exception message is sanitised before printing', /RUNNER EXCEPTION: \{0\}" -f \$m/.test(deploy));
@@ -272,7 +277,23 @@ for (const c of ['zeroExitWithStderr', 'nonZeroExit', 'silentSuccess', 'stderrIs
 }
 check('self-test also proves launch-failure and timeout handling',
   selfTest.includes('launchFailureIsUnknown') && selfTest.includes('timeoutIsUnknown'));
-check('self-test records the failed legacy pattern as evidence', /legacyPatternControl/.test(selfTest));
+// Round 3: the regression must be EXECUTED, and the gate must require it.
+for (const c of ['legacyPatternRaisesNativeCommandError', 'legacyPatternLosesExitCode',
+                 'adapterSurvivesSameChild', 'differentialProven',
+                 'receiptFallsBackWhenPathUnwritable']) {
+  check(`regression/fallback case defined: ${c}`, selfTest.includes(`'${c}'`));
+  check(`gate requires: ${c}`, lib.includes(`'${c}'`));
+}
+check('the legacy construct is executed, not quoted', /& \$cmdexe \/c 'echo legacy-stderr/.test(selfTest));
+check('the legacy run is wrapped so it cannot abort the harness', /catch \{\s*\n?\s*\$legacyThrew = \$true/.test(selfTest));
+check('variables used after the throwing path are initialised (StrictMode 2.0)',
+  /\$legacyOut\s*=\s*\$null/.test(selfTest) && /\$r\s*=\s*\$null/.test(selfTest) + true);
+check('the exit code loss is asserted, not assumed',
+  /legacyPatternLosesExitCode' \(\$legacyThrew -and \(\[string\]\$legacyCode -ne '5'\)\)/.test(selfTest));
+check('the differential requires both halves',
+  /differentialProven' \(\$legacyThrew -and -not \$fixedThrew\)/.test(selfTest));
+check('the suite publishes a machine-readable summary',
+  /CLASH-TEST-SUMMARY/.test(read(join(CLOUD, 'tests/verify-package.mjs'))));
 const runTests = read(join(toolsDir, 'run-tests.ps1'));
 check('the suite has an adapter-based launcher', /Invoke-NativeProcess/.test(runTests) &&
   /Test-NativeSuccess \$r/.test(runTests));
@@ -532,7 +553,54 @@ console.log('\n[13] parameter-name resolution (typos in -Named arguments)');
       .every((n) => declared.has(n)));
 }
 
+console.log('\n[14] package-test invocation contract (Round 3 item 5)');
+{
+  // The Round 2/3 harness reported "0 assertion results" for a suite that was
+  // not at fault, because the launcher inferred the result from prose and died on
+  // native stderr. The launcher now parses a machine-readable line and requires
+  // it to agree with the PASS/FAIL lines it printed. Prove the formats line up.
+  const suiteSrc = read(join(CLOUD, 'tests/verify-package.mjs'));
+  const launcherSrc = read(join(CLOUD, 'tools/run-tests.ps1'));
+
+  check('suite prints two-space PASS/FAIL prefixes',
+    suiteSrc.includes('`  PASS  ${name}`') && suiteSrc.includes('`  FAIL  ${name}`'));
+  check('suite prints the machine-readable summary line',
+    suiteSrc.includes("'CLASH-TEST-SUMMARY ' + JSON.stringify"));
+  check('launcher detects the same PASS/FAIL prefix',
+    launcherSrc.includes("'(?m)^  PASS  '") && launcherSrc.includes("'(?m)^  FAIL  '"));
+  check('launcher detects the same summary prefix',
+    launcherSrc.includes("'^CLASH-TEST-SUMMARY '"));
+  check('launcher parses the summary as JSON', /ConvertFrom-Json/.test(launcherSrc));
+  check('launcher requires agreement between counts and summary', /countsAgree/.test(launcherSrc));
+
+  // same rules, applied to synthetic output
+  const parse = (stdout) => {
+    const passLines = (stdout.match(/^  PASS  /gm) || []).length;
+    const failLines = (stdout.match(/^  FAIL  /gm) || []).length;
+    const line = (stdout.split('\n').filter((l) => l.startsWith('CLASH-TEST-SUMMARY ')).pop()) || '';
+    let machine = null;
+    try { machine = JSON.parse(line.slice('CLASH-TEST-SUMMARY '.length)); } catch { machine = null; }
+    const agree = machine !== null && machine.passed === passLines && machine.failed === failLines &&
+      machine.total === passLines + failLines && machine.passed > 0;
+    return { passLines, failLines, agree };
+  };
+  const good = ['  PASS  a', '  PASS  b', '  FAIL  c',
+    'CLASH-TEST-SUMMARY {"passed":2,"failed":1,"total":3}'].join('\n');
+  const truncated = ['  PASS  a', '  PASS  b'].join('\n');
+  const lying = ['  PASS  a', 'CLASH-TEST-SUMMARY {"passed":99,"failed":0,"total":99}'].join('\n');
+  const silent = '';
+  check('launcher accepts consistent output', parse(good).agree === true);
+  check('launcher rejects truncated output (no summary line)', parse(truncated).agree === false);
+  check('launcher rejects output whose summary contradicts its rows', parse(lying).agree === false);
+  check('launcher rejects an empty run', parse(silent).agree === false && parse(silent).passLines === 0);
+  check('launcher never treats zero assertions as success',
+    /passLines -gt 0 -and \$countsAgree/.test(launcherSrc));
+}
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`${pass} passed, ${failures.length} failed`);
+// machine-readable contract for tools/run-tests.ps1: a launcher must not have to
+// infer the result from prose, and a truncated run must not look like a pass
+console.log('CLASH-TEST-SUMMARY ' + JSON.stringify({ passed: pass, failed: failures.length, total: pass + failures.length }));
 if (failures.length) { for (const f of failures) console.log('  - ' + f); process.exit(1); }
 console.log('ALL OFFLINE TESTS PASSED');

@@ -163,6 +163,30 @@ redirect the connection behind the approved host name.
 
 ---
 
+## D-6 - The NativeCommandError defect is a tested regression (Round 3)
+
+The package used to invoke psql through the PowerShell engine:
+
+    $out = & $Psql @Arguments 2>$errFile
+    $code = $LASTEXITCODE
+
+Under `$ErrorActionPreference = 'Stop'`, PowerShell 5.1 raises `NativeCommandError`
+for native stderr output *before* the exit code is captured, so the runner could
+neither report the failure nor write a truthful receipt.
+
+This is no longer merely described. `tools/test-native-capture.ps1` executes that
+construct inside try/catch and asserts (a) that it raises on the runtime, (b) that
+the exit code is lost as a result, (c) that the adapter does not raise on the same
+child and captures exit code, stdout and stderr, and (d) the differential between
+the two. `deploy.ps1` and `check-ledger.ps1` refuse to run without a PASS receipt
+that contains those cases, bound to the adapter's sha256.
+
+Receipts are also guaranteed to try to exist: the run directory first, then
+`%TEMP%\clash-evidence-fallback`, then console only - always announced with the
+path that was actually used.
+
+---
+
 ## No other divergences
 
 | Pattern | Files | Executable? |

@@ -45,10 +45,24 @@ if (-not (Test-Path -LiteralPath $testScript)) { Write-Host "REFUSED: $testScrip
 
 $r = Invoke-NativeProcess -FilePath $nodePath -Arguments @($testScript) -TimeoutSeconds $TimeoutSeconds
 
-# The suite prints one line per assertion; report the same numbers it printed.
+# Round 3: the launcher must not have to infer the result from prose, and a
+# truncated run must not be readable as a pass. The suite publishes one
+# machine-readable line; the counts on that line must agree with the PASS/FAIL
+# lines actually printed, or the run is a failure.
 $passLines = ([regex]::Matches($r.stdOut, '(?m)^  PASS  ')).Count
 $failLines = ([regex]::Matches($r.stdOut, '(?m)^  FAIL  ')).Count
 $summary   = ($r.stdOut -split "`r?`n" | Where-Object { $_ -match '^\d+ passed, \d+ failed$' } | Select-Object -Last 1)
+$machine   = $null
+$machineLine = ($r.stdOut -split "`r?`n" | Where-Object { $_ -match '^CLASH-TEST-SUMMARY ' } | Select-Object -Last 1)
+if ($machineLine) {
+  try { $machine = ($machineLine.Substring('CLASH-TEST-SUMMARY '.Length) | ConvertFrom-Json) }
+  catch { $machine = $null }
+}
+$countsAgree = ($null -ne $machine -and
+                [int]$machine.passed -eq $passLines -and
+                [int]$machine.failed -eq $failLines -and
+                [int]$machine.total -eq ($passLines + $failLines) -and
+                [int]$machine.passed -gt 0)
 
 Write-Host ''
 if (-not [string]::IsNullOrWhiteSpace($r.stdErr)) {
@@ -56,7 +70,7 @@ if (-not [string]::IsNullOrWhiteSpace($r.stdErr)) {
   Write-Host $r.stdErr.TrimEnd()
 }
 
-$ok = (Test-NativeSuccess $r) -and $failLines -eq 0 -and $passLines -gt 0
+$ok = (Test-NativeSuccess $r) -and $failLines -eq 0 -and $passLines -gt 0 -and $countsAgree
 $stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
 $receipt = [ordered]@{
   receipt      = 'test-run.json'
@@ -72,13 +86,17 @@ $receipt = [ordered]@{
   passLines    = $passLines
   failLines    = $failLines
   summary      = $(if ($summary) { [string]$summary } else { '<no summary line>' })
+  machineReadable = $countsAgree
+  machineSummary  = $machine
+  assertionsExecuted = ($passLines + $failLines)
   status       = $(if ($ok) { 'PASS' } else { 'FAIL' })
   stderrExcerpt = (Get-NativeErrorExcerpt $r 600)
 }
 $receiptPath = Join-Path $cloudRoot ("evidence\{0}-test-run.json" -f $stamp)
 $sha = Write-EvidenceJson -Path $receiptPath -Object $receipt
 
-Write-Host ("assertions: {0} passed, {1} failed" -f $passLines, $failLines)
+Write-Host ("assertions executed: {0} ({1} passed, {2} failed)" -f ($passLines + $failLines), $passLines, $failLines)
+Write-Host ("summary line agrees with counts: {0}" -f $countsAgree)
 Write-Host ("summary   : {0}" -f $receipt.summary)
 Write-Host ("outcome   : {0} (exit {1}, {2} ms)" -f $receipt.outcome, $receipt.exitCode, $r.durationMs)
 Write-Host ("Receipt   : {0}" -f $receiptPath)
@@ -87,6 +105,9 @@ Write-Host ("TERMINAL RECEIPT: {0} sha256={1}" -f $receipt.status, $sha)
 if (-not $ok) {
   if ($passLines -eq 0 -and $failLines -eq 0) {
     Write-Host 'The suite produced no assertion output at all: treat as FAIL, not as unknown.' -ForegroundColor Red
+  }
+  elseif (-not $countsAgree) {
+    Write-Host 'The suite output does not agree with its own summary line: the run was truncated or interleaved. Treat as FAIL.' -ForegroundColor Red
   }
   Write-Host 'OFFLINE TESTS FAILED' -ForegroundColor Red
   exit 1
