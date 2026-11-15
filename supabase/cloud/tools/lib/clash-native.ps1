@@ -707,6 +707,14 @@ function Resolve-ExecutionPolicy {
     PGAPPNAME         = 'clash-cloud-deploy'
     PGCONNECT_TIMEOUT = '15'
     PGCLIENTENCODING  = 'UTF8'
+    # Round 13: Test-VerifyReport now requires the exact psql envelope, and the
+    # row-count footer is built with ngettext("(%lu row)", "(%lu rows)", n) in
+    # src/fe_utils/print.c - it is TRANSLATED. On a host whose message catalog is
+    # not English, a perfectly good report would end in "(19 Zeilen)", the strict
+    # parser would report "no row-count footer: the output is truncated", and the
+    # gate would STOP a correct deployment. The parser's environment is part of
+    # the contract, so the catalog is pinned for every psql child.
+    LC_ALL            = 'C'
   }
   if ($env:PGPASSWORD) { $envMap['PGPASSWORD'] = $env:PGPASSWORD }
   if ($env:PGPASSFILE) { $envMap['PGPASSFILE'] = $env:PGPASSFILE }

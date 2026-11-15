@@ -2015,7 +2015,11 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
     /row-count footer says \{1\} row\(s\) but \{2\} data row\(s\)/.test(libCode) &&
     /invalid ordinal in a data row/.test(libCode) &&
     /invalid status in a data row/.test(libCode) &&
-    /footers_with_default/.test(libCode));
+    /footers_with_default/.test(libCode) &&
+    // The footer the parser demands is ngettext()-translated, so the psql child
+    // must run under the C message catalog or a good report on a localised host
+    // would be rejected as truncated.
+    /LC_ALL\s*=\s*'C'/.test(libCode));
   check('the envelope result is carried in the receipts',
     /headerSeen\s+= \$vfReport\.headerSeen/.test(lf(read(join(CLOUD, 'tools/deploy.ps1')))) &&
     /footerRows\s+= \$vfReport\.footerRows/.test(lf(read(join(CLOUD, 'tools/deploy.ps1')))) &&

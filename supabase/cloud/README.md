@@ -193,6 +193,14 @@ listing or an ABSENT ledger is exercised in PowerShell, not just in JavaScript.
 
 Adapter `4.3.0` (was `4.2.0`), native self-test 33 cases (was 26).
 
+One consequence is worth stating: psql builds the `(N rows)` footer with
+`ngettext("(%lu row)", "(%lu rows)", n)`, so the footer is *translated*. A host
+whose message catalog is not English would render `(19 Zeilen)`, the strict
+parser would call a good report truncated, and gate 5 would stop a correct
+deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
+`-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
+the contract rather than an accident of the host.
+
 Adapter `4.5.0` (was `4.4.0`), native self-test 55 cases (was 46): the envelope
 itself is now parsed strictly - header, separator, one `(N rows)` footer with a
 validated count, and nothing else - and nine cases execute it for both verifiers:
