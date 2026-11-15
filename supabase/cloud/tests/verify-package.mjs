@@ -8,12 +8,26 @@
 //   node supabase/cloud/tests/verify-package.mjs
 // ============================================================================
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { join, win32, posix, resolve as absolutise } from 'node:path';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { pathsFromModuleUrl, looksLikeDoubledDrive } from './paths.mjs';
 
-const CLOUD = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
-const ROOT = new URL('../../..', import.meta.url).pathname.replace(/\/$/, '');
+// Round 6: never derive a filesystem path from URL.pathname. On Windows that
+// produces '/C:/Users/.../' and path.join turns it into 'C:\\C:\\Users\\...'.
+let CLOUD, ROOT;
+try {
+  const PATHS = pathsFromModuleUrl(import.meta.url);
+  CLOUD = PATHS.cloud;
+  ROOT = PATHS.root;
+} catch (error) {
+  // No assertion has run yet, so no PASS summary may be printed.
+  console.error('CLASH-TEST-BOOTSTRAP-FAILED ' + JSON.stringify({ stage: 'paths', message: String((error && error.message) || error) }));
+  process.exit(1);
+}
 const GEN = join(CLOUD, 'generated');
 
 const lf = (s) => s.replace(/\r\n/g, '\n');
@@ -21,17 +35,32 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
+const EXPECTED_SECTIONS = 17;
+let sectionsRun = 0;
 let pass = 0; const failures = [];
+function hdr(n, title) {
+  sectionsRun++;
+  console.log(`\n[${n}] ${title}`);
+}
 function check(name, cond, detail = '') {
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { failures.push(`${name}${detail ? ' :: ' + detail : ''}`); console.log(`  FAIL  ${name}${detail ? ' :: ' + detail : ''}`); }
 }
 
-const manifest = JSON.parse(read(join(CLOUD, 'manifest.json')));
-const entries = manifest.entries;
-const migFiles = readdirSync(join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
+let manifest, entries, migFiles;
+try {
+  manifest = JSON.parse(read(join(CLOUD, 'manifest.json')));
+  entries = manifest.entries;
+  migFiles = readdirSync(join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
+} catch (error) {
+  // Bootstrap failure: exit nonzero, print the marker, never a summary line.
+  console.error('CLASH-TEST-BOOTSTRAP-FAILED ' + JSON.stringify({
+    stage: 'files', cloud: CLOUD, root: ROOT, message: String((error && error.message) || error),
+  }));
+  process.exit(1);
+}
 
-console.log('\n[1] originals');
+hdr(1, 'originals');
 check('exactly 111 original migrations', migFiles.length === 111, `found ${migFiles.length}`);
 check('manifest declares 111', entries.length === 111, `found ${entries.length}`);
 check('indexes contiguous 1..111', entries.every((e, i) => e.index === i + 1));
@@ -39,7 +68,7 @@ check('versions unique', new Set(entries.map((e) => e.version)).size === 111);
 check('version == filename prefix', entries.every((e) => e.version === e.file.split('/').pop().slice(0, 14)));
 check('every original sha256 matches disk', entries.every((e) => nsha(join(ROOT, e.file)) === e.sha256));
 
-console.log('\n[2] file 13 divergence (F3)');
+hdr(2, 'file 13 divergence (F3)');
 const e13 = entries.find((e) => e.version === '20260927030000');
 check('mode is diverged', e13.mode === 'diverged');
 check('executed source is the variant', e13.sqlPath.endsWith('__cloud_nocron.sql'));
@@ -51,7 +80,7 @@ const orig13 = read(join(ROOT, e13.file));
 const revokes = orig13.split('\n').filter((l) => l.startsWith('revoke execute')).join('\n');
 check('variant preserves both REVOKEs byte-identically', variant.includes(revokes) && revokes.length > 0);
 
-console.log('\n[3] wrappers (F1 atomicity, F2 begin/commit)');
+hdr(3, 'wrappers (F1 atomicity, F2 begin/commit)');
 const gen = readdirSync(GEN).filter((f) => f.endsWith('.sql')).sort();
 check('112 generated files (step 0 + 111)', gen.length === 112, `found ${gen.length}`);
 check('step 0 is the ledger bootstrap', gen[0] === '000_ledger_bootstrap.sql');
@@ -70,7 +99,7 @@ check('normalised wrappers contain no second top-level begin;', norm.every((v) =
   return (bodies[String(e.index).padStart(3, '0')].match(/^begin;$/gm) || []).length === 1;
 }));
 
-console.log('\n[4] no Storage writes in the package (F4)');
+hdr(4, 'no Storage writes in the package (F4)');
 // NOTE: generated/ wrappers are byte-faithful copies of the originals and DO
 // contain migration 4's storage writes. The package must add none of its own.
 const pkgSql = [
@@ -87,7 +116,7 @@ const m4 = read(join(ROOT, 'supabase/migrations/20260926150000_media_storage.sql
 check('migration 4 does own bucket creation', /insert into storage\.buckets/.test(m4));
 check('migration 4 creates the five policies', (m4.match(/create policy/g) || []).length >= 5);
 
-console.log('\n[5] fail-closed gates (F6)');
+hdr(5, 'fail-closed gates (F6)');
 for (const f of ['preflight/00_preflight.sql', 'verify/90_verify.sql', 'verify/95_storage_config.sql']) {
   const t = read(join(CLOUD, f));
   check(`${f} raises on failure`, /raise\s+exception/i.test(t));
@@ -154,7 +183,7 @@ function psLex(src) {
   return { code, issues };
 }
 
-console.log('\n[6] PowerShell hygiene — Round 2 (F2, F4, F5, F7)');
+hdr(6, 'PowerShell hygiene — Round 2 (F2, F4, F5, F7)');
 const toolsDir = join(CLOUD, 'tools');
 const psTools = readdirSync(toolsDir).filter((f) => f.endsWith('.ps1')).sort();
 const LIB = join(toolsDir, 'lib/clash-native.ps1');
@@ -309,7 +338,7 @@ check('the launcher treats zero output as FAIL, not as unknown',
   /produced no assertion output at all/.test(runTests));
 check('credential-bearing arguments are refused before spawn', /Assert-NoCredentialInArguments/.test(lib) && /SECURITY/.test(lib));
 
-console.log('\n[7] checksums');
+hdr(7, 'checksums');
 if (existsSync(join(CLOUD, 'checksums.sha256'))) {
   const lines = read(join(CLOUD, 'checksums.sha256')).trim().split('\n');
   const bad = lines.filter((l) => {
@@ -319,7 +348,7 @@ if (existsSync(join(CLOUD, 'checksums.sha256'))) {
   check(`checksums verify (${lines.length} files)`, bad.length === 0, bad.slice(0, 3).join(','));
 } else { check('checksums.sha256 exists', false); }
 
-console.log('\n[8] failure injection — detectors must fire on corruption');
+hdr(8, 'failure injection — detectors must fire on corruption');
 {
   // 8a: a wrapper whose ledger insert was removed must be detected
   const w = bodies['013'].replace(/insert into supabase_migrations\.schema_migrations[\s\S]*?on conflict \(version\) do nothing;/, '');
@@ -337,7 +366,7 @@ console.log('\n[8] failure injection — detectors must fire on corruption');
   check('detects unexpected ledger version', !known.has('20990101000000'));
 }
 
-console.log('\n[9] structural checks (scaffolding lint + byte-level body fidelity)');
+hdr(9, 'structural checks (scaffolding lint + byte-level body fidelity)');
 // A naive quote/paren linter cannot judge 1.3 MB of dollar-quoted plpgsql, so we
 // lint only what this package authored (the gates and the wrapper scaffolding)
 // and prove body fidelity by hash instead.
@@ -402,7 +431,7 @@ for (const e of entries) {
 }
 check('every wrapper body is byte-identical to its normalised source', bodyMismatch.length === 0, bodyMismatch.slice(0, 5).join(','));
 
-console.log('\n[10] PowerShell structural lint (lexer, not quote counting)');
+hdr(10, 'PowerShell structural lint (lexer, not quote counting)');
 // PowerShell is not SQL: strings, here-strings and comments are lexically
 // regular, so a real lexer can prove balance where a naive quote count cannot.
 function psBalance(src) {
@@ -450,7 +479,7 @@ for (const f of [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps
   check('lexer retains most of deploy.ps1 as code', ratio > 0.5, `ratio=${ratio.toFixed(2)}`);
 }
 
-console.log('\n[11] failure injection — Round 2 detectors must fire');
+hdr(11, 'failure injection — Round 2 detectors must fire');
 {
   // 11a: the exact construct the Round 2 audit found failing must be flagged
   const legacyFixture = "$out = & $Psql @Arguments 2>$errFile\n$code = $LASTEXITCODE\n";
@@ -497,7 +526,7 @@ check('the integrity gate also precedes any connection',
     deploy.indexOf("'01-integrity.json'") < deploy.indexOf("'02-preflight.json'"));
 }
 
-console.log('\n[12] cross-file function resolution (catches a typo a parser cannot)');
+hdr(12, 'cross-file function resolution (catches a typo a parser cannot)');
 {
   // A PowerShell parser accepts a call to a function that does not exist; the
   // failure appears only at run time, on the deployment host. Resolve every
@@ -527,7 +556,7 @@ console.log('\n[12] cross-file function resolution (catches a typo a parser cann
   check('every defined helper is used somewhere', unused.length === 0, unused.join(','));
 }
 
-console.log('\n[13] parameter-name resolution (typos in -Named arguments)');
+hdr(13, 'parameter-name resolution (typos in -Named arguments)');
 {
   // PowerShell does not validate named arguments against a function's param()
   // block at parse time; a typo becomes a run-time ParameterBindingException on
@@ -561,7 +590,7 @@ console.log('\n[13] parameter-name resolution (typos in -Named arguments)');
       .every((n) => declared.has(n)));
 }
 
-console.log('\n[14] package-test invocation contract (Round 3 item 5)');
+hdr(14, 'package-test invocation contract (Round 3 item 5)');
 {
   // The Round 2/3 harness reported "0 assertion results" for a suite that was
   // not at fault, because the launcher inferred the result from prose and died on
@@ -605,7 +634,7 @@ console.log('\n[14] package-test invocation contract (Round 3 item 5)');
     /passLines -gt 0 -and \$countsAgree/.test(launcherSrc));
 }
 
-console.log('\n[15] self-test integrity - a dropped or crashed case cannot pass (Round 4)');
+hdr(15, 'self-test integrity - a dropped or crashed case cannot pass (Round 4)');
 {
   const code = (src) => psLex(src).code;
 
@@ -711,7 +740,7 @@ console.log('\n[15] self-test integrity - a dropped or crashed case cannot pass 
     check(`validator rejects: ${name}`, validate(d).length > 0);
   }
 }
-console.log('\n[16] inventory integrity - flat, unique, exact (Round 5)');
+hdr(16, 'inventory integrity - flat, unique, exact (Round 5)');
 {
   const libNames = [...lib.match(/ClashSelfTestRequiredCases = @\(([\s\S]*?)\n\)/)[1].matchAll(/'([A-Za-z][A-Za-z0-9]*)'/g)].map((m) => m[1]);
 
@@ -809,10 +838,144 @@ console.log('\n[16] inventory integrity - flat, unique, exact (Round 5)');
     nestedProblem && /is not a record/.test(lib));
 }
 
+// strips JS comments and string literals so the detectors in [17] scan code,
+// not documentation (the fix documents the old construct in a comment)
+function jsCodeOnly(src) {
+  let out = '';
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i]; const n = src[i + 1];
+    if (c === '/' && n === '/') { const j = src.indexOf('\n', i); i = j < 0 ? src.length : j; out += ' '; continue; }
+    if (c === '/' && n === '*') { const j = src.indexOf('*/', i + 2); i = j < 0 ? src.length : j + 2; out += ' '; continue; }
+    if (c === '`' || c === '"' || c === "'") {
+      const q = c; let j = i + 1; let closed = false;
+      while (j < src.length) {
+        if (src[j] === '\\') { j += 2; continue; }
+        if (src[j] === q) { closed = true; break; }
+        j++;
+      }
+      i = closed ? j + 1 : src.length; out += ' STRLIT '; continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
+
+hdr(17, 'platform path handling - drive letters, spaces, POSIX (Round 6)');
+{
+  // --- the reported failure, reproduced --------------------------------------
+  const winUrl = 'file:///C:/Users/91962/Desktop/clash%20cloud/supabase/cloud/tests/verify-package.mjs';
+  const legacyPathname = new URL('..', winUrl).pathname;
+  const legacyJoined = win32.resolve(legacyPathname.replace(/\/$/, ''), 'manifest.json');
+  // The exact corruption differs by host: 'C:\\C:\\...' when a drive-relative cwd
+  // exists, '\\C:\\...' with a leading root, and '%20' left undecoded either way.
+  // The invariant is that it is never a valid absolute Windows path.
+  const legacyIsUsable = /^[A-Za-z]:\\/.test(legacyJoined) && !legacyJoined.includes('%20') &&
+    !legacyJoined.startsWith('\\') && !looksLikeDoubledDrive(legacyJoined);
+  check('the legacy pathname form is not a usable Windows path',
+    legacyPathname.startsWith('/C:/') && legacyIsUsable === false, legacyJoined);
+  check('the doubled-drive detector fires on the reproduced failure',
+    looksLikeDoubledDrive(legacyJoined) === true, legacyJoined);
+
+  // --- the fix, per platform -------------------------------------------------
+  const simulate = (url, platformPath) => pathsFromModuleUrl(url, {
+    urlToPath: (u) => {
+      const raw = decodeURIComponent(new URL(u).pathname);
+      return platformPath === win32 ? raw.replace(/^\//, '').replace(/\//g, '\\') : raw;
+    },
+    resolvePath: platformPath.resolve,
+    dirnameOf: platformPath.dirname,
+  });
+
+  const win = simulate(winUrl, win32);
+  check('windows: cloud dir is a clean drive path',
+    win.cloud === 'C:\\Users\\91962\\Desktop\\clash cloud\\supabase\\cloud', win.cloud);
+  check('windows: repo root is two levels above cloud',
+    win.root === 'C:\\Users\\91962\\Desktop\\clash cloud', win.root);
+  check('windows: no doubled drive, no percent-encoding, no leading backslash',
+    !looksLikeDoubledDrive(win.cloud) && !win.cloud.includes('%20') && !win.cloud.startsWith('\\'), win.cloud);
+  check('windows: the derived path is a valid absolute drive path',
+    /^[A-Za-z]:\\/.test(win.cloud) && /^[A-Za-z]:\\/.test(win.root), win.cloud);
+  check('windows: a manifest path built from it is well formed',
+    win32.join(win.cloud, 'manifest.json') === 'C:\\Users\\91962\\Desktop\\clash cloud\\supabase\\cloud\\manifest.json');
+
+  const mac = simulate('file:///Users/dev/clash%20app/supabase/cloud/tests/verify-package.mjs', posix);
+  check('macOS with spaces: cloud dir decoded and clean',
+    mac.cloud === '/Users/dev/clash app/supabase/cloud' && !mac.cloud.includes('%20'), mac.cloud);
+  check('macOS with spaces: root is the repo', mac.root === '/Users/dev/clash app', mac.root);
+
+  const lin = simulate('file:///home/user/clash-app/supabase/cloud/tests/verify-package.mjs', posix);
+  check('linux: cloud dir unchanged', lin.cloud === '/home/user/clash-app/supabase/cloud', lin.cloud);
+  check('linux: root unchanged', lin.root === '/home/user/clash-app', lin.root);
+
+  // --- and for real, on this machine, via an independent recomputation ------
+  const independentCloud = absolutise(posix.dirname(fileURLToPath(import.meta.url)), '..');
+  check('the live derivation matches the directories actually in use',
+    CLOUD === independentCloud && ROOT === absolutise(CLOUD, '..', '..'), `${CLOUD} / ${ROOT}`);
+  check('the live paths are usable',
+    existsSync(join(CLOUD, 'manifest.json')) && existsSync(join(ROOT, 'supabase/migrations')));
+  check('the live derived paths carry no URL artefacts',
+    !CLOUD.includes('%') && !ROOT.includes('%') && !CLOUD.includes('\\'));
+
+  // --- bootstrap failure cannot look like success ---------------------------
+  let bootRejected = false;
+  try { pathsFromModuleUrl('https://example.com/pkg/tests/x.mjs'); } catch { bootRejected = true; }
+  check('a non-file module URL is rejected by the derivation', bootRejected);
+  const suiteSrc = read(join(CLOUD, 'tests/verify-package.mjs'));
+  check('the suite exits nonzero on a bootstrap failure',
+    suiteSrc.includes('CLASH-TEST-BOOTSTRAP-FAILED') && suiteSrc.includes('process.exit(1)'));
+  check('no PASS summary can precede the bootstrap',
+    suiteSrc.indexOf('CLASH-TEST-BOOTSTRAP-FAILED') < suiteSrc.indexOf("'CLASH-TEST-SUMMARY '"));
+
+  // --- end to end: a bootstrap failure in a real child process --------------
+  // Copy the suite + its path module into a directory with no manifest.json and
+  // run it: it must exit nonzero, print the marker and print no summary.
+  const brokenRoot = mkdtempSync(join(tmpdir(), 'clash-bootstrap-'));
+  try {
+    mkdirSync(join(brokenRoot, 'tests'), { recursive: true });
+    copyFileSync(join(CLOUD, 'tests/paths.mjs'), join(brokenRoot, 'tests/paths.mjs'));
+    copyFileSync(join(CLOUD, 'tests/verify-package.mjs'), join(brokenRoot, 'tests/verify-package.mjs'));
+    const child = spawnSync(process.execPath, [join(brokenRoot, 'tests/verify-package.mjs')], { encoding: 'utf8' });
+    check('a broken bootstrap exits nonzero', child.status !== 0, `status=${child.status}`);
+    check('a broken bootstrap names the failure', /CLASH-TEST-BOOTSTRAP-FAILED/.test(child.stderr || ''),
+      (child.stderr || '').split('\n')[0].slice(0, 160));
+    check('a broken bootstrap prints no PASS summary',
+      !/CLASH-TEST-SUMMARY/.test(child.stdout || '') && !/ALL OFFLINE TESTS PASSED/.test(child.stdout || ''));
+    check('a broken bootstrap prints no PASS lines', !/^  PASS  /m.test(child.stdout || ''));
+  }
+  finally { rmSync(brokenRoot, { recursive: true, force: true }); }
+
+  // --- static: no URL.pathname used for filesystem paths --------------------
+  const jsFiles = ['tests/verify-package.mjs', 'tests/paths.mjs', 'tools/build-package.mjs'];
+  const offenders = jsFiles.filter((f) => /\.pathname/.test(jsCodeOnly(read(join(CLOUD, f)))));
+  check('no filesystem path is derived from URL.pathname', offenders.length === 0, offenders.join(','));
+  check('the detector fires on the old construct',
+    /\.pathname/.test(jsCodeOnly("const CLOUD = new URL('..', import.meta.url).pathname;")));
+  check('every module that derives paths uses fileURLToPath',
+    read(join(CLOUD, 'tests/paths.mjs')).includes('fileURLToPath') &&
+    read(join(CLOUD, 'tests/verify-package.mjs')).includes('pathsFromModuleUrl') &&
+    read(join(CLOUD, 'tools/build-package.mjs')).includes('fileURLToPath'));
+  check('a skipped section cannot pass',
+    suiteSrc.includes('sections ran') && suiteSrc.includes('only ${sectionsRun} of ${EXPECTED_SECTIONS}'));
+}
+
+if (sectionsRun !== EXPECTED_SECTIONS) {
+  const message = `only ${sectionsRun} of ${EXPECTED_SECTIONS} sections ran`;
+  failures.push(message);
+  console.log(`  FAIL  ${message}`);
+}
+if (pass === 0) {
+  failures.push('no assertion produced a result');
+  console.log('  FAIL  no assertion produced a result');
+}
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`${pass} passed, ${failures.length} failed`);
 // machine-readable contract for tools/run-tests.ps1: a launcher must not have to
 // infer the result from prose, and a truncated run must not look like a pass
-console.log('CLASH-TEST-SUMMARY ' + JSON.stringify({ passed: pass, failed: failures.length, total: pass + failures.length }));
+console.log('CLASH-TEST-SUMMARY ' + JSON.stringify({
+  passed: pass, failed: failures.length, total: pass + failures.length,
+  sections: sectionsRun, sectionsExpected: EXPECTED_SECTIONS,
+}));
 if (failures.length) { for (const f of failures) console.log('  - ' + f); process.exit(1); }
 console.log('ALL OFFLINE TESTS PASSED');

@@ -37,9 +37,14 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('../../..', import.meta.url).pathname.replace(/\/$/, ''); // repo root
+// Round 6: URL.pathname is not a filesystem path. On Windows it is
+// '/C:/Users/.../' with percent-encoded spaces, and every path built from it is
+// wrong ('C:\\C:\\Users\\...'), so the builder could not even read the
+// migrations it is supposed to package. fileURLToPath() is the only conversion.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..'); // repo root
 const MIG = join(ROOT, 'supabase/migrations');
 const CLOUD = join(ROOT, 'supabase/cloud');
 const GEN = join(CLOUD, 'generated');

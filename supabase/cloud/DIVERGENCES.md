@@ -225,6 +225,22 @@ FAIL document and exit 1 instead of an unexplained exception.
 
 ---
 
+## D-9 - Paths are derived with fileURLToPath, not URL.pathname (Round 6)
+
+`new URL('..', import.meta.url).pathname` is a URL path, not a filesystem path: on
+Windows it keeps the leading slash, the drive letter and percent-encoding
+(`/C:/Users/.../clash%20cloud/`). Joining anything onto it produced
+`C:\C:\Users\...\manifest.json` and ENOENT, so the offline suite failed before
+its first assertion and the builder could not read the migrations.
+
+`tests/paths.mjs` now converts with `fileURLToPath()` and resolves from there;
+both consumers use it. A bootstrap failure prints `CLASH-TEST-BOOTSTRAP-FAILED`
+and exits 1 before any assertion can run, and the suite fails if fewer than its 17
+sections executed, so neither a broken bootstrap nor a truncated run can produce a
+PASS summary.
+
+---
+
 ## No other divergences
 
 | Pattern | Files | Executable? |
