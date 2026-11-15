@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 20;
-const EXPECTED_CASES = 26;
-const EXPECTED_ASSERTIONS = 344;
+const EXPECTED_SECTIONS = 21;
+const EXPECTED_CASES = 33;
+const EXPECTED_ASSERTIONS = 365;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -1369,6 +1369,288 @@ hdr(20, 'fail-closed ledger parsing, branch safety, SQLSTATE (Round 9)');
     /06-claim-release-ownership-stop\.json/.test(deployCode));
   check('stale-claim clearance requires proof the previous writer is inactive',
     /pg_stat_activity/.test(rollbackDoc) && /inactive/i.test(rollbackDoc));
+}
+
+hdr(21, 'claim release: the committed block, executed (Round 10)');
+{
+  const deployCode = read(join(CLOUD, 'tools/deploy.ps1'));
+  const selfTest = read(join(CLOUD, 'tools/test-native-capture.ps1'));
+  const libCode = read(join(CLOUD, 'tools/lib/clash-native.ps1'));
+
+  // ---------------------------------------------------------------- R9-C1 ----
+  check('R9-C1: the claim-release condition calls the predicate inside parentheses',
+    deployCode.includes('if ((Test-NativeSuccess $release) -and (-not $releasedOwned)) {'));
+  check('R9-C1: the unparenthesised form that collapsed the condition is gone',
+    !/if \(Test-NativeSuccess \$release -and/.test(deployCode) &&
+    !/Test-NativeSuccess \$release -and -not/.test(deployCode));
+
+  // ---------------------------------------- PowerShell invocation/operator ---
+  // In argument mode '-and', '-not', '-eq' and friends are ARGUMENTS, not
+  // operators: a condition that begins with a command invocation and then
+  // continues with one of them passes the extra tokens to the command and
+  // collapses to that command's own output. Valid syntax, silently wrong logic.
+  const maskStrings = (source) => {
+    const chars = source.split('');
+    let i = 0; let inSingle = false; let inDouble = false;
+    while (i < source.length) {
+      const c = source[i];
+      if (inSingle) {
+        if (c === '\n') { i += 1; continue; }
+        if (c === "'") {
+          if (source[i + 1] === "'") { chars[i] = 'x'; chars[i + 1] = 'x'; i += 2; continue; }
+          inSingle = false; i += 1; continue;
+        }
+        chars[i] = 'x'; i += 1; continue;
+      }
+      if (inDouble) {
+        if (c === '\n') { i += 1; continue; }
+        if (c === '`') { chars[i] = 'x'; if (i + 1 < source.length) chars[i + 1] = 'x'; i += 2; continue; }
+        if (c === '"') {
+          if (source[i + 1] === '"') { chars[i] = 'x'; chars[i + 1] = 'x'; i += 2; continue; }
+          inDouble = false; i += 1; continue;
+        }
+        chars[i] = 'x'; i += 1; continue;
+      }
+      if (c === "'") { inSingle = true; i += 1; continue; }
+      if (c === '"') { inDouble = true; i += 1; continue; }
+      i += 1;
+    }
+    return chars.join('');
+  };
+  const stripComments = (source) => {
+    const chars = source.split('');
+    let i = 0; let inSingle = false; let inDouble = false;
+    while (i < source.length) {
+      const c = source[i];
+      if (inSingle) {
+        if (c === "'") { if (source[i + 1] === "'") { i += 2; continue; } inSingle = false; }
+        i += 1; continue;
+      }
+      if (inDouble) {
+        if (c === '`') { i += 2; continue; }
+        if (c === '"') { if (source[i + 1] === '"') { i += 2; continue; } inDouble = false; }
+        i += 1; continue;
+      }
+      if (c === '<' && source.startsWith('<#', i)) {
+        const end = source.indexOf('#>', i + 2);
+        const stop = end < 0 ? source.length : end + 2;
+        for (let j = i; j < stop; j += 1) if (source[j] !== '\n') chars[j] = ' ';
+        i = stop; continue;
+      }
+      if (c === '#') {
+        const end = source.indexOf('\n', i);
+        const stop = end < 0 ? source.length : end;
+        for (let j = i; j < stop; j += 1) chars[j] = ' ';
+        i = stop; continue;
+      }
+      if (c === "'") { inSingle = true; i += 1; continue; }
+      if (c === '"') { inDouble = true; i += 1; continue; }
+      i += 1;
+    }
+    return chars.join('');
+  };
+  const matchParenFrom = (source, open) => {
+    let depth = 0; let i = open; let inSingle = false; let inDouble = false;
+    while (i < source.length) {
+      const c = source[i];
+      if (inSingle) { if (c === "'") { if (source[i + 1] === "'") { i += 2; continue; } inSingle = false; } i += 1; continue; }
+      if (inDouble) { if (c === '`') { i += 2; continue; } if (c === '"') { if (source[i + 1] === '"') { i += 2; continue; } inDouble = false; } i += 1; continue; }
+      if (c === "'") { inSingle = true; i += 1; continue; }
+      if (c === '"') { inDouble = true; i += 1; continue; }
+      if ('([{'.includes(c)) depth += 1;
+      else if (')]}'.includes(c)) { depth -= 1; if (depth === 0) return i; }
+      i += 1;
+    }
+    return -1;
+  };
+  const topLevelTokens = (inner) => {
+    const tokens = []; let cur = ''; let depth = 0; let inSingle = false; let inDouble = false;
+    for (let i = 0; i < inner.length; i += 1) {
+      const c = inner[i];
+      if (inSingle) { cur += c; if (c === "'") { if (inner[i + 1] === "'") { cur += "'"; i += 1; continue; } inSingle = false; } continue; }
+      if (inDouble) { cur += c; if (c === '`') { cur += inner[i + 1] || ''; i += 1; continue; } if (c === '"') { if (inner[i + 1] === '"') { cur += '"'; i += 1; continue; } inDouble = false; } continue; }
+      if (c === "'") { inSingle = true; cur += c; continue; }
+      if (c === '"') { inDouble = true; cur += c; continue; }
+      if ('([{'.includes(c)) { depth += 1; cur += c; continue; }
+      if (')]}'.includes(c)) { depth -= 1; cur += c; continue; }
+      if (/\s/.test(c) && depth === 0) { if (cur) { tokens.push(cur); cur = ''; } continue; }
+      cur += c;
+    }
+    if (cur) tokens.push(cur);
+    return tokens;
+  };
+  const PS_OPERATOR = new Set(['-and', '-or', '-xor', '-eq', '-ne', '-lt', '-gt', '-le', '-ge',
+    '-like', '-notlike', '-match', '-notmatch', '-contains', '-notcontains', '-in', '-notin',
+    '-is', '-isnot', '-replace', '-split', '-join', '-f', '-as', '-not']);
+  const PS_COMMAND = /^[A-Za-z][A-Za-z0-9]*-[A-Za-z][A-Za-z0-9]*$/;
+  const commandOperatorMisparses = (source) => {
+    const original = maskStrings(String(source).replace(/\r\n/g, '\n'));
+    const masked = stripComments(original);
+    const findings = [];
+    const keyword = /(?:^|[^A-Za-z0-9_-])(if|elseif|while|until)\s*\(/gm;
+    let m;
+    while ((m = keyword.exec(masked)) !== null) {
+      const open = m.index + m[0].length - 1;
+      const close = matchParenFrom(masked, open);
+      if (close < 0) continue;
+      const inner = original.slice(open + 1, close).replace(/`?\n/g, ' ');
+      let tokens = topLevelTokens(inner);
+      while (tokens.length && (tokens[0] === '-not' || tokens[0] === '!' || tokens[0] === '-bnot')) tokens = tokens.slice(1);
+      if (tokens.length && PS_COMMAND.test(tokens[0])) {
+        const ops = tokens.slice(1).filter((t) => PS_OPERATOR.has(t.toLowerCase()));
+        if (ops.length) {
+          findings.push({
+            line: masked.slice(0, open).split('\n').length,
+            head: tokens[0], ops, text: inner.trim().split(/\s+/).join(' ').slice(0, 120),
+          });
+        }
+      }
+      keyword.lastIndex = open + 1;
+    }
+    const assign = /^[ \t]*(\$[A-Za-z_][A-Za-z0-9_:]*)\s*=\s*([A-Za-z][A-Za-z0-9]*-[A-Za-z][A-Za-z0-9]*)(?=[ \t]|$)/gm;
+    let a;
+    while ((a = assign.exec(masked)) !== null) {
+      const lineEnd = masked.indexOf('\n', a.index);
+      const tail = original.slice(a.index + a[0].length, lineEnd < 0 ? original.length : lineEnd);
+      const ops = topLevelTokens(tail).filter((t) => PS_OPERATOR.has(t.toLowerCase()));
+      if (ops.length) {
+        findings.push({
+          line: masked.slice(0, a.index).split('\n').length,
+          head: a[2], ops, text: tail.trim().split(/\s+/).join(' ').slice(0, 120),
+        });
+      }
+    }
+    const ret = /^[ \t]*return\s+([A-Za-z][A-Za-z0-9]*-[A-Za-z][A-Za-z0-9]*)(?=[ \t]|$)/gm;
+    let r;
+    while ((r = ret.exec(masked)) !== null) {
+      const lineEnd = masked.indexOf('\n', r.index);
+      const tail = original.slice(r.index + r[0].length, lineEnd < 0 ? original.length : lineEnd);
+      const ops = topLevelTokens(tail).filter((t) => PS_OPERATOR.has(t.toLowerCase()));
+      if (ops.length) {
+        findings.push({ line: masked.slice(0, r.index).split('\n').length, head: r[1], ops, text: tail.trim().slice(0, 120) });
+      }
+    }
+    return findings;
+  };
+
+  const psFiles = ['tools/check-ledger.ps1', 'tools/check-manifest.ps1', 'tools/deploy.ps1',
+    'tools/lib/clash-native.ps1', 'tools/run-tests.ps1', 'tools/test-native-capture.ps1'];
+  const audited = psFiles.map((rel) => ({ rel, findings: commandOperatorMisparses(read(join(CLOUD, rel))) }));
+  const offenders = audited.filter((x) => x.findings.length > 0)
+    .map((x) => x.rel + ':' + x.findings.map((f) => f.line + '(' + f.head + ' ' + f.ops.join(' ') + ')').join(','));
+  check('audit: no PowerShell condition combines a bare command call with an operator',
+    offenders.length === 0 && audited.length === 6, offenders.join(' | '));
+
+  // Failure injection: the detector must fire on the exact shape that shipped.
+  check('audit: the detector fires on the R9-C1 condition',
+    commandOperatorMisparses('if (Test-NativeSuccess $release -and -not $releasedOwned) { }').length === 1);
+  check('audit: the detector fires on the assignment form',
+    commandOperatorMisparses('$ok = Test-NativeSuccess $r -and $x').length === 1);
+  check('audit: the detector fires on a cmdlet with a comparison',
+    commandOperatorMisparses('if (Test-Path $p -eq $true) { }').length === 1);
+  check('audit: the detector accepts the parenthesised forms',
+    commandOperatorMisparses('if ((Test-NativeSuccess $release) -and (-not $releasedOwned)) { }').length === 0 &&
+    commandOperatorMisparses('if (-not (Test-NativeSuccess $r)) { }').length === 0 &&
+    commandOperatorMisparses('$ok = (Test-NativeSuccess $r) -and $x').length === 0 &&
+    commandOperatorMisparses('if ($x -and $y) { }').length === 0);
+  check('audit: the detector ignores operators inside strings and comments',
+    commandOperatorMisparses("$a = @('-and', '-or')\n# if (Cmd $x -and $y)\n$b = 1").length === 0);
+
+  // --------------------------------------- the committed block is executed ---
+  check('the harness extracts the release block from deploy.ps1 instead of restating it',
+    /function Get-ClaimReleaseBlock/.test(selfTest) &&
+    /\[System\.IO\.File\]::ReadAllLines\(\$Path\)/.test(selfTest) &&
+    /\$releaseSql\\s\*=\\s\*"delete from supabase_migrations/.test(selfTest) &&
+    /\[scriptblock\]::Create\(\[string\]\$blockInfo\.text\)/.test(selfTest) &&
+    /& \$script:r10Block/.test(selfTest));
+  check('the extractor refuses a drifted region instead of probing something else',
+    /claim-release block rejected/.test(selfTest) &&
+    /'06-claim-release-ownership-stop\.json'/.test(selfTest) &&
+    /contains an exit statement/.test(selfTest) &&
+    /still seals evidence/.test(selfTest) &&
+    /returning run_id/.test(selfTest));
+  check('only the process and evidence layers are substituted',
+    /function Invoke-NativeProcess/.test(selfTest) && /function Write-Evidence/.test(selfTest) &&
+    /function New-PhaseReceipt/.test(selfTest) && /function Stop-Run/.test(selfTest) &&
+    !/function Test-NativeSuccess/.test(selfTest) && !/function Get-PgSqlState/.test(selfTest) &&
+    !/function Get-NativeOutcomeLabel/.test(selfTest) && !/function Get-NativeErrorExcerpt/.test(selfTest));
+  check('the success case requires COMPLETE, one owner row and the committed argv',
+    /reachedComplete -eq \$true/.test(selfTest) &&
+    /\$ownedArgs -contains 'VERBOSITY=verbose'/.test(selfTest) &&
+    /\$ownedSql\.Contains\('returning run_id'\)/.test(selfTest) &&
+    /\[string\]\$ownedDone\['status'\] -eq 'COMPLETE'/.test(selfTest) &&
+    /\[string\]\$ownedDone\['writerRunId'\] -eq \$probeRunId/.test(selfTest));
+  const releaseCases = ['claimReleaseOwnedRowProceedsToComplete', 'claimReleaseZeroRowsStops',
+    'claimReleaseWrongOwnerStops', 'claimReleaseMultipleRowsStops', 'claimReleaseNonZeroExitStops',
+    'claimReleaseTimeoutStops', 'claimReleaseIncompleteCaptureStops'];
+  check('all seven release outcomes are executed against the committed block',
+    releaseCases.every((n) => new RegExp("^Add-Case '" + n + "'", 'm').test(selfTest)) &&
+    (selfTest.match(/Invoke-ClaimReleaseProbe -RunId/g) || []).length === 7);
+  check('the timeout and incomplete-capture cases refuse to infer a release',
+    /'UNKNOWN-TIMEOUT'/.test(selfTest) && /'UNKNOWN-CAPTURE-INCOMPLETE'/.test(selfTest) &&
+    (selfTest.match(/-not \$probe(Timeout|Partial)\.receipts\.Contains\('06-claim-release-ownership-stop\.json'\)/g) || []).length === 2);
+  check('the new cases are in the shared inventory the receipt must match',
+    releaseCases.every((n) => libCode.includes("'" + n + "'")));
+
+  // The extractor's preconditions, mirrored on Linux so anchor drift fails the
+  // offline suite instead of surfacing only when the PowerShell case runs.
+  const deployLines = lf(deployCode).split('\n');
+  const startIdx = deployLines.findIndex((l) => /^\$releaseSql\s*=\s*"delete from supabase_migrations\.clash_deploy_claim/.test(l));
+  const endIdx = deployLines.findIndex((l, i) => i > startIdx && /^\$seal\s*=\s*Seal-Evidence\s+-Root\s+\$run\s*$/.test(l));
+  const region = startIdx >= 0 && endIdx > startIdx ? deployLines.slice(startIdx, endIdx).join('\n') : '';
+  const regionMarkers = {
+    '06-claim-release-ownership.json': 1,
+    '06-claim-release-ownership-stop.json': 1,
+    '06-claim-release-fail.json': 1,
+    '06-claim-release.json': 2,
+    '06-complete.json': 1,
+  };
+  check('mirror: the committed release region satisfies every extractor guard',
+    startIdx >= 0 && endIdx > startIdx &&
+    Object.entries(regionMarkers).every(([m, n]) => region.split(m).length - 1 === n) &&
+    region.includes('returning run_id') &&
+    !/^\s*exit\b/m.test(region) && !region.includes('Seal-Evidence'),
+    `start=${startIdx} end=${endIdx} lines=${endIdx - startIdx}`);
+  check('mirror: the extractor anchors are unique in deploy.ps1',
+    deployLines.filter((l) => /^\$releaseSql\s*=/.test(l)).length === 1 &&
+    deployLines.filter((l) => /^\$seal\s*=\s*Seal-Evidence/.test(l)).length === 1);
+  check('mirror: exactly one $common assignment exists for the probe to extract',
+    deployLines.filter((l) => /^\$common\s*=\s*@\(/.test(l)).length === 1 &&
+    /VERBOSITY=verbose/.test(deployLines.filter((l) => /^\$common\s*=\s*@\(/.test(l))[0] || ''));
+
+  // ------------------------------------------- decision-table specification ---
+  // Mirror of the deployed control flow. This proves the SPECIFICATION; the
+  // executed PowerShell cases above prove the deployed expressions.
+  const nativeSuccess = (r) => r !== null && !r.launchError && !r.timedOut && r.exitCode !== null &&
+    String(r.captureNote).trim() === '' && Number(r.exitCode) === 0;
+  const ownedOf = (rows, runId) => rows.length === 1 && rows[0].trim() === runId;
+  const releaseBranch = (result, rows, runId) => {
+    if (nativeSuccess(result) && !ownedOf(rows, runId)) return 'ownership-stop';
+    if (!nativeSuccess(result)) return 'release-fail';
+    return 'complete';
+  };
+  const buggyBranch = (result) => (nativeSuccess(result) ? 'ownership-stop' : 'release-fail');
+  const runId = 'probe-run';
+  const ok = { exitCode: 0, timedOut: false, launchError: null, captureNote: '' };
+  const table = [
+    ['owned row', ok, [runId], 'complete'],
+    ['zero rows', ok, [], 'ownership-stop'],
+    ['wrong owner', ok, ['other'], 'ownership-stop'],
+    ['two rows', ok, [runId, runId], 'ownership-stop'],
+    ['nonzero exit', { ...ok, exitCode: 3 }, [], 'release-fail'],
+    ['timeout', { ...ok, exitCode: null, timedOut: true }, [runId], 'release-fail'],
+    ['incomplete capture', { ...ok, captureNote: 'stdout capture incomplete' }, [runId], 'release-fail'],
+  ];
+  const offTable = table.filter(([, result, rows, expected]) => releaseBranch(result, rows, runId) !== expected)
+    .map(([name]) => name);
+  check('mirror: the release decision table matches the seven executed scenarios',
+    offTable.length === 0, offTable.join(','));
+  check('mirror: the R9-C1 collapse would be caught by this table',
+    buggyBranch(ok) === 'ownership-stop' && releaseBranch(ok, [runId], runId) === 'complete' &&
+    buggyBranch({ ...ok, exitCode: 3 }) === 'release-fail');
+  check('mirror: a run that prints its own id but did not succeed is never a release',
+    releaseBranch({ ...ok, timedOut: true }, [runId], runId) === 'release-fail' &&
+    releaseBranch({ ...ok, captureNote: 'x' }, [runId], runId) === 'release-fail');
 }
 
 {

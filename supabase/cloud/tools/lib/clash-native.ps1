@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.2.0'
+$script:ClashAdapterVersion = '4.3.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -755,7 +755,14 @@ $script:ClashSelfTestRequiredCases = @(
   'incompleteCaptureIsUnknown',
   'sqlStateExtracted',
   'ledgerParserRejectsMalformedOutput',
-  'absentAndPresentBranchesRecordActualResult'
+  'absentAndPresentBranchesRecordActualResult',
+  'claimReleaseOwnedRowProceedsToComplete',
+  'claimReleaseZeroRowsStops',
+  'claimReleaseWrongOwnerStops',
+  'claimReleaseMultipleRowsStops',
+  'claimReleaseNonZeroExitStops',
+  'claimReleaseTimeoutStops',
+  'claimReleaseIncompleteCaptureStops'
 )
 
 # Returns a FLAT sequence of case-name strings.

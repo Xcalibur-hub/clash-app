@@ -120,7 +120,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 18 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 26
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 33
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -141,7 +141,7 @@ if (-not $inventoryCheck.ok) {
     adapterVersion    = $script:ClashAdapterVersion
     adapterSha256     = $script:adapterShaFinal
     casesExecuted     = 0
-    casesExpected     = 26
+    casesExpected     = 33
     cases             = @{}
     problems          = $reasons
     inventoryObserved = $observed
@@ -721,6 +721,404 @@ Add-Case 'absentAndPresentBranchesRecordActualResult' (
   absentRows    = $absentFields.rowsParsed
   presentRows   = $presentFields.rowsParsed
   presentVerdict = $presentFields.verdict
+}
+
+# ---- 27-33: the committed claim-release block, executed (Round 10) ----------
+# Codex R9-C1: deploy.ps1 tested a command invocation inside a boolean
+# expression without parentheses:
+#
+#     if (Test-NativeSuccess $release -and -not $releasedOwned)
+#
+# PowerShell parses that as ONE command. '-and', '-not' and the ownership value
+# became extra ARGUMENTS to Test-NativeSuccess, so the condition collapsed to
+# that function's own return value: a release that returned exactly this run's
+# row still entered the STOP branch, and a correct deployment could never reach
+# COMPLETE. Syntax was valid, so no parser check could see it.
+#
+# The cases below do not restate the block. They read deploy.ps1, extract the
+# committed region between two anchors, refuse the region unless it carries
+# every receipt it is supposed to, and then EXECUTE it. Only the process and
+# evidence layers are substituted, so the real Test-NativeSuccess,
+# Get-PgSqlState, Get-NativeOutcomeLabel and Get-NativeErrorExcerpt decide what
+# the block does. A copy that drifts from deploy.ps1 cannot pass these cases.
+
+function Get-ClaimReleaseBlock {
+  param([string]$Path)
+
+  $lines   = [System.IO.File]::ReadAllLines($Path)
+  $startAt = -1
+  $endAt   = -1
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($startAt -lt 0 -and $lines[$i] -match '^\$releaseSql\s*=\s*"delete from supabase_migrations\.clash_deploy_claim') {
+      $startAt = $i
+      continue
+    }
+    if ($startAt -ge 0 -and $lines[$i] -match '^\$seal\s*=\s*Seal-Evidence\s+-Root\s+\$run\s*$') {
+      $endAt = $i
+      break
+    }
+  }
+  if ($startAt -lt 0 -or $endAt -le $startAt) {
+    throw ('claim-release block not found in {0} (start {1}, end {2})' -f $Path, $startAt, $endAt)
+  }
+
+  $text = (@($lines[$startAt..($endAt - 1)]) -join "`n")
+  # Expected occurrences, not just presence. '06-claim-release.json' is written
+  # by BOTH branches (STOP for a failed release, PASS for a released claim), so
+  # a region that reports it only once has lost a branch.
+  $required = [ordered]@{
+    '06-claim-release-ownership.json'      = 1
+    '06-claim-release-ownership-stop.json' = 1
+    '06-claim-release-fail.json'           = 1
+    '06-claim-release.json'                = 2
+    '06-complete.json'                     = 1
+  }
+  $problems = @()
+  foreach ($marker in @($required.Keys)) {
+    $hits = ([regex]::Matches($text, [regex]::Escape([string]$marker))).Count
+    if ($hits -ne [int]$required[$marker]) {
+      $problems += ('receipt marker {0} appears {1} time(s), expected {2}' -f $marker, $hits, $required[$marker])
+    }
+  }
+  if (-not $text.Contains('returning run_id')) { $problems += 'the release is not an ownership-qualified RETURNING delete' }
+  if ([regex]::IsMatch($text, '(?m)^\s*exit\b')) { $problems += 'the extracted region contains an exit statement' }
+  if ($text.Contains('Seal-Evidence')) { $problems += 'the extracted region still seals evidence' }
+  if ($problems.Count -gt 0) { throw ('claim-release block rejected: ' + ($problems -join '; ')) }
+
+  return ([ordered]@{ text = $text; lines = ($endAt - $startAt); startLine = ($startAt + 1) })
+}
+
+# The argv prefix is extracted too, so the probe asserts the real '-v
+# ON_ERROR_STOP=1 -v VERBOSITY=verbose' that ship in deploy.ps1, not a copy.
+function Get-DeployCommonArguments {
+  param([string]$Path)
+  $hits = @([System.IO.File]::ReadAllLines($Path) | Where-Object { $_ -match '^\$common\s*=\s*@\(' })
+  if ($hits.Count -ne 1) { throw ('expected exactly one $common assignment in deploy.ps1, found {0}' -f $hits.Count) }
+  $expression = ($hits[0] -replace '^\$common\s*=\s*', '')
+  return @(& ([scriptblock]::Create($expression)))
+}
+
+function Invoke-ClaimReleaseProbe {
+  param(
+    [hashtable]$Stub,
+    [string]$RunId = 'r10-claim-release-probe-0001'
+  )
+
+  $state = [ordered]@{
+    runId           = $RunId
+    receipts        = [ordered]@{}
+    stopName        = ''
+    stopReason      = ''
+    reachedComplete = $false
+    nativeCalls     = 0
+    arguments       = @()
+    evidenceCalls   = 0
+    threw           = ''
+    blockLines      = 0
+    blockStartLine  = 0
+  }
+
+  try {
+    $blockInfo = Get-ClaimReleaseBlock -Path (Join-Path $pluginRoot 'deploy.ps1')
+    $state.blockLines     = [int]$blockInfo.lines
+    $state.blockStartLine = [int]$blockInfo.startLine
+
+    # Every variable the committed region reads but never assigns. Under
+    # Set-StrictMode 2.0 an unset reader would abort the case instead of failing
+    # it, so they are all bound here.
+    $common      = Get-DeployCommonArguments -Path (Join-Path $pluginRoot 'deploy.ps1')
+    $runId       = $RunId
+    $run         = 'C:\clash-probe-evidence\r10'
+    $psqlPath    = 'C:\clash-probe\psql.exe'
+    $policy      = [pscustomobject]@{ env = @{} }
+    $applied     = 111
+    $treeHash    = 'probe-tree-hash'
+    $bootOutcome = 'CREATED'
+
+    $script:r10State = $state
+    $script:r10Block = [scriptblock]::Create([string]$blockInfo.text)
+    $script:r10Stub  = $Stub
+
+    & {
+      # Substituted: the child process and the evidence writer. Everything the
+      # block asks ABOUT THE RESULT comes from the real adapter functions.
+      function Invoke-NativeProcess {
+        param($FilePath, $Arguments, $Environment, $TimeoutSeconds)
+        $script:r10State.nativeCalls = $script:r10State.nativeCalls + 1
+        $script:r10State.arguments   = @($Arguments)
+        $s = $script:r10Stub
+        return [ordered]@{
+          filePath      = 'psql.exe'
+          argumentCount = @($Arguments).Count
+          exitCode      = $s['exitCode']
+          timedOut      = $s['timedOut']
+          launchError   = $s['launchError']
+          captureNote   = $s['captureNote']
+          stdOut        = $s['stdOut']
+          stdErr        = $s['stdErr']
+          startedUtc    = 'probe'
+          finishedUtc   = 'probe'
+          durationMs    = 0
+        }
+      }
+      function Write-Evidence {
+        param($Path, $Text)
+        $script:r10State.evidenceCalls = $script:r10State.evidenceCalls + 1
+        return [ordered]@{ ok = $true; path = [string]$Path; sha256 = ('0' * 64) }
+      }
+      function New-PhaseReceipt {
+        param([string]$Name, $Fields)
+        $copy = [ordered]@{}
+        foreach ($k in @($Fields.Keys)) { $copy[[string]$k] = $Fields[$k] }
+        $script:r10State.receipts[[string]$Name] = $copy
+      }
+      function Stop-Run {
+        param([string]$Reason, [string]$StopName = 'STOP.json')
+        $script:r10State.receipts[[string]$StopName] = [ordered]@{ status = 'STOPPED'; reason = [string]$Reason }
+        $script:r10State.stopName   = [string]$StopName
+        $script:r10State.stopReason = [string]$Reason
+        # The real Stop-Run writes STOP.txt, seals and exits 1. A throw keeps
+        # this test process alive and marks exactly the same branch.
+        throw ('CLASH-PROBE-STOP:' + [string]$StopName)
+      }
+      & $script:r10Block
+      $script:r10State.reachedComplete = $script:r10State.receipts.Contains('06-complete.json')
+    }
+  }
+  catch {
+    $message = 'unknown'
+    try { $message = [string]$_.Exception.Message } catch { }
+    # Only the sentinel throw is the expected way out of the block.
+    if ($message -notlike 'CLASH-PROBE-STOP:*') {
+      $state.threw = (Protect-Text $message)
+    }
+  }
+  return $state
+}
+
+# The branch is proven by the SET of receipts produced and by the STOP that was
+# requested - not by the absence of an exception.
+function Test-ClaimReleaseOutcome {
+  param(
+    $Probe,
+    [string[]]$ExpectedReceipts,
+    [string]$ExpectedStop,
+    $ExpectedStatus = $null
+  )
+  $problems = @()
+  $names = @($Probe.receipts.Keys | ForEach-Object { [string]$_ })
+  $unexpected = @($names | Where-Object { $ExpectedReceipts -notcontains $_ })
+  $absent     = @($ExpectedReceipts | Where-Object { $names -notcontains $_ })
+  if ($unexpected.Count -gt 0) { $problems += ('unexpected receipt(s): ' + ($unexpected -join ',')) }
+  if ($absent.Count -gt 0) { $problems += ('missing receipt(s): ' + ($absent -join ',')) }
+  if ([string]$Probe.stopName -ne [string]$ExpectedStop) {
+    $problems += ("stopped with '{0}', expected '{1}'" -f $Probe.stopName, $ExpectedStop)
+  }
+  if ([string]$Probe.threw -ne '') { $problems += ('unexpected exception: ' + [string]$Probe.threw) }
+  if ([int]$Probe.nativeCalls -ne 1) { $problems += ('the release was issued {0} time(s), expected 1' -f $Probe.nativeCalls) }
+  if ($null -ne $ExpectedStatus) {
+    foreach ($key in @($ExpectedStatus.Keys)) {
+      $entry  = $null
+      if ($Probe.receipts.Contains([string]$key)) { $entry = $Probe.receipts[[string]$key] }
+      $actual = ''
+      if ($null -ne $entry) { $actual = [string]$entry['status'] }
+      if ($actual -ne [string]$ExpectedStatus[$key]) {
+        $problems += ("receipt {0} status '{1}', expected '{2}'" -f $key, $actual, $ExpectedStatus[$key])
+      }
+    }
+  }
+  $completeInReceipts = ((@('06-complete.json') | Where-Object { $names -contains $_ }).Count -gt 0)
+  if ($completeInReceipts -ne [bool]$Probe.reachedComplete) {
+    $problems += 'reachedComplete disagrees with the receipts that were written'
+  }
+  return [ordered]@{ ok = ($problems.Count -eq 0); problems = $problems; receipts = $names }
+}
+
+# Receipts are read through this helper so that an ABSENT receipt fails an
+# assertion instead of indexing a key that is not there.
+function Get-ProbeReceipt {
+  param($Probe, [string]$Name)
+  if ($Probe.receipts.Contains([string]$Name)) { return $Probe.receipts[[string]$Name] }
+  return @{ status = '<absent>'; returnedRows = -1; returned = @(); outcome = '<absent>'; sqlState = ''; writerRunId = ''; appliedThisRun = -1 }
+}
+
+$probeRunId  = 'r10-claim-release-probe-0001'
+$probeOther  = 'r10-someone-elses-run-0002'
+
+# ---- 27: one returned row that IS this run -> PASS -> COMPLETE -------------
+$probeOwned = Invoke-ClaimReleaseProbe -RunId $probeRunId -Stub @{
+  exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''
+  stdOut = ($probeRunId + "`n"); stdErr = ''
+}
+$ownedOutcome = Test-ClaimReleaseOutcome -Probe $probeOwned `
+  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release.json', '06-complete.json') `
+  -ExpectedStop '' `
+  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'PASS'; '06-claim-release.json' = 'PASS'; '06-complete.json' = 'COMPLETE' }
+$ownedArgs  = @($probeOwned.arguments)
+$ownedAt    = [array]::IndexOf($ownedArgs, '-c')
+$ownedSql   = ''
+if ($ownedAt -ge 0 -and ($ownedAt + 1) -lt $ownedArgs.Count) { $ownedSql = [string]$ownedArgs[$ownedAt + 1] }
+$ownedScan  = Get-ProbeReceipt -Probe $probeOwned -Name '06-claim-release-ownership.json'
+$ownedDone  = Get-ProbeReceipt -Probe $probeOwned -Name '06-complete.json'
+Add-Case 'claimReleaseOwnedRowProceedsToComplete' (
+  $ownedOutcome.ok -and
+  [string]$probeOwned.threw -eq '' -and
+  [string]$probeOwned.stopName -eq '' -and
+  $probeOwned.reachedComplete -eq $true -and
+  $probeOwned.nativeCalls -eq 1 -and
+  $probeOwned.evidenceCalls -eq 2 -and
+  $ownedArgs -contains '-t' -and $ownedArgs -contains '-A' -and
+  $ownedArgs -contains 'ON_ERROR_STOP=1' -and $ownedArgs -contains 'VERBOSITY=verbose' -and
+  $ownedSql.Contains('returning run_id') -and
+  $ownedSql.Contains("run_id = '" + $probeRunId + "'") -and
+  [int]$ownedScan['returnedRows'] -eq 1 -and
+  @($ownedScan['returned']).Count -eq 1 -and
+  [string]$ownedDone['status'] -eq 'COMPLETE' -and
+  [string]$ownedDone['writerRunId'] -eq $probeRunId -and
+  [int]$ownedDone['appliedThisRun'] -eq 111) @{
+  blockStartLine  = $probeOwned.blockStartLine
+  blockLines      = $probeOwned.blockLines
+  stopName        = [string]$probeOwned.stopName
+  reachedComplete = $probeOwned.reachedComplete
+  receipts        = @($ownedOutcome.receipts)
+  returnedRows    = [int]$ownedScan['returnedRows']
+  releaseHasT     = ($ownedArgs -contains '-t')
+  releaseHasA     = ($ownedArgs -contains '-A')
+  sqlHasReturning = $ownedSql.Contains('returning run_id')
+  sqlHasOwnership = $ownedSql.Contains("run_id = '" + $probeRunId + "'")
+  note            = 'the false STOP of R9-C1 is proven gone: this branch reaches COMPLETE'
+}
+
+# ---- 28: success but ZERO rows ---------------------------------------------
+$probeZero = Invoke-ClaimReleaseProbe -RunId $probeRunId -Stub @{
+  exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''
+  stdOut = ''; stdErr = ''
+}
+$zeroScan    = Get-ProbeReceipt -Probe $probeZero -Name '06-claim-release-ownership.json'
+$zeroOutcome = Test-ClaimReleaseOutcome -Probe $probeZero `
+  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release-ownership-stop.json') `
+  -ExpectedStop '06-claim-release-ownership-stop.json' `
+  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'STOP'; '06-claim-release-ownership-stop.json' = 'STOPPED' }
+Add-Case 'claimReleaseZeroRowsStops' (
+  $zeroOutcome.ok -and
+  $probeZero.reachedComplete -eq $false -and
+  [int]$zeroScan['returnedRows'] -eq 0 -and
+  @($zeroScan['returned']).Count -eq 0 -and
+  -not $probeZero.receipts.Contains('06-claim-release.json')) @{
+  stopName     = [string]$probeZero.stopName
+  receipts     = @($zeroOutcome.receipts)
+  returnedRows = [int]$zeroScan['returnedRows']
+}
+
+# ---- 29: success but the row belongs to someone else -----------------------
+$probeWrong = Invoke-ClaimReleaseProbe -RunId $probeRunId -Stub @{
+  exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''
+  stdOut = ($probeOther + "`n"); stdErr = ''
+}
+$wrongScan    = Get-ProbeReceipt -Probe $probeWrong -Name '06-claim-release-ownership.json'
+$wrongRows    = @($wrongScan['returned'])
+$wrongOutcome = Test-ClaimReleaseOutcome -Probe $probeWrong `
+  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release-ownership-stop.json') `
+  -ExpectedStop '06-claim-release-ownership-stop.json' `
+  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'STOP'; '06-claim-release-ownership-stop.json' = 'STOPPED' }
+Add-Case 'claimReleaseWrongOwnerStops' (
+  $wrongOutcome.ok -and
+  $probeWrong.reachedComplete -eq $false -and
+  [int]$wrongScan['returnedRows'] -eq 1 -and
+  ([string]$wrongRows[0]) -eq $probeOther) @{
+  stopName     = [string]$probeWrong.stopName
+  receipts     = @($wrongOutcome.receipts)
+  returned     = $wrongRows
+}
+
+# ---- 30: success, two rows, one of them matching ---------------------------
+# A count-blind ownership test would PASS this. Membership alone is not enough:
+# exactly one row must come back.
+$probeMany = Invoke-ClaimReleaseProbe -RunId $probeRunId -Stub @{
+  exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''
+  stdOut = ($probeRunId + "`n" + $probeRunId); stdErr = ''
+}
+$manyScan    = Get-ProbeReceipt -Probe $probeMany -Name '06-claim-release-ownership.json'
+$manyRows    = @($manyScan['returned'])
+$manyOutcome = Test-ClaimReleaseOutcome -Probe $probeMany `
+  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release-ownership-stop.json') `
+  -ExpectedStop '06-claim-release-ownership-stop.json' `
+  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'STOP'; '06-claim-release-ownership-stop.json' = 'STOPPED' }
+Add-Case 'claimReleaseMultipleRowsStops' (
+  $manyOutcome.ok -and
+  $probeMany.reachedComplete -eq $false -and
+  [int]$manyScan['returnedRows'] -eq 2 -and
+  ([string]$manyRows[0]) -eq $probeRunId) @{
+  stopName     = [string]$probeMany.stopName
+  receipts     = @($manyOutcome.receipts)
+  returnedRows = [int]$manyScan['returnedRows']
+}
+
+# ---- 31: the release exits nonzero -----------------------------------------
+$probeExit = Invoke-ClaimReleaseProbe -RunId $probeRunId -Stub @{
+  exitCode = 3; timedOut = $false; launchError = $null; captureNote = ''
+  stdOut = ''; stdErr = 'ERROR:  42P01: relation "supabase_migrations.clash_deploy_claim" does not exist'
+}
+$exitFail    = Get-ProbeReceipt -Probe $probeExit -Name '06-claim-release.json'
+$exitOutcome = Test-ClaimReleaseOutcome -Probe $probeExit `
+  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release.json', '06-claim-release-fail.json') `
+  -ExpectedStop '06-claim-release-fail.json' `
+  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'STOP'; '06-claim-release.json' = 'STOP'; '06-claim-release-fail.json' = 'STOPPED' }
+Add-Case 'claimReleaseNonZeroExitStops' (
+  $exitOutcome.ok -and
+  $probeExit.reachedComplete -eq $false -and
+  [string]$exitFail['outcome'] -eq 'FAILED-EXIT' -and
+  [string]$exitFail['sqlState'] -eq '42P01' -and
+  -not $probeExit.receipts.Contains('06-claim-release-ownership-stop.json')) @{
+  stopName  = [string]$probeExit.stopName
+  receipts  = @($exitOutcome.receipts)
+  outcome   = [string]$exitFail['outcome']
+  sqlState  = [string]$exitFail['sqlState']
+}
+
+# ---- 32: the release times out after printing this run's row ---------------
+# No inference: an unproven release is a FAILED release even when the text
+# looked right. This is the R3 rule applied to the claim.
+$probeTimeout = Invoke-ClaimReleaseProbe -RunId $probeRunId -Stub @{
+  exitCode = $null; timedOut = $true; launchError = $null; captureNote = ''
+  stdOut = ($probeRunId + "`n"); stdErr = ''
+}
+$timeoutFail     = Get-ProbeReceipt -Probe $probeTimeout -Name '06-claim-release.json'
+$timeoutScan     = Get-ProbeReceipt -Probe $probeTimeout -Name '06-claim-release-ownership.json'
+$timeoutOutcome = Test-ClaimReleaseOutcome -Probe $probeTimeout `
+  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release.json', '06-claim-release-fail.json') `
+  -ExpectedStop '06-claim-release-fail.json' `
+  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'PASS'; '06-claim-release.json' = 'STOP'; '06-claim-release-fail.json' = 'STOPPED' }
+Add-Case 'claimReleaseTimeoutStops' (
+  $timeoutOutcome.ok -and
+  $probeTimeout.reachedComplete -eq $false -and
+  [string]$timeoutFail['outcome'] -eq 'UNKNOWN-TIMEOUT' -and
+  -not $probeTimeout.receipts.Contains('06-claim-release-ownership-stop.json')) @{
+  stopName    = [string]$probeTimeout.stopName
+  receipts    = @($timeoutOutcome.receipts)
+  outcome     = [string]$timeoutFail['outcome']
+  ownership   = [string]$timeoutScan['status']
+  note        = 'the row matched, but a timed-out release is not a proven release'
+}
+
+# ---- 33: the capture was incomplete ----------------------------------------
+$probePartial = Invoke-ClaimReleaseProbe -RunId $probeRunId -Stub @{
+  exitCode = 0; timedOut = $false; launchError = $null; captureNote = 'stdout capture incomplete'
+  stdOut = ($probeRunId + "`n"); stdErr = ''
+}
+$partialFail     = Get-ProbeReceipt -Probe $probePartial -Name '06-claim-release.json'
+$partialOutcome = Test-ClaimReleaseOutcome -Probe $probePartial `
+  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release.json', '06-claim-release-fail.json') `
+  -ExpectedStop '06-claim-release-fail.json' `
+  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'PASS'; '06-claim-release.json' = 'STOP'; '06-claim-release-fail.json' = 'STOPPED' }
+Add-Case 'claimReleaseIncompleteCaptureStops' (
+  $partialOutcome.ok -and
+  $probePartial.reachedComplete -eq $false -and
+  [string]$partialFail['outcome'] -eq 'UNKNOWN-CAPTURE-INCOMPLETE' -and
+  -not $probePartial.receipts.Contains('06-claim-release-ownership-stop.json')) @{
+  stopName  = [string]$probePartial.stopName
+  receipts  = @($partialOutcome.receipts)
+  outcome   = [string]$partialFail['outcome']
 }
 
 # ===========================================================================

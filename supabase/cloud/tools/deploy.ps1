@@ -706,7 +706,13 @@ New-PhaseReceipt '06-claim-release-ownership.json' @{
   expectedRunId = $runId; returnedRows = $releasedRows.Count
   returned = @($releasedRows | ForEach-Object { $_.Trim() })
 }
-if (Test-NativeSuccess $release -and -not $releasedOwned) {
+# Round 10 (R9-C1): the call MUST be parenthesised. Unparenthesised, PowerShell
+# parses this as ONE command: '-and', '-not' and the ownership value become extra
+# arguments to Test-NativeSuccess, so the condition collapsed to that function's
+# own result and a successful release entered this STOP branch. The runner could
+# therefore never reach COMPLETE on a correct deployment. Executed by
+# test-native-capture.ps1 cases 27-33 against this committed block.
+if ((Test-NativeSuccess $release) -and (-not $releasedOwned)) {
   Stop-Run ("the claim release did not remove exactly this run's row (returned {0} row(s), expected 1 matching {1}). All 111 migrations and postflight passed; the claim state needs human review (ROLLBACK.md T1.1)." -f `
       $releasedRows.Count, $runId) '06-claim-release-ownership-stop.json'
 }
