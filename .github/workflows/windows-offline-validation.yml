@@ -30,8 +30,9 @@
 #     manifest proof and the offline test launcher run.
 #   * no database, no Supabase project, no network call after the checkout.
 #   * no secret is read, set or required; every receipt writer sanitises before
-#     encoding, and the credential guard fails the job if a PG*/SUPABASE_*
-#     credential variable is ever added to the environment.
+#     encoding. The image's own PGUSER/PGPASSWORD (a throwaway local PostgreSQL
+#     role) and every Supabase variable are cleared at job level, and a guard
+#     step fails the job if any of them is non-empty again.
 #   * the only token the job may use is `contents: read`, and the checkout does
 #     not persist it. No environment, no deployment target, no write scope.
 #
@@ -73,6 +74,32 @@ jobs:
     permissions:
       contents: read
 
+    # The windows-2022 image ships a local PostgreSQL installation and exports
+    # PGUSER/PGPASSWORD (and friends) into every step. That is a throwaway local
+    # role, not a project secret, but this job must not be able to reach ANY
+    # database - so every PostgreSQL/Supabase variable is cleared here, at job
+    # level, for every step's process. The guard step below then fails the job if
+    # one of them is ever non-empty again, which is what makes "credential-free"
+    # an enforced property rather than a promise.
+    env:
+      PGPASSWORD: ''
+      PGPASSFILE: ''
+      PGHOST: ''
+      PGHOSTADDR: ''
+      PGUSER: ''
+      PGDATABASE: ''
+      PGPORT: ''
+      PGSSLMODE: ''
+      PGSSLROOTCERT: ''
+      PGSERVICE: ''
+      PGOPTIONS: ''
+      DATABASE_URL: ''
+      SUPABASE_ACCESS_TOKEN: ''
+      SUPABASE_DB_PASSWORD: ''
+      SUPABASE_SERVICE_ROLE_KEY: ''
+      SUPABASE_URL: ''
+      SUPABASE_ANON_KEY: ''
+
     steps:
       - name: Check out this commit without persisting credentials
         uses: actions/checkout@v4
@@ -86,7 +113,8 @@ jobs:
           -ExecutionPolicy Bypass -Command "try { $v = $PSVersionTable;
           Write-Host ('::notice::CLASH-RUNTIME ' + $v.PSVersion + ' edition=' + $v.PSEdition);
           foreach ($n in @('PGPASSWORD', 'PGPASSFILE', 'PGHOST', 'PGHOSTADDR', 'PGUSER', 'PGDATABASE',
-          'DATABASE_URL', 'SUPABASE_ACCESS_TOKEN', 'SUPABASE_DB_PASSWORD', 'SUPABASE_SERVICE_ROLE_KEY')) {
+          'PGPORT', 'PGSSLMODE', 'PGSSLROOTCERT', 'PGSERVICE', 'PGOPTIONS', 'DATABASE_URL',
+          'SUPABASE_ACCESS_TOKEN', 'SUPABASE_DB_PASSWORD', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY')) {
           $val = [Environment]::GetEnvironmentVariable($n); $len = 0; if ($null -ne $val) { $len = $val.Length };
           Write-Host ('::notice::CLASH-ENVCHECK ' + $n + ' length=' + $len) } }
           catch { Write-Host ('::error::CLASH-DIAGNOSTICS-FAILED ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
@@ -96,8 +124,9 @@ jobs:
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
           -ExecutionPolicy Bypass -Command "try { $ErrorActionPreference = 'Stop'; $names = @('PGPASSWORD',
-          'PGPASSFILE', 'PGHOST', 'PGHOSTADDR', 'PGUSER', 'PGDATABASE', 'DATABASE_URL',
-          'SUPABASE_ACCESS_TOKEN', 'SUPABASE_DB_PASSWORD', 'SUPABASE_SERVICE_ROLE_KEY'); $found = @();
+          'PGPASSFILE', 'PGHOST', 'PGHOSTADDR', 'PGUSER', 'PGDATABASE', 'PGPORT', 'PGSSLMODE',
+          'PGSSLROOTCERT', 'PGSERVICE', 'PGOPTIONS', 'DATABASE_URL', 'SUPABASE_ACCESS_TOKEN',
+          'SUPABASE_DB_PASSWORD', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'); $found = @();
           foreach ($n in $names) { $v = [Environment]::GetEnvironmentVariable($n); if (-not [string]::IsNullOrWhiteSpace($v)) { $found += $n } };
           if ($found.Count -gt 0) { throw ('REFUSED: this job must run without credentials, but these are set: ' + ($found -join ', ')) };
           Write-Host ('::notice::CLASH-CREDENTIAL-FREE-OK checked=' + $names.Count) }
