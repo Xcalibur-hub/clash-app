@@ -142,8 +142,13 @@ Step 0 is create-only and is **not** counted in the 111. The operator does not
 run it by hand: leaving it to a human was one of the unvalidated steps Round 2
 named, so the runner owns it and records its digest and read-back.
 
-Use the **direct** connection (port 5432), not the pooler: a transaction-mode
-pooler can break the multi-statement DDL in this set.
+Prefer the **direct** connection (port 5432): a transaction-mode pooler can break
+the multi-statement DDL in this set. If the direct host does not resolve from the
+deployment host (a project without the IPv4 add-on resolves `db.<ref>.supabase.co`
+to IPv6 only), the package accepts the session pooler instead -
+`aws-<n>-<region>.pooler.supabase.com:6543` with user `postgres.<ref>` - and
+nothing else. A HostNotFound or an IPv6 route failure is a network problem, not a
+package problem: fix connectivity rather than loosening the policy.
 
 Note for auditors: `node tests/verify-package.mjs` is itself a native child
 process. Run it from `cmd.exe`, or use `tools\run-tests.ps1`, which is what the
