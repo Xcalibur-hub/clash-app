@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill. The runner proceeds only when the ledger is a **proven prefix** of the manifest — same versions *and* same stored hashes; any gap, mismatch or extra row is a hard stop |
-| **F9** no tests | none | `tests/verify-package.mjs`: **282 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **289 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -40,10 +40,10 @@ test layers unvalidated. Its source findings are addressed here.
 | **F2 critical** — `$ErrorActionPreference='Stop'` plus `& $Psql @Arguments 2>$errFile` raised `NativeCommandError` *before* the exit code was captured; logs could stay empty | A single adapter starts every child through `System.Diagnostics.Process` (`UseShellExecute=$false`), drains stdout/stderr asynchronously **into memory**, and reads `Process.ExitCode`. No `&`, no `2>`, no `$LASTEXITCODE`, no dependence on the error-action preference. stderr is data: a `NOTICE` never decides failure | `tools/lib/clash-native.ps1` |
 | **F2** — adapter verified only by static reasoning | `tools/test-native-capture.ps1` proves the adapter on the target PowerShell 5.1 with harmless stderr-producing children (exit 0, exit 17, silent, launch failure, timeout, credential refusal, sanitiser, non-overwriting writer) and records the failed legacy construct as an informational control. **`deploy.ps1` refuses to run without a PASS receipt bound to the adapter's sha256** | `tools/test-native-capture.ps1`, `Assert-AdapterSelfTest` |
 | **F4** — "Wrapper transaction rolled back; ledger unchanged" asserted for *every* nonzero exit | Outcomes are classified from evidence, never narrated: `COMMITTED`, `ROLLED_BACK_PROVEN` (only when a read-only probe proves the row absent), `COMMITTED_WITH_ERROR` (row present with the expected token ⇒ the error came after commit), `LEDGER_MISMATCH`, `UNKNOWN` (probe failed / timeout / no exit code) | `deploy.ps1` gate 4 |
-| **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 238 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
+| **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 282 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 289 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -124,8 +124,9 @@ while serialising.
 The suite derived its directories from `new URL('..', import.meta.url).pathname`.
 On Windows that is `/C:/Users/.../` - leading slash, drive letter, percent-encoded
 spaces - and `path.join` turns it into `C:\C:\Users\...\manifest.json`, so the
-suite died with ENOENT **before its first assertion**. The builder had the same
-line, so `node tools/build-package.mjs` could not read the migrations either.
+suite died with ENOENT **before its first assertion**. The builder carried the same
+line, so it would have failed the same way on Windows - inferred, not observed:
+the audit ran the suite, not the builder.
 
 | Correction | Detail |
 |---|---|
@@ -146,6 +147,15 @@ package.
 
 The replacement is stricter than the rule it replaces, and it is covered for
 Windows drive paths, UNC, spaces, mixed separators and POSIX paths.
+
+#### Counts in this file are checked by the suite
+
+The numbers above have drifted before: this file claimed 238 checksummed files
+while there were 239 and then 240. Section [18] now asserts that the counts
+written here - checksums, migrations, wrappers, assertions - equal what the suite
+measures, and the suite fails if its own assertion total differs from
+`EXPECTED_ASSERTIONS`. A stale number in this file is a test failure, not a
+puzzle for the reader.
 
 Still unproven, and stated as such: the four scripts have **never run**, the SQL
 gates have **never run against the hosted database**, and the ledger/CLI
@@ -171,8 +181,8 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, proof-based resume
-tests/verify-package.mjs       offline test suite (282 assertions)
-checksums.sha256               238 files: originals + every package file
+tests/verify-package.mjs       offline test suite (289 assertions)
+checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)
 ```
@@ -229,7 +239,7 @@ node tools/build-package.mjs                  # only if you intend to regenerate
 
 ```
 gate 0  connection policy + adapter self-test receipt + baseline record
-gate 1  full package integrity — 238 checksum files, 111 originals, executed
+gate 1  full package integrity — 240 checksum files, 111 originals, executed
         sources and wrapper digests — BEFORE any database connection
 gate 2  preflight SQL (fail-closed DO block)
 gate 3  ledger prefix proof (read-only)

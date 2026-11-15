@@ -35,7 +35,8 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 17;
+const EXPECTED_SECTIONS = 18;
+const EXPECTED_ASSERTIONS = 289;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -1008,6 +1009,42 @@ hdr(17, 'platform path handling - drive letters, spaces, POSIX (Round 6)');
     read(join(CLOUD, 'tools/build-package.mjs')).includes('fileURLToPath'));
   check('a skipped section cannot pass',
     suiteSrc.includes('sections ran') && suiteSrc.includes('only ${sectionsRun} of ${EXPECTED_SECTIONS}'));
+}
+
+hdr(18, 'documentation claims match the package (Round 7)');
+{
+  // This file's counts have been wrong before (README said 238 checksummed files
+  // when there were 239, then 240). A number a reader relies on is now a test.
+  const readmeText = read(join(CLOUD, 'README.md'));
+  const checksumCount = read(join(CLOUD, 'checksums.sha256')).trim().split('\n').length;
+  const originals = read(join(CLOUD, 'checksums.sha256')).split('\n').filter((l) => l.includes('supabase/migrations/')).length;
+  const wrapperCount = entries.length;
+  const migrationCount = migFiles.length;
+
+  check('the checksum set covers every original migration plus the package',
+    checksumCount === originals + (checksumCount - originals) && originals === migrationCount && checksumCount === 240,
+    `checksums=${checksumCount} originals=${originals}`);
+  check('README states the real checksum file count',
+    readmeText.includes(`${checksumCount} files`) || readmeText.includes(`${checksumCount} checksum files`),
+    String(checksumCount));
+  check('README states the real migration count',
+    readmeText.includes(`${migrationCount} migrations`) && readmeText.includes(`${migrationCount} files, byte-identical`));
+  check('README states the real wrapper count',
+    readmeText.includes(`${wrapperCount} wrappers`) && wrapperCount === migrationCount,
+    `${wrapperCount}/${migrationCount}`);
+  check('README states the suite\'s own assertion count',
+    readmeText.includes(`${EXPECTED_ASSERTIONS} offline assertions`), String(EXPECTED_ASSERTIONS));
+  const staleFileClaims = [...readmeText.matchAll(/all (\d+) files/g)].map((m) => Number(m[1]))
+    .filter((n) => n !== checksumCount);
+  check('no stale "all N files" claim remains', staleFileClaims.length === 0, staleFileClaims.join(','));
+}
+
+{
+  // Tripwire: the documented total must equal what actually ran. Adding an
+  // assertion without updating EXPECTED_ASSERTIONS fails here.
+  const ran = pass + failures.length + 1;
+  check('the suite runs exactly the documented number of assertions',
+    ran === EXPECTED_ASSERTIONS, `expected ${EXPECTED_ASSERTIONS}, ran ${ran}`);
 }
 
 if (sectionsRun !== EXPECTED_SECTIONS) {
