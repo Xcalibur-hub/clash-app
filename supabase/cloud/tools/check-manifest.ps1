@@ -1,74 +1,138 @@
 #Requires -Version 5.1
 <#
-  Offline integrity check. Touches no database.
+  check-manifest.ps1 - offline integrity proof. Touches no database.
 
   Proves, before anything executes:
     * the 111 originals are byte-identical to the manifest (LF-normalised)
     * the executed source for every step matches the manifest
-    * generated/ contains exactly 111 wrappers + step 0, each with one
-      transaction and one ledger insert carrying the right version + identity
+    * every generated wrapper matches the digest the manifest declares
+      (the same digest deploy.ps1 compares immediately before execution)
+    * each wrapper carries one transaction, a trailing commit, and a ledger
+      insert with the right version literal and identity token
     * checksums.sha256 verifies for every listed file
     * supabase/migrations is clean in git
 
+  Round 2 corrections: git is invoked through the native adapter (no '&', no
+  '2>&1'), and the receipt is created exclusively with FileMode::CreateNew and
+  sealed by hash chain, instead of overwriting a file.
+
   Any mismatch is STOP condition S9.
+  Exit codes: 0 PASS, 1 FAIL, 2 refused.
 #>
 [CmdletBinding()]
-param()
+param(
+  [string]$OutFile
+)
 
-$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
+$ErrorActionPreference = 'Stop'
 
-function Get-NormalizedSha256 {
-  param([string]$Path)
-  $text = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($Path))
-  if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) { $text = $text.Substring(1) }
-  $text = $text.Replace("`r`n", "`n")
-  $sha = [System.Security.Cryptography.SHA256]::Create()
-  try { $h = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($text)) } finally { $sha.Dispose() }
-  return (-join ($h | ForEach-Object { $_.ToString('x2') }))
-}
+$cloudRoot   = Split-Path -Parent $PSScriptRoot
+$repoRoot    = Split-Path -Parent (Split-Path -Parent $cloudRoot)
+$adapterPath = Join-Path (Join-Path $PSScriptRoot 'lib') 'clash-native.ps1'
+if (-not (Test-Path -LiteralPath $adapterPath)) { Write-Host "REFUSED: adapter missing: $adapterPath" -ForegroundColor Red; exit 2 }
+. $adapterPath
 
-$cloudRoot = Split-Path -Parent $PSScriptRoot
-$repoRoot  = Split-Path -Parent (Split-Path -Parent $cloudRoot)
-$manifest  = Get-Content -Raw -Encoding UTF8 (Join-Path $cloudRoot 'manifest.json') | ConvertFrom-Json
-$entries   = @($manifest.entries)
-$fail = 0
+$manifest = [System.IO.File]::ReadAllText((Join-Path $cloudRoot 'manifest.json')) | ConvertFrom-Json
+$entries  = @($manifest.entries)
+$fail     = 0
+$notes    = @()
+function Fail([string]$Message) { Write-Host ("FAIL  {0}" -f $Message) -ForegroundColor Red; $script:fail++; $script:notes += $Message }
 
-if ($entries.Count -ne 111) { Write-Host "FAIL: manifest has $($entries.Count) entries" -ForegroundColor Red; $fail++ }
+if ($entries.Count -ne 111) { Fail ("manifest has {0} entries, expected 111" -f $entries.Count) }
 
 foreach ($e in $entries) {
   $origAbs = Join-Path $repoRoot $e.file
   $execAbs = Join-Path $repoRoot $e.sqlPath
-  if (-not (Test-Path $origAbs)) { Write-Host "FAIL [$($e.index)] missing $($e.file)" -ForegroundColor Red; $fail++; continue }
-  if (-not (Test-Path $execAbs)) { Write-Host "FAIL [$($e.index)] missing $($e.sqlPath)" -ForegroundColor Red; $fail++; continue }
+  if (-not (Test-Path -LiteralPath $origAbs)) { Fail ("[{0}] missing {1}" -f $e.index, $e.file); continue }
+  if (-not (Test-Path -LiteralPath $execAbs)) { Fail ("[{0}] missing {1}" -f $e.index, $e.sqlPath); continue }
 
-  if ((Get-NormalizedSha256 $origAbs) -ne $e.sha256) { Write-Host "FAIL [$($e.index)] original changed: $($e.file)" -ForegroundColor Red; $fail++ }
-  if ((Get-NormalizedSha256 $execAbs) -ne $e.executedSha256) { Write-Host "FAIL [$($e.index)] executed source changed: $($e.sqlPath)" -ForegroundColor Red; $fail++ }
+  if ((Get-NormalizedSha256 -Path $origAbs) -ne $e.sha256) { Fail ("[{0}] original changed: {1}" -f $e.index, $e.file) }
+  if ((Get-NormalizedSha256 -Path $execAbs) -ne $e.executedSha256) { Fail ("[{0}] executed source changed: {1}" -f $e.index, $e.sqlPath) }
 
-  $wrap = Join-Path $cloudRoot ('generated\{0:D3}_{1}.sql' -f $e.index, $e.version)
-  if (-not (Test-Path $wrap)) { Write-Host "FAIL [$($e.index)] missing wrapper" -ForegroundColor Red; $fail++; continue }
-  $wt = [System.IO.File]::ReadAllText($wrap)
-  if ($wt -notmatch "(?m)^commit;\s*$") { Write-Host "FAIL [$($e.index)] wrapper has no trailing commit" -ForegroundColor Red; $fail++ }
-  if ($wt -notmatch [regex]::Escape("'$($e.version)'")) { Write-Host "FAIL [$($e.index)] wrapper ledger version missing" -ForegroundColor Red; $fail++ }
-  if ($wt -notmatch [regex]::Escape("sha256:$($e.normalizedSha256)")) { Write-Host "FAIL [$($e.index)] wrapper identity token missing" -ForegroundColor Red; $fail++ }
+  if (-not $e.PSObject.Properties['wrapperSha256'] -or [string]::IsNullOrWhiteSpace($e.wrapperSha256)) {
+    Fail ("[{0}] manifest carries no wrapperSha256 (stale manifest - rebuild)" -f $e.index); continue
+  }
+  $wrapAbs = Join-Path $cloudRoot ('generated\{0}' -f $e.wrapperPath)
+  if (-not (Test-Path -LiteralPath $wrapAbs)) { Fail ("[{0}] missing wrapper {1}" -f $e.index, $e.wrapperPath); continue }
+  if ((Get-NormalizedSha256 -Path $wrapAbs) -ne $e.wrapperSha256) { Fail ("[{0}] wrapper digest mismatch: {1}" -f $e.index, $e.wrapperPath) }
+
+  $wt = [System.IO.File]::ReadAllText($wrapAbs)
+  if (([regex]::Matches($wt, '(?m)^begin;\s*$')).Count -ne 1) { Fail ("[{0}] wrapper must contain exactly one top-level begin;" -f $e.index) }
+  if ($wt -notmatch '(?m)^commit;\s*$') { Fail ("[{0}] wrapper has no trailing commit" -f $e.index) }
+  $insAt = $wt.IndexOf('insert into supabase_migrations.schema_migrations')
+  if ($insAt -lt 0) { Fail ("[{0}] wrapper has no ledger insert" -f $e.index) }
+  elseif ($insAt -gt $wt.LastIndexOf('commit;')) { Fail ("[{0}] ledger insert does not precede commit" -f $e.index) }
+  if ($wt -notmatch [regex]::Escape("'$($e.version)'")) { Fail ("[{0}] wrapper ledger version missing" -f $e.index) }
+  if ($wt -notmatch [regex]::Escape("sha256:$($e.normalizedSha256)")) { Fail ("[{0}] wrapper identity token missing" -f $e.index) }
 }
 
-$dirty = git -C $repoRoot status --porcelain -- supabase/migrations 2>&1
-if ($dirty) { Write-Host "FAIL: supabase/migrations dirty:`n$dirty" -ForegroundColor Red; $fail++ }
-
 $sumFile = Join-Path $cloudRoot 'checksums.sha256'
-if (Test-Path $sumFile) {
+$sumCount = 0
+if (-not (Test-Path -LiteralPath $sumFile)) { Fail 'checksums.sha256 missing' }
+else {
   foreach ($line in [System.IO.File]::ReadAllLines($sumFile)) {
     if ([string]::IsNullOrWhiteSpace($line)) { continue }
     $parts = $line -split '\s{2}', 2
     if ($parts.Count -ne 2) { continue }
-    $abs = Join-Path $repoRoot $parts[1]
-    if (-not (Test-Path $abs)) { Write-Host "FAIL checksum: missing $($parts[1])" -ForegroundColor Red; $fail++; continue }
-    if ((Get-NormalizedSha256 $abs) -ne $parts[0]) { Write-Host "FAIL checksum: $($parts[1])" -ForegroundColor Red; $fail++ }
+    $sumCount++
+    $abs = Join-Path $repoRoot ($parts[1].Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    if (-not (Test-Path -LiteralPath $abs)) { Fail ("checksum: missing {0}" -f $parts[1]); continue }
+    if ((Get-NormalizedSha256 -Path $abs) -ne $parts[0]) { Fail ("checksum: {0}" -f $parts[1]) }
   }
+  if ($sumCount -lt 200) { Fail ("checksums.sha256 lists only {0} files" -f $sumCount) }
 }
 
+# git is a native program: run it through the adapter, never through '&'
+$gitPath = $null
+try {
+  $gitCmd = Get-Command 'git' -ErrorAction Stop
+  $gitPath = [string]$gitCmd.Path
+  if ([string]::IsNullOrWhiteSpace($gitPath)) { $gitPath = [string]$gitCmd.Source }
+}
+catch { $gitPath = $null }
+$gitHead = New-NotRunResult 'git not found on PATH'
+if ($gitPath) { $gitHead = Invoke-NativeProcess -FilePath $gitPath -Arguments @('-C', $repoRoot, 'rev-parse', 'HEAD') -TimeoutSeconds 30 }
+$gitDirty = New-NotRunResult 'git not found on PATH'
+if ($gitPath) { $gitDirty = Invoke-NativeProcess -FilePath $gitPath -Arguments @('-C', $repoRoot, 'status', '--porcelain', '--', 'supabase/migrations') -TimeoutSeconds 60 }
+if (-not (Test-NativeSuccess $gitHead)) { Fail ("git rev-parse HEAD failed: {0}" -f (Get-NativeErrorExcerpt $gitHead 200)) }
+if (-not (Test-NativeSuccess $gitDirty)) { Fail ("git status failed: {0}" -f (Get-NativeErrorExcerpt $gitDirty 200)) }
+if (-not [string]::IsNullOrWhiteSpace($gitDirty.stdOut)) { Fail ("supabase/migrations is dirty: {0}" -f $gitDirty.stdOut.Trim()) }
+
+# ---------------------------------------------------------------- receipt ---
+$stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
+if ([string]::IsNullOrWhiteSpace($OutFile)) {
+  $OutFile = Join-Path $cloudRoot ("evidence\{0}-manifest-check.json" -f $stamp)
+}
+if (Test-Path -LiteralPath $OutFile) {
+  Write-Host ("REFUSED: {0} already exists; receipts are never overwritten." -f $OutFile) -ForegroundColor Red
+  exit 2
+}
+$doc = [ordered]@{
+  receipt          = 'manifest-check.json'
+  utc              = (Get-Date).ToUniversalTime().ToString('o')
+  adapter          = (Get-ClashAdapterIdentity)
+  adapterSha256    = (Get-NormalizedSha256 -Path $adapterPath)
+  repoHead         = $gitHead.stdOut.Trim()
+  manifestBuilder  = $manifest.builder
+  manifestBuiltUtc = $manifest.built_at_utc
+  projectRef       = $manifest.project_ref
+  entries          = $entries.Count
+  checksumFiles    = $sumCount
+  problems         = @($notes)
+  status           = $(if ($fail -eq 0) { 'PASS' } else { 'FAIL' })
+  verdict          = $(if ($fail -eq 0) { 'originals, wrappers and checksums all verify' } else { 'integrity failure' })
+}
+$sha = Write-EvidenceJson -Path $OutFile -Object $doc
+
 Write-Host ''
-if ($fail -gt 0) { Write-Host "FAIL: $fail problem(s). Do not deploy." -ForegroundColor Red; exit 1 }
-Write-Host 'PASS: originals, wrappers and checksums all verify.' -ForegroundColor Green
+Write-Host ("entries={0} checksumFiles={1}" -f $entries.Count, $sumCount)
+if ($fail -gt 0) {
+  Write-Host ("FAIL: {0} problem(s). Do not deploy." -f $fail) -ForegroundColor Red
+  Write-Host ("Receipt: {0} sha256={1}" -f (Resolve-Path -LiteralPath $OutFile).Path, $sha)
+  exit 1
+}
+Write-Host 'PASS: originals, wrappers, manifests and checksums all verify.' -ForegroundColor Green
+Write-Host ("Receipt: {0}" -f (Resolve-Path -LiteralPath $OutFile).Path)
+Write-Host ("TERMINAL RECEIPT: manifest-check PASS sha256={0}" -f $sha)
 exit 0

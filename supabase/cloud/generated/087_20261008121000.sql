@@ -9,7 +9,10 @@
 -- normalized sha256 : 60e249c9a05dc6ffc4679e98809aa2a76d706f4f9b305e9d7daa3b7e3818d7c0
 --
 -- ATOMICITY: the migration SQL and its ledger row are committed together.
--- If this file fails, neither the schema change nor the ledger row survives.
+-- A server-side error before COMMIT aborts the transaction, so neither the
+-- schema change nor its ledger row survives. A connection lost around COMMIT
+-- can leave the outcome unknown, which is why the runner classifies it from
+-- the ledger instead of claiming a rollback.
 -- ============================================================================
 begin;
 

@@ -28,6 +28,9 @@
 //       buckets and policies when the Storage tables exist (which is always the
 //       case on hosted). 95_storage_config.sql only verifies.
 //   F6  every gate fails closed: a missing/mismatched identity is an error.
+//   R2  every entry carries wrapperSha256, the digest of the exact wrapper file,
+//       so the runner can compare bytes-on-disk with bytes-as-reviewed before
+//       execution instead of hashing into an unused variable.
 //
 // Nothing here connects to a database. No migration is executed.
 // ============================================================================
@@ -153,6 +156,8 @@ const entries = files.map((file, i) => {
     normalisation: norm.kind,
     normalizedSha256: sha256(norm.text),
     statementsStored: true,
+    wrapperPath: `${String(i + 1).padStart(3, '0')}_${version}.sql`,
+    wrapperSha256: null,   // filled in below, once the wrapper text exists
   };
 }).map((e) => ({ ...e, _text: normalise(readFileSync(join(ROOT, e.sqlPath), 'utf8')).text }));
 
@@ -201,7 +206,10 @@ for (const e of entries) {
 -- normalized sha256 : ${e.normalizedSha256}
 --
 -- ATOMICITY: the migration SQL and its ledger row are committed together.
--- If this file fails, neither the schema change nor the ledger row survives.
+-- A server-side error before COMMIT aborts the transaction, so neither the
+-- schema change nor its ledger row survives. A connection lost around COMMIT
+-- can leave the outcome unknown, which is why the runner classifies it from
+-- the ledger instead of claiming a rollback.
 -- ============================================================================
 begin;
 
@@ -219,6 +227,15 @@ on conflict (version) do nothing;
 commit;
 `;
   writeFileSync(join(GEN, `${label}_${e.version}.sql`), wrapper);
+  // the digest deploy.ps1 compares against the bytes on disk immediately before
+  // executing this wrapper (audit F5: an unused hash is not enforcement)
+  e.wrapperSha256 = sha256(lf(wrapper));
+}
+
+const missingWrapperDigest = entries.filter((e) => !e.wrapperSha256);
+if (missingWrapperDigest.length) {
+  console.error(`REFUSING: ${missingWrapperDigest.length} entries without a wrapper digest`);
+  process.exit(1);
 }
 
 // --------------------------------------------------------------- SQL gates --
@@ -394,6 +411,7 @@ const list = [
   'supabase/cloud/verify/95_storage_config.sql',
   ...readdirSync(GEN).filter((f) => f.endsWith('.sql')).sort().map((f) => `supabase/cloud/generated/${f}`),
   ...readdirSync(join(CLOUD, 'tools')).filter((f) => /\.(ps1|mjs)$/.test(f)).sort().map((f) => `supabase/cloud/tools/${f}`),
+  ...readdirSync(join(CLOUD, 'tools/lib')).filter((f) => f.endsWith('.ps1')).sort().map((f) => `supabase/cloud/tools/lib/${f}`),
   ...readdirSync(join(CLOUD, 'tests')).filter((f) => f.endsWith('.mjs')).sort().map((f) => `supabase/cloud/tests/${f}`),
 ].filter((p) => existsSync(join(ROOT, p)));
 

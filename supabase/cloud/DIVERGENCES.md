@@ -119,6 +119,50 @@ MIME allowlist, five named `storage.objects` policies).
 
 ---
 
+## D-4 — Runner outcomes are classified, not narrated (Round 2)
+
+Not a migration divergence: a change in what the package is allowed to *claim*.
+
+The v2 runner printed "Wrapper transaction rolled back; ledger unchanged" for
+every nonzero exit. A nonzero exit does not establish rollback — the error can
+arrive after `COMMIT`, and a lost connection can leave the commit outcome
+unknown. The runner now reads the ledger back and reports one of:
+
+| Outcome | Evidence required |
+|---|---|
+| `COMMITTED` | exit 0 **and** the stored token equals `sha256:<normalizedSha256>` |
+| `ROLLED_BACK_PROVEN` | nonzero exit **and** a successful probe finds no row for that version (the insert shares the wrapper transaction) |
+| `COMMITTED_WITH_ERROR` | nonzero exit **and** the row is present with the expected token |
+| `LEDGER_MISMATCH` | a row exists with an identity the manifest does not describe |
+| `UNKNOWN` | probe failed, timeout, launch failure or no exit code |
+
+`UNKNOWN` is a terminal state, not a retry prompt: the schema is treated as
+unknown and the operator escalates.
+
+## D-5 — Native process handling, sanitisation, exclusive evidence (Round 2)
+
+The v2 runner used `& $Psql @Arguments 2>$errFile` under
+`$ErrorActionPreference='Stop'`. On Windows PowerShell 5.1 that raises
+`NativeCommandError` before `$LASTEXITCODE` is captured, so neither the exit code
+nor the logs could be trusted. It also wrote raw stderr to the evidence path and
+redacted it afterwards, and used `File.WriteAllText`, which overwrites.
+
+Now: one adapter (`tools/lib/clash-native.ps1`) starts every child through
+`System.Diagnostics.Process` with `UseShellExecute = $false`, drains both streams
+asynchronously into memory, and reads `Process.ExitCode`. Text is sanitised
+before it is encoded, every artefact is created with `FileMode::CreateNew`, and
+receipts are hash-chained and sealed. `deploy.ps1` also refuses to run without a
+PASS adapter self-test receipt bound to the adapter's sha256, because the adapter's
+runtime behaviour cannot be proven by static analysis.
+
+Connection policy (D-5b): `-ProjectRef` is mandatory and the host must belong to
+it (`db.<ref>.supabase.co:5432`, or `aws-…pooler.supabase.com:6543` with user
+`postgres.<ref>`); `PGSSLMODE` is forced to `verify-full`, a CA certificate is
+mandatory, and `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because each can
+redirect the connection behind the approved host name.
+
+---
+
 ## No other divergences
 
 | Pattern | Files | Executable? |

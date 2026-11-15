@@ -10,13 +10,29 @@ answer is always "discard or stop", never "surgically repair".
 ## T0 — Stop (the default outcome of any failure)
 
 `deploy.ps1` already does this: on a failed gate, failed wrapper, mismatched
-read-back or exception it writes `STOP.txt`, prints the reason and exits 1. It
-never retries and never repairs.
+read-back or exception it writes `STOP.json` / `STOP.txt`, prints the sanitised
+reason, seals the evidence directory and exits 1. It never retries, never
+repairs, and never overwrites an earlier attempt.
 
 Because every wrapper is **one transaction containing both the migration and its
-ledger row**, a failed wrapper leaves a self-consistent state: that version is
+ledger row**, a *proven* rollback leaves a self-consistent state: that version is
 absent from both the schema and the ledger, and every earlier version is present
 in both. There is nothing to clean up and nothing to hand-repair.
+
+### T0.1 — Read the outcome before deciding anything
+
+The runner records one of `COMMITTED`, `ROLLED_BACK_PROVEN`,
+`COMMITTED_WITH_ERROR`, `LEDGER_MISMATCH` or `UNKNOWN`. Only the middle two need
+operator judgement:
+
+* `ROLLED_BACK_PROVEN` — the read-only probe proved the ledger row absent. Fix
+  the cause, then re-run; the ledger is still a proven prefix, so T1 applies.
+* `COMMITTED_WITH_ERROR` — the row **is** present with the expected token, so the
+  transaction committed and the error arrived afterwards. **Do not re-run it.**
+  Confirm with `check-ledger.ps1`, then continue from the next index.
+* `UNKNOWN` — the commit outcome could not be established. Do not assume success
+  and do not assume rollback. Run `check-ledger.ps1` (SELECT only, safe), and
+  escalate; if the state cannot be proven, T2 is the only remaining option.
 
 ## T1 — Resume (only with proof)
 

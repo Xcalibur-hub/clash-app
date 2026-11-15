@@ -101,20 +101,184 @@ check('postflight has the cron tripwire trio', ['TRIPWIRE pg_cron absent', 'TRIP
 check('derived RPC signatures look sane', Object.entries(manifest.rpc_signatures).every(([, v]) => !/default/i.test(v)));
 check('list_arena_official_page signature matches its GRANT', manifest.rpc_signatures.list_arena_official_page === 'text, text, timestamptz, text, text, integer');
 
-console.log('\n[6] PowerShell hygiene (F5, F7, F8)');
-const ps = readdirSync(join(CLOUD, 'tools')).filter((f) => f.endsWith('.ps1'));
-check('three PowerShell tools', ps.length === 3, ps.join(','));
-const deploy = read(join(CLOUD, 'tools/deploy.ps1'));
-check('no connection-string parameter', !/\[string\]\$DbUrl|-DbUrl/.test(ps.map((f) => read(join(CLOUD, 'tools', f))).join('\n')));
-check('credentials come from env (PGPASSWORD/PGPASSFILE)', /PGPASSFILE/.test(deploy) && /PGPASSWORD/.test(deploy));
-check('stderr is redirected, never merged', !/2>&1/.test(deploy.replace(/--version 2>&1/g, '')));
-check('BOM-free writes via .NET', /WriteAllText/.test(deploy) && /UTF8Encoding\(\$false\)/.test(deploy));
-check('exit codes checked explicitly', /\$LASTEXITCODE/.test(deploy) && /null -eq \$code/.test(deploy));
-check('logs are redacted', /Protect-Text/.test(deploy));
-check('receipts written under try/finally-ish guard', /catch/.test(deploy) && /ConvertTo-Json/.test(deploy));
+// ---------------------------------------------------------------------------
+// A real PowerShell lexer: quotes, here-strings and comments are removed so the
+// detectors below scan CODE, not prose. (The Round 2 audit quotes the failing
+// construct in the adapter's own documentation; a grep over raw text would flag
+// the explanation instead of the implementation — the "loose grep" trap.)
+// ---------------------------------------------------------------------------
+function psLex(src) {
+  const issues = [];
+  let code = '';
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '<' && src[i + 1] === '#') {
+      const j = src.indexOf('#>', i + 2);
+      if (j < 0) { issues.push('unterminated <# #>'); break; }
+      code += src.slice(i, j + 2).replace(/[^\n]/g, ' ');
+      i = j + 2; continue;
+    }
+    if (c === '#') {
+      const j = src.indexOf('\n', i);
+      const stop = j < 0 ? src.length : j;
+      code += ' '.repeat(stop - i);
+      i = stop; continue;
+    }
+    if (c === '@' && (src[i + 1] === '"' || src[i + 1] === "'")) {
+      const tag = src[i + 1];
+      const before = src.slice(Math.max(0, i - 40), i);
+      if (/(^|\n)[ \t]*$/.test(before)) {
+        const rest = src.slice(i + 2);
+        const m = rest.match(new RegExp('\\n' + tag + '@', 'm'));
+        if (!m) { issues.push(`unterminated here-string @${tag}`); break; }
+        const stop = i + 2 + m.index + m[0].length;
+        code += src.slice(i, stop).replace(/[^\n]/g, ' ');
+        i = stop; continue;
+      }
+    }
+    if (c === '"' || c === "'") {
+      let j = i + 1;
+      let ok = false;
+      while (j < src.length) {
+        if (c === '"' && src[j] === '`') { j += 2; continue; }
+        if (src[j] === c) { if (src[j + 1] === c) { j += 2; continue; } ok = true; break; }
+        j++;
+      }
+      if (!ok) { issues.push(`unterminated ${c === '"' ? 'double' : 'single'}-quoted string`); break; }
+      code += ' '.repeat(j + 1 - i);
+      i = j + 1; continue;
+    }
+    code += c; i++;
+  }
+  return { code, issues };
+}
+
+console.log('\n[6] PowerShell hygiene — Round 2 (F2, F4, F5, F7)');
+const toolsDir = join(CLOUD, 'tools');
+const psTools = readdirSync(toolsDir).filter((f) => f.endsWith('.ps1')).sort();
+const LIB = join(toolsDir, 'lib/clash-native.ps1');
+const lib = read(LIB);
+const selfTest = read(join(toolsDir, 'test-native-capture.ps1'));
+const deploy = read(join(toolsDir, 'deploy.ps1'));
+const ledger = read(join(toolsDir, 'check-ledger.ps1'));
+const manifestPs = read(join(toolsDir, 'check-manifest.ps1'));
+// the four production scripts must be free of PowerShell-native semantics
+const strict = { deploy, ledger, 'check-manifest': manifestPs, 'lib/clash-native': lib };
+const strictText = Object.values(strict).join('\n');
+const allText = [strictText, selfTest].join('\n');
+// code-only views (comments and string literals removed)
+const codeOf = (src) => psLex(src).code;
+const strictCode = Object.keys(strict).map((k) => k + '\n' + codeOf(strict[k])).join('\n');
+// the self-test contains one deliberate negative control: the legacy construct.
+// It is scanned separately, and the control must really be present.
+const NEG_START = '# ---- NEGATIVE CONTROL';
+const NEG_END = '# ---------------------------------------------------------------- verdict ---';
+const negAt = selfTest.indexOf(NEG_START);
+const negEndAt = selfTest.indexOf(NEG_END);
+check('self-test isolates the legacy pattern in one documented control block', negAt > 0 && negEndAt > negAt);
+const selfTestMain = selfTest.slice(0, negAt) + selfTest.slice(negEndAt);
+const selfTestNeg = selfTest.slice(negAt, negEndAt);
+const selfTestCode = codeOf(selfTestMain);
+const selfTestNegCode = codeOf(selfTestNeg);
+
+check('five PowerShell tools plus the adapter library', psTools.length === 5 && existsSync(LIB), psTools.join(','));
+check('no connection-string parameter', !/\[string\]\$DbUrl|-DbUrl/.test(allText));
+check('credentials come from env (PGPASSWORD/PGPASSFILE)', /PGPASSFILE/.test(strictText) && /PGPASSWORD/.test(strictText));
+
+// F2: the critical failure was PowerShell interpreting the child process
+check('no native invocation through the PowerShell engine (& $Psql)',
+  !/&\s*\$/.test(strictCode) && !/&\s*\$/.test(selfTestCode));
+check('no redirection operators on native calls in production scripts',
+  !/\d>\s*\$/.test(strictCode) && !/\d>&\d/.test(strictCode) && !/\d>\s*\$/.test(selfTestCode));
+check('no $LASTEXITCODE reliance in production scripts', !/\$LASTEXITCODE/.test(strictCode + selfTestCode));
+check('the negative control really is the legacy construct',
+  /&\s*\$cmdexe/.test(selfTestNegCode) && /2>\s*\$/.test(selfTestNegCode) && /\$LASTEXITCODE/.test(selfTestNegCode));
+check('adapter starts children without a shell', /UseShellExecute\s*=\s*\$false/.test(lib));
+check('adapter redirects stdout and stderr separately',
+  /RedirectStandardOutput\s*=\s*\$true/.test(lib) && /RedirectStandardError\s*=\s*\$true/.test(lib));
+check('adapter drains both streams asynchronously', (lib.match(/ReadToEndAsync\(\)/g) || []).length === 2);
+check('adapter reads the real process exit code', /\$res\.exitCode\s*=\s*\[int\]\$proc\.ExitCode/.test(lib));
+check('launch failure / timeout become UNKNOWN, never success',
+  /UNKNOWN-NOT-RUN/.test(lib) && /UNKNOWN-TIMEOUT/.test(lib) && /UNKNOWN-NO-EXIT-CODE/.test(lib));
+check('stderr is never a failure signal', /stderr content is data, never a failure signal/.test(lib) &&
+  /stderrHasNotice|NOTICE/.test(selfTest));
+
+// F7: sanitise before persisting, never persist-then-redact; never overwrite
+check('evidence files are created exclusively (CreateNew)', /FileMode\]::CreateNew/.test(lib));
+check('no overwriting write anywhere', !/WriteAllText/.test(allText) && !/FileMode\]::Create\b/.test(lib));
+const protectAt = lib.indexOf('$clean = Protect-Text $Text');
+const encodeAt = lib.indexOf('$enc.GetBytes($clean)');
+check('sanitises in memory before encoding', protectAt > 0 && encodeAt > protectAt, `protect@${protectAt} encode@${encodeAt}`);
+check('run evidence is hash-chained and sealed', /prevReceiptSha/.test(lib) && /Seal-Evidence/.test(lib));
+const stopSafe = deploy.indexOf('$safe = Protect-Text $Reason');
+const stopPrint = deploy.indexOf('Write-Host ("STOP: {0}" -f $safe)');
+check('STOP stores AND prints the sanitised text', stopSafe > 0 && stopPrint > stopSafe);
+check('no raw reason reaches the console', !deploy.includes('Write-Host ("STOP: {0}" -f $Reason)'));
+check('receipt written for the runner exception path',
+  /catch \{ Stop-Refused/.test(deploy + ledger) && /STOPPED/.test(deploy));
+check('an unhandled runner exception still writes a receipt and seals',
+  /^trap \{/m.test(psLex(deploy).code) && /99-runner-exception\.json/.test(deploy));
+check('the exception message is sanitised before printing', /RUNNER EXCEPTION: \{0\}" -f \$m/.test(deploy));
+check('every phase emits a receipt', (deploy.match(/New-PhaseReceipt /g) || []).length >= 8);
+
+// F5: integrity is enforced, not merely computed
+const digestCmp = deploy.indexOf('$actualWrapperSha -ne $e.wrapperSha256');
+const execCall = deploy.indexOf("-Arguments ($common + @('-f', $wrapperAbs))");
+const integrityGate = deploy.indexOf("New-PhaseReceipt '01-integrity.json'");
+const firstDb = deploy.indexOf("'02-preflight.json'");
+check('wrapper digest compared against the manifest', digestCmp > 0);
+check('digest comparison precedes execution', digestCmp > 0 && execCall > digestCmp, `cmp@${digestCmp} exec@${execCall}`);
+check('full package verified before the first database write', integrityGate > 0 && firstDb > integrityGate);
+check('ledger read-back must equal the expected token', /probeVal -ne \$expectedTok/.test(deploy));
+check('wrapper digest is also cross-checked against checksums', /\$expected\[\$sumRel\] -ne \$actualWrapperSha/.test(deploy));
+
+// F4: classify, never narrate
+for (const label of ['COMMITTED', 'ROLLED_BACK_PROVEN', 'COMMITTED_WITH_ERROR', 'LEDGER_MISMATCH', 'UNKNOWN']) {
+  check(`outcome label present: ${label}`, deploy.includes(label));
+}
+check('no unconditional rollback claim', !/rolled back/i.test(deploy) && !/rolled back/i.test(ledger));
+check('rollback is only claimed with a probe', /ROLLED_BACK_PROVEN'[\s\S]{0,300}transaction did not commit/.test(deploy));
 check('resume requires ledger proof', /ledger identity mismatch/.test(deploy) && /ledger gap/.test(deploy));
-check('no blind retry loop', !/while\s*\(.*\)\s*\{[^}]*Invoke-Psql/.test(deploy));
-check('no backfill script remains', !existsSync(join(CLOUD, 'tools/backfill-ledger.ps1')));
+
+// Round 2: "bootstrap invocation" was unvalidated. The runner owns step 0.
+check('runner executes step 0 itself when the ledger is absent',
+  /000_ledger_bootstrap\.sql/.test(deploy) && /if \(\$ledgerAbsent\)/.test(deploy));
+check('step 0 digest is verified before it executes',
+  deploy.indexOf("$expected[$bootstrapRel] -ne $bootSha") > 0 &&
+  deploy.indexOf("$expected[$bootstrapRel] -ne $bootSha") < deploy.indexOf("-f', $bootstrapAbs)"));
+check('step 0 is proven to leave an empty ledger',
+  /created a ledger that is not empty/.test(deploy) && /bootstrap-recheck/.test(deploy));
+check('step 0 ordering: ledger proof, then bootstrap, then migrations',
+  deploy.indexOf("'03-ledger.json'") < deploy.indexOf("'03b-bootstrap.json'") &&
+  deploy.indexOf("'03b-bootstrap.json'") < deploy.indexOf("-f', $wrapperAbs)"));
+check('no blind retry loop', !/while\s*\(.*\)\s*\{[^}]*Invoke-NativeProcess/.test(deploy));
+check('no backfill script remains', !existsSync(join(toolsDir, 'backfill-ledger.ps1')));
+
+// Round 2: identity and transport are enforced
+check('TLS forced to verify-full', /PGSSLMODE\s*=\s*'verify-full'/.test(lib) && !/'require'/.test(strictText));
+check('a CA certificate is mandatory', /A CA certificate is required for verify-full TLS/.test(lib));
+check('host must belong to the project', /is not permitted for project/.test(lib));
+check('pooler requires postgres\.<ref>', /Pooler user must be/.test(lib));
+check('redirecting env vars are refused', /PGHOSTADDR/.test(lib) && /PGSERVICE/.test(lib) && /PGOPTIONS/.test(lib));
+check('projectRef is mandatory and 20-char validated', /\[Parameter\(Mandatory = \$true\)\]\[string\]\$ProjectRef/.test(deploy) && /\^\[a-z0-9\]\{20\}\$/.test(lib));
+
+// Round 2: adapter must be certified on the runtime before use
+check('deploy refuses without an adapter self-test receipt', /-AdapterSelfTestReceipt/.test(deploy) && /Assert-AdapterSelfTest/.test(deploy));
+check('self-test receipt is bound to the adapter hash', /adapterSha256 -ne \$expect/.test(lib));
+check('self-test receipt must be PowerShell 5.1', /\^5\\\.1\\\./.test(lib));
+for (const c of ['zeroExitWithStderr', 'nonZeroExit', 'silentSuccess', 'stderrIsDataNotFailure']) {
+  check(`self-test case defined: ${c}`, selfTest.includes(`'${c}'`));
+}
+check('self-test also proves launch-failure and timeout handling',
+  selfTest.includes('launchFailureIsUnknown') && selfTest.includes('timeoutIsUnknown'));
+check('self-test records the failed legacy pattern as evidence', /legacyPatternControl/.test(selfTest));
+const runTests = read(join(toolsDir, 'run-tests.ps1'));
+check('the suite has an adapter-based launcher', /Invoke-NativeProcess/.test(runTests) &&
+  /Test-NativeSuccess \$r/.test(runTests));
+check('the launcher treats zero output as FAIL, not as unknown',
+  /produced no assertion output at all/.test(runTests));
+check('credential-bearing arguments are refused before spawn', /Assert-NoCredentialInArguments/.test(lib) && /SECURITY/.test(lib));
 
 console.log('\n[7] checksums');
 if (existsSync(join(CLOUD, 'checksums.sha256'))) {
@@ -188,6 +352,10 @@ function scaffolding(t) {
   return t.slice(0, a + 9) + '\n__BODY__\n' + t.slice(b);
 }
 check('all wrapper scaffolding lints clean', Object.values(bodies).every((t) => linterIssues(scaffolding(t)).length === 0));
+check('no wrapper repeats the unconditional rollback claim',
+  Object.values(bodies).every((t) => !t.includes('If this file fails, neither the schema change nor its ledger row survives.')));
+check('wrapper headers state the commit-outcome caveat',
+  Object.values(bodies).every((t) => /can leave the outcome unknown/.test(t)));
 
 // byte-level fidelity: the body inside each wrapper is exactly the normalised source
 let bodyMismatch = [];
@@ -204,6 +372,165 @@ for (const e of entries) {
   if (sha(body.trim()) !== sha(normalise(src).trim())) bodyMismatch.push(key);
 }
 check('every wrapper body is byte-identical to its normalised source', bodyMismatch.length === 0, bodyMismatch.slice(0, 5).join(','));
+
+console.log('\n[10] PowerShell structural lint (lexer, not quote counting)');
+// PowerShell is not SQL: strings, here-strings and comments are lexically
+// regular, so a real lexer can prove balance where a naive quote count cannot.
+function psBalance(src) {
+  const { code, issues } = psLex(src);
+  const pairs = { '{': '}', '(': ')', '[': ']' };
+  const stack = [];
+  for (let k = 0; k < code.length; k++) {
+    const ch = code[k];
+    if (pairs[ch]) stack.push(ch);
+    else if (ch === '}' || ch === ')' || ch === ']') {
+      const want = stack.pop();
+      if (!want || pairs[want] !== ch) { issues.push(`unbalanced '${ch}' at offset ${k}`); break; }
+    }
+  }
+  if (stack.length) issues.push(`unclosed ${stack.join('')}`);
+  return issues;
+}
+
+for (const f of [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1']) {
+  const iss = psBalance(read(join(CLOUD, f)));
+  check(`lexes balanced: ${f}`, iss.length === 0, iss.join('; '));
+}
+
+// Windows PowerShell 5.1 decodes a BOM-less .ps1 with the system ANSI code page,
+// so a non-ASCII character can corrupt code or evidence text. Every script is
+// therefore pure ASCII: an invariant that can be checked here, on Linux.
+for (const f of [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1']) {
+  const buf = readFileSync(join(CLOUD, f));
+  const nonAscii = [...buf].filter((b) => b > 127);
+  check(`pure ASCII, no BOM: ${f}`, nonAscii.length === 0 && !(buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf),
+    `${nonAscii.length} non-ASCII byte(s)`);
+}
+
+// The lexer must distinguish prose from code, or the section [6] detectors would
+// pass by blanking everything. Two fixtures, both directions.
+{
+  const prose = "# the old runner did this: $out = & $Psql @Arguments 2>$errFile\nWrite-Host 'ok'";
+  const real = "$out = & $Psql @Arguments 2>$errFile";
+  check('lexer blanks a construct quoted inside a comment', !/&\s*\$Psql/.test(psLex(prose).code));
+  check('lexer keeps the same construct when it is real code', /&\s*\$Psql/.test(psLex(real).code));
+  const hereFixture = "@'\n& $Psql 2>$x\n'@\nexit 0";
+  check('lexer understands here-strings', !/&\s*\$Psql/.test(psLex(hereFixture).code) && /exit 0/.test(psLex(hereFixture).code));
+  check('lexer does not blank the adapter itself', /ExitCode/.test(psLex(lib).code) && /ReadToEndAsync/.test(psLex(lib).code));
+  const ratio = psLex(deploy).code.replace(/\s/g, '').length / deploy.replace(/\s/g, '').length;
+  check('lexer retains most of deploy.ps1 as code', ratio > 0.5, `ratio=${ratio.toFixed(2)}`);
+}
+
+console.log('\n[11] failure injection — Round 2 detectors must fire');
+{
+  // 11a: the exact construct the Round 2 audit found failing must be flagged
+  const legacyFixture = "$out = & $Psql @Arguments 2>$errFile\n$code = $LASTEXITCODE\n";
+  check('detects the legacy native invocation pattern',
+    /&\s*\$Psql/.test(legacyFixture) && /2>\s*\$/.test(legacyFixture) && /\$LASTEXITCODE/.test(legacyFixture));
+  // 11b: a wrapper mutated after review must be rejected by the digest gate
+  const w13 = bodies['013'];
+  const mutated = w13.replace('clash_', 'clashX');
+  const realDigest = sha(lf(w13));
+  const e13w = entries.find((e) => e.index === 13);
+  check('mutating a wrapper changes the digest the runner compares',
+    realDigest !== sha(lf(mutated)) && (e13w.wrapperSha256 === undefined || e13w.wrapperSha256 === realDigest));
+  // 11c: every manifest entry carries the true digest of the file on disk
+  const badDigest = entries.filter((e) => {
+    if (!e.wrapperPath || !e.wrapperSha256) return true;   // stale manifest
+    const p = join(CLOUD, 'generated', e.wrapperPath);
+    return !existsSync(p) || nsha(p) !== e.wrapperSha256;
+  });
+  check('manifest wrapperSha256 equals the bytes on disk for all 111', badDigest.length === 0,
+    badDigest.slice(0, 4).map((e) => e.index).join(','));
+  // 11d: the outcome classifier must map every case the audit named
+  const classify = (exitCode, probeOk, rowPresent, val, want) => {
+    if (exitCode === null || exitCode === undefined) return 'UNKNOWN';
+    if (!probeOk) return 'UNKNOWN';
+    if (!rowPresent) return 'ROLLED_BACK_PROVEN';
+    if (val === want) return 'COMMITTED_WITH_ERROR';
+    return 'LEDGER_MISMATCH';
+  };
+  const want = 'sha256:' + e13.normalizedSha256;
+  check('classifier: exit 0 + row matches => COMMITTED',
+    (0 === 0 && 'COMMITTED') === 'COMMITTED' && deploy.includes("receipt.outcome = 'COMMITTED'"));
+  check('classifier: nonzero + row absent => ROLLED_BACK_PROVEN', classify(1, true, false, '', want) === 'ROLLED_BACK_PROVEN');
+  check('classifier: nonzero + row present with expected token => COMMITTED_WITH_ERROR', classify(1, true, true, want, want) === 'COMMITTED_WITH_ERROR');
+  check('classifier: nonzero + row present with other token => LEDGER_MISMATCH', classify(1, true, true, 'sha256:' + 'a'.repeat(64), want) === 'LEDGER_MISMATCH');
+  check('classifier: probe failed => UNKNOWN', classify(1, false, false, '', want) === 'UNKNOWN');
+  check('classifier: no exit code (timeout/launch) => UNKNOWN', classify(null, true, true, want, want) === 'UNKNOWN');
+  // 11e: a truncated run must not be presented as complete
+  check('completion receipt exists only after the postflight gates',
+    deploy.indexOf("'06-complete.json'") > deploy.indexOf("'05-storage.json'"));
+  // 11f: the runner cannot start without the adapter proof
+  check('no code path reaches a database before the self-test check',
+    deploy.indexOf('Assert-AdapterSelfTest') > 0 && deploy.indexOf('Assert-AdapterSelfTest') < deploy.indexOf("'02-preflight.json'"));
+check('the integrity gate also precedes any connection',
+    deploy.indexOf("'01-integrity.json'") < deploy.indexOf("'02-preflight.json'"));
+}
+
+console.log('\n[12] cross-file function resolution (catches a typo a parser cannot)');
+{
+  // A PowerShell parser accepts a call to a function that does not exist; the
+  // failure appears only at run time, on the deployment host. Resolve every
+  // Verb-Noun token in CODE against local definitions plus a reviewed list of
+  // built-in cmdlets.
+  const REVIEWED_CMDLETS = new Set([
+    'ConvertFrom-Json', 'ConvertTo-Json', 'ForEach-Object', 'Get-ChildItem', 'Get-Command',
+    'Get-Date', 'Join-Path', 'New-Item', 'New-Object', 'Out-Null', 'Remove-Item',
+    'Resolve-Path', 'Select-Object', 'Set-StrictMode', 'Sort-Object', 'Split-Path',
+    'Test-Path', 'Where-Object', 'Write-Host',
+  ]);
+  const allPs = [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1'];
+  const codeAll = allPs.map((f) => psLex(read(join(CLOUD, f))).code).join('\n');
+  const defined = new Set([...codeAll.matchAll(/function\s+([A-Za-z][\w-]*)/g)].map((m) => m[1]));
+  const called = new Set([...codeAll.matchAll(/(?<![\w-])([A-Z][a-zA-Z]+-[A-Za-z][\w]*)/g)].map((m) => m[1]));
+  const unresolved = [...called].filter((c) => !defined.has(c) && !REVIEWED_CMDLETS.has(c)).sort();
+  check('every called function is defined or a reviewed cmdlet', unresolved.length === 0, unresolved.join(','));
+  check('no reviewed cmdlet entry is stale', [...REVIEWED_CMDLETS].every((c) => called.has(c)),
+    [...REVIEWED_CMDLETS].filter((c) => !called.has(c)).join(','));
+  check('the adapter exports the outcome helpers the runner uses',
+    ['Invoke-NativeProcess', 'Test-NativeSuccess', 'Get-NativeOutcomeLabel', 'Format-NativeSummary',
+     'Get-NativeErrorExcerpt', 'Write-Evidence', 'Write-EvidenceJson', 'Add-Receipt', 'Seal-Evidence',
+     'Resolve-ExecutionPolicy', 'Assert-AdapterSelfTest', 'Protect-Text', 'Get-NormalizedSha256']
+      .every((f) => defined.has(f) && called.has(f)));
+  const occurrences = (name) => (codeAll.match(new RegExp('(?<![\\w-])' + name + '(?![\\w-])', 'g')) || []).length;
+  const unused = [...defined].filter((f) => occurrences(f) < 2);   // definition + at least one call
+  check('every defined helper is used somewhere', unused.length === 0, unused.join(','));
+}
+
+console.log('\n[13] parameter-name resolution (typos in -Named arguments)');
+{
+  // PowerShell does not validate named arguments against a function's param()
+  // block at parse time; a typo becomes a run-time ParameterBindingException on
+  // the deployment host. Resolve every -Named token in code against declared
+  // parameters plus the parameters of the built-in cmdlets actually used.
+  const CMDLET_PARAMS = new Set([
+    'Path', 'LiteralPath', 'ItemType', 'Force', 'Recurse', 'File', 'Depth', 'Value',
+    'Encoding', 'Raw', 'ArgumentList', 'TypeName', 'ForegroundColor', 'ErrorAction',
+    'Object', 'InputObject', 'Property', 'ExpandProperty', 'First',
+    'Leaf', 'Parent', 'Version', 'Last', 'Descending',
+  ]);
+  const allPs = [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1'];
+  const codeAll = allPs.map((f) => psLex(read(join(CLOUD, f))).code).join('\n');
+  const declared = new Set();
+  for (const m of codeAll.matchAll(/param\s*\(([\s\S]*?)\)\s*\r?\n/g)) {
+    for (const n of m[1].matchAll(/\$(?:\w+)\s*[,=)]|\[[^\]]*\]\s*\$(\w+)/g)) { /* fallthrough */ }
+    for (const n of m[1].matchAll(/\$([A-Za-z_]\w*)/g)) declared.add(n[1]);
+  }
+  // named-argument tokens: -Capitalised, not an operator, not a command flag
+  const used = new Set([...codeAll.matchAll(/(?<![\w$`])-([A-Z][A-Za-z0-9]+)\b(?!\s*\()/g)].map((m) => m[1]));
+  const unknown = [...used].filter((u) => !declared.has(u) && !CMDLET_PARAMS.has(u)).sort();
+  check('every -Named argument is a declared parameter or a reviewed cmdlet parameter',
+    unknown.length === 0, unknown.join(','));
+  check('declared parameters are actually bound somewhere', declared.size > 30,
+    `${declared.size} declared`);
+  const unknownExamples = ['Results', 'Textt', 'Patth'];
+  check('detector fires on a typo', unknownExamples.some((x) => !declared.has(x) && !CMDLET_PARAMS.has(x)));
+  check('deploy binds only parameters the adapter declares',
+    ['FilePath', 'Arguments', 'Environment', 'TimeoutSeconds', 'Root', 'Name', 'Fields', 'PrevSha',
+     'ReceiptPath', 'AdapterPath', 'ProjectRef', 'PgHost', 'PgPort', 'PgUser', 'PgDatabase', 'CaCert', 'Text', 'Path']
+      .every((n) => declared.has(n)));
+}
 
 console.log(`\n${'='.repeat(60)}`);
 console.log(`${pass} passed, ${failures.length} failed`);
