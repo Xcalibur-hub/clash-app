@@ -11,10 +11,10 @@
 import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { join, win32, posix, resolve as absolutise } from 'node:path';
+import { join, win32, posix, dirname, sep, resolve as absolutise } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { pathsFromModuleUrl, looksLikeDoubledDrive } from './paths.mjs';
+import { pathsFromModuleUrl, looksLikeDoubledDrive, pathArtefacts } from './paths.mjs';
 
 // Round 6: never derive a filesystem path from URL.pathname. On Windows that
 // produces '/C:/Users/.../' and path.join turns it into 'C:\\C:\\Users\\...'.
@@ -909,13 +909,24 @@ hdr(17, 'platform path handling - drive letters, spaces, POSIX (Round 6)');
   check('linux: root unchanged', lin.root === '/home/user/clash-app', lin.root);
 
   // --- and for real, on this machine, via an independent recomputation ------
-  const independentCloud = absolutise(posix.dirname(fileURLToPath(import.meta.url)), '..');
+  // Round 7: posix.dirname('C:\\Users\\...') returns '.', so on Windows this
+  // comparison silently became resolve('.', '..') and always failed. The live
+  // comparison must use the platform's own dirname.
+  const independentCloud = absolutise(dirname(fileURLToPath(import.meta.url)), '..');
   check('the live derivation matches the directories actually in use',
     CLOUD === independentCloud && ROOT === absolutise(CLOUD, '..', '..'), `${CLOUD} / ${ROOT}`);
   check('the live paths are usable',
     existsSync(join(CLOUD, 'manifest.json')) && existsSync(join(ROOT, 'supabase/migrations')));
-  check('the live derived paths carry no URL artefacts',
-    !CLOUD.includes('%') && !ROOT.includes('%') && !CLOUD.includes('\\'));
+  // Round 7: 'no backslash' is wrong on Windows, where backslash is the
+  // separator. The rule is now platform-explicit and stricter elsewhere: an
+  // absolute path, no URL artefacts, no foreign separator, no doubled drive.
+  check('the live derived paths are clean filesystem paths',
+    pathArtefacts(CLOUD).length === 0 && pathArtefacts(ROOT).length === 0,
+    [...pathArtefacts(CLOUD), ...pathArtefacts(ROOT)].join('; '));
+  check('the live derived paths use only this platform\'s separator',
+    !CLOUD.includes(sep === '\\' ? '/' : '\\') && !ROOT.includes(sep === '\\' ? '/' : '\\'));
+  check('the live derived paths are absolute',
+    absolutise(CLOUD) === CLOUD && absolutise(ROOT) === ROOT);
 
   // --- bootstrap failure cannot look like success ---------------------------
   let bootRejected = false;
@@ -944,6 +955,46 @@ hdr(17, 'platform path handling - drive letters, spaces, POSIX (Round 6)');
     check('a broken bootstrap prints no PASS lines', !/^  PASS  /m.test(child.stdout || ''));
   }
   finally { rmSync(brokenRoot, { recursive: true, force: true }); }
+
+  // --- strict validation, per platform --------------------------------------
+  const clean = (p, o) => pathArtefacts(p, o).length === 0;
+  check('accepts a Windows drive path containing spaces',
+    clean('C:\\Users\\91962\\Desktop\\clash cloud\\supabase\\cloud', { windows: true }));
+  check('accepts a UNC path',
+    clean('\\\\server\\share\\clash cloud\\supabase\\cloud', { windows: true }));
+  check('accepts POSIX paths, with and without spaces',
+    clean('/home/user/clash-app/supabase/cloud', { windows: false }) &&
+    clean('/Users/dev/clash app/supabase/cloud', { windows: false }));
+  check('rejects a doubled drive letter',
+    pathArtefacts('C:\\C:\\Users\\91962\\manifest.json', { windows: true })
+      .some((x) => /doubled drive/.test(x)));
+  check('rejects the legacy pathname output',
+    pathArtefacts(legacyJoined, { windows: true }).length > 0, legacyJoined);
+  check('rejects forward slashes in a Windows path',
+    pathArtefacts('C:/Users/91962/clash cloud/supabase/cloud', { windows: true })
+      .some((x) => /foreign separator/.test(x)));
+  check('rejects a backslash in a POSIX path',
+    pathArtefacts('/home/user/clash\\app', { windows: false }).some((x) => /foreign separator/.test(x)));
+  check('rejects a drive letter left on a POSIX path',
+    pathArtefacts('/C:/Users/91962/manifest.json', { windows: false }).length > 0);
+  check('rejects percent-encoding on both platforms',
+    pathArtefacts('C:\\Users\\clash%20cloud', { windows: true }).length > 0 &&
+    pathArtefacts('/home/clash%20app', { windows: false }).length > 0);
+  check('rejects relative paths on both platforms',
+    pathArtefacts('supabase/cloud', { windows: false }).length > 0 &&
+    pathArtefacts('..\\cloud', { windows: true }).length > 0);
+  check('the live derivation passes strict validation on this platform',
+    pathArtefacts(CLOUD).length === 0 && pathArtefacts(ROOT).length === 0, CLOUD);
+
+  // --- the two Round 7 test defects, pinned ---------------------------------
+  check('win32.dirname splits a drive path where posix.dirname cannot',
+    win32.dirname('C:\\Users\\91962\\clash cloud\\supabase\\cloud\\tests\\verify-package.mjs') ===
+      'C:\\Users\\91962\\clash cloud\\supabase\\cloud\\tests' &&
+    posix.dirname('C:\\Users\\91962\\clash cloud\\supabase\\cloud\\tests\\verify-package.mjs') === '.');
+  check('the live comparison no longer uses posix.dirname',
+    !/posix\.dirname\(/.test(jsCodeOnly(read(join(CLOUD, 'tests/verify-package.mjs')))));
+  check('the live path assertion no longer forbids backslashes outright',
+    !/CLOUD\.includes\('\\\\'\)/.test(jsCodeOnly(read(join(CLOUD, 'tests/verify-package.mjs')))));
 
   // --- static: no URL.pathname used for filesystem paths --------------------
   const jsFiles = ['tests/verify-package.mjs', 'tests/paths.mjs', 'tools/build-package.mjs'];

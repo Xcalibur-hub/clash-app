@@ -241,6 +241,22 @@ PASS summary.
 
 ---
 
+## D-9a - Path validation is platform-explicit (Round 7)
+
+Two assertions added in Round 6 passed on Linux and failed on Windows, because
+they applied POSIX rules to a Windows filesystem: `posix.dirname()` of a
+drive-letter path is `'.'`, and forbidding backslashes rejects every valid Windows
+path.
+
+`tests/paths.mjs` now exposes `pathArtefacts(path, { windows })`, which requires an
+absolute path in the platform's own form - drive letter or UNC on Windows,
+leading `/` on POSIX - and rejects percent-encoding, foreign separators, doubled
+drive letters and a drive letter left on a POSIX path. The live comparison uses the
+platform `dirname`. Both rules are asserted for both platforms from either
+platform, so the suite is not silently host-dependent again.
+
+---
+
 ## No other divergences
 
 | Pattern | Files | Executable? |

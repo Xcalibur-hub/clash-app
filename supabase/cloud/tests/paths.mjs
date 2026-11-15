@@ -53,3 +53,40 @@ export function pathsFromModuleUrl(moduleUrl, options = {}) {
 export function looksLikeDoubledDrive(p) {
   return /^[A-Za-z]:\\(?:[^\\]+\\)?[A-Za-z]:\\/.test(p) || /^\\[A-Za-z]:/.test(p);
 }
+
+/**
+ * Strict validation of a derived filesystem path, per platform.
+ *
+ * Round 7: the suite used to assert `!path.includes('\\\\')`, which is wrong on
+ * Windows where a backslash is the separator. It also compared a live Windows
+ * path against `posix.dirname(...)`, which returns '.' for a backslash path.
+ * Both rules now live here and are platform-explicit, so they can be tested for
+ * every platform from any machine - and neither is weakened: a Windows path must
+ * be absolute (drive or UNC), use backslashes only, and carry no URL artefacts.
+ *
+ * @param {string} p
+ * @param {{windows?: boolean}} [options]
+ * @returns {string[]} problems; empty means clean
+ */
+export function pathArtefacts(p, options = {}) {
+  const { windows = process.platform === 'win32' } = options;
+  const problems = [];
+
+  if (typeof p !== 'string' || p.trim() === '') return ['empty path'];
+  if (p.includes('\0')) problems.push('NUL byte');
+  if (p.includes('%')) problems.push('percent-encoded characters (URL artefact)');
+
+  if (windows) {
+    if (p.includes('/')) problems.push("foreign separator '/' on a Windows path");
+    if (looksLikeDoubledDrive(p)) problems.push('doubled drive letter');
+    const drive = /^[A-Za-z]:\\/.test(p);
+    const unc = /^\\\\[^\\/]+\\[^\\/]+/.test(p);
+    if (!drive && !unc) problems.push('not an absolute Windows path (drive or UNC)');
+  } else {
+    if (p.includes('\\')) problems.push("foreign separator '\\' on a POSIX path");
+    if (/^[A-Za-z]:/.test(p) || /^\/[A-Za-z]:/.test(p)) problems.push('drive letter on a POSIX path (URL artefact)');
+    if (!p.startsWith('/')) problems.push('not an absolute POSIX path');
+  }
+
+  return problems;
+}
