@@ -11,7 +11,7 @@
 import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { join, win32, posix, resolve as absolutise } from 'node:path';
+import { join, dirname, win32, posix, resolve as absolutise } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { pathsFromModuleUrl, looksLikeDoubledDrive } from './paths.mjs';
@@ -909,13 +909,35 @@ hdr(17, 'platform path handling - drive letters, spaces, POSIX (Round 6)');
   check('linux: root unchanged', lin.root === '/home/user/clash-app', lin.root);
 
   // --- and for real, on this machine, via an independent recomputation ------
-  const independentCloud = absolutise(posix.dirname(fileURLToPath(import.meta.url)), '..');
+  const independentCloud = absolutise(dirname(fileURLToPath(import.meta.url)), '..');
   check('the live derivation matches the directories actually in use',
     CLOUD === independentCloud && ROOT === absolutise(CLOUD, '..', '..'), `${CLOUD} / ${ROOT}`);
   check('the live paths are usable',
     existsSync(join(CLOUD, 'manifest.json')) && existsSync(join(ROOT, 'supabase/migrations')));
+  // Native separators are valid. Keep rejecting relative, noncanonical and
+  // URL-shaped paths instead of confusing Windows backslashes with URL debris.
+  const cleanPath = (p, platformPath) => typeof p === 'string' &&
+    platformPath.isAbsolute(p) && platformPath.normalize(p) === p &&
+    !looksLikeDoubledDrive(p) && !p.includes('%') && !p.includes('\0');
+  const nativePath = process.platform === 'win32' ? win32 : posix;
   check('the live derived paths carry no URL artefacts',
-    !CLOUD.includes('%') && !ROOT.includes('%') && !CLOUD.includes('\\'));
+    cleanPath(CLOUD, nativePath) && cleanPath(ROOT, nativePath));
+
+  check('regression: Windows dirname recognizes native backslashes',
+    win32.dirname(win.file) === win.tests && posix.dirname(win.file) !== win.tests);
+  check('regression: Windows drive and backslashes remain valid', cleanPath(win.cloud, win32));
+  check('regression: another Windows drive with spaces remains valid',
+    cleanPath('D:\\clash app\\supabase\\cloud', win32));
+  check('regression: POSIX absolute paths remain valid', cleanPath(lin.cloud, posix));
+  check('regression: POSIX spaces remain valid', cleanPath(mac.cloud, posix));
+  check('regression: doubled Windows drives are rejected', !cleanPath('C:\\C:\\clash', win32));
+  check('regression: slash-prefixed Windows drives are rejected', !cleanPath('\\C:\\clash', win32));
+  check('regression: drive-relative Windows paths are rejected', !cleanPath('C:clash', win32));
+  check('regression: undecoded Windows spaces are rejected', !cleanPath('C:\\clash%20app', win32));
+  check('regression: noncanonical Windows traversal is rejected', !cleanPath('C:\\clash\\..\\other', win32));
+  check('regression: relative POSIX paths are rejected', !cleanPath('clash/app', posix));
+  check('regression: undecoded POSIX spaces are rejected', !cleanPath('/home/clash%20app', posix));
+  check('regression: file URLs are rejected as filesystem paths', !cleanPath(winUrl, win32));
 
   // --- bootstrap failure cannot look like success ---------------------------
   let bootRejected = false;
