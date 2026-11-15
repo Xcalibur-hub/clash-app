@@ -1,0 +1,186 @@
+# ============================================================================
+# CLASH - Windows offline validation (Round 11)
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# Every round before this one was validated on Linux, where Windows PowerShell
+# 5.1 does not exist. `tests/verify-package.mjs` proves the package statically
+# (365 assertions, a real lexer, a structural lint) and that is worth having, but
+# it cannot execute the one runtime the package ships for. Round 10 shipped a
+# defect of exactly that shape: in `tools/test-native-capture.ps1` a membership
+# test was written as
+#
+#     ((@('06-complete.json') | Where-Object { $names -contains $_ }).Count -gt 0)
+#
+# When no receipt matches, the pipeline emits nothing, `.Count` binds to
+# [AutomationNull] and Set-StrictMode -Version 2.0 raises PropertyNotFoundStrict.
+# Case 28 is the first case whose receipts carry no COMPLETE, so the harness
+# aborted there on Windows PowerShell 5.1 (27/33 cases, EXCEPTION receipt) and
+# the adapter could never be certified. The offline suite could not see it: it
+# asserts the text of that file, never its behaviour on the target runtime.
+#
+# This workflow is the missing gate. It executes what the package actually does
+# on windows-2022 with powershell.exe (5.1, Desktop edition). `pwsh` is never
+# used, and the runtime assertion refuses to run anywhere else.
+#
+# OFFLINE AND CREDENTIAL-FREE BY CONSTRUCTION
+# -------------------------------------------
+#   * no deployment script is invoked. `deploy.ps1` and `check-ledger.ps1` are
+#     never referenced by any step in this file; only the self-test, the offline
+#     manifest proof and the offline test launcher run.
+#   * no database, no Supabase project, no network call after the checkout.
+#   * no secret is read, set or required; every receipt writer sanitises before
+#     encoding, and the credential guard step fails the job if a PG*/SUPABASE_*
+#     credential variable is ever added to the environment.
+#   * the only token the job may use is `contents: read`, and the checkout does
+#     not persist it. No environment, no deployment target, no write scope.
+#
+# FAIL-CLOSED
+# -----------
+# Each gate is its own step, so a non-zero exit stops every later gate. Nothing
+# here treats silence as success: the adapter gate asserts 33/33 executed cases
+# through the package's own validator, and the suite gate asserts 365 passed /
+# 0 failed / machine summary agreement, not merely "no output and exit 0".
+# ============================================================================
+name: Windows offline validation (PowerShell 5.1)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-offline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-offline-validation:
+    name: windows-2022 / powershell.exe 5.1 / offline
+    runs-on: windows-2022
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out this commit without persisting credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Guard - no credential may be present in this job
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $names = @('PGPASSWORD',
+          'PGPASSFILE', 'PGHOST', 'PGHOSTADDR', 'PGUSER', 'PGDATABASE', 'DATABASE_URL',
+          'SUPABASE_ACCESS_TOKEN', 'SUPABASE_DB_PASSWORD', 'SUPABASE_SERVICE_ROLE_KEY'); $found = @();
+          foreach ($n in $names) { $v = [Environment]::GetEnvironmentVariable($n); if (-not [string]::IsNullOrWhiteSpace($v)) { $found += $n } };
+          if ($found.Count -gt 0) { throw ('REFUSED: this job must run without credentials, but these are set: ' + ($found -join ', ')) };
+          Write-Host ('CREDENTIAL-FREE OK (checked ' + $names.Count + ' variable names)')"
+
+      - name: Assert the runtime is Windows PowerShell 5.1 (never pwsh)
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $v = $PSVersionTable;
+          if ($v.PSVersion.Major -ne 5 -or $v.PSVersion.Minor -ne 1 -or $v.PSEdition -ne 'Desktop') {
+          throw ('REFUSED: this workflow certifies Windows PowerShell 5.1; running ' + $v.PSVersion + ' ' + $v.PSEdition) };
+          Write-Host ('RUNTIME OK ' + $v.PSVersion + ' ' + $v.PSEdition)"
+
+      - name: Record the Node runtime (the suite is a native child, run through the adapter)
+        shell: cmd
+        run: node --version
+
+      - name: Parse every package script with the 5.1 parser (negative control included)
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop';
+          $files = @(Get-ChildItem -Path 'supabase/cloud/tools' -Recurse -Filter '*.ps1' -File);
+          if ($files.Count -ne 6) { throw ('expected 6 PowerShell files (5 tools + the adapter library), found ' + $files.Count) };
+          $bad = @(); foreach ($f in $files) { $tokens = $null; $errors = $null;
+          [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors);
+          if ($errors.Count -gt 0) { $bad += ($f.Name + ': ' + (($errors | ForEach-Object { $_.Message }) -join '; ')) } };
+          if ($bad.Count -gt 0) { throw ('parse errors: ' + ($bad -join ' | ')) };
+          $probeTokens = $null; $probeErrors = $null;
+          [void][System.Management.Automation.Language.Parser]::ParseInput('function Broken { if (', [ref]$probeTokens, [ref]$probeErrors);
+          if ($probeErrors.Count -eq 0) { throw 'the parse gate cannot detect broken syntax, so a clean result means nothing' };
+          Write-Host ('PARSE OK ' + $files.Count + ' files; negative control reported ' + $probeErrors.Count + ' error(s)')"
+
+      - name: Native adapter self-test - 33 cases on this runtime
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -File supabase/cloud/tools/test-native-capture.ps1
+          -OutFile supabase/cloud/evidence-adapter/ci-adapter-selftest.json
+
+      - name: Verify the adapter receipt with the package's own gate (PASS, 33/33, adapter 4.3.0)
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $lib = 'supabase/cloud/tools/lib/clash-native.ps1';
+          $receipt = 'supabase/cloud/evidence-adapter/ci-adapter-selftest.json'; . $lib;
+          $identity = Get-ClashAdapterIdentity;
+          if ([string]$identity.version -ne '4.3.0') { throw ('REFUSED: adapter version is ' + $identity.version + ', expected 4.3.0') };
+          if ([string]$identity.id -ne 'clash-native-adapter') { throw ('REFUSED: adapter id is ' + $identity.id) };
+          $r = Assert-AdapterSelfTest -ReceiptPath $receipt -AdapterPath $lib;
+          if ([int]$r.casesExecuted -ne 33) { throw ('REFUSED: the receipt records ' + $r.casesExecuted + ' executed case(s), 33 are required') };
+          if ([string]$r.powerShell -notmatch '^5\.1\.') { throw ('REFUSED: the receipt was produced on ' + $r.powerShell) };
+          Write-Host ('ADAPTER RECEIPT OK cases=' + $r.casesExecuted + '/33 powerShell=' + $r.powerShell + ' receiptSha256=' + $r.receiptSha256)"
+
+      - name: Offline manifest verification (111 originals, wrappers, checksums, git clean)
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -File supabase/cloud/tools/check-manifest.ps1
+
+      - name: Offline Node package suite through the adapter (365 assertions)
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -File supabase/cloud/tools/run-tests.ps1
+
+      - name: Verify the manifest receipt (status PASS, 111 entries)
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop';
+          $receipts = @(Get-ChildItem -Path 'supabase/cloud/evidence' -Filter '*-manifest-check.json' -File);
+          if ($receipts.Count -ne 1) { throw ('expected exactly 1 manifest-check receipt, found ' + $receipts.Count) };
+          $d = [System.IO.File]::ReadAllText($receipts[0].FullName) | ConvertFrom-Json;
+          if ([string]$d.status -ne 'PASS') { throw ('REFUSED: manifest receipt status is ' + $d.status + ' :: ' + (@($d.problems) -join ' | ')) };
+          if ([int]$d.entries -ne 111) { throw ('REFUSED: manifest receipt records ' + $d.entries + ' entries, 111 are required') };
+          if ([int]$d.checksumFiles -lt 200) { throw ('REFUSED: only ' + $d.checksumFiles + ' checksum files verified') };
+          if (@($d.problems).Count -ne 0) { throw ('REFUSED: manifest receipt lists problems: ' + (@($d.problems) -join ' | ')) };
+          Write-Host ('MANIFEST RECEIPT OK entries=' + $d.entries + ' checksumFiles=' + $d.checksumFiles)"
+
+      - name: Verify the suite receipt (365/365, machine summary agreed, adapter 4.3.0)
+        shell: cmd
+        run: >-
+          "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
+          -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop';
+          $receipts = @(Get-ChildItem -Path 'supabase/cloud/evidence' -Filter '*-test-run.json' -File);
+          if ($receipts.Count -ne 1) { throw ('expected exactly 1 test-run receipt, found ' + $receipts.Count) };
+          $d = [System.IO.File]::ReadAllText($receipts[0].FullName) | ConvertFrom-Json;
+          if ([string]$d.status -ne 'PASS') { throw ('REFUSED: suite receipt status is ' + $d.status) };
+          if ([int]$d.passLines -ne 365) { throw ('REFUSED: ' + $d.passLines + ' assertion(s) passed, 365 are required') };
+          if ([int]$d.failLines -ne 0) { throw ('REFUSED: ' + $d.failLines + ' assertion(s) failed') };
+          if ([int]$d.assertionsExecuted -ne 365) { throw ('REFUSED: ' + $d.assertionsExecuted + ' assertion(s) executed, 365 are required') };
+          if (-not $d.machineReadable) { throw 'REFUSED: the suite summary line did not agree with its own PASS/FAIL counts' };
+          if ([string]$d.adapter.version -ne '4.3.0') { throw ('REFUSED: the suite ran on adapter ' + $d.adapter.version) };
+          if ([string]$d.outcome -ne 'SUCCEEDED') { throw ('REFUSED: native outcome was ' + $d.outcome) };
+          Write-Host ('SUITE RECEIPT OK 365/365 failures=0 machineReadable=' + $d.machineReadable + ' adapter=' + $d.adapter.version)"
+
+      - name: Upload diagnostic evidence (no secrets are produced or uploaded)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-windows-offline-evidence
+          path: |
+            supabase/cloud/evidence/*.json
+            supabase/cloud/evidence-adapter/*.json
+          if-no-files-found: warn
+          retention-days: 14

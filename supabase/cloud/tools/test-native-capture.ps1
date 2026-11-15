@@ -927,7 +927,18 @@ function Test-ClaimReleaseOutcome {
       }
     }
   }
-  $completeInReceipts = ((@('06-complete.json') | Where-Object { $names -contains $_ }).Count -gt 0)
+  # Round 11 (R10-C1): this was
+  #   ((@('06-complete.json') | Where-Object { $names -contains $_ }).Count -gt 0)
+  # When COMPLETE is absent from the receipts the pipeline emits NOTHING, so the
+  # result is [AutomationNull] and .Count is not a property of it. Off (or on
+  # PowerShell 7, by its scalar shim) that reads as 0; under Set-StrictMode 2.0 on
+  # Windows PowerShell 5.1 it raises PropertyNotFoundStrict and the trap ends the
+  # whole run. Case 28 - zero rows, the FIRST case whose receipts carry no
+  # COMPLETE - could therefore never be reached on the only runtime this harness
+  # certifies: a run that died at 27/33 cases. -contains answers the same question
+  # from the collection itself, returns a real boolean, and cannot see an empty
+  # pipeline. No unwrapped pipeline result in this package may be counted.
+  $completeInReceipts = ($names -contains '06-complete.json')
   if ($completeInReceipts -ne [bool]$Probe.reachedComplete) {
     $problems += 'reachedComplete disagrees with the receipts that were written'
   }
