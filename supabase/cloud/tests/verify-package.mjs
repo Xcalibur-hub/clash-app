@@ -173,7 +173,7 @@ const strictCode = Object.keys(strict).map((k) => k + '\n' + codeOf(strict[k])).
 // the self-test contains one deliberate negative control: the legacy construct.
 // It is scanned separately, and the control must really be present.
 const NEG_START = '# ---- NEGATIVE CONTROL';
-const NEG_END = '# ---------------------------------------------------------------- verdict ---';
+const NEG_END = '# verdict: inventory first';
 const negAt = selfTest.indexOf(NEG_START);
 const negEndAt = selfTest.indexOf(NEG_END);
 check('self-test isolates the legacy pattern in one documented control block', negAt > 0 && negEndAt > negAt);
@@ -187,13 +187,18 @@ check('no connection-string parameter', !/\[string\]\$DbUrl|-DbUrl/.test(allText
 check('credentials come from env (PGPASSWORD/PGPASSFILE)', /PGPASSFILE/.test(strictText) && /PGPASSWORD/.test(strictText));
 
 // F2: the critical failure was PowerShell interpreting the child process
-check('no native invocation through the PowerShell engine (& $Psql)',
-  !/&\s*\$/.test(strictCode) && !/&\s*\$/.test(selfTestCode));
+// Native invocations are '& $exe'. '& $scriptblock' is a PowerShell language
+// construct and appears legitimately in the harness integrity cases.
+const NATIVE_CALL = /&\s*\$(cmdexe|Psql|psqlPath|nodePath|gitPath|exe)\b/;
+check('no native invocation through the PowerShell engine (& $exe)',
+  !NATIVE_CALL.test(strictCode) && !NATIVE_CALL.test(selfTestCode) &&
+  (selfTestMain.match(/&\s*\$cmdexe\b/g) || []).length === 0);
 check('no redirection operators on native calls in production scripts',
   !/\d>\s*\$/.test(strictCode) && !/\d>&\d/.test(strictCode) && !/\d>\s*\$/.test(selfTestCode));
 check('no $LASTEXITCODE reliance in production scripts', !/\$LASTEXITCODE/.test(strictCode + selfTestCode));
 check('the negative control really is the legacy construct',
-  /&\s*\$cmdexe/.test(selfTestNegCode) && /2>\s*\$/.test(selfTestNegCode) && /\$LASTEXITCODE/.test(selfTestNegCode));
+  (selfTestNeg.match(/&\s*\$cmdexe\b/g) || []).length === 1 &&
+  /2>\s*\$/.test(selfTestNegCode) && /\$LASTEXITCODE/.test(selfTestNegCode));
 check('adapter starts children without a shell', /UseShellExecute\s*=\s*\$false/.test(lib));
 check('adapter redirects stdout and stderr separately',
   /RedirectStandardOutput\s*=\s*\$true/.test(lib) && /RedirectStandardError\s*=\s*\$true/.test(lib));
@@ -270,7 +275,10 @@ check('projectRef is mandatory and 20-char validated', /\[Parameter\(Mandatory =
 
 // Round 2: adapter must be certified on the runtime before use
 check('deploy refuses without an adapter self-test receipt', /-AdapterSelfTestReceipt/.test(deploy) && /Assert-AdapterSelfTest/.test(deploy));
-check('self-test receipt is bound to the adapter hash', /adapterSha256 -ne \$expect/.test(lib));
+check('self-test receipt is bound to the adapter hash', /\$receiptSha -ne \$AdapterSha256/.test(lib));
+check('receipt validation is a single shared implementation',
+  /function Test-SelfTestReceipt/.test(lib) && /Test-SelfTestReceipt -Document/.test(lib) &&
+  (selfTest.match(/Test-SelfTestReceipt -Document/g) || []).length >= 1);
 check('self-test receipt must be PowerShell 5.1', /\^5\\\.1\\\./.test(lib));
 for (const c of ['zeroExitWithStderr', 'nonZeroExit', 'silentSuccess', 'stderrIsDataNotFailure']) {
   check(`self-test case defined: ${c}`, selfTest.includes(`'${c}'`));
@@ -597,6 +605,109 @@ console.log('\n[14] package-test invocation contract (Round 3 item 5)');
     /passLines -gt 0 -and \$countsAgree/.test(launcherSrc));
 }
 
+console.log('\n[15] self-test integrity - a dropped or crashed case cannot pass (Round 4)');
+{
+  const code = (src) => psLex(src).code;
+
+  // --- the root cause: hashtable splatting binds KEYS as parameter names ------
+  const SPLAT = /@[A-Za-z_][A-Za-z0-9_]*/;   // '@name' - '@(' '@{' '@"' are not splatting
+  const allCodes = [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1']
+    .map((f) => code(read(join(CLOUD, f)))).join('\n');
+  check('no hashtable splatting anywhere in code', !SPLAT.test(allCodes));
+  check('the detector fires on the exact Round 4 construct',
+    SPLAT.test('Add-Case \'x\' $true @legacyDetail') &&
+    !SPLAT.test('Add-Case \'x\' $true $legacyDetail') &&
+    !SPLAT.test('$a = @(1,2); $b = @{k=1}'));
+  check('the legacy detail is passed explicitly, twice',
+    (selfTest.match(/Add-Case 'legacyPattern\w+' [^\n]*-Detail \$legacyDetail/g) || []).length === 2 &&
+    !SPLAT.test(code(selfTest)));
+
+  // --- strict error policy + trap -------------------------------------------
+  check('the harness is strict, not Continue',
+    /^\$ErrorActionPreference = 'Stop'/m.test(selfTest) &&
+    !/^\$ErrorActionPreference = 'Continue'/m.test(selfTest));
+  check('a script-scope trap writes a receipt and exits nonzero',
+    /^trap \{/m.test(code(selfTest)) &&
+    /verdict\s*=\s*'EXCEPTION'/.test(selfTest) && /exit 1/.test(selfTest));
+  check('the trap receipt is written through the fallback writer',
+    /Write-EvidenceOrFallback/.test(selfTest));
+
+  // --- inventory: one list, three consumers ---------------------------------
+  const libListMatch = lib.match(/\$script:ClashSelfTestRequiredCases = @\(([\s\S]*?)\n\)/);
+  check('the shared inventory is declared in the adapter', Boolean(libListMatch));
+  const required = libListMatch ? [...libListMatch[1].matchAll(/'([A-Za-z][A-Za-z0-9]+)'/g)].map((m) => m[1]) : [];
+  check('inventory is non-trivial and unique', required.length >= 15 && new Set(required).size === required.length,
+    `${required.length} names`);
+  const addCaseCalls = [...selfTest.matchAll(/^Add-Case '([A-Za-z][A-Za-z0-9]+)'/gm)].map((m) => m[1]);
+  check('the harness records exactly the inventory', addCaseCalls.length === required.length,
+    `${addCaseCalls.length} calls vs ${required.length} names`);
+  check('every inventory case is implemented in the harness',
+    required.every((n) => addCaseCalls.includes(n)),
+    required.filter((n) => !addCaseCalls.includes(n)).join(','));
+  check('the harness checks the executed count', /casesExecuted\s*-ne\s*\$requiredCases\.Count|-ne \$requiredCases\.Count/.test(selfTest));
+  check('the receipt records both counts', /casesExecuted\s*=/.test(selfTest) && /casesExpected\s*=/.test(selfTest));
+  check('Add-Case rejects duplicates and unknown names',
+    /was recorded twice/.test(selfTest) && /is not in the shared inventory/.test(selfTest));
+
+  // --- the receipt is re-validated with the gate's own function -------------
+  check('the receipt is validated before it is written',
+    selfTest.indexOf('$selfCheck = Test-SelfTestReceipt') > 0 &&
+    selfTest.indexOf('$selfCheck = Test-SelfTestReceipt') < selfTest.indexOf('$sha = Write-EvidenceJson'));
+  check('a rejected run cannot leave a PASS receipt on disk',
+    /receipt rejected by the gate validator/.test(selfTest) &&
+    /\$doc = New-SelfTestDocument -Verdict \$verdictValue/.test(selfTest) &&
+    selfTest.indexOf("$verdictValue = 'FAIL'\n  $doc = New-SelfTestDocument") > 0);
+  check('what landed on disk must match the run',
+    /receiptConsistent/.test(selfTest) && /does not match the run/.test(selfTest));
+  check('both consumers validate the receipt',
+    /Assert-AdapterSelfTest/.test(deploy) && /Assert-AdapterSelfTest/.test(ledger));
+
+  // --- the validator's rules, exercised on synthetic receipts ---------------
+  const adapterVersion = (lib.match(/\$script:ClashAdapterVersion = '([^']+)'/) || [])[1];
+  const SHA = 'a'.repeat(64);
+  const goodCases = Object.fromEntries(required.map((n) => [n, { passed: true }]));
+  const base = () => ({
+    adapterId: 'clash-native-adapter', adapterVersion, adapterSha256: SHA,
+    powerShellVersion: '5.1.26100.9818', verdict: 'PASS',
+    casesExecuted: required.length, cases: JSON.parse(JSON.stringify(goodCases)), problems: [],
+  });
+  const validate = (doc, sha = SHA) => {
+    const problems = [];
+    if (doc.adapterId !== 'clash-native-adapter') problems.push('adapterId');
+    if (doc.adapterVersion !== adapterVersion) problems.push('adapterVersion');
+    if (doc.adapterSha256 !== sha) problems.push('adapterSha256');
+    if (!/^5\.1\./.test(String(doc.powerShellVersion))) problems.push('powerShellVersion');
+    if (doc.verdict !== 'PASS') problems.push('verdict');
+    if ((doc.problems || []).length > 0) problems.push('problems');
+    const names = Object.keys(doc.cases || {});
+    if (names.length === 0) problems.push('no cases');
+    for (const n of required) if (!names.includes(n)) problems.push('missing:' + n);
+    for (const n of names) if (!required.includes(n)) problems.push('unexpected:' + n);
+    for (const n of required) if (doc.cases && doc.cases[n] && doc.cases[n].passed !== true) problems.push('notpassed:' + n);
+    if (names.length !== required.length) problems.push('caseCount');
+    if (doc.casesExecuted !== required.length) problems.push('casesExecuted');
+    if (doc.casesExecuted !== names.length) problems.push('executedVsRecorded');
+    return problems;
+  };
+  check('validator accepts a faithful receipt', validate(base()).length === 0, validate(base()).join(','));
+  const tamper = {
+    'verdict not PASS': (d) => { d.verdict = 'FAIL'; },
+    'missing case': (d) => { delete d.cases[required[0]]; },
+    'failed case': (d) => { d.cases[required[1]].passed = false; },
+    'count disagrees': (d) => { d.casesExecuted = 3; },
+    'count missing': (d) => { delete d.casesExecuted; },
+    'problems recorded': (d) => { d.problems = ['boom']; },
+    'wrong adapter sha': (d) => { d.adapterSha256 = '0'.repeat(64); },
+    'wrong adapter version': (d) => { d.adapterVersion = '0.0.0'; },
+    'no cases at all': (d) => { d.cases = null; },
+    'extra invented case': (d) => { d.cases.inventedCase = { passed: true }; },
+    'wrong PowerShell': (d) => { d.powerShellVersion = '7.4.0'; },
+  };
+  for (const [name, mutate] of Object.entries(tamper)) {
+    const d = base(); mutate(d);
+    check(`validator rejects: ${name}`, validate(d).length > 0);
+  }
+}
 console.log(`\n${'='.repeat(60)}`);
 console.log(`${pass} passed, ${failures.length} failed`);
 // machine-readable contract for tools/run-tests.ps1: a launcher must not have to

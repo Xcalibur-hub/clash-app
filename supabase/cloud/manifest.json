@@ -2,7 +2,7 @@
   "project_ref": "kgaqejgubjemdecifzew",
   "source_commit": "9569391e0950956682c522d2d118bc8a711169d2",
   "builder": "tools/build-package.mjs",
-  "built_at_utc": "2026-11-15T10:01:53.560Z",
+  "built_at_utc": "2026-11-15T10:14:02.077Z",
   "total": 111,
   "ledger_column_shape": [
     "version",

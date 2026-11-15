@@ -1,34 +1,44 @@
 #Requires -Version 5.1
 <#
   test-native-capture.ps1 - certify the native adapter on THIS machine, and
-  reproduce the Round 2/3 failure as an executed regression test.
+  reproduce the Round 2/3/4 failures as executed regression tests.
 
-  Round 3 requirement: "Add Windows PowerShell 5.1 regression tests for the
-  actual NativeCommandError failure, not merely static checks."
+  ROUND 4 DEFECT (fixed here)
+  ---------------------------
+  The previous version passed a hashtable by splatting it:
 
-  So the legacy construct is not quoted in a comment and it is not informational.
-  It is run, inside try/catch, under the exact policy that broke the old runner:
+      Add-Case 'legacyPatternLosesExitCode' (...) @legacyDetail      # wrong
+      Add-Case 'legacyPatternLosesExitCode' (...) $legacyDetail      # right
 
-      $ErrorActionPreference = 'Stop'
-      $out = & $cmd /c '...writes to stderr...' 2>$errFile
-      $code = $LASTEXITCODE
+  Splatting binds dictionary KEYS as parameter names, so -Detail was never bound,
+  $Detail stayed $null, and @($Detail.Keys) raised PropertyNotFoundStrict under
+  Set-StrictMode 2.0. Because that line ran under $ErrorActionPreference =
+  'Continue', the error was non-terminating: the case was never recorded, no
+  problem was raised, the verdict stayed PASS and the script exited 0.
 
-  and three things are asserted as hard cases:
+  So this harness is now built so that a dropped, crashed or skipped case cannot
+  reach a PASS verdict:
 
-    legacyPatternRaisesNativeCommandError  the defect reproduces on this runtime
-    legacyPatternLosesExitCode             the exit code is not captured (the harm)
-    adapterSurvivesSameChild               the adapter, same child, is immune
+    * $ErrorActionPreference = 'Stop' at the top, and a script-scope trap that
+      writes an EXCEPTION receipt and exits 1 for anything unexpected
+    * Add-Case refuses a null/invalid detail, a duplicate name, or a name that is
+      not in the shared inventory; each becomes a recorded problem
+    * the executed case count is compared with the shared inventory before the
+      verdict, and the receipt records both numbers
+    * the receipt is re-read from disk after writing and re-validated with
+      Test-SelfTestReceipt - the same function deploy.ps1 uses
+    * four cases exist purely to prove the above: an unexpected exception, a
+      dropped case, a null detail, and a tampered receipt
 
-  plus differentialProven (legacy threw AND adapter did not, same child).
-
-  deploy.ps1 and check-ledger.ps1 refuse to run without a PASS receipt from this
-  script, bound to the adapter's sha256.
+  It also executes the Round 2/3 NativeCommandError regression: the legacy
+  construct under 'Stop' is asserted to raise, to lose the exit code, and to be
+  survived by the adapter for the same child.
 
   Usage:
     .\test-native-capture.ps1
     .\test-native-capture.ps1 -OutFile C:\tmp\adapter-selftest.json
 
-  Exit codes: 0 PASS, 1 FAIL, 2 refused (wrong runtime / prerequisites).
+  Exit codes: 0 PASS, 1 FAIL or EXCEPTION, 2 refused (wrong runtime / prerequisite).
 #>
 [CmdletBinding()]
 param(
@@ -36,60 +46,157 @@ param(
 )
 
 Set-StrictMode -Version 2.0
-# Top level stays at 'Continue': the adapter must work without 'Stop'. Each case
-# sets exactly the policy it is testing and restores the previous one.
-$ErrorActionPreference = 'Continue'
+# Strict on purpose: an unexpected error must abort the run, not skip a case.
+$ErrorActionPreference = 'Stop'
 
-$adapterPath = Join-Path (Join-Path $PSScriptRoot 'lib') 'clash-native.ps1'
+$pluginRoot  = $PSScriptRoot
+$adapterPath = Join-Path (Join-Path $pluginRoot 'lib') 'clash-native.ps1'
+
+$script:cases           = [ordered]@{}
+$script:problems        = @()
+$script:receiptWritten  = $false
+$script:outFileFinal    = ''
+$script:adapterShaFinal = ''
+$script:psVersionFinal  = $PSVersionTable.PSVersion.ToString()
+
+trap {
+  $message = 'unexpected exception'
+  try { $message = Protect-Text $_.Exception.Message } catch { }
+  Write-Host ("SELF-TEST EXCEPTION: {0}" -f $message) -ForegroundColor Red
+  try {
+    if (-not $script:receiptWritten) {
+      $payload = [ordered]@{
+        verdict            = 'EXCEPTION'
+        utc                = (Get-Date).ToUniversalTime().ToString('o')
+        powerShellVersion  = $script:psVersionFinal
+        adapterSha256      = $script:adapterShaFinal
+        casesExecuted      = @($script:cases.Keys).Count
+        cases              = $script:cases
+        problems           = @(('unexpected exception: ' + $message), 'no PASS may be inferred from this receipt')
+        exception          = $message
+      }
+      $target = $script:outFileFinal
+      if ([string]::IsNullOrWhiteSpace($target)) {
+        $target = Join-Path $pluginRoot ('..\evidence-adapter\{0}-EXCEPTION.json' -f (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ'))
+      }
+      if (Test-Path -LiteralPath $target) { $target = ($target -replace '\.json$', '') + '.exception.json' }
+      [void](Write-EvidenceOrFallback -Path $target -Label 'adapter-selftest-exception.json' -Text ($payload | ConvertTo-Json -Depth 8))
+    }
+  }
+  catch { }
+  Write-Host 'SELF-TEST FAILED: exit 1. This run must not be used as an adapter receipt.' -ForegroundColor Red
+  exit 1
+}
+
 if (-not (Test-Path -LiteralPath $adapterPath)) {
   Write-Host "REFUSED: adapter not found at $adapterPath" -ForegroundColor Red
   exit 2
 }
 . $adapterPath
 
-$psv = $PSVersionTable.PSVersion.ToString()
-if ($psv -notmatch '^5\.1\.') {
-  Write-Host ("REFUSED: this self-test certifies PowerShell 5.1; running '{0}'." -f $psv) -ForegroundColor Red
+if ($script:psVersionFinal -notmatch '^5\.1\.') {
+  Write-Host ("REFUSED: this self-test certifies PowerShell 5.1; running '{0}'." -f $script:psVersionFinal) -ForegroundColor Red
   exit 2
 }
 $cmdexe = Join-Path $env:SystemRoot 'System32\cmd.exe'
 if (-not (Test-Path -LiteralPath $cmdexe)) {
-  Write-Host "REFUSED: cmd.exe not found; cannot run harmless stderr-producing children." -ForegroundColor Red
+  Write-Host 'REFUSED: cmd.exe not found; cannot run harmless stderr-producing children.' -ForegroundColor Red
   exit 2
 }
 
-$adapterSha = Get-NormalizedSha256 -Path $adapterPath
-$stamp      = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
+$script:adapterShaFinal = Get-NormalizedSha256 -Path $adapterPath
+$stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
 if ([string]::IsNullOrWhiteSpace($OutFile)) {
-  $OutFile = Join-Path $PSScriptRoot ("..\evidence-adapter\{0}-adapter-selftest.json" -f $stamp)
+  $OutFile = Join-Path $pluginRoot ("..\evidence-adapter\{0}-adapter-selftest.json" -f $stamp)
 }
 if (Test-Path -LiteralPath $OutFile) {
   Write-Host "REFUSED: $OutFile already exists. Receipts are never overwritten." -ForegroundColor Red
   exit 2
 }
+$script:outFileFinal = $OutFile
 
-$cases = [ordered]@{}
-$problems = @()
+$requiredCases = @(Get-ClashSelfTestInventory)
+
+# --------------------------------------------------------------- harness ----
+function New-CaseRecord {
+  param([string]$Name, [bool]$Passed, $Detail = $null)
+  $record = [ordered]@{ name = $Name; passed = $Passed }
+  if ($null -ne $Detail -and $Detail -is [hashtable]) {
+    foreach ($k in @($Detail.Keys)) { $record[$k] = $Detail[$k] }
+  }
+  elseif ($null -ne $Detail) {
+    # never crash on a bad detail: record what arrived and let the caller fail
+    $record['detailType'] = $Detail.GetType().FullName
+  }
+  return $record
+}
 
 function Add-Case {
-  param([string]$Name, [bool]$Passed, [hashtable]$Detail)
-  $obj = [ordered]@{ passed = $Passed }
-  foreach ($k in @($Detail.Keys)) { $obj[$k] = $Detail[$k] }
-  $script:cases[$Name] = $obj
+  param([string]$Name, [bool]$Passed, $Detail = $null)
+
+  $effective = $Passed
+  if ([string]::IsNullOrWhiteSpace($Name)) {
+    $script:problems += 'a case was recorded without a name'
+    $Name = '<unnamed>'
+    $effective = $false
+  }
+  if ($script:cases.Contains($Name)) {
+    $script:problems += ("case '{0}' was recorded twice" -f $Name)
+    $effective = $false
+  }
+  if ($requiredCases -notcontains $Name) {
+    $script:problems += ("case '{0}' is not in the shared inventory" -f $Name)
+    $effective = $false
+  }
+  if (-not $effective) { $script:problems += ("case '{0}' did not pass" -f $Name) }
+
+  $record = New-CaseRecord -Name $Name -Passed $effective -Detail $Detail
+  $script:cases[$Name] = $record
+
   $colour = 'Green'
-  if (-not $Passed) { $colour = 'Red'; $script:problems += $Name }
-  $label = 'PASS'
-  if (-not $Passed) { $label = 'FAIL' }
+  $label  = 'PASS'
+  if (-not $effective) { $colour = 'Red'; $label = 'FAIL' }
   Write-Host ("  {0}  {1}" -f $label, $Name) -ForegroundColor $colour
 }
 
+function Invoke-IsolatedCase {
+  param([string]$Name, [scriptblock]$Body)
+  try {
+    & $Body | Out-Null
+    return [ordered]@{ name = $Name; passed = $true; threw = $false; message = '' }
+  }
+  catch {
+    $message = 'unknown'
+    try { $message = Protect-Text $_.Exception.Message } catch { }
+    return [ordered]@{ name = $Name; passed = $false; threw = $true; message = $message }
+  }
+}
+
+function Test-CaseInventory {
+  param($Cases, [string[]]$Expected)
+  $problems = @()
+  $names = @(Get-CaseNames -Cases $Cases)
+  $missing = @($Expected | Where-Object { $names -notcontains $_ })
+  if ($missing.Count -gt 0) { $problems += ('missing: ' + ($missing -join ',')) }
+  if ($names.Count -ne $Expected.Count) { $problems += ('count {0} != expected {1}' -f $names.Count, $Expected.Count) }
+  foreach ($n in $Expected) {
+    $entry = Get-CaseEntry -Cases $Cases -Name $n
+    if ($null -eq $entry) { continue }
+    if ((Get-DocumentProperty -Object $entry -Name 'passed' -Default $null) -ne $true) {
+      $problems += ('not passed: ' + $n)
+    }
+  }
+  return [ordered]@{ ok = ($problems.Count -eq 0); problems = $problems }
+}
+
 Write-Host ''
-Write-Host "Adapter self-test on PowerShell $psv" -ForegroundColor Cyan
-Write-Host "adapter sha256 = $adapterSha"
+Write-Host ("Adapter self-test on PowerShell {0}" -f $script:psVersionFinal) -ForegroundColor Cyan
+Write-Host ("adapter sha256 = {0}" -f $script:adapterShaFinal)
+Write-Host ("inventory      = {0} cases" -f $requiredCases.Count)
 Write-Host ''
 
 # ---- 1: exit 0, but the child writes to stderr ------------------------------
-$ErrorActionPreference = 'Stop'          # the policy that broke the old runner
+$r = $null
 try {
   $r = Invoke-NativeProcess -FilePath $cmdexe `
         -Arguments @('/c', 'echo stdout-line & echo stderr-line 1>&2 & exit /b 0') `
@@ -100,18 +207,17 @@ catch {
   $threw = $true
   $r = $null
 }
-$ErrorActionPreference = 'Continue'
-Add-Case 'zeroExitWithStderr' (-not $threw -and (Test-NativeSuccess $r) -and
+Add-Case 'zeroExitWithStderr' (-not $threw -and $null -ne $r -and (Test-NativeSuccess $r) -and
     $r.stdOut -match 'stdout-line' -and $r.stdErr -match 'stderr-line') @{
-  threwUnderStop   = $threw
-  exitCode         = $(if ($null -eq $r) { $null } else { $r.exitCode })
-  stdoutHasLine    = $(if ($null -eq $r) { $false } else { [bool]($r.stdOut -match 'stdout-line') })
-  stderrHasLine    = $(if ($null -eq $r) { $false } else { [bool]($r.stdErr -match 'stderr-line') })
-  note             = 'stderr text must not turn exit 0 into a failure'
+  threwUnderStop = $threw
+  exitCode       = $(if ($null -eq $r) { $null } else { $r.exitCode })
+  stdoutHasLine  = $(if ($null -eq $r) { $false } else { [bool]($r.stdOut -match 'stdout-line') })
+  stderrHasLine  = $(if ($null -eq $r) { $false } else { [bool]($r.stdErr -match 'stderr-line') })
+  note           = 'stderr text must not turn exit 0 into a failure'
 }
 
 # ---- 2: nonzero exit -------------------------------------------------------
-$ErrorActionPreference = 'Stop'
+$r2 = $null
 try {
   $r2 = Invoke-NativeProcess -FilePath $cmdexe `
           -Arguments @('/c', 'echo pre-failure 1>&2 & exit /b 17') `
@@ -122,7 +228,6 @@ catch {
   $threw2 = $true
   $r2 = $null
 }
-$ErrorActionPreference = 'Continue'
 Add-Case 'nonZeroExit' (-not $threw2 -and $null -ne $r2 -and $r2.exitCode -eq 17) @{
   threwUnderStop = $threw2
   exitCode       = $(if ($null -eq $r2) { $null } else { $r2.exitCode })
@@ -139,7 +244,6 @@ Add-Case 'silentSuccess' ((Test-NativeSuccess $r3) -and $r3.stdErr.Length -eq 0 
 }
 
 # ---- 4: stderr is data, not a failure signal -------------------------------
-# A NOTICE-like warning on stderr with exit 0 must classify as SUCCEEDED.
 $r4 = Invoke-NativeProcess -FilePath $cmdexe `
         -Arguments @('/c', 'echo NOTICE:  relation already exists, skipping 1>&2 & exit /b 0') `
         -TimeoutSeconds 30
@@ -188,19 +292,18 @@ Add-Case 'sanitiserRedacts' ($clean -notmatch 'hunter2' -and $clean -match '\[RE
 # ---- 9: evidence writer refuses to overwrite ------------------------------
 $tmpDir = Join-Path $env:TEMP ('clash-evidence-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
-$first  = Write-Evidence -Path (Join-Path $tmpDir 'x.txt') -Text 'one'
-$second = $false
+$first = Write-Evidence -Path (Join-Path $tmpDir 'x.txt') -Text 'one'
+$secondRejected = $false
 try { Write-Evidence -Path (Join-Path $tmpDir 'x.txt') -Text 'two' | Out-Null }
-catch { $second = $true }
+catch { $secondRejected = $true }
 $kept = [System.IO.File]::ReadAllText((Join-Path $tmpDir 'x.txt'))
-Add-Case 'evidenceNeverOverwrites' $second -and ($kept -eq 'one') -and ($first.Length -eq 64) @{
-  secondWriteRejected = $second
+Add-Case 'evidenceNeverOverwrites' ($secondRejected -and ($kept -eq 'one') -and ($first.Length -eq 64)) @{
+  secondWriteRejected = $secondRejected
   contentPreserved    = ($kept -eq 'one')
 }
 Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
 
 # ---- 10: a receipt is still produced when the intended path is unwritable ---
-# Round 3 F7: "guarantee terminal failure/UNKNOWN receipts where possible".
 $badName = 'clash-bad-' + [guid]::NewGuid().ToString('N') + ':invalid'
 $badPath = Join-Path $env:TEMP ($badName + '\receipt.json')
 $fallback = Write-EvidenceOrFallback -Path $badPath -Text '{"status":"UNKNOWN"}' -Label 'selftest-fallback.json'
@@ -221,15 +324,15 @@ Add-Case 'receiptFallsBackWhenPathUnwritable' ($fallback.ok -and $fallback.fallb
 # 11-14: REGRESSION - the actual NativeCommandError failure, executed
 # ===========================================================================
 # ---- NEGATIVE CONTROL: the construct that failed in Round 2/3 -------------
-# This block is the *code under test*, not commentary: it is executed, its
-# behaviour is asserted, and it is the only place in this package where a
-# native command is invoked through the PowerShell engine.
-$legacyThrew      = $false
-$legacyOut        = $null      # assigned in the try; StrictMode 2.0 forbids a later reference otherwise
-$legacyCode       = 'unset'
-$legacyStderrLen  = -1
-$legacyStdoutLen  = -1
-$legacyErrFile    = Join-Path $env:TEMP ('clash-legacy-' + [guid]::NewGuid().ToString('N') + '.err')
+# This block is the code under test, not commentary: it is executed, its behaviour
+# is asserted, and it is the only place in this package where a native command is
+# invoked through the PowerShell engine.
+$legacyThrew     = $false
+$legacyOut       = $null      # assigned in the try; StrictMode 2.0 forbids a later reference otherwise
+$legacyCode      = 'unset'
+$legacyStderrLen = -1
+$legacyStdoutLen = -1
+$legacyErrFile   = Join-Path $env:TEMP ('clash-legacy-' + [guid]::NewGuid().ToString('N') + '.err')
 
 $previousPolicy = $ErrorActionPreference
 $ErrorActionPreference = 'Stop'
@@ -247,6 +350,7 @@ if (Test-Path -LiteralPath $legacyErrFile) {
   Remove-Item -LiteralPath $legacyErrFile -Force -ErrorAction SilentlyContinue
 }
 if ($null -eq $legacyOut) { $legacyStdoutLen = 0 } else { $legacyStdoutLen = (@($legacyOut) -join "`n").Length }
+
 $legacyDetail = @{
   policyUnderTest  = 'Stop'
   threw            = $legacyThrew
@@ -255,12 +359,15 @@ $legacyDetail = @{
   stderrFileChars  = $legacyStderrLen
   stdoutChars      = $legacyStdoutLen
 }
-Add-Case 'legacyPatternRaisesNativeCommandError' $legacyThrew $legacyDetail
+# Round 4: this was written as @legacyDetail (splatting), which bound the
+# dictionary keys as parameter names, left -Detail unbound, and dropped the case.
+Add-Case 'legacyPatternRaisesNativeCommandError' $legacyThrew -Detail $legacyDetail
 
 # The harm: with the exception raised before the capture, the exit code is gone.
-Add-Case 'legacyPatternLosesExitCode' ($legacyThrew -and ([string]$legacyCode -ne '5')) @legacyDetail
+Add-Case 'legacyPatternLosesExitCode' ($legacyThrew -and ([string]$legacyCode -ne '5')) -Detail $legacyDetail
 
 # ---- the fix: the adapter, same child, same policy ------------------------
+$fixed = $null
 $ErrorActionPreference = 'Stop'
 try {
   $fixed = Invoke-NativeProcess -FilePath $cmdexe `
@@ -284,42 +391,183 @@ Add-Case 'adapterSurvivesSameChild' (-not $fixedThrew -and $null -ne $fixed -and
 }
 
 Add-Case 'differentialProven' ($legacyThrew -and -not $fixedThrew) @{
-  legacyThrew          = $legacyThrew
-  adapterThrew         = $fixedThrew
-  sameChildExpression  = 'echo legacy-stderr 1>&2 & echo legacy-stdout & exit /b 5'
-  note                 = 'the defect reproduced and the adapter avoided it on the same runtime'
+  legacyThrew         = $legacyThrew
+  adapterThrew        = $fixedThrew
+  sameChildExpression = 'echo legacy-stderr 1>&2 & echo legacy-stdout & exit /b 5'
+  note                = 'the defect reproduced and the adapter avoided it on the same runtime'
 }
 
-# ---------------------------------------------------------------- verdict ---
-$verdict = 'PASS'
-if ($problems.Count -gt 0) { $verdict = 'FAIL' }
-$doc = [ordered]@{
-  verdict             = $verdict
-  utc                 = (Get-Date).ToUniversalTime().ToString('o')
-  host                = $env:COMPUTERNAME
-  powerShellVersion   = $psv
-  powerShellEdition   = $PSVersionTable.PSEdition
-  adapterId           = $script:ClashAdapterId
-  adapterVersion      = $script:ClashAdapterVersion
-  adapterSha256       = $adapterSha
-  adapterPath         = (Resolve-Path -LiteralPath $adapterPath).Path
-  casesExecuted       = $cases.Count
-  cases               = $cases
-  problems            = @($problems)
-  regressionSubject   = 'NativeCommandError interrupts exit-code capture under $ErrorActionPreference=Stop'
+# ===========================================================================
+# 15-18: HARNESS INTEGRITY - a dropped or crashed case cannot look like a pass
+# ===========================================================================
+# ---- 15: an unexpected exception is recorded as a failure ------------------
+$probeThrows    = Invoke-IsolatedCase -Name 'deliberate-throw' -Body { throw 'deliberate failure for the harness integrity test' }
+$probeSucceeds  = Invoke-IsolatedCase -Name 'deliberate-pass' -Body { $null = 1 }
+Add-Case 'unexpectedExceptionCannotPass' ($probeThrows.threw -eq $true -and $probeThrows.passed -eq $false -and
+    $probeSucceeds.threw -eq $false -and $probeSucceeds.passed -eq $true) @{
+  throwingCaseRecordedAsFailed = $probeThrows.passed
+  throwingCaseReportedThrew    = $probeThrows.threw
+  controlCasePassed            = $probeSucceeds.passed
+  message                      = $probeThrows.message
+}
+
+# ---- 16: the inventory check notices a missing case ------------------------
+$completeInventory = [ordered]@{}
+foreach ($n in $requiredCases) { $completeInventory[$n] = [ordered]@{ passed = $true } }
+$goodInventory = Test-CaseInventory -Cases $completeInventory -Expected $requiredCases
+$dropped = [ordered]@{}
+foreach ($n in $requiredCases) { if ($n -ne 'zeroExitWithStderr') { $dropped[$n] = [ordered]@{ passed = $true } } }
+$droppedInventory = Test-CaseInventory -Cases $dropped -Expected $requiredCases
+$failedInventory = [ordered]@{}
+foreach ($n in $requiredCases) { $failedInventory[$n] = [ordered]@{ passed = ($n -ne 'nonZeroExit') } }
+$oneFailed = Test-CaseInventory -Cases $failedInventory -Expected $requiredCases
+Add-Case 'droppedCaseFailsInventory' ($goodInventory.ok -eq $true -and
+    $droppedInventory.ok -eq $false -and $droppedInventory.problems.Count -gt 0 -and
+    $oneFailed.ok -eq $false) @{
+  completeInventoryAccepted = $goodInventory.ok
+  droppedCaseRejected      = $droppedInventory.ok -eq $false
+  droppedProblems          = @($droppedInventory.problems)
+  failedCaseRejected       = $oneFailed.ok -eq $false
+}
+
+# ---- 17: a null or malformed detail is recorded, not crashed --------------
+$nullDetailRecorded = $false
+$nullDetailPassed   = $null
+try {
+  $record = New-CaseRecord -Name 'null-detail-probe' -Passed $true -Detail $null
+  $nullDetailPassed = (Get-DocumentProperty -Object $record -Name 'passed' -Default $false)
+  $nullDetailRecorded = ($record.name -eq 'null-detail-probe')
+}
+catch { $nullDetailRecorded = $false }
+$stringDetailHandled = $false
+try {
+  $record2 = New-CaseRecord -Name 'string-detail-probe' -Passed $true -Detail 'not-a-hashtable'
+  $stringDetailHandled = ($record2.detailType -eq 'System.String')
+}
+catch { $stringDetailHandled = $false }
+Add-Case 'nullDetailIsRecordedNotCrashed' ($nullDetailRecorded -and $nullDetailPassed -eq $true -and $stringDetailHandled) @{
+  nullDetailRecorded      = $nullDetailRecorded
+  nullDetailPassed        = $nullDetailPassed
+  stringDetailClassified  = $stringDetailHandled
+  note                    = 'Round 4 root cause: an unbound -Detail reached $Detail.Keys'
+}
+
+# ---- 18: the gate validator rejects tampered receipts ---------------------
+$snapshot = [ordered]@{
+  adapterId         = $script:ClashAdapterId
+  adapterVersion    = $script:ClashAdapterVersion
+  adapterSha256     = $script:adapterShaFinal
+  powerShellVersion = $script:psVersionFinal
+  verdict           = 'PASS'
+  casesExecuted     = $requiredCases.Count
+  problems          = @()
+  cases             = $completeInventory
+}
+$roundTrip = ($snapshot | ConvertTo-Json -Depth 8) | ConvertFrom-Json
+$accepted = Test-SelfTestReceipt -Document $roundTrip -AdapterSha256 $script:adapterShaFinal
+
+$tamperResults = [ordered]@{}
+$tampered = [ordered]@{
+  'verdict-not-pass'      = { param($d) $d.verdict = 'FAIL'; $d }
+  'missing-case'          = { param($d) $d.cases.PSObject.Properties.Remove('zeroExitWithStderr'); $d }
+  'failed-case'           = { param($d) $d.cases.silentSuccess.passed = $false; $d }
+  'count-disagrees'       = { param($d) $d.casesExecuted = 3; $d }
+  'count-missing'         = { param($d) $d.PSObject.Properties.Remove('casesExecuted'); $d }
+  'problems-not-empty'    = { param($d) $d.problems = @('something went wrong'); $d }
+  'wrong-adapter-sha'     = { param($d) $d.adapterSha256 = ('0' * 64); $d }
+  'wrong-adapter-version' = { param($d) $d.adapterVersion = '0.0.0'; $d }
+  'no-cases'              = { param($d) $d.cases = $null; $d }
+}
+foreach ($key in @($tampered.Keys)) {
+  $copy = ($snapshot | ConvertTo-Json -Depth 8) | ConvertFrom-Json
+  $copy = & $tampered[$key] $copy
+  $verdict = Test-SelfTestReceipt -Document $copy -AdapterSha256 $script:adapterShaFinal
+  $tamperResults[$key] = ($verdict.ok -eq $false)
+}
+$allTamperedRejected = $true
+foreach ($k in @($tamperResults.Keys)) { if (-not $tamperResults[$k]) { $allTamperedRejected = $false } }
+Add-Case 'validatorRejectsTamperedReceipt' ($accepted.ok -eq $true -and $allTamperedRejected -and @($tamperResults.Keys).Count -ge 9) @{
+  untamperedAccepted = $accepted.ok
+  tamperedRejected   = $allTamperedRejected
+  detail             = $tamperResults
+  acceptedProblems   = @($accepted.problems)
+}
+
+# ===========================================================================
+# verdict: inventory first, then the receipt, then the file on disk
+# ===========================================================================
+$inventory = Test-CaseInventory -Cases $script:cases -Expected $requiredCases
+if (-not $inventory.ok) {
+  foreach ($p in @($inventory.problems)) { $script:problems += ('inventory: ' + $p) }
+}
+$executedCount = @($script:cases.Keys).Count
+if ($executedCount -ne $requiredCases.Count) {
+  $script:problems += ('executed {0} case(s), the inventory requires {1}' -f $executedCount, $requiredCases.Count)
+}
+
+$verdictValue = 'PASS'
+if ($script:problems.Count -gt 0) { $verdictValue = 'FAIL' }
+
+# Validate the receipt BEFORE it exists. A PASS receipt must never be written for
+# a run the gate would reject, otherwise a rejected run still leaves an accepted
+# artefact on disk for deploy.ps1 to pick up.
+function New-SelfTestDocument {
+  param([string]$Verdict)
+  return [ordered]@{
+    verdict                 = $Verdict
+    utc                     = (Get-Date).ToUniversalTime().ToString('o')
+    host                    = $env:COMPUTERNAME
+    powerShellVersion       = $script:psVersionFinal
+    powerShellEdition       = $PSVersionTable.PSEdition
+    adapterId               = $script:ClashAdapterId
+    adapterVersion          = $script:ClashAdapterVersion
+    adapterSha256           = $script:adapterShaFinal
+    adapterPath             = (Resolve-Path -LiteralPath $adapterPath).Path
+    casesExecuted           = @($script:cases.Keys).Count
+    casesExpected           = $requiredCases.Count
+    cases                   = $script:cases
+    problems                = @($script:problems)
+    regressionSubject       = 'NativeCommandError interrupts exit-code capture under $ErrorActionPreference=Stop'
+    harnessIntegritySubject = 'a dropped, crashed or unrecorded case cannot reach a PASS verdict'
+  }
+}
+
+$doc = New-SelfTestDocument -Verdict $verdictValue
+$roundTripDoc = ($doc | ConvertTo-Json -Depth 8) | ConvertFrom-Json
+$selfCheck = Test-SelfTestReceipt -Document $roundTripDoc -AdapterSha256 $script:adapterShaFinal
+if (-not $selfCheck.ok) {
+  foreach ($p in @($selfCheck.problems)) { $script:problems += ('receipt rejected by the gate validator: ' + $p) }
+  $verdictValue = 'FAIL'
+  $doc = New-SelfTestDocument -Verdict $verdictValue
 }
 
 $dir = Split-Path -Parent $OutFile
 if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 $sha = Write-EvidenceJson -Path $OutFile -Object $doc
+$script:receiptWritten = $true
+
+# Confirm what landed on disk is what was validated: a truncated or altered write
+# must not survive as a usable receipt.
+$onDiskRaw = [System.IO.File]::ReadAllText($OutFile)
+$onDisk = $onDiskRaw | ConvertFrom-Json
+$postWrite = Test-SelfTestReceipt -Document $onDisk -AdapterSha256 $script:adapterShaFinal
+$receiptConsistent = ($postWrite.ok -eq ($verdictValue -eq 'PASS')) -and
+                     ([string](Get-DocumentProperty -Object $onDisk -Name 'verdict' -Default '') -eq $verdictValue) -and
+                     ([int](Get-DocumentProperty -Object $onDisk -Name 'casesExecuted' -Default 0) -eq @($script:cases.Keys).Count)
+if (-not $receiptConsistent) {
+  Write-Host 'SELF-TEST FAILED: the receipt on disk does not match the run. Exit 1.' -ForegroundColor Red
+  Write-Host ("disk verdict='{0}' expected='{1}' validatorOk={2}" -f (Get-DocumentProperty -Object $onDisk -Name 'verdict' -Default '?'), $verdictValue, $postWrite.ok) -ForegroundColor Red
+  exit 1
+}
 
 Write-Host ''
-Write-Host ("VERDICT {0} ({1} cases executed)" -f $verdict, $cases.Count) -ForegroundColor $(if ($verdict -eq 'PASS') { 'Green' } else { 'Red' })
+Write-Host ("VERDICT {0} ({1}/{2} cases executed)" -f $verdictValue, $executedCount, $requiredCases.Count) -ForegroundColor $(if ($verdictValue -eq 'PASS') { 'Green' } else { 'Red' })
 Write-Host ("Receipt : {0}" -f (Resolve-Path -LiteralPath $OutFile).Path)
 Write-Host ("sha256  : {0}" -f $sha)
 Write-Host ("NativeCommandError regression: legacy threw={0}, adapter threw={1}, legacy exit code={2}" -f $legacyThrew, $fixedThrew, [string]$legacyCode)
-if ($verdict -ne 'PASS') {
-  Write-Host ("Problems: {0}" -f ($problems -join ', ')) -ForegroundColor Red
+
+if ($verdictValue -ne 'PASS') {
+  Write-Host ("Problems: {0}" -f (@($script:problems) -join ' | ')) -ForegroundColor Red
   Write-Host 'Do not deploy: the adapter is not proven on this runtime.' -ForegroundColor Red
   exit 1
 }

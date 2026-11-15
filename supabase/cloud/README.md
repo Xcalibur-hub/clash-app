@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill. The runner proceeds only when the ledger is a **proven prefix** of the manifest — same versions *and* same stored hashes; any gap, mismatch or extra row is a hard stop |
-| **F9** no tests | none | `tests/verify-package.mjs`: **184 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **214 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 238 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 184 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 214 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -73,6 +73,36 @@ happened". `tools/run-tests.ps1` requires the suite's own machine-readable
 `CLASH-TEST-SUMMARY {passed,failed,total}` line to agree with the PASS/FAIL lines
 it actually printed - a truncated run cannot be read as a pass.
 
+### 1d. Round 4 (audit of `a88cc26`) - self-test integrity
+
+The report found `tools/test-native-capture.ps1:261` passing a hashtable by
+splatting (`@legacyDetail`). Splatting binds **keys** as parameter names, so
+`-Detail` stayed unbound, `$Detail.Keys` raised `PropertyNotFoundStrict` under
+`Set-StrictMode 2.0`, and because that line ran under
+`$ErrorActionPreference = 'Continue'` the case was silently dropped while the
+verdict stayed PASS.
+
+The line is fixed (`-Detail $legacyDetail`), and the whole class is closed:
+
+| Control | Effect |
+|---|---|
+| `-Detail $legacyDetail` explicitly, twice | the Round 4 construct is gone; a detector forbids any `@name` splatting in the package |
+| `$ErrorActionPreference = 'Stop'` at the top | an unexpected error can no longer skip a case and continue |
+| script-scope `trap` | writes an `EXCEPTION` receipt through the fallback writer and exits 1 |
+| shared inventory (`$script:ClashSelfTestRequiredCases`, 18 cases) | harness, receipt and gate agree on one list |
+| `Add-Case` guards | rejects a null/invalid detail, a duplicate name, or a name outside the inventory; each is a recorded problem |
+| executed-count check | `casesExecuted` must equal the inventory **before** the verdict |
+| validate-then-write | the receipt is validated *before* it is written, so a rejected run cannot leave a PASS artefact for `deploy.ps1` to accept |
+| on-disk re-check | the file is re-read and must match the run |
+| four integrity cases | deliberate exception, dropped case, null detail, tampered receipt - each proven not to produce PASS |
+
+`Assert-AdapterSelfTest` now delegates to `Test-SelfTestReceipt`, one shared
+implementation used by `deploy.ps1`, `check-ledger.ps1` **and** the harness. It
+rejects a receipt that is failed, incomplete (missing case, wrong `casesExecuted`,
+count disagreement), contradictory (FAIL verdict, non-empty `problems`) or bound
+to another adapter. The adapter version moved to `4.0.0`, so every receipt issued
+before this correction is rejected by version.
+
 Still unproven, and stated as such: the four scripts have **never run**, the SQL
 gates have **never run against the hosted database**, and the ledger/CLI
 interoperability is **documented, not executed**.
@@ -97,7 +127,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, proof-based resume
-tests/verify-package.mjs       offline test suite (184 assertions)
+tests/verify-package.mjs       offline test suite (214 assertions)
 checksums.sha256               238 files: originals + every package file
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)
@@ -202,7 +232,7 @@ Stop, record, do not retry, do not repair, do not "make it pass":
 | S9 | Package integrity failure (digest drift, missing file, dirty `supabase/migrations`) |
 | S10 | Anyone proposes `migration repair --status reverted 20260927030000`, deleting the ledger, or `db push` before `check-ledger.ps1` reports 111/111 |
 | S11 | A step would edit `supabase/migrations/`, disable triggers, bypass RLS, set `session_replication_role` or change ownership |
-| S12 | No adapter self-test receipt, or one bound to a different adapter hash / PowerShell version / non-PASS verdict, or one missing the executed `NativeCommandError` regression cases |
+| S12 | No adapter self-test receipt, or one that fails validation: failed verdict, non-empty problems, missing/incomplete/duplicated cases, `casesExecuted` disagreement, different adapter hash or version, non-PowerShell-5.1, or missing the executed `NativeCommandError` regression cases |
 | S13 | A wrapper's digest on disk differs from the manifest at execution time |
 | S14 | Connection policy violated (host not belonging to the project, wrong port/user for the mode, `PGSSLMODE` forced, CA certificate missing, `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` set) |
 

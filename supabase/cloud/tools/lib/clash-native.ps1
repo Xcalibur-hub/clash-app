@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '3.0.0'
+$script:ClashAdapterVersion = '4.0.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -463,10 +463,158 @@ function Resolve-ExecutionPolicy {
   }
 }
 
+# ------------------------------------------------------ self-test inventory ---
+# The complete set of cases tools/test-native-capture.ps1 must execute. The
+# harness checks that it ran exactly these, and the gate checks that the receipt
+# records exactly these. A dropped case can therefore never look like a pass.
+$script:ClashSelfTestRequiredCases = @(
+  'zeroExitWithStderr',
+  'nonZeroExit',
+  'silentSuccess',
+  'stderrIsDataNotFailure',
+  'launchFailureIsUnknown',
+  'timeoutIsUnknown',
+  'refusesCredentialArguments',
+  'sanitiserRedacts',
+  'evidenceNeverOverwrites',
+  'receiptFallsBackWhenPathUnwritable',
+  'legacyPatternRaisesNativeCommandError',
+  'legacyPatternLosesExitCode',
+  'adapterSurvivesSameChild',
+  'differentialProven',
+  'unexpectedExceptionCannotPass',
+  'droppedCaseFailsInventory',
+  'nullDetailIsRecordedNotCrashed',
+  'validatorRejectsTamperedReceipt'
+)
+
+function Get-ClashSelfTestInventory {
+  return ,@($script:ClashSelfTestRequiredCases)
+}
+
+# StrictMode 2.0 turns a missing property into a terminating error, and a
+# receipt is untrusted input, so every read goes through this.
+function Get-DocumentProperty {
+  param($Object, [string]$Name, $Default = $null)
+  if ($null -eq $Object) { return $Default }
+  if ($Object -is [System.Collections.IDictionary]) {
+    if ($Object.Contains($Name)) { return $Object[$Name] }
+    return $Default
+  }
+  $p = $Object.PSObject.Properties[$Name]
+  if ($null -eq $p) { return $Default }
+  return $p.Value
+}
+
+function Get-CaseNames {
+  param($Cases)
+  if ($null -eq $Cases) { return @() }
+  if ($Cases -is [System.Collections.IDictionary]) { return @($Cases.Keys) }
+  return @($Cases.PSObject.Properties | ForEach-Object { $_.Name })
+}
+
+function Get-CaseEntry {
+  param($Cases, [string]$Name)
+  if ($null -eq $Cases) { return $null }
+  if ($Cases -is [System.Collections.IDictionary]) {
+    if ($Cases.Contains($Name)) { return $Cases[$Name] }
+    return $null
+  }
+  $p = $Cases.PSObject.Properties[$Name]
+  if ($null -eq $p) { return $null }
+  return $p.Value
+}
+
 # ------------------------------------------------------ adapter self-test ---
 # The adapter's own runtime behaviour cannot be proven by static analysis; it is
 # proven by tools/test-native-capture.ps1 on the declared runtime, whose receipt
 # is bound to this file's hash. deploy.ps1 refuses without a matching receipt.
+# Validates a self-test receipt against the inventory and the adapter identity.
+# Returns every problem it finds: the caller decides whether to throw. Used both
+# by the gate (deploy.ps1, check-ledger.ps1) and, in memory, by the harness, so
+# the acceptance rule has exactly one implementation.
+function Test-SelfTestReceipt {
+  param(
+    $Document,
+    [Parameter(Mandatory = $true)][string]$AdapterSha256
+  )
+  $problems = @()
+  $required = @($script:ClashSelfTestRequiredCases)
+
+  if ($null -eq $Document) {
+    return [ordered]@{ ok = $false; problems = @('receipt is empty') }
+  }
+
+  $adapterId  = [string](Get-DocumentProperty -Object $Document -Name 'adapterId' -Default '')
+  $adapterVer = [string](Get-DocumentProperty -Object $Document -Name 'adapterVersion' -Default '')
+  $receiptSha = [string](Get-DocumentProperty -Object $Document -Name 'adapterSha256' -Default '')
+  $verdict    = [string](Get-DocumentProperty -Object $Document -Name 'verdict' -Default '')
+  $psv        = [string](Get-DocumentProperty -Object $Document -Name 'powerShellVersion' -Default '')
+  $problemsRaw = Get-DocumentProperty -Object $Document -Name 'problems' -Default @()
+  $executed   = Get-DocumentProperty -Object $Document -Name 'casesExecuted' -Default $null
+  $cases      = Get-DocumentProperty -Object $Document -Name 'cases' -Default $null
+
+  if ($adapterId -ne $script:ClashAdapterId) {
+    $problems += ("adapterId '{0}' is not '{1}'" -f $adapterId, $script:ClashAdapterId)
+  }
+  if ($adapterVer -ne $script:ClashAdapterVersion) {
+    $problems += ("adapterVersion '{0}' is not '{1}'" -f $adapterVer, $script:ClashAdapterVersion)
+  }
+  if ($receiptSha -ne $AdapterSha256) {
+    $problems += ('receipt is bound to adapter sha256 {0}, this adapter is {1}' -f $receiptSha, $AdapterSha256)
+  }
+  if ($psv -notmatch '^5\.1\.') {
+    $problems += ("receipt was produced on PowerShell '{0}'; the declared runtime is 5.1" -f $psv)
+  }
+  if ($verdict -ne 'PASS') {
+    $problems += ("verdict is '{0}', not PASS" -f $verdict)
+  }
+  $problemsList = @()
+  if ($null -ne $problemsRaw) { $problemsList = @($problemsRaw | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) }
+  if ($problemsList.Count -gt 0) {
+    $problems += ('receipt lists {0} problem(s): {1}' -f $problemsList.Count, ($problemsList -join '; '))
+  }
+
+  $names = @(Get-CaseNames -Cases $cases)
+  if ($names.Count -eq 0) {
+    $problems += 'receipt records no cases'
+  }
+  else {
+    $missing = @($required | Where-Object { $names -notcontains $_ })
+    if ($missing.Count -gt 0) {
+      $problems += ('receipt is missing {0} case(s): {1}' -f $missing.Count, ($missing -join ', '))
+    }
+    $unexpected = @($names | Where-Object { $required -notcontains $_ })
+    if ($unexpected.Count -gt 0) {
+      $problems += ('receipt records case(s) outside the inventory: {0}' -f ($unexpected -join ', '))
+    }
+    foreach ($name in $required) {
+      $entry = Get-CaseEntry -Cases $cases -Name $name
+      if ($null -eq $entry) { continue }
+      $passed = Get-DocumentProperty -Object $entry -Name 'passed' -Default $null
+      if ($passed -ne $true) { $problems += ("case '{0}' is not recorded as passed" -f $name) }
+    }
+    if ($names.Count -ne $required.Count) {
+      $problems += ('receipt records {0} case(s), the inventory requires {1}' -f $names.Count, $required.Count)
+    }
+  }
+
+  $executedInt = -1
+  if ($null -eq $executed -or -not [int]::TryParse([string]$executed, [ref]$executedInt)) {
+    $problems += 'receipt does not state how many cases were executed'
+  }
+  else {
+    if ($executedInt -ne $required.Count) {
+      $problems += ('receipt states {0} case(s) executed, the inventory requires {1}' -f $executedInt, $required.Count)
+    }
+    if ($executedInt -ne $names.Count) {
+      $problems += ('receipt states {0} case(s) executed but records {1}' -f $executedInt, $names.Count)
+    }
+  }
+
+  return [ordered]@{ ok = ($problems.Count -eq 0); problems = $problems }
+}
+
 function Assert-AdapterSelfTest {
   param(
     [Parameter(Mandatory = $true)][string]$ReceiptPath,
@@ -476,36 +624,21 @@ function Assert-AdapterSelfTest {
     throw ("Adapter self-test receipt not found: {0}. Run tools\test-native-capture.ps1 first." -f $ReceiptPath)
   }
   $raw = [System.IO.File]::ReadAllText($ReceiptPath)
-  $doc = $raw | ConvertFrom-Json
-  $expect = Get-NormalizedSha256 -Path $AdapterPath
+  try { $doc = $raw | ConvertFrom-Json }
+  catch { throw ("Adapter self-test receipt is not valid JSON: {0}" -f $ReceiptPath) }
 
-  if ($doc.adapterSha256 -ne $expect) {
-    throw ("Adapter self-test receipt is bound to adapter sha256 {0} but this adapter is {1}. Re-run the self-test." -f $doc.adapterSha256, $expect)
-  }
-  if ([string]$doc.adapterVersion -ne "$($script:ClashAdapterVersion)") {
-    throw ("Adapter self-test receipt is for adapter version '{0}', this is '{1}'." -f $doc.adapterVersion, $script:ClashAdapterVersion)
-  }
-  $psv = [string]$doc.powerShellVersion
-  if ($psv -notmatch '^5\.1\.') {
-    throw ("Adapter self-test ran on PowerShell '{0}'; the declared runtime is 5.1." -f $psv)
-  }
-  if ($doc.verdict -ne 'PASS') { throw ("Adapter self-test verdict is '{0}', not PASS." -f $doc.verdict) }
-  if (-not $doc.PSObject.Properties['cases'] -or $null -eq $doc.cases) {
-    throw 'Adapter self-test receipt carries no cases.'
-  }
-  foreach ($case in @('zeroExitWithStderr', 'nonZeroExit', 'silentSuccess', 'stderrIsDataNotFailure',
-                     'legacyPatternRaisesNativeCommandError', 'legacyPatternLosesExitCode',
-                     'adapterSurvivesSameChild', 'differentialProven',
-                     'receiptFallsBackWhenPathUnwritable')) {
-    if (-not $doc.cases.PSObject.Properties[$case]) { throw ("Adapter self-test receipt is missing case '{0}'." -f $case) }
-    if ($doc.cases.$case.passed -ne $true) { throw ("Adapter self-test case '{0}' did not pass." -f $case) }
+  $expect = Get-NormalizedSha256 -Path $AdapterPath
+  $verdict = Test-SelfTestReceipt -Document $doc -AdapterSha256 $expect
+  if (-not $verdict.ok) {
+    throw ('Adapter self-test receipt rejected: ' + (@($verdict.problems) -join ' | '))
   }
   return [ordered]@{
     receiptPath    = (Resolve-Path -LiteralPath $ReceiptPath).Path
     receiptSha256  = Get-NormalizedSha256 -Path $ReceiptPath
     adapterSha256  = $expect
-    powerShell     = $psv
-    ranUtc         = [string]$doc.utc
+    powerShell     = [string](Get-DocumentProperty -Object $doc -Name 'powerShellVersion' -Default '')
+    casesExecuted  = [int](Get-DocumentProperty -Object $doc -Name 'casesExecuted' -Default 0)
+    ranUtc         = [string](Get-DocumentProperty -Object $doc -Name 'utc' -Default '')
   }
 }
 

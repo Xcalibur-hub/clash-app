@@ -187,6 +187,27 @@ path that was actually used.
 
 ---
 
+## D-7 - A self-test case can no longer be lost (Round 4)
+
+`Add-Case 'legacyPatternLosesExitCode' (...) @legacyDetail` splatted a hashtable,
+so `-Detail` was never bound, `$Detail.Keys` raised `PropertyNotFoundStrict` under
+strict mode 2.0, and - because the statement ran under
+`$ErrorActionPreference = 'Continue'` - the case vanished while the verdict
+remained PASS and the script exited 0. Fourteen PASS lines, one of them missing,
+and no failure.
+
+The harness now treats a lost case as a failure by construction: strict mode
+policy, a trap that emits an EXCEPTION receipt and exits 1, a shared 18-case
+inventory that both the harness and the receipt validator enforce, an
+executed-count comparison before the verdict, guards in `Add-Case` for null
+detail / duplicate / unknown names, validation of the receipt before it is
+written, and a post-write re-read that must agree with the run.
+
+The receipt contract changed, so the adapter version is now `4.0.0`: receipts
+produced by earlier versions are rejected rather than reinterpreted.
+
+---
+
 ## No other divergences
 
 | Pattern | Files | Executable? |
