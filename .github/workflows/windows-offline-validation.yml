@@ -241,7 +241,13 @@ jobs:
           if (-not (Test-Path -LiteralPath $adapter)) { $lines += 'error|adapter receipt: absent (the self-test did not reach a verdict)' }
           else { $d = [System.IO.File]::ReadAllText($adapter) | ConvertFrom-Json; $level = 'error';
           if ([string]$d.verdict -eq 'PASS') { $level = 'notice' };
-          $problems = (@($d.problems) -join ' | '); $lines += ($level + '|adapter receipt verdict=' + $d.verdict + ' cases=' + $d.casesExecuted + '/' + $d.casesExpected + ' ps=' + $d.powerShellVersion + ' problems=' + $problems) };
+          $problems = (@($d.problems) -join ' | '); $lines += ($level + '|adapter receipt verdict=' + $d.verdict + ' cases=' + $d.casesExecuted + '/' + $d.casesExpected + ' ps=' + $d.powerShellVersion + ' problems=' + $problems);
+          if ([string]$d.verdict -ne 'PASS' -and $null -ne $d.cases) {
+          foreach ($entry in @($d.cases.PSObject.Properties)) {
+          $c = $entry.Value; if ($null -eq $c) { continue }; if ([bool]$c.passed) { continue };
+          $json = ''; try { $json = ($c | ConvertTo-Json -Depth 4 -Compress) } catch { $json = 'unserialisable detail' };
+          if ($json.Length -gt 900) { $json = $json.Substring(0, 900) };
+          $lines += ('warning|failed case ' + [string]$entry.Name + ' ' + $json) } } };
           foreach ($f in @(Get-ChildItem -Path 'supabase/cloud/evidence' -Filter '*-test-run.json' -File -ErrorAction SilentlyContinue)) {
           $d = [System.IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json; $level = 'error'; if ([string]$d.status -eq 'PASS') { $level = 'notice' };
           $excerpt = [string]$d.stderrExcerpt; if ($excerpt.Length -gt 300) { $excerpt = $excerpt.Substring(0, 300) };

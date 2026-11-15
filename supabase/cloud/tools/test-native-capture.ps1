@@ -1399,6 +1399,31 @@ function Test-VerificationGateOutcome {
   return [ordered]@{ ok = ($problems.Count -eq 0); problems = $problems; receipts = $names }
 }
 
+
+# One record per case, so a CI annotation can say WHICH expectation failed:
+# the receipt set, the phase statuses, the child count and the STOP reason.
+function New-GateCaseDetail {
+  param($Probe, $Outcome, [string]$Note = '')
+
+  $reason = [string]$Probe.stopReason
+  if ($reason.Length -gt 240) { $reason = $reason.Substring(0, 240) }
+  $statusByReceipt = @{}
+  foreach ($name in @($Probe.receipts.Keys)) {
+    $statusByReceipt[[string]$name] = [string]$Probe.receipts[[string]$name]['status']
+  }
+  return @{
+    stopName    = [string]$Probe.stopName
+    receipts    = @($Outcome.receipts)
+    statuses    = $statusByReceipt
+    nativeCalls = [int]$Probe.nativeCalls
+    evidence    = [int]$Probe.evidenceCalls
+    threw       = [string]$Probe.threw
+    problems    = @($Outcome.problems)
+    reason      = $reason
+    note        = $Note
+  }
+}
+
 $cloudPath = Split-Path -Parent $pluginRoot
 
 # ---- 34: the declared contract IS the SQL, not a copy of it ----------------
@@ -1462,13 +1487,8 @@ Add-Case 'verificationReportsProceedToComplete' (
   ([string]$gatePass.calls[1]) -match '95_storage_config\.sql' -and
   ([string]$gatePass.calls[2]) -match 'delete from supabase_migrations\.clash_deploy_claim' -and
   ([string]$gatePass.calls[2]).Contains("run_id = '" + $probeRunId + "'") -and
-  [int]$gatePass.evidenceCalls -eq 6) @{
-  blockStartLine = $gatePass.blockStartLine
-  blockLines     = $gatePass.blockLines
-  nativeCalls    = $gatePass.nativeCalls
-  receipts       = @($passOutcome.receipts)
-  note           = 'the release is the third child and only after both contracts hold'
-}
+  [int]$gatePass.evidenceCalls -eq 6) (New-GateCaseDetail -Probe $gatePass -Outcome $passOutcome `
+  -Note ('block {0}+{1}; the release is the third child and only after both contracts hold' -f $gatePass.blockStartLine, $gatePass.blockLines))
 
 # ---- 36: postflight exits 0 with NO output --------------------------------
 $gateEmpty = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text ''))
@@ -1483,13 +1503,8 @@ Add-Case 'postflightEmptyReportStops' (
   [string]$gateEmpty.stopReason -match 'rendered no verification rows' -and
   [string]$gateEmpty.stopReason -match 'claim stays held' -and
   ([string]$gateEmpty.stopReason) -notmatch '(?i)rolled\s*back' -and
-  -not $gateEmpty.receipts.Contains('06-claim-release.json')) @{
-  stopName     = [string]$gateEmpty.stopName
-  nativeCalls  = $gateEmpty.nativeCalls
-  status       = (Get-GateReceiptStatus -Probe $gateEmpty -Name '04-postflight.json')
-  receipts     = @($emptyOutcome.receipts)
-  note         = 'R11-C1: exit 0 with no rows used to pass this gate and release the claim'
-}
+  -not $gateEmpty.receipts.Contains('06-claim-release.json')) (New-GateCaseDetail -Probe $gateEmpty -Outcome $emptyOutcome `
+  -Note 'R11-C1: exit 0 with no rows used to pass this gate and release the claim')
 
 # ---- 37: postflight exits 0 while rendering a FAIL row ---------------------
 $gateFailRow = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -StatusByOrd @{ 7 = 'FAIL' })))
@@ -1502,11 +1517,7 @@ Add-Case 'postflightFailedRowStops' (
   $gateFailRow.reachedComplete -eq $false -and
   [int]$gateFailRow.nativeCalls -eq 1 -and
   [string]$gateFailRow.stopReason -match '1 rendered check\(s\) FAILED' -and
-  [string]$gateFailRow.stopReason -notmatch '(?i)rolled\s*back') @{
-  stopName = [string]$gateFailRow.stopName
-  status   = (Get-GateReceiptStatus -Probe $gateFailRow -Name '04-postflight.json')
-  receipts = @($failRowOutcome.receipts)
-}
+  [string]$gateFailRow.stopReason -notmatch '(?i)rolled\s*back') (New-GateCaseDetail -Probe $gateFailRow -Outcome $failRowOutcome)
 
 # ---- 38: postflight report is truncated (18 of 19 checks) ------------------
 $gateShort = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -OmitOrds @(19))))
@@ -1518,10 +1529,7 @@ Add-Case 'postflightTruncatedReportStops' (
   $shortOutcome.ok -and
   [int]$gateShort.nativeCalls -eq 1 -and
   [string]$gateShort.stopReason -match 'declared check\(s\) missing' -and
-  [string]$gateShort.stopReason -match 'gating row\(s\) rendered') @{
-  stopName = [string]$gateShort.stopName
-  receipts = @($shortOutcome.receipts)
-}
+  [string]$gateShort.stopReason -match 'gating row\(s\) rendered') (New-GateCaseDetail -Probe $gateShort -Outcome $shortOutcome)
 
 # ---- 39: the same check is rendered twice --------------------------------
 $gateDuplicate = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -DuplicateOrds @(5))))
@@ -1532,10 +1540,7 @@ $duplicateOutcome = Test-VerificationGateOutcome -Probe $gateDuplicate `
 Add-Case 'postflightDuplicateRowStops' (
   $duplicateOutcome.ok -and
   [int]$gateDuplicate.nativeCalls -eq 1 -and
-  [string]$gateDuplicate.stopReason -match 'duplicated check ord') @{
-  stopName = [string]$gateDuplicate.stopName
-  receipts = @($duplicateOutcome.receipts)
-}
+  [string]$gateDuplicate.stopReason -match 'duplicated check ord') (New-GateCaseDetail -Probe $gateDuplicate -Outcome $duplicateOutcome)
 
 # ---- 40: a row loses its status column (malformed shape) ------------------
 $gateMalformed = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -BreakOrds @(3))))
@@ -1546,10 +1551,7 @@ $malformedOutcome = Test-VerificationGateOutcome -Probe $gateMalformed `
 Add-Case 'postflightMalformedRowStops' (
   $malformedOutcome.ok -and
   [int]$gateMalformed.nativeCalls -eq 1 -and
-  [string]$gateMalformed.stopReason -match 'malformed row') @{
-  stopName = [string]$gateMalformed.stopName
-  receipts = @($malformedOutcome.receipts)
-}
+  [string]$gateMalformed.stopReason -match 'malformed row') (New-GateCaseDetail -Probe $gateMalformed -Outcome $malformedOutcome)
 
 # ---- 41: a check is renamed - the report is not the reviewed report -------
 $gateDrift = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql' -RenameOrds @{ 2 = 'ledger versions look about right' })))
@@ -1560,10 +1562,7 @@ $driftOutcome = Test-VerificationGateOutcome -Probe $gateDrift `
 Add-Case 'postflightIdentityDriftStops' (
   $driftOutcome.ok -and
   [int]$gateDrift.nativeCalls -eq 1 -and
-  [string]$gateDrift.stopReason -match 'is not the declared') @{
-  stopName = [string]$gateDrift.stopName
-  receipts = @($driftOutcome.receipts)
-}
+  [string]$gateDrift.stopReason -match 'is not the declared') (New-GateCaseDetail -Probe $gateDrift -Outcome $driftOutcome)
 
 # ---- 42: the child fails outright - UNPROVEN, never PASS and never FAIL ---
 $gateUnproven = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text $verifyPass -ExitCode 3 -StdErr 'ERROR:  57014: canceling statement due to statement timeout'))
@@ -1576,12 +1575,8 @@ Add-Case 'postflightUnprovenStops' (
   [int]$gateUnproven.nativeCalls -eq 1 -and
   [string]$gateUnproven.stopReason -match 'verdict=UNPROVEN' -and
   -not $gateUnproven.receipts.Contains('06-claim-release.json') -and
-  -not $gateUnproven.receipts.Contains('06-complete.json')) @{
-  stopName = [string]$gateUnproven.stopName
-  status   = (Get-GateReceiptStatus -Probe $gateUnproven -Name '04-postflight.json')
-  receipts = @($unprovenOutcome.receipts)
-  note     = 'a nonzero exit is UNKNOWN, not a content failure and not a pass'
-}
+  -not $gateUnproven.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateUnproven -Outcome $unprovenOutcome `
+  -Note 'a nonzero exit is UNKNOWN, not a content failure and not a pass')
 
 # ---- 43: storage exits 0 with NO output ----------------------------------
 $gateStorageEmpty = Invoke-VerificationGateProbe -Results @(
@@ -1599,12 +1594,8 @@ Add-Case 'storageEmptyReportStops' (
   [string]$gateStorageEmpty.stopReason -match 'storage verification did not satisfy' -and
   ([string]$gateStorageEmpty.stopReason) -notmatch 'clash_deploy_claim' -and
   -not $gateStorageEmpty.receipts.Contains('06-claim-release.json') -and
-  -not $gateStorageEmpty.receipts.Contains('06-complete.json')) @{
-  stopName    = [string]$gateStorageEmpty.stopName
-  nativeCalls = $gateStorageEmpty.nativeCalls
-  receipts    = @($storageEmptyOutcome.receipts)
-  note        = 'the claim is not released: the third child is never issued'
-}
+  -not $gateStorageEmpty.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateStorageEmpty -Outcome $storageEmptyOutcome `
+  -Note 'the claim is not released: the third child is never issued')
 
 # ---- 44: storage exits 0 while rendering a FAIL row ----------------------
 $gateStorageFail = Invoke-VerificationGateProbe -Results @(
@@ -1619,10 +1610,7 @@ Add-Case 'storageFailedRowStops' (
   $storageFailOutcome.ok -and
   [int]$gateStorageFail.nativeCalls -eq 2 -and
   [string]$gateStorageFail.stopReason -match '1 rendered check\(s\) FAILED' -and
-  -not $gateStorageFail.receipts.Contains('06-complete.json')) @{
-  stopName = [string]$gateStorageFail.stopName
-  receipts = @($storageFailOutcome.receipts)
-}
+  -not $gateStorageFail.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateStorageFail -Outcome $storageFailOutcome)
 
 # ---- 45: storage omits its INFO row (6 of 7) -----------------------------
 $gateStorageShort = Invoke-VerificationGateProbe -Results @(
@@ -1637,10 +1625,7 @@ Add-Case 'storageMissingInfoRowStops' (
   $storageShortOutcome.ok -and
   [int]$gateStorageShort.nativeCalls -eq 2 -and
   [string]$gateStorageShort.stopReason -match 'INFO row\(s\) rendered' -and
-  -not $gateStorageShort.receipts.Contains('06-claim-release.json')) @{
-  stopName = [string]$gateStorageShort.stopName
-  receipts = @($storageShortOutcome.receipts)
-}
+  -not $gateStorageShort.receipts.Contains('06-claim-release.json')) (New-GateCaseDetail -Probe $gateStorageShort -Outcome $storageShortOutcome)
 
 # ---- 46: storage cannot be proven - UNPROVEN, claim retained -------------
 $gateStorageUnproven = Invoke-VerificationGateProbe -Results @(
@@ -1655,11 +1640,7 @@ Add-Case 'storageUnprovenStops' (
   $storageUnprovenOutcome.ok -and
   [int]$gateStorageUnproven.nativeCalls -eq 2 -and
   [string]$gateStorageUnproven.stopReason -match 'verdict=UNPROVEN' -and
-  -not $gateStorageUnproven.receipts.Contains('06-complete.json')) @{
-  stopName = [string]$gateStorageUnproven.stopName
-  status   = (Get-GateReceiptStatus -Probe $gateStorageUnproven -Name '05-storage.json')
-  receipts = @($storageUnprovenOutcome.receipts)
-}
+  -not $gateStorageUnproven.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateStorageUnproven -Outcome $storageUnprovenOutcome)
 
 # ===========================================================================
 # verdict: inventory first, then the receipt, then the file on disk
