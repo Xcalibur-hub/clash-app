@@ -1781,22 +1781,26 @@ $gatePass = Invoke-VerificationGateProbe -RunId $probeRunId -Results @(
   (New-GateChildResult -Text $storagePass),
   (New-GateChildResult -Text ($probeRunId + "`n"))
 )
+# Round 16 (R15-C1): the gate block ends where completion begins, so the proven
+# reports lead to a released claim - never to a completion receipt written by the
+# gates themselves.
 $passOutcome = Test-VerificationGateOutcome -Probe $gatePass `
-  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '06-claim-release-ownership.json', '06-claim-release.json', '06-complete.json') `
+  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '06-claim-release-ownership.json', '06-claim-release.json') `
   -ExpectedStop '' `
-  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'PASS'; '06-claim-release-ownership.json' = 'PASS'; '06-claim-release.json' = 'PASS'; '06-complete.json' = 'COMPLETE' }
+  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'PASS'; '06-claim-release-ownership.json' = 'PASS'; '06-claim-release.json' = 'PASS' }
 $passCallCount = @($gatePass.calls).Count
 Add-Case 'verificationReportsProceedToComplete' (
   $passOutcome.ok -and
   [string]$gatePass.threw -eq '' -and
-  $gatePass.reachedComplete -eq $true -and
+  $gatePass.reachedComplete -eq $false -and
   [int]$gatePass.nativeCalls -eq 3 -and $passCallCount -eq 3 -and
   ([string]$gatePass.calls[0]) -match '90_verify\.sql' -and
   ([string]$gatePass.calls[1]) -match '95_storage_config\.sql' -and
   ([string]$gatePass.calls[2]) -match 'delete from supabase_migrations\.clash_deploy_claim' -and
   ([string]$gatePass.calls[2]).Contains("run_id = '" + $probeRunId + "'") -and
-  [int]$gatePass.evidenceCalls -eq 6) (New-GateCaseDetail -Probe $gatePass -Outcome $passOutcome `
-  -Note ('block {0}+{1}; the release is the third child and only after both contracts hold' -f $gatePass.blockStartLine, $gatePass.blockLines))
+  [int]$gatePass.evidenceCalls -eq 6 -and
+  -not $gatePass.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gatePass -Outcome $passOutcome `
+  -Note ('block {0}+{1}; the release is the third child and only after both contracts hold, and it publishes no completion' -f $gatePass.blockStartLine, $gatePass.blockLines))
 
 # ---- 36: postflight exits 0 with NO output --------------------------------
 $gateEmpty = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text ''))
