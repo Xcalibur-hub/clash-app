@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **437 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **441 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 437 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 441 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -201,7 +201,7 @@ deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
 `-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
 the contract rather than an accident of the host.
 
-Adapter `4.8.0` (was `4.7.0`), native self-test 91 cases (was 75): completion is
+Adapter `4.9.0` (was `4.7.0`), native self-test 102 cases (was 75): completion is
 now a commit protocol rather than a receipt the runner wrote before sealing (see
 §1n), and sixteen cases execute it against real directories - the success path,
 a refused seal publication, an injected seal write failure, the committed
@@ -293,9 +293,23 @@ have not been executed on this machine either - they are executed by
 | R15-C1 (critical) | the runner wrote `06-complete.json` with `status=COMPLETE` and announced `TERMINAL RECEIPT: COMPLETE` **before** calling `Seal-Evidence`. The audit replayed that tail on PowerShell 5.1 with only the seal write fault-injected: the marker was durably persisted and announced, the seal threw, the trap wrote `99-runner-exception.json` with `status=EXCEPTION`, and the process exited 1 - so the evidence directory said COMPLETE and EXCEPTION at the same time, and a consumer reading the marker accepted a run whose evidence was never sealed | completion is now a commit protocol in `Publish-ClashCompletion` with **one** commit point: (1) `06-finalization-intent.json`, a provisional receipt that says `FINALIZING`; (2) the seal, published atomically (exclusive temp file, then a move that cannot overwrite) and excluding the completion artifacts; (3) the seal verified against disk - every hash, every chain link, the declared count and the required evidence; (4) the marker written exclusively to a scratch name; (5) an atomic rename onto `06-complete.json` - **the commit point**; (6) the marker re-read and re-verified against the seal. Nothing is announced before step 6, and a failure at any step leaves no `06-complete.json` |
 | - | the marker and the seal could have hashed each other | the seal's file set excludes `06-complete.json` and `06-complete-unverified.json`, and the marker binds the seal's sha256 instead of being sealed. Case 77 corrupts the marker and shows the seal still verifies (no circular dependency) while the consumer still rejects the run |
 | - | the release region could still write a completion receipt | the claim-release region ends where completion begins and may not contain `06-complete.json`; its probe now asserts the release proves the **claim**, not completion (case 27, renamed `claimReleaseOwnedRowReleasesClaimOnly`) |
-| - | a consumer had no way to tell a finished run from a finalized one | `Test-ClashRunCompletion` is the consumer contract: the marker must exist, carry `protocol = clash-completion/2` and `finalized = true`, bind the seal that is on disk, the seal must re-derive from the files, no `06-complete-unverified.json` and no `99-runner-exception.json` may be present, and no file may have been written after sealing. The runner calls it on itself, so runner and consumer cannot disagree |
+| - | a consumer had no way to tell a finished run from a finalized one | `Test-ClashRunCompletion` is the consumer contract: the marker must exist, carry `protocol = clash-completion/2`, `status = COMPLETE` and a boolean `finalized = true`, bind the seal that is on disk, the seal must re-derive from the files, every authoritative field must agree with sealed evidence (see §1o), no `06-complete-unverified.json` and no `99-runner-exception.json` may be present, and no file may have been written after sealing. The runner calls it on itself, so runner and consumer cannot disagree |
 | - | a failure at the very end could be read as a rollback, or invite a re-run | a finalization failure writes `06-finalize-fail.json` (`status=STOPPED`, `claimReleased=true`, `rollbackImplied=false`, `completionMarkerWritten`), the trap's exception receipt carries `completionAccepted=false` and `rollbackImplied=false`, and both say the schema was applied and the claim released - only the evidence failed. Nothing is deleted, rewritten or repaired, and a second finalization refuses |
 | - | the earlier tests proved a hand-assembled copy of the tail | cases 82/83 read `deploy.ps1`, extract the committed completion region between two anchors, refuse it unless it calls the protocol exactly once, demands all five required receipts, never writes the marker itself and announces after the call - then **execute** it with the real protocol, real receipts and real sealing. Only `exit 0` is substituted (a test process cannot exit), and the announcement case records whether the marker existed **at the moment** the COMPLETE line was printed |
+
+### 1o. Round 17 (audit of `27db5b8`) - the marker's own chain claims were never read
+
+| # | Defect | Fix |
+|---|---|---|
+| C16-C1 (critical against the completion-acceptance contract) | `Test-ClashRunCompletion` proved the seal, the marker-to-seal SHA binding and the file count - but it never read `prevReceiptSha` or `seal.chainHead`. The independent audit published a real run with the real publisher, then changed exactly those two fields to 64 zeros. The seal still verified and the consumer still returned `ok=true` with no problems, so a run whose receipt predecessor and chain head contradicted its own sealed evidence was accepted | every authoritative marker field is now compared against evidence derived independently from disk: `prevReceiptSha` must equal the hash of the sealed `06-finalization-intent.json`, and `seal.chainHead` must equal the chain head re-derived from the seal's entries (which `Test-EvidenceSeal` already recomputes). `seal.name`, the adapter identity, and `writerRunId` (against the sealed claim release) are verified too, and the sealed intent must itself chain to the sealed `06-claim-release.json` and declare required evidence that is really sealed |
+| - | hash comparisons used `-eq`, which is case-insensitive for strings | every hash comparison is `-ceq`/`-cne`, the format is `^[0-9a-f]{64}$` (`Test-ClashSha256Text`), and `finalized` must be a JSON boolean and `fileCount` a JSON integer - the strings `"true"` and `"six"` are rejected |
+| - | marker fields that nothing verified were still presented as facts | the authoritative set is declared in one place (the comment above `Test-ClashRunCompletion`) and everything else the runner contributes (`appliedThisRun`, `freshOnly`, `packageTreeHash`, `step0Bootstrap`, `ledgerReadBack`) is written under `metadata`, which the consumer ignores. `utc` is checked for parseability only and is documented as ordering metadata, not authority |
+| - | the producer could publish a marker the consumer would reject | `Publish-ClashCompletion` now runs `Test-ClashRunCompletion` on its own output after the commit; if the consumer refuses, a doubt marker records the problems and the finalization throws instead of reporting success. The required evidence is declared once (`Get-ClashCompletionRequiredEvidence`) and demanded by both the producer and the consumer, so a run cannot drop a receipt from both the intent and the seal |
+| - | only the audit's two-field mutation was known to be accepted | eleven executed cases mutate a real published marker field by field: the exact Codex mutation (case 92), each field alone (93, 94, 100, 101, 102), a missing intent (95), wrong JSON types (96), malformed and case-folded hashes (97), a mis-chained intent (98) and required-evidence drift (99) |
+
+Still not proven: the consumer validates *files*, not signatures. A privileged
+writer can replace the whole artifact set consistently; the seal is consistency
+evidence, not an attestation.
 
 **Authority rule.** `06-complete.json` is evidence, not a verdict: a run is
 complete only when `Test-ClashRunCompletion` accepts the directory it lives in.
@@ -330,7 +344,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (437 assertions)
+tests/verify-package.mjs       offline test suite (441 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

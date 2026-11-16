@@ -837,13 +837,10 @@ New-PhaseReceipt '06-claim-release.json' @{ status = 'PASS'; runId = $runId; rel
 # exclusive-writer claim WAS released. Only the evidence finalization failed, so
 # no rollback is implied and no second release is needed - but the run is not an
 # accepted completion and must not be re-run blindly.
-$completionRequired = @(
-  '02-preflight.json'
-  '04-postflight.json'
-  '05-storage.json'
-  '06-claim-release.json'
-  '06-finalization-intent.json'
-)
+# The required evidence is declared ONCE, in the adapter, and the consumer
+# requires the same list. A runner that demanded less than the consumer verifies
+# would publish a marker the consumer rejects.
+$completionRequired = @(Get-ClashCompletionRequiredEvidence)
 try {
   $completion = Publish-ClashCompletion -Root $run -PrevSha $script:chain -RequiredEvidence $completionRequired -Fields @{
     appliedThisRun  = $applied

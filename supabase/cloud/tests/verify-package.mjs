@@ -36,8 +36,8 @@ const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 26;
-const EXPECTED_CASES = 91;
-const EXPECTED_ASSERTIONS = 437;
+const EXPECTED_CASES = 102;
+const EXPECTED_ASSERTIONS = 441;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -2530,6 +2530,37 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
     /rollbackImplied = \$false/.test(deployCode) &&
     /completionAccepted = \$false/.test(deployCode) &&
     /only evidence finalization failed\. Do NOT re-run/.test(deployCode));
+  // Round 17 (C16-C1): the marker's OWN chain claims were never read. Every
+  // authoritative field must be compared against independently derived sealed
+  // evidence, and hashes must compare case-strictly.
+  check('the consumer verifies every authoritative marker field',
+    (() => {
+      const body = libCode.slice(libCode.indexOf('function Test-ClashRunCompletion'), libCode.indexOf('# ------------------------------------------------------- connection policy --'));
+      return /intentHashes -notcontains/.test(body) &&
+        /boundHead -cne \[string\]\$check\.chainHead/.test(body) &&
+        /sealFieldName -cne \$sealName/.test(body) &&
+        /adapter -cne \[string\]\$sealAdapter/.test(body) &&
+        /releaseRun -cne \[string\]\$writerRun/.test(body) &&
+        /intentPrev/.test(body) && /releaseHashes -notcontains/.test(body) &&
+        /Test-ClashSha256Text/.test(body) && /Test-ClashIntegerValue/.test(body) &&
+        /finalized -is \[bool\]/.test(body) && /-cref|must be boolean true/.test(body);
+    })());
+  check('the required evidence is declared once and used by producer and consumer',
+    /function Get-ClashCompletionRequiredEvidence/.test(libCode) &&
+    /Test-EvidenceSeal -Root \$RunPath -Require @\(Get-ClashCompletionRequiredEvidence\)/.test(libCode) &&
+    /\$completionRequired = @\(Get-ClashCompletionRequiredEvidence\)/.test(deployCode) &&
+    !/'02-preflight\.json'\s*\r?\n\s*'04-postflight\.json'/.test(deployCode));
+  check('the producer will not report success for a marker its consumer rejects',
+    (() => {
+      const body = libCode.slice(libCode.indexOf('function Publish-ClashCompletion'), libCode.indexOf('function Test-ClashRunCompletion'));
+      return /\$selfCheck = Test-ClashRunCompletion -RunPath \$Root/.test(body) &&
+        /completion refused: the published marker fails the completion contract/.test(body) &&
+        body.indexOf('$selfCheck') > body.indexOf('[System.IO.File]::Move($temp, $marker)');
+    })());
+  check('the marker contract declares which fields are authoritative',
+    /AUTHORITATIVE marker fields/.test(libCode) &&
+    /NOT authoritative, and never trusted/.test(libCode) &&
+    /metadata/.test(libCode.slice(libCode.indexOf('function Publish-ClashCompletion'), libCode.indexOf('function Test-ClashRunCompletion'))));
   const completionCases = ['completionSuccessPublishesVerifiedMarker', 'completionMarkerExcludedFromSeal',
     'completionRefusesSecondFinalization', 'completionRefusesDoubtMarker',
     'completionSealPublicationFailureLeavesNoMarker', 'completionSealWriteFailureLeavesNoMarker',
@@ -2537,8 +2568,14 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
     'completionValidatorRejectsExceptionBesideMarker', 'completionValidatorRejectsTamperedEvidence',
     'completionValidatorRejectsTruncatedSeal', 'completionValidatorReportsUnreadableSeal',
     'completionValidatorRejectsUnsealedEvidence', 'completionRefusesMissingRequiredEvidence',
-    'completionIntentNeverClaimsComplete', 'deployTailIsTheOnlyCompletionPath'];
-  check('all sixteen finalization cases are executed and in the shared inventory',
+    'completionIntentNeverClaimsComplete', 'deployTailIsTheOnlyCompletionPath',
+    'completionRejectsCodexChainMutation', 'completionRejectsWrongPrevReceiptShaOnly',
+    'completionRejectsWrongSealChainHeadOnly', 'completionRejectsMissingIntent',
+    'completionRejectsMisTypedMarker', 'completionRejectsMalformedHashFields',
+    'completionRejectsIntentChainBreak', 'completionRejectsRequiredEvidenceDrift',
+    'completionRejectsContradictoryWriterRunId', 'completionRejectsUnknownSealName',
+    'completionRejectsForeignAdapter'];
+  check('all twenty-seven finalization cases are executed and in the shared inventory',
     completionCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest) && libCode.includes(`'${n}'`)));
   check('the tail cases execute the committed region, not a copy',
     /function Get-CompletionTail/.test(selfTest) &&

@@ -117,10 +117,10 @@ $script:outFileFinal = $OutFile
 
 $requiredCases = @(Get-ClashSelfTestInventory)
 
-# Round 5: the inventory must be exactly 91 unique, non-empty strings, and that
+# Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 91
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 102
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -2428,10 +2428,43 @@ function New-FinalizationRun {
   New-Item -ItemType Directory -Path $root -Force | Out-Null
   New-Item -ItemType Directory -Path (Join-Path $root '04-postflight') -Force | Out-Null
   foreach ($name in $Evidence) {
-    [void](Write-Evidence -Path (Join-Path $root $name) -Text (([ordered]@{ receipt = $name; status = 'PASS'; probe = $true }) | ConvertTo-Json -Depth 4))
+    # The claim release carries the fields the completion contract verifies
+    # against it (runId, status PASS, released true); the others only have to
+    # exist and be sealed.
+    $fields = [ordered]@{ receipt = $name; status = 'PASS'; probe = $true }
+    if ($name -ceq '06-claim-release.json') {
+      $fields['runId']    = 'probe-run-id'
+      $fields['released'] = $true
+    }
+    [void](Write-Evidence -Path (Join-Path $root $name) -Text ($fields | ConvertTo-Json -Depth 4))
   }
   [void](Write-Evidence -Path (Join-Path $root '04-postflight\claim-release.out') -Text "probe-run-id`n")
   return $root
+}
+
+# The receipt hash the runner's chain holds at the moment completion starts: the
+# raw text hash of the last receipt it wrote (Add-Receipt's return value).
+function Get-FinalizationReleaseSha {
+  param([string]$Root)
+  return (Get-TextSha256 -Text ([System.IO.File]::ReadAllText((Join-Path $Root '06-claim-release.json'))))
+}
+
+# Test-only fixture builder: rewrites one or more dotted fields of an already
+# published marker. The marker is NOT part of the seal, so the seal keeps
+# verifying - which is exactly the attack surface C16-C1 found.
+function Set-CompletionMarkerField {
+  param([string]$Root, [hashtable]$Mutation)
+
+  $path = Join-Path $Root '06-complete.json'
+  $doc  = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
+  foreach ($key in @($Mutation.Keys)) {
+    $parts = ([string]$key) -split '\.'
+    $node  = $doc
+    for ($i = 0; $i -lt ($parts.Count - 1); $i++) { $node = $node.($parts[$i]) }
+    $node.($parts[$parts.Count - 1]) = $Mutation[$key]
+  }
+  [System.IO.File]::WriteAllText($path, ($doc | ConvertTo-Json -Depth 8))
+  return $path
 }
 
 function Remove-FinalizationRun {
@@ -2452,10 +2485,14 @@ function Read-RunDocument {
 function Invoke-CompletionProbe {
   param(
     [string]$Root,
-    [string[]]$Required = @('02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json', '06-finalization-intent.json'),
+    [string[]]$Required = @(),
     [string]$FailWriteJsonSuffix = '',
+    [string]$PrevSha = '',
     [hashtable]$Fields = @{ appliedThisRun = 111; freshOnly = $true; writerRunId = 'probe-run-id' }
   )
+
+  if (@($Required).Count -eq 0) { $Required = @(Get-ClashCompletionRequiredEvidence) }
+  if ([string]::IsNullOrWhiteSpace($PrevSha)) { $PrevSha = Get-FinalizationReleaseSha -Root $Root }
 
   $state = [ordered]@{
     ok = $false; threw = ''; result = $null; output = @()
@@ -2465,7 +2502,7 @@ function Invoke-CompletionProbe {
   $state.sealPath   = Join-Path $Root 'EVIDENCE-MANIFEST.json'
 
   & {
-    param($Root, $Required, $FailWriteJsonSuffix, $Fields, $State)
+    param($Root, $Required, $FailWriteJsonSuffix, $PrevSha, $Fields, $State)
 
     function Write-Host {
       param(
@@ -2485,6 +2522,7 @@ function Invoke-CompletionProbe {
     }
 
     $script:probeFailSuffix = [string]$FailWriteJsonSuffix
+    $script:probePrevSha    = [string]$PrevSha
     $script:probeRealWriteJson = ${function:Write-EvidenceJson}
     function Write-EvidenceJson {
       param([string]$Path, $Object)
@@ -2495,11 +2533,11 @@ function Invoke-CompletionProbe {
     }
 
     try {
-      $State.result = Publish-ClashCompletion -Root $Root -PrevSha 'probe-prev-receipt' -RequiredEvidence $Required -Fields $Fields
+      $State.result = Publish-ClashCompletion -Root $Root -PrevSha $script:probePrevSha -RequiredEvidence $Required -Fields $Fields
       $State.ok = $true
     }
     catch { $State.threw = Protect-Text $_.Exception.Message }
-  } $Root $Required $FailWriteJsonSuffix $Fields $state 6>$null | Out-Null
+  } $Root $Required $FailWriteJsonSuffix $PrevSha $Fields $state 6>$null | Out-Null
 
   return $state
 }
@@ -2528,8 +2566,11 @@ function Get-CompletionTail {
   if ($text.Contains("New-PhaseReceipt '06-complete.json'")) {
     $problems += 'the completion region writes 06-complete.json itself instead of going through the protocol'
   }
-  foreach ($name in @('02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json', '06-finalization-intent.json')) {
-    if (([regex]::Matches($text, [regex]::Escape($name))).Count -lt 1) { $problems += ('required evidence {0} is not demanded by the region' -f $name) }
+  # The required-evidence list is declared once, in the adapter, and the consumer
+  # requires the same list. A region that hard-codes its own copy could drift
+  # from what the consumer verifies, so it must call the canonical source.
+  if ($text -notmatch 'Get-ClashCompletionRequiredEvidence') {
+    $problems += 'the completion region does not use the canonical required-evidence list'
   }
   if (([regex]::Matches($text, '(?m)^exit 0\s*$')).Count -ne 1) { $problems += 'the region must exit 0 exactly once' }
   $publishAt  = $text.IndexOf('Publish-ClashCompletion -Root $run')
@@ -2575,7 +2616,8 @@ function Invoke-CompletionTailProbe {
   $runId       = 'probe-run-id'
   $treeHash    = 'probe-tree-hash'
   $bootOutcome = 'CREATED'
-  $script:chain = 'probe-prev-receipt'
+  # The runner's chain at this point is the hash of the last receipt it wrote.
+  $script:chain = Get-FinalizationReleaseSha -Root $Root
 
   & {
     param($Root, $FailWriteJsonSuffix, $State)
@@ -2626,6 +2668,9 @@ $finDoc   = Read-RunDocument -Path (Join-Path $finRoot '06-complete.json')
 $finSeal  = Read-RunDocument -Path (Join-Path $finRoot 'EVIDENCE-MANIFEST.json')
 $finCheck = $null
 try { $finCheck = Test-ClashRunCompletion -RunPath $finRoot } catch { $finCheck = $null }
+$finIdentity = '{0}/{1}' -f (Get-ClashAdapterIdentity).id, (Get-ClashAdapterIdentity).version
+# Read once, behind a null guard: StrictMode raises on a property of $null.
+$finChainHead = $(if ($null -ne $finCheck) { [string]$finCheck.sealChain } else { '' })
 $finIntent = Read-RunDocument -Path (Join-Path $finRoot '06-finalization-intent.json')
 $finIntentSha = Get-TextSha256 -Text ([System.IO.File]::ReadAllText((Join-Path $finRoot '06-finalization-intent.json')))
 Add-Case 'completionSuccessPublishesVerifiedMarker' (
@@ -2641,6 +2686,12 @@ Add-Case 'completionSuccessPublishesVerifiedMarker' (
     (Get-NormalizedSha256 -Path (Join-Path $finRoot 'EVIDENCE-MANIFEST.json')) -and
   [string](Get-DocumentProperty -Object $finDoc -Name 'prevReceiptSha' -Default '') -eq $finIntentSha -and
   [string](Get-DocumentProperty -Object $finIntent -Name 'status' -Default '') -eq 'FINALIZING' -and
+  # the authoritative fields the consumer verifies against sealed evidence
+  [string](Get-DocumentProperty -Object $finDoc -Name 'writerRunId' -Default '') -eq 'probe-run-id' -and
+  [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'name' -Default '') -eq 'EVIDENCE-MANIFEST.json' -and
+  [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'chainHead' -Default '') -eq $finChainHead -and
+  [string](Get-DocumentProperty -Object $finDoc -Name 'adapter' -Default '') -eq $finIdentity -and
+  $null -ne (Get-DocumentProperty -Object $finDoc -Name 'metadata' -Default $null) -and
   $null -ne $finCheck -and $finCheck.ok -and
   @($finCheck.problems).Count -eq 0 -and
   @(Get-ChildItem -LiteralPath $finRoot -Filter '*.tmp' -File).Count -eq 0) @{
@@ -2991,6 +3042,255 @@ Add-Case 'deployTailIsTheOnlyCompletionPath' (
   completeAnnouncements = $announceCount; tailLines = $(if ($null -ne $tailInfo) { $tailInfo.lines } else { 0 })
   note = 'a second, hand-written COMPLETE path cannot be added without failing this case'
 }
+
+# ===========================================================================
+# 92-102: the completion-marker contract, field by field (Round 17 / C16-C1)
+# ===========================================================================
+# C16-C1: the consumer proved the seal and the marker-to-seal SHA binding, but it
+# never read the marker's OWN chain claims. A marker could declare
+# prevReceiptSha = 64 zeros and seal.chainHead = 64 zeros while the real sealed
+# intent hash and the re-derived chain head were different, and
+# Test-ClashRunCompletion still returned ok=true with no problems.
+#
+# These cases mutate a real, published marker (the marker is deliberately not
+# part of the seal, which is what makes the attack possible) and require the
+# consumer to reject every mutation - singly, so each check is proven to fire.
+
+$zero64 = '0' * 64
+$probeComment = 'local fixture; no SQL was executed'
+
+# ---- 92: Codex's exact two-field mutation must now be rejected --------------
+$c16Root = New-FinalizationRun
+$c16Pub  = Invoke-CompletionProbe -Root $c16Root
+$c16Before = $null
+try { $c16Before = Test-ClashRunCompletion -RunPath $c16Root } catch { $c16Before = $null }
+$c16Marker = Read-RunDocument -Path (Join-Path $c16Root '06-complete.json')
+$c16SealSha = [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $c16Marker -Name 'seal' -Default $null) -Name 'sha256' -Default '')
+[void](Set-CompletionMarkerField -Root $c16Root -Mutation @{
+    'prevReceiptSha'   = $zero64
+    'seal.chainHead'   = $zero64
+  })
+$c16After = $null
+try { $c16After = Test-ClashRunCompletion -RunPath $c16Root } catch { $c16After = $null }
+$c16Problems = ''
+if ($null -ne $c16After) { $c16Problems = (@($c16After.problems) -join ' ') }
+$c16SealStillVerifies = $null
+try { $c16SealStillVerifies = Test-EvidenceSeal -Root $c16Root } catch { $c16SealStillVerifies = $null }
+Add-Case 'completionRejectsCodexChainMutation' (
+  $c16Pub.ok -and
+  $null -ne $c16Before -and $c16Before.ok -and
+  $null -ne $c16After -and (-not $c16After.ok) -and
+  $c16Problems -match 'prevReceiptSha' -and
+  $c16Problems -match 'chain head' -and
+  $null -ne $c16SealStillVerifies -and $c16SealStillVerifies.ok -and
+  [string]$c16After.sealSha256 -ceq $c16SealSha) @{
+  acceptedBeforeMutation = $(if ($null -ne $c16Before) { $c16Before.ok } else { 'null' })
+  acceptedAfterMutation  = $(if ($null -ne $c16After) { $c16After.ok } else { 'null' })
+  problems = $c16Problems
+  sealStillVerifies = $(if ($null -ne $c16SealStillVerifies) { $c16SealStillVerifies.ok } else { 'null' })
+  sealShaUnchanged = ([string]$c16After.sealSha256 -ceq $c16SealSha)
+  note = 'C16-C1 reproduction: two marker fields changed, seal untouched, consumer now refuses'
+}
+Remove-FinalizationRun -Root $c16Root
+
+# ---- 93: only prevReceiptSha is wrong --------------------------------------
+$pRoot = New-FinalizationRun
+$pPub  = Invoke-CompletionProbe -Root $pRoot
+[void](Set-CompletionMarkerField -Root $pRoot -Mutation @{ 'prevReceiptSha' = $zero64 })
+$pCheck = $null
+try { $pCheck = Test-ClashRunCompletion -RunPath $pRoot } catch { $pCheck = $null }
+$pProblems = ''
+if ($null -ne $pCheck) { $pProblems = (@($pCheck.problems) -join ' ') }
+Add-Case 'completionRejectsWrongPrevReceiptShaOnly' (
+  $pPub.ok -and
+  $null -ne $pCheck -and (-not $pCheck.ok) -and
+  $pProblems -match 'is not the hash of the sealed 06-finalization-intent' -and
+  $pProblems -notmatch 'chain head') @{
+  problems = $pProblems
+  note = 'single-field isolation: the chain-head check must not be what fires'
+}
+Remove-FinalizationRun -Root $pRoot
+
+# ---- 94: only the declared seal chain head is wrong ------------------------
+$hRoot = New-FinalizationRun
+$hPub  = Invoke-CompletionProbe -Root $hRoot
+[void](Set-CompletionMarkerField -Root $hRoot -Mutation @{ 'seal.chainHead' = $zero64 })
+$hCheck = $null
+try { $hCheck = Test-ClashRunCompletion -RunPath $hRoot } catch { $hCheck = $null }
+$hProblems = ''
+if ($null -ne $hCheck) { $hProblems = (@($hCheck.problems) -join ' ') }
+Add-Case 'completionRejectsWrongSealChainHeadOnly' (
+  $hPub.ok -and
+  $null -ne $hCheck -and (-not $hCheck.ok) -and
+  $hProblems -match 'chain head' -and
+  $hProblems -notmatch 'prevReceiptSha' -and
+  $hProblems -match 'the seal re-derives to') @{
+  problems = $hProblems
+  note = 'single-field isolation: the predecessor check must not be what fires'
+}
+Remove-FinalizationRun -Root $hRoot
+
+# ---- 95: the sealed intent is gone -----------------------------------------
+$iRoot = New-FinalizationRun
+$iPub  = Invoke-CompletionProbe -Root $iRoot
+Remove-Item -LiteralPath (Join-Path $iRoot '06-finalization-intent.json') -Force
+$iCheck = $null
+try { $iCheck = Test-ClashRunCompletion -RunPath $iRoot } catch { $iCheck = $null }
+$iProblems = ''
+if ($null -ne $iCheck) { $iProblems = (@($iCheck.problems) -join ' ') }
+Add-Case 'completionRejectsMissingIntent' (
+  $iPub.ok -and
+  $null -ne $iCheck -and (-not $iCheck.ok) -and
+  $iProblems -match '06-finalization-intent\.json' -and
+  $iProblems -match 'finalization intent') @{
+  problems = $iProblems
+  note = 'a marker whose predecessor no longer exists cannot be accepted'
+}
+Remove-FinalizationRun -Root $iRoot
+
+# ---- 96: wrong JSON types ---------------------------------------------------
+$t2Root = New-FinalizationRun
+$t2Pub  = Invoke-CompletionProbe -Root $t2Root
+[void](Set-CompletionMarkerField -Root $t2Root -Mutation @{
+    'finalized'       = 'true'
+    'seal.fileCount'  = 'six'
+  })
+$t2Check = $null
+try { $t2Check = Test-ClashRunCompletion -RunPath $t2Root } catch { $t2Check = $null }
+$t2Problems = ''
+if ($null -ne $t2Check) { $t2Problems = (@($t2Check.problems) -join ' ') }
+Add-Case 'completionRejectsMisTypedMarker' (
+  $t2Pub.ok -and
+  $null -ne $t2Check -and (-not $t2Check.ok) -and
+  $t2Problems -match 'must be boolean true' -and
+  $t2Problems -match 'must be an integer') @{
+  problems = $t2Problems
+  note = 'the string "true" and the string "six" are not the boolean and the integer'
+}
+Remove-FinalizationRun -Root $t2Root
+
+# ---- 97: malformed and case-folded hashes ----------------------------------
+$m2Root = New-FinalizationRun
+$m2Pub  = Invoke-CompletionProbe -Root $m2Root
+$m2Real = Read-RunDocument -Path (Join-Path $m2Root '06-complete.json')
+$m2Sha  = [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $m2Real -Name 'seal' -Default $null) -Name 'sha256' -Default '')
+[void](Set-CompletionMarkerField -Root $m2Root -Mutation @{
+    'prevReceiptSha'  = ('a' * 63)
+    'seal.chainHead'  = ('z' * 64)
+    'seal.sha256'     = $m2Sha.ToUpperInvariant()
+  })
+$m2Check = $null
+try { $m2Check = Test-ClashRunCompletion -RunPath $m2Root } catch { $m2Check = $null }
+$m2Problems = ''
+if ($null -ne $m2Check) { $m2Problems = (@($m2Check.problems) -join ' ') }
+Add-Case 'completionRejectsMalformedHashFields' (
+  $m2Pub.ok -and
+  $null -ne $m2Check -and (-not $m2Check.ok) -and
+  $m2Problems -match '64 lowercase hex' -and
+  ([regex]::Matches($m2Problems, '64 lowercase hex')).Count -ge 3) @{
+  problems = $m2Problems
+  malformedFields = ([regex]::Matches($m2Problems, '64 lowercase hex')).Count
+  note = 'a 63-character hash, a non-hex hash and an upper-cased copy of the real hash are all rejected'
+}
+Remove-FinalizationRun -Root $m2Root
+
+# ---- 98: an intent chained to the wrong predecessor is never finalised -----
+# The intent's own predecessor is the sealed claim release. A run whose intent
+# claims any other predecessor cannot be completed: the publisher's consumer
+# self-check refuses, a doubt marker is recorded and the caller must not
+# announce. The consumer-side comparison itself is asserted in section [26].
+$cbRoot = New-FinalizationRun
+$cbPub  = Invoke-CompletionProbe -Root $cbRoot -PrevSha $zero64
+$cbDoubt = Test-Path -LiteralPath (Join-Path $cbRoot '06-complete-unverified.json')
+$cbCheck = $null
+try { $cbCheck = Test-ClashRunCompletion -RunPath $cbRoot } catch { $cbCheck = $null }
+$cbProblems = ''
+if ($null -ne $cbCheck) { $cbProblems = (@($cbCheck.problems) -join ' ') }
+Add-Case 'completionRejectsIntentChainBreak' (
+  (-not $cbPub.ok) -and
+  $cbPub.threw -match 'completion contract' -and
+  $cbPub.threw -match 'the sealed intent prevReceiptSha' -and
+  $cbPub.threw -match '06-claim-release\.json' -and
+  $cbDoubt -and
+  $null -ne $cbCheck -and (-not $cbCheck.ok)) @{
+  refusal = $cbPub.threw
+  doubtRecorded = $cbDoubt
+  problems = $cbProblems
+  note = 'intent -> claim release is verified by the publisher through the consumer before anything is announced'
+}
+Remove-FinalizationRun -Root $cbRoot
+
+# ---- 99: required evidence disappears after sealing ------------------------
+$drRoot = New-FinalizationRun
+$drPub  = Invoke-CompletionProbe -Root $drRoot
+Remove-Item -LiteralPath (Join-Path $drRoot '04-postflight.json') -Force
+$drCheck = $null
+try { $drCheck = Test-ClashRunCompletion -RunPath $drRoot } catch { $drCheck = $null }
+$drProblems = ''
+if ($null -ne $drCheck) { $drProblems = (@($drCheck.problems) -join ' ') }
+Add-Case 'completionRejectsRequiredEvidenceDrift' (
+  $drPub.ok -and
+  $null -ne $drCheck -and (-not $drCheck.ok) -and
+  $drProblems -match '04-postflight\.json' -and
+  $drProblems -match 'appears 0 time' -and
+  $drProblems -match 'missing from disk') @{
+  problems = $drProblems
+  note = 'the canonical required-evidence list is enforced by the consumer, not trusted from the intent'
+}
+Remove-FinalizationRun -Root $drRoot
+
+# ---- 100: writerRunId contradicts the sealed claim release -----------------
+$w2Root = New-FinalizationRun
+$w2Pub  = Invoke-CompletionProbe -Root $w2Root
+[void](Set-CompletionMarkerField -Root $w2Root -Mutation @{ 'writerRunId' = 'someone-elses-run' })
+$w2Check = $null
+try { $w2Check = Test-ClashRunCompletion -RunPath $w2Root } catch { $w2Check = $null }
+$w2Problems = ''
+if ($null -ne $w2Check) { $w2Problems = (@($w2Check.problems) -join ' ') }
+Add-Case 'completionRejectsContradictoryWriterRunId' (
+  $w2Pub.ok -and
+  $null -ne $w2Check -and (-not $w2Check.ok) -and
+  $w2Problems -match 'writerRunId' -and
+  $w2Problems -match 'sealed claim release') @{
+  problems = $w2Problems
+  note = 'the run identity is checked against the sealed 06-claim-release.json'
+}
+Remove-FinalizationRun -Root $w2Root
+
+# ---- 101: the marker names a different seal --------------------------------
+$s2Root = New-FinalizationRun
+$s2Pub  = Invoke-CompletionProbe -Root $s2Root
+[void](Set-CompletionMarkerField -Root $s2Root -Mutation @{ 'seal.name' = 'OTHER-MANIFEST.json' })
+$s2Check = $null
+try { $s2Check = Test-ClashRunCompletion -RunPath $s2Root } catch { $s2Check = $null }
+$s2Problems = ''
+if ($null -ne $s2Check) { $s2Problems = (@($s2Check.problems) -join ' ') }
+Add-Case 'completionRejectsUnknownSealName' (
+  $s2Pub.ok -and
+  $null -ne $s2Check -and (-not $s2Check.ok) -and
+  $s2Problems -match 'names the seal') @{
+  problems = $s2Problems
+  note = 'seal.name was an unchecked claim; it is now compared with the sealed name'
+}
+Remove-FinalizationRun -Root $s2Root
+
+# ---- 102: the marker claims a foreign adapter ------------------------------
+$a2Root = New-FinalizationRun
+$a2Pub  = Invoke-CompletionProbe -Root $a2Root
+[void](Set-CompletionMarkerField -Root $a2Root -Mutation @{ 'adapter' = 'other-adapter/9.9.9' })
+$a2Check = $null
+try { $a2Check = Test-ClashRunCompletion -RunPath $a2Root } catch { $a2Check = $null }
+$a2Problems = ''
+if ($null -ne $a2Check) { $a2Problems = (@($a2Check.problems) -join ' ') }
+Add-Case 'completionRejectsForeignAdapter' (
+  $a2Pub.ok -and
+  $null -ne $a2Check -and (-not $a2Check.ok) -and
+  $a2Problems -match 'marker adapter' -and
+  $a2Problems -match 'written by') @{
+  problems = $a2Problems
+  note = 'adapter is compared with the identity the verified seal records'
+}
+Remove-FinalizationRun -Root $a2Root
 
 # ===========================================================================
 # verdict: inventory first, then the receipt, then the file on disk

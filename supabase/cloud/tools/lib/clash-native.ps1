@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.8.0'
+$script:ClashAdapterVersion = '4.9.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -53,6 +53,55 @@ function Get-NormalizedSha256 {
   if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) { $text = $text.Substring(1) }
   $text = $text.Replace("`r`n", "`n")
   return (Get-TextSha256 -Text $text)
+}
+
+# A SHA-256 claim is exactly 64 lowercase hex characters. PowerShell's -eq is
+# case-insensitive for strings, so every hash comparison in the completion
+# contract uses -ceq/-cne; a case-folded "match" is a different value.
+function Test-ClashSha256Text {
+  param($Value)
+  if (-not ($Value -is [string])) { return $false }
+  return ([bool]($Value -cmatch '^[0-9a-f]{64}$'))
+}
+
+# An integral JSON number, not the string "6" and not a boolean.
+function Test-ClashIntegerValue {
+  param($Value)
+  return ($Value -is [int] -or $Value -is [long] -or $Value -is [int16] -or $Value -is [byte])
+}
+
+# How a field is rendered in a verdict, so "missing" and "wrong type" cannot be
+# confused with an empty string.
+function Format-ClashFieldValue {
+  param($Value)
+  if ($null -eq $Value) { return '<missing or null>' }
+  if ($Value -is [bool]) {
+    if ($Value) { return 'boolean true' }
+    return 'boolean false'
+  }
+  if ($Value -is [string]) {
+    $shown = $Value
+    if ($shown.Length -gt 80) { $shown = $shown.Substring(0, 80) + '...' }
+    return ('string "' + $shown + '"')
+  }
+  if ($Value -is [ValueType]) { return ('number ' + [string]$Value) }
+  if ($Value -is [System.Management.Automation.PSCustomObject]) { return 'object' }
+  return $Value.GetType().Name
+}
+
+# Both hashes a verifier can derive from a file: the hash of the text as written
+# (what Add-Receipt returns and chains) and the normalised hash (BOM stripped,
+# CRLF->LF, what the seal records). A receipt hash matches if it is either, so
+# the check is independent of line endings but still binds the exact bytes.
+function Get-ClashFileHashes {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $hashes = @()
+  try {
+    $hashes += (Get-TextSha256 -Text ([System.IO.File]::ReadAllText($Path)))
+    $hashes += (Get-NormalizedSha256 -Path $Path)
+  }
+  catch { return @() }
+  return $hashes
 }
 
 # StrictMode 2.0 raises on a reference to a property that does not exist, so a
@@ -753,6 +802,19 @@ function Test-EvidenceSeal {
   return [ordered]@{ ok = ($problems.Count -eq 0); problems = @($problems); fileCount = $entries.Count; chainHead = $chain; sha256 = $sha }
 }
 
+# The evidence a completed run must have sealed. Declared once: the runner
+# demands it (Publish-ClashCompletion) and every consumer requires it, so the
+# producer and the consumer cannot drift apart.
+function Get-ClashCompletionRequiredEvidence {
+  return @(
+    '02-preflight.json'
+    '04-postflight.json'
+    '05-storage.json'
+    '06-claim-release.json'
+    '06-finalization-intent.json'
+  )
+}
+
 # ------------------------------------------------------- completion protocol --
 # Round 16 (R15-C1). The runner used to write a COMPLETE receipt and announce it
 # BEFORE sealing the evidence, so a failed seal left a durable, announced
@@ -795,6 +857,15 @@ function Publish-ClashCompletion {
   }
 
   $protocol = 'clash-completion/2'
+  # writerRunId is part of the authoritative contract: the consumer checks it
+  # against the sealed claim-release receipt. A caller that cannot supply it must
+  # not be able to publish a marker at all.
+  $writerRunId = ''
+  if ($Fields.ContainsKey('writerRunId')) { $writerRunId = [string]$Fields['writerRunId'] }
+  if ([string]::IsNullOrWhiteSpace($writerRunId)) {
+    throw 'completion refused: the marker requires writerRunId, which is verified against the sealed 06-claim-release.json. Nothing was published.'
+  }
+
   # Provisional receipt: it says finalization started, never that it succeeded.
   # It joins the hash chain so the run's receipts remain one ordered sequence.
   $intentSha = Add-Receipt -Root $Root -Name '06-finalization-intent.json' -PrevSha $PrevSha -Fields @{
@@ -812,6 +883,14 @@ function Publish-ClashCompletion {
     throw ('completion refused: the evidence seal does not verify: {0}' -f ($sample -join '; '))
   }
 
+  # Which marker fields are authoritative is declared here, once. Everything the
+  # consumer validates is derivable from sealed evidence; everything else is
+  # metadata and is explicitly ignored by the consumer.
+  $metadata = [ordered]@{}
+  foreach ($k in @($Fields.Keys)) {
+    if ([string]$k -ceq 'writerRunId') { continue }
+    $metadata[[string]$k] = $Fields[$k]
+  }
   $object = [ordered]@{
     protocol       = $protocol
     status         = 'COMPLETE'
@@ -819,14 +898,15 @@ function Publish-ClashCompletion {
     adapter        = ("{0}/{1}" -f $script:ClashAdapterId, $script:ClashAdapterVersion)
     finalized      = $true
     prevReceiptSha = $intentSha
-    seal        = [ordered]@{
+    writerRunId    = $writerRunId
+    seal           = [ordered]@{
       name      = 'EVIDENCE-MANIFEST.json'
       sha256    = [string]$check.sha256
       fileCount = [int]$check.fileCount
       chainHead = [string]$check.chainHead
     }
+    metadata       = $metadata
   }
-  foreach ($k in @($Fields.Keys)) { $object[[string]$k] = $Fields[$k] }
 
   $temp = '{0}.{1}.tmp' -f $marker, ([guid]::NewGuid().ToString('N').Substring(0, 12))
   $markerSha = Write-EvidenceJson -Path $temp -Object $object
@@ -875,6 +955,25 @@ function Publish-ClashCompletion {
     throw 'completion refused: the published marker could not be re-verified; 06-complete-unverified.json records the doubt'
   }
 
+  # The publisher accepts its own output only if the CONSUMER accepts it. A
+  # marker the consumer would reject is never reported as a successful
+  # finalization, whatever the publisher believes it wrote.
+  $selfCheck = Test-ClashRunCompletion -RunPath $Root
+  if (-not $selfCheck.ok) {
+    $shown = @($selfCheck.problems)
+    if ($shown.Count -gt 6) { $shown = @($shown[0..5]) }
+    try {
+      [void](Add-Receipt -Root $Root -Name '06-complete-unverified.json' -PrevSha $markerSha -Fields @{
+          protocol = $protocol
+          status   = 'UNVERIFIED'
+          reason   = 'the published marker does not satisfy the completion contract'
+          problems = @($shown)
+        })
+    }
+    catch { Write-Host ('REPORT LOST: the doubt receipt could not be persisted: {0}' -f (Protect-Text $_.Exception.Message)) -ForegroundColor Red }
+    throw ('completion refused: the published marker fails the completion contract: {0}' -f ($shown -join '; '))
+  }
+
   return [ordered]@{
     ok           = $true
     protocol     = $protocol
@@ -886,58 +985,264 @@ function Publish-ClashCompletion {
   }
 }
 
-# The consumer half of the contract. A run counts as complete only when the
-# marker exists, the seal exists, the marker binds THAT seal, the seal still
-# describes the files on disk, and nothing in the run records an exception or an
-# unverified publication. Anything else is not acceptance, whatever the marker
-# says on its own.
+# ------------------------------------------------------------------ consumer --
+# The consumer half of the contract. AUTHORITATIVE marker fields, and where each
+# one is derived from (all of them from sealed evidence):
+#
+#   protocol        constant clash-completion/2
+#   status          constant COMPLETE
+#   finalized       boolean true (a string "true" is not accepted)
+#   adapter         the adapter identity recorded in the verified seal
+#   prevReceiptSha  sha256 of the SEALED 06-finalization-intent.json
+#   writerRunId     the runId recorded in the SEALED 06-claim-release.json
+#   seal.name       constant EVIDENCE-MANIFEST.json
+#   seal.sha256     the normalised sha256 of the seal on disk
+#   seal.fileCount  the number of entries the seal lists
+#   seal.chainHead  the chain head RE-DERIVED from the seal's entries
+#
+# Plus the sealed finalization intent, which must itself chain to the sealed
+# claim release and declare required evidence that is really sealed.
+#
+# NOT authoritative, and never trusted: "utc" (checked for parseability only,
+# used for nothing) and "metadata" (free-form copies of facts that are proven by
+# their own sealed receipts). A consumer must not accept a claim from either.
 function Test-ClashRunCompletion {
   param([Parameter(Mandatory = $true)][string]$RunPath)
 
-  $problems = New-Object System.Collections.Generic.List[string]
-  $marker = Join-Path $RunPath '06-complete.json'
-  $doubt  = Join-Path $RunPath '06-complete-unverified.json'
-  $exception = Join-Path $RunPath '99-runner-exception.json'
+  $protocol      = 'clash-completion/2'
+  $sealName      = 'EVIDENCE-MANIFEST.json'
+  $problems      = New-Object System.Collections.Generic.List[string]
+  $markerPath    = Join-Path $RunPath '06-complete.json'
+  $doubtPath     = Join-Path $RunPath '06-complete-unverified.json'
+  $exceptionPath = Join-Path $RunPath '99-runner-exception.json'
+  $intentPath    = Join-Path $RunPath '06-finalization-intent.json'
+  $releasePath   = Join-Path $RunPath '06-claim-release.json'
+  $sealPath      = Join-Path $RunPath $sealName
 
-  if (-not (Test-Path -LiteralPath $marker)) { $problems.Add('no 06-complete.json: the run is not finalised') }
-  if (Test-Path -LiteralPath $doubt) { $problems.Add('06-complete-unverified.json is present: the run published a marker it could not verify') }
-  if (Test-Path -LiteralPath $exception) { $problems.Add('99-runner-exception.json is present: the run ended in an exception') }
+  if (-not (Test-Path -LiteralPath $markerPath)) { $problems.Add('no 06-complete.json: the run is not finalised') }
+  if (Test-Path -LiteralPath $doubtPath) { $problems.Add('06-complete-unverified.json is present: the run published a marker it could not verify') }
+  if (Test-Path -LiteralPath $exceptionPath) { $problems.Add('99-runner-exception.json is present: the run ended in an exception') }
+
+  # The seal is the anchor: it is verified first, and every authoritative marker
+  # field is then compared against it.
+  $check = Test-EvidenceSeal -Root $RunPath -Require @(Get-ClashCompletionRequiredEvidence)
+  if (-not $check.ok) {
+    $shown = @($check.problems)
+    if ($shown.Count -gt 6) { $shown = @($shown[0..5]) }
+    foreach ($p in $shown) { $problems.Add(('seal: {0}' -f $p)) }
+  }
 
   $document = $null
-  if (Test-Path -LiteralPath $marker) {
-    try { $document = [System.IO.File]::ReadAllText($marker) | ConvertFrom-Json }
+  if (Test-Path -LiteralPath $markerPath) {
+    try { $document = [System.IO.File]::ReadAllText($markerPath) | ConvertFrom-Json }
     catch { $problems.Add(('06-complete.json is not readable JSON: {0}' -f (Protect-Text $_.Exception.Message))) }
   }
-  if ($null -ne $document) {
-    $status = [string](Get-ClashProperty -Object $document -Name 'status' -Default '')
-    $proto  = [string](Get-ClashProperty -Object $document -Name 'protocol' -Default '')
-    if ($status -ne 'COMPLETE') { $problems.Add(('the marker status is "{0}", not COMPLETE' -f $status)) }
-    if ($proto -ne 'clash-completion/2') { $problems.Add(('the marker protocol is "{0}"' -f $proto)) }
-    if ((Get-ClashProperty -Object $document -Name 'finalized' -Default $false) -ne $true) { $problems.Add('the marker does not record a completed finalization') }
+
+  $sealDocument = $null
+  if (Test-Path -LiteralPath $sealPath -PathType Leaf) {
+    try { $sealDocument = [System.IO.File]::ReadAllText($sealPath) | ConvertFrom-Json }
+    catch { $sealDocument = $null }
   }
 
-  $check = Test-EvidenceSeal -Root $RunPath
-  if (-not $check.ok) {
-    foreach ($p in @($check.problems)) { $problems.Add(('seal: {0}' -f $p)) }
-  }
-  $markerSeal = Get-ClashProperty -Object $document -Name 'seal' -Default $null
   if ($null -ne $document) {
-    $boundSha = [string](Get-ClashProperty -Object $markerSeal -Name 'sha256' -Default '')
-    $boundN   = Get-ClashProperty -Object $markerSeal -Name 'fileCount' -Default -1
-    if ($boundSha -ne [string]$check.sha256) {
-      $problems.Add(('the marker binds seal {0} but the seal on disk is {1}' -f $boundSha, $check.sha256))
+    # ---- 1-3: the three constants -----------------------------------------
+    $proto = Get-ClashProperty -Object $document -Name 'protocol' -Default $null
+    if (-not ($proto -is [string]) -or $proto -cne $protocol) {
+      $problems.Add(('the marker protocol is {0}, not "{1}"' -f (Format-ClashFieldValue $proto), $protocol))
     }
-    if ([int]$boundN -ne [int]$check.fileCount) {
-      $problems.Add(('the marker says the seal covers {0} file(s), the seal lists {1}' -f $boundN, $check.fileCount))
+    $status = Get-ClashProperty -Object $document -Name 'status' -Default $null
+    if (-not ($status -is [string]) -or $status -cne 'COMPLETE') {
+      $problems.Add(('the marker status is {0}, not COMPLETE' -f (Format-ClashFieldValue $status)))
     }
+    $finalized = Get-ClashProperty -Object $document -Name 'finalized' -Default $null
+    if (-not ($finalized -is [bool]) -or $finalized -ne $true) {
+      $problems.Add(('the marker finalized field is {0}; a completed finalization must be boolean true' -f (Format-ClashFieldValue $finalized)))
+    }
+
+    # ---- 4: utc is ordering metadata: parseable, never trusted ------------
+    $utc = Get-ClashProperty -Object $document -Name 'utc' -Default $null
+    $utcOk = $false
+    if ($utc -is [string] -and -not [string]::IsNullOrWhiteSpace($utc)) {
+      $parsed = [datetime]::MinValue
+      $utcOk = [datetime]::TryParse($utc, [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::RoundtripKind, [ref]$parsed)
+    }
+    if (-not $utcOk) {
+      $problems.Add(('the marker utc is {0}; it must be a parseable ISO-8601 timestamp' -f (Format-ClashFieldValue $utc)))
+    }
+
+    # ---- 5: adapter identity must match the verified seal ----------------
+    $adapter = Get-ClashProperty -Object $document -Name 'adapter' -Default $null
+    $sealAdapter = Get-ClashProperty -Object $sealDocument -Name 'adapter' -Default $null
+    if (-not ($adapter -is [string]) -or [string]::IsNullOrWhiteSpace([string]$adapter)) {
+      $problems.Add(('the marker adapter is {0}' -f (Format-ClashFieldValue $adapter)))
+    }
+    elseif (-not ($sealAdapter -is [string]) -or [string]::IsNullOrWhiteSpace([string]$sealAdapter)) {
+      $problems.Add('the seal records no adapter identity, so the marker adapter cannot be verified')
+    }
+    elseif ([string]$adapter -cne [string]$sealAdapter) {
+      $problems.Add(('the marker adapter is "{0}" but the seal was written by "{1}"' -f $adapter, $sealAdapter))
+    }
+
+    # ---- 6-9: the seal block ---------------------------------------------
+    $markerSeal = Get-ClashProperty -Object $document -Name 'seal' -Default $null
+    if (-not ($markerSeal -is [System.Management.Automation.PSCustomObject])) {
+      $problems.Add(('the marker seal block is {0}; it must be an object' -f (Format-ClashFieldValue $markerSeal)))
+    }
+    else {
+      $sealFieldName = Get-ClashProperty -Object $markerSeal -Name 'name' -Default $null
+      if (-not ($sealFieldName -is [string]) -or $sealFieldName -cne $sealName) {
+        $problems.Add(('the marker names the seal {0}, not "{1}"' -f (Format-ClashFieldValue $sealFieldName), $sealName))
+      }
+      $boundSha = Get-ClashProperty -Object $markerSeal -Name 'sha256' -Default $null
+      if (-not (Test-ClashSha256Text $boundSha)) {
+        $problems.Add(('the marker seal sha256 is {0}; it must be 64 lowercase hex characters' -f (Format-ClashFieldValue $boundSha)))
+      }
+      elseif ([string]$boundSha -cne [string]$check.sha256) {
+        $problems.Add(('the marker binds seal {0} but the seal on disk is {1}' -f $boundSha, (Format-ClashFieldValue $check.sha256)))
+      }
+      $boundCount = Get-ClashProperty -Object $markerSeal -Name 'fileCount' -Default $null
+      if (-not (Test-ClashIntegerValue $boundCount)) {
+        $problems.Add(('the marker seal fileCount is {0}; it must be an integer' -f (Format-ClashFieldValue $boundCount)))
+      }
+      elseif ([int]$boundCount -ne [int]$check.fileCount) {
+        $problems.Add(('the marker says the seal covers {0} file(s), the seal lists {1}' -f $boundCount, $check.fileCount))
+      }
+      $boundHead = Get-ClashProperty -Object $markerSeal -Name 'chainHead' -Default $null
+      if (-not (Test-ClashSha256Text $boundHead)) {
+        $problems.Add(('the marker seal chainHead is {0}; it must be 64 lowercase hex characters' -f (Format-ClashFieldValue $boundHead)))
+      }
+      elseif ([string]$boundHead -cne [string]$check.chainHead) {
+        $problems.Add(('the marker declares seal chain head {0} but the seal re-derives to {1}' -f $boundHead, (Format-ClashFieldValue $check.chainHead)))
+      }
+    }
+
+    # ---- 10: the receipt-chain predecessor must be the sealed intent -----
+    $prev = Get-ClashProperty -Object $document -Name 'prevReceiptSha' -Default $null
+    $intentHashes = @(Get-ClashFileHashes -Path $intentPath)
+    if (-not (Test-ClashSha256Text $prev)) {
+      $problems.Add(('the marker prevReceiptSha is {0}; it must be 64 lowercase hex characters' -f (Format-ClashFieldValue $prev)))
+    }
+    elseif ($intentHashes.Count -eq 0) {
+      $problems.Add('the marker prevReceiptSha cannot be verified: the sealed 06-finalization-intent.json is missing or unreadable')
+    }
+    elseif ($intentHashes -notcontains [string]$prev) {
+      $problems.Add(('the marker prevReceiptSha {0} is not the hash of the sealed 06-finalization-intent.json ({1})' -f $prev, $intentHashes[0]))
+    }
+
+    # ---- 11: the sealed intent must be a FINALIZING intent that chains to the
+    #          sealed claim release and declares evidence that is really sealed
+    $intentHashesNow = @(Get-ClashFileHashes -Path $intentPath)
+    if ($intentHashesNow.Count -eq 0) {
+      $problems.Add('the sealed 06-finalization-intent.json is missing or unreadable, so the run has no finalization intent')
+    }
+    else {
+      $intent = $null
+      try { $intent = [System.IO.File]::ReadAllText($intentPath) | ConvertFrom-Json }
+      catch { $problems.Add(('06-finalization-intent.json is not readable JSON: {0}' -f (Protect-Text $_.Exception.Message))) }
+      if ($null -ne $intent) {
+        $intentName = Get-ClashProperty -Object $intent -Name 'receipt' -Default $null
+        if (-not ($intentName -is [string]) -or $intentName -cne '06-finalization-intent.json') {
+          $problems.Add(('the sealed intent names itself {0}, not "06-finalization-intent.json"' -f (Format-ClashFieldValue $intentName)))
+        }
+        $intentProto = Get-ClashProperty -Object $intent -Name 'protocol' -Default $null
+        if (-not ($intentProto -is [string]) -or $intentProto -cne $protocol) {
+          $problems.Add(('the sealed intent protocol is {0}, not "{1}"' -f (Format-ClashFieldValue $intentProto), $protocol))
+        }
+        $intentStatus = Get-ClashProperty -Object $intent -Name 'status' -Default $null
+        if (-not ($intentStatus -is [string]) -or $intentStatus -cne 'FINALIZING') {
+          $problems.Add(('the sealed intent status is {0}, not FINALIZING' -f (Format-ClashFieldValue $intentStatus)))
+        }
+        # the intent must chain to the sealed claim release
+        $intentPrev = Get-ClashProperty -Object $intent -Name 'prevReceiptSha' -Default $null
+        $releaseHashes = @(Get-ClashFileHashes -Path $releasePath)
+        if (-not (Test-ClashSha256Text $intentPrev)) {
+          $problems.Add(('the sealed intent prevReceiptSha is {0}; it must be 64 lowercase hex characters' -f (Format-ClashFieldValue $intentPrev)))
+        }
+        elseif ($releaseHashes.Count -eq 0) {
+          $problems.Add('the sealed intent cannot be chained: 06-claim-release.json is missing or unreadable')
+        }
+        elseif ($releaseHashes -notcontains [string]$intentPrev) {
+          $problems.Add(('the sealed intent prevReceiptSha {0} is not the hash of the sealed 06-claim-release.json ({1})' -f $intentPrev, $releaseHashes[0]))
+        }
+        # declared required evidence must be a clean list and really be sealed
+        $declaredRaw = Get-ClashProperty -Object $intent -Name 'requiredEvidence' -Default $null
+        if ($null -eq $declaredRaw -or $declaredRaw -is [string] -or -not ($declaredRaw -is [array] -or $declaredRaw -is [System.Collections.IList])) {
+          $problems.Add(('the sealed intent requiredEvidence is {0}; it must be a non-empty array' -f (Format-ClashFieldValue $declaredRaw)))
+        }
+        else {
+          $declared = @($declaredRaw)
+          if ($declared.Count -eq 0) { $problems.Add('the sealed intent declares no required evidence') }
+          $seenDeclared = @{}
+          foreach ($entry in $declared) {
+            if (-not ($entry -is [string]) -or [string]::IsNullOrWhiteSpace([string]$entry)) {
+              $problems.Add(('the sealed intent declares a required evidence entry that is not a name: {0}' -f (Format-ClashFieldValue $entry)))
+              continue
+            }
+            if ($seenDeclared.ContainsKey([string]$entry)) {
+              $problems.Add(('the sealed intent declares {0} twice' -f $entry))
+              continue
+            }
+            $seenDeclared[[string]$entry] = $true
+            $hits = @(Get-ChildItem -LiteralPath $RunPath -Recurse -File | Where-Object { $_.Name -ceq [string]$entry }).Count
+            if ($hits -lt 1) { $problems.Add(('the sealed intent requires {0} but no such file exists in the run' -f $entry)) }
+          }
+          $sealEntries = @(Get-ClashProperty -Object $sealDocument -Name 'files' -Default @())
+          foreach ($must in @(Get-ClashCompletionRequiredEvidence)) {
+            if (-not $seenDeclared.ContainsKey($must)) {
+              $problems.Add(('the sealed intent does not declare the required evidence {0}' -f $must))
+            }
+            $sealed = 0
+            foreach ($entry in $sealEntries) {
+              if ([string](Get-ClashProperty -Object $entry -Name 'path' -Default '') -ceq $must) { $sealed++ }
+            }
+            if ($sealed -ne 1) { $problems.Add(('the evidence {0} appears {1} time(s) in the seal, expected exactly 1' -f $must, $sealed)) }
+          }
+        }
+      }
+    }
+
+    # ---- 12: writerRunId must match the sealed claim release -------------
+    $writerRun  = Get-ClashProperty -Object $document -Name 'writerRunId' -Default $null
+    $releaseDoc = $null
+    if (Test-Path -LiteralPath $releasePath -PathType Leaf) {
+      try { $releaseDoc = [System.IO.File]::ReadAllText($releasePath) | ConvertFrom-Json } catch { $releaseDoc = $null }
+    }
+    $releaseRun   = Get-ClashProperty -Object $releaseDoc -Name 'runId' -Default $null
+    $releaseState = Get-ClashProperty -Object $releaseDoc -Name 'status' -Default $null
+    $releaseDone  = Get-ClashProperty -Object $releaseDoc -Name 'released' -Default $null
+    if (-not ($writerRun -is [string]) -or [string]::IsNullOrWhiteSpace([string]$writerRun)) {
+      $problems.Add(('the marker writerRunId is {0}' -f (Format-ClashFieldValue $writerRun)))
+    }
+    elseif ($null -eq $releaseDoc) {
+      $problems.Add('the marker writerRunId cannot be verified: 06-claim-release.json is missing or unreadable')
+    }
+    else {
+      if (-not ($releaseState -is [string]) -or $releaseState -cne 'PASS') {
+        $problems.Add(('the sealed claim release status is {0}, not PASS' -f (Format-ClashFieldValue $releaseState)))
+      }
+      if (-not ($releaseDone -is [bool]) -or $releaseDone -ne $true) {
+        $problems.Add(('the sealed claim release does not record released = true ({0})' -f (Format-ClashFieldValue $releaseDone)))
+      }
+      if (-not ($releaseRun -is [string]) -or $releaseRun -cne [string]$writerRun) {
+        $problems.Add(('the marker writerRunId "{0}" is not the runId "{1}" recorded by the sealed claim release' -f $writerRun, $releaseRun))
+      }
+    }
+  }
+
+  $markerSha = ''
+  if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+    try { $markerSha = Get-NormalizedSha256 -Path $markerPath } catch { $markerSha = '' }
   }
 
   return [ordered]@{
-    ok         = ($problems.Count -eq 0)
-    problems   = @($problems)
-    protocol   = $(if ($null -ne $document) { [string](Get-ClashProperty -Object $document -Name 'protocol' -Default '') } else { '' })
-    sealSha256 = [string]$check.sha256
-    sealFiles  = [int]$check.fileCount
+    ok          = ($problems.Count -eq 0)
+    problems    = @($problems)
+    protocol    = $(if ($null -ne $document) { [string](Get-ClashProperty -Object $document -Name 'protocol' -Default '') } else { '' })
+    sealSha256  = [string]$check.sha256
+    sealFiles   = [int]$check.fileCount
+    sealChain   = [string]$check.chainHead
+    markerSha256 = $markerSha
   }
 }
 
@@ -1758,7 +2063,20 @@ $script:ClashSelfTestRequiredCases = @(
   'completionValidatorRejectsUnsealedEvidence',
   'completionRefusesMissingRequiredEvidence',
   'completionIntentNeverClaimsComplete',
-  'deployTailIsTheOnlyCompletionPath'
+  'deployTailIsTheOnlyCompletionPath',
+  # Round 17 (C16-C1): every authoritative marker field is verified against
+  # sealed evidence, one mutation at a time.
+  'completionRejectsCodexChainMutation',
+  'completionRejectsWrongPrevReceiptShaOnly',
+  'completionRejectsWrongSealChainHeadOnly',
+  'completionRejectsMissingIntent',
+  'completionRejectsMisTypedMarker',
+  'completionRejectsMalformedHashFields',
+  'completionRejectsIntentChainBreak',
+  'completionRejectsRequiredEvidenceDrift',
+  'completionRejectsContradictoryWriterRunId',
+  'completionRejectsUnknownSealName',
+  'completionRejectsForeignAdapter'
 )
 
 # Returns a FLAT sequence of case-name strings.
