@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 23;
-const EXPECTED_CASES = 55;
-const EXPECTED_ASSERTIONS = 395;
+const EXPECTED_SECTIONS = 24;
+const EXPECTED_CASES = 65;
+const EXPECTED_ASSERTIONS = 410;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -1815,8 +1815,9 @@ hdr(22, 'verification report contract - the report IS the SQL (Round 12 / R11-C1
   const gate5 = deployCode.slice(deployCode.indexOf('gate 5: postflight'), deployCode.indexOf('$seal = Seal-Evidence'));
   check('R11-C1: row counting is no longer the gate for postflight or storage',
     !/\[regex\]::Matches/.test(gate5) && !/\$vfFailRows|\$stFailRows/.test(gate5) &&
-    // gate 2 keeps its own zero-row rule, so hardening gate 5 leaves no sibling open
-    /if \(\$pfFail -gt 0 -or \$pfPass -lt 1\)/.test(deployCode));
+    // Round 14 (R13-C1): the sibling gate kept a row count; it is gone too
+    !/\$pfFail|\$pfPass/.test(deployCode) &&
+    deployCode.includes("$pfReport = Test-VerifyReport -Result $pf -ReportName '00_preflight.sql'"));
   check('a report that does not hold never produces a PASS phase receipt',
     /\$vfReport\.verdict/.test(deployCode) && /\$stReport\.verdict/.test(deployCode) &&
     /if \(-not \$vfReport\.ok\) \{/.test(deployCode) && /if \(-not \$stReport\.ok\) \{/.test(deployCode) &&
@@ -1910,6 +1911,18 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
     return lines.join('\n') + '\n';
   };
 
+  // The column spans the dashed separator declares: (width + 2) dashes per
+  // column, joined by '+'. Independent of the PowerShell implementation, which
+  // reads the same arithmetic off the same line.
+  const boundsOf = (separator) => {
+    const out = []; let start = 0;
+    for (const seg of separator.split('+')) { out.push({ start, width: seg.length }); start += seg.length + 1; }
+    return out;
+  };
+  const cellsByBounds = (line, bounds) => bounds.map((b, i) => (i === bounds.length - 1
+    ? line.slice(b.start).trim()
+    : line.slice(b.start, b.start + b.width).trim()));
+
   // Mirror of the deployed state machine, written from the rules rather than
   // from the PowerShell source so the two have to agree independently.
   const parseEnvelope = (text) => {
@@ -1917,7 +1930,7 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
     const rows = [];
     let state = 'preamble';
     let sawHeader = false; let sawSep = false; let sawFooter = false; let footerRows = -1;
-    let blanksInside = 0;
+    let blanksInside = 0; let bounds = null;
     text.split(/\r?\n/).forEach((raw, idx) => {
       const lineNo = idx + 1;
       const trimmed = raw.trim();
@@ -1937,7 +1950,7 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
       if (state === 'separator') {
         const segs = trimmed.split('+');
         if (/^-+(\+-+)+$/.test(trimmed) && segs.length === 5 && segs.every((x) => x.length >= 3)) {
-          sawSep = true; state = 'body'; return;
+          sawSep = true; bounds = boundsOf(trimmed); state = 'body'; return;
         }
         problems.push(`line ${lineNo}: expected the dashed separator`); state = 'body'; return;
       }
@@ -1945,7 +1958,10 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
         const footer = trimmed.match(/^\((\d+) rows?\)$/);
         if (footer) { footerRows = Number(footer[1]); sawFooter = true; state = 'after-footer'; return; }
         if (/^\(.*row/.test(trimmed)) { problems.push(`line ${lineNo}: malformed row-count footer`); return; }
-        const fields = raw.split('|');
+        // Frame the row on the separator's column spans. Splitting on '|' is
+        // wrong the moment a cell contains a pipe, and 00_preflight.sql renders
+        // 'postgis|extensions' on purpose (R13-C1).
+        const fields = bounds === null ? raw.split('|') : cellsByBounds(raw, bounds);
         const first = fields.length === 5 ? fields[0].trim() : '';
         const status = fields.length === 5 ? fields[4].trim() : '';
         const ordinalOk = /^\d+$/.test(first);
@@ -2055,6 +2071,200 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
   check('the README documents the envelope',
     readmeText.includes('(N rows)') && readmeText.includes('row-count footer') &&
     readmeText.includes('header') && readmeText.includes('separator'));
+}
+
+{
+  // ==========================================================================
+  // Section 24: gate 2 is a contract too (R13-C1)
+  //
+  // Round 13 hardened gate 5 and left gate 2 counting lines that end in
+  // '| PASS'. The independent audit ran the committed block with exit 0, a
+  // complete capture and the single line
+  //     THIS IS NOT A PREFLIGHT REPORT | PASS
+  // and got a PASS receipt, no STOP, and a run that would have advanced to the
+  // ledger gate. These assertions hold the fix: a declared 21-row contract,
+  // framing that survives a pipe inside a cell, and a receipt that takes its
+  // status from the report verdict rather than from the exit code.
+  // ==========================================================================
+  sectionsRun += 1;
+
+  const boundsOf = (separator) => {
+    const out = []; let start = 0;
+    for (const seg of separator.split('+')) { out.push({ start, width: seg.length }); start += seg.length + 1; }
+    return out;
+  };
+  const cellsByBounds = (line, bounds) => bounds.map((b, i) => (i === bounds.length - 1
+    ? line.slice(b.start).trim()
+    : line.slice(b.start, b.start + b.width).trim()));
+
+  const preflightSql = lf(read(join(CLOUD, 'preflight/00_preflight.sql')));
+  const deployCode = lf(read(join(CLOUD, 'tools/deploy.ps1')));
+  const libCode = lf(read(join(CLOUD, 'tools/lib/clash-native.ps1')));
+  const selfTest = lf(read(join(CLOUD, 'tools/test-native-capture.ps1')));
+  const readmeText = lf(read(join(CLOUD, 'README.md')));
+
+  // Derive the contract from the SQL itself: every 'select N as ord, ...' triple
+  // appears twice (the SELECT and the guard), so both copies must agree and both
+  // must match what the adapter declares.
+  const sqlRows = [];
+  const triple = /select (\d+) as ord, '((?:[^']|'')*)'::text as check_name, '((?:[^']|'')*)'::text as expected/g;
+  let m;
+  while ((m = triple.exec(preflightSql)) !== null) {
+    sqlRows.push({ ord: Number(m[1]), name: m[2].replace(/''/g, "'"), expected: m[3].replace(/''/g, "'") });
+  }
+  const sqlByOrd = new Map();
+  let sqlConflict = 0;
+  for (const row of sqlRows) {
+    const prior = sqlByOrd.get(row.ord);
+    if (prior && (prior.name !== row.name || prior.expected !== row.expected)) sqlConflict += 1;
+    sqlByOrd.set(row.ord, row);
+  }
+  const sqlContract = [...sqlByOrd.values()].sort((a, b) => a.ord - b.ord);
+
+  // The declaration, read out of the adapter's own text (no import: the suite
+  // must not reuse the code it is checking).
+  const declaredBlock = libCode.slice(libCode.indexOf("if ($ReportName -eq '00_preflight.sql')"), libCode.indexOf("if ($ReportName -eq '90_verify.sql')"));
+  const declaredRows = [];
+  const decl = /ord = (\d+);\s+name = '((?:[^']|'')*)';\s+expected = '((?:[^']|'')*)';\s+info = \$(true|false)/g;
+  while ((m = decl.exec(declaredBlock)) !== null) {
+    declaredRows.push({ ord: Number(m[1]), name: m[2], expected: m[3], info: m[4] === 'true' });
+  }
+  const declaredGating = /gating = (\d+)/.exec(declaredBlock);
+  const declaredInfo = /info\s+= (\d+)/.exec(declaredBlock);
+
+  check('the adapter declares exactly the 21 checks 00_preflight.sql renders',
+    sqlRows.length === 42 && sqlConflict === 0 && sqlContract.length === 21 &&
+    declaredRows.length === 21 &&
+    sqlContract.every((row, i) => declaredRows[i].ord === row.ord &&
+      declaredRows[i].name === row.name && declaredRows[i].expected === row.expected),
+    `sql=${sqlContract.length} declared=${declaredRows.length} conflicts=${sqlConflict}`);
+  check('the preflight contract counts 19 gating checks and two INFO checks',
+    Number(declaredGating && declaredGating[1]) === 19 &&
+    Number(declaredInfo && declaredInfo[1]) === 2 &&
+    declaredRows.filter((r) => r.info).map((r) => r.ord).join(',') === '20,21' &&
+    declaredRows.filter((r) => !r.info).length === 19 &&
+    // the SQL decides INFO from the check name, so the declaration must agree
+    declaredRows.filter((r) => r.info).every((r) => r.name.startsWith('INFO')));
+  check('the pipe in ord 8 is a value in both the SQL and the declaration',
+    sqlContract[7].expected === 'postgis|extensions' &&
+    declaredRows[7].expected === 'postgis|extensions' &&
+    /e\.extname\|\|'\|'\|\|n\.nspname/.test(preflightSql),
+    'ord 8 must carry postgis|extensions on both sides');
+
+  // --- an independent read of the real report -------------------------------
+  const preflightFixture = (opts = {}) => {
+    const header = ['ord', 'check_name', 'expected', 'actual', 'status'];
+    const body = sqlContract.map((r) => {
+      const info = r.name.startsWith('INFO');
+      const actual = info ? 'INFO absent' : r.expected;
+      return [String(r.ord), r.name, r.expected, actual, info ? 'INFO' : (opts.failOrd === r.ord ? 'FAIL' : 'PASS')];
+    });
+    if (opts.omitOrd) { const at = body.findIndex((r) => Number(r[0]) === opts.omitOrd); if (at >= 0) body.splice(at, 1); }
+    const widths = header.map((h, i) => Math.max(h.length, ...body.map((r) => r[i].length)));
+    const pad = (t, w, right) => (right ? String(t).padStart(w) : String(t).padEnd(w));
+    const lines = [
+      ` ${header.map((c, i) => pad(c, widths[i], i === 0)).join(' | ')} `,
+      widths.map((w) => '-'.repeat(w + 2)).join('+'),
+      ...body.map((r) => ` ${r.map((c, i) => pad(c, widths[i], i === 0)).join(' | ')} `),
+    ];
+    if (!opts.noFooter) lines.push(`(${body.length} ${body.length === 1 ? 'row' : 'rows'})`);
+    if (opts.trailer) lines.push(opts.trailer);
+    return lines.join('\n') + '\n';
+  };
+
+  const readReport = (text) => {
+    const lines = text.split(/\r?\n/);
+    const sepAt = lines.findIndex((l) => /^-+(\+-+)+$/.test(l.trim()));
+    if (sepAt < 0) return { rows: [], bounds: null, footer: null };
+    const bounds = boundsOf(lines[sepAt].trim());
+    const rows = [];
+    let footer = null;
+    for (const line of lines.slice(sepAt + 1)) {
+      const t = line.trim();
+      if (t.length === 0) continue;
+      const f = t.match(/^\((\d+) rows?\)$/);
+      if (f) { footer = Number(f[1]); break; }
+      rows.push(cellsByBounds(line, bounds));
+    }
+    return { rows, bounds, footer };
+  };
+
+  const real = preflightFixture();
+  const parsedReal = readReport(real);
+  const statuses = parsedReal.rows.map((r) => r[4]);
+  check('mirror: a five-column boundary read parses the real preflight report to 21 rows',
+    parsedReal.rows.length === 21 && parsedReal.footer === 21 &&
+    statuses.filter((x) => x === 'PASS').length === 19 &&
+    statuses.filter((x) => x === 'INFO').length === 2 &&
+    parsedReal.rows[7][2] === 'postgis|extensions' &&
+    parsedReal.rows[7][3] === 'postgis|extensions' &&
+    parsedReal.rows.every((r) => r.length === 5),
+    `rows=${parsedReal.rows.length} footer=${parsedReal.footer}`);
+  check('mirror: splitting that same report on the pipe would read more than five cells',
+    real.split('\n').find((l) => l.includes('postgis|extensions')).split('|').length === 7,
+    'the postgis row must prove why a pipe splitter is wrong');
+  check('mirror: the audit input is not a report under any reading',
+    (() => {
+      const audit = 'THIS IS NOT A PREFLIGHT REPORT | PASS\n';
+      const read = readReport(audit);
+      return read.bounds === null && read.rows.length === 0 && read.footer === null;
+    })());
+  check('mirror: a missing check and a rendered FAIL are both visible to the contract',
+    (() => {
+      const missing = readReport(preflightFixture({ omitOrd: 7 }));
+      const failed = readReport(preflightFixture({ failOrd: 5 }));
+      return missing.rows.length === 20 && missing.footer === 20 &&
+        !missing.rows.some((r) => Number(r[0]) === 7) &&
+        failed.rows.filter((r) => r[4] === 'FAIL').length === 1;
+    })());
+
+  // --- the committed gate ---------------------------------------------------
+  const gate2 = deployCode.slice(deployCode.indexOf('gate 2: preflight SQL'), deployCode.indexOf('gate 3: ledger must be empty'));
+  check('R13-C1: gate 2 validates the report contract instead of counting suffixes',
+    gate2.includes("Test-VerifyReport -Result $pf -ReportName '00_preflight.sql'") &&
+    !gate2.includes('[regex]::Matches') && !/\$pfPass|\$pfFail/.test(gate2) &&
+    !/\\\|\\s\*PASS\\s\*\$/.test(gate2),
+    'the suffix count must be gone, not merely unused');
+  check('R13-C1: the preflight receipt takes its status from the report verdict',
+    /New-PhaseReceipt '02-preflight\.json' @\{\s*\n?\s*status\s+= \$pfReport\.verdict/.test(gate2) &&
+    !/status\s+= \$\(if \(Test-NativeSuccess \$pf\)/.test(gate2) &&
+    /if \(-not \$pfReport\.ok\)/.test(gate2) &&
+    gate2.includes('problems        = @($pfReport.problems)'));
+  check('R13-C1: preflight STOPs cover the child and the report, in that order',
+    gate2.indexOf("'02-preflight-fail.json'") > gate2.indexOf("New-PhaseReceipt '02-preflight.json'") &&
+    gate2.indexOf("'02-preflight-rows.json'") > gate2.indexOf("'02-preflight-fail.json'") &&
+    gate2.indexOf("'02-preflight-rows.json'") < deployCode.indexOf('gate 3: ledger must be empty'));
+
+  // --- framing in the adapter ----------------------------------------------
+  check('the adapter frames rows on the separator column spans, not on the pipe',
+    /function Get-ReportColumnBounds/.test(libCode) &&
+    /function Get-ReportCellsFromBounds/.test(libCode) &&
+    /\$bounds = @\(Get-ReportColumnBounds -SeparatorLine \$line\)/.test(libCode) &&
+    /\$fields = @\(Get-ReportCellsFromBounds -Line \$line -Bounds \$bounds\)/.test(libCode) &&
+    // the split survives only where a separator was never seen (already a failure)
+    /else \{\s*\n\s*\$fields = @\(\$line\.Split\('\|'\)\)/.test(libCode));
+  check('ten gate-2 cases exist in the harness and in the inventory',
+    ['preflightValidReportAdvancesToLedgerGate', 'preflightArbitrarySuffixTextStops',
+      'preflightMissingCheckStops', 'preflightDuplicateCheckStops', 'preflightReorderedChecksStop',
+      'preflightRenamedCheckStops', 'preflightRenderedFailRowStops', 'preflightTruncatedReportStops',
+      'preflightPipeInsideCellIsNotAColumn', 'preflightInfoOnlyReportStops']
+      .every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest) && libCode.includes(`'${n}'`)));
+  check('the harness executes the committed gate-2 block and forbids a suffix count in it',
+    /function Get-PreflightGateBlock/.test(selfTest) &&
+    /function Invoke-PreflightGateProbe/.test(selfTest) &&
+    // the extractor's boundaries and guards, as escape-free fragments
+    selfTest.includes('$pf = Invoke-NativeProcess -FilePath') &&
+    selfTest.includes('gate 3: ') &&
+    selfTest.includes('status          = `$pfReport.verdict') &&
+    selfTest.includes("$text.Contains('[regex]::Matches')") &&
+    selfTest.includes("$text.Contains('Multiline')"));
+  check('the README documents the preflight contract',
+    readmeText.includes('00_preflight.sql') && readmeText.includes('21') &&
+    readmeText.includes('postgis|extensions') && /R13-C1/.test(readmeText));
+  check('the adapter identity is 4.6.0 in the lib, the README and the workflow',
+    /ClashAdapterVersion = '4\.6\.0'/.test(libCode) &&
+    readmeText.includes('4.6.0') &&
+    lf(read(join(ROOT, '.github/workflows/windows-offline-validation.yml'))).includes("'4.6.0'"));
 }
 
 {

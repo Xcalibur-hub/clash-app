@@ -120,7 +120,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 55 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 55
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 65
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -141,7 +141,7 @@ if (-not $inventoryCheck.ok) {
     adapterVersion    = $script:ClashAdapterVersion
     adapterSha256     = $script:adapterShaFinal
     casesExecuted     = 0
-    casesExpected     = 55
+    casesExpected     = 65
     cases             = @{}
     problems          = $reasons
     inventoryObserved = $observed
@@ -1145,6 +1145,135 @@ Add-Case 'claimReleaseIncompleteCaptureStops' (
 # process and evidence layers substituted. Every fixture is generated from the
 # adapter's own contract, so a fixture cannot drift from the reviewed identities.
 
+# The committed gate-2 region, extracted the same way the gate-5 region is:
+# between its own first line and the gate-3 banner, with the markers that make it
+# a contract instead of a count. R13-C1 was a gate whose body nobody had to
+# satisfy; these markers are the shape the probe executes, so a future rewrite
+# that drops the contract fails here before it can ship.
+function Get-PreflightGateBlock {
+  param([string]$Path)
+
+  $lines   = [System.IO.File]::ReadAllLines($Path)
+  $startAt = -1
+  $endAt   = -1
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($startAt -lt 0 -and $lines[$i] -match '^\$pf = Invoke-NativeProcess -FilePath \$psqlPath') { $startAt = $i; continue }
+    if ($startAt -ge 0 -and $lines[$i] -match '^# -+ gate 3: ') { $endAt = $i; break }
+  }
+  if ($startAt -lt 0 -or $endAt -le $startAt) {
+    throw ('preflight gate block not found in {0} (start {1}, end {2})' -f $Path, $startAt, $endAt)
+  }
+
+  $text = (@($lines[$startAt..($endAt - 1)]) -join "`n")
+  $required = [ordered]@{
+    "Test-VerifyReport -Result `$pf -ReportName '00_preflight.sql'" = 1
+    "New-PhaseReceipt '02-preflight.json'"                         = 1
+    "status          = `$pfReport.verdict"                         = 1
+    "if (-not `$pfReport.ok)"                                      = 1
+    "'02-preflight-fail.json'"                                     = 1
+    "'02-preflight-rows.json'"                                     = 1
+    'preflight\00_preflight.sql'                                   = 1
+  }
+  $problems = @()
+  foreach ($marker in @($required.Keys)) {
+    $hits = ([regex]::Matches($text, [regex]::Escape([string]$marker))).Count
+    if ($hits -ne [int]$required[$marker]) {
+      $problems += ('gate marker {0} appears {1} time(s), expected {2}' -f $marker, $hits, $required[$marker])
+    }
+  }
+  # The defect itself must not come back. These are escape-free literals: the
+  # old gate counted with [regex]::Matches over a 'Multiline' PASS/FAIL suffix,
+  # so a gate that has neither cannot be counting suffixes any more.
+  if ($text.Contains('[regex]::Matches')) { $problems += 'the preflight gate still regex-counts rows' }
+  if ($text.Contains('Multiline')) { $problems += 'the preflight gate still matches a multiline suffix' }
+  if ($text.Contains('$pfPass')) { $problems += 'the preflight gate still decides on a PASS row count' }
+  if ($text.Contains('$pfFail')) { $problems += 'the preflight gate still decides on a FAIL row count' }
+
+  return [ordered]@{ text = $text; lines = ($endAt - $startAt); startLine = ($startAt + 1); problems = $problems }
+}
+
+# Runs the committed gate-2 block against stubbed child/evidence layers. Nothing
+# is simulated: the block text is the file's own, executed by PowerShell 5.1, and
+# the only things replaced are the psql child, the evidence writer and the
+# receipt writer - the same substitutions the gate-5 probe makes.
+function Invoke-PreflightGateProbe {
+  param(
+    [object[]]$Results,
+    [string]$RunId = 'r14-preflight-probe-0001'
+  )
+
+  $state = [ordered]@{
+    runId = $RunId; receipts = [ordered]@{}; stopName = ''; stopReason = ''
+    advanced = $false; nativeCalls = 0; calls = @(); evidenceCalls = 0
+    threw = ''; blockLines = 0; blockStartLine = 0; blockProblems = @()
+  }
+
+  try {
+    $blockInfo = Get-PreflightGateBlock -Path (Join-Path $pluginRoot 'deploy.ps1')
+    $state.blockLines     = [int]$blockInfo.lines
+    $state.blockStartLine = [int]$blockInfo.startLine
+    $state.blockProblems  = @($blockInfo.problems)
+
+    $common      = Get-DeployCommonArguments -Path (Join-Path $pluginRoot 'deploy.ps1')
+    $runId       = $RunId
+    $run         = 'C:\clash-probe-evidence\r14'
+    $psqlPath    = 'C:\clash-probe\psql.exe'
+    $cloudRoot   = 'C:\clash-probe\cloud'
+    $policy      = [pscustomobject]@{ env = @{} }
+    $PreflightTimeoutSeconds = 300
+
+    $script:r14State = $state
+    $script:r14Queue = @($Results)
+    $script:r14Block = [scriptblock]::Create([string]$blockInfo.text)
+
+    & {
+      function Invoke-NativeProcess {
+        param($FilePath, $Arguments, $Environment, $TimeoutSeconds)
+        $script:r14State.nativeCalls = $script:r14State.nativeCalls + 1
+        $script:r14State.calls += (@($Arguments) -join ' ')
+        $index = $script:r14State.nativeCalls - 1
+        if ($index -ge @($script:r14Queue).Count) {
+          return [ordered]@{
+            filePath = 'psql.exe'; argumentCount = 0; exitCode = $null; timedOut = $false
+            launchError = 'probe result queue exhausted'; captureNote = ''
+            stdOut = ''; stdErr = ''; startedUtc = 'probe'; finishedUtc = 'probe'; durationMs = 0
+          }
+        }
+        return $script:r14Queue[$index]
+      }
+      function Write-Evidence {
+        param($Path, $Text)
+        $script:r14State.evidenceCalls = $script:r14State.evidenceCalls + 1
+        return [ordered]@{ ok = $true; path = [string]$Path; sha256 = ('0' * 64) }
+      }
+      function New-PhaseReceipt {
+        param([string]$Name, $Fields)
+        $copy = [ordered]@{}
+        foreach ($k in @($Fields.Keys)) { $copy[[string]$k] = $Fields[$k] }
+        $script:r14State.receipts[[string]$Name] = $copy
+      }
+      function Stop-Run {
+        param([string]$Reason, [string]$StopName = 'STOP.json')
+        $script:r14State.receipts[[string]$StopName] = [ordered]@{ status = 'STOPPED'; reason = [string]$Reason }
+        $script:r14State.stopName   = [string]$StopName
+        $script:r14State.stopReason = [string]$Reason
+        throw ('CLASH-PROBE-STOP:' + [string]$StopName)
+      }
+      & $script:r14Block
+      # The block finished without stopping: the gate would have continued.
+      $script:r14State.advanced = $true
+    }
+  }
+  catch {
+    $message = 'unknown'
+    try { $message = [string]$_.Exception.Message } catch { }
+    if ($message -notlike 'CLASH-PROBE-STOP:*') {
+      $state.threw = (Protect-Text $message)
+    }
+  }
+  return $state
+}
+
 function Get-VerificationGateBlock {
   param([string]$Path)
 
@@ -1257,7 +1386,8 @@ function New-VerifyReportText {
     [switch]$NoFooter,
     [string]$Trailer = '',
     [string]$JunkLine = '',
-    [int]$CutLastChars = 0
+    [int]$CutLastChars = 0,
+    [int[]]$SwapOrds = @()
   )
 
   $contract = Get-ClashVerifyContract -ReportName $ReportName
@@ -1283,6 +1413,24 @@ function New-VerifyReportText {
     $body.Add(@([string]$ord, $name, [string]$c.expected, $actual, $status))
     if (@($DuplicateOrds) -contains $ord) {
       $body.Add(@([string]$ord, $name, [string]$c.expected, $actual, $status))
+    }
+  }
+
+  # Reordering is a defect of its own: every row can be present, correct and
+  # complete, and the report is still not the one the script renders.
+  if (@($SwapOrds).Count -ge 2) {
+    $first = [int]$SwapOrds[0]
+    $second = [int]$SwapOrds[1]
+    $firstAt = -1
+    $secondAt = -1
+    for ($i = 0; $i -lt $body.Count; $i++) {
+      if ([int]$body[$i][0] -eq $first) { $firstAt = $i }
+      if ([int]$body[$i][0] -eq $second) { $secondAt = $i }
+    }
+    if ($firstAt -ge 0 -and $secondAt -ge 0 -and $firstAt -ne $secondAt) {
+      $held = $body[$firstAt]
+      $body[$firstAt] = $body[$secondAt]
+      $body[$secondAt] = $held
     }
   }
 
@@ -1894,6 +2042,159 @@ Add-Case 'reportStorageTrailerStops' (
   -not $gateStorageTrailer.receipts.Contains('06-claim-release.json') -and
   -not $gateStorageTrailer.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateStorageTrailer -Outcome $storageTrailerOutcome `
   -Note 'the storage verifier is held to the same envelope as the postflight')
+
+# ===========================================================================
+# 56-65: gate 2 - the preflight report is a contract (R13-C1)
+#
+# Round 13 made gate 5 read its report strictly and left gate 2 counting lines
+# that end in '| PASS'. The independent audit proved the consequence: exit 0, a
+# complete capture, and the single line
+#     THIS IS NOT A PREFLIGHT REPORT | PASS
+# produced a PASS receipt, no STOP, and a run that would have advanced to the
+# ledger gate. These cases execute the committed gate-2 block on this runtime and
+# require the same contract gate 5 already had: 21 declared checks, in order,
+# framed by a header, a separator and a '(21 rows)' footer, and a receipt that
+# takes its status from that verdict.
+# ===========================================================================
+
+# ---- 56: the real report advances to the ledger gate ----------------------
+$pfValidText = New-VerifyReportText -ReportName '00_preflight.sql'
+$gatePfValid = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $pfValidText))
+$pfValidOutcome = Test-VerificationGateOutcome -Probe $gatePfValid `
+  -ExpectedReceipts @('02-preflight.json') `
+  -ExpectedStop '' `
+  -ExpectedStatus @{ '02-preflight.json' = 'PASS' }
+Add-Case 'preflightValidReportAdvancesToLedgerGate' (
+  $pfValidOutcome.ok -and
+  $gatePfValid.advanced -and
+  # The extracted block carries every marker the contract needs; a gate whose
+  # shape drifted must fail here rather than pass by accident.
+  @($gatePfValid.blockProblems).Count -eq 0 -and
+  [int]$gatePfValid.blockLines -gt 20 -and
+  [int]$gatePfValid.nativeCalls -eq 1 -and
+  [string]$gatePfValid.receipts['02-preflight.json']['rows'] -eq '21' -and
+  [string]$gatePfValid.receipts['02-preflight.json']['passRows'] -eq '19' -and
+  [string]$gatePfValid.receipts['02-preflight.json']['infoRows'] -eq '2' -and
+  ([string]$gatePfValid.calls[0]) -match '00_preflight\.sql') (New-GateCaseDetail -Probe $gatePfValid -Outcome $pfValidOutcome `
+  -Note 'the unmodified 21-row report satisfies the contract and the gate continues')
+
+# ---- 57: the audit's exact input ------------------------------------------
+$gatePfSuffix = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text 'THIS IS NOT A PREFLIGHT REPORT | PASS'))
+$pfSuffixOutcome = Test-VerificationGateOutcome -Probe $gatePfSuffix `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightArbitrarySuffixTextStops' (
+  $pfSuffixOutcome.ok -and
+  -not $gatePfSuffix.advanced -and
+  [int]$gatePfSuffix.nativeCalls -eq 1 -and
+  [string]$gatePfSuffix.stopReason -match 'no column header' -and
+  [string]$gatePfSuffix.stopReason -match 'no row-count footer') (New-GateCaseDetail -Probe $gatePfSuffix -Outcome $pfSuffixOutcome `
+  -Note 'exit 0 plus a line ending in | PASS is not a preflight report')
+
+# ---- 58: one declared check is missing ------------------------------------
+$pfMissingText = New-VerifyReportText -ReportName '00_preflight.sql' -OmitOrds @(7)
+$gatePfMissing = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $pfMissingText))
+$pfMissingOutcome = Test-VerificationGateOutcome -Probe $gatePfMissing `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightMissingCheckStops' (
+  $pfMissingOutcome.ok -and
+  -not $gatePfMissing.advanced -and
+  [string]$gatePfMissing.stopReason -match '1 declared check\(s\) missing from the report: ord 7') (New-GateCaseDetail -Probe $gatePfMissing -Outcome $pfMissingOutcome)
+
+# ---- 59: a check is rendered twice ---------------------------------------
+$pfDuplicateText = New-VerifyReportText -ReportName '00_preflight.sql' -DuplicateOrds @(4)
+$gatePfDuplicate = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $pfDuplicateText))
+$pfDuplicateOutcome = Test-VerificationGateOutcome -Probe $gatePfDuplicate `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightDuplicateCheckStops' (
+  $pfDuplicateOutcome.ok -and
+  -not $gatePfDuplicate.advanced -and
+  [string]$gatePfDuplicate.stopReason -match '1 duplicated check ord\(s\): 4') (New-GateCaseDetail -Probe $gatePfDuplicate -Outcome $pfDuplicateOutcome)
+
+# ---- 60: the rows are complete but out of order ---------------------------
+$pfOrderText = New-VerifyReportText -ReportName '00_preflight.sql' -SwapOrds @(4, 5)
+$gatePfOrder = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $pfOrderText))
+$pfOrderOutcome = Test-VerificationGateOutcome -Probe $gatePfOrder `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightReorderedChecksStop' (
+  $pfOrderOutcome.ok -and
+  -not $gatePfOrder.advanced -and
+  [string]$gatePfOrder.stopReason -match 'not in ascending ord order') (New-GateCaseDetail -Probe $gatePfOrder -Outcome $pfOrderOutcome `
+  -Note 'every row can be present and correct and the report still not be the one the script renders')
+
+# ---- 61: a check is renamed ----------------------------------------------
+$pfRenamedText = New-VerifyReportText -ReportName '00_preflight.sql' -RenameOrds @{ 9 = 'pgcrypto schema, maybe' }
+$gatePfRenamed = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $pfRenamedText))
+$pfRenamedOutcome = Test-VerificationGateOutcome -Probe $gatePfRenamed `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightRenamedCheckStops' (
+  $pfRenamedOutcome.ok -and
+  -not $gatePfRenamed.advanced -and
+  [string]$gatePfRenamed.stopReason -match "check 9: name 'pgcrypto schema, maybe' is not the declared 'pgcrypto schema'") (New-GateCaseDetail -Probe $gatePfRenamed -Outcome $pfRenamedOutcome)
+
+# ---- 62: a gating check renders FAIL ------------------------------------
+$pfFailText = New-VerifyReportText -ReportName '00_preflight.sql' -StatusByOrd @{ 5 = 'FAIL' }
+$gatePfFail = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $pfFailText))
+$pfFailOutcome = Test-VerificationGateOutcome -Probe $gatePfFail `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightRenderedFailRowStops' (
+  $pfFailOutcome.ok -and
+  -not $gatePfFail.advanced -and
+  [string]$gatePfFail.stopReason -match '1 rendered check\(s\) FAILED' -and
+  [string]$gatePfFail.stopReason -match 'rendered FAIL') (New-GateCaseDetail -Probe $gatePfFail -Outcome $pfFailOutcome)
+
+# ---- 63: the report is truncated (no footer) ----------------------------
+$pfTruncText = New-VerifyReportText -ReportName '00_preflight.sql' -NoFooter
+$gatePfTrunc = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $pfTruncText))
+$pfTruncOutcome = Test-VerificationGateOutcome -Probe $gatePfTrunc `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightTruncatedReportStops' (
+  $pfTruncOutcome.ok -and
+  -not $gatePfTrunc.advanced -and
+  [string]$gatePfTrunc.stopReason -match 'no row-count footer') (New-GateCaseDetail -Probe $gatePfTrunc -Outcome $pfTruncOutcome)
+
+# ---- 64: 'postgis|extensions' is a VALUE, not a separator ---------------
+# The report is the real one, so ord 8 carries a pipe in BOTH the expected and
+# the actual column. Splitting on '|' reads eight fields from that row; the
+# separator's column spans read five. A PASS here is only possible if the framing
+# is the boundaries, and the counts prove no row was dropped or misread.
+Add-Case 'preflightPipeInsideCellIsNotAColumn' (
+  $pfValidOutcome.ok -and
+  $gatePfValid.advanced -and
+  ([regex]::Matches([string]$pfValidText, [regex]::Escape('postgis|extensions'))).Count -eq 2 -and
+  [string]$gatePfValid.receipts['02-preflight.json']['rows'] -eq '21' -and
+  [string]$gatePfValid.receipts['02-preflight.json']['passRows'] -eq '19' -and
+  [string]$gatePfValid.receipts['02-preflight.json']['infoRows'] -eq '2' -and
+  [string]$gatePfValid.receipts['02-preflight.json']['separatorSeen'] -eq 'True') (New-GateCaseDetail -Probe $gatePfValid -Outcome $pfValidOutcome `
+  -Note 'expected and actual both carry the pipe; a split-on-| reader would see seven cells and drop the row')
+
+# ---- 65: an INFO-only report cannot leave a PASS receipt -----------------
+$pfInfoText = New-VerifyReportText -ReportName '00_preflight.sql' -OmitOrds @(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)
+$gatePfInfo = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $pfInfoText))
+$pfInfoOutcome = Test-VerificationGateOutcome -Probe $gatePfInfo `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightInfoOnlyReportStops' (
+  $pfInfoOutcome.ok -and
+  -not $gatePfInfo.advanced -and
+  [string]$gatePfInfo.receipts['02-preflight.json']['infoRows'] -eq '2' -and
+  [string]$gatePfInfo.receipts['02-preflight.json']['passRows'] -eq '0' -and
+  [string]$gatePfInfo.stopReason -match 'gating row\(s\) rendered') (New-GateCaseDetail -Probe $gatePfInfo -Outcome $pfInfoOutcome `
+  -Note 'the receipt takes its status from the report verdict, not from the exit code')
 
 # ===========================================================================
 # verdict: inventory first, then the receipt, then the file on disk

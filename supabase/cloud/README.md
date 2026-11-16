@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **395 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **410 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 395 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 410 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -201,6 +201,13 @@ deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
 `-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
 the contract rather than an accident of the host.
 
+Adapter `4.6.0` (was `4.5.0`), native self-test 65 cases (was 55): gate 2 is now
+held to a report contract too (see §1l), and ten cases execute the committed
+gate-2 region - the real 21-row report, the audit's arbitrary suffix line, a
+missing check, a duplicate, a reordering, a rename, a rendered FAIL, a truncation,
+the `postgis|extensions` row that proves the framing, and an INFO-only report
+whose receipt must not say PASS.
+
 Adapter `4.5.0` (was `4.4.0`), native self-test 55 cases (was 46): the envelope
 itself is now parsed strictly - header, separator, one `(N rows)` footer with a
 validated count, and nothing else - and nine cases execute it for both verifiers:
@@ -246,6 +253,15 @@ have not been executed on this machine either - they are executed by
 | - | the same class in two sibling parsers | `check-manifest.ps1` skipped a checksum line it could not split (a truncated list still passed while 200 well-formed lines remained); it now FAILs that line with its number. `Test-SelfTestReceipt` skipped a case recorded with no body, so "present but null" satisfied the name and count checks; it is now a problem |
 | - | the offline suite could not see any of this | section [23] mirrors the envelope grammar independently and runs ten scenarios through it, and the nine new native cases execute the real parser and the real gate for both verifiers |
 
+### 1l. Round 14 (audit of `3bd6c18`) - gate 2 counted suffixes
+
+| # | Defect | Fix |
+|---|---|---|
+| R13-C1 (critical) | the preflight gate counted lines ending in `\| PASS` / `\| FAIL` and refused only when FAIL > 0 or PASS < 1. The independent audit ran the committed block on PowerShell 5.1 with exit 0, a complete capture and the single line `THIS IS NOT A PREFLIGHT REPORT \| PASS`: the receipt said PASS, no STOP was taken, and the run would have advanced to the ledger gate. Nothing about `00_preflight.sql` - its 21 checks, their names, expected values, statuses, order or framing - was validated | `Get-ClashVerifyContract` now declares `00_preflight.sql` (19 gating checks 1-19, INFO checks 20-21) and gate 2 calls `Test-VerifyReport` exactly as gate 5 does. A report that is not those 21 rows, in that order, framed by header, separator and `(21 rows)` footer, is a problem; the gate STOPs with `02-preflight-rows.json` and lists them |
+| - | the phase receipt said PASS whenever the child exited 0 | `02-preflight.json` now takes its `status` from `$pfReport.verdict`, so a rendered FAIL, an INFO-only or a malformed report can never leave a PASS receipt behind, and an unprovable child is `UNPROVEN` |
+| - | a five-column `\|` splitter would have broken the new gate immediately | `00_preflight.sql` renders the literal `postgis\|extensions` in the *expected* column and `postgis\|<schema>` (or `ABSENT`) in *actual*, so a pipe splitter reads seven cells from a good row. Rows are now framed on the column spans the dashed separator declares - `(width + 2)` dashes per column joined by `+` - and the pipe stays inside its cell. `Test-VerifyReportHeader`/`Separator` and the envelope are unchanged |
+| - | the offline suite asserted the old behaviour | section [24] derives the 21 rows from `00_preflight.sql` itself (both copies of the list must agree), compares them with the declaration, mirrors the boundary framing independently, and the ten new native cases execute the committed gate-2 block with the child and evidence layers stubbed |
+
 ## 2. Layout
 
 ```
@@ -266,7 +282,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (395 assertions)
+tests/verify-package.mjs       offline test suite (410 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

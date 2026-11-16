@@ -312,29 +312,60 @@ if ($integrityProblems.Count -gt 0) {
 $common = @('-X', '-q', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose')
 
 # --------------------------------------------------- gate 2: preflight SQL ---
+# Round 14 (R13-C1): this gate counted lines ending in '| PASS' and '| FAIL' and
+# refused only when FAIL > 0 or PASS < 1. Any text ending in '| PASS' therefore
+# passed it: the independent audit fed the gate
+#     THIS IS NOT A PREFLIGHT REPORT | PASS
+# with exit 0 and complete capture, and the receipt said PASS, no STOP was taken
+# and the run advanced to the ledger gate. A report the runner cannot read is not
+# evidence, whatever its suffix says.
+#
+# Gate 2 now asks the same question gate 5 asks: is this EXACTLY the report that
+# preflight\00_preflight.sql renders? Test-VerifyReport holds the declared
+# contract for '00_preflight.sql' - 21 checks (19 gating, 2 INFO), each with its
+# ordinal, name, expected text and status, arriving in order, framed by the
+# header, the dashed separator and the '(21 rows)' footer. Anything else is a
+# problem, and the phase receipt takes its status from that verdict rather than
+# from the exit code alone (a rendered-FAIL or INFO-only report can no longer
+# leave a PASS receipt behind).
 $pf = Invoke-NativeProcess -FilePath $psqlPath `
         -Arguments ($common + @('-f', (Join-Path $cloudRoot 'preflight\00_preflight.sql'))) `
         -Environment $policy.env -TimeoutSeconds $PreflightTimeoutSeconds
 [void](Write-Evidence -Path (Join-Path $run '01-gates\preflight.out') -Text $pf.stdOut)
 [void](Write-Evidence -Path (Join-Path $run '01-gates\preflight.err') -Text $pf.stdErr)
-$pfPass = ([regex]::Matches($pf.stdOut, '\|\s*PASS\s*$', 'Multiline')).Count
-$pfFail = ([regex]::Matches($pf.stdOut, '\|\s*FAIL\s*$', 'Multiline')).Count
+$pfReport = Test-VerifyReport -Result $pf -ReportName '00_preflight.sql'
 New-PhaseReceipt '02-preflight.json' @{
-  status    = $(if (Test-NativeSuccess $pf) { 'PASS' } else { 'FAIL' })
-  outcome   = (Get-NativeOutcomeLabel $pf)
-  exitCode  = $pf.exitCode
-  timedOut  = $pf.timedOut
-  durationMs = $pf.durationMs
-  passRows  = $pfPass
-  failRows  = $pfFail
-  stderrChars = $pf.stdErr.Length
-  summary   = (Format-NativeSummary $pf)
+  status          = $pfReport.verdict
+  outcome         = $pfReport.outcome
+  exitCode        = $pf.exitCode
+  timedOut        = $pf.timedOut
+  durationMs      = $pf.durationMs
+  rows            = $pfReport.rows
+  passRows        = $pfReport.passRows
+  failRows        = $pfReport.failRows
+  infoRows        = $pfReport.infoRows
+  gatingExpected  = $pfReport.gatingExpected
+  infoExpected    = $pfReport.infoExpected
+  captureComplete = $pfReport.captureComplete
+  headerSeen      = $pfReport.headerSeen
+  separatorSeen   = $pfReport.separatorSeen
+  footerSeen      = $pfReport.footerSeen
+  footerRows      = $pfReport.footerRows
+  reportContract  = '00_preflight.sql'
+  problems        = @($pfReport.problems)
+  stderrChars     = $pf.stdErr.Length
+  summary         = (Format-NativeSummary $pf)
 }
 if (-not (Test-NativeSuccess $pf)) {
   Stop-Run ("preflight failed: {0}; {1}" -f (Format-NativeSummary $pf), (Get-NativeErrorExcerpt $pf)) '02-preflight-fail.json'
 }
-if ($pfFail -gt 0 -or $pfPass -lt 1) {
-  Stop-Run ("preflight report shows {0} PASS / {1} FAIL rows although psql exited 0. Treating as failure." -f $pfPass, $pfFail) '02-preflight-rows.json'
+if (-not $pfReport.ok) {
+  # Sliced, not piped through Select-Object: this runs under 'Stop'.
+  $pfProblems = @($pfReport.problems)
+  if ($pfProblems.Count -gt 6) { $pfProblems = @($pfProblems[0..5]) }
+  Stop-Run ("preflight verification did not satisfy the report contract: verdict={0}; rows={1} ({2} PASS / {3} FAIL / {4} INFO; contract {5} gating + {6} INFO); problems: {7}. Nothing has been applied yet and no database write has happened, so there is no transaction state to interpret." -f `
+      $pfReport.verdict, $pfReport.rows, $pfReport.passRows, $pfReport.failRows, $pfReport.infoRows, $pfReport.gatingExpected, $pfReport.infoExpected, `
+      ($pfProblems -join '; ')) '02-preflight-rows.json'
 }
 
 # ------------------------------------- gate 3: ledger must be empty (R2) -----

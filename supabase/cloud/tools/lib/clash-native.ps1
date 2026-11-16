@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.5.0'
+$script:ClashAdapterVersion = '4.6.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -756,6 +756,44 @@ function Resolve-ExecutionPolicy {
 function Get-ClashVerifyContract {
   param([Parameter(Mandatory = $true)][string]$ReportName)
 
+  # Gate 2's report, declared check by check. Round 14 (R13-C1): the deployment
+  # runner used to count lines ending in '| PASS' here, so any text at all was
+  # accepted as a preflight. The 21 rows below are the rows 00_preflight.sql
+  # renders, in the order it renders them: 19 gating checks (1-19) and two INFO
+  # checks (20-21, whose check_name starts with 'INFO' and whose status the SQL
+  # sets to INFO). The expected values are the literals in the script, including
+  # the pipe in 'postgis|extensions' - which is a VALUE, not a column separator.
+  if ($ReportName -eq '00_preflight.sql') {
+    return [ordered]@{
+      report = '00_preflight.sql'
+      path   = 'preflight\00_preflight.sql'
+      gating = 19
+      info   = 2
+      checks = @(
+        [ordered]@{ ord = 1;  name = 'postgres major version 17';                         expected = '17';                info = $false }
+        [ordered]@{ ord = 2;  name = 'wal_level';                                         expected = 'logical';           info = $false }
+        [ordered]@{ ord = 3;  name = 'replication slots';                                 expected = '0';                 info = $false }
+        [ordered]@{ ord = 4;  name = 'baseline public relations';                         expected = '0';                 info = $false }
+        [ordered]@{ ord = 5;  name = 'baseline public functions';                         expected = '0';                 info = $false }
+        [ordered]@{ ord = 6;  name = 'baseline auth.users rows';                          expected = '0';                 info = $false }
+        [ordered]@{ ord = 7;  name = 'baseline storage.buckets rows';                     expected = '0';                 info = $false }
+        [ordered]@{ ord = 8;  name = 'postgis installed in extensions';                   expected = 'postgis|extensions'; info = $false }
+        [ordered]@{ ord = 9;  name = 'pgcrypto schema';                                   expected = 'extensions';        info = $false }
+        [ordered]@{ ord = 10; name = 'pg_cron extension absent';                          expected = 'ABSENT';            info = $false }
+        [ordered]@{ ord = 11; name = 'cron.schedule() absent';                            expected = 'ABSENT';            info = $false }
+        [ordered]@{ ord = 12; name = 'schema cron absent';                                expected = 'ABSENT';            info = $false }
+        [ordered]@{ ord = 13; name = 'publication supabase_realtime owner';               expected = 'postgres';          info = $false }
+        [ordered]@{ ord = 14; name = 'publication supabase_realtime tables';              expected = '0';                 info = $false }
+        [ordered]@{ ord = 15; name = 'realtime.messages RLS';                             expected = 'true';              info = $false }
+        [ordered]@{ ord = 16; name = 'API roles present';                                 expected = '4';                 info = $false }
+        [ordered]@{ ord = 17; name = 'storage.objects.owner type';                        expected = 'uuid';              info = $false }
+        [ordered]@{ ord = 18; name = 'supautils delegates storage.objects policy DDL';    expected = 'delegated';         info = $false }
+        [ordered]@{ ord = 19; name = 'supautils delegates realtime.messages policy DDL';  expected = 'delegated';         info = $false }
+        [ordered]@{ ord = 20; name = 'INFO supautils privileged_extensions has pg_cron';  expected = 'INFO';              info = $true }
+        [ordered]@{ ord = 21; name = 'INFO expected step count';                          expected = 'INFO';              info = $true }
+      )
+    }
+  }
   if ($ReportName -eq '90_verify.sql') {
     return [ordered]@{
       report = '90_verify.sql'
@@ -832,6 +870,63 @@ function Format-ReportLine {
   $t = [string](Protect-Text ([string]$Line).Trim())
   if ($t.Length -gt 120) { $t = $t.Substring(0, 120) + '...' }
   return $t
+}
+
+# ---------------------------------------------------------------------------
+# The aligned table's dashed separator is the only trustworthy framing.
+#
+# psql builds it as (width + 2) dashes per column, joined by '+', so the dashes
+# give the exact span of every column. Splitting a row on '|' instead reads the
+# WRONG number of fields when a cell contains a pipe, and 00_preflight.sql does
+# exactly that on purpose: ord 8 renders the literal 'postgis|extensions' in the
+# expected column and 'postgis|<schema>' (or 'ABSENT') in the actual column. A
+# pipe splitter sees seven fields there and calls a good preflight report
+# malformed. Round 13's report on gate 2 (R13-C1) is why this exists.
+function Get-ReportColumnBounds {
+  param([Parameter(Mandatory = $true)][string]$SeparatorLine)
+
+  $t = ([string]$SeparatorLine).Trim()
+  if ($t -notmatch '^-+(\+-+)+$') { return $null }
+  $bounds = @()
+  $start  = 0
+  foreach ($segment in @($t.Split('+'))) {
+    $len    = ([string]$segment).Length
+    # A plain Hashtable, not [ordered]@{}: Round 12's R11-C1 was an
+    # OrderedDictionary indexer binding an int to a POSITION. Nothing here needs
+    # order, so keep the type that cannot surprise anyone.
+    $bounds += @{ start = $start; width = $len }
+    $start  = $start + $len + 1
+  }
+  return $bounds
+}
+
+# One cell = the text inside its column's span, trimmed. psql pads every column
+# to the separator width, so the span is exact; the last column is not padded on
+# the right in real psql output, so it runs to the end of the line. Nothing here
+# guesses: a span that starts past the end of the line is an empty cell, and the
+# caller reports whatever that makes of the row.
+function Get-ReportCellsFromBounds {
+  param(
+    [Parameter(Mandatory = $true)][string]$Line,
+    [Parameter(Mandatory = $true)]$Bounds
+  )
+
+  $cells = @()
+  $text  = [string]$Line
+  $count = @($Bounds).Count
+  for ($i = 0; $i -lt $count; $i++) {
+    $bound = $Bounds[$i]
+    $start = [int]$bound.start
+    if ($start -ge $text.Length) { $cells += ''; continue }
+    if ($i -eq ($count - 1)) {
+      $cells += ($text.Substring($start)).Trim()
+      continue
+    }
+    $width = [int]$bound.width
+    if (($start + $width) -gt $text.Length) { $width = $text.Length - $start }
+    $cells += ($text.Substring($start, $width)).Trim()
+  }
+  return $cells
 }
 
 function Test-VerifyReportHeader {
@@ -961,6 +1056,7 @@ function Test-VerifyReport {
   $footerRows  = -1
   $lineNo      = 0
   $blankInside = 0
+  $bounds      = $null   # column spans, taken from the separator once it is seen
 
   foreach ($raw in ($text -split "`r?`n")) {
     $lineNo++
@@ -982,7 +1078,12 @@ function Test-VerifyReport {
       continue
     }
     if ($state -eq 'separator') {
-      if (Test-VerifyReportSeparator -Line $line) { $sawSep = $true; $state = 'body'; continue }
+      if (Test-VerifyReportSeparator -Line $line) {
+        $sawSep = $true
+        $bounds = @(Get-ReportColumnBounds -SeparatorLine $line)
+        $state  = 'body'
+        continue
+      }
       $envelope.Add(('line {0}: expected the dashed separator under the header (five columns); found: {1}' -f $lineNo, (Format-ReportLine $line)))
       $state = 'body'
       continue
@@ -998,7 +1099,31 @@ function Test-VerifyReport {
         $envelope.Add(('line {0}: malformed row-count footer, expected "(N rows)": {1}' -f $lineNo, (Format-ReportLine $line)))
         continue
       }
-      $fields = @($line.Split('|'))
+      # Sliced on the separator's column spans, NOT split on '|': a cell may
+      # legitimately contain a pipe (preflight ord 8 renders 'postgis|extensions').
+      # If the separator never appeared, $bounds is null and the report is already
+      # a failure for that reason; the split keeps the rows readable in the
+      # problems, and the envelope problem is what decides the verdict.
+      $presentCells = 0
+      if ($null -ne $bounds -and @($bounds).Count -eq 5) {
+        $fields = @(Get-ReportCellsFromBounds -Line $line -Bounds $bounds)
+        # How many columns the line actually reaches. A row that stopped early (a
+        # damaged read, a hand-edited evidence file) is missing columns even
+        # though the boundary reader still returns five cells: two of them are
+        # simply past the end of the line.
+        for ($b = 0; $b -lt 5; $b++) {
+          if ($line.Length -gt [int]$bounds[$b].start) { $presentCells++ }
+        }
+        $lastBound = $bounds[4]
+        $limit = [int]$lastBound.start + [int]$lastBound.width
+        if ($line.Length -gt $limit) {
+          $envelope.Add(('line {0}: unexpected text beyond the last column ({1} characters): {2}' -f $lineNo, ($line.Length - $limit), (Format-ReportLine $line)))
+        }
+      }
+      else {
+        $fields = @($line.Split('|'))
+        $presentCells = $fields.Count
+      }
       $first  = ''
       $status = ''
       if ($fields.Count -eq 5) {
@@ -1017,6 +1142,9 @@ function Test-VerifyReport {
         $malformed += (Format-ReportLine $line)
         if ($fields.Count -ne 5) {
           $envelope.Add(('line {0}: malformed data row: {1} field(s), expected 5: {2}' -f $lineNo, $fields.Count, (Format-ReportLine $line)))
+        }
+        elseif ($presentCells -lt 5) {
+          $envelope.Add(('line {0}: malformed data row: {1} field(s) present, expected 5: {2}' -f $lineNo, $presentCells, (Format-ReportLine $line)))
         }
         continue
       }
@@ -1209,7 +1337,18 @@ $script:ClashSelfTestRequiredCases = @(
   'reportExtraJunkLineStops',
   'reportInvalidOrdinalAndStatusStops',
   'reportTruncatedMidRowStops',
-  'reportStorageTrailerStops'
+  'reportStorageTrailerStops',
+  # Round 14 (R13-C1): gate 2 used to count '| PASS' suffixes.
+  'preflightValidReportAdvancesToLedgerGate',
+  'preflightArbitrarySuffixTextStops',
+  'preflightMissingCheckStops',
+  'preflightDuplicateCheckStops',
+  'preflightReorderedChecksStop',
+  'preflightRenamedCheckStops',
+  'preflightRenderedFailRowStops',
+  'preflightTruncatedReportStops',
+  'preflightPipeInsideCellIsNotAColumn',
+  'preflightInfoOnlyReportStops'
 )
 
 # Returns a FLAT sequence of case-name strings.
