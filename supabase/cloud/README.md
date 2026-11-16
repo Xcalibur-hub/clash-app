@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **456 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **467 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 456 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 467 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -201,7 +201,7 @@ deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
 `-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
 the contract rather than an accident of the host.
 
-Adapter `5.0.0` (was `4.7.0`), native self-test 120 cases (was 75): completion is
+Adapter `5.1.0` (was `4.7.0`), native self-test 135 cases (was 75): completion is
 now a commit protocol rather than a receipt the runner wrote before sealing (see
 §1n), and sixteen cases execute it against real directories - the success path,
 a refused seal publication, an injected seal write failure, the committed
@@ -317,6 +317,16 @@ have not been executed on this machine either - they are executed by
 | - | the producer could still write, or accept, a wrongly typed marker | `Publish-ClashCompletion` asserts the JSON kind of every authoritative field **it** wrote, independently of the consumer (a serializer that turns `true` into `"true"`, `6` into `"6"` or an object into an array is caught before publication), and its post-commit re-verification compares kinds as well as values. The consumer's verdict record reports `protocol` only when the marker really carries a string, plus the observed `protocolKind`, so the record can no longer make an accepted-looking shape out of a rejected one |
 | - | the audit's exact input was the only collection case known | eighteen executed cases (103-120): the accessor keeps empty/singleton/multi/nested arrays, an object, a null and scalars; the kind classifier separates `missing` from `null`; the exact Codex input `protocol: ["clash-completion/2"]` (106) plus `[]` (107), two elements (108), a nested array (109), an object (110) and `null` (111); every other authoritative field as a one-element array (112); all four seal-block fields as arrays (113); an array-rooted marker (114); a seal whose `files` is a string (115), whose `fileCount` is `"6"` (116) and whose `chainHead` is an array (117); a collection-valued intent (118) and claim release (119); and a verification receipt that says `["PASS"]`/`[102]`/`"none"` (120) |
 
+### 1q. Round 19 (audit of `93e9d34`) - a JSON null root skipped every check
+
+| # | Defect | Fix |
+|---|---|---|
+| C18-C1 (critical: the consumer accepted absent completion authority) | `ConvertFrom-Json` parses the four bytes `null` to `$null` **without throwing**, and every authoritative check in `Test-ClashRunCompletion` sat inside `if ($null -ne $document)`. The audit replaced only `06-complete.json` with `null`, left the seal valid, and the consumer returned `ok=true`, `problems=[]` - a run with no completion authority at all was accepted, and its own verdict record even said `protocolKind: missing` | the ROOT of every document is now validated on its own by `Get-ClashJsonRoot`, before any field is read: **missing**, a **directory**, **unreadable**, **empty**, **whitespace-only**, **malformed**, the **literal null**, an **array**, a **scalar** (`integer`/`number`/`boolean`/`string`) are each an explicit problem, and only a JSON **object** is accepted. The root verdict is added to `$problems` unconditionally, so no guard can skip it |
+| - | a rejection with an empty problem list is unreadable | a seal containing `null` used to return `ok=false` with **no** problem at all. The seal root is validated first and its problem is always reported |
+| - | the same class in every other document reader | sealed finalization intent, sealed claim release, the publisher's candidate and published marker, the adapter self-test receipt (`Test-SelfTestReceipt`) and `Assert-AdapterSelfTest`, and the package manifest as read by `deploy.ps1`, `check-manifest.ps1` and `check-ledger.ps1` all validate their root before reading a field. A manifest that parsed to `null` used to fail as "manifest has 0 entries"; it now refuses with the state it actually saw |
+| - | `null` is the one wrong root that needs no exception | so it is a named state (`'null'`) with its own message (`is the JSON literal null; it must be a JSON object`), not a side effect. The root record also carries `state`, which the tests and verdicts assert on |
+| - | only the audit's single input was known to be accepted | fifteen executed cases (121-135) against a **real published fixture**: the exact four bytes `null` (121, asserting the 4-byte length and `markerSha256 = 74234e98…f982b90b`), empty (122), whitespace-only (123), `[]` (124), string/number/boolean roots (125), malformed (126), missing (127), a ten-state table including a directory and a valid object (128), the positive control (129), a null seal (130) and an empty seal (131), a null intent (132), a null claim release (133), a null/array receipt root (134) and a null receipt refused by `Assert-AdapterSelfTest` (135) |
+
 Still not proven: the consumer validates *files*, not signatures. A privileged
 writer can replace the whole artifact set consistently; the seal is consistency
 evidence, not an attestation.
@@ -354,7 +364,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (456 assertions)
+tests/verify-package.mjs       offline test suite (467 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

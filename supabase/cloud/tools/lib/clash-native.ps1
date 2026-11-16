@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '5.0.0'
+$script:ClashAdapterVersion = '5.1.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -188,6 +188,88 @@ function Test-ClashJsonKind {
   $actual = Get-ClashJsonKind -Value $Value
   if ($Kind -ceq 'number') { return ($actual -ceq 'number' -or $actual -ceq 'integer') }
   return ($actual -ceq $Kind)
+}
+
+# C18-C1: the ROOT of every JSON document the package reads is untrusted input,
+# and it must be validated on its own. `ConvertFrom-Json` turns the four bytes
+# `null` into $null WITHOUT throwing, and every validation block is guarded by
+# "the document parsed", so a null root used to skip the whole authoritative
+# block and leave the run accepted on its remaining evidence. A document that is
+# missing, a directory, unreadable, empty, whitespace-only, the literal null, an
+# array, a scalar or malformed must therefore produce its own explicit problem,
+# independently of any field validation.
+#
+# Returns @{ ok; state; kind; value; problem }. `state` is the root STATE, which
+# is what the tests assert on and what a verdict reports:
+#   missing | directory | unreadable | empty | malformed | null | object | <kind>
+function Get-ClashJsonRoot {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Label,
+    [string[]]$Kind = @('object')
+  )
+
+  $leaf = Split-Path -Leaf $Path
+  $root = @{ ok = $false; state = 'missing'; kind = 'missing'; value = $null; problem = '' }
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    $root['problem'] = ('the {0} {1} is missing' -f $Label, $leaf)
+    return $root
+  }
+  if (Test-Path -LiteralPath $Path -PathType Container) {
+    $root['state'] = 'directory'
+    $root['kind'] = 'directory'
+    $root['problem'] = ('the {0} {1} is a directory, not a document' -f $Label, $leaf)
+    return $root
+  }
+
+  $text = ''
+  try { $text = [System.IO.File]::ReadAllText($Path) }
+  catch {
+    $root['state'] = 'unreadable'
+    $root['kind'] = 'unreadable'
+    $root['problem'] = ('the {0} {1} could not be read: {2}' -f $Label, $leaf, (Protect-Text $_.Exception.Message))
+    return $root
+  }
+
+  if ([string]::IsNullOrWhiteSpace($text)) {
+    $root['state'] = 'empty'
+    $root['kind'] = 'empty'
+    $root['problem'] = ('the {0} {1} is empty or whitespace only ({2} byte(s)); it must be a JSON object' -f $Label, $leaf, $text.Length)
+    return $root
+  }
+
+  $parsed = $null
+  try { $parsed = $text | ConvertFrom-Json }
+  catch {
+    $root['state'] = 'malformed'
+    $root['kind'] = 'malformed'
+    $root['problem'] = ('the {0} {1} is not readable JSON: {2}' -f $Label, $leaf, (Protect-Text $_.Exception.Message))
+    return $root
+  }
+
+  if ($null -eq $parsed) {
+    # JSON null parses happily; it is the ONE root state that needs no exception
+    # to be wrong, which is exactly why it was missed.
+    $root['state'] = 'null'
+    $root['kind'] = 'null'
+    $root['problem'] = ('the {0} {1} is the JSON literal null; it must be a JSON object' -f $Label, $leaf)
+    return $root
+  }
+
+  $kindName = Get-ClashJsonKind -Value $parsed
+  $root['kind'] = $kindName
+  $root['state'] = $kindName
+  $root['value'] = $parsed
+  $wanted = @($Kind)
+  $accept = $false
+  foreach ($want in $wanted) { if (Test-ClashJsonKind -Value $parsed -Kind $want) { $accept = $true; break } }
+  if (-not $accept) {
+    $root['problem'] = ('the {0} {1} is {2}; it must be a JSON {3}' -f $Label, $leaf, (Format-ClashFieldValue -Value $parsed), ($wanted -join ' or '))
+    return $root
+  }
+  $root['ok'] = $true
+  return $root
 }
 
 # ----------------------------------------------------------- sanitisation ---
@@ -823,12 +905,15 @@ function Test-EvidenceSeal {
     $problems.Add(('the seal {0} could not be read: {1}' -f $SealName, (Protect-Text $_.Exception.Message)))
     return [ordered]@{ ok = $false; problems = @($problems); fileCount = 0; chainHead = ''; sha256 = '' }
   }
-  $seal = $null
-  try { $seal = [System.IO.File]::ReadAllText($target) | ConvertFrom-Json }
-  catch { $problems.Add(('the seal {0} is not readable JSON: {1}' -f $SealName, (Protect-Text $_.Exception.Message))) }
-  if ($null -eq $seal) {
+  # C18-C1: the seal's ROOT is validated on its own. A seal containing `null`
+  # used to reject with a silent, EMPTY problem list; a rejection nobody can read
+  # is a rejection nobody can act on.
+  $sealRoot = Get-ClashJsonRoot -Path $target -Label 'evidence seal' -Kind @('object')
+  if (-not $sealRoot['ok']) {
+    $problems.Add($sealRoot['problem'])
     return [ordered]@{ ok = $false; problems = @($problems); fileCount = 0; chainHead = ''; sha256 = $sha }
   }
+  $seal = $sealRoot['value']
   # The seal is untrusted input, so its SHAPE is part of the verdict: the root
   # must be an object, "files" a JSON array, each entry an object, each entry
   # field a JSON string and fileCount a JSON integer. A wrong type is a rejection;
@@ -1032,7 +1117,11 @@ function Publish-ClashCompletion {
   $markerSha = Write-EvidenceJson -Path $temp -Object $object
   # Verify the candidate BEFORE it becomes authoritative: same bytes, but read
   # back from disk rather than trusted from memory.
-  $candidate = [System.IO.File]::ReadAllText($temp) | ConvertFrom-Json
+  $candidateRoot = Get-ClashJsonRoot -Path $temp -Label 'candidate completion marker' -Kind @('object')
+  if (-not $candidateRoot['ok']) {
+    throw ('completion refused: {0}; nothing was published' -f $candidateRoot['problem'])
+  }
+  $candidate = $candidateRoot['value']
   # Producer-side typed self-check, independent of the consumer: the publisher
   # asserts the JSON KIND of every authoritative field it just wrote. A serializer
   # that turned true into "true", 6 into "6" or an object into a one-element array
@@ -1072,8 +1161,8 @@ function Publish-ClashCompletion {
   [System.IO.File]::Move($temp, $marker)
 
   $published = $null
-  try { $published = [System.IO.File]::ReadAllText($marker) | ConvertFrom-Json }
-  catch { $published = $null }
+  $publishedRoot = Get-ClashJsonRoot -Path $marker -Label 'published completion marker' -Kind @('object')
+  if ($publishedRoot['ok']) { $published = $publishedRoot['value'] }
   # Re-verification is part of the protocol, so it must not be able to throw its
   # way out: an unreadable seal here is exactly the doubt this step exists to
   # record.
@@ -1188,12 +1277,17 @@ function Test-ClashRunCompletion {
     foreach ($p in $shown) { $problems.Add(('seal: {0}' -f $p)) }
   }
 
-  $document = $null
-  if (Test-Path -LiteralPath $markerPath) {
-    try { $document = [System.IO.File]::ReadAllText($markerPath) | ConvertFrom-Json }
-    catch { $problems.Add(('06-complete.json is not readable JSON: {0}' -f (Protect-Text $_.Exception.Message))) }
-  }
+  # C18-C1: the marker ROOT is validated on its own, so an unparsable, empty,
+  # null, array or scalar marker is a rejection even though every field check
+  # below is guarded by "the document parsed".
+  $markerRoot = Get-ClashJsonRoot -Path $markerPath -Label 'completion marker' -Kind @('object')
+  if (-not $markerRoot['ok']) { $problems.Add($markerRoot['problem']) }
+  $document = $markerRoot['value']
 
+  # The seal document is parsed here ONLY for the adapter identity it records.
+  # Its root is validated by Test-EvidenceSeal above (C18-C1), which already
+  # rejects a missing, empty, null, array or malformed seal, so a null value here
+  # cannot be used to accept anything.
   $sealDocument = $null
   if (Test-Path -LiteralPath $sealPath -PathType Leaf) {
     try { $sealDocument = [System.IO.File]::ReadAllText($sealPath) | ConvertFrom-Json }
@@ -1302,9 +1396,9 @@ function Test-ClashRunCompletion {
       $problems.Add('the sealed 06-finalization-intent.json is missing or unreadable, so the run has no finalization intent')
     }
     else {
-      $intent = $null
-      try { $intent = [System.IO.File]::ReadAllText($intentPath) | ConvertFrom-Json }
-      catch { $problems.Add(('06-finalization-intent.json is not readable JSON: {0}' -f (Protect-Text $_.Exception.Message))) }
+      $intentRoot = Get-ClashJsonRoot -Path $intentPath -Label 'sealed finalization intent' -Kind @('object')
+      if (-not $intentRoot['ok']) { $problems.Add($intentRoot['problem']) }
+      $intent = $intentRoot['value']
       if (($null -ne $intent) -and (-not (Test-ClashJsonKind -Value $intent -Kind 'object'))) {
         $problems.Add(('06-finalization-intent.json is {0}; a finalization intent must be a JSON object' -f (Format-ClashFieldValue -Value $intent)))
       }
@@ -1375,10 +1469,9 @@ function Test-ClashRunCompletion {
 
     # ---- 12: writerRunId must match the sealed claim release -------------
     $writerRun  = (Get-ClashJsonField -Object $document -Name 'writerRunId')['value']
-    $releaseDoc = $null
-    if (Test-Path -LiteralPath $releasePath -PathType Leaf) {
-      try { $releaseDoc = [System.IO.File]::ReadAllText($releasePath) | ConvertFrom-Json } catch { $releaseDoc = $null }
-    }
+    $releaseRoot = Get-ClashJsonRoot -Path $releasePath -Label 'sealed claim release' -Kind @('object')
+    if (-not $releaseRoot['ok']) { $problems.Add($releaseRoot['problem']) }
+    $releaseDoc = $releaseRoot['value']
     if (($null -ne $releaseDoc) -and (-not (Test-ClashJsonKind -Value $releaseDoc -Kind 'object'))) {
       $problems.Add(('the sealed 06-claim-release.json is {0}; a claim release must be a JSON object' -f (Format-ClashFieldValue -Value $releaseDoc)))
     }
@@ -2276,13 +2369,30 @@ $script:ClashSelfTestRequiredCases = @(
   'completionRejectsProtocolNull',
   'completionRejectsArrayTypedMarkerFields',
   'completionRejectsArrayTypedSealBlockFields',
-  'completionRejectsScalarRootMarker',
+  'completionRejectsCollectionRootMarker',
   'evidenceSealRejectsNonArrayFiles',
   'evidenceSealRejectsStringFileCount',
   'evidenceSealRejectsArrayChainHead',
   'completionRejectsCollectionValuedIntent',
   'completionRejectsCollectionValuedClaimRelease',
-  'selfTestReceiptRejectsCollectionValuedMetadata'
+  'selfTestReceiptRejectsCollectionValuedMetadata',
+  # Round 19 (C18-C1): the ROOT of every document is validated on its own -
+  # missing, empty, whitespace, null, array, scalar, malformed, and a valid object.
+  'completionRejectsNullRootMarker',
+  'completionRejectsEmptyRootMarker',
+  'completionRejectsWhitespaceRootMarker',
+  'completionRejectsArrayRootMarker',
+  'completionRejectsScalarRootMarker',
+  'completionRejectsMalformedRootMarker',
+  'completionRejectsMissingRootMarker',
+  'jsonRootStatesAreValidated',
+  'completionAcceptsValidObjectRoot',
+  'evidenceSealRejectsNullRoot',
+  'evidenceSealRejectsEmptyRoot',
+  'completionRejectsNullRootIntent',
+  'completionRejectsNullRootClaimRelease',
+  'selfTestReceiptRejectsInvalidRoot',
+  'adapterSelfTestRejectsNullRootReceipt'
 )
 
 # Returns a FLAT sequence of case-name strings.
@@ -2401,7 +2511,10 @@ function Test-SelfTestReceipt {
   $required = @($script:ClashSelfTestRequiredCases)
 
   if ($null -eq $Document) {
-    return [ordered]@{ ok = $false; problems = @('receipt is empty') }
+    return [ordered]@{ ok = $false; problems = @('receipt is empty: an adapter self-test receipt must be a JSON object, and this document parsed to null') }
+  }
+  if (-not (Test-ClashJsonKind -Value $Document -Kind 'object')) {
+    $problems += ('the receipt root is {0}; an adapter self-test receipt must be a JSON object' -f (Format-ClashFieldValue -Value $Document))
   }
 
   # the declared inventory itself must be valid before it is used to judge a receipt
@@ -2525,9 +2638,9 @@ function Assert-AdapterSelfTest {
   if (-not (Test-Path -LiteralPath $ReceiptPath)) {
     throw ("Adapter self-test receipt not found: {0}. Run tools\test-native-capture.ps1 first." -f $ReceiptPath)
   }
-  $raw = [System.IO.File]::ReadAllText($ReceiptPath)
-  try { $doc = $raw | ConvertFrom-Json }
-  catch { throw ("Adapter self-test receipt is not valid JSON: {0}" -f $ReceiptPath) }
+  $receiptRoot = Get-ClashJsonRoot -Path $ReceiptPath -Label 'adapter self-test receipt' -Kind @('object')
+  if (-not $receiptRoot['ok']) { throw ('Adapter self-test receipt rejected: ' + $receiptRoot['problem']) }
+  $doc = $receiptRoot['value']
 
   $expect = Get-NormalizedSha256 -Path $AdapterPath
   $verdict = Test-SelfTestReceipt -Document $doc -AdapterSha256 $expect

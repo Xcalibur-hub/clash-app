@@ -52,8 +52,13 @@ function Stop-Refused([string]$Reason) {
   exit 2
 }
 
-$manifest = [System.IO.File]::ReadAllText((Join-Path $cloudRoot 'manifest.json')) | ConvertFrom-Json
-$entries  = @($manifest.entries)
+# C18-C1: validate the manifest root before reading fields out of it.
+$manifestRoot = Get-ClashJsonRoot -Path (Join-Path $cloudRoot 'manifest.json') -Label 'package manifest' -Kind @('object')
+if (-not $manifestRoot['ok']) { Stop-Refused $manifestRoot['problem'] }
+$manifest = $manifestRoot['value']
+$entriesField = Get-ClashJsonField -Object $manifest -Name 'entries'
+$entries  = @()
+if ($entriesField['kind'] -ceq 'array') { $entries = @($entriesField['value']) }
 if ($entries.Count -ne 111) { Stop-Refused ("manifest has {0} entries, expected 111." -f $entries.Count) }
 if ($manifest.project_ref -ne $ProjectRef) { Stop-Refused ("manifest is bound to project '{0}', not '{1}'." -f $manifest.project_ref, $ProjectRef) }
 

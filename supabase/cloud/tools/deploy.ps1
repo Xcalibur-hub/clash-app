@@ -155,11 +155,19 @@ try {
 catch { Stop-Refused ("'{0}' not found on PATH." -f $Psql) }
 if ([string]::IsNullOrWhiteSpace($psqlPath)) { Stop-Refused ("could not resolve the full path of '{0}'." -f $Psql) }
 
-$manifest = [System.IO.File]::ReadAllText($manifestPath) | ConvertFrom-Json
-$entries  = @($manifest.entries)
+# C18-C1: the manifest ROOT is validated before any field is read out of it. A
+# null, empty, array or malformed manifest must refuse explicitly, not fall
+# through to a zero-entry message.
+$manifestRoot = Get-ClashJsonRoot -Path $manifestPath -Label 'package manifest' -Kind @('object')
+if (-not $manifestRoot['ok']) { Stop-Refused $manifestRoot['problem'] }
+$manifest = $manifestRoot['value']
+$entriesField = Get-ClashJsonField -Object $manifest -Name 'entries'
+$entries  = @()
+if ($entriesField['kind'] -ceq 'array') { $entries = @($entriesField['value']) }
 if ($entries.Count -ne 111) { Stop-Refused ("manifest has {0} entries, expected 111. Rebuild the package." -f $entries.Count) }
-if ($manifest.project_ref -ne $ProjectRef) {
-  Stop-Refused ("manifest is bound to project '{0}', not '{1}'." -f $manifest.project_ref, $ProjectRef)
+$manifestProject = (Get-ClashJsonField -Object $manifest -Name 'project_ref')['value']
+if (-not (Test-ClashJsonKind -Value $manifestProject -Kind 'string') -or $manifestProject -cne $ProjectRef) {
+  Stop-Refused ("manifest is bound to project '{0}', not '{1}'." -f (Format-ClashFieldValue -Value $manifestProject), $ProjectRef)
 }
 $staleEntries = @($entries | Where-Object { -not $_.PSObject.Properties['wrapperSha256'] -or [string]::IsNullOrWhiteSpace($_.wrapperSha256) })
 if ($staleEntries.Count -gt 0) {

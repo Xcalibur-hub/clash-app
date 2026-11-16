@@ -33,11 +33,19 @@ $adapterPath = Join-Path (Join-Path $PSScriptRoot 'lib') 'clash-native.ps1'
 if (-not (Test-Path -LiteralPath $adapterPath)) { Write-Host "REFUSED: adapter missing: $adapterPath" -ForegroundColor Red; exit 2 }
 . $adapterPath
 
-$manifest = [System.IO.File]::ReadAllText((Join-Path $cloudRoot 'manifest.json')) | ConvertFrom-Json
-$entries  = @($manifest.entries)
 $fail     = 0
 $notes    = @()
 function Fail([string]$Message) { Write-Host ("FAIL  {0}" -f $Message) -ForegroundColor Red; $script:fail++; $script:notes += $Message }
+
+# C18-C1: the manifest ROOT is validated before anything is read out of it, so a
+# null, empty, array or malformed manifest is an explicit failure rather than an
+# empty entry list that HAPPENS to fail the count.
+$manifestRoot = Get-ClashJsonRoot -Path (Join-Path $cloudRoot 'manifest.json') -Label 'package manifest' -Kind @('object')
+if (-not $manifestRoot['ok']) { Fail $manifestRoot['problem'] }
+$manifest = $manifestRoot['value']
+$entriesField = Get-ClashJsonField -Object $manifest -Name 'entries'
+$entries  = @()
+if ($entriesField['kind'] -ceq 'array') { $entries = @($entriesField['value']) }
 
 if ($entries.Count -ne 111) { Fail ("manifest has {0} entries, expected 111" -f $entries.Count) }
 

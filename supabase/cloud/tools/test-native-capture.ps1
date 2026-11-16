@@ -120,7 +120,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 120
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 135
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -3598,7 +3598,7 @@ $r1Check = $null
 try { $r1Check = Test-ClashRunCompletion -RunPath $r1Root } catch { $r1Check = $null }
 $r1Problems = ''
 if ($null -ne $r1Check) { $r1Problems = (@($r1Check.problems) -join ' ') }
-Add-Case 'completionRejectsScalarRootMarker' (
+Add-Case 'completionRejectsCollectionRootMarker' (
   $r1Pub.ok -and
   $null -ne $r1Check -and (-not $r1Check.ok) -and
   ($r1Problems -match '06-complete\.json is array\(1\)') -and
@@ -3724,6 +3724,289 @@ Add-Case 'selfTestReceiptRejectsCollectionValuedMetadata' (
   ($metaProblems -match 'casesExecuted is a JSON array, not a JSON integer')) @{
   problems = $metaProblems
   note = 'a receipt that says ["PASS"] or [102] is a wrong type; a verification record proves nothing it does not state'
+}
+
+# ===========================================================================
+# Round 19 (C18-C1): the ROOT of every document is validated on its own
+# ===========================================================================
+# ConvertFrom-Json turns the four bytes `null` into $null WITHOUT throwing, so a
+# consumer whose authoritative block is guarded by "the document parsed" skipped
+# every check and accepted the run on the remaining valid seal. Each root state is
+# now executed against a real published fixture.
+
+# Replaces ONE document in a freshly published run with raw text (or deletes it)
+# and records both the root verdict and the consumer's verdict.
+function Invoke-RootStateProbe {
+  param([string]$File = '06-complete.json', [string]$Text = '', [switch]$Delete)
+
+  $root = New-FinalizationRun
+  $pub  = Invoke-CompletionProbe -Root $root
+  $before = $null
+  try { $before = Test-ClashRunCompletion -RunPath $root } catch { $before = $null }
+  $path = Join-Path $root $File
+  if ($Delete) { Remove-Item -LiteralPath $path -Force }
+  else { [System.IO.File]::WriteAllText($path, $Text) }
+  $bytes = 0
+  if (Test-Path -LiteralPath $path -PathType Leaf) { $bytes = @([System.IO.File]::ReadAllBytes($path)).Length }
+  $rootVerdict = Get-ClashJsonRoot -Path $path -Label 'probe document' -Kind @('object')
+  $check = $null
+  try { $check = Test-ClashRunCompletion -RunPath $root } catch { $check = $null }
+  $problems = ''
+  if ($null -ne $check) { $problems = (@($check.problems) -join ' ') }
+  return @{
+    root        = $root
+    pubOk       = [bool]$pub.ok
+    beforeOk    = ($null -ne $before) -and [bool]$before.ok
+    rootState   = [string]$rootVerdict['state']
+    rootOk      = [bool]$rootVerdict['ok']
+    rootProblem = [string]$rootVerdict['problem']
+    bytes       = $bytes
+    ok          = ($null -ne $check) -and [bool]$check.ok
+    problems    = $problems
+    markerSha   = $(if ($null -ne $check) { [string]$check.markerSha256 } else { '' })
+  }
+}
+
+# ---- 121: the audit's exact four bytes: null -------------------------------
+$n1 = Invoke-RootStateProbe -File '06-complete.json' -Text 'null'
+Add-Case 'completionRejectsNullRootMarker' (
+  $n1['pubOk'] -and $n1['beforeOk'] -and
+  ($n1['rootState'] -ceq 'null') -and (-not $n1['rootOk']) -and
+  ($n1['bytes'] -eq 4) -and
+  (-not $n1['ok']) -and
+  ($n1['problems'] -match 'is the JSON literal null; it must be a JSON object') -and
+  ($n1['markerSha'] -ceq '74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b')) @{
+  bytes = $n1['bytes']
+  markerSha = $n1['markerSha']
+  problems = $n1['problems']
+  note = 'C18-C1: four bytes of null parsed without an exception and skipped every authoritative check'
+}
+Remove-FinalizationRun -Root $n1['root']
+
+# ---- 122: an empty document -------------------------------------------------
+$n2 = Invoke-RootStateProbe -File '06-complete.json' -Text ''
+Add-Case 'completionRejectsEmptyRootMarker' (
+  $n2['pubOk'] -and $n2['beforeOk'] -and
+  ($n2['rootState'] -ceq 'empty') -and
+  ($n2['bytes'] -eq 0) -and
+  (-not $n2['ok']) -and
+  ($n2['problems'] -match 'is empty or whitespace only \(0 byte\(s\)\)')) @{
+  problems = $n2['problems']
+  note = 'an empty marker is a root state, not an absent field'
+}
+Remove-FinalizationRun -Root $n2['root']
+
+# ---- 123: a whitespace-only document ---------------------------------------
+$n3 = Invoke-RootStateProbe -File '06-complete.json' -Text ("   `r`n`t " + '  ')
+Add-Case 'completionRejectsWhitespaceRootMarker' (
+  $n3['pubOk'] -and $n3['beforeOk'] -and
+  ($n3['rootState'] -ceq 'empty') -and
+  (-not $n3['ok']) -and
+  ($n3['problems'] -match 'is empty or whitespace only')) @{
+  bytes = $n3['bytes']
+  problems = $n3['problems']
+  note = 'whitespace is not a document: the same state as empty, with its size reported'
+}
+Remove-FinalizationRun -Root $n3['root']
+
+# ---- 124: an empty array root ----------------------------------------------
+$n4 = Invoke-RootStateProbe -File '06-complete.json' -Text '[]'
+Add-Case 'completionRejectsArrayRootMarker' (
+  $n4['pubOk'] -and $n4['beforeOk'] -and
+  ($n4['rootState'] -ceq 'array') -and
+  (-not $n4['ok']) -and
+  ($n4['problems'] -match 'the completion marker 06-complete\.json is array\(0\) \[\]') -and
+  ($n4['problems'] -match 'a completion marker must be a JSON object')) @{
+  problems = $n4['problems']
+  note = 'an empty array is neither an object nor absent; it is an explicit rejection'
+}
+Remove-FinalizationRun -Root $n4['root']
+
+# ---- 125: scalar roots (string, number, boolean) ---------------------------
+$s1 = Invoke-RootStateProbe -File '06-complete.json' -Text '"clash-completion/2"'
+$s2 = Invoke-RootStateProbe -File '06-complete.json' -Text '7'
+$s3 = Invoke-RootStateProbe -File '06-complete.json' -Text 'true'
+Add-Case 'completionRejectsScalarRootMarker' (
+  $s1['pubOk'] -and $s1['beforeOk'] -and ($s1['rootState'] -ceq 'string') -and (-not $s1['ok']) -and
+  ($s1['problems'] -match 'the completion marker 06-complete\.json is string "clash-completion/2"') -and
+  $s2['pubOk'] -and ($s2['rootState'] -ceq 'integer') -and (-not $s2['ok']) -and
+  ($s2['problems'] -match 'the completion marker 06-complete\.json is number 7') -and
+  $s3['pubOk'] -and ($s3['rootState'] -ceq 'boolean') -and (-not $s3['ok']) -and
+  ($s3['problems'] -match 'the completion marker 06-complete\.json is boolean true') -and
+  ($s1['problems'] -match 'a completion marker must be a JSON object')) @{
+  states = 'string, integer, boolean'
+  problems = $s1['problems']
+  note = 'a scalar root contains the right characters in the wrong shape'
+}
+Remove-FinalizationRun -Root $s1['root']
+Remove-FinalizationRun -Root $s2['root']
+Remove-FinalizationRun -Root $s3['root']
+
+# ---- 126: malformed JSON ----------------------------------------------------
+$n5 = Invoke-RootStateProbe -File '06-complete.json' -Text '{not json'
+Add-Case 'completionRejectsMalformedRootMarker' (
+  $n5['pubOk'] -and $n5['beforeOk'] -and
+  ($n5['rootState'] -ceq 'malformed') -and
+  (-not $n5['ok']) -and
+  ($n5['problems'] -match 'is not readable JSON')) @{
+  problems = $n5['problems']
+  note = 'the rejection names the state; it does not raise'
+}
+Remove-FinalizationRun -Root $n5['root']
+
+# ---- 127: the marker is absent ---------------------------------------------
+$n6 = Invoke-RootStateProbe -File '06-complete.json' -Delete
+Add-Case 'completionRejectsMissingRootMarker' (
+  $n6['pubOk'] -and $n6['beforeOk'] -and
+  ($n6['rootState'] -ceq 'missing') -and
+  (-not $n6['ok']) -and
+  ($n6['problems'] -match 'the completion marker 06-complete\.json is missing') -and
+  ($n6['problems'] -match 'no 06-complete\.json: the run is not finalised')) @{
+  problems = $n6['problems']
+  note = 'absent is its own state and is reported twice: by the run and by the root contract'
+}
+Remove-FinalizationRun -Root $n6['root']
+
+# ---- 128: every root state is distinct, and only an object is accepted -----
+$rsDir = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-roots-' + [guid]::NewGuid().ToString('N').Substring(0, 12))
+New-Item -ItemType Directory -Path $rsDir -Force | Out-Null
+[void](Write-Evidence -Path (Join-Path $rsDir 'empty.json') -Text '')
+[void](Write-Evidence -Path (Join-Path $rsDir 'space.json') -Text '   ')
+[void](Write-Evidence -Path (Join-Path $rsDir 'null.json') -Text 'null')
+[void](Write-Evidence -Path (Join-Path $rsDir 'array.json') -Text '[]')
+[void](Write-Evidence -Path (Join-Path $rsDir 'string.json') -Text '"x"')
+[void](Write-Evidence -Path (Join-Path $rsDir 'number.json') -Text '7')
+[void](Write-Evidence -Path (Join-Path $rsDir 'bool.json') -Text 'true')
+[void](Write-Evidence -Path (Join-Path $rsDir 'broken.json') -Text '{')
+[void](Write-Evidence -Path (Join-Path $rsDir 'object.json') -Text '{}')
+$rsState = @{}
+foreach ($rsName in @('empty', 'space', 'null', 'array', 'string', 'number', 'bool', 'broken', 'object')) {
+  $rsState[$rsName] = Get-ClashJsonRoot -Path (Join-Path $rsDir ($rsName + '.json')) -Label 'probe' -Kind @('object')
+}
+$rsMissing = Get-ClashJsonRoot -Path (Join-Path $rsDir 'absent.json') -Label 'probe' -Kind @('object')
+$rsDirVerdict = Get-ClashJsonRoot -Path $rsDir -Label 'probe' -Kind @('object')
+Add-Case 'jsonRootStatesAreValidated' (
+  ($rsState['empty']['state'] -ceq 'empty') -and (-not $rsState['empty']['ok']) -and
+  ($rsState['space']['state'] -ceq 'empty') -and (-not $rsState['space']['ok']) -and
+  ($rsState['null']['state'] -ceq 'null') -and (-not $rsState['null']['ok']) -and
+  ($rsState['array']['state'] -ceq 'array') -and (-not $rsState['array']['ok']) -and
+  ($rsState['string']['state'] -ceq 'string') -and (-not $rsState['string']['ok']) -and
+  ($rsState['number']['state'] -ceq 'integer') -and (-not $rsState['number']['ok']) -and
+  ($rsState['bool']['state'] -ceq 'boolean') -and (-not $rsState['bool']['ok']) -and
+  ($rsState['broken']['state'] -ceq 'malformed') -and (-not $rsState['broken']['ok']) -and
+  ($rsMissing['state'] -ceq 'missing') -and (-not $rsMissing['ok']) -and
+  ($rsDirVerdict['state'] -ceq 'directory') -and (-not $rsDirVerdict['ok']) -and
+  ($rsState['object']['state'] -ceq 'object') -and $rsState['object']['ok'] -and
+  ([string]::IsNullOrWhiteSpace([string]$rsState['object']['problem']))) @{
+  states = (($rsState.GetEnumerator() | Sort-Object Name | ForEach-Object { '{0}={1}' -f $_.Key, $_.Value['state'] }) -join ' ') + (' absent=' + $rsMissing['state'] + ' directory=' + $rsDirVerdict['state'])
+  note = 'ten distinct states, and only a JSON object is accepted'
+}
+Remove-Item -LiteralPath $rsDir -Recurse -Force -ErrorAction SilentlyContinue
+
+# ---- 129: the positive control still passes --------------------------------
+$posRoot = New-FinalizationRun
+$posPub  = Invoke-CompletionProbe -Root $posRoot
+$posRootVerdict = Get-ClashJsonRoot -Path (Join-Path $posRoot '06-complete.json') -Label 'completion marker' -Kind @('object')
+$posCheck = $null
+try { $posCheck = Test-ClashRunCompletion -RunPath $posRoot } catch { $posCheck = $null }
+Add-Case 'completionAcceptsValidObjectRoot' (
+  $posPub.ok -and
+  $posRootVerdict['ok'] -and ($posRootVerdict['state'] -ceq 'object') -and
+  ([string]::IsNullOrWhiteSpace([string]$posRootVerdict['problem'])) -and
+  $null -ne $posCheck -and $posCheck.ok -and
+  ([string]$posCheck.protocolKind -ceq 'string')) @{
+  protocolKind = $(if ($null -ne $posCheck) { [string]$posCheck.protocolKind } else { '' })
+  note = 'the root contract rejects the invalid states without rejecting a valid run'
+}
+Remove-FinalizationRun -Root $posRoot
+
+# ---- 130: the seal is the JSON literal null --------------------------------
+$sr1 = Invoke-RootStateProbe -File 'EVIDENCE-MANIFEST.json' -Text 'null'
+$sr1Seal = $null
+try { $sr1Seal = Test-EvidenceSeal -Root $sr1['root'] } catch { $sr1Seal = $null }
+$sr1Problems = ''
+if ($null -ne $sr1Seal) { $sr1Problems = (@($sr1Seal.problems) -join ' ') }
+Add-Case 'evidenceSealRejectsNullRoot' (
+  $sr1['pubOk'] -and
+  $null -ne $sr1Seal -and (-not $sr1Seal.ok) -and
+  (@($sr1Seal.problems).Count -ge 1) -and
+  ($sr1Problems -match 'the evidence seal EVIDENCE-MANIFEST\.json is the JSON literal null')) @{
+  problems = $sr1Problems
+  note = 'a null seal used to reject with an EMPTY problem list: unreadable, and therefore unfixable'
+}
+Remove-FinalizationRun -Root $sr1['root']
+
+# ---- 131: the seal is empty ------------------------------------------------
+$sr2 = Invoke-RootStateProbe -File 'EVIDENCE-MANIFEST.json' -Text ''
+$sr2Seal = $null
+try { $sr2Seal = Test-EvidenceSeal -Root $sr2['root'] } catch { $sr2Seal = $null }
+$sr2Problems = ''
+if ($null -ne $sr2Seal) { $sr2Problems = (@($sr2Seal.problems) -join ' ') }
+Add-Case 'evidenceSealRejectsEmptyRoot' (
+  $sr2['pubOk'] -and
+  $null -ne $sr2Seal -and (-not $sr2Seal.ok) -and
+  (@($sr2Seal.problems).Count -ge 1) -and
+  ($sr2Problems -match 'the evidence seal EVIDENCE-MANIFEST\.json is empty or whitespace only')) @{
+  problems = $sr2Problems
+  note = 'an empty seal is a root state, not a missing field'
+}
+Remove-FinalizationRun -Root $sr2['root']
+
+# ---- 132: the sealed finalization intent is null --------------------------
+$ir = Invoke-RootStateProbe -File '06-finalization-intent.json' -Text 'null'
+Add-Case 'completionRejectsNullRootIntent' (
+  $ir['pubOk'] -and
+  ($ir['rootState'] -ceq 'null') -and
+  (-not $ir['ok']) -and
+  ($ir['problems'] -match 'the sealed finalization intent 06-finalization-intent\.json is the JSON literal null')) @{
+  problems = $ir['problems']
+  note = 'the intent is sealed evidence, but its root is validated like any other document'
+}
+Remove-FinalizationRun -Root $ir['root']
+
+# ---- 133: the sealed claim release is null -------------------------------
+$qr = Invoke-RootStateProbe -File '06-claim-release.json' -Text 'null'
+Add-Case 'completionRejectsNullRootClaimRelease' (
+  $qr['pubOk'] -and
+  ($qr['rootState'] -ceq 'null') -and
+  (-not $qr['ok']) -and
+  ($qr['problems'] -match 'the sealed claim release 06-claim-release\.json is the JSON literal null')) @{
+  problems = $qr['problems']
+  note = 'the release is what proves the claim: a null release must never verify'
+}
+Remove-FinalizationRun -Root $qr['root']
+
+# ---- 134: the verification receipt has a null or array root --------------
+$metaSha = ('a' * 64)
+$rc1 = $null
+try { $rc1 = Test-SelfTestReceipt -Document $null -AdapterSha256 $metaSha } catch { $rc1 = $null }
+$rc1Problems = ''
+if ($null -ne $rc1) { $rc1Problems = (@($rc1.problems) -join ' ') }
+$rc2Doc = '[{"verdict":"PASS"}]' | ConvertFrom-Json
+$rc2 = $null
+try { $rc2 = Test-SelfTestReceipt -Document $rc2Doc -AdapterSha256 $metaSha } catch { $rc2 = $null }
+$rc2Problems = ''
+if ($null -ne $rc2) { $rc2Problems = (@($rc2.problems) -join ' ') }
+Add-Case 'selfTestReceiptRejectsInvalidRoot' (
+  $null -ne $rc1 -and (-not $rc1.ok) -and
+  ($rc1Problems -match 'receipt is empty: an adapter self-test receipt must be a JSON object') -and
+  $null -ne $rc2 -and (-not $rc2.ok) -and
+  ($rc2Problems -match 'the receipt root is array\(1\)')) @{
+  nullRoot = $rc1Problems
+  arrayRoot = $rc2Problems
+  note = 'a receipt that parsed to null or to an array proves nothing, and says so'
+}
+$rcPath = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-null-receipt-' + [guid]::NewGuid().ToString('N').Substring(0, 12) + '.json')
+[void](Write-Evidence -Path $rcPath -Text 'null')
+$rcThrew = ''
+try { [void](Assert-AdapterSelfTest -ReceiptPath $rcPath -AdapterPath (Join-Path (Join-Path $pluginRoot 'lib') 'clash-native.ps1')) }
+catch { $rcThrew = Protect-Text $_.Exception.Message }
+Remove-Item -LiteralPath $rcPath -Force -ErrorAction SilentlyContinue
+Add-Case 'adapterSelfTestRejectsNullRootReceipt' (
+  $rcThrew -match 'Adapter self-test receipt rejected' -and
+  $rcThrew -match 'is the JSON literal null') @{
+  refusal = $rcThrew
+  note = 'deploy refuses a null receipt instead of comparing hashes against nothing'
 }
 
 # ===========================================================================

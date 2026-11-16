@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 27;
-const EXPECTED_CASES = 120;
-const EXPECTED_ASSERTIONS = 456;
+const EXPECTED_SECTIONS = 28;
+const EXPECTED_CASES = 135;
+const EXPECTED_ASSERTIONS = 467;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -2513,7 +2513,7 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
         'Test-EvidenceSeal -Root $Root -Require $RequiredEvidence',     // verified against disk
         'Write-EvidenceJson -Path $temp -Object $object',               // candidate marker
         '[System.IO.File]::Move($temp, $marker)',                       // THE COMMIT POINT
-        '[System.IO.File]::ReadAllText($marker)',                       // re-read after the commit
+        "published completion marker",                                 // re-read after the commit
       ].map(at);
       return seq.every((v, i) => v > 0 && (i === 0 || v > seq[i - 1]));
     })());
@@ -2676,7 +2676,7 @@ hdr(27, 'the JSON type boundary - an accessor must not enumerate (Round 18 / C17
     'completionRejectsProtocolEmptyArray', 'completionRejectsProtocolMultiValueArray',
     'completionRejectsProtocolNestedArray', 'completionRejectsProtocolObject',
     'completionRejectsProtocolNull', 'completionRejectsArrayTypedMarkerFields',
-    'completionRejectsArrayTypedSealBlockFields', 'completionRejectsScalarRootMarker',
+    'completionRejectsArrayTypedSealBlockFields', 'completionRejectsCollectionRootMarker',
     'evidenceSealRejectsNonArrayFiles', 'evidenceSealRejectsStringFileCount',
     'evidenceSealRejectsArrayChainHead', 'completionRejectsCollectionValuedIntent',
     'completionRejectsCollectionValuedClaimRelease', 'selfTestReceiptRejectsCollectionValuedMetadata'];
@@ -2690,6 +2690,79 @@ hdr(27, 'the JSON type boundary - an accessor must not enumerate (Round 18 / C17
   check('the README documents the C17-C1 root cause and the type rules',
     readmeText.includes('C17-C1') && /enumerat/i.test(readmeText) &&
     /authoritative field/i.test(readmeText) && /JSON kind|exact JSON type/i.test(readmeText));
+}
+
+hdr(28, 'document roots are validated, never assumed (Round 19 / C18-C1)');
+{
+  // C18-C1: ConvertFrom-Json turns the four bytes `null` into $null without
+  // throwing, and every authoritative check is guarded by "the document parsed".
+  // A null root therefore skipped the whole block and the run was accepted on its
+  // remaining valid seal. Executed proofs: cases 121-135 on Windows PowerShell 5.1.
+  const libRaw = lib;
+  const deploySrc = lf(read(join(CLOUD, 'tools/deploy.ps1')));
+  const manifestSrc = lf(read(join(CLOUD, 'tools/check-manifest.ps1')));
+  const ledgerSrc = lf(read(join(CLOUD, 'tools/check-ledger.ps1')));
+  const selfTest = lf(read(join(CLOUD, 'tools/test-native-capture.ps1')));
+  const readmeText = lf(read(join(CLOUD, 'README.md')));
+  const consumer = libRaw.slice('function Test-ClashRunCompletion'.length + libRaw.indexOf('function Test-ClashRunCompletion'),
+    libRaw.indexOf('# ------------------------------------------------------- connection policy --'));
+
+  check('the root contract is declared once and names every state',
+    /function Get-ClashJsonRoot/.test(libRaw) &&
+    /'missing'/.test(libRaw) && /'directory'/.test(libRaw) && /'unreadable'/.test(libRaw) &&
+    /'empty'/.test(libRaw) && /'malformed'/.test(libRaw) && /'null'/.test(libRaw) &&
+    /is the JSON literal null; it must be a JSON object/.test(libRaw) &&
+    /is empty or whitespace only/.test(libRaw));
+  check('the completion consumer cannot skip its authoritative block',
+    consumer.includes("Get-ClashJsonRoot -Path $markerPath -Label 'completion marker'") &&
+    consumer.includes("$problems.Add($markerRoot['problem'])") &&
+    consumer.includes("$document = $markerRoot['value']") &&
+    consumer.indexOf("Get-ClashJsonRoot -Path $markerPath") < consumer.indexOf('$proto = (Get-ClashJsonField') &&
+    // the field block is still guarded, but the guard can no longer be the only
+    // thing that decides whether a run is accepted
+    /if \(\$null -ne \$document\) \{/.test(consumer));
+  check('the sealed intent and claim release roots are validated too',
+    consumer.includes("Get-ClashJsonRoot -Path $intentPath -Label 'sealed finalization intent'") &&
+    consumer.includes("Get-ClashJsonRoot -Path $releasePath -Label 'sealed claim release'") &&
+    consumer.includes("$problems.Add($intentRoot['problem'])") &&
+    consumer.includes("$problems.Add($releaseRoot['problem'])"));
+  check('a rejected seal says why: the null root is an explicit problem',
+    /Get-ClashJsonRoot -Path \$target -Label 'evidence seal'/.test(libRaw) &&
+    /\$problems.Add\(\$sealRoot\['problem'\]\)/.test(libRaw) &&
+    /a rejection nobody can read/.test(libRaw) && /rejection nobody can act on/.test(libRaw));
+  check('the producer validates its own candidate and published root',
+    /Get-ClashJsonRoot -Path \$temp -Label 'candidate completion marker'/.test(libRaw) &&
+    /Get-ClashJsonRoot -Path \$marker -Label 'published completion marker'/.test(libRaw) &&
+    /if \(\$publishedRoot\['ok'\]\) \{ \$published = \$publishedRoot\['value'\] \}/.test(libRaw));
+  check('the verification receipt has a root contract of its own',
+    /an adapter self-test receipt must be a JSON object, and this document parsed to null/.test(libRaw) &&
+    /the receipt root is \{0\}; an adapter self-test receipt must be a JSON object/.test(libRaw) &&
+    /Get-ClashJsonRoot -Path \$ReceiptPath -Label 'adapter self-test receipt'/.test(libRaw));
+  check('every manifest reader validates the manifest root first',
+    deploySrc.includes("Get-ClashJsonRoot -Path $manifestPath -Label 'package manifest'") &&
+    manifestSrc.includes("Get-ClashJsonRoot -Path (Join-Path $cloudRoot 'manifest.json') -Label 'package manifest'") &&
+    ledgerSrc.includes("Get-ClashJsonRoot -Path (Join-Path $cloudRoot 'manifest.json') -Label 'package manifest'") &&
+    !/"\$manifest\.entries"/.test(deploySrc));
+  const rootCases = ['completionRejectsNullRootMarker', 'completionRejectsEmptyRootMarker',
+    'completionRejectsWhitespaceRootMarker', 'completionRejectsArrayRootMarker',
+    'completionRejectsScalarRootMarker', 'completionRejectsMalformedRootMarker',
+    'completionRejectsMissingRootMarker', 'jsonRootStatesAreValidated',
+    'completionAcceptsValidObjectRoot', 'evidenceSealRejectsNullRoot', 'evidenceSealRejectsEmptyRoot',
+    'completionRejectsNullRootIntent', 'completionRejectsNullRootClaimRelease',
+    'selfTestReceiptRejectsInvalidRoot', 'adapterSelfTestRejectsNullRootReceipt'];
+  check('all fifteen root-state cases are executed and in the shared inventory',
+    rootCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest) && libRaw.includes(`'${n}'`)));
+  check('the executed null fixture is the audit four bytes',
+    /-Text 'null'/.test(selfTest) &&
+    selfTest.includes('74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b') &&
+    /\(\$n1\['bytes'\] -eq 4\)/.test(selfTest));
+  check('the root states are executed against a valid published fixture',
+    /function Invoke-RootStateProbe/.test(selfTest) &&
+    /Invoke-CompletionProbe -Root \$root/.test(selfTest) &&
+    /beforeOk/.test(selfTest));
+  check('the README documents C18-C1 and the root contract',
+    readmeText.includes('C18-C1') && /literal null/.test(readmeText) &&
+    /root/i.test(readmeText) && /C17-C1/.test(readmeText));
 }
 
 {
