@@ -120,7 +120,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 55 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 65
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 75
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -141,7 +141,7 @@ if (-not $inventoryCheck.ok) {
     adapterVersion    = $script:ClashAdapterVersion
     adapterSha256     = $script:adapterShaFinal
     casesExecuted     = 0
-    casesExpected     = 65
+    casesExpected     = 75
     cases             = @{}
     problems          = $reasons
     inventoryObserved = $observed
@@ -1387,7 +1387,15 @@ function New-VerifyReportText {
     [string]$Trailer = '',
     [string]$JunkLine = '',
     [int]$CutLastChars = 0,
-    [int[]]$SwapOrds = @()
+    [int[]]$SwapOrds = @(),
+    [int]$DamageRowOrd = 0,
+    [string]$DamageChar = '',
+    [switch]$DamageHeader,
+    [int]$ShiftRowOrd = 0,
+    [int]$ShiftCount = 0,
+    [switch]$ShiftHeader,
+    [int]$UnpadRowOrd = 0,
+    [switch]$Crlf
   )
 
   $contract = Get-ClashVerifyContract -ReportName $ReportName
@@ -1448,7 +1456,18 @@ function New-VerifyReportText {
   $separator = @()
   foreach ($w in $widths) { $separator += ('-' * ([int]$w + 2)) }
   $lines.Add(($separator -join '+'))
+  # The spans the separator declares, computed the same way the parser does:
+  # each column is (width + 2) characters, and the '|' that closes it sits at
+  # start + width.
+  $spans = @()
+  $spanPos = 0
+  foreach ($w in $widths) {
+    $spans += @{ start = $spanPos; width = ([int]$w + 2) }
+    $spanPos = $spanPos + ([int]$w + 2) + 1
+  }
+  $lineOfOrd = @{}
   foreach ($row in $body) {
+    $lineOfOrd[[int]$row[0]] = $lines.Count
     if (@($row).Count -lt 5) {
       # A damaged report can lose trailing columns: the row ends at its last real
       # cell instead of being padded out to five. psql never renders this; it is
@@ -1465,6 +1484,43 @@ function New-VerifyReportText {
     }
   }
 
+  # R14-C1: the row whose structural '|' characters are replaced is the exact
+  # mutation the Round 14 audit used. Only the four declared boundaries change;
+  # every cell keeps its text and its position, which is why the span reader
+  # alone could not see it.
+  if ($DamageRowOrd -gt 0 -and $DamageChar.Length -gt 0 -and $lineOfOrd.ContainsKey([int]$DamageRowOrd)) {
+    $at = [int]$lineOfOrd[[int]$DamageRowOrd]
+    $chars = ([string]$lines[$at]).ToCharArray()
+    for ($c = 0; $c -lt 4; $c++) {
+      $pos = [int]$spans[$c].start + [int]$spans[$c].width
+      if ($pos -lt $chars.Length) { $chars[$pos] = [char]$DamageChar[0] }
+    }
+    $lines[$at] = (-join $chars)
+  }
+  if ($DamageHeader -and $DamageChar.Length -gt 0) {
+    $chars = ([string]$lines[0]).ToCharArray()
+    for ($c = 0; $c -lt 4; $c++) {
+      $pos = [int]$spans[$c].start + [int]$spans[$c].width
+      if ($pos -lt $chars.Length) { $chars[$pos] = [char]$DamageChar[0] }
+    }
+    $lines[0] = (-join $chars)
+  }
+  if ($ShiftRowOrd -gt 0 -and $ShiftCount -gt 0 -and $lineOfOrd.ContainsKey([int]$ShiftRowOrd)) {
+    $at = [int]$lineOfOrd[[int]$ShiftRowOrd]
+    $text = [string]$lines[$at]
+    $at2 = [int]$spans[1].start
+    if ($at2 -lt $text.Length) { $lines[$at] = $text.Insert($at2, (' ' * [int]$ShiftCount)) }
+  }
+  if ($ShiftHeader -and $ShiftCount -gt 0) {
+    $text = [string]$lines[0]
+    $at2 = [int]$spans[1].start
+    if ($at2 -lt $text.Length) { $lines[0] = $text.Insert($at2, (' ' * [int]$ShiftCount)) }
+  }
+  if ($UnpadRowOrd -gt 0 -and $lineOfOrd.ContainsKey([int]$UnpadRowOrd)) {
+    $at = [int]$lineOfOrd[[int]$UnpadRowOrd]
+    $text = [string]$lines[$at]
+    if ($text.Length -gt 2) { $lines[$at] = $text.Remove(0, 1) }
+  }
   if ($CutLastChars -gt 0 -and $lines.Count -gt 2) {
     $lastIndex = $lines.Count - 1
     $last = [string]$lines[$lastIndex]
@@ -1486,6 +1542,9 @@ function New-VerifyReportText {
     }
   }
   if ($Trailer.Length -gt 0) { $lines.Add($Trailer) }
+  # The parser splits on "`r?`n", so a CRLF capture must read identically to an LF
+  # one. psql on Windows writes CRLF; the fixture can produce either.
+  if ($Crlf) { return ((@($lines) -join "`r`n") + "`r`n") }
   return ((@($lines) -join "`n") + "`n")
 }
 
@@ -2201,6 +2260,144 @@ Add-Case 'preflightInfoOnlyReportStops' (
   [string]$gatePfInfo.receipts['02-preflight.json']['passRows'] -eq '0' -and
   [string]$gatePfInfo.stopReason -match 'gating row\(s\) rendered') (New-GateCaseDetail -Probe $gatePfInfo -Outcome $pfInfoOutcome `
   -Note 'the receipt takes its status from the report verdict, not from the exit code')
+
+# ===========================================================================
+# 66-75: the framing characters are part of the report (R14-C1)
+#
+# Round 14 read the cells inside the separator's spans and never looked at what
+# separated them. Replacing the four structural '|' characters on a row with '!'
+# left every cell in place, so the row parsed, the contract matched, the receipt
+# said PASS and gate 2 advanced. The framing is now validated at the exact
+# positions the separator declares, and a '|' inside a cell is still a value
+# because it is not at any of those positions.
+# ===========================================================================
+
+# ---- 66: the exact R14-C1 mutation ---------------------------------------
+$damagedText = New-VerifyReportText -ReportName '00_preflight.sql' -DamageRowOrd 1 -DamageChar '!'
+$gateDamaged = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $damagedText))
+$damagedOutcome = Test-VerificationGateOutcome -Probe $gateDamaged `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightDelimiterReplacedStops' (
+  $damagedOutcome.ok -and
+  -not $gateDamaged.advanced -and
+  [int]$gateDamaged.nativeCalls -eq 1 -and
+  [string]$gateDamaged.stopReason -match 'the delimiter closing column') (New-GateCaseDetail -Probe $gateDamaged -Outcome $damagedOutcome `
+  -Note 'row 1 with ! instead of | at the four declared boundaries: the audit''s exact mutation')
+
+# ---- 67: the header's delimiter is replaced -------------------------------
+$damagedHeaderText = New-VerifyReportText -ReportName '00_preflight.sql' -DamageHeader -DamageChar '!'
+$gateDamagedHeader = Invoke-PreflightGateProbe -Results @((New-GateChildResult -Text $damagedHeaderText))
+$damagedHeaderOutcome = Test-VerificationGateOutcome -Probe $gateDamagedHeader `
+  -ExpectedReceipts @('02-preflight.json', '02-preflight-rows.json') `
+  -ExpectedStop '02-preflight-rows.json' `
+  -ExpectedStatus @{ '02-preflight.json' = 'FAIL' }
+Add-Case 'preflightHeaderDelimiterReplacedStops' (
+  $damagedHeaderOutcome.ok -and
+  -not $gateDamagedHeader.advanced -and
+  [string]$gateDamagedHeader.stopReason -match 'no column header') (New-GateCaseDetail -Probe $gateDamagedHeader -Outcome $damagedHeaderOutcome)
+
+# ---- 68: the postflight report, same mutation -----------------------------
+$damagedVerifyText = New-VerifyReportText -ReportName '90_verify.sql' -DamageRowOrd 2 -DamageChar '!'
+$gateDamagedVerify = Invoke-VerificationGateProbe -Results @((New-GateChildResult -Text $damagedVerifyText))
+$damagedVerifyOutcome = Test-VerificationGateOutcome -Probe $gateDamagedVerify `
+  -ExpectedReceipts @('04-postflight.json', '04-postflight-fail.json') `
+  -ExpectedStop '04-postflight-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'FAIL' }
+Add-Case 'postflightDelimiterReplacedStops' (
+  $damagedVerifyOutcome.ok -and
+  [int]$gateDamagedVerify.nativeCalls -eq 1 -and
+  [string]$gateDamagedVerify.stopReason -match 'the delimiter closing column' -and
+  -not $gateDamagedVerify.receipts.Contains('06-claim-release.json') -and
+  -not $gateDamagedVerify.receipts.Contains('06-complete.json')) (New-GateCaseDetail -Probe $gateDamagedVerify -Outcome $damagedVerifyOutcome)
+
+# ---- 69: the storage report, same mutation -------------------------------
+$damagedStorageText = New-VerifyReportText -ReportName '95_storage_config.sql' -DamageRowOrd 3 -DamageChar '!'
+$gateDamagedStorage = Invoke-VerificationGateProbe -Results @(
+  (New-GateChildResult -Text (New-VerifyReportText -ReportName '90_verify.sql')),
+  (New-GateChildResult -Text $damagedStorageText)
+)
+$damagedStorageOutcome = Test-VerificationGateOutcome -Probe $gateDamagedStorage `
+  -ExpectedReceipts @('04-postflight.json', '05-storage.json', '05-storage-fail.json') `
+  -ExpectedStop '05-storage-fail.json' `
+  -ExpectedStatus @{ '04-postflight.json' = 'PASS'; '05-storage.json' = 'FAIL' }
+Add-Case 'storageDelimiterReplacedStops' (
+  $damagedStorageOutcome.ok -and
+  [int]$gateDamagedStorage.nativeCalls -eq 2 -and
+  [string]$gateDamagedStorage.stopReason -match 'storage verification did not satisfy' -and
+  [string]$gateDamagedStorage.stopReason -match 'the delimiter closing column') (New-GateCaseDetail -Probe $gateDamagedStorage -Outcome $damagedStorageOutcome)
+
+# ---- 70: a shifted boundary (one padding space removed) -------------------
+$shiftText = New-VerifyReportText -ReportName '90_verify.sql' -ShiftRowOrd 4 -ShiftCount 1
+$parsedShift = Get-ReportParse -ReportName '90_verify.sql' -Text $shiftText
+Add-Case 'reportShiftedBoundaryStops' (
+  -not $parsedShift.ok -and
+  [string]$parsedShift.verdict -eq 'FAIL' -and
+  [int]$parsedShift.rows -eq 18 -and
+  ((@($parsedShift.problems) -join ' ') -match 'does not begin at its boundary')) @{
+    verdict = [string]$parsedShift.verdict; rows = [int]$parsedShift.rows; note = 'an extra padding space moves every later delimiter'
+  }
+
+# ---- 71: a row with no left padding at all --------------------------------
+$unpadText = New-VerifyReportText -ReportName '90_verify.sql' -UnpadRowOrd 5
+$parsedUnpad = Get-ReportParse -ReportName '90_verify.sql' -Text $unpadText
+Add-Case 'reportUnpaddedRowStops' (
+  -not $parsedUnpad.ok -and
+  [string]$parsedUnpad.verdict -eq 'FAIL' -and
+  [int]$parsedUnpad.rows -eq 18 -and
+  ((@($parsedUnpad.problems) -join ' ') -match 'does not begin at its boundary')) @{
+    verdict = [string]$parsedUnpad.verdict; rows = [int]$parsedUnpad.rows; note = 'a row shifted one character left is not a row'
+  }
+
+# ---- 72: the negative control - padding and right-aligned ord are fine ---
+$paddedText = New-VerifyReportText -ReportName '90_verify.sql'
+$parsedPadded = Get-ReportParse -ReportName '90_verify.sql' -Text $paddedText
+$ordLine = @([string]$paddedText -split "`n")[2]
+Add-Case 'reportPaddedShortCellsStillParse' (
+  [bool]$parsedPadded.ok -and
+  [string]$parsedPadded.verdict -eq 'PASS' -and
+  [int]$parsedPadded.rows -eq 19 -and
+  @($parsedPadded.problems).Count -eq 0 -and
+  # 'ord 1' is right-aligned inside its column: shorter than the header width,
+  # padded on the left, and still framed exactly.
+  ([string]$ordLine -match '^ +1 \| ')) @{
+    verdict = [string]$parsedPadded.verdict; rows = [int]$parsedPadded.rows; note = 'a short value padded to its column is legal'
+  }
+
+# ---- 73: a CRLF capture reads the same -----------------------------------
+$crlfText = New-VerifyReportText -ReportName '90_verify.sql' -Crlf
+$parsedCrlf = Get-ReportParse -ReportName '90_verify.sql' -Text $crlfText
+Add-Case 'reportCrlfEnvelopeParses' (
+  [bool]$parsedCrlf.ok -and
+  [int]$parsedCrlf.rows -eq 19 -and
+  [bool]$parsedCrlf.footerSeen -and
+  @($parsedCrlf.problems).Count -eq 0 -and
+  ([string]$crlfText -match "`r`n")) @{
+    verdict = [string]$parsedCrlf.verdict; rows = [int]$parsedCrlf.rows; note = 'psql on Windows writes CRLF; the parser splits on r?n'
+  }
+
+# ---- 74: the header still splits, but sits off the separator's columns ----
+$headerShiftText = New-VerifyReportText -ReportName '90_verify.sql' -ShiftHeader -ShiftCount 1
+$parsedHeaderShift = Get-ReportParse -ReportName '90_verify.sql' -Text $headerShiftText
+Add-Case 'reportHeaderMisalignedToSeparatorStops' (
+  -not $parsedHeaderShift.ok -and
+  [string]$parsedHeaderShift.verdict -eq 'FAIL' -and
+  ((@($parsedHeaderShift.problems) -join ' ') -match 'header is not aligned with the separator')) @{
+    verdict = [string]$parsedHeaderShift.verdict; rows = [int]$parsedHeaderShift.rows; note = 'five names, wrong positions'
+  }
+
+# ---- 75: an embedded pipe keeps its cell, and is not a boundary ----------
+$pipeText = New-VerifyReportText -ReportName '00_preflight.sql'
+$parsedPipe = Get-ReportParse -ReportName '00_preflight.sql' -Text $pipeText
+Add-Case 'reportEmbeddedPipeKeepsFraming' (
+  [bool]$parsedPipe.ok -and
+  [int]$parsedPipe.rows -eq 21 -and
+  @($parsedPipe.problems).Count -eq 0 -and
+  ([regex]::Matches([string]$pipeText, [regex]::Escape('postgis|extensions'))).Count -eq 2 -and
+  -not ((@($parsedPipe.problems) -join ' ') -match 'delimiter')) @{
+    verdict = [string]$parsedPipe.verdict; rows = [int]$parsedPipe.rows; note = 'postgis|extensions sits inside cells, not on a declared boundary'
+  }
 
 # ===========================================================================
 # verdict: inventory first, then the receipt, then the file on disk

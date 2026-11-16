@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **410 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **425 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 410 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 425 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -201,6 +201,13 @@ deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
 `-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
 the contract rather than an accident of the host.
 
+Adapter `4.7.0` (was `4.6.0`), native self-test 75 cases (was 65): the framing
+characters of a report are now validated at every separator-derived boundary (see
+§1m), and ten cases execute the mutation the Round 14 audit used - the exact
+four-delimiter replacement - plus shifted, unpadded and misaligned headers for
+all three reports, alongside valid controls for embedded pipes, right-aligned
+numbers, LF/CRLF and padded short values.
+
 Adapter `4.6.0` (was `4.5.0`), native self-test 65 cases (was 55): gate 2 is now
 held to a report contract too (see §1l), and ten cases execute the committed
 gate-2 region - the real 21-row report, the audit's arbitrary suffix line, a
@@ -262,6 +269,15 @@ have not been executed on this machine either - they are executed by
 | - | a five-column `\|` splitter would have broken the new gate immediately | `00_preflight.sql` renders the literal `postgis\|extensions` in the *expected* column and `postgis\|<schema>` (or `ABSENT`) in *actual*, so a pipe splitter reads seven cells from a good row. Rows are now framed on the column spans the dashed separator declares - `(width + 2)` dashes per column joined by `+` - and the pipe stays inside its cell. `Test-VerifyReportHeader`/`Separator` and the envelope are unchanged |
 | - | the offline suite asserted the old behaviour | section [24] derives the 21 rows from `00_preflight.sql` itself (both copies of the list must agree), compares them with the declaration, mirrors the boundary framing independently, and the ten new native cases execute the committed gate-2 block with the child and evidence layers stubbed |
 
+### 1m. Round 15 (audit of `03861c2`) - the delimiters were never checked
+
+| # | Defect | Fix |
+|---|---|---|
+| R14-C1 (critical) | `Get-ReportColumnBounds` records each column's span and `Get-ReportCellsFromBounds` slices inside it, but nothing looked at the character *between* spans. Replacing the four structural `\|` on row 1 with `!` left every cell at its position, so the report parsed to 21 rows, matched the contract, produced a PASS receipt and advanced gate 2 | `Test-ReportRowFraming` checks the framing at the exact positions the separator declares - a space at the first character of every column and a `\|` at `start + width` for every column but the last - for **both** the header and every data row. A row whose framing fails is reported, counted as malformed and **not** counted as a row, so the verdict is FAIL, the receipt is non-PASS and the gate STOPs before anything after it |
+| - | a `\|` inside a cell had to stay a value | only the declared boundaries are delimiters, so `postgis|extensions` (preflight ord 8, in *expected* and in *actual*) still frames exactly - case 75 asserts the report parses with zero problems while containing the literal pipe twice |
+| - | the header was checked by splitting it, so it could still sit off the separator's columns | once the separator is seen the recorded header line is framed against the same spans and each header cell must read `ord`, `check_name`, `expected`, `actual`, `status` *at its column*; a shifted header is a reported problem |
+| - | the offline suite had no framing mirror | section [25] re-derives the 21 preflight rows from the SQL, frames them independently, and replays the audit's mutation on row 1 and on the pipe row, plus shifted, unpadded, header-misaligned, LF/CRLF and short-padded-value controls |
+
 ## 2. Layout
 
 ```
@@ -282,7 +298,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (410 assertions)
+tests/verify-package.mjs       offline test suite (425 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 24;
-const EXPECTED_CASES = 65;
-const EXPECTED_ASSERTIONS = 410;
+const EXPECTED_SECTIONS = 25;
+const EXPECTED_CASES = 75;
+const EXPECTED_ASSERTIONS = 425;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -2261,10 +2261,194 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
   check('the README documents the preflight contract',
     readmeText.includes('00_preflight.sql') && readmeText.includes('21') &&
     readmeText.includes('postgis|extensions') && /R13-C1/.test(readmeText));
-  check('the adapter identity is 4.6.0 in the lib, the README and the workflow',
-    /ClashAdapterVersion = '4\.6\.0'/.test(libCode) &&
-    readmeText.includes('4.6.0') &&
-    lf(read(join(ROOT, '.github/workflows/windows-offline-validation.yml'))).includes("'4.6.0'"));
+  const declaredVersion = (/ClashAdapterVersion = '([0-9]+\.[0-9]+\.[0-9]+)'/.exec(libCode) || [])[1] || '';
+  check('the adapter identity is the same in the lib, the README and the workflow',
+    declaredVersion !== '' && readmeText.includes(declaredVersion) &&
+    lf(read(join(ROOT, '.github/workflows/windows-offline-validation.yml'))).includes(`'${declaredVersion}'`),
+    declaredVersion);
+}
+
+{
+  // ==========================================================================
+  // Section 25: the framing characters are part of the report (R14-C1)
+  //
+  // Round 14 sliced cells out of the separator's spans and never looked at what
+  // separated them: replacing a row's four structural '|' with '!' kept every
+  // cell in place, so the report parsed, the contract matched and gate 2
+  // advanced. A span says where a cell is; it says nothing about the delimiter
+  // that ends it.
+  // ==========================================================================
+  sectionsRun += 1;
+
+  const libCode = lf(read(join(CLOUD, 'tools/lib/clash-native.ps1')));
+  const deployCode = lf(read(join(CLOUD, 'tools/deploy.ps1')));
+  const selfTest = lf(read(join(CLOUD, 'tools/test-native-capture.ps1')));
+  const readmeText = lf(read(join(CLOUD, 'README.md')));
+  const preflightSql = lf(read(join(CLOUD, 'preflight/00_preflight.sql')));
+
+  // --- the report the SQL renders, and an independent framing reader --------
+  const rowsFromSql = [];
+  {
+    const triple = /select (\d+) as ord, '((?:[^']|'')*)'::text as check_name, '((?:[^']|'')*)'::text as expected/g;
+    const seen = new Map();
+    let m;
+    while ((m = triple.exec(preflightSql)) !== null) seen.set(Number(m[1]), { ord: Number(m[1]), name: m[2], expected: m[3] });
+    rowsFromSql.push(...[...seen.values()].sort((a, b) => a.ord - b.ord));
+  }
+  const render = (rows) => {
+    const header = ['ord', 'check_name', 'expected', 'actual', 'status'];
+    const body = rows.map((r) => [String(r.ord), r.name, r.expected, r.expected, r.name.startsWith('INFO') ? 'INFO' : 'PASS']);
+    const widths = header.map((h, i) => Math.max(h.length, ...body.map((r) => r[i].length)));
+    const pad = (t, w, right) => (right ? String(t).padStart(w) : String(t).padEnd(w));
+    const lines = [
+      ` ${header.map((c, i) => pad(c, widths[i], i === 0)).join('|').replace(/\|/g, ' | ')} `.replace(/ +\| +/g, (s) => s),
+      '',
+    ];
+    const row = (cells) => ` ${cells.map((c, i) => pad(c, widths[i], i === 0)).join(' | ')} `;
+    const headerLine = row(header);
+    const bounds = [];
+    let at = 0;
+    for (const w of widths) { bounds.push({ start: at, width: w + 2 }); at += w + 2 + 1; }
+    const bodyLines = body.map(row);
+    return { headerLine, bodyLines, bounds, separator: widths.map((w) => '-'.repeat(w + 2)).join('+'), body };
+  };
+  const framingProblems = (line, bounds) => {
+    const out = [];
+    bounds.forEach((b, i) => {
+      if (b.start >= line.length) return;
+      if (line[b.start] !== ' ') out.push(`column ${i + 1} does not begin at its boundary (position ${b.start}): found '${line[b.start]}', expected a space`);
+      if (i < bounds.length - 1) {
+        const pos = b.start + b.width;
+        if (pos >= line.length) { out.push(`the row ends before the delimiter that closes column ${i + 1} (position ${pos})`); return; }
+        if (line[pos] !== '|') out.push(`the delimiter closing column ${i + 1} is '${line[pos]}' at position ${pos}, expected "|"`);
+      }
+    });
+    return out;
+  };
+  const readWithFraming = (headerLine, separator, bodyLines) => {
+    const segs = separator.split('+');
+    const bounds = []; let at = 0;
+    for (const seg of segs) { bounds.push({ start: at, width: seg.length }); at += seg.length + 1; }
+    const problems = [...framingProblems(headerLine, bounds)];
+    const cells = [];
+    for (const line of bodyLines) {
+      const f = framingProblems(line, bounds);
+      if (f.length > 0) { problems.push(...f); continue; }
+      cells.push(bounds.map((b, i) => (i === bounds.length - 1 ? line.slice(b.start).trim() : line.slice(b.start, b.start + b.width).trim())));
+    }
+    return { cells, problems, bounds };
+  };
+
+  const real = render(rowsFromSql);
+  const baseline = readWithFraming(real.headerLine, real.separator, real.bodyLines);
+
+  check('the adapter validates the framing characters at every declared boundary',
+    /function Test-ReportRowFraming/.test(libCode) &&
+    /\$framing = @\(Test-ReportRowFraming -Line \$line -Bounds \$bounds\)/.test(libCode) &&
+    /if \(\$framing\.Count -gt 0 -or -not \$ordinalOk -or -not \$statusOk\)/.test(libCode) &&
+    /the delimiter closing column/.test(libCode) &&
+    /does not begin at its boundary/.test(libCode));
+  check('the header is checked against the separator, not only the data rows',
+    /Test-ReportRowFraming -Line \$headerLine -Bounds \$bounds/.test(libCode) &&
+    /header is not aligned with the separator/.test(libCode) &&
+    /\$headerLine  = ''/.test(libCode));
+
+  check('mirror: the undamaged preflight report frames exactly and keeps its 21 rows',
+    baseline.problems.length === 0 && baseline.cells.length === 21 &&
+    baseline.cells[7][2] === 'postgis|extensions' && baseline.cells[7][3] === 'postgis|extensions');
+
+  // The audit's exact mutation, replayed on the row it used (row 1) and on the
+  // row that carries a pipe (row 8): the cells never move, only the delimiters.
+  const damage = (rowIndex) => {
+    const line = real.bodyLines[rowIndex];
+    const chars = [...line];
+    for (let i = 0; i < 4; i += 1) chars[real.bounds[i].start + real.bounds[i].width] = '!';
+    return chars.join('');
+  };
+  {
+    const lines = [...real.bodyLines];
+    lines[0] = damage(0);
+    const damaged = readWithFraming(real.headerLine, real.separator, lines);
+    check('mirror: R14-C1 - replacing the four structural delimiters with ! is a rejection',
+      damaged.problems.filter((p) => p.includes('delimiter closing column')).length === 4 &&
+      damaged.cells.length === 20 &&
+      !damaged.problems.some((p) => p.includes('does not begin at its boundary')),
+      damaged.problems.slice(0, 2).join(' | '));
+  }
+  {
+    const lines = [...real.bodyLines];
+    lines[7] = damage(7);
+    const damaged = readWithFraming(real.headerLine, real.separator, lines);
+    check('mirror: the same mutation on the pipe row is rejected, and its pipes stay values',
+      damaged.cells.length === 20 && damaged.problems.length === 4 &&
+      damaged.problems.every((p) => p.includes('expected "|"')),
+      damaged.problems.length);
+  }
+  {
+    const shifted = [...real.bodyLines];
+    const b = real.bounds[1];
+    shifted[3] = shifted[3].slice(0, b.start) + ' ' + shifted[3].slice(b.start);
+    const damaged = readWithFraming(real.headerLine, real.separator, shifted);
+    check('mirror: a shifted boundary (one extra padding space) is a rejection',
+      damaged.cells.length === 20 &&
+      damaged.problems.some((p) => p.includes('does not begin at its boundary') || p.includes('delimiter closing column')));
+  }
+  {
+    const unpadded = [...real.bodyLines];
+    unpadded[4] = unpadded[4].slice(1);
+    const damaged = readWithFraming(real.headerLine, real.separator, unpadded);
+    check('mirror: a row with no left padding is a rejection',
+      damaged.cells.length === 20 && damaged.problems.length > 0);
+  }
+  {
+    const headerShifted = ' ' + real.headerLine.slice(0, real.bounds[1].start) + ' ' + real.headerLine.slice(real.bounds[1].start);
+    const damaged = readWithFraming(headerShifted, real.separator, real.bodyLines);
+    check('mirror: a header that sits off the separator columns is a rejection',
+      damaged.problems.length > 0 && damaged.cells.length === 21);
+  }
+  check('mirror: LF and CRLF captures frame identically',
+    (() => {
+      const crlf = [real.headerLine, real.separator, ...real.bodyLines].join('\r\n') + '\r\n';
+      const lf = [real.headerLine, real.separator, ...real.bodyLines].join('\n') + '\n';
+      const a = lf.split(/\r?\n/);
+      const b = crlf.split(/\r?\n/);
+      return a.length === b.length && a.every((line, i) => line === b[i]) && b[0] === real.headerLine;
+    })());
+  check('mirror: a padded short value (right-aligned ord) stays legal',
+    (() => {
+      const line = real.bodyLines[0];
+      const ordCell = line.slice(real.bounds[0].start, real.bounds[0].start + real.bounds[0].width);
+      return /^ +\d+ $/.test(ordCell) && framingProblems(line, real.bounds).length === 0;
+    })());
+
+  // --- the cases and the receipts -------------------------------------------
+  const framingCases = ['preflightDelimiterReplacedStops', 'preflightHeaderDelimiterReplacedStops',
+    'postflightDelimiterReplacedStops', 'storageDelimiterReplacedStops', 'reportShiftedBoundaryStops',
+    'reportUnpaddedRowStops', 'reportPaddedShortCellsStillParse', 'reportCrlfEnvelopeParses',
+    'reportHeaderMisalignedToSeparatorStops', 'reportEmbeddedPipeKeepsFraming'];
+  check('ten framing cases exist in the harness and in the inventory',
+    framingCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest) && libCode.includes(`'${n}'`)));
+  check('the delimiter mutation is executed for all three reports',
+    framingCases.slice(0, 4).every((n) => selfTest.includes(`Add-Case '${n}'`)) &&
+    /-DamageRowOrd/.test(selfTest) && /-DamageChar/.test(selfTest) &&
+    /preflightDelimiterReplacedStops' \(|postflightDelimiterReplacedStops' \(|storageDelimiterReplacedStops' \(/.test(selfTest));
+  check('a framed report still has to satisfy the declared contract',
+    // the framing check is additive: the contract, the envelope and the counts
+    // are unchanged, and the gate STOPs on the preflight receipt
+    /19 declared gating|gatingExpected/.test(libCode) &&
+    deployCode.includes("Test-VerifyReport -Result $pf -ReportName '00_preflight.sql'") &&
+    deployCode.includes("if (-not $pfReport.ok)"));
+  check('the README documents the framing rule and the audit finding',
+    readmeText.includes('R14-C1') && /delimiter/i.test(readmeText) &&
+    readmeText.includes('postgis|extensions') && readmeText.includes('boundary'));
+  check('mirror: the rejection names the exact boundary position',
+    (() => {
+      const lines = [...real.bodyLines];
+      lines[0] = damage(0);
+      const d = readWithFraming(real.headerLine, real.separator, lines);
+      const first = real.bounds[0].start + real.bounds[0].width;
+      return d.problems.some((p) => p.includes(`position ${first}`));
+    })());
 }
 
 {

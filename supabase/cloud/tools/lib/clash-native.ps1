@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.6.0'
+$script:ClashAdapterVersion = '4.7.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -907,7 +907,7 @@ function Get-ReportColumnBounds {
 # caller reports whatever that makes of the row.
 function Get-ReportCellsFromBounds {
   param(
-    [Parameter(Mandatory = $true)][string]$Line,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Line,
     [Parameter(Mandatory = $true)]$Bounds
   )
 
@@ -927,6 +927,55 @@ function Get-ReportCellsFromBounds {
     $cells += ($text.Substring($start, $width)).Trim()
   }
   return $cells
+}
+
+function Format-ReportChar {
+  param([char]$Char)
+  $code = [int]$Char
+  if ($code -lt 32 -or $code -eq 127) { return ('U+{0:X4}' -f $code) }
+  return ("'{0}'" -f [string]$Char)
+}
+
+# The spans say WHERE a cell is; they say nothing about what separates it from
+# the next one. Reading only the spans means a row whose structural '|' has been
+# replaced - by '!', by nothing, by anything - still yields the same five cells
+# and the same PASS. Round 14's audit (R14-C1) mutated the four delimiters on
+# row 1 to '!' and the gate advanced to gate 3.
+#
+# So the framing is checked in its own right, at the exact positions the
+# separator declares:
+#   * a space at the first character of every column (psql's left padding),
+#   * a '|' at start_i + width_i for every column but the last.
+# A '|' INSIDE a cell is not at any of those positions, which is why
+# 'postgis|extensions' stays a value: only the declared boundaries are delimiters.
+function Test-ReportRowFraming {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Line,
+    [Parameter(Mandatory = $true)]$Bounds
+  )
+
+  $problems = @()
+  $text  = [string]$Line
+  $count = @($Bounds).Count
+  for ($i = 0; $i -lt $count; $i++) {
+    $start = [int]$Bounds[$i].start
+    $width = [int]$Bounds[$i].width
+    if ($start -ge $text.Length) { break }   # a short row is reported by the caller
+    if ($text[$start] -ne ' ') {
+      $problems += ('column {0} does not begin at its boundary (position {1}): found {2}, expected a space' -f ($i + 1), $start, (Format-ReportChar $text[$start]))
+    }
+    if ($i -lt ($count - 1)) {
+      $pos = $start + $width
+      if ($pos -ge $text.Length) {
+        $problems += ('the row ends before the delimiter that closes column {0} (position {1})' -f ($i + 1), $pos)
+        break
+      }
+      if ($text[$pos] -ne '|') {
+        $problems += ('the delimiter closing column {0} is {1} at position {2}, expected "|"' -f ($i + 1), (Format-ReportChar $text[$pos]), $pos)
+      }
+    }
+  }
+  return $problems
 }
 
 function Test-VerifyReportHeader {
@@ -1057,6 +1106,7 @@ function Test-VerifyReport {
   $lineNo      = 0
   $blankInside = 0
   $bounds      = $null   # column spans, taken from the separator once it is seen
+  $headerLine  = ''      # kept so the header can be checked against those spans
 
   foreach ($raw in ($text -split "`r?`n")) {
     $lineNo++
@@ -1071,7 +1121,7 @@ function Test-VerifyReport {
       continue
     }
     if ($state -eq 'preamble') {
-      if (Test-VerifyReportHeader -Line $line) { $sawHeader = $true; $state = 'separator'; continue }
+      if (Test-VerifyReportHeader -Line $line) { $sawHeader = $true; $headerLine = $line; $state = 'separator'; continue }
       $envelope.Add(('line {0}: expected the column header ord | check_name | expected | actual | status; found: {1}' -f $lineNo, (Format-ReportLine $line)))
       # keep going inside the body so one report can list every problem it has
       $state = 'body'
@@ -1081,6 +1131,24 @@ function Test-VerifyReport {
       if (Test-VerifyReportSeparator -Line $line) {
         $sawSep = $true
         $bounds = @(Get-ReportColumnBounds -SeparatorLine $line)
+        # The header must sit on the columns the separator declares, with the same
+        # names in the same places. A header that still splits into five cells but
+        # is shifted relative to the separators would mis-frame every row read
+        # under it, so the alignment is checked here rather than assumed.
+        $headerProblems = @()
+        if ($headerLine.Length -gt 0) { $headerProblems = @(Test-ReportRowFraming -Line $headerLine -Bounds $bounds) }
+        foreach ($headerProblem in $headerProblems) {
+          $envelope.Add(('line {0} (column header): {1}' -f ($lineNo - 1), $headerProblem))
+        }
+        $headerNames = @(Get-ReportCellsFromBounds -Line $headerLine -Bounds $bounds)
+        $expectedNames = @('ord', 'check_name', 'expected', 'actual', 'status')
+        if ($headerLine.Length -gt 0 -and $headerNames.Count -eq 5) {
+          for ($h = 0; $h -lt 5; $h++) {
+            if ([string]$headerNames[$h] -ne $expectedNames[$h]) {
+              $envelope.Add(('the column header at position {0} reads "{1}", expected "{2}": the header is not aligned with the separator' -f ($h + 1), ([string]$headerNames[$h]), $expectedNames[$h]))
+            }
+          }
+        }
         $state  = 'body'
         continue
       }
@@ -1132,13 +1200,29 @@ function Test-VerifyReport {
       }
       $ordinalOk = ($first -match '^\d+$')
       $statusOk  = ($status -eq 'PASS' -or $status -eq 'FAIL' -or $status -eq 'INFO')
+      # The framing is a separate fact from the cell contents: same cells, wrong
+      # separators, and the row is not this report's row.
+      $framing = @()
+      if ($null -ne $bounds -and @($bounds).Count -eq 5) {
+        $framing = @(Test-ReportRowFraming -Line $line -Bounds $bounds)
+      }
+      if ($framing.Count -gt 0) {
+        $framingSample = @($framing)
+        if ($framingSample.Count -gt 3) { $framingSample = @($framingSample[0..2]) }
+        foreach ($framingProblem in $framingSample) {
+          $envelope.Add(('line {0}: {1}' -f $lineNo, $framingProblem))
+        }
+        if ($framing.Count -gt 3) {
+          $envelope.Add(('line {0}: ... and {1} more framing problem(s)' -f $lineNo, ($framing.Count - 3)))
+        }
+      }
       if (-not $ordinalOk) {
         $envelope.Add(('line {0}: invalid ordinal in a data row (expected digits): {1}' -f $lineNo, (Format-ReportLine $line)))
       }
       if (-not $statusOk) {
         $envelope.Add(('line {0}: invalid status in a data row (expected PASS, FAIL or INFO): {1}' -f $lineNo, (Format-ReportLine $line)))
       }
-      if (-not $ordinalOk -or -not $statusOk) {
+      if ($framing.Count -gt 0 -or -not $ordinalOk -or -not $statusOk) {
         $malformed += (Format-ReportLine $line)
         if ($fields.Count -ne 5) {
           $envelope.Add(('line {0}: malformed data row: {1} field(s), expected 5: {2}' -f $lineNo, $fields.Count, (Format-ReportLine $line)))
@@ -1348,7 +1432,18 @@ $script:ClashSelfTestRequiredCases = @(
   'preflightRenderedFailRowStops',
   'preflightTruncatedReportStops',
   'preflightPipeInsideCellIsNotAColumn',
-  'preflightInfoOnlyReportStops'
+  'preflightInfoOnlyReportStops',
+  # Round 15 (R14-C1): the framing characters are validated at every boundary.
+  'preflightDelimiterReplacedStops',
+  'preflightHeaderDelimiterReplacedStops',
+  'postflightDelimiterReplacedStops',
+  'storageDelimiterReplacedStops',
+  'reportShiftedBoundaryStops',
+  'reportUnpaddedRowStops',
+  'reportPaddedShortCellsStillParse',
+  'reportCrlfEnvelopeParses',
+  'reportHeaderMisalignedToSeparatorStops',
+  'reportEmbeddedPipeKeepsFraming'
 )
 
 # Returns a FLAT sequence of case-name strings.
