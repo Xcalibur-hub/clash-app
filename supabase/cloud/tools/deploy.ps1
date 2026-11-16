@@ -104,9 +104,16 @@ trap {
   $m = Protect-Text $_.Exception.Message
   Write-Host ("RUNNER EXCEPTION: {0}" -f $m) -ForegroundColor Red
   if ($run -and (Test-Path -LiteralPath $run)) {
+    $markerPresent = Test-Path -LiteralPath (Join-Path $run '06-complete.json')
     try {
       if (Get-Command New-PhaseReceipt -ErrorAction SilentlyContinue) {
-        New-PhaseReceipt '99-runner-exception.json' @{ status = 'EXCEPTION'; message = $m }
+        New-PhaseReceipt '99-runner-exception.json' @{
+          status = 'EXCEPTION'
+          message = $m
+          completionMarkerWritten = $markerPresent
+          completionAccepted = $false
+          rollbackImplied = $false
+        }
       }
       else {
         [void](Write-EvidenceOrFallback -Path (Join-Path $run '99-runner-exception.json') -Label '99-runner-exception.json' -Text (([ordered]@{
@@ -818,18 +825,63 @@ if (-not (Test-NativeSuccess $release)) {
 New-PhaseReceipt '06-claim-release.json' @{ status = 'PASS'; runId = $runId; released = $true }
 
 # ------------------------------------------------------------- completion ---
-New-PhaseReceipt '06-complete.json' @{
-  status = 'COMPLETE'
-  appliedThisRun = $applied
-  freshOnly = $true
-  writerRunId = $runId
-  packageTreeHash = $treeHash
-  step0Bootstrap  = $bootOutcome
-  ledgerReadBack = '111/111 verified by 90_verify.sql'
+# Round 16 (R15-C1): this used to write and announce a COMPLETE receipt BEFORE
+# sealing the evidence, so a failed seal left a durable, announced COMPLETE
+# beside an EXCEPTION and exit 1. Completion is now a commit protocol owned by
+# Publish-ClashCompletion: provisional intent -> atomic seal -> seal verified
+# against disk -> marker written exclusively -> atomic rename (THE COMMIT POINT)
+# -> marker re-read and re-verified. Nothing is announced until all of that has
+# happened, and a failure at any step leaves no 06-complete.json at all.
+#
+# What a failure here does NOT mean: the 111 migrations were applied and the
+# exclusive-writer claim WAS released. Only the evidence finalization failed, so
+# no rollback is implied and no second release is needed - but the run is not an
+# accepted completion and must not be re-run blindly.
+$completionRequired = @(
+  '02-preflight.json'
+  '04-postflight.json'
+  '05-storage.json'
+  '06-claim-release.json'
+  '06-finalization-intent.json'
+)
+try {
+  $completion = Publish-ClashCompletion -Root $run -PrevSha $script:chain -RequiredEvidence $completionRequired -Fields @{
+    appliedThisRun  = $applied
+    freshOnly       = $true
+    writerRunId     = $runId
+    packageTreeHash = $treeHash
+    step0Bootstrap  = $bootOutcome
+    ledgerReadBack  = '111/111 verified by 90_verify.sql'
+  }
+  # The runner accepts the run through the SAME function a consumer uses, so the
+  # two can never disagree about what a completed run looks like.
+  $consumer = Test-ClashRunCompletion -RunPath $run
+  if (-not $consumer.ok) {
+    throw ('completion refused: the published run does not pass the consumer check: {0}' -f (@($consumer.problems) -join '; '))
+  }
 }
-$seal = Seal-Evidence -Root $run
+catch {
+  $finalizeMessage = Protect-Text $_.Exception.Message
+  Write-Host ("FINALIZATION FAILED: {0}" -f $finalizeMessage) -ForegroundColor Red
+  try {
+    New-PhaseReceipt '06-finalize-fail.json' @{
+      status          = 'STOPPED'
+      phase           = 'completion'
+      message         = $finalizeMessage
+      migrationsApplied = $applied
+      claimReleased   = $true
+      rollbackImplied = $false
+      completionMarkerWritten = (Test-Path -LiteralPath (Join-Path $run '06-complete.json'))
+      guidance        = 'The schema was applied and the claim released; only evidence finalization failed. Do NOT re-run: inspect the evidence directory, verify with check-ledger.ps1 (read-only), and treat acceptance as UNKNOWN.'
+    }
+  }
+  catch { }
+  throw
+}
+
 Write-Host ''
-Write-Host ("TERMINAL RECEIPT: COMPLETE applied={0} freshOnly=true writerRunId={1} seal={2} files={3}" -f $applied, $runId, $seal.sha256, $seal.fileCount) -ForegroundColor Green
+Write-Host ("TERMINAL RECEIPT: COMPLETE applied={0} freshOnly=true writerRunId={1} seal={2} files={3} marker={4}" -f `
+    $applied, $runId, $completion.sealSha256, $completion.sealEntries, $completion.markerSha256) -ForegroundColor Green
 Write-Host ("Evidence: {0}" -f $run)
 Write-Host 'Next: store the evidence directory as-is. Do not edit, re-run or repair.'
 exit 0

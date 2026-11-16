@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 25;
-const EXPECTED_CASES = 75;
-const EXPECTED_ASSERTIONS = 425;
+const EXPECTED_SECTIONS = 26;
+const EXPECTED_CASES = 91;
+const EXPECTED_ASSERTIONS = 437;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -242,7 +242,16 @@ check('stderr is never a failure signal', /stderr content is data, never a failu
 
 // F7: sanitise before persisting, never persist-then-redact; never overwrite
 check('evidence files are created exclusively (CreateNew)', /FileMode\]::CreateNew/.test(lib));
-check('no overwriting write anywhere', !/WriteAllText/.test(allText) && !/FileMode\]::Create\b/.test(lib));
+// Round 16: the finalization cases deliberately corrupt artifacts to prove they
+// are rejected, so the rule is scoped to production code and the harness's
+// overwrites must all sit inside that fault-injection section.
+const finSectionAt = selfTest.indexOf('76-91: the completion finalization protocol');
+const selfTestProduction = finSectionAt > 0 ? selfTest.slice(0, finSectionAt) : selfTest;
+const injectionWrites = (finSectionAt > 0 ? selfTest.slice(finSectionAt).match(/WriteAllText/g) || [] : []).length;
+check('no overwriting write in production code, and only fault injection overwrites evidence',
+  !/WriteAllText/.test(strictText) && !/WriteAllText/.test(selfTestProduction) &&
+  !/FileMode\]::Create\b/.test(lib) && injectionWrites >= 3,
+  `injectionWrites=${injectionWrites}`);
 const protectAt = lib.indexOf('$clean = Protect-Text $Text');
 const encodeAt = lib.indexOf('$enc.GetBytes($clean)');
 check('sanitises in memory before encoding', protectAt > 0 && encodeAt > protectAt, `protect@${protectAt} encode@${encodeAt}`);
@@ -542,9 +551,14 @@ hdr(11, 'failure injection — Round 2 detectors must fire');
   check('classifier: nonzero + row present with other token => LEDGER_MISMATCH', classify(1, true, true, 'sha256:' + 'a'.repeat(64), want) === 'LEDGER_MISMATCH');
   check('classifier: probe failed => UNKNOWN', classify(1, false, false, '', want) === 'UNKNOWN');
   check('classifier: no exit code (timeout/launch) => UNKNOWN', classify(null, true, true, want, want) === 'UNKNOWN');
-  // 11e: a truncated run must not be presented as complete
-  check('completion receipt exists only after the postflight gates',
-    deploy.indexOf("'06-complete.json'") > deploy.indexOf("'05-storage.json'"));
+  // 11e: a truncated run must not be presented as complete. Round 16 (R15-C1):
+  // completion is published by the protocol, after the gates AND after the
+  // claim release - never by a receipt the runner writes itself.
+  check('completion is published only after the postflight gates and the release',
+    deploy.indexOf('Publish-ClashCompletion -Root $run') > deploy.indexOf("'05-storage.json'") &&
+    deploy.indexOf('Publish-ClashCompletion -Root $run') > deploy.indexOf('06-claim-release.json') &&
+    deploy.indexOf('Publish-ClashCompletion -Root $run') < deploy.indexOf('TERMINAL RECEIPT: COMPLETE') &&
+    !deploy.includes("New-PhaseReceipt '06-complete.json'"));
   // 11f: the runner cannot start without the adapter proof
   check('no code path reaches a database before the self-test check',
     deploy.indexOf('Assert-AdapterSelfTest') > 0 && deploy.indexOf('Assert-AdapterSelfTest') < deploy.indexOf("'02-preflight.json'"));
@@ -593,6 +607,7 @@ hdr(13, 'parameter-name resolution (typos in -Named arguments)');
     'Encoding', 'Raw', 'ArgumentList', 'TypeName', 'ForegroundColor', 'ErrorAction',
     'Object', 'InputObject', 'Property', 'ExpandProperty', 'First',
     'Leaf', 'Parent', 'Version', 'Last', 'Descending',
+    'Filter', 'PathType',
   ]);
   const allPs = [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1'];
   const codeAll = allPs.map((f) => psLex(read(join(CLOUD, f))).code).join('\n');
@@ -1580,13 +1595,13 @@ hdr(21, 'claim release: the committed block, executed (Round 10)');
     /function New-PhaseReceipt/.test(selfTest) && /function Stop-Run/.test(selfTest) &&
     !/function Test-NativeSuccess/.test(selfTest) && !/function Get-PgSqlState/.test(selfTest) &&
     !/function Get-NativeOutcomeLabel/.test(selfTest) && !/function Get-NativeErrorExcerpt/.test(selfTest));
-  check('the success case requires COMPLETE, one owner row and the committed argv',
-    /reachedComplete -eq \$true/.test(selfTest) &&
+  check('the success case requires one owner row and the committed argv, not COMPLETE',
+    /reachedComplete -eq \$false/.test(selfTest) &&
     /\$ownedArgs -contains 'VERBOSITY=verbose'/.test(selfTest) &&
     /\$ownedSql\.Contains\('returning run_id'\)/.test(selfTest) &&
-    /\[string\]\$ownedDone\['status'\] -eq 'COMPLETE'/.test(selfTest) &&
-    /\[string\]\$ownedDone\['writerRunId'\] -eq \$probeRunId/.test(selfTest));
-  const releaseCases = ['claimReleaseOwnedRowProceedsToComplete', 'claimReleaseZeroRowsStops',
+    /\[string\]\$ownedDone\['status'\] -eq '<absent>'/.test(selfTest) &&
+    !/\[string\]\$ownedDone\['writerRunId'\]/.test(selfTest));
+  const releaseCases = ['claimReleaseOwnedRowReleasesClaimOnly', 'claimReleaseZeroRowsStops',
     'claimReleaseWrongOwnerStops', 'claimReleaseMultipleRowsStops', 'claimReleaseNonZeroExitStops',
     'claimReleaseTimeoutStops', 'claimReleaseIncompleteCaptureStops'];
   check('all seven release outcomes are executed against the committed block',
@@ -1602,24 +1617,28 @@ hdr(21, 'claim release: the committed block, executed (Round 10)');
   // offline suite instead of surfacing only when the PowerShell case runs.
   const deployLines = lf(deployCode).split('\n');
   const startIdx = deployLines.findIndex((l) => /^\$releaseSql\s*=\s*"delete from supabase_migrations\.clash_deploy_claim/.test(l));
-  const endIdx = deployLines.findIndex((l, i) => i > startIdx && /^\$seal\s*=\s*Seal-Evidence\s+-Root\s+\$run\s*$/.test(l));
+  // Round 16 (R15-C1): the release region ends where the completion region
+  // begins, and it may not write a completion receipt at all.
+  const endIdx = deployLines.findIndex((l, i) => i > startIdx && /^#\s*-+\s*completion\s*-+\s*$/.test(l));
   const region = startIdx >= 0 && endIdx > startIdx ? deployLines.slice(startIdx, endIdx).join('\n') : '';
   const regionMarkers = {
     '06-claim-release-ownership.json': 1,
     '06-claim-release-ownership-stop.json': 1,
     '06-claim-release-fail.json': 1,
     '06-claim-release.json': 2,
-    '06-complete.json': 1,
+    '06-complete.json': 0,
   };
   check('mirror: the committed release region satisfies every extractor guard',
     startIdx >= 0 && endIdx > startIdx &&
     Object.entries(regionMarkers).every(([m, n]) => region.split(m).length - 1 === n) &&
     region.includes('returning run_id') &&
-    !/^\s*exit\b/m.test(region) && !region.includes('Seal-Evidence'),
+    !/^\s*exit\b/m.test(region) && !region.includes('Seal-Evidence') &&
+    !region.includes('Publish-ClashCompletion'),
     `start=${startIdx} end=${endIdx} lines=${endIdx - startIdx}`);
   check('mirror: the extractor anchors are unique in deploy.ps1',
     deployLines.filter((l) => /^\$releaseSql\s*=/.test(l)).length === 1 &&
-    deployLines.filter((l) => /^\$seal\s*=\s*Seal-Evidence/.test(l)).length === 1);
+    deployLines.filter((l) => /^#\s*-+\s*completion\s*-+\s*$/.test(l)).length === 1 &&
+    deployLines.filter((l) => /^exit 0\s*$/.test(l)).length === 1);
   check('mirror: exactly one $common assignment exists for the probe to extract',
     deployLines.filter((l) => /^\$common\s*=\s*@\(/.test(l)).length === 1 &&
     /VERBOSITY=verbose/.test(deployLines.filter((l) => /^\$common\s*=\s*@\(/.test(l))[0] || ''));
@@ -1812,7 +1831,8 @@ hdr(22, 'verification report contract - the report IS the SQL (Round 12 / R11-C1
     deployCode.includes("$vfReport = Test-VerifyReport -Result $vf -ReportName '90_verify.sql'") &&
     deployCode.includes("$stReport = Test-VerifyReport -Result $st -ReportName '95_storage_config.sql'") &&
     /function Test-VerifyReport/.test(libCode) && /function Get-ClashVerifyContract/.test(libCode));
-  const gate5 = deployCode.slice(deployCode.indexOf('gate 5: postflight'), deployCode.indexOf('$seal = Seal-Evidence'));
+  const gate5End = deployCode.indexOf('# ------------------------------------------------------------- completion ---');
+  const gate5 = gate5End > 0 ? deployCode.slice(deployCode.indexOf('gate 5: postflight'), gate5End) : '';
   check('R11-C1: row counting is no longer the gate for postflight or storage',
     !/\[regex\]::Matches/.test(gate5) && !/\$vfFailRows|\$stFailRows/.test(gate5) &&
     // Round 14 (R13-C1): the sibling gate kept a row count; it is gone too
@@ -1827,11 +1847,12 @@ hdr(22, 'verification report contract - the report IS the SQL (Round 12 / R11-C1
     deployCode.indexOf('05-storage-fail.json') < deployCode.indexOf('REFUSED: the claim release was reached without two proven verification reports') &&
     deployCode.indexOf('REFUSED: the claim release was reached without two proven verification reports') <
       deployCode.indexOf("delete from supabase_migrations.clash_deploy_claim") &&
-    deployCode.indexOf("delete from supabase_migrations.clash_deploy_claim") < deployCode.indexOf("'06-complete.json'"));
+    deployCode.indexOf("delete from supabase_migrations.clash_deploy_claim") <
+      deployCode.indexOf('Publish-ClashCompletion -Root $run'));
   check('an incomplete report stops with wording that does not imply a rollback',
     /claim stays held for human review/.test(deployCode) &&
     /No rollback is implied/.test(deployCode) &&
-    !/rolled back/i.test(deployCode.slice(deployCode.indexOf('gate 5: postflight'), deployCode.indexOf('$seal = Seal-Evidence'))));
+    gate5.length > 0 && !/rolled back/i.test(gate5));
   check('the verdict is forced to UNPROVEN whenever the child is not a proven success',
     /if \(-not \$nativeOk\) \{ \$verdict = 'UNPROVEN' \}/.test(libCode) &&
     /its evidence cannot be classified as PASS or FAIL/.test(libCode));
@@ -2449,6 +2470,85 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
       const first = real.bounds[0].start + real.bounds[0].width;
       return d.problems.some((p) => p.includes(`position ${first}`));
     })());
+}
+
+hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 / R15-C1)');
+{
+  // R15-C1: the runner wrote and announced COMPLETE before sealing. These
+  // checks are the offline mirror of the protocol; the executed proof is
+  // test-native-capture.ps1 cases 76-91 on Windows PowerShell 5.1.
+  const deployCode = lf(read(join(CLOUD, 'tools/deploy.ps1')));
+  // raw text on purpose: these checks look for the literal receipt names, which
+  // the lexer strips out of its code view.
+  const libCode = lib;
+  const completionAt = deployCode.indexOf('# ------------------------------------------------------------- completion ---');
+  const completionRegion = completionAt > 0 ? deployCode.slice(completionAt) : '';
+  check('the runner publishes completion through the protocol exactly once',
+    (completionRegion.match(/Publish-ClashCompletion -Root \$run/g) || []).length === 1 &&
+    !completionRegion.includes("New-PhaseReceipt '06-complete.json'") &&
+    !/Seal-Evidence/.test(completionRegion),
+    `region=${completionRegion.length}`);
+  check('the COMPLETE announcement follows the publication call and nothing else announces it',
+    completionRegion.indexOf('TERMINAL RECEIPT: COMPLETE') > completionRegion.indexOf('Publish-ClashCompletion -Root $run') &&
+    (deployCode.match(/TERMINAL RECEIPT: COMPLETE/g) || []).length === 1);
+  check('the runner accepts its own run through the consumer contract',
+    /Test-ClashRunCompletion -RunPath \$run/.test(completionRegion) &&
+    /function Test-ClashRunCompletion/.test(libCode));
+  check('the seal excludes the completion artifacts, so the marker cannot be sealed into itself',
+    /function Get-ClashSealExclusions/.test(libCode) &&
+    /'EVIDENCE-MANIFEST\.json', '06-complete\.json', '06-complete-unverified\.json'/.test(libCode) &&
+    /Get-ClashSealExclusions/.test(libCode.slice(libCode.indexOf('function Seal-Evidence'), libCode.indexOf('function Test-EvidenceSeal'))));
+  check('publication is atomic: a scratch file then a move that cannot overwrite',
+    (libCode.match(/\[System\.IO\.File\]::Move\(/g) || []).length === 2 &&
+    !/Write-EvidenceJson -Path \(Join-Path \$Root \$SealName\)/.test(libCode) &&
+    !/Remove-Item -LiteralPath \$temp/.test(libCode));
+  check('the order inside the protocol is intent -> seal -> verify -> marker -> commit -> re-verify',
+    (() => {
+      const body = libCode.slice(libCode.indexOf('function Publish-ClashCompletion'), libCode.indexOf('function Test-ClashRunCompletion'));
+      const at = (needle) => body.indexOf(needle);
+      const seq = [
+        'if (Test-Path -LiteralPath $marker) {',                       // refusal first
+        "'06-finalization-intent.json'",                               // provisional receipt
+        'Seal-Evidence -Root $Root',                                   // the seal
+        'Test-EvidenceSeal -Root $Root -Require $RequiredEvidence',     // verified against disk
+        'Write-EvidenceJson -Path $temp -Object $object',               // candidate marker
+        '[System.IO.File]::Move($temp, $marker)',                       // THE COMMIT POINT
+        '[System.IO.File]::ReadAllText($marker)',                       // re-read after the commit
+      ].map(at);
+      return seq.every((v, i) => v > 0 && (i === 0 || v > seq[i - 1]));
+    })());
+  check('a finalised run is never re-finalised and a doubt marker blocks publication',
+    /already exists\. A finalised run is never re-finalised/.test(libCode) &&
+    /a previous finalization could not verify what it published/.test(libCode) &&
+    /06-complete-unverified\.json/.test(libCode));
+  check('the consumer rejects an exception, a doubt marker and unsealed evidence',
+    /99-runner-exception\.json is present/.test(libCode) &&
+    /published a marker it could not verify/.test(libCode) &&
+    /is not sealed/.test(libCode) &&
+    /does not re-derive/.test(libCode));
+  check('a finalization failure never claims a rollback and never invites a re-run',
+    /rollbackImplied = \$false/.test(deployCode) &&
+    /completionAccepted = \$false/.test(deployCode) &&
+    /only evidence finalization failed\. Do NOT re-run/.test(deployCode));
+  const completionCases = ['completionSuccessPublishesVerifiedMarker', 'completionMarkerExcludedFromSeal',
+    'completionRefusesSecondFinalization', 'completionRefusesDoubtMarker',
+    'completionSealPublicationFailureLeavesNoMarker', 'completionSealWriteFailureLeavesNoMarker',
+    'completionTailDoesNotAnnounceOnSealFailure', 'completionTailAnnouncesOnlyAfterMarker',
+    'completionValidatorRejectsExceptionBesideMarker', 'completionValidatorRejectsTamperedEvidence',
+    'completionValidatorRejectsTruncatedSeal', 'completionValidatorReportsUnreadableSeal',
+    'completionValidatorRejectsUnsealedEvidence', 'completionRefusesMissingRequiredEvidence',
+    'completionIntentNeverClaimsComplete', 'deployTailIsTheOnlyCompletionPath'];
+  check('all sixteen finalization cases are executed and in the shared inventory',
+    completionCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest) && libCode.includes(`'${n}'`)));
+  check('the tail cases execute the committed region, not a copy',
+    /function Get-CompletionTail/.test(selfTest) &&
+    /Get-CompletionTail -Path \(Join-Path \$pluginRoot 'deploy\.ps1'\)/.test(selfTest) &&
+    /completion region rejected/.test(selfTest) &&
+    /markerAtAnnounce/.test(selfTest));
+  const readmeText = lf(read(join(CLOUD, 'README.md')));
+  check('the README documents R15-C1 and the protocol',
+    readmeText.includes('R15-C1') && /06-finalization-intent\.json/.test(readmeText) &&
+    /commit point/i.test(readmeText) && /06-complete-unverified\.json/.test(readmeText));
 }
 
 {

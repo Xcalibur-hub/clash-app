@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **425 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **437 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 425 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 437 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -201,6 +201,14 @@ deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
 `-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
 the contract rather than an accident of the host.
 
+Adapter `4.8.0` (was `4.7.0`), native self-test 91 cases (was 75): completion is
+now a commit protocol rather than a receipt the runner wrote before sealing (see
+§1n), and sixteen cases execute it against real directories - the success path,
+a refused seal publication, an injected seal write failure, the committed
+completion region of `deploy.ps1` run for real (success and failure), a second
+finalization, a doubt marker, a missing required receipt, and five ways a
+consumer must reject a run whose evidence does not verify.
+
 Adapter `4.7.0` (was `4.6.0`), native self-test 75 cases (was 65): the framing
 characters of a report are now validated at every separator-derived boundary (see
 §1m), and ten cases execute the mutation the Round 14 audit used - the exact
@@ -278,6 +286,30 @@ have not been executed on this machine either - they are executed by
 | - | the header was checked by splitting it, so it could still sit off the separator's columns | once the separator is seen the recorded header line is framed against the same spans and each header cell must read `ord`, `check_name`, `expected`, `actual`, `status` *at its column*; a shifted header is a reported problem |
 | - | the offline suite had no framing mirror | section [25] re-derives the 21 preflight rows from the SQL, frames them independently, and replays the audit's mutation on row 1 and on the pipe row, plus shifted, unpadded, header-misaligned, LF/CRLF and short-padded-value controls |
 
+### 1n. Round 16 (audit of `cc3dd1f`) - COMPLETE was written before the seal
+
+| # | Defect | Fix |
+|---|---|---|
+| R15-C1 (critical) | the runner wrote `06-complete.json` with `status=COMPLETE` and announced `TERMINAL RECEIPT: COMPLETE` **before** calling `Seal-Evidence`. The audit replayed that tail on PowerShell 5.1 with only the seal write fault-injected: the marker was durably persisted and announced, the seal threw, the trap wrote `99-runner-exception.json` with `status=EXCEPTION`, and the process exited 1 - so the evidence directory said COMPLETE and EXCEPTION at the same time, and a consumer reading the marker accepted a run whose evidence was never sealed | completion is now a commit protocol in `Publish-ClashCompletion` with **one** commit point: (1) `06-finalization-intent.json`, a provisional receipt that says `FINALIZING`; (2) the seal, published atomically (exclusive temp file, then a move that cannot overwrite) and excluding the completion artifacts; (3) the seal verified against disk - every hash, every chain link, the declared count and the required evidence; (4) the marker written exclusively to a scratch name; (5) an atomic rename onto `06-complete.json` - **the commit point**; (6) the marker re-read and re-verified against the seal. Nothing is announced before step 6, and a failure at any step leaves no `06-complete.json` |
+| - | the marker and the seal could have hashed each other | the seal's file set excludes `06-complete.json` and `06-complete-unverified.json`, and the marker binds the seal's sha256 instead of being sealed. Case 77 corrupts the marker and shows the seal still verifies (no circular dependency) while the consumer still rejects the run |
+| - | the release region could still write a completion receipt | the claim-release region ends where completion begins and may not contain `06-complete.json`; its probe now asserts the release proves the **claim**, not completion (case 27, renamed `claimReleaseOwnedRowReleasesClaimOnly`) |
+| - | a consumer had no way to tell a finished run from a finalized one | `Test-ClashRunCompletion` is the consumer contract: the marker must exist, carry `protocol = clash-completion/2` and `finalized = true`, bind the seal that is on disk, the seal must re-derive from the files, no `06-complete-unverified.json` and no `99-runner-exception.json` may be present, and no file may have been written after sealing. The runner calls it on itself, so runner and consumer cannot disagree |
+| - | a failure at the very end could be read as a rollback, or invite a re-run | a finalization failure writes `06-finalize-fail.json` (`status=STOPPED`, `claimReleased=true`, `rollbackImplied=false`, `completionMarkerWritten`), the trap's exception receipt carries `completionAccepted=false` and `rollbackImplied=false`, and both say the schema was applied and the claim released - only the evidence failed. Nothing is deleted, rewritten or repaired, and a second finalization refuses |
+| - | the earlier tests proved a hand-assembled copy of the tail | cases 82/83 read `deploy.ps1`, extract the committed completion region between two anchors, refuse it unless it calls the protocol exactly once, demands all five required receipts, never writes the marker itself and announces after the call - then **execute** it with the real protocol, real receipts and real sealing. Only `exit 0` is substituted (a test process cannot exit), and the announcement case records whether the marker existed **at the moment** the COMPLETE line was printed |
+
+**Authority rule.** `06-complete.json` is evidence, not a verdict: a run is
+complete only when `Test-ClashRunCompletion` accepts the directory it lives in.
+The seal is authoritative for *what the evidence is*, the run directory is
+authoritative for *what happened*, and no single file may be read in isolation.
+`06-finalization-intent.json` (`FINALIZING`) and `06-complete-unverified.json`
+(`UNVERIFIED`) are explicitly **not** completion, and a `99-runner-exception.json`
+anywhere in the directory means the outcome is UNKNOWN - the schema may have been
+applied and the claim may have been released.
+
+Still unproven, and stated as such: `deploy.ps1` has never run against a
+database. The finalization protocol is proven against real files on a real
+PowerShell 5.1 runtime, not against a real deployment.
+
 ## 2. Layout
 
 ```
@@ -298,7 +330,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (425 assertions)
+tests/verify-package.mjs       offline test suite (437 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

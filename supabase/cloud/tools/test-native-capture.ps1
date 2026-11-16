@@ -117,10 +117,10 @@ $script:outFileFinal = $OutFile
 
 $requiredCases = @(Get-ClashSelfTestInventory)
 
-# Round 5: the inventory must be exactly 55 unique, non-empty strings, and that
+# Round 5: the inventory must be exactly 91 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 75
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 91
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -753,7 +753,7 @@ function Get-ClaimReleaseBlock {
       $startAt = $i
       continue
     }
-    if ($startAt -ge 0 -and $lines[$i] -match '^\$seal\s*=\s*Seal-Evidence\s+-Root\s+\$run\s*$') {
+    if ($startAt -ge 0 -and $lines[$i] -match '^#\s*-+\s*completion\s*-+\s*$') {
       $endAt = $i
       break
     }
@@ -771,7 +771,8 @@ function Get-ClaimReleaseBlock {
     '06-claim-release-ownership-stop.json' = 1
     '06-claim-release-fail.json'           = 1
     '06-claim-release.json'                = 2
-    '06-complete.json'                     = 1
+    # Round 16 (R15-C1): the release region must NOT claim completion.
+    '06-complete.json'                     = 0
   }
   $problems = @()
   foreach ($marker in @($required.Keys)) {
@@ -783,6 +784,7 @@ function Get-ClaimReleaseBlock {
   if (-not $text.Contains('returning run_id')) { $problems += 'the release is not an ownership-qualified RETURNING delete' }
   if ([regex]::IsMatch($text, '(?m)^\s*exit\b')) { $problems += 'the extracted region contains an exit statement' }
   if ($text.Contains('Seal-Evidence')) { $problems += 'the extracted region still seals evidence' }
+  if ($text.Contains('Publish-ClashCompletion')) { $problems += 'the extracted region publishes completion' }
   if ($problems.Count -gt 0) { throw ('claim-release block rejected: ' + ($problems -join '; ')) }
 
   return ([ordered]@{ text = $text; lines = ($endAt - $startAt); startLine = ($startAt + 1) })
@@ -956,26 +958,28 @@ function Get-ProbeReceipt {
 $probeRunId  = 'r10-claim-release-probe-0001'
 $probeOther  = 'r10-someone-elses-run-0002'
 
-# ---- 27: one returned row that IS this run -> PASS -> COMPLETE -------------
+# ---- 27: one returned row that IS this run -> PASS, claim released ---------
+# Round 16 (R15-C1): the release no longer writes 06-complete.json. Releasing the
+# claim is not completing the run; completion is published after the seal exists.
 $probeOwned = Invoke-ClaimReleaseProbe -RunId $probeRunId -Stub @{
   exitCode = 0; timedOut = $false; launchError = $null; captureNote = ''
   stdOut = ($probeRunId + "`n"); stdErr = ''
 }
 $ownedOutcome = Test-ClaimReleaseOutcome -Probe $probeOwned `
-  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release.json', '06-complete.json') `
+  -ExpectedReceipts @('06-claim-release-ownership.json', '06-claim-release.json') `
   -ExpectedStop '' `
-  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'PASS'; '06-claim-release.json' = 'PASS'; '06-complete.json' = 'COMPLETE' }
+  -ExpectedStatus @{ '06-claim-release-ownership.json' = 'PASS'; '06-claim-release.json' = 'PASS' }
 $ownedArgs  = @($probeOwned.arguments)
 $ownedAt    = [array]::IndexOf($ownedArgs, '-c')
 $ownedSql   = ''
 if ($ownedAt -ge 0 -and ($ownedAt + 1) -lt $ownedArgs.Count) { $ownedSql = [string]$ownedArgs[$ownedAt + 1] }
 $ownedScan  = Get-ProbeReceipt -Probe $probeOwned -Name '06-claim-release-ownership.json'
 $ownedDone  = Get-ProbeReceipt -Probe $probeOwned -Name '06-complete.json'
-Add-Case 'claimReleaseOwnedRowProceedsToComplete' (
+Add-Case 'claimReleaseOwnedRowReleasesClaimOnly' (
   $ownedOutcome.ok -and
   [string]$probeOwned.threw -eq '' -and
   [string]$probeOwned.stopName -eq '' -and
-  $probeOwned.reachedComplete -eq $true -and
+  $probeOwned.reachedComplete -eq $false -and
   $probeOwned.nativeCalls -eq 1 -and
   $probeOwned.evidenceCalls -eq 2 -and
   $ownedArgs -contains '-t' -and $ownedArgs -contains '-A' -and
@@ -984,9 +988,7 @@ Add-Case 'claimReleaseOwnedRowProceedsToComplete' (
   $ownedSql.Contains("run_id = '" + $probeRunId + "'") -and
   [int]$ownedScan['returnedRows'] -eq 1 -and
   @($ownedScan['returned']).Count -eq 1 -and
-  [string]$ownedDone['status'] -eq 'COMPLETE' -and
-  [string]$ownedDone['writerRunId'] -eq $probeRunId -and
-  [int]$ownedDone['appliedThisRun'] -eq 111) @{
+  [string]$ownedDone['status'] -eq '<absent>') @{
   blockStartLine  = $probeOwned.blockStartLine
   blockLines      = $probeOwned.blockLines
   stopName        = [string]$probeOwned.stopName
@@ -997,7 +999,7 @@ Add-Case 'claimReleaseOwnedRowProceedsToComplete' (
   releaseHasA     = ($ownedArgs -contains '-A')
   sqlHasReturning = $ownedSql.Contains('returning run_id')
   sqlHasOwnership = $ownedSql.Contains("run_id = '" + $probeRunId + "'")
-  note            = 'the false STOP of R9-C1 is proven gone: this branch reaches COMPLETE'
+  note            = 'the false STOP of R9-C1 is proven gone; the release proves the claim, not completion'
 }
 
 # ---- 28: success but ZERO rows ---------------------------------------------
@@ -1285,7 +1287,7 @@ function Get-VerificationGateBlock {
       $startAt = $i
       continue
     }
-    if ($startAt -ge 0 -and $lines[$i] -match '^\$seal\s*=\s*Seal-Evidence\s+-Root\s+\$run\s*$') {
+    if ($startAt -ge 0 -and $lines[$i] -match '^#\s*-+\s*completion\s*-+\s*$') {
       $endAt = $i
       break
     }
@@ -1304,7 +1306,9 @@ function Get-VerificationGateBlock {
     "'05-storage-fail.json'"                                        = 2
     'delete from supabase_migrations.clash_deploy_claim'            = 1
     'returning run_id'                                              = 1
-    "'06-complete.json'"                                            = 1
+    # Round 16 (R15-C1): the gates release the claim; completion is published by
+    # the protocol afterwards, so this region must not touch 06-complete.json.
+    "'06-complete.json'"                                            = 0
   }
   $problems = @()
   foreach ($marker in @($required.Keys)) {
@@ -1317,6 +1321,7 @@ function Get-VerificationGateBlock {
   if (-not $text.Contains('if (-not $stReport.ok)')) { $problems += 'the storage gate does not test $stReport.ok' }
   if ([regex]::IsMatch($text, '(?m)^\s*exit\b')) { $problems += 'the extracted region contains an exit statement' }
   if ($text.Contains('Seal-Evidence')) { $problems += 'the extracted region still seals evidence' }
+  if ($text.Contains('Publish-ClashCompletion')) { $problems += 'the extracted region publishes completion' }
   if ($problems.Count -gt 0) { throw ('verification gate block rejected: ' + ($problems -join '; ')) }
 
   return ([ordered]@{ text = $text; lines = ($endAt - $startAt); startLine = ($startAt + 1) })
@@ -2398,6 +2403,590 @@ Add-Case 'reportEmbeddedPipeKeepsFraming' (
   -not ((@($parsedPipe.problems) -join ' ') -match 'delimiter')) @{
     verdict = [string]$parsedPipe.verdict; rows = [int]$parsedPipe.rows; note = 'postgis|extensions sits inside cells, not on a declared boundary'
   }
+
+# ===========================================================================
+# 76-91: the completion finalization protocol, executed (Round 16 / R15-C1)
+# ===========================================================================
+# R15-C1: deploy.ps1 wrote and announced a COMPLETE receipt BEFORE sealing the
+# evidence. An injected seal failure therefore left a durable, announced
+# COMPLETE beside an EXCEPTION and exit 1 - a consumer reading only
+# 06-complete.json would accept a run whose evidence was never sealed.
+#
+# The cases below execute the REAL functions against REAL directories: every
+# artifact asserted on is a file on disk, read back through the same helpers a
+# consumer would use. Two of them extract the committed completion region from
+# deploy.ps1 and run it, so a copy that drifts from the runner cannot pass.
+
+function New-FinalizationRun {
+  param([string[]]$Evidence = @('02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json'))
+
+  $root = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-finalization-' + [guid]::NewGuid().ToString('N').Substring(0, 12))
+  New-Item -ItemType Directory -Path $root -Force | Out-Null
+  New-Item -ItemType Directory -Path (Join-Path $root '04-postflight') -Force | Out-Null
+  foreach ($name in $Evidence) {
+    [void](Write-Evidence -Path (Join-Path $root $name) -Text (([ordered]@{ receipt = $name; status = 'PASS'; probe = $true }) | ConvertTo-Json -Depth 4))
+  }
+  [void](Write-Evidence -Path (Join-Path $root '04-postflight\claim-release.out') -Text "probe-run-id`n")
+  return $root
+}
+
+function Remove-FinalizationRun {
+  param([string]$Root)
+  try { if ($Root -and (Test-Path -LiteralPath $Root)) { Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction Stop } } catch { }
+}
+
+function Read-RunDocument {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path)) { return $null }
+  try { return ([System.IO.File]::ReadAllText($Path) | ConvertFrom-Json) } catch { return $null }
+}
+
+# Runs Publish-ClashCompletion in a child scope with the console captured and,
+# optionally, ONE evidence write refused. The substitution is the same trick the
+# claim-release probe uses for the child process: the adapter's own code still
+# decides everything it decides in production.
+function Invoke-CompletionProbe {
+  param(
+    [string]$Root,
+    [string[]]$Required = @('02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json', '06-finalization-intent.json'),
+    [string]$FailWriteJsonSuffix = '',
+    [hashtable]$Fields = @{ appliedThisRun = 111; freshOnly = $true; writerRunId = 'probe-run-id' }
+  )
+
+  $state = [ordered]@{
+    ok = $false; threw = ''; result = $null; output = @()
+    markerAtAnnounce = $false; sealAtAnnounce = $false; exitLine = ''
+  }
+  $state.markerPath = Join-Path $Root '06-complete.json'
+  $state.sealPath   = Join-Path $Root 'EVIDENCE-MANIFEST.json'
+
+  & {
+    param($Root, $Required, $FailWriteJsonSuffix, $Fields, $State)
+
+    function Write-Host {
+      param(
+        [Parameter(Position = 0)][object]$Object = $null,
+        [switch]$NoNewline,
+        [string]$ForegroundColor = '',
+        [Parameter(ValueFromRemainingArguments = $true)][object[]]$Rest = @()
+      )
+      $line = [string]$Object
+      $State.output += $line
+      if ($line -match '^TERMINAL RECEIPT: COMPLETE') {
+        # Exactly the question R15-C1 got wrong: does the authoritative marker
+        # exist AT THE MOMENT the completion is announced?
+        $State.markerAtAnnounce = (Test-Path -LiteralPath $State.markerPath)
+        $State.sealAtAnnounce   = (Test-Path -LiteralPath $State.sealPath)
+      }
+    }
+
+    $script:probeFailSuffix = [string]$FailWriteJsonSuffix
+    $script:probeRealWriteJson = ${function:Write-EvidenceJson}
+    function Write-EvidenceJson {
+      param([string]$Path, $Object)
+      if ($script:probeFailSuffix -and ([string]$Path).Contains($script:probeFailSuffix)) {
+        throw ('CLASH-PROBE-INJECTED-WRITE-FAILURE: refused {0}' -f $Path)
+      }
+      return (& $script:probeRealWriteJson -Path $Path -Object $Object)
+    }
+
+    try {
+      $State.result = Publish-ClashCompletion -Root $Root -PrevSha 'probe-prev-receipt' -RequiredEvidence $Required -Fields $Fields
+      $State.ok = $true
+    }
+    catch { $State.threw = Protect-Text $_.Exception.Message }
+  } $Root $Required $FailWriteJsonSuffix $Fields $state 6>$null | Out-Null
+
+  return $state
+}
+
+# Extracts the committed completion region from deploy.ps1. The region must be
+# the ONLY place that can publish completion, and the announcement must sit after
+# the publication call in source order.
+function Get-CompletionTail {
+  param([string]$Path)
+
+  $lines   = [System.IO.File]::ReadAllLines($Path)
+  $startAt = -1
+  $endAt   = -1
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($startAt -lt 0 -and $lines[$i] -match '^#\s*-+\s*completion\s*-+\s*$') { $startAt = $i; continue }
+    if ($startAt -ge 0 -and $lines[$i] -match '^exit 0\s*$') { $endAt = $i; break }
+  }
+  if ($startAt -lt 0 -or $endAt -le $startAt) {
+    throw ('completion region not found in {0} (start {1}, end {2})' -f $Path, $startAt, $endAt)
+  }
+  $text = (@($lines[$startAt..$endAt]) -join "`n")
+  $problems = @()
+  if (([regex]::Matches($text, [regex]::Escape('Publish-ClashCompletion -Root $run'))).Count -ne 1) {
+    $problems += 'the completion region must call Publish-ClashCompletion -Root $run exactly once'
+  }
+  if ($text.Contains("New-PhaseReceipt '06-complete.json'")) {
+    $problems += 'the completion region writes 06-complete.json itself instead of going through the protocol'
+  }
+  foreach ($name in @('02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json', '06-finalization-intent.json')) {
+    if (([regex]::Matches($text, [regex]::Escape($name))).Count -lt 1) { $problems += ('required evidence {0} is not demanded by the region' -f $name) }
+  }
+  if (([regex]::Matches($text, '(?m)^exit 0\s*$')).Count -ne 1) { $problems += 'the region must exit 0 exactly once' }
+  $publishAt  = $text.IndexOf('Publish-ClashCompletion -Root $run')
+  $announceAt = $text.IndexOf('TERMINAL RECEIPT: COMPLETE')
+  if ($publishAt -lt 0 -or $announceAt -lt 0 -or $announceAt -lt $publishAt) {
+    $problems += 'the COMPLETE announcement does not follow the publication call'
+  }
+  if ($problems.Count -gt 0) { throw ('completion region rejected: ' + ($problems -join '; ')) }
+
+  # A test process cannot execute 'exit 0', so the process-exit statement is
+  # replaced by a returning sentinel. Nothing else in the region is altered.
+  $body = $text -replace '(?m)^exit 0\s*$', "return 'EXIT-0'"
+  return ([ordered]@{ text = $body; lines = ($endAt - $startAt + 1); startLine = ($startAt + 1) })
+}
+
+# Executes the committed completion region with the real protocol, real receipts
+# and real sealing. Only the process boundary is substituted.
+function Invoke-CompletionTailProbe {
+  param([string]$Root, [string]$FailWriteJsonSuffix = '')
+
+  $state = [ordered]@{
+    ok = $false; threw = ''; exited = ''; output = @()
+    markerAtAnnounce = $false; sealAtAnnounce = $false
+    receipts = [ordered]@{}; tailLines = 0; tailStartLine = 0; bindError = ''
+  }
+  $state.markerPath = Join-Path $Root '06-complete.json'
+  $state.sealPath   = Join-Path $Root 'EVIDENCE-MANIFEST.json'
+
+  try {
+    $tail = Get-CompletionTail -Path (Join-Path $pluginRoot 'deploy.ps1')
+    $state.tailLines     = [int]$tail.lines
+    $state.tailStartLine = [int]$tail.startLine
+    $script:probeTail = [scriptblock]::Create([string]$tail.text)
+  }
+  catch {
+    $state.bindError = Protect-Text $_.Exception.Message
+    return $state
+  }
+
+  # Variables the committed region reads but never assigns.
+  $run         = $Root
+  $applied     = 111
+  $runId       = 'probe-run-id'
+  $treeHash    = 'probe-tree-hash'
+  $bootOutcome = 'CREATED'
+  $script:chain = 'probe-prev-receipt'
+
+  & {
+    param($Root, $FailWriteJsonSuffix, $State)
+
+    function Write-Host {
+      param(
+        [Parameter(Position = 0)][object]$Object = $null,
+        [switch]$NoNewline,
+        [string]$ForegroundColor = '',
+        [Parameter(ValueFromRemainingArguments = $true)][object[]]$Rest = @()
+      )
+      $line = [string]$Object
+      $State.output += $line
+      if ($line -match '^TERMINAL RECEIPT: COMPLETE') {
+        $State.markerAtAnnounce = (Test-Path -LiteralPath $State.markerPath)
+        $State.sealAtAnnounce   = (Test-Path -LiteralPath $State.sealPath)
+      }
+    }
+    # The runner's own receipt helper, pointed at the probe run directory.
+    function New-PhaseReceipt {
+      param([string]$Name, [hashtable]$Fields)
+      $State.receipts[[string]$Name] = $Fields
+      $script:chain = Add-Receipt -Root $Root -Name $Name -Fields $Fields -PrevSha $script:chain
+    }
+    $script:probeFailSuffix    = [string]$FailWriteJsonSuffix
+    $script:probeRealWriteJson = ${function:Write-EvidenceJson}
+    function Write-EvidenceJson {
+      param([string]$Path, $Object)
+      if ($script:probeFailSuffix -and ([string]$Path).Contains($script:probeFailSuffix)) {
+        throw ('CLASH-PROBE-INJECTED-WRITE-FAILURE: refused {0}' -f $Path)
+      }
+      return (& $script:probeRealWriteJson -Path $Path -Object $Object)
+    }
+
+    try {
+      $State.exited = [string](& $script:probeTail)
+    }
+    catch { $State.threw = Protect-Text $_.Exception.Message }
+  } $Root $FailWriteJsonSuffix $state 6>$null | Out-Null
+
+  return $state
+}
+
+# ---- 76: the success path publishes a marker that an independent reader accepts
+$finRoot  = New-FinalizationRun
+$finProbe = Invoke-CompletionProbe -Root $finRoot
+$finDoc   = Read-RunDocument -Path (Join-Path $finRoot '06-complete.json')
+$finSeal  = Read-RunDocument -Path (Join-Path $finRoot 'EVIDENCE-MANIFEST.json')
+$finCheck = $null
+try { $finCheck = Test-ClashRunCompletion -RunPath $finRoot } catch { $finCheck = $null }
+$finIntent = Read-RunDocument -Path (Join-Path $finRoot '06-finalization-intent.json')
+$finIntentSha = Get-TextSha256 -Text ([System.IO.File]::ReadAllText((Join-Path $finRoot '06-finalization-intent.json')))
+Add-Case 'completionSuccessPublishesVerifiedMarker' (
+  $finProbe.ok -and
+  [string]$finProbe.threw -eq '' -and
+  $null -ne $finDoc -and
+  [string](Get-DocumentProperty -Object $finDoc -Name 'status' -Default '') -eq 'COMPLETE' -and
+  [string](Get-DocumentProperty -Object $finDoc -Name 'protocol' -Default '') -eq 'clash-completion/2' -and
+  (Get-DocumentProperty -Object $finDoc -Name 'finalized' -Default $false) -eq $true -and
+  (Get-DocumentProperty -Object $finDoc -Name 'appliedThisRun' -Default 0) -eq 111 -and
+  $null -ne $finSeal -and
+  [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'sha256' -Default '') -eq
+    (Get-NormalizedSha256 -Path (Join-Path $finRoot 'EVIDENCE-MANIFEST.json')) -and
+  [string](Get-DocumentProperty -Object $finDoc -Name 'prevReceiptSha' -Default '') -eq $finIntentSha -and
+  [string](Get-DocumentProperty -Object $finIntent -Name 'status' -Default '') -eq 'FINALIZING' -and
+  $null -ne $finCheck -and $finCheck.ok -and
+  @($finCheck.problems).Count -eq 0 -and
+  @(Get-ChildItem -LiteralPath $finRoot -Filter '*.tmp' -File).Count -eq 0) @{
+  verdict = 'COMPLETE'; protocol = [string](Get-DocumentProperty -Object $finDoc -Name 'protocol' -Default '')
+  sealSha = [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'sha256' -Default '')
+  sealFiles = [int](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'fileCount' -Default 0)
+  validator = $(if ($null -ne $finCheck) { $finCheck.ok } else { 'null' })
+}
+
+# ---- 77: the marker is NOT part of the seal, and the seal is not part of the
+#          marker - so neither depends on a hash of the other
+$sealHasMarker = $false
+if ($null -ne $finSeal) {
+  foreach ($entry in @(Get-DocumentProperty -Object $finSeal -Name 'files' -Default @())) {
+    if ([string](Get-DocumentProperty -Object $entry -Name 'path' -Default '') -eq '06-complete.json') { $sealHasMarker = $true }
+  }
+}
+$markerCorrupt = $false
+$sealAfterCorrupt = $null
+try {
+  [System.IO.File]::WriteAllText((Join-Path $finRoot '06-complete.json'), 'not json at all')
+  $markerCorrupt = $true
+  $sealAfterCorrupt = Test-EvidenceSeal -Root $finRoot
+} catch { }
+$checkAfterCorrupt = $null
+try { $checkAfterCorrupt = Test-ClashRunCompletion -RunPath $finRoot } catch { $checkAfterCorrupt = $null }
+Add-Case 'completionMarkerExcludedFromSeal' (
+  -not $sealHasMarker -and
+  $markerCorrupt -and
+  $null -ne $sealAfterCorrupt -and $sealAfterCorrupt.ok -and
+  $null -ne $checkAfterCorrupt -and (-not $checkAfterCorrupt.ok)) @{
+  sealListsMarker = $sealHasMarker
+  sealStillValid  = $(if ($null -ne $sealAfterCorrupt) { $sealAfterCorrupt.ok } else { 'null' })
+  validatorRejects = $(if ($null -ne $checkAfterCorrupt) { -not $checkAfterCorrupt.ok } else { 'null' })
+  note = 'no circular dependency: corrupting the marker leaves the seal valid, and the consumer still rejects the run'
+}
+Remove-FinalizationRun -Root $finRoot
+
+# ---- 78: a finalised run is never re-finalised, and its bytes never change --
+$reRoot  = New-FinalizationRun
+$reFirst = Invoke-CompletionProbe -Root $reRoot
+$reBytes = ''
+if (Test-Path -LiteralPath (Join-Path $reRoot '06-complete.json')) {
+  $reBytes = [System.IO.File]::ReadAllText((Join-Path $reRoot '06-complete.json'))
+}
+$reSecond = Invoke-CompletionProbe -Root $reRoot
+$reBytesAfter = ''
+if (Test-Path -LiteralPath (Join-Path $reRoot '06-complete.json')) {
+  $reBytesAfter = [System.IO.File]::ReadAllText((Join-Path $reRoot '06-complete.json'))
+}
+Add-Case 'completionRefusesSecondFinalization' (
+  $reFirst.ok -and
+  (-not $reSecond.ok) -and
+  $reSecond.threw -match 'already exists' -and
+  $reBytes.Length -gt 0 -and
+  $reBytes -eq $reBytesAfter) @{
+  firstOk = $reFirst.ok; secondOk = $reSecond.ok
+  refusal = $reSecond.threw; unchanged = ($reBytes -eq $reBytesAfter)
+  note = 'no silent repair: the existing marker is left exactly as it was'
+}
+Remove-FinalizationRun -Root $reRoot
+
+# ---- 79: a doubt marker blocks finalization ---------------------------------
+$dRoot = New-FinalizationRun
+[void](Write-Evidence -Path (Join-Path $dRoot '06-complete-unverified.json') -Text '{"status":"UNVERIFIED"}')
+$dProbe = Invoke-CompletionProbe -Root $dRoot
+$dMarker = Test-Path -LiteralPath (Join-Path $dRoot '06-complete.json')
+$dCheck = $null
+try { $dCheck = Test-ClashRunCompletion -RunPath $dRoot } catch { $dCheck = $null }
+Add-Case 'completionRefusesDoubtMarker' (
+  (-not $dProbe.ok) -and
+  $dProbe.threw -match 'could not verify' -and
+  (-not $dMarker) -and
+  $null -ne $dCheck -and (-not $dCheck.ok)) @{
+  refusal = $dProbe.threw; markerWritten = $dMarker
+  problems = $(if ($null -ne $dCheck) { @($dCheck.problems) } else { @('validator threw') })
+}
+Remove-FinalizationRun -Root $dRoot
+
+# ---- 80: the seal cannot be published (R15-C1's fault, at publication) ------
+# A directory occupies EVIDENCE-MANIFEST.json, so the atomic move cannot publish
+# the seal. The old runner had already written and announced COMPLETE by now.
+$sRoot = New-FinalizationRun
+New-Item -ItemType Directory -Path (Join-Path $sRoot 'EVIDENCE-MANIFEST.json') -Force | Out-Null
+$sProbe = Invoke-CompletionProbe -Root $sRoot
+$sMarker = Test-Path -LiteralPath (Join-Path $sRoot '06-complete.json')
+$sIntent = Test-Path -LiteralPath (Join-Path $sRoot '06-finalization-intent.json')
+$sCheck = $null
+try { $sCheck = Test-ClashRunCompletion -RunPath $sRoot } catch { $sCheck = $null }
+$sCompleteClaims = 0
+foreach ($f in @(Get-ChildItem -LiteralPath $sRoot -Recurse -File -Filter '*.json')) {
+  $raw = ''
+  try { $raw = [System.IO.File]::ReadAllText($f.FullName) } catch { }
+  if ($raw -match '"status"\s*:\s*"COMPLETE"') { $sCompleteClaims++ }
+}
+Add-Case 'completionSealPublicationFailureLeavesNoMarker' (
+  (-not $sProbe.ok) -and
+  [string]$sProbe.threw -ne '' -and
+  (-not $sMarker) -and
+  $sIntent -and
+  $sCompleteClaims -eq 0 -and
+  $null -ne $sCheck -and (-not $sCheck.ok) -and
+  (@($sCheck.problems) -join ' ') -match 'no 06-complete.json') @{
+  threw = $sProbe.threw; markerWritten = $sMarker; intentWritten = $sIntent
+  completeClaimsOnDisk = $sCompleteClaims
+  validatorProblems = $(if ($null -ne $sCheck) { @($sCheck.problems) } else { @('validator threw') })
+  note = 'the R15-C1 fault no longer leaves any COMPLETE claim on disk'
+}
+Remove-FinalizationRun -Root $sRoot
+
+# ---- 81: the seal WRITE fails (the audit's exact injection) -----------------
+$wRoot = New-FinalizationRun
+$wProbe = Invoke-CompletionProbe -Root $wRoot -FailWriteJsonSuffix 'EVIDENCE-MANIFEST.json'
+$wMarker = Test-Path -LiteralPath (Join-Path $wRoot '06-complete.json')
+$wSeal = $false
+foreach ($f in @(Get-ChildItem -LiteralPath $wRoot -File)) { if ($f.Name -like 'EVIDENCE-MANIFEST.json*') { $wSeal = $true } }
+$wCheck = $null
+try { $wCheck = Test-ClashRunCompletion -RunPath $wRoot } catch { $wCheck = $null }
+Add-Case 'completionSealWriteFailureLeavesNoMarker' (
+  (-not $wProbe.ok) -and
+  $wProbe.threw -match 'CLASH-PROBE-INJECTED-WRITE-FAILURE' -and
+  (-not $wMarker) -and
+  (-not $wSeal) -and
+  $null -ne $wCheck -and (-not $wCheck.ok)) @{
+  threw = $wProbe.threw; markerWritten = $wMarker; anySealFile = $wSeal
+  note = 'a seal that never reached disk cannot be announced as completion'
+}
+Remove-FinalizationRun -Root $wRoot
+
+# ---- 82: the committed tail never announces COMPLETE when the seal fails ----
+$tRoot = New-FinalizationRun
+$tProbe = Invoke-CompletionTailProbe -Root $tRoot -FailWriteJsonSuffix 'EVIDENCE-MANIFEST.json'
+$tCompleteLines = @($tProbe.output | Where-Object { $_ -match '^TERMINAL RECEIPT: COMPLETE' })
+$tFailReceipt = Read-RunDocument -Path (Join-Path $tRoot '06-finalize-fail.json')
+$tMarker = Test-Path -LiteralPath (Join-Path $tRoot '06-complete.json')
+$tValidated = $null
+try { $tValidated = Test-ClashRunCompletion -RunPath $tRoot } catch { $tValidated = $null }
+Add-Case 'completionTailDoesNotAnnounceOnSealFailure' (
+  [string]$tProbe.bindError -eq '' -and
+  [string]$tProbe.threw -ne '' -and
+  [string]$tProbe.exited -eq '' -and
+  $tCompleteLines.Count -eq 0 -and
+  @($tProbe.output | Where-Object { $_ -match '^FINALIZATION FAILED' }).Count -eq 1 -and
+  (-not $tMarker) -and
+  $null -ne $tFailReceipt -and
+  [string](Get-DocumentProperty -Object $tFailReceipt -Name 'status' -Default '') -eq 'STOPPED' -and
+  (Get-DocumentProperty -Object $tFailReceipt -Name 'claimReleased' -Default $false) -eq $true -and
+  (Get-DocumentProperty -Object $tFailReceipt -Name 'rollbackImplied' -Default $true) -eq $false -and
+  (Get-DocumentProperty -Object $tFailReceipt -Name 'completionMarkerWritten' -Default $true) -eq $false -and
+  $null -ne $tValidated -and (-not $tValidated.ok)) @{
+  tailStartLine = $tProbe.tailStartLine; tailLines = $tProbe.tailLines
+  completeAnnouncements = $tCompleteLines.Count
+  threw = $tProbe.threw
+  failReceiptStatus = [string](Get-DocumentProperty -Object $tFailReceipt -Name 'status' -Default '')
+  rollbackImplied = (Get-DocumentProperty -Object $tFailReceipt -Name 'rollbackImplied' -Default 'unknown')
+  markerWritten = $tMarker
+  note = 'the real committed region, executed: no COMPLETE line, no marker, no rollback claim'
+}
+Remove-FinalizationRun -Root $tRoot
+
+# ---- 83: the committed tail announces only AFTER the marker is on disk ------
+$okRoot = New-FinalizationRun
+$okProbe = Invoke-CompletionTailProbe -Root $okRoot
+$okCompleteLines = @($okProbe.output | Where-Object { $_ -match '^TERMINAL RECEIPT: COMPLETE' })
+$okDoc = Read-RunDocument -Path (Join-Path $okRoot '06-complete.json')
+$okCheck = $null
+try { $okCheck = Test-ClashRunCompletion -RunPath $okRoot } catch { $okCheck = $null }
+Add-Case 'completionTailAnnouncesOnlyAfterMarker' (
+  [string]$okProbe.bindError -eq '' -and
+  [string]$okProbe.threw -eq '' -and
+  [string]$okProbe.exited -eq 'EXIT-0' -and
+  $okCompleteLines.Count -eq 1 -and
+  $okProbe.markerAtAnnounce -eq $true -and
+  $okProbe.sealAtAnnounce -eq $true -and
+  $null -ne $okDoc -and
+  [string](Get-DocumentProperty -Object $okDoc -Name 'status' -Default '') -eq 'COMPLETE' -and
+  $null -ne $okCheck -and $okCheck.ok) @{
+  announcements = $okCompleteLines.Count
+  markerPresentAtAnnouncement = $okProbe.markerAtAnnounce
+  sealPresentAtAnnouncement   = $okProbe.sealAtAnnounce
+  exited = [string]$okProbe.exited
+  note = 'R15-C1 is proven fixed by observation at the moment of the announcement'
+}
+Remove-FinalizationRun -Root $okRoot
+
+# ---- 84: the R15-C1 artifact shape (COMPLETE + EXCEPTION) is rejected ------
+$xRoot = New-FinalizationRun
+$xProbe = Invoke-CompletionProbe -Root $xRoot
+[void](Write-Evidence -Path (Join-Path $xRoot '99-runner-exception.json') -Text '{"status":"EXCEPTION"}')
+$xCheck = $null
+try { $xCheck = Test-ClashRunCompletion -RunPath $xRoot } catch { $xCheck = $null }
+$xProblems = ''
+if ($null -ne $xCheck) { $xProblems = (@($xCheck.problems) -join ' ') }
+Add-Case 'completionValidatorRejectsExceptionBesideMarker' (
+  $xProbe.ok -and
+  Test-Path -LiteralPath (Join-Path $xRoot '06-complete.json') -and
+  $null -ne $xCheck -and (-not $xCheck.ok) -and
+  $xProblems -match 'exception') @{
+  markerPresent = $true
+  problems = $xProblems
+  note = 'exactly the R15-C1 directory: a marker next to an exception is not an accepted run'
+}
+Remove-FinalizationRun -Root $xRoot
+
+# ---- 85: evidence edited after it was sealed is detected --------------------
+$mRoot = New-FinalizationRun
+$mProbe = Invoke-CompletionProbe -Root $mRoot
+[void](Write-Evidence -Path (Join-Path $mRoot '05-postflight-tampered.json') -Text 'x')
+$mTarget = Join-Path $mRoot '02-preflight.json'
+[System.IO.File]::WriteAllText($mTarget, '{"status":"PASS","edited":true}')
+$mCheck = $null
+try { $mCheck = Test-ClashRunCompletion -RunPath $mRoot } catch { $mCheck = $null }
+$mProblems = ''
+if ($null -ne $mCheck) { $mProblems = (@($mCheck.problems) -join ' ') }
+Add-Case 'completionValidatorRejectsTamperedEvidence' (
+  $mProbe.ok -and
+  $null -ne $mCheck -and (-not $mCheck.ok) -and
+  $mProblems -match '02-preflight\.json hash is') @{
+  problems = $mProblems
+  note = 'the seal is re-derived from disk, not trusted'
+}
+Remove-FinalizationRun -Root $mRoot
+
+# ---- 86: a truncated seal does not verify ----------------------------------
+$trRoot = New-FinalizationRun
+$trProbe = Invoke-CompletionProbe -Root $trRoot
+$trSealPath = Join-Path $trRoot 'EVIDENCE-MANIFEST.json'
+$trSeal = Read-RunDocument -Path $trSealPath
+$trTruncated = $null
+if ($null -ne $trSeal) {
+  $trFiles = @(Get-DocumentProperty -Object $trSeal -Name 'files' -Default @())
+  if ($trFiles.Count -gt 1) {
+    $trTruncated = [ordered]@{
+      sealedUtc = (Get-DocumentProperty -Object $trSeal -Name 'sealedUtc' -Default '')
+      adapter   = (Get-DocumentProperty -Object $trSeal -Name 'adapter' -Default '')
+      fileCount = [int](Get-DocumentProperty -Object $trSeal -Name 'fileCount' -Default 0)
+      chainHead = [string](Get-DocumentProperty -Object $trSeal -Name 'chainHead' -Default '')
+      files     = @($trFiles[0..($trFiles.Count - 2)])
+    }
+    [System.IO.File]::WriteAllText($trSealPath, ($trTruncated | ConvertTo-Json -Depth 8))
+  }
+}
+$trCheck = $null
+try { $trCheck = Test-ClashRunCompletion -RunPath $trRoot } catch { $trCheck = $null }
+$trProblems = ''
+if ($null -ne $trCheck) { $trProblems = (@($trCheck.problems) -join ' ') }
+Add-Case 'completionValidatorRejectsTruncatedSeal' (
+  $trProbe.ok -and
+  $null -ne $trTruncated -and
+  $null -ne $trCheck -and (-not $trCheck.ok) -and
+  ($trProblems -match 'chain head does not re-derive' -or $trProblems -match 'the seal says')) @{
+  problems = $trProblems
+  note = 'a dropped entry breaks the chain head and the declared count'
+}
+Remove-FinalizationRun -Root $trRoot
+
+# ---- 87: an unreadable seal is reported, never thrown ----------------------
+$cRoot = New-FinalizationRun
+$cProbe = Invoke-CompletionProbe -Root $cRoot
+[System.IO.File]::WriteAllText((Join-Path $cRoot 'EVIDENCE-MANIFEST.json'), 'this is not json {')
+$cCheck = $null
+$cThrew = ''
+try { $cCheck = Test-ClashRunCompletion -RunPath $cRoot } catch { $cThrew = Protect-Text $_.Exception.Message }
+$cProblems = ''
+if ($null -ne $cCheck) { $cProblems = (@($cCheck.problems) -join ' ') }
+Add-Case 'completionValidatorReportsUnreadableSeal' (
+  $cProbe.ok -and
+  [string]$cThrew -eq '' -and
+  $null -ne $cCheck -and (-not $cCheck.ok) -and
+  $cProblems -match 'not readable JSON') @{
+  threw = $cThrew; problems = $cProblems
+  note = 'StrictMode-safe inspection: a corrupt seal is a verdict, not an exception'
+}
+Remove-FinalizationRun -Root $cRoot
+
+# ---- 88: evidence written after the seal is reported -----------------------
+$uRoot = New-FinalizationRun
+$uProbe = Invoke-CompletionProbe -Root $uRoot
+[void](Write-Evidence -Path (Join-Path $uRoot '06-written-after-seal.json') -Text '{"late":true}')
+$uCheck = $null
+try { $uCheck = Test-ClashRunCompletion -RunPath $uRoot } catch { $uCheck = $null }
+$uProblems = ''
+if ($null -ne $uCheck) { $uProblems = (@($uCheck.problems) -join ' ') }
+Add-Case 'completionValidatorRejectsUnsealedEvidence' (
+  $uProbe.ok -and
+  $null -ne $uCheck -and (-not $uCheck.ok) -and
+  $uProblems -match 'is not sealed') @{
+  problems = $uProblems
+  note = 'the R15-C1 shape at file granularity: a receipt that appears after sealing invalidates the run'
+}
+Remove-FinalizationRun -Root $uRoot
+
+# ---- 89: a required receipt that is missing forbids finalization -----------
+$rRoot = New-FinalizationRun -Evidence @('02-preflight.json', '05-storage.json', '06-claim-release.json')
+$rProbe = Invoke-CompletionProbe -Root $rRoot
+$rMarker = Test-Path -LiteralPath (Join-Path $rRoot '06-complete.json')
+$rCheck = $null
+try { $rCheck = Test-ClashRunCompletion -RunPath $rRoot } catch { $rCheck = $null }
+Add-Case 'completionRefusesMissingRequiredEvidence' (
+  (-not $rProbe.ok) -and
+  $rProbe.threw -match '04-postflight\.json' -and
+  (-not $rMarker) -and
+  $null -ne $rCheck -and (-not $rCheck.ok)) @{
+  refusal = $rProbe.threw; markerWritten = $rMarker
+  note = 'completion cannot be claimed without postflight evidence, even if the seal would verify'
+}
+Remove-FinalizationRun -Root $rRoot
+
+# ---- 90: nothing on disk claims COMPLETE unless the run was accepted -------
+$nRoot = New-FinalizationRun
+$nProbe = Invoke-CompletionTailProbe -Root $nRoot -FailWriteJsonSuffix 'EVIDENCE-MANIFEST.json'
+$nClaimants = @()
+foreach ($f in @(Get-ChildItem -LiteralPath $nRoot -Recurse -File -Filter '*.json')) {
+  $raw = ''
+  try { $raw = [System.IO.File]::ReadAllText($f.FullName) } catch { }
+  if ($raw -match '"status"\s*:\s*"COMPLETE"') { $nClaimants += $f.Name }
+}
+$nIntent = Read-RunDocument -Path (Join-Path $nRoot '06-finalization-intent.json')
+$nAccepted = $null
+try { $nAccepted = Test-ClashRunCompletion -RunPath $nRoot } catch { $nAccepted = $null }
+Add-Case 'completionIntentNeverClaimsComplete' (
+  [string]$nProbe.threw -ne '' -and
+  $nClaimants.Count -eq 0 -and
+  $null -ne $nIntent -and
+  [string](Get-DocumentProperty -Object $nIntent -Name 'status' -Default '') -eq 'FINALIZING' -and
+  $null -ne $nAccepted -and (-not $nAccepted.ok)) @{
+  completeClaimants = @($nClaimants)
+  intentStatus = [string](Get-DocumentProperty -Object $nIntent -Name 'status' -Default '')
+  note = 'the provisional receipt says FINALIZING, and no artifact claims completion'
+}
+Remove-FinalizationRun -Root $nRoot
+
+# ---- 91: the runner has exactly one completion path ------------------------
+$deployText = [System.IO.File]::ReadAllText((Join-Path $pluginRoot 'deploy.ps1'))
+$publishCount = ([regex]::Matches($deployText, [regex]::Escape('Publish-ClashCompletion -Root $run'))).Count
+$directComplete = ([regex]::Matches($deployText, [regex]::Escape("New-PhaseReceipt '06-complete.json'"))).Count
+$announceCount = ([regex]::Matches($deployText, [regex]::Escape('TERMINAL RECEIPT: COMPLETE'))).Count
+$tailInfo = $null
+$tailError = ''
+try { $tailInfo = Get-CompletionTail -Path (Join-Path $pluginRoot 'deploy.ps1') } catch { $tailError = Protect-Text $_.Exception.Message }
+Add-Case 'deployTailIsTheOnlyCompletionPath' (
+  $publishCount -eq 1 -and
+  $directComplete -eq 0 -and
+  $announceCount -eq 1 -and
+  [string]$tailError -eq '' -and
+  $null -ne $tailInfo) @{
+  publishCalls = $publishCount; directCompleteReceipts = $directComplete
+  completeAnnouncements = $announceCount; tailLines = $(if ($null -ne $tailInfo) { $tailInfo.lines } else { 0 })
+  note = 'a second, hand-written COMPLETE path cannot be added without failing this case'
+}
 
 # ===========================================================================
 # verdict: inventory first, then the receipt, then the file on disk
