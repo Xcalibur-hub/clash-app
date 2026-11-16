@@ -2832,7 +2832,7 @@ $xProblems = ''
 if ($null -ne $xCheck) { $xProblems = (@($xCheck.problems) -join ' ') }
 Add-Case 'completionValidatorRejectsExceptionBesideMarker' (
   $xProbe.ok -and
-  Test-Path -LiteralPath (Join-Path $xRoot '06-complete.json') -and
+  (Test-Path -LiteralPath (Join-Path $xRoot '06-complete.json')) -and
   $null -ne $xCheck -and (-not $xCheck.ok) -and
   $xProblems -match 'exception') @{
   markerPresent = $true
