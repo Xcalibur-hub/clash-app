@@ -2606,7 +2606,11 @@ hdr(27, 'the JSON type boundary - an accessor must not enumerate (Round 18 / C17
     /\breturn ,\$prop\.Value/.test(libLexed) && /\breturn ,\$p\.Value/.test(libLexed) &&
     /\breturn ,\$Object\[\$Name\]/.test(libLexed) &&
     !/\breturn \$prop\.Value/.test(libLexed) && !/\breturn \$p\.Value/.test(libLexed) &&
-    !/\breturn \$Object\[\$Name\]/.test(libLexed));
+    !/\breturn \$Object\[\$Name\]/.test(libLexed) &&
+    // not vacuous: the construct this audit found is still caught
+    /\breturn \$prop\.Value/.test('  return $prop.Value') &&
+    /\breturn \$p\.Value/.test('  return $p.Value') &&
+    /\breturn \$Object\[\$Name\]/.test('  return $Object[$Name]'));
   check('the defect is documented where the fix is, not in the README only',
     /C17-C1: a bare `return \$prop\.Value` writes the value into the OUTPUT PIPELINE/.test(libCode) &&
     /the pipeline enumerates an array/.test(libCode));
