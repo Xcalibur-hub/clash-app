@@ -1204,7 +1204,7 @@ function Invoke-PreflightGateProbe {
 
   $state = [ordered]@{
     runId = $RunId; receipts = [ordered]@{}; stopName = ''; stopReason = ''
-    advanced = $false; nativeCalls = 0; calls = @(); evidenceCalls = 0
+    advanced = $false; reachedComplete = $false; nativeCalls = 0; calls = @(); evidenceCalls = 0
     threw = ''; blockLines = 0; blockStartLine = 0; blockProblems = @()
   }
 
@@ -1623,7 +1623,13 @@ function Test-VerificationGateOutcome {
   if ([string]$Probe.threw -ne '') { $problems += ('unexpected exception: ' + [string]$Probe.threw) }
   $completeSeen = $false
   if ($names -contains '06-complete.json') { $completeSeen = $true }
-  if ($completeSeen -ne [bool]$Probe.reachedComplete) {
+  # The gate-2 probe stops before any claim release, so it has no
+  # 'reachedComplete' field at all. Under StrictMode a missing property is a
+  # terminating error, and the first 5.1 run of Round 14 died exactly here:
+  # 'The property reachedComplete cannot be found on this object'. Read it
+  # defensively - a probe that never writes COMPLETE is the truthful default.
+  $reachedComplete = [bool](Get-DocumentProperty -Object $Probe -Name 'reachedComplete' -Default $false)
+  if ($completeSeen -ne $reachedComplete) {
     $problems += 'reachedComplete disagrees with the receipts that were written'
   }
   if ($null -ne $ExpectedStatus) {
