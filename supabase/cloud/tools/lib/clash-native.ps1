@@ -2073,7 +2073,7 @@ $script:ClashSelfTestRequiredCases = @(
   'completionRejectsMisTypedMarker',
   'completionRejectsMalformedHashFields',
   'completionRejectsIntentChainBreak',
-  'completionRejectsRequiredEvidenceDrift',
+  'completionRejectsPostSealEvidenceLoss',
   'completionRejectsContradictoryWriterRunId',
   'completionRejectsUnknownSealName',
   'completionRejectsForeignAdapter'

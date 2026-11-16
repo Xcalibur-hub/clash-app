@@ -2572,7 +2572,7 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
     'completionRejectsCodexChainMutation', 'completionRejectsWrongPrevReceiptShaOnly',
     'completionRejectsWrongSealChainHeadOnly', 'completionRejectsMissingIntent',
     'completionRejectsMisTypedMarker', 'completionRejectsMalformedHashFields',
-    'completionRejectsIntentChainBreak', 'completionRejectsRequiredEvidenceDrift',
+    'completionRejectsIntentChainBreak', 'completionRejectsPostSealEvidenceLoss',
     'completionRejectsContradictoryWriterRunId', 'completionRejectsUnknownSealName',
     'completionRejectsForeignAdapter'];
   check('all twenty-seven finalization cases are executed and in the shared inventory',

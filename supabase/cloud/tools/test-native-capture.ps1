@@ -2680,7 +2680,7 @@ Add-Case 'completionSuccessPublishesVerifiedMarker' (
   [string](Get-DocumentProperty -Object $finDoc -Name 'status' -Default '') -eq 'COMPLETE' -and
   [string](Get-DocumentProperty -Object $finDoc -Name 'protocol' -Default '') -eq 'clash-completion/2' -and
   (Get-DocumentProperty -Object $finDoc -Name 'finalized' -Default $false) -eq $true -and
-  (Get-DocumentProperty -Object $finDoc -Name 'appliedThisRun' -Default 0) -eq 111 -and
+  (Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'metadata' -Default $null) -Name 'appliedThisRun' -Default 0) -eq 111 -and
   $null -ne $finSeal -and
   [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'sha256' -Default '') -eq
     (Get-NormalizedSha256 -Path (Join-Path $finRoot 'EVIDENCE-MANIFEST.json')) -and
@@ -3220,7 +3220,10 @@ Add-Case 'completionRejectsIntentChainBreak' (
 }
 Remove-FinalizationRun -Root $cbRoot
 
-# ---- 99: required evidence disappears after sealing ------------------------
+# ---- 99: required evidence disappears after it was sealed ------------------
+# The seal still LISTS the receipt (the manifest is not rewritten), so the
+# verdict is "sealed but missing from disk": the canonical evidence a completed
+# run must have is gone, and the run cannot be accepted.
 $drRoot = New-FinalizationRun
 $drPub  = Invoke-CompletionProbe -Root $drRoot
 Remove-Item -LiteralPath (Join-Path $drRoot '04-postflight.json') -Force
@@ -3228,14 +3231,13 @@ $drCheck = $null
 try { $drCheck = Test-ClashRunCompletion -RunPath $drRoot } catch { $drCheck = $null }
 $drProblems = ''
 if ($null -ne $drCheck) { $drProblems = (@($drCheck.problems) -join ' ') }
-Add-Case 'completionRejectsRequiredEvidenceDrift' (
+Add-Case 'completionRejectsPostSealEvidenceLoss' (
   $drPub.ok -and
   $null -ne $drCheck -and (-not $drCheck.ok) -and
-  $drProblems -match '04-postflight\.json' -and
-  $drProblems -match 'appears 0 time' -and
-  $drProblems -match 'missing from disk') @{
+  $drProblems -match '04-postflight\.json is sealed but missing from disk' -and
+  $drProblems -match 'the sealed intent requires 04-postflight\.json but no such file exists') @{
   problems = $drProblems
-  note = 'the canonical required-evidence list is enforced by the consumer, not trusted from the intent'
+  note = 'a canonical receipt removed after sealing is caught twice: by the seal and by the declared required evidence'
 }
 Remove-FinalizationRun -Root $drRoot
 
