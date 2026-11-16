@@ -120,7 +120,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 102
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 120
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -2467,6 +2467,34 @@ function Set-CompletionMarkerField {
   return $path
 }
 
+# Test-only fixture builder: replaces ONE scalar field of a JSON file with
+# arbitrary raw JSON text. Shapes that PowerShell cannot assign directly (an empty
+# array, a nested array, an object, an explicit null) must reach the consumer as
+# real JSON text, exactly as an attacker would write it.
+function Set-JsonScalarField {
+  param([string]$Path, [string]$Name, [string]$RawJson)
+
+  $text = [System.IO.File]::ReadAllText($Path)
+  $pattern = '("{0}"[ \t]*:[ \t]*)("(?:[^"\\]|\\.)*"|true|false|null|-?[0-9]+(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?)' -f [regex]::Escape($Name)
+  $match = [regex]::Match($text, $pattern)
+  if (-not $match.Success) { throw ('the fixture {0} has no scalar field {1}' -f $Path, $Name) }
+  $head = $text.Substring(0, $match.Groups[1].Index)
+  $tail = $text.Substring($match.Index + $match.Length)
+  [System.IO.File]::WriteAllText($Path, ($head + $match.Groups[1].Value + $RawJson + $tail))
+  return $Path
+}
+
+# Test-only fixture builder: regex surgery on a JSON file, for a field whose value
+# is a collection (renamed or re-typed in place so the JSON stays valid).
+function Set-JsonFileRegex {
+  param([string]$Path, [string]$Pattern, [string]$Replacement)
+
+  $text = [System.IO.File]::ReadAllText($Path)
+  if (-not [regex]::IsMatch($text, $Pattern)) { throw ('the fixture {0} does not match the pattern' -f $Path) }
+  [System.IO.File]::WriteAllText($Path, ([regex]::Replace($text, $Pattern, $Replacement)))
+  return $Path
+}
+
 function Remove-FinalizationRun {
   param([string]$Root)
   try { if ($Root -and (Test-Path -LiteralPath $Root)) { Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction Stop } } catch { }
@@ -3293,6 +3321,402 @@ Add-Case 'completionRejectsForeignAdapter' (
   note = 'adapter is compared with the identity the verified seal records'
 }
 Remove-FinalizationRun -Root $a2Root
+
+# ===========================================================================
+# Round 18 (C17-C1): the JSON type boundary
+# ===========================================================================
+# The accessor and the kind classifier are the foundation everything else rests
+# on, so they are executed first, on shapes that PowerShell cannot assign.
+$shapeText = '{"empty":[],"single":["a"],"multi":["a","b"],"nested":[["a"]],"object":{"k":1},"nul":null,"whole":6,"half":6.5,"flag":true,"text":"s"}'
+$shapeDoc  = $shapeText | ConvertFrom-Json
+$shapeEmpty  = Get-ClashProperty -Object $shapeDoc -Name 'empty'  -Default 'DEFAULT'
+$shapeSingle = Get-ClashProperty -Object $shapeDoc -Name 'single' -Default 'DEFAULT'
+$shapeMulti  = Get-ClashProperty -Object $shapeDoc -Name 'multi'  -Default 'DEFAULT'
+$shapeNested = Get-ClashProperty -Object $shapeDoc -Name 'nested' -Default 'DEFAULT'
+$shapeObject = Get-ClashProperty -Object $shapeDoc -Name 'object' -Default 'DEFAULT'
+$shapeNull   = Get-ClashProperty -Object $shapeDoc -Name 'nul'    -Default 'DEFAULT'
+$shapeWhole  = Get-ClashProperty -Object $shapeDoc -Name 'whole'  -Default 'DEFAULT'
+$shapeHalf   = Get-ClashProperty -Object $shapeDoc -Name 'half'   -Default 'DEFAULT'
+$shapeFlag   = Get-ClashProperty -Object $shapeDoc -Name 'flag'   -Default 'DEFAULT'
+$shapeString = Get-ClashProperty -Object $shapeDoc -Name 'text'   -Default 'DEFAULT'
+Add-Case 'jsonAccessorPreservesCollectionShape' (
+  (($shapeEmpty -is [array]) -and (@($shapeEmpty).Count -eq 0)) -and
+  (($shapeSingle -is [array]) -and (@($shapeSingle).Count -eq 1) -and ([string]$shapeSingle[0] -ceq 'a')) -and
+  (($shapeMulti -is [array]) -and (@($shapeMulti).Count -eq 2)) -and
+  (($shapeNested -is [array]) -and (@($shapeNested).Count -eq 1) -and ($shapeNested[0] -is [array]) -and ([string]$shapeNested[0][0] -ceq 'a')) -and
+  ($shapeObject -is [System.Management.Automation.PSCustomObject]) -and
+  ($shapeNull -ceq 'DEFAULT') -and
+  (($shapeWhole -is [int]) -and ($shapeWhole -eq 6)) -and
+  ($shapeHalf -eq 6.5) -and
+  ($shapeFlag -eq $true) -and
+  ($shapeString -ceq 's')) @{
+  emptyKind = $(if ($null -eq $shapeEmpty) { 'null' } else { $shapeEmpty.GetType().Name })
+  singleCount = @($shapeSingle).Count
+  nestedCount = @($shapeNested).Count
+  note = 'C17-C1 root cause: the accessor must not enumerate. [] stays empty, ["a"] stays one element, [["a"]] stays nested.'
+}
+
+$kindOf = @{}
+foreach ($kindName in @('absent', 'nul', 'text', 'flag', 'whole', 'half', 'object', 'empty', 'single', 'nested')) {
+  $kindOf[$kindName] = (Get-ClashJsonField -Object $shapeDoc -Name $kindName)['kind']
+}
+Add-Case 'jsonFieldReportsExactJsonKinds' (
+  ($kindOf['absent'] -ceq 'missing') -and
+  ($kindOf['nul'] -ceq 'null') -and
+  ($kindOf['text'] -ceq 'string') -and
+  ($kindOf['flag'] -ceq 'boolean') -and
+  ($kindOf['whole'] -ceq 'integer') -and
+  ($kindOf['half'] -ceq 'number') -and
+  ($kindOf['object'] -ceq 'object') -and
+  ($kindOf['empty'] -ceq 'array') -and
+  ($kindOf['single'] -ceq 'array') -and
+  ($kindOf['nested'] -ceq 'array') -and
+  (Test-ClashJsonKind -Value 6 -Kind 'integer') -and
+  (Test-ClashJsonKind -Value 6 -Kind 'number') -and
+  (-not (Test-ClashJsonKind -Value 6.5 -Kind 'integer')) -and
+  (-not (Test-ClashJsonKind -Value '6' -Kind 'integer')) -and
+  (-not (Test-ClashJsonKind -Value @('s') -Kind 'string')) -and
+  (Test-ClashJsonKind -Value @('s') -Kind 'array')) @{
+  kinds = ($kindOf.GetEnumerator() | Sort-Object Name | ForEach-Object { '{0}={1}' -f $_.Key, $_.Value }) -join ' '
+  note = 'a classifier, never a converter: "6" is not an integer, [..] is not a string, 6.5 is not an integer'
+}
+
+$arrayRender = Format-ClashFieldValue -Value @('clash-completion/2')
+$nullRender  = Format-ClashFieldValue -Value $null
+Add-Case 'jsonFieldSeparatesMissingFromNull' (
+  (((Get-ClashJsonField -Object $shapeDoc -Name 'absent')['present']) -eq $false) -and
+  (((Get-ClashJsonField -Object $shapeDoc -Name 'nul')['present']) -eq $true) -and
+  (((Get-ClashJsonField -Object $shapeDoc -Name 'nul')['kind']) -ceq 'null') -and
+  ($arrayRender -match '^array\(1\)') -and
+  ($arrayRender -match 'string "clash-completion/2"') -and
+  (-not ($arrayRender -match '^string')) -and
+  ($nullRender -ceq '<missing or null>')) @{
+  arrayRender = $arrayRender
+  nullRender = $nullRender
+  note = 'a verdict must never render ["x"] as string "x": that is the confusion C17-C1 was'
+}
+
+# One adversarial marker fixture: publish a real marker with the real publisher,
+# overwrite ONE field with raw JSON text, and record the consumer's verdict.
+function Invoke-MarkerTypeProbe {
+  param([string]$Field, [string]$RawJson)
+
+  $root = New-FinalizationRun
+  $pub  = Invoke-CompletionProbe -Root $root
+  $before = $null
+  try { $before = Test-ClashRunCompletion -RunPath $root } catch { $before = $null }
+  $sealBefore = ''
+  if ($null -ne $before) { $sealBefore = [string]$before.sealSha256 }
+  [void](Set-JsonScalarField -Path (Join-Path $root '06-complete.json') -Name $Field -RawJson $RawJson)
+  $rawDoc = Read-RunDocument -Path (Join-Path $root '06-complete.json')
+  $fieldRecord = Get-ClashJsonField -Object $rawDoc -Name $Field
+  $check = $null
+  try { $check = Test-ClashRunCompletion -RunPath $root } catch { $check = $null }
+  $problems = ''
+  if ($null -ne $check) { $problems = (@($check.problems) -join ' ') }
+  $seal = $null
+  try { $seal = Test-EvidenceSeal -Root $root -Require @(Get-ClashCompletionRequiredEvidence) } catch { $seal = $null }
+  $count = -1
+  if ($fieldRecord['kind'] -ceq 'array') { $count = @($fieldRecord['value']).Count }
+  return @{
+    root       = $root
+    pubOk      = [bool]$pub.ok
+    beforeOk   = ($null -ne $before) -and [bool]$before.ok
+    sealBefore = $sealBefore
+    sealAfter  = $(if ($null -ne $check) { [string]$check.sealSha256 } else { '' })
+    sealOk     = ($null -ne $seal) -and [bool]$seal.ok
+    kind       = [string]$fieldRecord['kind']
+    count      = $count
+    ok         = ($null -ne $check) -and [bool]$check.ok
+    problems   = $problems
+  }
+}
+
+# ---- 106: Codex C17-C1 exactly: the protocol is a one-element array ---------
+$p1 = Invoke-MarkerTypeProbe -Field 'protocol' -RawJson '["clash-completion/2"]'
+Add-Case 'completionRejectsProtocolSingletonArray' (
+  $p1['pubOk'] -and $p1['beforeOk'] -and
+  ($p1['kind'] -ceq 'array') -and
+  ($p1['count'] -eq 1) -and
+  (-not $p1['ok']) -and
+  ($p1['problems'] -match 'the marker protocol is array\(1\)') -and
+  $p1['sealOk'] -and
+  ([string]$p1['sealAfter'] -ceq [string]$p1['sealBefore'])) @{
+  cases = 'protocol = ["clash-completion/2"]'
+  kind = $p1['kind']
+  problems = $p1['problems']
+  note = 'the independent acceptance reproduced this as accepted; it is rejected now, with the seal still verified'
+}
+Remove-FinalizationRun -Root $p1['root']
+
+# ---- 107: an empty array ----------------------------------------------------
+$p2 = Invoke-MarkerTypeProbe -Field 'protocol' -RawJson '[]'
+Add-Case 'completionRejectsProtocolEmptyArray' (
+  $p2['pubOk'] -and $p2['beforeOk'] -and
+  ($p2['kind'] -ceq 'array') -and
+  ($p2['count'] -eq 0) -and
+  (-not $p2['ok']) -and
+  ($p2['problems'] -match 'the marker protocol is array\(0\)')) @{
+  cases = 'protocol = []'
+  problems = $p2['problems']
+  note = 'the accessor used to deliver [] as nothing at all, which is how "absent" got confused with "empty"'
+}
+Remove-FinalizationRun -Root $p2['root']
+
+# ---- 108: a two-element array ----------------------------------------------
+$p3 = Invoke-MarkerTypeProbe -Field 'protocol' -RawJson '["clash-completion/2","clash-completion/2"]'
+Add-Case 'completionRejectsProtocolMultiValueArray' (
+  $p3['pubOk'] -and $p3['beforeOk'] -and
+  ($p3['kind'] -ceq 'array') -and
+  ($p3['count'] -eq 2) -and
+  (-not $p3['ok']) -and
+  ($p3['problems'] -match 'the marker protocol is array\(2\)')) @{
+  cases = 'protocol = ["clash-completion/2","clash-completion/2"]'
+  problems = $p3['problems']
+  note = 'a multi-element array survives the pipeline unchanged; it must still be a wrong type'
+}
+Remove-FinalizationRun -Root $p3['root']
+
+# ---- 109: a nested array ----------------------------------------------------
+$p4 = Invoke-MarkerTypeProbe -Field 'protocol' -RawJson '[["clash-completion/2"]]'
+Add-Case 'completionRejectsProtocolNestedArray' (
+  $p4['pubOk'] -and $p4['beforeOk'] -and
+  ($p4['kind'] -ceq 'array') -and
+  ($p4['count'] -eq 1) -and
+  (-not $p4['ok']) -and
+  ($p4['problems'] -match 'the marker protocol is array\(1\) \[array\(1\)')) @{
+  cases = 'protocol = [["clash-completion/2"]]'
+  problems = $p4['problems']
+  note = 'nesting is preserved and rejected: a collection is not a string at any depth'
+}
+Remove-FinalizationRun -Root $p4['root']
+
+# ---- 110: an object where a string is required -----------------------------
+$p5 = Invoke-MarkerTypeProbe -Field 'protocol' -RawJson '{"value":"clash-completion/2"}'
+Add-Case 'completionRejectsProtocolObject' (
+  $p5['pubOk'] -and $p5['beforeOk'] -and
+  ($p5['kind'] -ceq 'object') -and
+  (-not $p5['ok']) -and
+  ($p5['problems'] -match 'the marker protocol is object')) @{
+  cases = 'protocol = {"value":"clash-completion/2"}'
+  problems = $p5['problems']
+  note = 'an object is not a string, and its contents are never searched for the expected value'
+}
+Remove-FinalizationRun -Root $p5['root']
+
+# ---- 111: an explicit JSON null --------------------------------------------
+$p6 = Invoke-MarkerTypeProbe -Field 'protocol' -RawJson 'null'
+Add-Case 'completionRejectsProtocolNull' (
+  $p6['pubOk'] -and $p6['beforeOk'] -and
+  ($p6['kind'] -ceq 'null') -and
+  (-not $p6['ok']) -and
+  ($p6['problems'] -match 'the marker protocol is <missing or null>, not')) @{
+  cases = 'protocol = null'
+  problems = $p6['problems']
+  note = 'null and absent are separate kinds, and both are rejected for a required string'
+}
+Remove-FinalizationRun -Root $p6['root']
+
+# ---- 112: every other authoritative marker field as a collection -----------
+$c17Root = New-FinalizationRun
+$c17Pub  = Invoke-CompletionProbe -Root $c17Root
+$c17Doc  = Read-RunDocument -Path (Join-Path $c17Root '06-complete.json')
+$c17SealDoc = Get-DocumentProperty -Object $c17Doc -Name 'seal' -Default $null
+$c17Sha  = [string](Get-DocumentProperty -Object $c17SealDoc -Name 'sha256' -Default '')
+$c17Head = [string](Get-DocumentProperty -Object $c17SealDoc -Name 'chainHead' -Default '')
+$c17Prev = [string](Get-DocumentProperty -Object $c17Doc -Name 'prevReceiptSha' -Default '')
+[void](Set-CompletionMarkerField -Root $c17Root -Mutation @{
+    'status'         = @('COMPLETE')
+    'finalized'      = @($true)
+    'adapter'        = @("$($script:ClashAdapterId)/$($script:ClashAdapterVersion)")
+    'prevReceiptSha' = @($c17Prev)
+    'writerRunId'    = @('probe-run-id')
+    'seal'           = @($c17SealDoc)
+  })
+$c17Check = $null
+try { $c17Check = Test-ClashRunCompletion -RunPath $c17Root } catch { $c17Check = $null }
+$c17Problems = ''
+if ($null -ne $c17Check) { $c17Problems = (@($c17Check.problems) -join ' ') }
+Add-Case 'completionRejectsArrayTypedMarkerFields' (
+  $c17Pub.ok -and
+  $null -ne $c17Check -and (-not $c17Check.ok) -and
+  ($c17Problems -match 'the marker status is array\(1\)') -and
+  ($c17Problems -match 'must be boolean true') -and
+  ($c17Problems -match 'the marker adapter is array\(1\)') -and
+  ($c17Problems -match 'the marker prevReceiptSha is array\(1\)') -and
+  ($c17Problems -match 'the marker writerRunId is array\(1\)') -and
+  ($c17Problems -match 'the marker seal block is array\(1\)')) @{
+  problems = $c17Problems
+  note = 'the same singleton-array shape is rejected at every authoritative field, not just at protocol'
+}
+Remove-FinalizationRun -Root $c17Root
+
+# ---- 113: the seal block's own fields as collections -----------------------
+$b1Root = New-FinalizationRun
+$b1Pub  = Invoke-CompletionProbe -Root $b1Root
+$b1Doc  = Read-RunDocument -Path (Join-Path $b1Root '06-complete.json')
+$b1Seal = Get-DocumentProperty -Object $b1Doc -Name 'seal' -Default $null
+$b1Sha  = [string](Get-DocumentProperty -Object $b1Seal -Name 'sha256' -Default '')
+$b1Head = [string](Get-DocumentProperty -Object $b1Seal -Name 'chainHead' -Default '')
+$b1Count = Get-DocumentProperty -Object $b1Seal -Name 'fileCount' -Default 0
+[void](Set-CompletionMarkerField -Root $b1Root -Mutation @{
+    'seal.name'      = @('EVIDENCE-MANIFEST.json')
+    'seal.sha256'    = @($b1Sha)
+    'seal.fileCount' = @($b1Count)
+    'seal.chainHead' = @($b1Head)
+  })
+$b1Check = $null
+try { $b1Check = Test-ClashRunCompletion -RunPath $b1Root } catch { $b1Check = $null }
+$b1Problems = ''
+if ($null -ne $b1Check) { $b1Problems = (@($b1Check.problems) -join ' ') }
+Add-Case 'completionRejectsArrayTypedSealBlockFields' (
+  $b1Pub.ok -and
+  $null -ne $b1Check -and (-not $b1Check.ok) -and
+  ($b1Problems -match 'the marker names the seal array\(1\)') -and
+  ($b1Problems -match 'the marker seal sha256 is array\(1\)') -and
+  ($b1Problems -match 'the marker seal fileCount is array\(1\)') -and
+  ($b1Problems -match 'the marker seal chainHead is array\(1\)') -and
+  ([regex]::Matches($b1Problems, '64 lowercase hex')).Count -ge 2) @{
+  problems = $b1Problems
+  note = 'the hashes are not extracted from a collection: a one-element array is the wrong type, not the right value'
+}
+Remove-FinalizationRun -Root $b1Root
+
+# ---- 114: the marker root is not an object --------------------------------
+$r1Root = New-FinalizationRun
+$r1Pub  = Invoke-CompletionProbe -Root $r1Root
+[System.IO.File]::WriteAllText((Join-Path $r1Root '06-complete.json'), '[{"protocol":"clash-completion/2"}]')
+$r1Check = $null
+try { $r1Check = Test-ClashRunCompletion -RunPath $r1Root } catch { $r1Check = $null }
+$r1Problems = ''
+if ($null -ne $r1Check) { $r1Problems = (@($r1Check.problems) -join ' ') }
+Add-Case 'completionRejectsScalarRootMarker' (
+  $r1Pub.ok -and
+  $null -ne $r1Check -and (-not $r1Check.ok) -and
+  ($r1Problems -match '06-complete\.json is array\(1\)') -and
+  ($r1Problems -match 'a completion marker must be a JSON object')) @{
+  problems = $r1Problems
+  note = 'a marker whose root is a collection has no fields; that is a wrong shape, reported as such'
+}
+Remove-FinalizationRun -Root $r1Root
+
+# ---- 115: the seal's files field is not an array --------------------------
+$f1Root = New-FinalizationRun
+$f1Pub  = Invoke-CompletionProbe -Root $f1Root
+[void](Set-JsonFileRegex -Path (Join-Path $f1Root 'EVIDENCE-MANIFEST.json') `
+    -Pattern '("files"[ \t]*:[ \t]*\[)' `
+    -Replacement '"files": "not-an-array", "removedFiles": [')
+$f1Seal = $null
+try { $f1Seal = Test-EvidenceSeal -Root $f1Root -Require @(Get-ClashCompletionRequiredEvidence) } catch { $f1Seal = $null }
+$f1Problems = ''
+if ($null -ne $f1Seal) { $f1Problems = (@($f1Seal.problems) -join ' ') }
+Add-Case 'evidenceSealRejectsNonArrayFiles' (
+  $f1Pub.ok -and
+  $null -ne $f1Seal -and (-not $f1Seal.ok) -and
+  ($f1Problems -match 'the seal field files is string "not-an-array"') -and
+  ($f1Problems -match 'it must be a JSON array of entries')) @{
+  problems = $f1Problems
+  note = 'a seal whose entries are not an array proves nothing, whatever its chain head says'
+}
+Remove-FinalizationRun -Root $f1Root
+
+# ---- 116: the seal's fileCount is a string --------------------------------
+$f2Root = New-FinalizationRun
+$f2Pub  = Invoke-CompletionProbe -Root $f2Root
+[void](Set-JsonScalarField -Path (Join-Path $f2Root 'EVIDENCE-MANIFEST.json') -Name 'fileCount' -RawJson '"6"')
+$f2Seal = $null
+try { $f2Seal = Test-EvidenceSeal -Root $f2Root -Require @(Get-ClashCompletionRequiredEvidence) } catch { $f2Seal = $null }
+$f2Problems = ''
+if ($null -ne $f2Seal) { $f2Problems = (@($f2Seal.problems) -join ' ') }
+Add-Case 'evidenceSealRejectsStringFileCount' (
+  $f2Pub.ok -and
+  $null -ne $f2Seal -and (-not $f2Seal.ok) -and
+  ($f2Problems -match 'the seal fileCount is string "6"') -and
+  ($f2Problems -match 'it must be a JSON integer')) @{
+  problems = $f2Problems
+  note = 'the old reader cast the claim with [int], so "6" passed; the count is now a JSON integer or a rejection'
+}
+Remove-FinalizationRun -Root $f2Root
+
+# ---- 117: the seal's chainHead is a collection ----------------------------
+$f3Root = New-FinalizationRun
+$f3Pub  = Invoke-CompletionProbe -Root $f3Root
+$f3SealDoc = Read-RunDocument -Path (Join-Path $f3Root 'EVIDENCE-MANIFEST.json')
+$f3Head = [string](Get-DocumentProperty -Object $f3SealDoc -Name 'chainHead' -Default '')
+[void](Set-JsonScalarField -Path (Join-Path $f3Root 'EVIDENCE-MANIFEST.json') -Name 'chainHead' -RawJson ('["' + $f3Head + '"]'))
+$f3Seal = $null
+try { $f3Seal = Test-EvidenceSeal -Root $f3Root -Require @(Get-ClashCompletionRequiredEvidence) } catch { $f3Seal = $null }
+$f3Problems = ''
+if ($null -ne $f3Seal) { $f3Problems = (@($f3Seal.problems) -join ' ') }
+Add-Case 'evidenceSealRejectsArrayChainHead' (
+  $f3Pub.ok -and
+  $null -ne $f3Seal -and (-not $f3Seal.ok) -and
+  ($f3Problems -match 'the seal chainHead is array\(1\)') -and
+  ($f3Problems -match 'it must be a JSON string of 64 lowercase hex characters')) @{
+  problems = $f3Problems
+  note = 'the real chain head inside an array is still a wrong type; the value is never mined out of a collection'
+}
+Remove-FinalizationRun -Root $f3Root
+
+# ---- 118: the sealed finalization intent carries collections -------------
+$i1Root = New-FinalizationRun
+$i1Pub  = Invoke-CompletionProbe -Root $i1Root
+$i1Path = Join-Path $i1Root '06-finalization-intent.json'
+[void](Set-JsonScalarField -Path $i1Path -Name 'status'  -RawJson '["FINALIZING"]')
+[void](Set-JsonScalarField -Path $i1Path -Name 'receipt' -RawJson '["06-finalization-intent.json"]')
+[void](Set-JsonFileRegex -Path $i1Path -Pattern '("requiredEvidence"[ \t]*:[ \t]*\[)' -Replacement '"requiredEvidence": "05-storage.json", "declaredEvidence": [')
+$i1Check = $null
+try { $i1Check = Test-ClashRunCompletion -RunPath $i1Root } catch { $i1Check = $null }
+$i1Problems = ''
+if ($null -ne $i1Check) { $i1Problems = (@($i1Check.problems) -join ' ') }
+Add-Case 'completionRejectsCollectionValuedIntent' (
+  $i1Pub.ok -and
+  $null -ne $i1Check -and (-not $i1Check.ok) -and
+  ($i1Problems -match 'the sealed intent status is array\(1\)') -and
+  ($i1Problems -match 'the sealed intent names itself array\(1\)') -and
+  ($i1Problems -match 'the sealed intent requiredEvidence is string "05-storage.json"') -and
+  ($i1Problems -match 'it must be a non-empty array')) @{
+  problems = $i1Problems
+  note = 'the intent is sealed evidence, but its SHAPE is still checked: a string is not a list of requirements'
+}
+Remove-FinalizationRun -Root $i1Root
+
+# ---- 119: the sealed claim release carries collections -------------------
+$q1Root = New-FinalizationRun
+$q1Pub  = Invoke-CompletionProbe -Root $q1Root
+$q1Path = Join-Path $q1Root '06-claim-release.json'
+[void](Set-JsonScalarField -Path $q1Path -Name 'status'   -RawJson '["PASS"]')
+[void](Set-JsonScalarField -Path $q1Path -Name 'released' -RawJson '[true]')
+[void](Set-JsonScalarField -Path $q1Path -Name 'runId'    -RawJson '["probe-run-id"]')
+$q1Check = $null
+try { $q1Check = Test-ClashRunCompletion -RunPath $q1Root } catch { $q1Check = $null }
+$q1Problems = ''
+if ($null -ne $q1Check) { $q1Problems = (@($q1Check.problems) -join ' ') }
+Add-Case 'completionRejectsCollectionValuedClaimRelease' (
+  $q1Pub.ok -and
+  $null -ne $q1Check -and (-not $q1Check.ok) -and
+  ($q1Problems -match 'the sealed claim release status is array\(1\)') -and
+  ($q1Problems -match 'does not record released = true') -and
+  ($q1Problems -match 'the marker writerRunId .* is not the runId')) @{
+  problems = $q1Problems
+  note = 'released = [true] is not released = true, and a runId inside a list is not the runId'
+}
+Remove-FinalizationRun -Root $q1Root
+
+# ---- 120: verification metadata carries collections ----------------------
+$metaDoc = '{"adapterId":"clash-native-adapter","adapterVersion":"5.0.0","adapterSha256":"' + ('a' * 64) + '","verdict":["PASS"],"powerShellVersion":"5.1.0","problems":"none","casesExecuted":[' + $requiredCases.Count + '],"cases":{}}' | ConvertFrom-Json
+$metaVerdict = $null
+try { $metaVerdict = Test-SelfTestReceipt -Document $metaDoc -AdapterSha256 ('a' * 64) } catch { $metaVerdict = $null }
+$metaProblems = ''
+if ($null -ne $metaVerdict) { $metaProblems = (@($metaVerdict.problems) -join ' ') }
+Add-Case 'selfTestReceiptRejectsCollectionValuedMetadata' (
+  $null -ne $metaVerdict -and (-not $metaVerdict.ok) -and
+  ($metaProblems -match 'verdict is a JSON array, not a JSON string') -and
+  ($metaProblems -match 'problems is a JSON string, not a JSON array') -and
+  ($metaProblems -match 'casesExecuted is a JSON array, not a JSON integer')) @{
+  problems = $metaProblems
+  note = 'a receipt that says ["PASS"] or [102] is a wrong type; a verification record proves nothing it does not state'
+}
 
 # ===========================================================================
 # verdict: inventory first, then the receipt, then the file on disk

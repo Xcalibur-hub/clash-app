@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **441 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **455 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 441 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 455 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -201,7 +201,7 @@ deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
 `-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
 the contract rather than an accident of the host.
 
-Adapter `4.9.0` (was `4.7.0`), native self-test 102 cases (was 75): completion is
+Adapter `5.0.0` (was `4.7.0`), native self-test 120 cases (was 75): completion is
 now a commit protocol rather than a receipt the runner wrote before sealing (see
 §1n), and sixteen cases execute it against real directories - the success path,
 a refused seal publication, an injected seal write failure, the committed
@@ -307,6 +307,16 @@ have not been executed on this machine either - they are executed by
 | - | the producer could publish a marker the consumer would reject | `Publish-ClashCompletion` now runs `Test-ClashRunCompletion` on its own output after the commit; if the consumer refuses, a doubt marker records the problems and the finalization throws instead of reporting success. The required evidence is declared once (`Get-ClashCompletionRequiredEvidence`) and demanded by both the producer and the consumer, so a run cannot drop a receipt from both the intent and the seal |
 | - | only the audit's two-field mutation was known to be accepted | eleven executed cases mutate a real published marker field by field: the exact Codex mutation (case 92), each field alone (93, 94, 100, 101, 102), a missing intent (95), wrong JSON types (96), malformed and case-folded hashes (97), a mis-chained intent (98) and required evidence removed after sealing (99) |
 
+### 1p. Round 18 (audit of `6bd5667`) - a JSON type boundary that enumerated its own input
+
+| # | Defect | Fix |
+|---|---|---|
+| C17-C1 (critical against the strict typed completion-acceptance contract) | `Get-ClashProperty` ended with `return $prop.Value`. A `return` writes its value into the PowerShell **output pipeline**, and the pipeline **enumerates an array**: a marker field of `["clash-completion/2"]` reached the consumer as the string `clash-completion/2`, `[]` arrived as nothing at all, and `[{...}]` arrived as the seal object. The consumer then tested `$proto -is [string]` on the *pipeline's output*, not on the JSON field, so the audit's `protocol: ["clash-completion/2"]` was **accepted** with no problems, and `Get-DocumentProperty` (the receipt accessor) had the identical defect | both accessors now emit the value without enumeration (`return ,$prop.Value`, `return ,$p.Value`, `return ,$Object[$Name]`), so an array arrives as an array, `[]` as an empty array and a nested array stays nested. A separate record reader, `Get-ClashJsonField`, reports `present`, the exact `kind` (`missing`/`null`/`string`/`boolean`/`integer`/`number`/`object`/`array`) and the untouched value, so "absent" and "null" are different answers |
+| - | a type test on a coerced local variable cannot be a type test | every authoritative field is gated on its exact JSON kind before its value is used: `protocol`, `status`, `adapter`, `prevReceiptSha`, `writerRunId`, `utc` and `seal.name` must be JSON strings, `finalized` a JSON boolean, `seal.fileCount` a JSON integer, `seal` and the marker root JSON objects, `requiredEvidence` a JSON array of strings, and the sealed claim release's `status`/`runId` strings with `released` a JSON boolean. `Get-ClashJsonKind`/`Test-ClashJsonKind` **classify and never convert**: `"6"` is not an integer, `6.5` is not an integer, `["s"]` is not a string |
+| - | the seal and the verification receipt trusted their own shape | `Test-EvidenceSeal` now requires an object root, a JSON array in `files`, an object in every entry, strings for `path`/`sha256`/`chain`, a string `chainHead` and a JSON **integer** `fileCount` (the old reader cast the claim with `[int]`, so `"6"` passed). `Test-SelfTestReceipt` requires `verdict`/`adapterId`/`adapterVersion`/`adapterSha256`/`powerShellVersion` strings, `problems` an array, `casesExecuted` a JSON integer and `cases` an object |
+| - | the producer could still write, or accept, a wrongly typed marker | `Publish-ClashCompletion` asserts the JSON kind of every authoritative field **it** wrote, independently of the consumer (a serializer that turns `true` into `"true"`, `6` into `"6"` or an object into an array is caught before publication), and its post-commit re-verification compares kinds as well as values. The consumer's verdict record reports `protocol` only when the marker really carries a string, plus the observed `protocolKind`, so the record can no longer make an accepted-looking shape out of a rejected one |
+| - | the audit's exact input was the only collection case known | eighteen executed cases (103-120): the accessor keeps empty/singleton/multi/nested arrays, an object, a null and scalars; the kind classifier separates `missing` from `null`; the exact Codex input `protocol: ["clash-completion/2"]` (106) plus `[]` (107), two elements (108), a nested array (109), an object (110) and `null` (111); every other authoritative field as a one-element array (112); all four seal-block fields as arrays (113); an array-rooted marker (114); a seal whose `files` is a string (115), whose `fileCount` is `"6"` (116) and whose `chainHead` is an array (117); a collection-valued intent (118) and claim release (119); and a verification receipt that says `["PASS"]`/`[102]`/`"none"` (120) |
+
 Still not proven: the consumer validates *files*, not signatures. A privileged
 writer can replace the whole artifact set consistently; the seal is consistency
 evidence, not an attestation.
@@ -344,7 +354,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (441 assertions)
+tests/verify-package.mjs       offline test suite (455 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

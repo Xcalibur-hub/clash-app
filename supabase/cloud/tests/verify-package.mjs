@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 26;
-const EXPECTED_CASES = 102;
-const EXPECTED_ASSERTIONS = 441;
+const EXPECTED_SECTIONS = 27;
+const EXPECTED_CASES = 120;
+const EXPECTED_ASSERTIONS = 455;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -2536,14 +2536,15 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
   check('the consumer verifies every authoritative marker field',
     (() => {
       const body = libCode.slice(libCode.indexOf('function Test-ClashRunCompletion'), libCode.indexOf('# ------------------------------------------------------- connection policy --'));
-      return /intentHashes -notcontains/.test(body) &&
+      return /intentHashes -cnotcontains/.test(body) &&
         /boundHead -cne \[string\]\$check\.chainHead/.test(body) &&
         /sealFieldName -cne \$sealName/.test(body) &&
         /adapter -cne \[string\]\$sealAdapter/.test(body) &&
         /releaseRun -cne \[string\]\$writerRun/.test(body) &&
-        /intentPrev/.test(body) && /releaseHashes -notcontains/.test(body) &&
+        /intentPrev/.test(body) && /releaseHashes -cnotcontains/.test(body) &&
         /Test-ClashSha256Text/.test(body) && /Test-ClashIntegerValue/.test(body) &&
-        /finalized -is \[bool\]/.test(body) && /-cref|must be boolean true/.test(body);
+        (/finalized -is \[bool\]/.test(body) || /Test-ClashJsonKind -Value \$finalized -Kind 'boolean'/.test(body)) &&
+        /-cref|must be boolean true/.test(body);
     })());
   check('the required evidence is declared once and used by producer and consumer',
     /function Get-ClashCompletionRequiredEvidence/.test(libCode) &&
@@ -2586,6 +2587,100 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
   check('the README documents R15-C1 and the protocol',
     readmeText.includes('R15-C1') && /06-finalization-intent\.json/.test(readmeText) &&
     /commit point/i.test(readmeText) && /06-complete-unverified\.json/.test(readmeText));
+}
+
+hdr(27, 'the JSON type boundary - an accessor must not enumerate (Round 18 / C17-C1)');
+{
+  // C17-C1: Get-ClashProperty returned the property through the output pipeline,
+  // and the pipeline enumerates an array. ["clash-completion/2"] therefore arrived
+  // at the consumer as the string "clash-completion/2" and was ACCEPTED. These are
+  // the offline mirrors; the executed proofs are cases 103-120 in
+  // test-native-capture.ps1 on Windows PowerShell 5.1.
+  const libRaw = lib;
+  const selfTest = lf(read(join(CLOUD, 'tools/test-native-capture.ps1')));
+  const libCode = libRaw;
+  // the lexed view, because the comment that documents the defect quotes it
+  const libLexed = psLex(libRaw).code;
+  const readmeText = lf(read(join(CLOUD, 'README.md')));
+  check('both shared accessors emit the value without pipeline enumeration',
+    /\breturn ,\$prop\.Value/.test(libLexed) && /\breturn ,\$p\.Value/.test(libLexed) &&
+    /\breturn ,\$Object\[\$Name\]/.test(libLexed) &&
+    !/\breturn \$prop\.Value/.test(libLexed) && !/\breturn \$p\.Value/.test(libLexed) &&
+    !/\breturn \$Object\[\$Name\]/.test(libLexed));
+  check('the defect is documented where the fix is, not in the README only',
+    /C17-C1: a bare `return \$prop\.Value` writes the value into the OUTPUT PIPELINE/.test(libCode) &&
+    /the pipeline enumerates an array/.test(libCode));
+  check('a typed field record keeps missing and null apart',
+    /function Get-ClashJsonField/.test(libCode) &&
+    /present = \$false; kind = 'missing'/.test(libCode) &&
+    /\$field\['kind'\]\s*=\s*Get-ClashJsonKind/.test(libCode) &&
+    /\$field\['value'\]\s*=\s*\$prop\.Value/.test(libCode));
+  check('the kind classifier is a classifier, not a converter',
+    /function Get-ClashJsonKind/.test(libCode) && /function Test-ClashJsonKind/.test(libCode) &&
+    /'integer'/.test(libCode) && /'number'/.test(libCode) && /'boolean'/.test(libCode) &&
+    /'object'/.test(libCode) && /'array'/.test(libCode) &&
+    /if \(\$Kind -ceq 'number'\)/.test(libCode));
+  check('a verdict renders a collection as a collection',
+    /array\(\{0\}\) \[\{1\}\]/.test(libCode) &&
+    /Reporting \["x"\] as string "x"/.test(libCode));
+  check('the completion consumer gates every authoritative field on its JSON kind', (() => {
+    const body = libRaw.slice(libRaw.indexOf('function Test-ClashRunCompletion'),
+      libRaw.indexOf('# ------------------------------------------------------- connection policy --'));
+    return (body.match(/Test-ClashJsonKind/g) || []).length >= 14 &&
+      /Test-ClashJsonKind -Value \$proto -Kind 'string'/.test(body) &&
+      /Test-ClashJsonKind -Value \$status -Kind 'string'/.test(body) &&
+      /Test-ClashJsonKind -Value \$finalized -Kind 'boolean'/.test(body) &&
+      /Test-ClashJsonKind -Value \$markerSeal -Kind 'object'/.test(body) &&
+      /Test-ClashJsonKind -Value \$writerRun -Kind 'string'/.test(body) &&
+      /Test-ClashJsonKind -Value \$declaredRaw -Kind 'array'/.test(body) &&
+      /a completion marker must be a JSON object/.test(body) &&
+      !/\[\s*string\s*\]\s*\(\s*Get-ClashProperty/.test(body);
+  })());
+  check('the seal gates its own shape before it is believed',
+    /a seal must be a JSON object/.test(libRaw) &&
+    /the seal field files is \{0\}; it must be a JSON array of entries/.test(libRaw) &&
+    /the seal fileCount is \{0\}; it must be a JSON integer/.test(libRaw) &&
+    /the seal chainHead is \{0\}; it must be a JSON string/.test(libRaw) &&
+    /every entry must be a JSON object/.test(libRaw) &&
+    !/\[int\]\$claimedCount -ne \$entries\.Count/.test(libRaw));
+  check('the verification receipt gates its own shape',
+    /receipt field \{0\} is a JSON \{1\}, not a JSON \{2\}/.test(libRaw) &&
+    /\@{ name = 'casesExecuted'; kind = 'integer' \}/.test(libRaw) &&
+    /\@{ name = 'verdict'; kind = 'string' \}/.test(libRaw) &&
+    /\@{ name = 'problems'; kind = 'array' \}/.test(libRaw));
+  check('the producer asserts the kinds it wrote, independently of the consumer',
+    /Producer-side typed self-check, independent of the consumer/.test(libRaw) &&
+    /\$expectedKinds = \@\{/.test(libRaw) &&
+    /the candidate marker wrote \{0\} as a JSON \{1\}, not a JSON \{2\}/.test(libRaw) &&
+    /the candidate marker wrote seal\.\{0\} as a JSON \{1\}/.test(libRaw) &&
+    /Test-ClashJsonKind -Value \$published -Kind/.test(libRaw) === false &&
+    /Test-ClashJsonKind -Value \$pubSeal -Kind 'object'/.test(libRaw));
+  check('the verdict record does not report an enumerated protocol as accepted',
+    /protocolKind = \$reportedProtocolKind/.test(libRaw) &&
+    /if \(\$reportedProtocolKind -ceq 'string'\)/.test(libRaw) &&
+    !/protocol    = \$\(if \(\$null -ne \$document\) \{ \[string\]\(Get-ClashProperty/.test(libRaw));
+  check('the shared accessor no longer has a decision-bearing caller',
+    !/Get-ClashProperty/.test(libRaw.slice(libRaw.indexOf('function Get-ClashJsonField'))) ||
+    !/\[string\]\(Get-ClashProperty/.test(libRaw));
+  const typeCases = ['jsonAccessorPreservesCollectionShape', 'jsonFieldReportsExactJsonKinds',
+    'jsonFieldSeparatesMissingFromNull', 'completionRejectsProtocolSingletonArray',
+    'completionRejectsProtocolEmptyArray', 'completionRejectsProtocolMultiValueArray',
+    'completionRejectsProtocolNestedArray', 'completionRejectsProtocolObject',
+    'completionRejectsProtocolNull', 'completionRejectsArrayTypedMarkerFields',
+    'completionRejectsArrayTypedSealBlockFields', 'completionRejectsScalarRootMarker',
+    'evidenceSealRejectsNonArrayFiles', 'evidenceSealRejectsStringFileCount',
+    'evidenceSealRejectsArrayChainHead', 'completionRejectsCollectionValuedIntent',
+    'completionRejectsCollectionValuedClaimRelease', 'selfTestReceiptRejectsCollectionValuedMetadata'];
+  check('all eighteen type-boundary cases are executed and in the shared inventory',
+    typeCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest) && libRaw.includes(`'${n}'`)));
+  check('the executed fixtures write real JSON text, not a PowerShell approximation',
+    /function Set-JsonScalarField/.test(selfTest) && /function Set-JsonFileRegex/.test(selfTest) &&
+    /-RawJson '\[\]'/.test(selfTest) && /-RawJson '\[\["clash-completion\/2"\]\]'/.test(selfTest) &&
+    /-RawJson 'null'/.test(selfTest) && /-RawJson '\{"value":"clash-completion\/2"\}'/.test(selfTest) &&
+    selfTest.indexOf("Add-Case 'completionRejectsProtocolSingletonArray'") > selfTest.indexOf('function Invoke-MarkerTypeProbe'));
+  check('the README documents the C17-C1 root cause and the type rules',
+    readmeText.includes('C17-C1') && /enumerat/i.test(readmeText) &&
+    /authoritative field/i.test(readmeText) && /JSON kind|exact JSON type/i.test(readmeText));
 }
 
 {

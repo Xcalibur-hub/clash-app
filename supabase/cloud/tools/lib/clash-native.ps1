@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '4.9.0'
+$script:ClashAdapterVersion = '5.0.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -73,7 +73,7 @@ function Test-ClashIntegerValue {
 # How a field is rendered in a verdict, so "missing" and "wrong type" cannot be
 # confused with an empty string.
 function Format-ClashFieldValue {
-  param($Value)
+  param($Value, [int]$Depth = 0)
   if ($null -eq $Value) { return '<missing or null>' }
   if ($Value -is [bool]) {
     if ($Value) { return 'boolean true' }
@@ -84,8 +84,21 @@ function Format-ClashFieldValue {
     if ($shown.Length -gt 80) { $shown = $shown.Substring(0, 80) + '...' }
     return ('string "' + $shown + '"')
   }
+  # A collection must be rendered AS a collection. Reporting ["x"] as string "x"
+  # in a verdict would repeat the very confusion C17-C1 was about.
+  if ($Value -is [array] -or $Value -is [System.Collections.IList]) {
+    $items = @($Value)
+    $shown = @()
+    $limit = [Math]::Min($items.Count, 3)
+    for ($i = 0; $i -lt $limit; $i++) {
+      if ($Depth -ge 2) { $shown += '...'; break }
+      $shown += (Format-ClashFieldValue -Value $items[$i] -Depth ($Depth + 1))
+    }
+    if ($items.Count -gt $limit) { $shown += '...' }
+    return ('array({0}) [{1}]' -f $items.Count, ($shown -join ', '))
+  }
   if ($Value -is [ValueType]) { return ('number ' + [string]$Value) }
-  if ($Value -is [System.Management.Automation.PSCustomObject]) { return 'object' }
+  if ($Value -is [System.Collections.IDictionary] -or $Value -is [System.Management.Automation.PSCustomObject]) { return 'object' }
   return $Value.GetType().Name
 }
 
@@ -113,7 +126,63 @@ function Get-ClashProperty {
   $prop = $Object.PSObject.Properties[$Name]
   if ($null -eq $prop) { return $Default }
   if ($null -eq $prop.Value) { return $Default }
-  return $prop.Value
+  # C17-C1: a bare `return $prop.Value` writes the value into the OUTPUT PIPELINE,
+  # and the pipeline enumerates an array. A JSON value of ["clash-completion/2"]
+  # therefore reached the caller as the string "clash-completion/2", [] arrived as
+  # nothing at all, and a singleton object array arrived as the object - so a type
+  # test on the caller's local variable was testing the pipeline's output, not the
+  # JSON field. The unary comma wraps the value so the pipeline emits exactly one
+  # object, and the caller receives the value with its original type and shape.
+  # This accessor is still the "convenient" reader: it reports a JSON null as the
+  # default. Anything that makes a decision about a TYPE must use
+  # Get-ClashJsonField instead, which keeps missing/null/kind separate.
+  return ,$prop.Value
+}
+
+# The type-and-shape-preserving reader. Returns a record, never the value through
+# the pipeline, so no caller can accidentally enumerate it:
+#   present  the property exists (a JSON null is present)
+#   kind     missing | null | string | boolean | integer | number | object | array
+#   value    the value exactly as ConvertFrom-Json produced it
+# MISSING and NULL are different answers here on purpose: a contract that requires
+# a string must reject both, and must be able to say which one it saw.
+function Get-ClashJsonField {
+  param($Object, [Parameter(Mandatory = $true)][string]$Name)
+  $field = @{ present = $false; kind = 'missing'; value = $null }
+  if ($null -eq $Object) { return $field }
+  $prop = $Object.PSObject.Properties[$Name]
+  if ($null -eq $prop) { return $field }
+  $field['present'] = $true
+  $field['kind']    = Get-ClashJsonKind -Value $prop.Value
+  $field['value']   = $prop.Value
+  return $field
+}
+
+# The JSON kind of a value that ConvertFrom-Json produced. Classification only:
+# nothing here converts anything, because a conversion is exactly the defect this
+# contract must not have.
+function Get-ClashJsonKind {
+  param($Value)
+  if ($null -eq $Value) { return 'null' }
+  if ($Value -is [string]) { return 'string' }
+  if ($Value -is [bool]) { return 'boolean' }
+  if ($Value -is [int] -or $Value -is [long] -or $Value -is [int16] -or $Value -is [byte] -or
+      $Value -is [uint32] -or $Value -is [uint64]) { return 'integer' }
+  if ($Value -is [double] -or $Value -is [single] -or $Value -is [decimal]) { return 'number' }
+  if ($Value -is [System.Collections.IDictionary]) { return 'object' }
+  if ($Value -is [System.Management.Automation.PSCustomObject]) { return 'object' }
+  if ($Value -is [array] -or $Value -is [System.Collections.IList]) { return 'array' }
+  return ('other:' + $Value.GetType().Name)
+}
+
+# Exact kind test. 'number' also matches an integer (both are JSON numbers), but
+# 'integer' never matches 6.0 or "6", and 'string' never matches ["..."]. The
+# caller passes the value; parameter binding does not enumerate an array.
+function Test-ClashJsonKind {
+  param($Value, [Parameter(Mandatory = $true)][string]$Kind)
+  $actual = Get-ClashJsonKind -Value $Value
+  if ($Kind -ceq 'number') { return ($actual -ceq 'number' -or $actual -ceq 'integer') }
+  return ($actual -ceq $Kind)
 }
 
 # ----------------------------------------------------------- sanitisation ---
@@ -755,39 +824,85 @@ function Test-EvidenceSeal {
   if ($null -eq $seal) {
     return [ordered]@{ ok = $false; problems = @($problems); fileCount = 0; chainHead = ''; sha256 = $sha }
   }
-  $sealFiles = Get-ClashProperty -Object $seal -Name 'files' -Default $null
-  if ($null -eq $sealFiles) { $problems.Add('the seal lists no files') }
-  $entries = @($sealFiles)
+  # The seal is untrusted input, so its SHAPE is part of the verdict: the root
+  # must be an object, "files" a JSON array, each entry an object, each entry
+  # field a JSON string and fileCount a JSON integer. A wrong type is a rejection;
+  # nothing here is coerced into an acceptable value (C17-C1).
+  if (-not (Test-ClashJsonKind -Value $seal -Kind 'object')) {
+    $problems.Add(('the seal {0} is {1}; a seal must be a JSON object' -f $SealName, (Format-ClashFieldValue -Value $seal)))
+    return [ordered]@{ ok = $false; problems = @($problems); fileCount = 0; chainHead = ''; sha256 = $sha }
+  }
+  $sealFilesField = Get-ClashJsonField -Object $seal -Name 'files'
+  $entries = @()
+  if ($sealFilesField['kind'] -cne 'array') {
+    if ($sealFilesField['kind'] -ceq 'missing' -or $sealFilesField['kind'] -ceq 'null') {
+      $problems.Add('the seal lists no files')
+    }
+    else {
+      $problems.Add(('the seal field files is {0}; it must be a JSON array of entries' -f (Format-ClashFieldValue -Value $sealFilesField['value'])))
+    }
+  }
+  else {
+    $entries = @($sealFilesField['value'])
+  }
   $chain = 'GENESIS'
   $seen = @{}
   foreach ($entry in $entries) {
-    $rel = [string](Get-ClashProperty -Object $entry -Name 'path' -Default '')
-    if ([string]::IsNullOrWhiteSpace($rel)) { $problems.Add('the seal contains an entry with no path'); continue }
+    if (-not (Test-ClashJsonKind -Value $entry -Kind 'object')) {
+      $problems.Add(('the seal lists an entry that is {0}; every entry must be a JSON object' -f (Format-ClashFieldValue -Value $entry)))
+      continue
+    }
+    $entryPathField = Get-ClashJsonField -Object $entry -Name 'path'
+    $rel = ''
+    if (Test-ClashJsonKind -Value $entryPathField['value'] -Kind 'string') { $rel = [string]$entryPathField['value'] }
+    if ([string]::IsNullOrWhiteSpace($rel)) {
+      $problems.Add(('the seal contains an entry with no path ({0})' -f (Format-ClashFieldValue -Value $entryPathField['value'])))
+      continue
+    }
     if ($seen.ContainsKey($rel)) { $problems.Add(('the seal lists {0} twice' -f $rel)) }
     $seen[$rel] = $true
     $full = Join-Path $Root $rel
     if (-not (Test-Path -LiteralPath $full)) { $problems.Add(('{0} is sealed but missing from disk' -f $rel)); continue }
     if (Test-Path -LiteralPath $full -PathType Container) { $problems.Add(('{0} is sealed but is a directory' -f $rel)); continue }
-    $claim = [string](Get-ClashProperty -Object $entry -Name 'sha256' -Default '')
+    $entryShaField = Get-ClashJsonField -Object $entry -Name 'sha256'
+    if (-not (Test-ClashJsonKind -Value $entryShaField['value'] -Kind 'string')) {
+      $problems.Add(('the seal entry {0} records its hash as {1}; it must be a JSON string' -f $rel, (Format-ClashFieldValue -Value $entryShaField['value'])))
+      continue
+    }
+    $claim = [string]$entryShaField['value']
     $actual = ''
     try { $actual = Get-NormalizedSha256 -Path $full }
     catch { $problems.Add(('{0} could not be read: {1}' -f $rel, (Protect-Text $_.Exception.Message))); continue }
-    if ($actual -ne $claim) { $problems.Add(('{0} hash is {1}, the seal says {2}' -f $rel, $actual, $claim)) }
+    if ($actual -cne $claim) { $problems.Add(('{0} hash is {1}, the seal says {2}' -f $rel, $actual, $claim)) }
     $chain = Get-TextSha256 -Text ($chain + '|' + $rel + '|' + $claim)
-    if ($chain -ne [string](Get-ClashProperty -Object $entry -Name 'chain' -Default '')) {
+    $entryChainField = Get-ClashJsonField -Object $entry -Name 'chain'
+    if (-not (Test-ClashJsonKind -Value $entryChainField['value'] -Kind 'string')) {
+      $problems.Add(('the seal entry {0} records its chain link as {1}; it must be a JSON string' -f $rel, (Format-ClashFieldValue -Value $entryChainField['value'])))
+    }
+    elseif ($chain -cne [string]$entryChainField['value']) {
       $problems.Add(('{0} chain link does not re-derive' -f $rel))
     }
   }
-  if ([string](Get-ClashProperty -Object $seal -Name 'chainHead' -Default '') -ne $chain) {
+  $sealHeadField = Get-ClashJsonField -Object $seal -Name 'chainHead'
+  if (-not (Test-ClashJsonKind -Value $sealHeadField['value'] -Kind 'string')) {
+    $problems.Add(('the seal chainHead is {0}; it must be a JSON string of 64 lowercase hex characters' -f (Format-ClashFieldValue -Value $sealHeadField['value'])))
+  }
+  elseif ([string]$sealHeadField['value'] -cne $chain) {
     $problems.Add('the seal chain head does not re-derive from its entries')
   }
-  $claimedCount = Get-ClashProperty -Object $seal -Name 'fileCount' -Default -1
-  if ([int]$claimedCount -ne $entries.Count) {
-    $problems.Add(('the seal says {0} file(s) but lists {1}' -f $claimedCount, $entries.Count))
+  $sealCountField = Get-ClashJsonField -Object $seal -Name 'fileCount'
+  if (-not (Test-ClashJsonKind -Value $sealCountField['value'] -Kind 'integer')) {
+    $problems.Add(('the seal fileCount is {0}; it must be a JSON integer' -f (Format-ClashFieldValue -Value $sealCountField['value'])))
+  }
+  elseif ([int]$sealCountField['value'] -ne $entries.Count) {
+    $problems.Add(('the seal says {0} file(s) but lists {1}' -f $sealCountField['value'], $entries.Count))
   }
   foreach ($required in @($Require)) {
     if ([string]::IsNullOrWhiteSpace($required)) { continue }
-    $hit = @($entries | Where-Object { [string](Get-ClashProperty -Object $_ -Name 'path' -Default '') -eq $required }).Count
+    $hit = @($entries | Where-Object {
+        $requiredPath = (Get-ClashJsonField -Object $_ -Name 'path')['value']
+        (Test-ClashJsonKind -Value $requiredPath -Kind 'string') -and ($requiredPath -ceq $required)
+      }).Count
     if ($hit -ne 1) { $problems.Add(('required evidence {0} appears {1} time(s) in the seal' -f $required, $hit)) }
   }
   # Anything present but unsealed means evidence was written after the seal - the
@@ -913,11 +1028,38 @@ function Publish-ClashCompletion {
   # Verify the candidate BEFORE it becomes authoritative: same bytes, but read
   # back from disk rather than trusted from memory.
   $candidate = [System.IO.File]::ReadAllText($temp) | ConvertFrom-Json
-  if ([string](Get-ClashProperty -Object $candidate -Name 'status' -Default '') -ne 'COMPLETE' -or
-      [string](Get-ClashProperty -Object $candidate -Name 'protocol' -Default '') -ne $protocol) {
+  # Producer-side typed self-check, independent of the consumer: the publisher
+  # asserts the JSON KIND of every authoritative field it just wrote. A serializer
+  # that turned true into "true", 6 into "6" or an object into a one-element array
+  # is caught here, before the marker can become authoritative.
+  $expectedKinds = @{
+    protocol = 'string'; status = 'string'; finalized = 'boolean'; adapter = 'string'
+    prevReceiptSha = 'string'; writerRunId = 'string'; seal = 'object'; utc = 'string'; metadata = 'object'
+  }
+  foreach ($fieldName in @($expectedKinds.Keys)) {
+    $actualKind = (Get-ClashJsonField -Object $candidate -Name $fieldName)['kind']
+    if ($actualKind -cne $expectedKinds[$fieldName]) {
+      throw ('completion refused: the candidate marker wrote {0} as a JSON {1}, not a JSON {2}; nothing was published' -f $fieldName, $actualKind, $expectedKinds[$fieldName])
+    }
+  }
+  $candidateSeal = (Get-ClashJsonField -Object $candidate -Name 'seal')['value']
+  foreach ($fieldName in @('name', 'sha256', 'chainHead')) {
+    $actualKind = (Get-ClashJsonField -Object $candidateSeal -Name $fieldName)['kind']
+    if ($actualKind -cne 'string') {
+      throw ('completion refused: the candidate marker wrote seal.{0} as a JSON {1}, not a JSON string; nothing was published' -f $fieldName, $actualKind)
+    }
+  }
+  $candidateCountKind = (Get-ClashJsonField -Object $candidateSeal -Name 'fileCount')['kind']
+  if ($candidateCountKind -cne 'integer') {
+    throw ('completion refused: the candidate marker wrote seal.fileCount as a JSON {0}, not a JSON integer; nothing was published' -f $candidateCountKind)
+  }
+  $candidateStatus = (Get-ClashJsonField -Object $candidate -Name 'status')['value']
+  $candidateProto  = (Get-ClashJsonField -Object $candidate -Name 'protocol')['value']
+  if ($candidateStatus -cne 'COMPLETE' -or $candidateProto -cne $protocol) {
     throw 'completion refused: the candidate marker did not read back as a COMPLETE marker for this protocol'
   }
-  if ([string](Get-ClashProperty -Object (Get-ClashProperty -Object $candidate -Name 'seal' -Default $null) -Name 'sha256' -Default '') -ne [string]$check.sha256) {
+  $candidateSealSha = (Get-ClashJsonField -Object $candidateSeal -Name 'sha256')['value']
+  if ($candidateSealSha -cne [string]$check.sha256) {
     throw 'completion refused: the candidate marker does not bind the seal that was verified'
   }
   # THE COMMIT POINT. Move fails if the marker appeared meanwhile, so the
@@ -932,10 +1074,19 @@ function Publish-ClashCompletion {
   # record.
   $publishedOk = $false
   try {
-    $publishedOk = ($null -ne $published -and
-      [string](Get-ClashProperty -Object $published -Name 'status' -Default '') -eq 'COMPLETE' -and
-      [string](Get-ClashProperty -Object $published -Name 'protocol' -Default '') -eq $protocol -and
-      [string](Get-ClashProperty -Object (Get-ClashProperty -Object $published -Name 'seal' -Default $null) -Name 'sha256' -Default '') -eq (Get-NormalizedSha256 -Path (Join-Path $Root 'EVIDENCE-MANIFEST.json')))
+    if ($null -ne $published) {
+      $pubStatus  = (Get-ClashJsonField -Object $published -Name 'status')['value']
+      $pubProto   = (Get-ClashJsonField -Object $published -Name 'protocol')['value']
+      $pubSeal    = (Get-ClashJsonField -Object $published -Name 'seal')['value']
+      $pubSealSha = (Get-ClashJsonField -Object $pubSeal -Name 'sha256')['value']
+      $sealOnDisk = Get-NormalizedSha256 -Path (Join-Path $Root 'EVIDENCE-MANIFEST.json')
+      # same typed reading as the consumer: the commit protocol must not accept a
+      # marker whose fields are the right characters in the wrong JSON type.
+      $publishedOk = ((Test-ClashJsonKind -Value $pubStatus -Kind 'string') -and ($pubStatus -ceq 'COMPLETE') -and
+        (Test-ClashJsonKind -Value $pubProto -Kind 'string') -and ($pubProto -ceq $protocol) -and
+        (Test-ClashJsonKind -Value $pubSeal -Kind 'object') -and
+        (Test-ClashJsonKind -Value $pubSealSha -Kind 'string') -and ($pubSealSha -ceq [string]$sealOnDisk))
+    }
   }
   catch { $publishedOk = $false }
   if (-not $publishedOk) {
@@ -1045,22 +1196,31 @@ function Test-ClashRunCompletion {
   }
 
   if ($null -ne $document) {
+    # The marker must be a JSON OBJECT. A scalar or array root has no fields at
+    # all, so it is reported as the wrong shape instead of as ten mysteries.
+    if (-not (Test-ClashJsonKind -Value $document -Kind 'object')) {
+      $problems.Add(('06-complete.json is {0}; a completion marker must be a JSON object' -f (Format-ClashFieldValue -Value $document)))
+    }
+
     # ---- 1-3: the three constants -----------------------------------------
-    $proto = Get-ClashProperty -Object $document -Name 'protocol' -Default $null
-    if (-not ($proto -is [string]) -or $proto -cne $protocol) {
+    # Every authoritative field is read with Get-ClashJsonField and gated on its
+    # JSON KIND before its value is used. A one-element array is not a string, an
+    # array is not a boolean, and an array of one seal is not a seal object.
+    $proto = (Get-ClashJsonField -Object $document -Name 'protocol')['value']
+    if (-not (Test-ClashJsonKind -Value $proto -Kind 'string') -or $proto -cne $protocol) {
       $problems.Add(('the marker protocol is {0}, not "{1}"' -f (Format-ClashFieldValue $proto), $protocol))
     }
-    $status = Get-ClashProperty -Object $document -Name 'status' -Default $null
-    if (-not ($status -is [string]) -or $status -cne 'COMPLETE') {
+    $status = (Get-ClashJsonField -Object $document -Name 'status')['value']
+    if (-not (Test-ClashJsonKind -Value $status -Kind 'string') -or $status -cne 'COMPLETE') {
       $problems.Add(('the marker status is {0}, not COMPLETE' -f (Format-ClashFieldValue $status)))
     }
-    $finalized = Get-ClashProperty -Object $document -Name 'finalized' -Default $null
-    if (-not ($finalized -is [bool]) -or $finalized -ne $true) {
+    $finalized = (Get-ClashJsonField -Object $document -Name 'finalized')['value']
+    if (-not (Test-ClashJsonKind -Value $finalized -Kind 'boolean') -or $finalized -ne $true) {
       $problems.Add(('the marker finalized field is {0}; a completed finalization must be boolean true' -f (Format-ClashFieldValue $finalized)))
     }
 
     # ---- 4: utc is ordering metadata: parseable, never trusted ------------
-    $utc = Get-ClashProperty -Object $document -Name 'utc' -Default $null
+    $utc = (Get-ClashJsonField -Object $document -Name 'utc')['value']
     $utcOk = $false
     if ($utc -is [string] -and -not [string]::IsNullOrWhiteSpace($utc)) {
       $parsed = [datetime]::MinValue
@@ -1072,12 +1232,12 @@ function Test-ClashRunCompletion {
     }
 
     # ---- 5: adapter identity must match the verified seal ----------------
-    $adapter = Get-ClashProperty -Object $document -Name 'adapter' -Default $null
-    $sealAdapter = Get-ClashProperty -Object $sealDocument -Name 'adapter' -Default $null
-    if (-not ($adapter -is [string]) -or [string]::IsNullOrWhiteSpace([string]$adapter)) {
+    $adapter = (Get-ClashJsonField -Object $document -Name 'adapter')['value']
+    $sealAdapter = (Get-ClashJsonField -Object $sealDocument -Name 'adapter')['value']
+    if (-not (Test-ClashJsonKind -Value $adapter -Kind 'string') -or [string]::IsNullOrWhiteSpace([string]$adapter)) {
       $problems.Add(('the marker adapter is {0}' -f (Format-ClashFieldValue $adapter)))
     }
-    elseif (-not ($sealAdapter -is [string]) -or [string]::IsNullOrWhiteSpace([string]$sealAdapter)) {
+    elseif (-not (Test-ClashJsonKind -Value $sealAdapter -Kind 'string') -or [string]::IsNullOrWhiteSpace([string]$sealAdapter)) {
       $problems.Add('the seal records no adapter identity, so the marker adapter cannot be verified')
     }
     elseif ([string]$adapter -cne [string]$sealAdapter) {
@@ -1085,30 +1245,30 @@ function Test-ClashRunCompletion {
     }
 
     # ---- 6-9: the seal block ---------------------------------------------
-    $markerSeal = Get-ClashProperty -Object $document -Name 'seal' -Default $null
-    if (-not ($markerSeal -is [System.Management.Automation.PSCustomObject])) {
+    $markerSeal = (Get-ClashJsonField -Object $document -Name 'seal')['value']
+    if (-not (Test-ClashJsonKind -Value $markerSeal -Kind 'object')) {
       $problems.Add(('the marker seal block is {0}; it must be an object' -f (Format-ClashFieldValue $markerSeal)))
     }
     else {
-      $sealFieldName = Get-ClashProperty -Object $markerSeal -Name 'name' -Default $null
-      if (-not ($sealFieldName -is [string]) -or $sealFieldName -cne $sealName) {
+      $sealFieldName = (Get-ClashJsonField -Object $markerSeal -Name 'name')['value']
+      if (-not (Test-ClashJsonKind -Value $sealFieldName -Kind 'string') -or $sealFieldName -cne $sealName) {
         $problems.Add(('the marker names the seal {0}, not "{1}"' -f (Format-ClashFieldValue $sealFieldName), $sealName))
       }
-      $boundSha = Get-ClashProperty -Object $markerSeal -Name 'sha256' -Default $null
+      $boundSha = (Get-ClashJsonField -Object $markerSeal -Name 'sha256')['value']
       if (-not (Test-ClashSha256Text $boundSha)) {
         $problems.Add(('the marker seal sha256 is {0}; it must be 64 lowercase hex characters' -f (Format-ClashFieldValue $boundSha)))
       }
       elseif ([string]$boundSha -cne [string]$check.sha256) {
         $problems.Add(('the marker binds seal {0} but the seal on disk is {1}' -f $boundSha, (Format-ClashFieldValue $check.sha256)))
       }
-      $boundCount = Get-ClashProperty -Object $markerSeal -Name 'fileCount' -Default $null
+      $boundCount = (Get-ClashJsonField -Object $markerSeal -Name 'fileCount')['value']
       if (-not (Test-ClashIntegerValue $boundCount)) {
         $problems.Add(('the marker seal fileCount is {0}; it must be an integer' -f (Format-ClashFieldValue $boundCount)))
       }
       elseif ([int]$boundCount -ne [int]$check.fileCount) {
         $problems.Add(('the marker says the seal covers {0} file(s), the seal lists {1}' -f $boundCount, $check.fileCount))
       }
-      $boundHead = Get-ClashProperty -Object $markerSeal -Name 'chainHead' -Default $null
+      $boundHead = (Get-ClashJsonField -Object $markerSeal -Name 'chainHead')['value']
       if (-not (Test-ClashSha256Text $boundHead)) {
         $problems.Add(('the marker seal chainHead is {0}; it must be 64 lowercase hex characters' -f (Format-ClashFieldValue $boundHead)))
       }
@@ -1118,7 +1278,7 @@ function Test-ClashRunCompletion {
     }
 
     # ---- 10: the receipt-chain predecessor must be the sealed intent -----
-    $prev = Get-ClashProperty -Object $document -Name 'prevReceiptSha' -Default $null
+    $prev = (Get-ClashJsonField -Object $document -Name 'prevReceiptSha')['value']
     $intentHashes = @(Get-ClashFileHashes -Path $intentPath)
     if (-not (Test-ClashSha256Text $prev)) {
       $problems.Add(('the marker prevReceiptSha is {0}; it must be 64 lowercase hex characters' -f (Format-ClashFieldValue $prev)))
@@ -1126,7 +1286,7 @@ function Test-ClashRunCompletion {
     elseif ($intentHashes.Count -eq 0) {
       $problems.Add('the marker prevReceiptSha cannot be verified: the sealed 06-finalization-intent.json is missing or unreadable')
     }
-    elseif ($intentHashes -notcontains [string]$prev) {
+    elseif ($intentHashes -cnotcontains [string]$prev) {
       $problems.Add(('the marker prevReceiptSha {0} is not the hash of the sealed 06-finalization-intent.json ({1})' -f $prev, $intentHashes[0]))
     }
 
@@ -1140,21 +1300,24 @@ function Test-ClashRunCompletion {
       $intent = $null
       try { $intent = [System.IO.File]::ReadAllText($intentPath) | ConvertFrom-Json }
       catch { $problems.Add(('06-finalization-intent.json is not readable JSON: {0}' -f (Protect-Text $_.Exception.Message))) }
-      if ($null -ne $intent) {
-        $intentName = Get-ClashProperty -Object $intent -Name 'receipt' -Default $null
-        if (-not ($intentName -is [string]) -or $intentName -cne '06-finalization-intent.json') {
+      if (($null -ne $intent) -and (-not (Test-ClashJsonKind -Value $intent -Kind 'object'))) {
+        $problems.Add(('06-finalization-intent.json is {0}; a finalization intent must be a JSON object' -f (Format-ClashFieldValue -Value $intent)))
+      }
+      elseif ($null -ne $intent) {
+        $intentName = (Get-ClashJsonField -Object $intent -Name 'receipt')['value']
+        if (-not (Test-ClashJsonKind -Value $intentName -Kind 'string') -or $intentName -cne '06-finalization-intent.json') {
           $problems.Add(('the sealed intent names itself {0}, not "06-finalization-intent.json"' -f (Format-ClashFieldValue $intentName)))
         }
-        $intentProto = Get-ClashProperty -Object $intent -Name 'protocol' -Default $null
-        if (-not ($intentProto -is [string]) -or $intentProto -cne $protocol) {
+        $intentProto = (Get-ClashJsonField -Object $intent -Name 'protocol')['value']
+        if (-not (Test-ClashJsonKind -Value $intentProto -Kind 'string') -or $intentProto -cne $protocol) {
           $problems.Add(('the sealed intent protocol is {0}, not "{1}"' -f (Format-ClashFieldValue $intentProto), $protocol))
         }
-        $intentStatus = Get-ClashProperty -Object $intent -Name 'status' -Default $null
-        if (-not ($intentStatus -is [string]) -or $intentStatus -cne 'FINALIZING') {
+        $intentStatus = (Get-ClashJsonField -Object $intent -Name 'status')['value']
+        if (-not (Test-ClashJsonKind -Value $intentStatus -Kind 'string') -or $intentStatus -cne 'FINALIZING') {
           $problems.Add(('the sealed intent status is {0}, not FINALIZING' -f (Format-ClashFieldValue $intentStatus)))
         }
         # the intent must chain to the sealed claim release
-        $intentPrev = Get-ClashProperty -Object $intent -Name 'prevReceiptSha' -Default $null
+        $intentPrev = (Get-ClashJsonField -Object $intent -Name 'prevReceiptSha')['value']
         $releaseHashes = @(Get-ClashFileHashes -Path $releasePath)
         if (-not (Test-ClashSha256Text $intentPrev)) {
           $problems.Add(('the sealed intent prevReceiptSha is {0}; it must be 64 lowercase hex characters' -f (Format-ClashFieldValue $intentPrev)))
@@ -1162,12 +1325,12 @@ function Test-ClashRunCompletion {
         elseif ($releaseHashes.Count -eq 0) {
           $problems.Add('the sealed intent cannot be chained: 06-claim-release.json is missing or unreadable')
         }
-        elseif ($releaseHashes -notcontains [string]$intentPrev) {
+        elseif ($releaseHashes -cnotcontains [string]$intentPrev) {
           $problems.Add(('the sealed intent prevReceiptSha {0} is not the hash of the sealed 06-claim-release.json ({1})' -f $intentPrev, $releaseHashes[0]))
         }
         # declared required evidence must be a clean list and really be sealed
-        $declaredRaw = Get-ClashProperty -Object $intent -Name 'requiredEvidence' -Default $null
-        if ($null -eq $declaredRaw -or $declaredRaw -is [string] -or -not ($declaredRaw -is [array] -or $declaredRaw -is [System.Collections.IList])) {
+        $declaredRaw = (Get-ClashJsonField -Object $intent -Name 'requiredEvidence')['value']
+        if (-not (Test-ClashJsonKind -Value $declaredRaw -Kind 'array')) {
           $problems.Add(('the sealed intent requiredEvidence is {0}; it must be a non-empty array' -f (Format-ClashFieldValue $declaredRaw)))
         }
         else {
@@ -1187,14 +1350,17 @@ function Test-ClashRunCompletion {
             $hits = @(Get-ChildItem -LiteralPath $RunPath -Recurse -File | Where-Object { $_.Name -ceq [string]$entry }).Count
             if ($hits -lt 1) { $problems.Add(('the sealed intent requires {0} but no such file exists in the run' -f $entry)) }
           }
-          $sealEntries = @(Get-ClashProperty -Object $sealDocument -Name 'files' -Default @())
+          $sealEntriesField = Get-ClashJsonField -Object $sealDocument -Name 'files'
+          $sealEntries = @()
+          if ($sealEntriesField['kind'] -ceq 'array') { $sealEntries = @($sealEntriesField['value']) }
           foreach ($must in @(Get-ClashCompletionRequiredEvidence)) {
             if (-not $seenDeclared.ContainsKey($must)) {
               $problems.Add(('the sealed intent does not declare the required evidence {0}' -f $must))
             }
             $sealed = 0
             foreach ($entry in $sealEntries) {
-              if ([string](Get-ClashProperty -Object $entry -Name 'path' -Default '') -ceq $must) { $sealed++ }
+              $entryPath = (Get-ClashJsonField -Object $entry -Name 'path')['value']
+              if ((Test-ClashJsonKind -Value $entryPath -Kind 'string') -and ([string]$entryPath -ceq $must)) { $sealed++ }
             }
             if ($sealed -ne 1) { $problems.Add(('the evidence {0} appears {1} time(s) in the seal, expected exactly 1' -f $must, $sealed)) }
           }
@@ -1203,29 +1369,32 @@ function Test-ClashRunCompletion {
     }
 
     # ---- 12: writerRunId must match the sealed claim release -------------
-    $writerRun  = Get-ClashProperty -Object $document -Name 'writerRunId' -Default $null
+    $writerRun  = (Get-ClashJsonField -Object $document -Name 'writerRunId')['value']
     $releaseDoc = $null
     if (Test-Path -LiteralPath $releasePath -PathType Leaf) {
       try { $releaseDoc = [System.IO.File]::ReadAllText($releasePath) | ConvertFrom-Json } catch { $releaseDoc = $null }
     }
-    $releaseRun   = Get-ClashProperty -Object $releaseDoc -Name 'runId' -Default $null
-    $releaseState = Get-ClashProperty -Object $releaseDoc -Name 'status' -Default $null
-    $releaseDone  = Get-ClashProperty -Object $releaseDoc -Name 'released' -Default $null
-    if (-not ($writerRun -is [string]) -or [string]::IsNullOrWhiteSpace([string]$writerRun)) {
+    if (($null -ne $releaseDoc) -and (-not (Test-ClashJsonKind -Value $releaseDoc -Kind 'object'))) {
+      $problems.Add(('the sealed 06-claim-release.json is {0}; a claim release must be a JSON object' -f (Format-ClashFieldValue -Value $releaseDoc)))
+    }
+    $releaseRun   = (Get-ClashJsonField -Object $releaseDoc -Name 'runId')['value']
+    $releaseState = (Get-ClashJsonField -Object $releaseDoc -Name 'status')['value']
+    $releaseDone  = (Get-ClashJsonField -Object $releaseDoc -Name 'released')['value']
+    if (-not (Test-ClashJsonKind -Value $writerRun -Kind 'string') -or [string]::IsNullOrWhiteSpace([string]$writerRun)) {
       $problems.Add(('the marker writerRunId is {0}' -f (Format-ClashFieldValue $writerRun)))
     }
     elseif ($null -eq $releaseDoc) {
       $problems.Add('the marker writerRunId cannot be verified: 06-claim-release.json is missing or unreadable')
     }
     else {
-      if (-not ($releaseState -is [string]) -or $releaseState -cne 'PASS') {
+      if (-not (Test-ClashJsonKind -Value $releaseState -Kind 'string') -or $releaseState -cne 'PASS') {
         $problems.Add(('the sealed claim release status is {0}, not PASS' -f (Format-ClashFieldValue $releaseState)))
       }
-      if (-not ($releaseDone -is [bool]) -or $releaseDone -ne $true) {
+      if (-not (Test-ClashJsonKind -Value $releaseDone -Kind 'boolean') -or $releaseDone -ne $true) {
         $problems.Add(('the sealed claim release does not record released = true ({0})' -f (Format-ClashFieldValue $releaseDone)))
       }
-      if (-not ($releaseRun -is [string]) -or $releaseRun -cne [string]$writerRun) {
-        $problems.Add(('the marker writerRunId "{0}" is not the runId "{1}" recorded by the sealed claim release' -f $writerRun, $releaseRun))
+      if (-not (Test-ClashJsonKind -Value $releaseRun -Kind 'string') -or $releaseRun -cne [string]$writerRun) {
+        $problems.Add(('the marker writerRunId "{0}" is not the runId {1} recorded by the sealed claim release' -f $writerRun, (Format-ClashFieldValue -Value $releaseRun)))
       }
     }
   }
@@ -1235,10 +1404,22 @@ function Test-ClashRunCompletion {
     try { $markerSha = Get-NormalizedSha256 -Path $markerPath } catch { $markerSha = '' }
   }
 
+  # The verdict record reports the protocol only when the marker really carries a
+  # JSON string. Reporting the enumerated scalar here is what made C17-C1 look
+  # accepted even to a careful reader of this record.
+  $reportedProtocol = ''
+  $reportedProtocolKind = 'missing'
+  if ($null -ne $document) {
+    $reportedField = Get-ClashJsonField -Object $document -Name 'protocol'
+    $reportedProtocolKind = [string]$reportedField['kind']
+    if ($reportedProtocolKind -ceq 'string') { $reportedProtocol = [string]$reportedField['value'] }
+  }
+
   return [ordered]@{
     ok          = ($problems.Count -eq 0)
     problems    = @($problems)
-    protocol    = $(if ($null -ne $document) { [string](Get-ClashProperty -Object $document -Name 'protocol' -Default '') } else { '' })
+    protocolKind = $reportedProtocolKind
+    protocol    = $reportedProtocol
     sealSha256  = [string]$check.sha256
     sealFiles   = [int]$check.fileCount
     sealChain   = [string]$check.chainHead
@@ -2076,7 +2257,27 @@ $script:ClashSelfTestRequiredCases = @(
   'completionRejectsPostSealEvidenceLoss',
   'completionRejectsContradictoryWriterRunId',
   'completionRejectsUnknownSealName',
-  'completionRejectsForeignAdapter'
+  'completionRejectsForeignAdapter',
+  # Round 18 (C17-C1): the JSON type boundary. The shared accessor must not
+  # enumerate, and every authoritative field is gated on its exact JSON kind.
+  'jsonAccessorPreservesCollectionShape',
+  'jsonFieldReportsExactJsonKinds',
+  'jsonFieldSeparatesMissingFromNull',
+  'completionRejectsProtocolSingletonArray',
+  'completionRejectsProtocolEmptyArray',
+  'completionRejectsProtocolMultiValueArray',
+  'completionRejectsProtocolNestedArray',
+  'completionRejectsProtocolObject',
+  'completionRejectsProtocolNull',
+  'completionRejectsArrayTypedMarkerFields',
+  'completionRejectsArrayTypedSealBlockFields',
+  'completionRejectsScalarRootMarker',
+  'evidenceSealRejectsNonArrayFiles',
+  'evidenceSealRejectsStringFileCount',
+  'evidenceSealRejectsArrayChainHead',
+  'completionRejectsCollectionValuedIntent',
+  'completionRejectsCollectionValuedClaimRelease',
+  'selfTestReceiptRejectsCollectionValuedMetadata'
 )
 
 # Returns a FLAT sequence of case-name strings.
@@ -2147,12 +2348,14 @@ function Get-DocumentProperty {
   param($Object, [string]$Name, $Default = $null)
   if ($null -eq $Object) { return $Default }
   if ($Object -is [System.Collections.IDictionary]) {
-    if ($Object.Contains($Name)) { return $Object[$Name] }
+    if ($Object.Contains($Name)) { return ,$Object[$Name] }
     return $Default
   }
   $p = $Object.PSObject.Properties[$Name]
   if ($null -eq $p) { return $Default }
-  return $p.Value
+  # Same C17-C1 boundary as Get-ClashProperty: the pipeline would enumerate an
+  # array, so a receipt that recorded ["PASS"] would arrive as the string "PASS".
+  return ,$p.Value
 }
 
 function Get-CaseNames {
@@ -2166,12 +2369,14 @@ function Get-CaseEntry {
   param($Cases, [string]$Name)
   if ($null -eq $Cases) { return $null }
   if ($Cases -is [System.Collections.IDictionary]) {
-    if ($Cases.Contains($Name)) { return $Cases[$Name] }
+    if ($Cases.Contains($Name)) { return ,$Cases[$Name] }
     return $null
   }
   $p = $Cases.PSObject.Properties[$Name]
   if ($null -eq $p) { return $null }
-  return $p.Value
+  # as everywhere else: a case record that happened to be an array must arrive as
+  # an array, so the caller's shape check sees the truth (C17-C1 class)
+  return ,$p.Value
 }
 
 # ------------------------------------------------------ adapter self-test ---
@@ -2198,6 +2403,25 @@ function Test-SelfTestReceipt {
   $declaredCheck = Assert-SelfTestInventory -Names (Get-ClashSelfTestInventory)
   if (-not $declaredCheck.ok) {
     foreach ($p in @($declaredCheck.problems)) { $problems += ('declared inventory invalid: ' + $p) }
+  }
+
+  # A verification receipt is untrusted input too, and its SHAPE decides what it
+  # can prove. Every field a verdict depends on must be the JSON type the contract
+  # declares: a verdict of ["PASS"], a casesExecuted of [102] or a problems string
+  # are wrong types, not shortcuts (C17-C1 class).
+  foreach ($shape in @(
+      @{ name = 'adapterId'; kind = 'string' },
+      @{ name = 'adapterVersion'; kind = 'string' },
+      @{ name = 'adapterSha256'; kind = 'string' },
+      @{ name = 'verdict'; kind = 'string' },
+      @{ name = 'powerShellVersion'; kind = 'string' },
+      @{ name = 'problems'; kind = 'array' },
+      @{ name = 'casesExecuted'; kind = 'integer' },
+      @{ name = 'cases'; kind = 'object' })) {
+    $shapeField = Get-ClashJsonField -Object $Document -Name $shape['name']
+    if ($shapeField['kind'] -cne $shape['kind']) {
+      $problems += ('receipt field {0} is a JSON {1}, not a JSON {2}' -f $shape['name'], $shapeField['kind'], $shape['kind'])
+    }
   }
 
   $adapterId  = [string](Get-DocumentProperty -Object $Document -Name 'adapterId' -Default '')
