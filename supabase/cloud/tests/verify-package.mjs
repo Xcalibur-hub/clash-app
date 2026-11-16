@@ -37,7 +37,7 @@ const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 27;
 const EXPECTED_CASES = 120;
-const EXPECTED_ASSERTIONS = 455;
+const EXPECTED_ASSERTIONS = 456;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -2659,6 +2659,11 @@ hdr(27, 'the JSON type boundary - an accessor must not enumerate (Round 18 / C17
     /protocolKind = \$reportedProtocolKind/.test(libRaw) &&
     /if \(\$reportedProtocolKind -ceq 'string'\)/.test(libRaw) &&
     !/protocol    = \$\(if \(\$null -ne \$document\) \{ \[string\]\(Get-ClashProperty/.test(libRaw));
+  check('no caller wraps a shape-preserving accessor in an array subexpression',
+    !/@\(\s*Get-(ClashProperty|DocumentProperty|ClashJsonField)\b/.test(psLex(selfTest).code) &&
+    !/@\(\s*Get-(ClashProperty|DocumentProperty|ClashJsonField)\b/.test(libLexed) &&
+    /CALL-SITE CONTRACT/.test(libRaw) &&
+    /@\(\$value\) is correct/.test(libRaw));
   check('the shared accessor no longer has a decision-bearing caller',
     !/Get-ClashProperty/.test(libRaw.slice(libRaw.indexOf('function Get-ClashJsonField'))) ||
     !/\[string\]\(Get-ClashProperty/.test(libRaw));

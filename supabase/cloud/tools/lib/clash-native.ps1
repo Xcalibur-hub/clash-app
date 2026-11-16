@@ -136,6 +136,11 @@ function Get-ClashProperty {
   # This accessor is still the "convenient" reader: it reports a JSON null as the
   # default. Anything that makes a decision about a TYPE must use
   # Get-ClashJsonField instead, which keeps missing/null/kind separate.
+  #
+  # CALL-SITE CONTRACT: because the value comes back as ONE object, a caller must
+  # not wrap the call in @(...) - @(Get-ClashProperty ...) would produce a
+  # one-element array holding the array. Assign first, then wrap the VARIABLE
+  # (@($value) is correct), or read the field record.
   return ,$prop.Value
 }
 

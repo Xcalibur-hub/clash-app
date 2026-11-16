@@ -2733,7 +2733,13 @@ Add-Case 'completionSuccessPublishesVerifiedMarker' (
 #          marker - so neither depends on a hash of the other
 $sealHasMarker = $false
 if ($null -ne $finSeal) {
-  foreach ($entry in @(Get-DocumentProperty -Object $finSeal -Name 'files' -Default @())) {
+  # The accessors preserve shape, so the entries are read as a typed FIELD and
+  # never wrapped in @(...): wrapping a shape-preserving call would put the whole
+  # array inside a one-element array (Round 18).
+  $finEntriesField = Get-ClashJsonField -Object $finSeal -Name 'files'
+  $finEntries = @()
+  if ($finEntriesField['kind'] -ceq 'array') { $finEntries = @($finEntriesField['value']) }
+  foreach ($entry in $finEntries) {
     if ([string](Get-DocumentProperty -Object $entry -Name 'path' -Default '') -eq '06-complete.json') { $sealHasMarker = $true }
   }
 }
@@ -2950,7 +2956,9 @@ $trSealPath = Join-Path $trRoot 'EVIDENCE-MANIFEST.json'
 $trSeal = Read-RunDocument -Path $trSealPath
 $trTruncated = $null
 if ($null -ne $trSeal) {
-  $trFiles = @(Get-DocumentProperty -Object $trSeal -Name 'files' -Default @())
+  $trFilesField = Get-ClashJsonField -Object $trSeal -Name 'files'
+  $trFiles = @()
+  if ($trFilesField['kind'] -ceq 'array') { $trFiles = @($trFilesField['value']) }
   if ($trFiles.Count -gt 1) {
     $trTruncated = [ordered]@{
       sealedUtc = (Get-DocumentProperty -Object $trSeal -Name 'sealedUtc' -Default '')
