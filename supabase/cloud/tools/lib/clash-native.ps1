@@ -2368,7 +2368,11 @@ function Get-ClashApprovedInventory {
     # supabase_migrations.schema_migrations.name. It is NOT a version_name composite:
     # the manifest records 'initial_arena_schema', and a rule that invented a second
     # shape here refused the real package while accepting a fabricated one (Round 21
-    # CI). What makes it an identity is that it is declared, non-empty and unique.
+    # CI). What binds it is the package's own rule: a DIRECT migration stores its
+    # migration name, and the one DIVERGED migration stores its documented variant.
+    if (($mode -ceq 'direct') -and ($ledgerName.Length -gt 0) -and ($name.Length -gt 0) -and ($ledgerName -cne $name)) {
+      $problems.Add((New-ClashFieldProblem $elabel 'ledgerName' $ledgerName ('the migration name "{0}" for a direct migration' -f $name)))
+    }
     $shaField   = Get-ClashJsonField -Object $raw -Name 'sha256'
     $execField  = Get-ClashJsonField -Object $raw -Name 'executedSha256'
     $normField  = Get-ClashJsonField -Object $raw -Name 'normalizedSha256'

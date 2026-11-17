@@ -4445,7 +4445,7 @@ $run = New-FinalizationRun
 [void](Set-EvidenceFieldRaw -Path (Join-Path $run '01-integrity.json') -Name 'wrappersChecked' -RawJson '5')
 $ev = $null
 try { $ev = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $ev = $null }
-if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'wrappersChecked is 5|the integrity receipt records'))) { $rc02mMissed += 'declared-count' }
+if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'wrappersChecked is number 5|wrappersChecked is 5|the integrity receipt records'))) { $rc02mMissed += 'declared-count' }
 Remove-FinalizationRun -Root $run
 $run = New-FinalizationRun
 Move-Item -LiteralPath (Join-Path $run '03-migrations\003-20260101000003.json') -Destination (Join-Path $run '03-migrations\001-20260101000003.json') -Force
@@ -4832,7 +4832,7 @@ $invMutations = @(
   @{ name = 'duplicate-version';  apply = { param($d) $d.entries[1].version = $d.entries[0].version };   expect = 'repeats approved version' },
   @{ name = 'foreign-wrapper';    apply = { param($d) $d.entries[5].wrapperPath = '999_20260101000000.sql' }; expect = 'wrapper' },
   @{ name = 'total-mismatch';     apply = { param($d) $d.total = 110 };                                     expect = 'total is' },
-  @{ name = 'foreign-ledger';     apply = { param($d) $d.entries[7].ledgerName = 'someone_elses_name' };    expect = 'ledger identity' },
+  @{ name = 'foreign-ledger';     apply = { param($d) $d.entries[7].ledgerName = 'someone_elses_name' };    expect = 'the migration name' },
   @{ name = 'missing-executed';   apply = { param($d) $d.entries[9].PSObject.Properties.Remove('executedSha256') }; expect = 'executedSha256' }
 )
 $invMissed = @()
