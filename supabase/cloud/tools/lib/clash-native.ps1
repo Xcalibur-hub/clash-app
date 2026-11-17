@@ -865,7 +865,9 @@ function Add-Receipt {
 function Resolve-ClashContainedPath {
   param(
     [Parameter(Mandatory = $true)][string]$Root,
-    [Parameter(Mandatory = $true)][string]$Relative,
+    # AllowEmptyString: an empty path is untrusted input that must be REJECTED with
+    # a reason, not a binding error (a binding failure is not a verdict).
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Relative,
     [string]$Label = 'path'
   )
   $record = @{ ok = $false; path = $null; relative = ''; problem = '' }
@@ -929,7 +931,11 @@ function Get-ClashSealedFileCandidates {
   $excluded = @(Get-ClashSealExclusions)
   $rows = @()
   foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force)) {
-    $rel = ([string]$file.FullName).Substring($Root.Length).TrimStart('\', '/')
+    # Forward slashes, always: the seal's entry paths are compared with the names
+    # the rest of the package uses (03-migrations/<NNN>-<version>.json), so a
+    # Windows-style backslash here made every migration receipt "appear 0 time(s)
+    # in the seal" and refused every finalization (Round 20 CI).
+    $rel = ([string]$file.FullName).Substring($Root.Length).TrimStart('\', '/').Replace('\', '/')
     if ($excluded -ccontains $rel) { continue }
     $rows += [ordered]@{ relative = $rel; path = [string]$file.FullName; bytes = [long]$file.Length }
   }
