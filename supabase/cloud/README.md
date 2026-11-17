@@ -394,6 +394,12 @@ document), Windows PowerShell `5.1.20348.5773`, 14 of 14 steps green in both:
 150 of 150 native cases, 496 of 496 offline assertions in 29 sections, manifest
 `PASS` with 111 entries and 240 checksummed files, adapter `5.2.0`.
 
+Every push re-verifies this text rather than trusting the citation: step 10
+refuses a dirty tree and any checksummed file that disagrees with
+`checksums.sha256`, so a document that does not match the package cannot be
+green. The run that verified the revision you are reading is the last one on the
+branch - if this paragraph is wrong, step 10 says so before anything else runs.
+
 | # | Found by | Class | What it was | Fix |
 |---|---|---|---|---|
 | 1 | case 144 (bind error) | RC11 | `$root = Get-ClashJsonRoot ...` assigned a *record* to a typed `[string]$Root` parameter; the record stringified to `System.Collections.Hashtable` and every field read empty | the record keeps its own name (`$docRoot`, `$migRoot`); a suite assertion now fails on any `$root = Get-ClashJsonRoot` assignment |
