@@ -1320,7 +1320,7 @@ function Test-ClashReportReceipt {
   Assert-ClashIntegerField -Object $doc -Label $label -Field 'exitCode' -Problems $problems -Expect 0 -ExpectSet
   Assert-ClashBooleanField -Object $doc -Label $label -Field 'timedOut' -Problems $problems
   $timedOut = (Get-ClashJsonField -Object $doc -Name 'timedOut')['value']
-  if (Test-ClashJsonKind -Value $timedOut -Kind 'boolean' -and $timedOut -ceq $true) {
+  if ((Test-ClashJsonKind -Value $timedOut -Kind 'boolean') -and ($timedOut -ceq $true)) {
     $problems.Add((New-ClashFieldProblem $label 'timedOut' $timedOut 'the JSON boolean false'))
   }
   Assert-ClashIntegerField -Object $doc -Label $label -Field 'rows' -Problems $problems -Min 0

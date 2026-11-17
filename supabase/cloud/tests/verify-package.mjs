@@ -37,7 +37,7 @@ const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
 const EXPECTED_CASES = 150;
-const EXPECTED_ASSERTIONS = 495;
+const EXPECTED_ASSERTIONS = 496;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -2936,6 +2936,12 @@ hdr(29, 'systemic validation boundary: RC01-RC11 (Round 20)');
     /\$rcMutationRoot = Join-Path \(\[System\.IO\.Path\]::GetTempPath\(\)\)/.test(selfTest) &&
     /\[System\.IO\.File\]::WriteAllText\(\$mutantPath, \$libText\.Replace\(\$old, \$new\)\)/.test(selfTest) &&
     !/WriteAllText\(\$adapterPath/.test(selfTest));
+  check('no command invocation is used as a bare operand of -and/-or',
+    // `if (Test-ClashJsonKind -Value $x -Kind 'boolean' -and $y)` passes -and to the
+    // command as a parameter: "A parameter cannot be found that matches parameter
+    // name 'and'". Every such call must be parenthesised before the operator.
+    !/\((?:Test|Assert|Get)-[A-Za-z][\w-]*[^()]*\s-(?:and|or)\s/.test(psLex(libRaw).code) &&
+    !/\((?:Test|Assert|Get)-[A-Za-z][\w-]*[^()]*\s-(?:and|or)\s/.test(psLex(selfTest).code));
   check('no validator shadows a typed parameter with a record (case-insensitive names)',
     // PowerShell variable names are case-insensitive: `$root = Get-ClashJsonRoot ...`
     // inside a function whose parameter is [string]$Root converts the record to
