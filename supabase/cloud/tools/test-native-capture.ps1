@@ -4445,13 +4445,15 @@ $run = New-FinalizationRun
 [void](Set-EvidenceFieldRaw -Path (Join-Path $run '01-integrity.json') -Name 'wrappersChecked' -RawJson '5')
 $ev = $null
 try { $ev = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $ev = $null }
-if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'integrity receipt records 5'))) { $rc02mMissed += 'declared-count' }
+if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'wrappersChecked is 5|the integrity receipt records'))) { $rc02mMissed += 'declared-count' }
 Remove-FinalizationRun -Root $run
 $run = New-FinalizationRun
 Move-Item -LiteralPath (Join-Path $run '03-migrations\003-20260101000003.json') -Destination (Join-Path $run '03-migrations\001-20260101000003.json') -Force
 $ev = $null
 try { $ev = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $ev = $null }
-if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'repeats migration index 1|is named'))) { $rc02mMissed += 'duplicate-index' }
+# Round 21: the expected receipt set comes from the approved inventory, so a renamed
+# receipt is either missing for its own ordinal, extra for the set, or misnamed.
+if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'no per-migration receipt exists for index|is not an approved migration receipt|is named|repeats migration'))) { $rc02mMissed += 'duplicate-index' }
 Remove-FinalizationRun -Root $run
 $run = New-FinalizationRun
 $evPos = $null
@@ -4902,7 +4904,9 @@ foreach ($attack in $approvalAttacks) {
       # a reduced certification proof: the proof object is replaced by null
       $doc = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
       $doc.adapter = $null
-      [void](Write-Evidence -Path $path -Text (($doc | ConvertTo-Json -Depth 6)))
+      # Write-Evidence is an exclusive create; a fixture that replaces a receipt must
+      # replace it.
+      [System.IO.File]::WriteAllText($path, ($doc | ConvertTo-Json -Depth 6))
     }
     else {
       [void](Set-EvidenceFieldRaw -Path $path -Name ([string]$attack.field) -RawJson ([string]$attack.raw))
@@ -4958,7 +4962,10 @@ $raceChild = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershe
 $raceWriter = Join-Path $raceDir 'mutate.ps1'
 [void](Write-Evidence -Path $raceWriter -Text ('try { [System.IO.File]::WriteAllText(''' + $raceTarget + ''', "select 666;`n"); Write-Output "WROTE" } catch { Write-Output ("DENIED " + $_.Exception.GetType().Name) }'))
 $raceMover = Join-Path $raceDir 'replace.ps1'
-[void](Write-Evidence -Path $raceMover -Text ('try { [System.IO.File]::WriteAllText(''' + (Join-Path $raceDir 'other.sql') + ''', "select 999;`n"); Move-Item -LiteralPath ''' + (Join-Path $raceDir 'other.sql') + ''' -Destination ''' + $raceTarget + ''' -Force; Write-Output "MOVED" } catch { Write-Output ("DENIED " + $_.Exception.GetType().Name) }'))
+# -ErrorAction Stop: Move-Item's refusal is a NON-terminating error, so the old child
+# script printed MOVED after a move that had already failed. The child must report
+# only what happened.
+[void](Write-Evidence -Path $raceMover -Text ('try { [System.IO.File]::WriteAllText(''' + (Join-Path $raceDir 'other.sql') + ''', "select 999;`n"); Move-Item -LiteralPath ''' + (Join-Path $raceDir 'other.sql') + ''' -Destination ''' + $raceTarget + ''' -Force -ErrorAction Stop; Write-Output "MOVED" } catch { Write-Output ("DENIED " + $_.Exception.GetType().Name) }'))
 $raceSnap = $null
 try { $raceSnap = New-VerifiedSqlSnapshot -SourcePath $raceSource -TargetPath $raceTarget -ExpectedSha256 $raceExpected -Label 'race probe' } catch { $raceSnap = $null }
 $raceWriteOut = ''

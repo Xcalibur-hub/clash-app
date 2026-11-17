@@ -2164,7 +2164,13 @@ function Test-ClashPackageIntegrity {
             $bytesChk = Get-ClashJsonField -Object $entry -Name 'bytes'
             if (Test-ClashIntegerValue $bytesChk['value']) { $declaredBytes = [long]$bytesChk['value'] }
             if (($declaredBytes -gt 0) -and (Test-Path -LiteralPath $originalAbs -PathType Leaf)) {
-              $actualBytes = [long](Get-Item -LiteralPath $originalAbs -Force).Length
+              # The declared length is the LF-normalised length, the same normalisation
+              # every digest in this package uses. Measuring the raw file made a CRLF
+              # checkout look 1 byte per line heavier than the reviewed original, so
+              # every Windows run reported all 111 originals as tampered.
+              $originalRaw = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($originalAbs))
+              if ($originalRaw.Length -gt 0 -and $originalRaw[0] -eq [char]0xFEFF) { $originalRaw = $originalRaw.Substring(1) }
+              $actualBytes = [long][System.Text.Encoding]::UTF8.GetByteCount($originalRaw.Replace("`r`n", "`n"))
               if ($actualBytes -ne $declaredBytes) {
                 $problems.Add(('{0}: original {1} is {2} byte(s), the manifest declares {3}' -f $label, $file, $actualBytes, $declaredBytes))
               }
@@ -2358,9 +2364,11 @@ function Get-ClashApprovedInventory {
         $problems.Add((New-ClashFieldProblem $elabel 'wrapperPath' $wrapperPath ('the wrapper "{0}" its ordinal and version describe' -f $expectedWrapper)))
       }
     }
-    if (($ledgerName.Length -gt 0) -and ($version.Length -gt 0) -and ($ledgerName -cne ($version + '_' + $name))) {
-      $problems.Add((New-ClashFieldProblem $elabel 'ledgerName' $ledgerName ('the ledger identity "{0}_{1}"' -f $version, $name)))
-    }
+    # The ledger identity is the DECLARED ledgerName - the value the wrapper stores in
+    # supabase_migrations.schema_migrations.name. It is NOT a version_name composite:
+    # the manifest records 'initial_arena_schema', and a rule that invented a second
+    # shape here refused the real package while accepting a fabricated one (Round 21
+    # CI). What makes it an identity is that it is declared, non-empty and unique.
     $shaField   = Get-ClashJsonField -Object $raw -Name 'sha256'
     $execField  = Get-ClashJsonField -Object $raw -Name 'executedSha256'
     $normField  = Get-ClashJsonField -Object $raw -Name 'normalizedSha256'
