@@ -184,7 +184,21 @@ function Add-Case {
     $script:problems += ("case '{0}' is not in the shared inventory" -f $Name)
     $effective = $false
   }
-  if (-not $effective) { $script:problems += ("case '{0}' did not pass" -f $Name) }
+  if (-not $effective) {
+    # The DETAIL, not just the name: a failing case that says only "did not pass"
+    # cannot be diagnosed from a CI annotation, and the annotation is often the
+    # only channel available (Round 20 CI could not download the job log).
+    $detailText = ''
+    if ($null -ne $Detail) {
+      $pairs = @()
+      foreach ($key in @($Detail.Keys)) {
+        $pairs += ('{0}={1}' -f $key, ([string]$Detail[$key]))
+      }
+      $detailText = ($pairs -join ' ')
+      if ($detailText.Length -gt 400) { $detailText = $detailText.Substring(0, 400) }
+    }
+    $script:problems += ("case '{0}' did not pass: {1}" -f $Name, (Protect-Text $detailText))
+  }
 
   $record = New-CaseRecord -Name $Name -Passed $effective -Detail $Detail
   $script:cases[$Name] = $record
@@ -2820,7 +2834,14 @@ $finIdentity = '{0}/{1}' -f (Get-ClashAdapterIdentity).id, (Get-ClashAdapterIden
 # Read once, behind a null guard: StrictMode raises on a property of $null.
 $finChainHead = $(if ($null -ne $finCheck) { [string]$finCheck.sealChain } else { '' })
 $finIntent = Read-RunDocument -Path (Join-Path $finRoot '06-finalization-intent.json')
-$finIntentSha = Get-TextSha256 -Text ([System.IO.File]::ReadAllText((Join-Path $finRoot '06-finalization-intent.json')))
+# A probe that refused publishes nothing, so the intent may legitimately be absent.
+# Reading it unguarded turned a recorded refusal into an unhandled exception that
+# aborted the whole harness (Round 20 CI); the refusal text belongs in the case.
+$finIntentPath = Join-Path $finRoot '06-finalization-intent.json'
+$finIntentSha = ''
+if (Test-Path -LiteralPath $finIntentPath -PathType Leaf) {
+  $finIntentSha = Get-TextSha256 -Text ([System.IO.File]::ReadAllText($finIntentPath))
+}
 Add-Case 'completionSuccessPublishesVerifiedMarker' (
   $finProbe.ok -and
   [string]$finProbe.threw -eq '' -and
@@ -2847,6 +2868,9 @@ Add-Case 'completionSuccessPublishesVerifiedMarker' (
   sealSha = [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'sha256' -Default '')
   sealFiles = [int](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'fileCount' -Default 0)
   validator = $(if ($null -ne $finCheck) { $finCheck.ok } else { 'null' })
+  probeThrew = [string]$finProbe.threw
+  probeOutput = (@($finProbe.output) | Select-Object -Last 2) -join ' / '
+  intentPresent = Test-Path -LiteralPath $finIntentPath -PathType Leaf
 }
 
 # ---- 77: the marker is NOT part of the seal, and the seal is not part of the
