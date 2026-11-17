@@ -2786,6 +2786,9 @@ function Invoke-CompletionTailProbe {
   # Variables the committed region reads but never assigns.
   $run         = $Root
   $applied     = 111
+  # deploy.ps1 states how many migrations it ran as $entries.Count; the fixture run
+  # holds three migration receipts, so the probe hands the region three entries.
+  $entries     = @('001', '002', '003')
   $runId       = 'probe-run-id'
   $treeHash    = 'probe-tree-hash'
   $bootOutcome = 'CREATED'
@@ -3068,6 +3071,8 @@ Add-Case 'completionTailAnnouncesOnlyAfterMarker' (
   markerPresentAtAnnouncement = $okProbe.markerAtAnnounce
   sealPresentAtAnnouncement   = $okProbe.sealAtAnnounce
   exited = [string]$okProbe.exited
+  threw = [string]$okProbe.threw
+  output = (@($okProbe.output) -join ' / ')
   note = 'R15-C1 is proven fixed by observation at the moment of the announcement'
 }
 Remove-FinalizationRun -Root $okRoot
@@ -3217,6 +3222,7 @@ Add-Case 'completionIntentNeverClaimsComplete' (
   $null -ne $nAccepted -and (-not $nAccepted.ok)) @{
   completeClaimants = @($nClaimants)
   intentStatus = [string](Get-DocumentProperty -Object $nIntent -Name 'status' -Default '')
+  threw = [string]$nProbe.threw
   note = 'the provisional receipt says FINALIZING, and no artifact claims completion'
 }
 Remove-FinalizationRun -Root $nRoot
@@ -4229,12 +4235,14 @@ Add-Case 'casePassedRequiresJsonBooleanTrue' (
   @($rc01Mismatch).Count -eq 0 -and
   $rc01Results['json-true'] -eq $true -and
   ($rc01Problems['false-true'] -match "case 'zeroExitWithStderr'") -and
-  ($rc01Problems['false-true'] -match 'passed as array') -and
+  ($rc01Problems['false-true'] -match 'is recorded as array\(2\)') -and
   ($rc01Problems['missing-field'] -match 'records no passed field') -and
   ($rc01Problems['record-is-null'] -match 'is recorded as') -and
   ($rc01Problems['number-one'] -match 'passed as number 1')) @{
   accepted = (($rc01Results.GetEnumerator() | Sort-Object Name | ForEach-Object { '{0}={1}' -f $_.Key, $_.Value }) -join ' ')
   wrong = (@($rc01Mismatch) -join ',')
+  falseTrueProblem = [string]$rc01Problems['false-true']
+  numberOneProblem = [string]$rc01Problems['number-one']
   note = 'C19-C1: [false,true] used to certify because -ne on an array FILTERS; only JSON true may'
 }
 
@@ -4779,7 +4787,10 @@ foreach ($mutant in $rcMutants) {
         return ([string]$problem).Length -eq 0
       }
       if ($Name -ceq 'rc06-parent-segment') {
-        $resolved = Resolve-ClashContainedPath -Root $FixtureRoot -Relative '..\escape.txt' -Label 'probe'
+        # A path whose only defect is an unnormalised parent segment: it RESOLVES
+        # inside the root, so containment alone accepts it. Only the '..' rule
+        # refuses it, which is why this is the fixture that can detect its removal.
+        $resolved = Resolve-ClashContainedPath -Root $FixtureRoot -Relative 'sub\..\ok.txt' -Label 'probe'
         return [bool]$resolved['ok']
       }
       return $false
