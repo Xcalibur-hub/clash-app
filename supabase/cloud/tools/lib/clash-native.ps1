@@ -1836,9 +1836,12 @@ function Test-ClashReceiptSemantics {
     $docRoot = Get-ClashJsonRoot -Path $abs -Label ('applied receipt ' + $rel) -Kind @('object')
     if (-not $docRoot['ok']) { $problems.Add(('{0}: {1}' -f $rel, [string]$docRoot['problem'])); continue }
     $doc = $docRoot['value']
-    $status = Assert-ClashTextField -Object $doc -Label $rel -Field 'status' -Problems $problems
-    if (($status.Length -gt 0) -and ($status -cne 'PASS')) {
-      $problems.Add((New-ClashFieldProblem $rel 'status' $status 'PASS: an applied migration that did not commit cannot support a completed deployment'))
+    # Round 23: a distinct local name, so the RC02 mutant's unique anchor
+    # (the phase-status guard) stays unique in this file - the mutation harness
+    # refuses to guess which of two identical guards it should drop.
+    $appliedStatus = Assert-ClashTextField -Object $doc -Label $rel -Field 'status' -Problems $problems
+    if (($appliedStatus.Length -gt 0) -and ($appliedStatus -cne 'PASS')) {
+      $problems.Add((New-ClashFieldProblem $rel 'status' $appliedStatus 'PASS: an applied migration that did not commit cannot support a completed deployment'))
     }
     $outcome = Assert-ClashTextField -Object $doc -Label $rel -Field 'outcome' -Problems $problems
     if (($outcome.Length -gt 0) -and ($outcome -cne 'COMMITTED')) {
