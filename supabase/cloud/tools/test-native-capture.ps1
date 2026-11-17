@@ -127,7 +127,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 156
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 159
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -2560,9 +2560,25 @@ function New-ProbeApprovedInventory {
 $script:probeApproved = New-ProbeApprovedInventory -Count 3
 $script:probeApproved1 = New-ProbeApprovedInventory -Count 1
 
+# Round 22 (C21-01): the fixture is now built by the REAL receipt writer, in the
+# runner's topology and order. Round 21's fixture wrote each receipt with an
+# independent header (every one GENESIS) and chained migrations to migrations, so it
+# could not represent - and therefore could not catch - the disagreement between the
+# writer's chain and the verifier's reconstruction. Every receipt here comes from
+# Add-Receipt, the applied receipt lives where the runner puts it, and the chain is
+# the writer's own return values.
+function Add-FixtureReceipt {
+  param([string]$Root, [string]$Name, $Fields = @{})
+
+  $sha = Add-Receipt -Root $Root -Name $Name -Fields $Fields -PrevSha $script:fixtureChain
+  $script:fixtureChain = [string]$sha
+  return [string]$sha
+}
+
 function New-FinalizationRun {
   param(
-    [string[]]$Evidence = @('00-baseline.json', '01-integrity.json', '02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json'),
+    [string[]]$Evidence = @('00-baseline.json', '01-integrity.json', '01b-approved.json', '02-preflight.json',
+                            '04-postflight.json', '05-storage.json', '06-claim-release.json'),
     [int]$MigrationCount = 3
   )
 
@@ -2571,12 +2587,46 @@ function New-FinalizationRun {
   New-Item -ItemType Directory -Path (Join-Path $root '04-postflight') -Force | Out-Null
   New-Item -ItemType Directory -Path (Join-Path $root '03-migrations') -Force | Out-Null
   $hex = ('a' * 64)
+  $script:fixtureChain = 'GENESIS'
+
+  # The runner writes the migrations after the preflight gate and before the
+  # postflight gate; the fixture keeps that order.
+  $order = @()
+  $migrationsSpliced = $false
   foreach ($name in $Evidence) {
-    $doc = $null
+    if (-not $migrationsSpliced -and (@('04-postflight.json', '05-storage.json', '06-claim-release.json') -ccontains $name)) {
+      $order += '@migrations'
+      $migrationsSpliced = $true
+    }
+    $order += $name
+  }
+  if (-not $migrationsSpliced) { $order += '@migrations' }
+
+  foreach ($name in $order) {
+    if ($name -ceq '@migrations') {
+      for ($i = 1; $i -le $MigrationCount; $i++) {
+        $version = '20260101{0:D6}' -f $i
+        $leaf = '{0:D3}-{1}.json' -f $i, $version
+        [void](Add-FixtureReceipt -Root $root -Name ('03-migrations/' + $leaf) -Fields ([ordered]@{
+              status = 'PASS'; index = $i; version = $version; mode = 'direct'
+              ledgerName = ('probe_{0}' -f $i); executedSha256 = $hex; expectedToken = ('sha256:' + $hex)
+              wrapperPath = ('{0:D3}_{1}.sql' -f $i, $version); wrapperSha256 = $hex
+              normalisation = 'none'; outcome = 'COMMITTED'; exitCode = 0; timedOut = $false
+              durationMs = 12; stderrChars = 0; stderrExcerpt = ''; ledgerReadBack = 'MATCH'
+            }))
+        # the applied receipt the NEXT migration chains from - at the run root, named
+        # by the same function the writer and the verifier share
+        [void](Add-FixtureReceipt -Root $root -Name (Get-ClashAppliedReceiptRelative -Index $i -Version $version) -Fields ([ordered]@{
+              status = 'PASS'; version = $version; outcome = 'COMMITTED'
+              wrapperSha256 = $hex; ledgerReadBack = 'MATCH'; exitCode = 0
+            }))
+      }
+      continue
+    }
+    $fields = [ordered]@{}
     if ($name -ceq '00-baseline.json') {
-      $doc = New-EvidenceReceiptHeader -Name $name -Adapter 'proof'
-      $doc['adapter'] = [ordered]@{
-        receiptPath   = 'evidence-adapter\\probe-adapter-selftest.json'
+      $fields['adapter'] = [ordered]@{
+        receiptPath   = 'evidence-adapter\probe-adapter-selftest.json'
         receiptSha256 = $hex
         adapterSha256 = $hex
         powerShell    = '5.1.0'
@@ -2584,91 +2634,58 @@ function New-FinalizationRun {
         adapterVersion = $script:ClashAdapterVersion
         ranUtc        = '2026-11-15T00:00:00.0000000Z'
       }
-      $doc['status'] = 'BASELINE'
-      $doc['projectRef'] = 'kgaqejgubjemdecifzew'
-      $doc['repoHead'] = ('b' * 40)
-      $doc['migrationsDirty'] = ''
+      $fields['status'] = 'BASELINE'
+      $fields['projectRef'] = 'kgaqejgubjemdecifzew'
+      $fields['repoHead'] = ('b' * 40)
+      $fields['migrationsDirty'] = ''
     }
     elseif ($name -ceq '01-integrity.json') {
-      $doc = New-EvidenceReceiptHeader -Name $name
-      $doc['status'] = 'PASS'
-      $doc['filesVerified'] = 240
-      $doc['checksumEntries'] = 240
-      $doc['packageMembers'] = 240
-      $doc['packageTreeHash'] = $hex
-      $doc['wrappersChecked'] = $MigrationCount
-      $doc['problems'] = @()
+      $fields['status'] = 'PASS'
+      $fields['filesVerified'] = 240
+      $fields['checksumEntries'] = 240
+      $fields['packageMembers'] = 240
+      $fields['packageTreeHash'] = $hex
+      $fields['wrappersChecked'] = $MigrationCount
+      $fields['problems'] = @()
+    }
+    elseif ($name -ceq '01b-approved.json') {
+      $fields['status'] = 'PASS'
+      $fields['approvedMigrations'] = $MigrationCount
+      $fields['approvedProjectRef'] = 'kgaqejgubjemdecifzew'
+      $fields['approvedSourceCommit'] = ('c' * 40)
+      $fields['approvedManifestSha256'] = $hex
     }
     elseif ($name -ceq '02-preflight.json') {
-      $doc = New-EvidenceReceiptHeader -Name $name
       $body = New-ReportReceiptBody -Contract '00_preflight.sql' -Gating 19 -Info 2
-      foreach ($key in @($body.Keys)) { $doc[$key] = $body[$key] }
+      foreach ($key in @($body.Keys)) { $fields[$key] = $body[$key] }
     }
     elseif ($name -ceq '04-postflight.json') {
-      $doc = New-EvidenceReceiptHeader -Name $name
       $body = New-ReportReceiptBody -Contract '90_verify.sql' -Gating 19 -Info 0
-      foreach ($key in @($body.Keys)) { $doc[$key] = $body[$key] }
+      foreach ($key in @($body.Keys)) { $fields[$key] = $body[$key] }
     }
     elseif ($name -ceq '05-storage.json') {
-      $doc = New-EvidenceReceiptHeader -Name $name
       $body = New-ReportReceiptBody -Contract '95_storage_config.sql' -Gating 6 -Info 1
-      foreach ($key in @($body.Keys)) { $doc[$key] = $body[$key] }
+      foreach ($key in @($body.Keys)) { $fields[$key] = $body[$key] }
     }
     elseif ($name -ceq '06-claim-release.json') {
-      $doc = New-EvidenceReceiptHeader -Name $name
-      $doc['status'] = 'PASS'
-      $doc['runId'] = 'probe-run-id'
-      $doc['released'] = $true
+      $fields['status'] = 'PASS'
+      $fields['runId'] = 'probe-run-id'
+      $fields['released'] = $true
     }
     else { continue }
-    [void](Write-Evidence -Path (Join-Path $root $name) -Text ($doc | ConvertTo-Json -Depth 6))
+    [void](Add-FixtureReceipt -Root $root -Name $name -Fields $fields)
   }
 
-  for ($i = 1; $i -le $MigrationCount; $i++) {
-    $version = '20260101{0:D6}' -f $i
-    $leaf = '{0:D3}-{1}.json' -f $i, $version
-    $doc = New-EvidenceReceiptHeader -Name ('03-migrations/' + $leaf)
-    $doc['status'] = 'PASS'
-    $doc['index'] = $i
-    $doc['version'] = $version
-    $doc['mode'] = 'direct'
-    $doc['ledgerName'] = ('probe_{0}' -f $i)
-    $doc['executedSha256'] = $hex
-    $doc['expectedToken'] = ('sha256:' + $hex)
-    $doc['wrapperPath'] = ('{0:D3}_{1}.sql' -f $i, $version)
-    $doc['wrapperSha256'] = $hex
-    $doc['normalisation'] = 'none'
-    $doc['outcome'] = 'COMMITTED'
-    $doc['exitCode'] = 0
-    $doc['timedOut'] = $false
-    $doc['durationMs'] = 12
-    $doc['stderrChars'] = 0
-    $doc['stderrExcerpt'] = ''
-    $doc['ledgerReadBack'] = 'MATCH'
-    # Add-Receipt ALWAYS writes prevReceiptSha - 'GENESIS' when the run has no
-    # earlier receipt to chain from - so the fixture writes it for every ordinal.
-    # A fixture that omitted it on the first receipt was accepted by the old
-    # consumer and refused by the new one, which is the point of the rule.
-    if ($i -gt 1) {
-      # the predecessor is the receipt before this one, by its on-disk digest: the
-      # validator re-derives the link, so a fixture with a decorative chain would
-      # prove nothing.
-      $previousLeaf = '{0:D3}-{1}.json' -f ($i - 1), ('20260101{0:D6}' -f ($i - 1))
-      $doc['prevReceiptSha'] = (Get-NormalizedSha256 -Path (Join-Path $root ('03-migrations/' + $previousLeaf)))
-    }
-    else { $doc['prevReceiptSha'] = 'GENESIS' }
-    [void](Write-Evidence -Path (Join-Path $root ('03-migrations/' + $leaf)) -Text ($doc | ConvertTo-Json -Depth 6))
-  }
-
-  [void](Write-Evidence -Path (Join-Path $root '04-postflight\claim-release.out') -Text "probe-run-id`n")
+  [System.IO.File]::WriteAllText((Join-Path $root '04-postflight\claim-release.out'), "probe-run-id`n")
   return $root
 }
 
 # The receipt hash the runner's chain holds at the moment completion starts: the
-# raw text hash of the last receipt it wrote (Add-Receipt's return value).
+# digest of the receipt it wrote last, computed exactly as the writer computes it
+# (one hashing contract: LF-normalised UTF-8, no BOM).
 function Get-FinalizationReleaseSha {
   param([string]$Root)
-  return (Get-TextSha256 -Text ([System.IO.File]::ReadAllText((Join-Path $Root '06-claim-release.json'))))
+  return (Get-NormalizedSha256 -Path (Join-Path $Root '06-claim-release.json'))
 }
 
 # Test-only fixture builder: rewrites one or more dotted fields of an already
@@ -5138,6 +5155,228 @@ Add-Case 'packageFidelityBindsEveryWrapperToItsOriginal' (
   attacks         = (@($fidResults) -join ' ')
   missed          = (@($fidMissed) -join ',')
   note = 'R20-M4: wrapper body, ledger identity and declared byte length are bound to the approved original even when every digest is rebound'
+}
+
+# ---- 157: R22/C21-01 - the writer's own stream round-trips -----------------
+# The Round 21 failure was not "the rule is wrong" but "the writer and the verifier
+# disagree": Add-Receipt hashed the raw text it wrote (CRLF on Windows) while every
+# verifier normalised CRLF to LF, and the applied receipt the next migration chains
+# from was written at the run root while the verifier looked inside 03-migrations.
+# This case builds a run with the ACTUAL writer, in the runner's order and topology,
+# and requires the actual producer and consumer to accept it.
+$w22Root = New-FinalizationRun
+$w22Chain = $null
+try { $w22Chain = Get-ClashReceiptChain -Root $w22Root -Exclude @('EVIDENCE-MANIFEST.json') } catch { $w22Chain = $null }
+$w22Evidence = $null
+try { $w22Evidence = Test-ClashDeploymentEvidence -Root $w22Root -Approved $script:probeApproved } catch { $w22Evidence = $null }
+# every link in the chain must be the digest a verifier recomputes from the file:
+# that IS the one hashing contract.
+$w22HashAgrees = $true
+$w22HashesChecked = 0
+if ($null -ne $w22Chain) {
+  foreach ($rel in @($w22Chain.order)) {
+    $abs = Join-Path $w22Root ($rel.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    $real = Get-NormalizedSha256 -Path $abs
+    $w22HashesChecked++
+    $doc = [System.IO.File]::ReadAllText($abs) | ConvertFrom-Json
+    if (([string]$doc.prevReceiptSha -ceq 'GENESIS')) { continue }
+    if ($w22HashesChecked -le 1) { continue }
+    # the predecessor named by this receipt must be the digest of the receipt before it
+    $prevAbs = Join-Path $w22Root ((@($w22Chain.order)[$w22HashesChecked - 2]).Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    if ((Get-NormalizedSha256 -Path $prevAbs) -cne [string]$doc.prevReceiptSha) { $w22HashAgrees = $false }
+  }
+}
+# the applied receipt is where the runner writes it, named by the shared function
+$w22AppliedRel = Get-ClashAppliedReceiptRelative -Index 2 -Version '20260101000002'
+$w22AppliedAtRoot = Test-Path -LiteralPath (Join-Path $w22Root $w22AppliedRel) -PathType Leaf
+$w22AppliedInMigrations = Test-Path -LiteralPath (Join-Path $w22Root (Join-Path '03-migrations' $w22AppliedRel)) -PathType Leaf
+# and the whole completion protocol must accept the writer's stream end to end
+$w22Pub = Invoke-CompletionProbe -Root $w22Root
+$w22Completion = $null
+if ($w22Pub.ok) {
+  try { $w22Completion = Test-ClashRunCompletion -RunPath $w22Root -Approved $script:probeApproved } catch { $w22Completion = $null }
+}
+Add-Case 'writerReceiptStreamRoundTripsThroughProducerAndConsumer' (
+  $null -ne $w22Chain -and $w22Chain.ok -and
+  $null -ne $w22Evidence -and $w22Evidence.ok -and
+  $w22HashAgrees -and
+  $w22AppliedAtRoot -and (-not $w22AppliedInMigrations) -and
+  $w22Pub.ok -and
+  $null -ne $w22Completion -and $w22Completion.ok) @{
+  chainLinks      = $(if ($null -ne $w22Chain) { @($w22Chain.order).Count } else { -1 })
+  evidenceOk      = $(if ($null -ne $w22Evidence) { [string]$w22Evidence.ok } else { 'threw' })
+  evidenceProblems = $(if ($null -ne $w22Evidence) { (@($w22Evidence.problems) | Select-Object -First 3) -join ' | ' } else { '' })
+  hashesAgree     = $w22HashAgrees
+  appliedAtRoot   = $w22AppliedAtRoot
+  producerThrew   = [string]$w22Pub.threw
+  consumerOk      = $(if ($null -ne $w22Completion) { [string]$w22Completion.ok } else { 'threw' })
+  consumerProblems = $(if ($null -ne $w22Completion) { (@($w22Completion.problems) | Select-Object -First 3) -join ' | ' } else { '' })
+  note = 'R22/C21-01: Add-Receipt writes LF and returns the normalised digest; the applied receipt is at the run root, named by Get-ClashAppliedReceiptRelative; producer and consumer accept the writer`s own stream'
+}
+Remove-FinalizationRun -Root $w22Root
+
+# ---- 158: R22/C21-02 - broken and exempted links ---------------------------
+# Rewrites ONE receipt's declared predecessor and then re-chains everything after it,
+# so the only remaining defect is the one under test. This is the reviewer's own
+# reproduction: "rebind downstream hashes so stale successor digests do not mask the
+# intended mutation".
+function Set-ReceiptPredecessor {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][string]$Relative,
+    [Parameter(Mandatory = $true)][string]$Prev
+  )
+
+  $chain = Get-ClashReceiptChain -Root $Root -Exclude @('EVIDENCE-MANIFEST.json')
+  $order = @($chain.order)
+  $index = [array]::IndexOf($order, $Relative)
+  if ($index -lt 0) { throw ('the receipt {0} is not in the run chain' -f $Relative) }
+  $path = Join-Path $Root ($Relative.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+  $doc = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
+  $doc.prevReceiptSha = $Prev
+  [System.IO.File]::WriteAllText($path, ($doc | ConvertTo-Json -Depth 8))
+  for ($i = $index + 1; $i -lt $order.Count; $i++) {
+    $prevRel = [string]$order[$i - 1]
+    $prevSha = Get-NormalizedSha256 -Path (Join-Path $Root ($prevRel.Replace('/', [System.IO.Path]::DirectorySeparatorChar)))
+    $nextPath = Join-Path $Root (([string]$order[$i]).Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    $nextDoc = [System.IO.File]::ReadAllText($nextPath) | ConvertFrom-Json
+    $nextDoc.prevReceiptSha = $prevSha
+    [System.IO.File]::WriteAllText($nextPath, ($nextDoc | ConvertTo-Json -Depth 8))
+  }
+  return $path
+}
+
+$c22Attacks = @(
+  @{ name = 'postflight-unrelated-predecessor'; apply = {
+      param($root)
+      # the EXACT Round 20 reproduction: postflight chains from a digest that is no
+      # receipt in this run, and everything downstream is re-chained
+      [void](Set-ReceiptPredecessor -Root $root -Relative '04-postflight.json' -Prev ('d' * 64))
+    }; expect = 'chains from a digest that is no receipt|not reachable from the start' },
+  @{ name = 'interior-genesis'; apply = {
+      param($root)
+      # GENESIS used as an escape from predecessor validation on an interior migration
+      [void](Set-ReceiptPredecessor -Root $root -Relative '03-migrations/002-20260101000002.json' -Prev 'GENESIS')
+    }; expect = 'GENESIS' },
+  @{ name = 'duplicate-genesis'; apply = {
+      param($root)
+      [void](Set-ReceiptPredecessor -Root $root -Relative '05-storage.json' -Prev 'GENESIS')
+    }; expect = 'GENESIS' },
+  @{ name = 'missing-applied-receipt'; apply = {
+      param($root)
+      # the applied receipt is what the next migration chains from: removing it leaves
+      # the link pointing at nothing
+      Remove-Item -LiteralPath (Join-Path $root '002-20260101000002-applied.json') -Force
+    }; expect = 'chains from|not reachable|no per-migration receipt' }
+)
+$c22Positive = $null
+$c22PositiveRoot = New-FinalizationRun
+try { $c22Positive = Test-ClashDeploymentEvidence -Root $c22PositiveRoot -Approved $script:probeApproved } catch { $c22Positive = $null }
+Remove-FinalizationRun -Root $c22PositiveRoot
+$c22Missed = @()
+$c22Results = @()
+foreach ($attack in $c22Attacks) {
+  $root = New-FinalizationRun
+  try {
+    & $attack.apply $root
+    $ev = $null
+    try { $ev = Test-ClashDeploymentEvidence -Root $root -Approved $script:probeApproved } catch { $ev = $null }
+    $text = ''
+    if ($null -ne $ev) { $text = (@($ev.problems) -join ' ') }
+    $refused = ($null -ne $ev) -and (-not $ev.ok)
+    $c22Results += ('{0}={1}' -f $attack.name, $refused)
+    if (-not $refused -or ($text -notmatch [string]$attack.expect)) { $c22Missed += [string]$attack.name }
+  }
+  catch { $c22Missed += ([string]$attack.name + '[threw]') }
+  finally { Remove-FinalizationRun -Root $root }
+}
+Add-Case 'receiptChainRejectsBrokenAndExemptedLinks' (
+  $null -ne $c22Positive -and $c22Positive.ok -and
+  @($c22Missed).Count -eq 0 -and
+  @($c22Results).Count -eq $c22Attacks.Count) @{
+  positiveControl = $(if ($null -ne $c22Positive) { [string]$c22Positive.ok } else { 'threw' })
+  attacks         = (@($c22Results) -join ' ')
+  missed          = (@($c22Missed) -join ',')
+  note = 'R22/C21-02: an unrelated postflight predecessor, an interior GENESIS, a second GENESIS and a missing applied receipt are all refused; GENESIS is not an exemption'
+}
+
+# ---- 159: R22/C21-03 - the executable body, not a substring ----------------
+$b22Missed = @()
+$b22Results = @()
+$b22Positive = $null
+$b22Root = New-PackageTreeCopy -Label 'r22body' -CloudRoot $packageRoot
+try { $b22Positive = Test-ClashPackageIntegrity -RepoRoot $b22Root } catch { $b22Positive = $null }
+Remove-Item -LiteralPath $b22Root -Recurse -Force -ErrorAction SilentlyContinue
+if (-not (($null -ne $b22Positive) -and $b22Positive.ok)) { $b22Missed += 'positive-control' }
+
+function Set-PackageFileAndRebind {
+  param([string]$RepoRoot, [string]$Relative, [string]$Text)
+
+  $abs = Join-Path $RepoRoot ($Relative.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+  [System.IO.File]::WriteAllText($abs, $Text)
+  $sumPath = Join-Path $RepoRoot 'supabase\cloud\checksums.sha256'
+  $lines = @()
+  foreach ($line in @([System.IO.File]::ReadAllLines($sumPath))) {
+    if ($line.Length -eq 0) { continue }
+    $parts = $line -split '  ', 2
+    $path = Join-Path $RepoRoot ($parts[1].Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    if (Test-Path -LiteralPath $path -PathType Leaf) { $lines += ((Get-NormalizedSha256 -Path $path) + '  ' + $parts[1]) }
+    else { $lines += $line }
+  }
+  [void](Set-ChecksumLines -RepoRoot $RepoRoot -Lines $lines)
+  return $abs
+}
+
+foreach ($attack in @(
+    @{ name = 'comment-before-body';  expect = 'executable body' },
+    @{ name = 'ledger-token-rewrite'; expect = 'not the approved template' },
+    @{ name = 'transaction-close';    expect = 'not the approved template' })) {
+  $pkg = New-PackageTreeCopy -Label ('r22-' + [string]$attack.name) -CloudRoot $packageRoot
+  try {
+    $manifestFile = Join-Path $pkg 'supabase\cloud\manifest.json'
+    $doc = [System.IO.File]::ReadAllText($manifestFile) | ConvertFrom-Json
+    $entry = $doc.entries[0]
+    $wrapperRel = 'supabase/cloud/generated/' + [string]$entry.wrapperPath
+    $wrapperAbs = Join-Path $pkg ($wrapperRel.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    $text = [System.IO.File]::ReadAllText($wrapperAbs).Replace("`r`n", "`n")
+    if ([string]$attack.name -ceq 'comment-before-body') {
+      # the reviewer's exact control: a harmless comment at the START of the body.
+      # Substring containment survives; exact body fidelity does not.
+      $text = $text.Replace("`nbegin;`n", "`nbegin;`n-- harmless extra comment`n")
+    }
+    elseif ([string]$attack.name -ceq 'ledger-token-rewrite') {
+      $text = $text.Replace(("sha256:" + [string]$entry.normalizedSha256), ('sha256:' + ('e' * 64)))
+    }
+    else {
+      # a statement after the transaction close: the wrapper no longer ends where the
+      # approved original ends
+      $text = $text.TrimEnd() + "`n-- trailing comment after the transaction`n"
+    }
+    [void](Set-PackageFileAndRebind -RepoRoot $pkg -Relative $wrapperRel -Text $text)
+    # the wrapper's own digest must be rebound too, or the case would pass on the
+    # generic digest check instead of the fidelity rule
+    $doc = [System.IO.File]::ReadAllText($manifestFile) | ConvertFrom-Json
+    $doc.entries[0].wrapperSha256 = Get-NormalizedSha256 -Path $wrapperAbs
+    [System.IO.File]::WriteAllText($manifestFile, ($doc | ConvertTo-Json -Depth 8))
+    [void](Set-PackageFileAndRebind -RepoRoot $pkg -Relative 'supabase/cloud/manifest.json' -Text ([System.IO.File]::ReadAllText($manifestFile)))
+    $verdict = $null
+    try { $verdict = Test-ClashPackageIntegrity -RepoRoot $pkg } catch { $verdict = $null }
+    $textOut = ''
+    if ($null -ne $verdict) { $textOut = (@($verdict.problems) -join ' ') }
+    $refused = ($null -ne $verdict) -and (-not $verdict.ok)
+    $b22Results += ('{0}={1}' -f $attack.name, $refused)
+    if (-not $refused -or ($textOut -notmatch [regex]::Escape([string]$attack.expect))) { $b22Missed += [string]$attack.name }
+  }
+  catch { $b22Missed += ([string]$attack.name + '[threw]') }
+  finally { Remove-Item -LiteralPath $pkg -Recurse -Force -ErrorAction SilentlyContinue }
+}
+Add-Case 'wrapperBodyIsTheApprovedBodyExactly' (
+  @($b22Missed).Count -eq 0 -and
+  @($b22Results).Count -eq 3) @{
+  positiveControl = $(if ($null -ne $b22Positive) { [string]$b22Positive.ok } else { 'threw' })
+  attacks         = (@($b22Results) -join ' ')
+  missed          = (@($b22Missed) -join ',')
+  note = 'R22/C21-03: a comment added at the start of the body, a rewritten ledger token and a statement after the transaction close are refused, with every digest rebound'
 }
 
 # ---- 149: the validators themselves - removed checks must be DETECTED -------

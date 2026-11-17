@@ -36,8 +36,8 @@ const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
-const EXPECTED_CASES = 156;
-const EXPECTED_ASSERTIONS = 514;
+const EXPECTED_CASES = 159;
+const EXPECTED_ASSERTIONS = 519;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -3084,6 +3084,49 @@ if (sectionsRun !== EXPECTED_SECTIONS) {
 if (pass === 0) {
   failures.push('no assertion produced a result');
   console.log('  FAIL  no assertion produced a result');
+}
+
+// ---- Round 22: the four root causes, asserted at the source ----------------
+{
+  const nativeSrc = read(join(CLOUD, 'tools', 'lib', 'clash-native.ps1'));
+  const deploySrc = read(join(CLOUD, 'tools', 'deploy.ps1'));
+  const fnBody = (source, name) => {
+    const start = source.indexOf('function ' + name);
+    if (start < 0) { return ''; }
+    const next = source.indexOf('\nfunction ', start + 1);
+    return source.slice(start, next < 0 ? source.length : next);
+  };
+  const writeEvidence = fnBody(nativeSrc, 'Write-Evidence');
+  const addReceipt = fnBody(nativeSrc, 'Add-Receipt');
+  const chainFn = fnBody(nativeSrc, 'Get-ClashReceiptChain');
+  const planner = fnBody(nativeSrc, 'Test-ClashPackageIntegrity');
+  const verifier = fnBody(nativeSrc, 'Test-ClashDeploymentEvidence');
+  const normaliseAt = writeEvidence.indexOf('$clean = $clean.Replace("`r`n", "`n")');
+  const encodeAt = writeEvidence.indexOf('$enc.GetBytes($clean)');
+  check('Round 22: Write-Evidence hashes exactly the bytes it writes (CRLF normalised before encoding)',
+    normaliseAt >= 0 && encodeAt > normaliseAt &&
+    /return \(Get-TextSha256 -Text \$clean\)/.test(writeEvidence),
+    `normalise@${normaliseAt} encode@${encodeAt}`);
+  check('Round 22: Add-Receipt chains the digest the writer returned, never a recomputed one',
+    /\$res\s*=\s*Write-EvidenceOrFallback/.test(addReceipt) &&
+    /return \[string\]\$res\.sha256/.test(addReceipt) &&
+    !/Get-TextSha256|Get-NormalizedSha256/.test(addReceipt));
+  check('Round 22: the applied receipt has ONE location, shared by writer and verifier',
+    /function Get-ClashAppliedReceiptRelative/.test(nativeSrc) &&
+    nativeSrc.split('function Get-ClashAppliedReceiptRelative').length === 2 &&
+    /Get-ClashAppliedReceiptRelative/.test(deploySrc) &&
+    !/"-applied\.json"/.test(deploySrc) &&
+    /Get-ClashAppliedReceiptRelative -Index/.test(verifier));
+  check('Round 22: the wrapper body is extracted and compared whole, not searched for as a substring',
+    /\$openMark = "`nbegin;`n"/.test(planner) &&
+    /\$insertMark = "`ninsert into supabase_migrations\.schema_migrations"/.test(planner) &&
+    /executable body of wrapper/.test(planner) &&
+    /not the approved template/.test(planner) &&
+    !/\.Contains\(\$bodyText\)/.test(planner));
+  check('Round 22: the chain covers every receipt and GENESIS is never an interior exemption',
+    /Get-ClashReceiptChain -Root \$Root/.test(verifier) &&
+    /GENESIS is never an exemption for an interior link/.test(chainFn) &&
+    /exists but is not part of the verified receipt chain/.test(verifier));
 }
 
 // ---- Round 21 (R20-M3): the assertion inventory ---------------------------

@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '5.3.0'
+$script:ClashAdapterVersion = '5.4.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -784,6 +784,12 @@ function Write-Evidence {
   if ($dir -and -not (Test-Path -LiteralPath $dir)) {
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
   }
+  # Round 22 (C21-01): ONE hashing contract. Evidence is written LF-only and the
+  # digest returned to the caller is the digest of exactly those bytes, so it is the
+  # same value Get-NormalizedSha256 recomputes from the file. Before this, the writer
+  # hashed raw text (ConvertTo-Json emits CRLF on Windows) while every verifier
+  # normalised CRLF to LF, so an actual writer-produced chain could never be verified.
+  $clean = $clean.Replace("`r`n", "`n")
   $enc   = New-Object System.Text.UTF8Encoding($false)
   $bytes = $enc.GetBytes($clean)
   $fs    = $null
@@ -1221,7 +1227,7 @@ function Test-EvidenceSeal {
     $problems.Add(('the seal says {0} file(s) but lists {1}' -f $sealCountField['value'], $entries.Count))
   }
   # RC10: the seal's own metadata is typed as well. A seal whose adapter identity
-  # is ["clash-native-adapter/5.3.0"] or whose sealedUtc is not a timestamp cannot
+  # is ["clash-native-adapter/5.4.0"] or whose sealedUtc is not a timestamp cannot
   # be compared with a marker, so it is rejected here rather than coerced later.
   $sealAdapterField = Get-ClashJsonField -Object $seal -Name 'adapter'
   if (-not (Test-ClashJsonKind -Value $sealAdapterField['value'] -Kind 'string')) {
@@ -1479,6 +1485,165 @@ function Test-ClashReportReceipt {
   return [ordered]@{ ok = ($problems.Count -eq 0); problems = @($problems); status = $status }
 }
 
+# Round 22 (C21-01/C21-02): ONE receipt chain, and ONE canonical place for the
+# applied receipt.
+#
+# The runner writes 03-migrations/<NNN>-<version>.json and then,
+# on success, <NNN>-<version>-applied.json AT THE RUN ROOT; the applied receipt is
+# what the next migration chains from. The verifier used to look for the applied
+# receipt inside 03-migrations, so an actual writer-produced stream could never be
+# verified. This function is the single definition of that path, used by the writer
+# and by the verifier.
+function Get-ClashAppliedReceiptRelative {
+  param(
+    [Parameter(Mandatory = $true)][int]$Index,
+    [Parameter(Mandatory = $true)][string]$Version
+  )
+  return ('{0:D3}-{1}-applied.json' -f $Index, $Version)
+}
+
+# The protocol phase a receipt belongs to, in the order the runner writes them.
+# A receipt that cannot be placed is a problem: the chain is a sequence, not a bag.
+function Get-ClashReceiptPhaseRank {
+  param([string]$Relative)
+
+  # The rank is the protocol phase a receipt belongs to, derived from the name the
+  # runner writes. It exists to detect a receipt that was written out of order, so it
+  # must cover the runner's WHOLE vocabulary - including its failure receipts - or a
+  # legitimate run would be refused for a name the map simply did not know.
+  $rel = ([string]$Relative).Replace('\', '/')
+  $leaf = @($rel -split '/')[-1]
+  if ($leaf -clike '*-applied.json') { return 50 }          # per-migration applied receipt
+  if ($leaf -clike '*-digest-detail.json') { return 50 }    # per-migration digest detail
+  $bands = @(
+    @{ pattern = '^03-migrations/'; rank = 50 }
+    @{ pattern = '^01-gates/';      rank = 15 }
+    @{ pattern = '^00-';            rank = 0 }
+    @{ pattern = '^01-integrity';   rank = 10 }
+    @{ pattern = '^01-approved';    rank = 15 }
+    @{ pattern = '^01b-';           rank = 20 }
+    @{ pattern = '^02-';            rank = 30 }
+    @{ pattern = '^03-ledger';      rank = 40 }
+    @{ pattern = '^03b-';           rank = 40 }
+    @{ pattern = '^03c-';           rank = 45 }
+    @{ pattern = '^04-';            rank = 55 }
+    @{ pattern = '^05-';            rank = 60 }
+    @{ pattern = '^06-claim-release'; rank = 70 }
+    @{ pattern = '^06-finalization-intent'; rank = 78 }
+    @{ pattern = '^06-finalize-fail'; rank = 79 }
+    @{ pattern = '^06-complete';    rank = 80 }
+    @{ pattern = '^99-';            rank = 90 }
+  )
+  foreach ($band in $bands) {
+    if ($rel -match [string]$band.pattern) { return [int]$band.rank }
+  }
+  return -1
+}
+
+# Round 22 (C21-02). The chain is verified as ONE ORDERED PATH over every receipt
+# in the run, because the Round 21 verifier only compared a migration receipt with
+# the receipt before it: an unrelated postflight predecessor - the exact Round 20
+# reproduction - was still accepted, and GENESIS acted as an exemption from the link
+# rule anywhere in the sequence.
+function Get-ClashReceiptChain {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [string[]]$Exclude = @()
+  )
+
+  $problems = New-Object System.Collections.Generic.List[string]
+  $rows = @()
+  $rootFull = [System.IO.Path]::GetFullPath($Root)
+  foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -Filter '*.json')) {
+    $rel = ([string]$file.FullName).Substring($rootFull.TrimEnd([char]92, [char]47).Length).TrimStart([char]92, [char]47).Replace([char]92, '/')
+    if (@($Exclude) -ccontains $rel) { continue }
+    $docRoot = Get-ClashJsonRoot -Path $file.FullName -Label ('receipt ' + $rel) -Kind @('object')
+    if (-not $docRoot['ok']) {
+      $problems.Add(('{0} is not a JSON object receipt: {1}' -f $rel, [string]$docRoot['problem']))
+      continue
+    }
+    $prevField = Get-ClashJsonField -Object $docRoot['value'] -Name 'prevReceiptSha'
+    if (-not (Test-ClashJsonKind -Value $prevField['value'] -Kind 'string')) {
+      $problems.Add(('{0} does not declare prevReceiptSha as a JSON string, so it cannot be placed in the receipt chain' -f $rel))
+      continue
+    }
+    $prev = [string]$prevField['value']
+    if (($prev -cne 'GENESIS') -and (-not (Test-ClashSha256Text $prev))) {
+      $problems.Add((New-ClashFieldProblem $rel 'prevReceiptSha' $prev 'GENESIS or the sha256 of the receipt written before it'))
+      continue
+    }
+    $rows += [ordered]@{
+      relative = $rel
+      prev     = $prev
+      sha      = (Get-NormalizedSha256 -Path $file.FullName)
+      rank     = (Get-ClashReceiptPhaseRank -Relative $rel)
+    }
+  }
+  if (@($rows).Count -eq 0) {
+    $problems.Add('the run holds no chained receipt at all')
+    return [ordered]@{ ok = $false; problems = @($problems); order = @(); count = 0 }
+  }
+
+  $bySha = @{}
+  foreach ($row in $rows) {
+    if ($bySha.ContainsKey([string]$row.sha)) {
+      $problems.Add(('{0} and {1} have the same content, so the chain cannot tell them apart' -f $bySha[[string]$row.sha], $row.relative))
+    }
+    else { $bySha[[string]$row.sha] = [string]$row.relative }
+  }
+  $genesis = @($rows | Where-Object { $_.prev -ceq 'GENESIS' })
+  if ($genesis.Count -ne 1) {
+    $names = @($genesis | ForEach-Object { [string]$_.relative })
+    $problems.Add(('{0} receipt(s) declare prevReceiptSha=GENESIS ({1}); exactly one receipt starts the chain, and GENESIS is never an exemption for an interior link' -f $genesis.Count, ($names -join ', ')))
+    if ($genesis.Count -eq 0) {
+      return [ordered]@{ ok = $false; problems = @($problems); order = @(); count = @($rows).Count }
+    }
+  }
+
+  $order = @()
+  $visited = @{}
+  $current = [string]$genesis[0].relative
+  while ($true) {
+    if ($visited.ContainsKey($current)) {
+      $problems.Add(('the receipt chain revisits {0}; a chain that loops is not a sequence' -f $current))
+      break
+    }
+    $visited[$current] = $true
+    $order += $current
+    $currentRow = @($rows | Where-Object { $_.relative -ceq $current })[0]
+    $successors = @($rows | Where-Object { $_.prev -ceq [string]$currentRow.sha })
+    if ($successors.Count -gt 1) {
+      $names = @($successors | ForEach-Object { [string]$_.relative })
+      $problems.Add(('{0} receipt(s) chain from {1} ({2}); the chain forks' -f $successors.Count, $current, ($names -join ', ')))
+      break
+    }
+    if ($successors.Count -eq 0) { break }
+    $current = [string]$successors[0].relative
+  }
+
+  foreach ($row in $rows) {
+    if ($visited.ContainsKey([string]$row.relative)) { continue }
+    $problems.Add(('{0} is not reachable from the start of the receipt chain: it either chains from a digest that is no receipt in this run ({1}) or it sits in a cycle' -f $row.relative, $(if ($row.prev -ceq 'GENESIS') { 'GENESIS' } else { ([string]$row.prev).Substring(0, 12) + '...' })))
+  }
+
+  $lastRank = -1
+  $lastName = ''
+  foreach ($rel in $order) {
+    $row = @($rows | Where-Object { $_.relative -ceq $rel })[0]
+    if ([int]$row.rank -lt 0) {
+      $problems.Add(('{0} is a receipt the protocol does not place in any phase, so the chain cannot be ordered' -f $rel))
+      continue
+    }
+    if ([int]$row.rank -lt $lastRank) {
+      $problems.Add(('{0} is written after {1} in the chain but belongs to an earlier protocol phase' -f $rel, $lastName))
+    }
+    $lastRank = [int]$row.rank
+    $lastName = $rel
+  }
+
+  return [ordered]@{ ok = (@($problems).Count -eq 0); problems = @($problems); order = @($order); count = @($rows).Count }
+}
+
 # Every per-migration receipt the runner writes is named 03-migrations/<NNN>-<version>.json.
 function Get-ClashMigrationReceiptNames {
   param([Parameter(Mandatory = $true)][string]$Root)
@@ -1649,9 +1814,19 @@ function Test-ClashDeploymentEvidence {
   $expectedNames = @()
   $indices = @{}
   $versions = @{}
+  # Round 22 (C21-01): the applied receipts live at the RUN ROOT with the name
+  # <NNN>-<version>-applied.json, which is where the runner writes them and where the
+  # next migration chains from. Resolving them anywhere else made an actual
+  # writer-produced stream unverifiable.
   $receiptShaByName = @{}
-  foreach ($name in $presentNames) {
+  $hashSources = @()
+  foreach ($name in $presentNames) { $hashSources += [string]$name }
+  foreach ($entry in $approvedEntries) {
+    $hashSources += (Get-ClashAppliedReceiptRelative -Index ([int]$entry.index) -Version ([string]$entry.version))
+  }
+  foreach ($name in $hashSources) {
     $abs = Join-Path $Root ($name.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    if (-not (Test-Path -LiteralPath $abs -PathType Leaf)) { continue }
     try { $receiptShaByName[[string]$name] = Get-NormalizedSha256 -Path $abs } catch { $receiptShaByName[[string]$name] = '' }
   }
 
@@ -1742,6 +1917,9 @@ function Test-ClashDeploymentEvidence {
       $problems.Add((New-ClashFieldProblem $label 'prevReceiptSha' ($prevField['value']) 'a JSON string'))
     }
     elseif ($ordinal -eq 1) {
+      # The first migration chains from whatever receipt the runner wrote before it
+      # (the preflight or ledger receipt). GENESIS is only legal when nothing
+      # precedes it, and the chain check below is what establishes that.
       if (($prevValue -cne 'GENESIS') -and (-not (Test-ClashSha256Text $prevValue))) {
         $problems.Add((New-ClashFieldProblem $label 'prevReceiptSha' $prevValue 'GENESIS or the sha256 of the receipt before it'))
       }
@@ -1749,15 +1927,18 @@ function Test-ClashDeploymentEvidence {
     else {
       $previousEntry = $approvedEntries[$ordinal - 2]
       $previousName = [string]$previousEntry.receipt
-      $previousApplied = ([string]$previousEntry.receipt).Replace('.json', '-applied.json')
+      $previousApplied = Get-ClashAppliedReceiptRelative -Index ([int]$previousEntry.index) -Version ([string]$previousEntry.version)
       $accepted = @()
       foreach ($candidate in @($previousName, $previousApplied)) {
         if ($receiptShaByName.ContainsKey($candidate) -and ([string]$receiptShaByName[$candidate]).Length -gt 0) {
           $accepted += [string]$receiptShaByName[$candidate]
         }
       }
-      if (($prevValue -cne 'GENESIS') -and ($accepted -cnotcontains $prevValue)) {
-        $problems.Add(('{0} chains from {1}, which is neither the receipt nor the applied receipt of the previous approved migration {2}' -f $relName, $prevValue, $previousName))
+      # Round 22 (C21-02): GENESIS is NOT an exemption here. The Round 21 rule read
+      # `($prevValue -cne 'GENESIS') -and ...`, so any interior migration could
+      # declare GENESIS and skip predecessor validation entirely.
+      if ($accepted -cnotcontains $prevValue) {
+        $problems.Add(('{0} chains from {1}, which is neither the per-migration receipt {2} nor the applied receipt {3} the runner writes for the previous approved migration' -f $relName, $prevValue, $previousName, $previousApplied))
       }
     }
     $receiptsValidated++
@@ -1792,6 +1973,31 @@ function Test-ClashDeploymentEvidence {
     if (-not $hit) { continue }
     $rel = ([string]$file.FullName).Substring([System.IO.Path]::GetFullPath($Root).TrimEnd([char]92, [char]47).Length).TrimStart([char]92, [char]47).Replace([char]92, '/')
     $problems.Add(('the run holds {0}, which records that this deployment did not complete' -f $rel))
+  }
+
+  # ------------------------------------------- one receipt chain (C21-02) -----
+  # Every receipt in the run must form ONE ordered path: exactly one GENESIS, every
+  # other receipt chained to the actual bytes of the receipt written before it, and
+  # the resulting order following the protocol phases. Round 21 verified only the
+  # migration links, so an unrelated postflight predecessor - the exact Round 20
+  # reproduction - was still accepted.
+  $chain = Get-ClashReceiptChain -Root $Root -Exclude @('EVIDENCE-MANIFEST.json', '06-complete-unverified.json')
+  if (-not $chain.ok) {
+    $chainProblems = @($chain.problems)
+    $chainShown = $chainProblems
+    if ($chainShown.Count -gt 6) { $chainShown = $chainShown[0..5] }
+    foreach ($p in $chainShown) { $problems.Add(('receipt chain: ' + [string]$p)) }
+    if ($chainProblems.Count -gt 6) {
+      $problems.Add(('receipt chain: {0} more problem(s) were not shown' -f ($chainProblems.Count - 6)))
+    }
+  }
+  # A phase receipt that exists but is not reachable from the chain's start is
+  # evidence the chain does not describe.
+  foreach ($chainedName in @('00-baseline.json', '01-integrity.json', '02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json', '06-finalization-intent.json')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Root $chainedName) -PathType Leaf)) { continue }
+    if (@($chain.order) -cnotcontains $chainedName) {
+      $problems.Add(('receipt chain: {0} exists but is not part of the verified receipt chain' -f $chainedName))
+    }
   }
 
   # The receipt count is declared by the sealed integrity receipt and must describe
@@ -2202,8 +2408,51 @@ function Test-ClashPackageIntegrity {
                   $problems.Add(('{0}: normalisation is none but the normalised body digest {1} is not the executed digest {2}' -f $label, $bodySha, $execField['value']))
                 }
               }
-              if (($wrapperText.Length -gt 0) -and (-not $wrapperText.Replace("`r`n", "`n").Contains($bodyText))) {
-                $problems.Add(('{0}: wrapper {1} does not contain the approved body of {2}; the wrapper must execute the approved migration text, not a variant of it' -f $label, $wrapperPath, $sqlPath))
+              # Round 22 (C21-03): CONTAINMENT is not fidelity. Round 21 required the
+              # wrapper to contain the approved body as a substring, so a harmless line
+              # added at the start of the body - exact Node fidelity fails, containment
+              # holds - passed the shared planner. The body is now EXTRACTED between the
+              # wrapper's transaction boundary and its ledger insert and compared whole.
+              if ($wrapperText.Length -gt 0) {
+                $wrapperNorm = $wrapperText.Replace("`r`n", "`n")
+                $openMark = "`nbegin;`n"
+                $insertMark = "`ninsert into supabase_migrations.schema_migrations"
+                $openAt = $wrapperNorm.IndexOf($openMark)
+                $insertAt = $wrapperNorm.IndexOf($insertMark)
+                if ($openAt -lt 0) {
+                  $problems.Add(('{0}: wrapper {1} has no standalone begin; boundary, so its executable body cannot be established' -f $label, $wrapperPath))
+                }
+                elseif (($insertAt -lt 0) -or ($insertAt -le $openAt)) {
+                  $problems.Add(('{0}: wrapper {1} has no ledger insert after its begin; boundary, so its executable body cannot be established' -f $label, $wrapperPath))
+                }
+                else {
+                  $wrapperBody = $wrapperNorm.Substring($openAt + $openMark.Length, $insertAt - ($openAt + $openMark.Length))
+                  $wrapperBodySha = Get-TextSha256 -Text $wrapperBody.Trim()
+                  $approvedBodySha = Get-TextSha256 -Text $bodyText.Trim()
+                  if ($wrapperBodySha -cne $approvedBodySha) {
+                    $problems.Add(('{0}: the executable body of wrapper {1} is {2}, but the approved body of {3} is {4}; the wrapper must execute exactly the approved migration text, not a variant of it (a line added before or inside the body changes this digest)' -f $label, $wrapperPath, $wrapperBodySha, $sqlPath, $approvedBodySha))
+                  }
+                  # The ledger insert and the transaction close are part of the body the
+                  # wrapper executes: they must be the approved template for THIS ordinal,
+                  # not merely present somewhere.
+                  $tailText = $wrapperNorm.Substring($insertAt + 1)
+                  $expectedTail = @(
+                    'insert into supabase_migrations.schema_migrations (version, name, statements, created_by)',
+                    'values (',
+                    ("  '{0}'," -f [string]$entry.version),
+                    ("  '{0}'," -f [string]$entry.ledgerName),
+                    ("  array['sha256:{0}']," -f [string]$normChk['value']),
+                    "  'clash-cloud-wrapper-v1'",
+                    ');',
+                    '',
+                    'commit;'
+                  ) -join "`n"
+                  $tailSquashed = (($tailText -replace '\s+', ' ').Trim())
+                  $expectedSquashed = (($expectedTail -replace '\s+', ' ').Trim())
+                  if ($tailSquashed -cne $expectedSquashed) {
+                    $problems.Add(('{0}: the ledger insert and transaction close of wrapper {1} are not the approved template for version {2} / ledger name {3} / token sha256:{4}' -f $label, $wrapperPath, [string]$entry.version, [string]$entry.ledgerName, [string]$normChk['value']))
+                  }
+                }
               }
             }
           }
@@ -4022,7 +4271,10 @@ $script:ClashSelfTestRequiredCases = @(
   'sqlSnapshotIsLockedBeforeItIsHashed',
   'reparsePointsCannotRedirectEvidence',
   'certificationProblemsMustBePlainStrings',
-  'packageFidelityBindsEveryWrapperToItsOriginal'
+  'packageFidelityBindsEveryWrapperToItsOriginal',
+  'writerReceiptStreamRoundTripsThroughProducerAndConsumer',
+  'receiptChainRejectsBrokenAndExemptedLinks',
+  'wrapperBodyIsTheApprovedBodyExactly'
 )
 
 # Returns a FLAT sequence of case-name strings.

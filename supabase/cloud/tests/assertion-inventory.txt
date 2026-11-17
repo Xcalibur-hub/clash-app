@@ -115,7 +115,7 @@ every-phase-emits-a-receipt
 every-wrapper-body-is-byte-identical-to-its-normalised-source
 evidence-files-are-created-exclusively-createnew
 exactly-111-original-migrations
-exactly-156-declared-case-names
+exactly-159-declared-case-names
 exactly-two-migrations-needed-normalisation
 executed-source-is-the-variant
 five-powershell-tools-plus-the-adapter-library
@@ -336,6 +336,11 @@ rejects-percent-encoding-on-both-platforms
 rejects-relative-paths-on-both-platforms
 rejects-the-legacy-pathname-output
 rollback-is-only-claimed-with-a-probe
+round-22-add-receipt-chains-the-digest-the-writer-returned-never-a-recom
+round-22-the-applied-receipt-has-one-location-shared-by-writer-and-verif
+round-22-the-chain-covers-every-receipt-and-genesis-is-never-an-interior
+round-22-the-wrapper-body-is-extracted-and-compared-whole-not-searched-f
+round-22-write-evidence-hashes-exactly-the-bytes-it-writes-crlf-normalis
 run-evidence-is-hash-chained-and-sealed
 runner-executes-step-0-itself-on-every-fresh-run
 sanitises-in-memory-before-encoding
@@ -397,7 +402,7 @@ the-executed-null-fixture-is-the-audit-four-bytes
 the-exit-code-loss-is-asserted-not-assumed
 the-extractor-refuses-a-drifted-region-instead-of-probing-something-else
 the-getter-builds-an-explicit-flat-list
-the-harness-asserts-exactly-156
+the-harness-asserts-exactly-159
 the-harness-builds-its-fixtures-in-the-real-psql-envelope
 the-harness-checks-the-executed-count
 the-harness-executes-the-committed-gate-2-block-and-forbids-a-suffix-cou

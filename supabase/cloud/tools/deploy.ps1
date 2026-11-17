@@ -721,7 +721,10 @@ foreach ($e in $entries) {
     $receipt.ledgerReadBack = 'MATCH'
     $receipt.status = 'PASS'
     New-PhaseReceipt ("03-migrations/{0}.json" -f $label) $receipt
-    New-PhaseReceipt ("{0}-applied.json" -f $label) @{
+    # Round 22 (C21-01): the applied receipt's name comes from the SAME function the
+    # verifier uses, so the writer and the reader cannot disagree about where the
+    # receipt that the next migration chains from actually lives.
+    New-PhaseReceipt (Get-ClashAppliedReceiptRelative -Index ([int]$e.index) -Version ([string]$e.version)) @{
       status = 'PASS'; version = $e.version; outcome = 'COMMITTED'
       wrapperSha256 = $actualWrapperSha; ledgerReadBack = 'MATCH'; exitCode = 0
     }
