@@ -2578,8 +2578,7 @@ function Add-FixtureReceipt {
 function New-FinalizationRun {
   param(
     [string[]]$Evidence = @('00-baseline.json', '01-integrity.json', '01b-approved.json', '02-preflight.json',
-                            '04-postflight.json', '05-storage.json', '06-claim-release-ownership.json',
-                            '06-claim-release.json'),
+                            '04-postflight.json', '05-storage.json', '06-claim-release.json'),
     [int]$MigrationCount = 3
   )
 
