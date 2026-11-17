@@ -2398,7 +2398,8 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
     /function Get-PreflightGateBlock/.test(selfTest) &&
     /function Invoke-PreflightGateProbe/.test(selfTest) &&
     // the extractor's boundaries and guards, as escape-free fragments
-    selfTest.includes('$pf = Invoke-NativeProcess -FilePath') &&
+    selfTest.includes('$pf = Invoke-LockedSqlInput -RepoRelative') &&
+    selfTest.includes('function Invoke-LockedSqlInput') &&
     selfTest.includes('gate 3: ') &&
     selfTest.includes('status          = `$pfReport.verdict') &&
     selfTest.includes("$text.Contains('[regex]::Matches')") &&

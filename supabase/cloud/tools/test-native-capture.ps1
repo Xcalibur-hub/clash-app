@@ -1184,7 +1184,9 @@ function Get-PreflightGateBlock {
   $startAt = -1
   $endAt   = -1
   for ($i = 0; $i -lt $lines.Count; $i++) {
-    if ($startAt -lt 0 -and $lines[$i] -match '^\$pf = Invoke-NativeProcess -FilePath \$psqlPath') { $startAt = $i; continue }
+    # Round 21 (RC08/M1): the preflight gate executes a locked, already-hashed
+    # snapshot instead of spawning psql on a path it has not verified.
+    if ($startAt -lt 0 -and $lines[$i] -match '^\$pf = Invoke-LockedSqlInput -RepoRelative') { $startAt = $i; continue }
     if ($startAt -ge 0 -and $lines[$i] -match '^# -+ gate 3: ') { $endAt = $i; break }
   }
   if ($startAt -lt 0 -or $endAt -le $startAt) {
@@ -1267,6 +1269,18 @@ function Invoke-PreflightGateProbe {
           }
         }
         return $script:r14Queue[$index]
+      }
+      # Round 21 (RC08/M1): the gate runs a locked snapshot of an APPROVED source.
+      # The recorded call names that source, so the case can still assert WHICH SQL
+      # the runner executed (the lock itself is proven by case 153).
+      function Invoke-LockedSqlInput {
+        param($RepoRelative, $SnapshotRelative, $Label, $Arguments, $Environment, $TimeoutSeconds)
+        $result = Invoke-NativeProcess -FilePath 'psql.exe' -Arguments $Arguments -Environment $Environment -TimeoutSeconds $TimeoutSeconds
+        if (@($script:r14State.calls).Count -gt 0) {
+          $last = @($script:r14State.calls).Count - 1
+          $script:r14State.calls[$last] = ([string]$RepoRelative + ' ' + [string]$script:r14State.calls[$last])
+        }
+        return $result
       }
       function Write-Evidence {
         param($Path, $Text)
@@ -1665,7 +1679,12 @@ function Invoke-VerificationGateProbe {
       # behave like the native call it replaces so the gate logic is unchanged.
       function Invoke-LockedSqlInput {
         param($RepoRelative, $SnapshotRelative, $Label, $Arguments, $Environment, $TimeoutSeconds)
-        return (Invoke-NativeProcess -FilePath 'psql.exe' -Arguments $Arguments -Environment $Environment -TimeoutSeconds $TimeoutSeconds)
+        $result = Invoke-NativeProcess -FilePath 'psql.exe' -Arguments $Arguments -Environment $Environment -TimeoutSeconds $TimeoutSeconds
+        if (@($script:r12State.calls).Count -gt 0) {
+          $last = @($script:r12State.calls).Count - 1
+          $script:r12State.calls[$last] = ([string]$RepoRelative + ' ' + [string]$script:r12State.calls[$last])
+        }
+        return $result
       }
       function Write-Evidence {
         param($Path, $Text)
@@ -5071,9 +5090,13 @@ foreach ($attack in @(
   elseif ([string]$attack.name -ceq 'declared-bytes') {
     $entry.bytes = [int]$entry.bytes + 1
   }
-  [void](Write-Evidence -Path $wrapperAbs -Text $wrapperText)
+  # Write-Evidence is an EXCLUSIVE create (it refuses to replace a file), which is
+  # exactly right for evidence and wrong for a fixture whose whole purpose is to
+  # replace an approved-looking file. The rewrite is deliberate and local to a
+  # throwaway copy.
+  [System.IO.File]::WriteAllText($wrapperAbs, $wrapperText)
   $entry.wrapperSha256 = Get-NormalizedSha256 -Path $wrapperAbs
-  [void](Write-Evidence -Path $manifestFile -Text ($doc | ConvertTo-Json -Depth 8))
+  [System.IO.File]::WriteAllText($manifestFile, ($doc | ConvertTo-Json -Depth 8))
   # rebind checksums for every file so the digest gates pass
   $sumPath = Join-Path $pkg 'supabase\cloud\checksums.sha256'
   $lines = @()
