@@ -5099,7 +5099,7 @@ try { $fidClean = Test-ClashPackageIntegrity -RepoRoot $fidRoot } catch { $fidCl
 $fidMissed = @()
 $fidResults = @()
 foreach ($attack in @(
-    @{ name = 'wrapper-body';   expect = 'does not contain the approved body' },
+    @{ name = 'wrapper-body';   expect = 'the executable body of wrapper' },
     @{ name = 'ledger-name';    expect = 'does not carry its approved ledger identity' },
     @{ name = 'declared-bytes'; expect = 'the manifest declares' })) {
   # rebuild a pristine copy per attack, then make ONE approved-looking change and
@@ -5220,6 +5220,27 @@ Remove-FinalizationRun -Root $w22Root
 # so the only remaining defect is the one under test. This is the reviewer's own
 # reproduction: "rebind downstream hashes so stale successor digests do not mask the
 # intended mutation".
+# Re-chains every receipt AFTER one deliberate mutation, so the only defect left in
+# the run is the one under test. The ordered path must be computed BEFORE the
+# mutation: once a link is broken the chain can no longer describe what follows it.
+function Repair-ReceiptChain {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][string[]]$Order,
+    [Parameter(Mandatory = $true)][int]$From
+  )
+
+  for ($i = $From + 1; $i -lt @($Order).Count; $i++) {
+    $prevRel = [string]@($Order)[$i - 1]
+    $prevSha = Get-NormalizedSha256 -Path (Join-Path $Root ($prevRel.Replace('/', [System.IO.Path]::DirectorySeparatorChar)))
+    $nextPath = Join-Path $Root (([string]@($Order)[$i]).Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    $nextDoc = [System.IO.File]::ReadAllText($nextPath) | ConvertFrom-Json
+    $nextDoc.prevReceiptSha = $prevSha
+    [System.IO.File]::WriteAllText($nextPath, ($nextDoc | ConvertTo-Json -Depth 8))
+  }
+  return $true
+}
+
 function Set-ReceiptPredecessor {
   param(
     [Parameter(Mandatory = $true)][string]$Root,
@@ -5235,14 +5256,7 @@ function Set-ReceiptPredecessor {
   $doc = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
   $doc.prevReceiptSha = $Prev
   [System.IO.File]::WriteAllText($path, ($doc | ConvertTo-Json -Depth 8))
-  for ($i = $index + 1; $i -lt $order.Count; $i++) {
-    $prevRel = [string]$order[$i - 1]
-    $prevSha = Get-NormalizedSha256 -Path (Join-Path $Root ($prevRel.Replace('/', [System.IO.Path]::DirectorySeparatorChar)))
-    $nextPath = Join-Path $Root (([string]$order[$i]).Replace('/', [System.IO.Path]::DirectorySeparatorChar))
-    $nextDoc = [System.IO.File]::ReadAllText($nextPath) | ConvertFrom-Json
-    $nextDoc.prevReceiptSha = $prevSha
-    [System.IO.File]::WriteAllText($nextPath, ($nextDoc | ConvertTo-Json -Depth 8))
-  }
+  [void](Repair-ReceiptChain -Root $Root -Order $order -From $index)
   return $path
 }
 
@@ -5430,7 +5444,15 @@ foreach ($mutant in $rcMutants) {
       if ($Name -ceq 'rc02-phase-status') {
         $run = New-FinalizationRun
         try {
+          # the ONLY defect must be the FAIL status: the receipt is rewritten and the
+          # links after it are re-chained, or the receipt chain (not the status check)
+          # would be what refuses the run
+          $chain = Get-ClashReceiptChain -Root $run -Exclude @('EVIDENCE-MANIFEST.json', '06-complete-unverified.json')
+          $order = @($chain.order)
+          $statusAt = [array]::IndexOf($order, '02-preflight.json')
+          if ($statusAt -lt 0) { throw 'rc02 fixture: 02-preflight.json is not in the run chain' }
           [void](Set-JsonScalarField -Path (Join-Path $run '02-preflight.json') -Name 'status' -RawJson '"FAIL"')
+          [void](Repair-ReceiptChain -Root $run -Order $order -From $statusAt)
           $evidence = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved
           return [bool]$evidence.ok
         }
