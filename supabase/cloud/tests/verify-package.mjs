@@ -37,7 +37,7 @@ const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
 const EXPECTED_CASES = 150;
-const EXPECTED_ASSERTIONS = 494;
+const EXPECTED_ASSERTIONS = 495;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -2936,6 +2936,17 @@ hdr(29, 'systemic validation boundary: RC01-RC11 (Round 20)');
     /\$rcMutationRoot = Join-Path \(\[System\.IO\.Path\]::GetTempPath\(\)\)/.test(selfTest) &&
     /\[System\.IO\.File\]::WriteAllText\(\$mutantPath, \$libText\.Replace\(\$old, \$new\)\)/.test(selfTest) &&
     !/WriteAllText\(\$adapterPath/.test(selfTest));
+  check('no validator shadows a typed parameter with a record (case-insensitive names)',
+    // PowerShell variable names are case-insensitive: `$root = Get-ClashJsonRoot ...`
+    // inside a function whose parameter is [string]$Root converts the record to
+    // 'System.Collections.Hashtable', and indexing that string yields nothing. Six
+    // documents then looked like empty root failures and every finalization was
+    // refused (Round 20 CI).
+    !/(?:^|\n)[ \t]*\$root[ \t]*=[ \t]*Get-ClashJsonRoot/.test(libRaw) &&
+    /\$migRoot = Get-ClashJsonRoot/.test(libRaw) &&
+    /\$docRoot = Get-ClashJsonRoot/.test(libRaw) &&
+    /function Test-ClashDeploymentEvidence \{[\s\S]*?\[Parameter\(Mandatory = \$true\)\]\[string\]\$Root/.test(libRaw) &&
+    /function Test-ClashReportReceipt \{[\s\S]*?\[Parameter\(Mandatory = \$true\)\]\[string\]\$Root/.test(libRaw));
   check('no validator reads a variable it was not given (dynamic-scope defects)',
     // two real defects found while reviewing this round: Read-ClashChecksumFile
     // used the CALLER's $RepoRoot and New-PackageTreeCopy the caller's $cloudRoot,

@@ -1295,13 +1295,18 @@ function Test-ClashReportReceipt {
 
   $problems = New-Object System.Collections.Generic.List[string]
   $path = Join-Path $Root $Name
-  $root = Get-ClashJsonRoot -Path $path -Label ('phase receipt ' + $Name) -Kind @('object')
-  if (-not $root['ok']) {
+  # NOT `$root`: PowerShell variable names are case-insensitive, so `$root` IS the
+  # [string]$Root parameter, and assigning the verdict record to it converts the
+  # record to 'System.Collections.Hashtable'. Indexing that string yields nothing,
+  # so every document looked like an empty root failure - six of them, once per
+  # report and per migration receipt. (Round 20 CI.)
+  $docRoot = Get-ClashJsonRoot -Path $path -Label ('phase receipt ' + $Name) -Kind @('object')
+  if (-not $docRoot['ok']) {
     $problems.Add(('{0} root: ok=[{1}] state=[{2}] kind=[{3}] problem=[{4}]' -f $Name,
-        [string]$root['ok'], [string]$root['state'], [string]$root['kind'], [string]$root['problem']))
+        [string]($docRoot['ok']), [string]($docRoot['state']), [string]($docRoot['kind']), [string]($docRoot['problem'])))
     return [ordered]@{ ok = $false; problems = @($problems); status = '' }
   }
-  $doc = $root['value']
+  $doc = $docRoot['value']
   $label = $Name
   Assert-ClashReceiptHeader -Object $doc -Label $label -Name $Name -Problems $problems
   $status = Assert-ClashTextField -Object $doc -Label $label -Field 'status' -Problems $problems
@@ -1477,13 +1482,15 @@ function Test-ClashDeploymentEvidence {
   $versions = @{}
   foreach ($name in $names) {
     $relName = [string]$name
-    $root = Get-ClashJsonRoot -Path (Join-Path $Root $relName) -Label ('migration receipt ' + $relName) -Kind @('object')
-    if (-not $root['ok']) {
+    # `$root` would BE the [string]$Root parameter (names are case-insensitive), so
+    # the verdict record would be converted to its type name and read as empty.
+    $migRoot = Get-ClashJsonRoot -Path (Join-Path $Root $relName) -Label ('migration receipt ' + $relName) -Kind @('object')
+    if (-not $migRoot['ok']) {
       $problems.Add(('{0} root: ok=[{1}] state=[{2}] kind=[{3}] problem=[{4}]' -f $relName,
-          [string]$root['ok'], [string]$root['state'], [string]$root['kind'], [string]$root['problem']))
+          [string]($migRoot['ok']), [string]($migRoot['state']), [string]($migRoot['kind']), [string]($migRoot['problem'])))
       continue
     }
-    $doc = $root['value']
+    $doc = $migRoot['value']
     $label = $relName
     Assert-ClashReceiptHeader -Object $doc -Label $label -Name $relName -Problems $problems
     $mstatus = Assert-ClashTextField -Object $doc -Label $label -Field 'status' -Problems $problems
