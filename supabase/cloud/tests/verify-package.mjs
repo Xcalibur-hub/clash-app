@@ -879,7 +879,9 @@ hdr(15, 'self-test integrity - a dropped or crashed case cannot pass (Round 4) /
       const rebound = lf(read(sumsPath)).split('\n').map((line) => {
         const m = /^([0-9a-f]{64})  (.+)$/.exec(line);
         if (!m) return line;
-        return (m[2] === rel ? sha(after) : m[1]) + '  ' + m[2];
+        // nsha, not sha: on a CRLF checkout the copy's bytes still hash the way every
+        // other digest in this package is computed (LF-normalised).
+        return (m[2] === rel ? sha(lf(after)) : m[1]) + '  ' + m[2];
       }).join('\n');
       writeFileSync(sumsPath, rebound);
       const child = spawnSync(process.execPath, [suiteCopy], {
