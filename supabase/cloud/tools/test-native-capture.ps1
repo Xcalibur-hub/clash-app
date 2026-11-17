@@ -2663,7 +2663,7 @@ function Invoke-CompletionProbe {
   if ([string]::IsNullOrWhiteSpace($PrevSha)) { $PrevSha = Get-FinalizationReleaseSha -Root $Root }
 
   $state = [ordered]@{
-    ok = $false; threw = ''; result = $null; output = @()
+    ok = $false; threw = ''; threwStack = ''; result = $null; output = @()
     markerAtAnnounce = $false; sealAtAnnounce = $false; exitLine = ''
   }
   $state.markerPath = Join-Path $Root '06-complete.json'
@@ -2704,7 +2704,12 @@ function Invoke-CompletionProbe {
       $State.result = Publish-ClashCompletion -Root $Root -PrevSha $script:probePrevSha -RequiredEvidence $Required -Fields $Fields
       $State.ok = $true
     }
-    catch { $State.threw = Protect-Text $_.Exception.Message }
+    catch {
+      $State.threw = Protect-Text $_.Exception.Message
+      # The message alone cannot say WHICH call refused; the stack names the
+      # function and the line inside it.
+      try { $State.threwStack = Protect-Text ([string]$_.ScriptStackTrace) } catch { }
+    }
   } $Root $Required $FailWriteJsonSuffix $PrevSha $Fields $state 6>$null | Out-Null
 
   return $state
@@ -2833,7 +2838,9 @@ function Invoke-CompletionTailProbe {
 $finRoot  = New-FinalizationRun
 $finProbe = Invoke-CompletionProbe -Root $finRoot
 if ($null -ne $finProbe -and (-not $finProbe.ok) -and ([string]$finProbe.threw -ne '')) {
-  $script:problems += ('the completion probe refused: ' + [string]$finProbe.threw)
+  $stack = [string]$finProbe.threwStack
+  if ($stack.Length -gt 300) { $stack = $stack.Substring(0, 300) }
+  $script:problems += ('the completion probe refused: ' + [string]$finProbe.threw + ' AT ' + $stack)
 }
 $finDoc   = Read-RunDocument -Path (Join-Path $finRoot '06-complete.json')
 $finSeal  = Read-RunDocument -Path (Join-Path $finRoot 'EVIDENCE-MANIFEST.json')
@@ -2878,6 +2885,7 @@ Add-Case 'completionSuccessPublishesVerifiedMarker' (
   sealFiles = [int](Get-DocumentProperty -Object (Get-DocumentProperty -Object $finDoc -Name 'seal' -Default $null) -Name 'fileCount' -Default 0)
   validator = $(if ($null -ne $finCheck) { $finCheck.ok } else { 'null' })
   probeThrew = [string]$finProbe.threw
+  probeStack = [string]$finProbe.threwStack
   probeOutput = (@($finProbe.output) | Select-Object -Last 2) -join ' / '
   intentPresent = Test-Path -LiteralPath $finIntentPath -PathType Leaf
 }
