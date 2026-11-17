@@ -2092,9 +2092,19 @@ function Publish-ClashCompletion {
   # a missing migration, a preflight that claims 19 gating rows while its own
   # counters sum to 17, an integrity proof that did not pass - each of those used to
   # seal cleanly and be accepted by both halves of the contract.
-  if (@($RequiredEvidence).Count -eq 0) {
-    $RequiredEvidence = @(Get-ClashCompletionRequiredEvidence -Root $Root)
+  # The INTENT must declare what this run actually requires, and that set is derived
+  # from the run directory, not from the caller: a caller that supplies six phase
+  # names while the run also holds three migration receipts would publish an intent
+  # the consumer must reject ("the sealed intent does not declare the required
+  # evidence 03-migrations/..."). A caller's extra requirements still widen the seal
+  # check, and a caller's names are always included in the intent.
+  $requiredFromRun = @(Get-ClashCompletionRequiredEvidence -Root $Root)
+  $declaredEvidence = @($requiredFromRun)
+  foreach ($extra in @($RequiredEvidence)) {
+    if ([string]::IsNullOrWhiteSpace([string]$extra)) { continue }
+    if ($declaredEvidence -cnotcontains [string]$extra) { $declaredEvidence += [string]$extra }
   }
+  $RequiredEvidence = $declaredEvidence
   $evidence = Test-ClashDeploymentEvidence -Root $Root -ExpectedMigrationCount $ExpectedMigrationCount
   if (-not $evidence.ok) {
     # Every problem is rendered with its length, so an empty entry (a null that
@@ -2118,7 +2128,7 @@ function Publish-ClashCompletion {
   $intentSha = Add-Receipt -Root $Root -Name '06-finalization-intent.json' -PrevSha $PrevSha -Fields @{
     protocol         = $protocol
     status           = 'FINALIZING'
-    requiredEvidence = @($RequiredEvidence)
+    requiredEvidence = @($declaredEvidence)
     guidance         = 'Provisional. A run is complete only when 06-complete.json exists and Test-ClashRunCompletion accepts it.'
   }
 
