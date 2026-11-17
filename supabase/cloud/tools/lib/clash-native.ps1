@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '5.4.0'
+$script:ClashAdapterVersion = '5.5.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -1227,7 +1227,7 @@ function Test-EvidenceSeal {
     $problems.Add(('the seal says {0} file(s) but lists {1}' -f $sealCountField['value'], $entries.Count))
   }
   # RC10: the seal's own metadata is typed as well. A seal whose adapter identity
-  # is ["clash-native-adapter/5.4.0"] or whose sealedUtc is not a timestamp cannot
+  # is ["clash-native-adapter/5.5.0"] or whose sealedUtc is not a timestamp cannot
   # be compared with a marker, so it is rejected here rather than coerced later.
   $sealAdapterField = Get-ClashJsonField -Object $seal -Name 'adapter'
   if (-not (Test-ClashJsonKind -Value $sealAdapterField['value'] -Kind 'string')) {
@@ -1659,6 +1659,242 @@ function Get-ClashMigrationReceiptNames {
   return @($names | Sort-Object)
 }
 
+# Round 23 (C22-M1). ONE closed receipt vocabulary, and one semantic success
+# contract over it.
+#
+# The Round 22 verifier asked two questions: does each APPROVED per-migration
+# receipt say the right thing, and does the chain form one ordered path? Both can be
+# answered "yes" while the run also holds receipts nobody approved - a nested
+# 03-migrations/extra/999-unapproved.json, an unlisted 04-unexpected.json, a second
+# 04-supplement.json recording FAIL - and while an applied or ownership receipt says
+# the opposite of the completion it is supposed to support.
+#
+# A graph is ordering, not permission. The inventory below is the closed set of
+# receipt paths the runner may write (its whole vocabulary, plus the names derived
+# from the approved manifest); anything else is evidence the approved package does
+# not describe. The semantic pass then requires every receipt that carries a status
+# to carry the status its TYPE is allowed to carry, and validates the applied and
+# ownership receipts against their own success contract.
+function Get-ClashReceiptVocabulary {
+  # Every receipt name deploy.ps1 can write, including its failure receipts: a
+  # closed inventory must describe the runner, not just its happy path, or a
+  # legitimate failed run would be refused for holding an undeclared name.
+  $names = @(
+    '00-baseline.json'
+    '00-baseline-fail.json'
+    '00-baseline-dirty.json'
+    '00-baseline-git.json'
+    '01-gates/input-unapproved.json'
+    '01-gates/input-unverified.json'
+    '01-integrity.json'
+    '01-integrity-fail.json'
+    '01-approved-inventory.json'
+    '01b-approved.json'
+    '02-preflight.json'
+    '02-preflight-fail.json'
+    '02-preflight-rows.json'
+    '03-ledger.json'
+    '03-ledger-fail.json'
+    '03-ledger-probe.json'
+    '03-ledger-probe-fail.json'
+    '03-ledger-probe-weird.json'
+    '03-ledger-not-empty.json'
+    '03-ledger-parse.json'
+    '03-ledger-parse-stop.json'
+    '03b-bootstrap-digest.json'
+    '03b-bootstrap-digest-stop.json'
+    '03b-bootstrap.json'
+    '03b-bootstrap-fail.json'
+    '03b-bootstrap-missing.json'
+    '03b-bootstrap-unproven.json'
+    '03b-bootstrap-nonempty.json'
+    '03b-schema.json'
+    '03b-schema-stop.json'
+    '03c-writer-claim.json'
+    '03c-writer-claim-stop.json'
+    '04-postflight.json'
+    '04-postflight-fail.json'
+    '05-storage.json'
+    '05-storage-fail.json'
+    '06-claim-release-ownership.json'
+    '06-claim-release-ownership-stop.json'
+    '06-claim-release.json'
+    '06-claim-release-fail.json'
+    '06-finalization-intent.json'
+    '06-finalize-fail.json'
+    '06-complete.json'
+    '06-complete-unverified.json'
+    '99-runner-exception.json'
+    'STOP.json'
+  )
+  return $names
+}
+
+# The exact path set a run may hold, derived from the runner vocabulary and the
+# APPROVED manifest. Nothing in the run directory can extend it.
+function Get-ClashDeclaredReceiptNames {
+  param($Approved)
+
+  $declared = @()
+  foreach ($name in @(Get-ClashReceiptVocabulary)) { $declared += [string]$name }
+  $approvedEntries = @()
+  if ($null -ne $Approved) { $approvedEntries = @($Approved.entries) }
+  foreach ($entry in $approvedEntries) {
+    $label = ('{0:D3}-{1}' -f [int]$entry.index, [string]$entry.version)
+    $declared += ('03-migrations/' + $label + '.json')
+    $declared += ('03-migrations/' + $label + '.sql')
+    $declared += ($label + '-applied.json')
+    $declared += ($label + '-digest-detail.json')
+    $declared += ($label + '-missing.json')
+    $declared += ($label + '-digest.json')
+    $declared += ($label + '-digest-detail-stop.json')
+    $declared += ($label + '-unproven.json')
+    $declared += ($label + '-ledger-mismatch.json')
+    $declared += ('03-migrations/' + $label + '-failed.json')
+    $declared += ($label + '-failed.json')
+  }
+  return @($declared)
+}
+
+# Closed inventory: every JSON under the run must be a declared receipt.
+function Test-ClashReceiptInventory {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    $Approved = $null
+  )
+
+  $problems = New-Object System.Collections.Generic.List[string]
+  $declared = @(Get-ClashDeclaredReceiptNames -Approved $Approved)
+  $rootFull = [System.IO.Path]::GetFullPath($Root).TrimEnd([char]92, [char]47)
+  foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -Filter '*.json')) {
+    $rel = ([string]$file.FullName).Substring($rootFull.Length).TrimStart([char]92, [char]47).Replace([char]92, '/')
+    if ($rel -ceq 'EVIDENCE-MANIFEST.json') { continue }
+    if ($declared -ccontains $rel) { continue }
+    if ($rel -clike '03-migrations/*/*') {
+      $problems.Add(('{0} is a receipt nested inside 03-migrations; every per-migration receipt belongs directly in 03-migrations/ and must name an approved migration' -f $rel))
+      continue
+    }
+    $problems.Add(('{0} is not a receipt this protocol declares; a completed run cannot hold evidence the approved package does not describe' -f $rel))
+  }
+  return @($problems)
+}
+
+# Semantic success contract: a receipt may not say the opposite of the completion it
+# supports, and the receipts that carry the deployment's success claims (the applied
+# receipts and the claim-ownership record) are validated field by field.
+function Test-ClashReceiptSemantics {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    $Approved = $null
+  )
+
+  $problems = New-Object System.Collections.Generic.List[string]
+  $rootFull = [System.IO.Path]::GetFullPath($Root).TrimEnd([char]92, [char]47)
+  # The status each receipt TYPE is allowed to carry. Every other status - FAIL,
+  # STOP, EXCEPTION, UNKNOWN, UNPROVEN, a non-string, an empty string - contradicts a
+  # completed deployment, whatever the receipt is called.
+  $typedStatus = @{
+    '00-baseline.json'              = 'BASELINE'
+    '06-finalization-intent.json'   = 'FINALIZING'
+    '06-complete.json'              = 'COMPLETE'
+  }
+  foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -Filter '*.json')) {
+    $rel = ([string]$file.FullName).Substring($rootFull.Length).TrimStart([char]92, [char]47).Replace([char]92, '/')
+    if ($rel -ceq 'EVIDENCE-MANIFEST.json') { continue }
+    $docRoot = $null
+    try { $docRoot = Get-ClashJsonRoot -Path $file.FullName -Label ('receipt ' + $rel) -Kind @('object') }
+    catch { $docRoot = $null }
+    if (($null -eq $docRoot) -or (-not $docRoot['ok'])) {
+      $problems.Add(('{0} could not be read as a JSON receipt, so the run cannot be certified complete' -f $rel))
+      continue
+    }
+    $doc = $docRoot['value']
+    $statusField = Get-ClashJsonField -Object $doc -Name 'status'
+    if ($statusField['kind'] -ceq 'missing') { continue }
+    $expected = 'PASS'
+    if ($typedStatus.ContainsKey($rel)) { $expected = [string]$typedStatus[$rel] }
+    if (-not (Test-ClashJsonKind -Value $statusField['value'] -Kind 'string')) {
+      $problems.Add(('{0} records status {1}; a completion record must state its outcome as a JSON string' -f $rel, (Format-ClashFieldValue -Value $statusField['value'])))
+      continue
+    }
+    $status = [string]$statusField['value']
+    if ($status -cne $expected) {
+      $problems.Add(('{0} records status "{1}"; a completed deployment cannot hold a receipt that does not say "{2}"' -f $rel, $status, $expected))
+    }
+  }
+
+  # ---- the applied receipts: one per approved migration, and it must say COMMITTED
+  $approvedEntries = @()
+  if ($null -ne $Approved) { $approvedEntries = @($Approved.entries) }
+  foreach ($entry in $approvedEntries) {
+    $rel = Get-ClashAppliedReceiptRelative -Index ([int]$entry.index) -Version ([string]$entry.version)
+    $abs = Join-Path $Root ($rel.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    if (-not (Test-Path -LiteralPath $abs -PathType Leaf)) {
+      $problems.Add(('no applied receipt exists for approved migration {0} ({1}): {2} is what the next migration chains from' -f [string]$entry.index, [string]$entry.version, $rel))
+      continue
+    }
+    $docRoot = Get-ClashJsonRoot -Path $abs -Label ('applied receipt ' + $rel) -Kind @('object')
+    if (-not $docRoot['ok']) { $problems.Add(('{0}: {1}' -f $rel, [string]$docRoot['problem'])); continue }
+    $doc = $docRoot['value']
+    $status = Assert-ClashTextField -Object $doc -Label $rel -Field 'status' -Problems $problems
+    if (($status.Length -gt 0) -and ($status -cne 'PASS')) {
+      $problems.Add((New-ClashFieldProblem $rel 'status' $status 'PASS: an applied migration that did not commit cannot support a completed deployment'))
+    }
+    $outcome = Assert-ClashTextField -Object $doc -Label $rel -Field 'outcome' -Problems $problems
+    if (($outcome.Length -gt 0) -and ($outcome -cne 'COMMITTED')) {
+      $problems.Add((New-ClashFieldProblem $rel 'outcome' $outcome 'COMMITTED'))
+    }
+    $version = Assert-ClashTextField -Object $doc -Label $rel -Field 'version' -Problems $problems
+    if (($version.Length -gt 0) -and ($version -cne [string]$entry.version)) {
+      $problems.Add((New-ClashFieldProblem $rel 'version' $version ('the approved version "{0}"' -f [string]$entry.version)))
+    }
+  }
+
+  # ---- the claim-ownership record: PASS, at least one row, and THIS run's row
+  $ownerRel = '06-claim-release-ownership.json'
+  $ownerAbs = Join-Path $Root $ownerRel
+  if (-not (Test-Path -LiteralPath $ownerAbs -PathType Leaf)) {
+    $problems.Add(('no {0} exists: releasing the exclusive-writer claim must be PROVEN, not assumed' -f $ownerRel))
+  }
+  else {
+    $ownerRoot = Get-ClashJsonRoot -Path $ownerAbs -Label 'claim release ownership receipt' -Kind @('object')
+    if (-not $ownerRoot['ok']) { $problems.Add(('{0}: {1}' -f $ownerRel, [string]$ownerRoot['problem'])) }
+    else {
+      $owner = $ownerRoot['value']
+      $ownerStatus = Assert-ClashTextField -Object $owner -Label $ownerRel -Field 'status' -Problems $problems
+      if (($ownerStatus.Length -gt 0) -and ($ownerStatus -cne 'PASS')) {
+        $problems.Add((New-ClashFieldProblem $ownerRel 'status' $ownerStatus 'PASS: the delete that released the claim must have removed exactly this run''s row'))
+      }
+      $rowsField = Get-ClashJsonField -Object $owner -Name 'returnedRows'
+      if (-not (Test-ClashIntegerValue $rowsField['value'])) {
+        $problems.Add((New-ClashFieldProblem $ownerRel 'returnedRows' ($rowsField['value']) 'the number of rows the release returned, as a JSON integer'))
+      }
+      elseif ([long]$rowsField['value'] -lt 1) {
+        $problems.Add((New-ClashFieldProblem $ownerRel 'returnedRows' $rowsField['value'] 'at least one row: a release that removed nothing did not release this run''s claim'))
+      }
+      $releaseRoot = Get-ClashJsonRoot -Path (Join-Path $Root '06-claim-release.json') -Label 'claim release receipt' -Kind @('object')
+      if ($releaseRoot['ok']) {
+        $runId = [string](Get-ClashJsonField -Object $releaseRoot['value'] -Name 'runId')['value']
+        $expectedRunId = [string](Get-ClashJsonField -Object $owner -Name 'expectedRunId')['value']
+        if (($runId.Length -gt 0) -and ($expectedRunId.Length -gt 0) -and ($expectedRunId -cne $runId)) {
+          $problems.Add((New-ClashFieldProblem $ownerRel 'expectedRunId' $expectedRunId ('the run id the released claim belonged to ("{0}")' -f $runId)))
+        }
+        $returnedField = Get-ClashJsonField -Object $owner -Name 'returned'
+        if (Test-ClashJsonKind -Value $returnedField['value'] -Kind 'array') {
+          $returned = @($returnedField['value'])
+          if (($runId.Length -gt 0) -and ($returned -cnotcontains $runId)) {
+            $problems.Add(('{0} does not list this run''s id "{1}" among the rows it returned' -f $ownerRel, $runId))
+          }
+        }
+        else {
+          $problems.Add((New-ClashFieldProblem $ownerRel 'returned' ($returnedField['value']) 'the list of run ids the release returned' ))
+        }
+      }
+    }
+  }
+  return @($problems)
+}
+
 # RC02: ONE deployment-evidence contract, validated by the producer BEFORE it
 # publishes anything and independently by every consumer.
 #
@@ -1690,6 +1926,18 @@ function Test-ClashDeploymentEvidence {
   }
   $approvedEntries = @($approved.entries)
   $approvedProjectRef = [string]$approved.projectRef
+
+  # ------------------------------------------ closed inventory (C22-M1) ------
+  # Round 23. Two questions the Round 22 contract never asked: is every receipt in
+  # this run one the protocol declares, and does every receipt that carries a status
+  # agree with the completion it is supposed to support? A correct graph of receipts
+  # can still describe an unapproved migration or a failed release.
+  foreach ($p in @(Test-ClashReceiptInventory -Root $Root -Approved $approved)) {
+    $problems.Add(('receipt inventory: ' + [string]$p))
+  }
+  foreach ($p in @(Test-ClashReceiptSemantics -Root $Root -Approved $approved)) {
+    $problems.Add(('receipt semantics: ' + [string]$p))
+  }
 
   # ---------------------------------------------------------- 00-baseline ----
   $baseName = '00-baseline.json'
@@ -2186,6 +2434,61 @@ function Read-ClashChecksumFile {
 # The whole package proof. Returns a verdict record; it never throws and never
 # writes. Every field a caller needs is in the record, so no caller needs to
 # re-read either file.
+# Round 23 (C22-H1). The wrapper's ENVELOPE, not only its body.
+#
+# Round 22 compared the text between the wrapper's begin; boundary and its ledger
+# insert, and the ledger tail, which is why an added line inside the body, a rewritten
+# ledger token and text after commit; were all refused. None of those checks looked at
+# what precedes begin; - so a statement inserted BEFORE the transaction passed with
+# every digest rebound, because the body it compared was still the approved body.
+#
+# The envelope rule is structural and total: exactly one statement-level begin; line,
+# exactly one statement-level commit; line, exactly one ledger insert between them,
+# commit; as the last non-blank line, and only comments or blank lines before begin;.
+# Anything executable outside the transaction is refused, whatever the digests say.
+function Get-ClashWrapperEnvelopeProblem {
+  param([string]$Text)
+
+  $lines = @(([string]$Text).Replace("`r`n", "`n") -split "`n")
+  $beginAt = @()
+  $commitAt = @()
+  $insertAt = @()
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    $line = [string]$lines[$i]
+    if ($line -match '^[ \t]*(?i:begin)[ \t]*;[ \t]*$') { $beginAt += $i }
+    if ($line -match '^[ \t]*(?i:commit)[ \t]*;[ \t]*$') { $commitAt += $i }
+    if ($line -match '^[ \t]*(?i:insert)[ \t]+(?i:into)[ \t]+supabase_migrations\.schema_migrations') { $insertAt += $i }
+  }
+  if ($beginAt.Count -ne 1) {
+    return ('has {0} statement-level begin; line(s); the wrapper must open exactly one transaction' -f @($beginAt).Count)
+  }
+  if ($commitAt.Count -ne 1) {
+    return ('has {0} statement-level commit; line(s); the wrapper must close exactly one transaction' -f @($commitAt).Count)
+  }
+  if ($insertAt.Count -ne 1) {
+    return ('has {0} ledger insert statement(s); the wrapper must record exactly one ledger row' -f @($insertAt).Count)
+  }
+  $beginIndex = [int]$beginAt[0]
+  $insertIndex = [int]$insertAt[0]
+  $commitIndex = [int]$commitAt[0]
+  if ($insertIndex -le $beginIndex) { return 'records its ledger row before the transaction it describes' }
+  if ($commitIndex -le $insertIndex) { return 'closes its transaction before recording the ledger row' }
+  for ($i = $commitIndex + 1; $i -lt $lines.Count; $i++) {
+    if (([string]$lines[$i]).Trim().Length -gt 0) {
+      return ('has executable content after its commit; line (line {0}); the transaction must be the end of the artifact' -f ($i + 1))
+    }
+  }
+  for ($i = 0; $i -lt $beginIndex; $i++) {
+    $line = [string]$lines[$i]
+    if ($line.Trim().Length -eq 0) { continue }
+    if ($line -match '^[ \t]*--') { continue }
+    $shown = $line.Trim()
+    if ($shown.Length -gt 80) { $shown = $shown.Substring(0, 80) + '...' }
+    return ('has executable content before its begin; line (line {0}: "{1}"); only comments may precede the transaction' -f ($i + 1), $shown)
+  }
+  return ''
+}
+
 function Test-ClashPackageIntegrity {
   param(
     [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -2415,6 +2718,13 @@ function Test-ClashPackageIntegrity {
               # wrapper's transaction boundary and its ledger insert and compared whole.
               if ($wrapperText.Length -gt 0) {
                 $wrapperNorm = $wrapperText.Replace("`r`n", "`n")
+                # Round 23 (C22-H1): the envelope first. The body and tail checks below
+                # cannot see a statement inserted BEFORE begin;, so the structure of the
+                # whole artifact is verified before its contents are compared.
+                $envelopeProblem = Get-ClashWrapperEnvelopeProblem -Text $wrapperNorm
+                if ($envelopeProblem.Length -gt 0) {
+                  $problems.Add(('{0}: wrapper {1} {2}' -f $label, $wrapperPath, $envelopeProblem))
+                }
                 $openMark = "`nbegin;`n"
                 $insertMark = "`ninsert into supabase_migrations.schema_migrations"
                 $openAt = $wrapperNorm.IndexOf($openMark)
@@ -4274,7 +4584,9 @@ $script:ClashSelfTestRequiredCases = @(
   'packageFidelityBindsEveryWrapperToItsOriginal',
   'writerReceiptStreamRoundTripsThroughProducerAndConsumer',
   'receiptChainRejectsBrokenAndExemptedLinks',
-  'wrapperBodyIsTheApprovedBodyExactly'
+  'wrapperBodyIsTheApprovedBodyExactly',
+  'wrapperEnvelopeRejectsContentOutsideTheTransaction',
+  'completionRejectsUnapprovedAndContradictoryEvidence'
 )
 
 # Returns a FLAT sequence of case-name strings.

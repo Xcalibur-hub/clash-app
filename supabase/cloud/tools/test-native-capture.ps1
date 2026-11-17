@@ -127,7 +127,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 159
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 161
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -2578,7 +2578,8 @@ function Add-FixtureReceipt {
 function New-FinalizationRun {
   param(
     [string[]]$Evidence = @('00-baseline.json', '01-integrity.json', '01b-approved.json', '02-preflight.json',
-                            '04-postflight.json', '05-storage.json', '06-claim-release.json'),
+                            '04-postflight.json', '05-storage.json', '06-claim-release-ownership.json',
+                            '06-claim-release.json'),
     [int]$MigrationCount = 3
   )
 
@@ -2594,6 +2595,7 @@ function New-FinalizationRun {
   $order = @()
   $migrationsSpliced = $false
   foreach ($name in $Evidence) {
+    if ($name -ceq '06-claim-release.json') { $order += '06-claim-release-ownership.json' }
     if (-not $migrationsSpliced -and (@('04-postflight.json', '05-storage.json', '06-claim-release.json') -ccontains $name)) {
       $order += '@migrations'
       $migrationsSpliced = $true
@@ -2666,6 +2668,15 @@ function New-FinalizationRun {
     elseif ($name -ceq '05-storage.json') {
       $body = New-ReportReceiptBody -Contract '95_storage_config.sql' -Gating 6 -Info 1
       foreach ($key in @($body.Keys)) { $fields[$key] = $body[$key] }
+    }
+    elseif ($name -ceq '06-claim-release-ownership.json') {
+      # Round 23 (C22-M1): the runner proves the release removed exactly this run's
+      # row. The fixture must carry the same record, or the contract it is judged by
+      # would not be the contract the runner implements.
+      $fields['status'] = 'PASS'
+      $fields['expectedRunId'] = 'probe-run-id'
+      $fields['returnedRows'] = 1
+      $fields['returned'] = @('probe-run-id')
     }
     elseif ($name -ceq '06-claim-release.json') {
       $fields['status'] = 'PASS'
@@ -5391,6 +5402,182 @@ Add-Case 'wrapperBodyIsTheApprovedBodyExactly' (
   attacks         = (@($b22Results) -join ' ')
   missed          = (@($b22Missed) -join ',')
   note = 'R22/C21-03: a comment added at the start of the body, a rewritten ledger token and a statement after the transaction close are refused, with every digest rebound'
+}
+
+# ---- 160: R23/C22-H1 - nothing executable outside the transaction ----------
+# The Round 22 rule compared the body between begin; and the ledger insert, and the
+# ledger tail, so a statement inserted BEFORE the transaction was invisible to it.
+# These controls keep every digest coherent: the wrapper, its manifest digest and
+# every checksum are rebound, so only the envelope rule can refuse the copy.
+$e23Missed = @()
+$e23Results = @()
+$e23Positive = $null
+$e23Root = New-PackageTreeCopy -Label 'r23env' -CloudRoot $packageRoot
+try { $e23Positive = Test-ClashPackageIntegrity -RepoRoot $e23Root } catch { $e23Positive = $null }
+Remove-Item -LiteralPath $e23Root -Recurse -Force -ErrorAction SilentlyContinue
+if (-not (($null -ne $e23Positive) -and $e23Positive.ok)) { $e23Missed += 'positive-control' }
+
+foreach ($attack in @(
+    @{ name = 'executable-prefix';  expect = 'executable content before its begin;';  accept = $false },
+    @{ name = 'comment-prefix';     expect = '';                                       accept = $true },
+    @{ name = 'statement-after-commit'; expect = 'executable content after its commit;'; accept = $false },
+    @{ name = 'second-begin';       expect = 'statement-level begin; line(s)';         accept = $false })) {
+  $pkg = New-PackageTreeCopy -Label ('r23-' + [string]$attack.name) -CloudRoot $packageRoot
+  try {
+    $manifestFile = Join-Path $pkg 'supabase\cloud\manifest.json'
+    $doc = [System.IO.File]::ReadAllText($manifestFile) | ConvertFrom-Json
+    $entry = $doc.entries[0]
+    $wrapperRel = 'supabase/cloud/generated/' + [string]$entry.wrapperPath
+    $wrapperAbs = Join-Path $pkg ($wrapperRel.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    $text = [System.IO.File]::ReadAllText($wrapperAbs).Replace("`r`n", "`n")
+    if ([string]$attack.name -ceq 'executable-prefix') {
+      # the exact C22-H1 reproduction: one harmless statement ahead of the transaction
+      $text = "select 1;`n" + $text
+    }
+    elseif ([string]$attack.name -ceq 'comment-prefix') {
+      # positive control: a comment before the transaction is NOT executable content
+      $text = "-- reviewed by the Round 23 audit`n" + $text
+    }
+    elseif ([string]$attack.name -ceq 'statement-after-commit') {
+      $text = $text.TrimEnd() + "`nselect 2;`n"
+    }
+    else {
+      $text = $text.Replace("`nbegin;`n", "`nbegin;`nbegin;`n")
+    }
+    [void](Set-PackageFileAndRebind -RepoRoot $pkg -Relative $wrapperRel -Text $text)
+    $doc = [System.IO.File]::ReadAllText($manifestFile) | ConvertFrom-Json
+    $doc.entries[0].wrapperSha256 = Get-NormalizedSha256 -Path $wrapperAbs
+    [System.IO.File]::WriteAllText($manifestFile, ($doc | ConvertTo-Json -Depth 8))
+    [void](Set-PackageFileAndRebind -RepoRoot $pkg -Relative 'supabase/cloud/manifest.json' -Text ([System.IO.File]::ReadAllText($manifestFile)))
+    $verdict = $null
+    try { $verdict = Test-ClashPackageIntegrity -RepoRoot $pkg } catch { $verdict = $null }
+    $textOut = ''
+    if ($null -ne $verdict) { $textOut = (@($verdict.problems) -join ' ') }
+    $accepted = ($null -ne $verdict) -and $verdict.ok
+    $e23Results += ('{0}={1}' -f $attack.name, $accepted)
+    if ([bool]$attack.accept) {
+      if (-not $accepted) { $e23Missed += ([string]$attack.name + '[refused]') }
+    }
+    else {
+      if ($accepted -or ($textOut -notmatch [regex]::Escape([string]$attack.expect))) { $e23Missed += [string]$attack.name }
+    }
+  }
+  catch { $e23Missed += ([string]$attack.name + '[threw]') }
+  finally { Remove-Item -LiteralPath $pkg -Recurse -Force -ErrorAction SilentlyContinue }
+}
+Add-Case 'wrapperEnvelopeRejectsContentOutsideTheTransaction' (
+  @($e23Missed).Count -eq 0 -and
+  @($e23Results).Count -eq 4) @{
+  positiveControl = $(if ($null -ne $e23Positive) { [string]$e23Positive.ok } else { 'threw' })
+  attacks         = (@($e23Results) -join ' ')
+  missed          = (@($e23Missed) -join ',')
+  note = 'R23/C22-H1: a statement before begin;, a statement after commit; and a second begin; are refused with every digest coherent, while a comment before begin; and the pristine copy are accepted'
+}
+
+# ---- 161-162: R23/C22-M1 - no unapproved or contradictory receipt ---------
+# Adds one receipt to a writer-built run and re-chains the rest, so the graph stays
+# valid and only the inventory/semantic rule can refuse it. This is the audit's own
+# method: a coherent graph of receipts the protocol does not permit.
+function Add-CoherentReceipt {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][string]$Name,
+    $Fields = @{},
+    [Parameter(Mandatory = $true)][string]$After
+  )
+
+  $chain = Get-ClashReceiptChain -Root $Root -Exclude @('EVIDENCE-MANIFEST.json', '06-complete-unverified.json')
+  $order = @($chain.order)
+  $index = [array]::IndexOf($order, $After)
+  if ($index -lt 0) { throw ('the receipt {0} is not in the run chain' -f $After) }
+  $prevSha = Get-NormalizedSha256 -Path (Join-Path $Root ($After.Replace('/', [System.IO.Path]::DirectorySeparatorChar)))
+  [void](Add-Receipt -Root $Root -Name $Name -PrevSha $prevSha -Fields $Fields)
+  $newOrder = @()
+  for ($i = 0; $i -lt $order.Count; $i++) {
+    $newOrder += [string]$order[$i]
+    if ($i -eq $index) { $newOrder += $Name }
+  }
+  [void](Repair-ReceiptChain -Root $Root -Order $newOrder -From $index)
+  return $Name
+}
+
+$m23Positive = $null
+$m23Root = New-FinalizationRun
+try { $m23Positive = Test-ClashDeploymentEvidence -Root $m23Root -Approved $script:probeApproved } catch { $m23Positive = $null }
+Remove-FinalizationRun -Root $m23Root
+
+$m23Attacks = @(
+  @{ name = 'nested-unapproved-migration'; expect = 'nested inside 03-migrations'; apply = {
+      param($root)
+      [void](Add-CoherentReceipt -Root $root -Name '03-migrations/extra/999-unapproved.json' -After '03-migrations/001-20260101000001.json' -Fields ([ordered]@{
+            status = 'PASS'; index = 999; version = '20260101999999'; mode = 'direct'; ledgerName = 'unapproved'
+            executedSha256 = ('a' * 64); expectedToken = ('sha256:' + ('a' * 64)); wrapperPath = '999_20260101999999.sql'
+            wrapperSha256 = ('a' * 64); normalisation = 'none'; outcome = 'COMMITTED'; exitCode = 0; timedOut = $false
+            durationMs = 1; stderrChars = 0; stderrExcerpt = ''; ledgerReadBack = 'MATCH'
+          }))
+    } },
+  @{ name = 'undeclared-receipt'; expect = 'is not a receipt this protocol declares'; apply = {
+      param($root)
+      [void](Add-CoherentReceipt -Root $root -Name '04-unexpected.json' -After '04-postflight.json' -Fields ([ordered]@{ status = 'PASS'; note = 'not part of the protocol' }))
+    } },
+  @{ name = 'undeclared-failed-receipt'; expect = 'is not a receipt this protocol declares|status "FAIL"'; apply = {
+      param($root)
+      [void](Add-CoherentReceipt -Root $root -Name '04-supplement.json' -After '04-postflight.json' -Fields ([ordered]@{ status = 'FAIL'; note = 'a second opinion the protocol never asked for' }))
+    } },
+  @{ name = 'failed-applied-receipt'; expect = 'status'; apply = {
+      param($root)
+      $target = '002-20260101000002-applied.json'
+      $chain = Get-ClashReceiptChain -Root $root -Exclude @('EVIDENCE-MANIFEST.json', '06-complete-unverified.json')
+      $order = @($chain.order)
+      $at = [array]::IndexOf($order, $target)
+      if ($at -lt 0) { throw 'the applied receipt is not in the run chain' }
+      [void](Set-JsonScalarField -Path (Join-Path $root $target) -Name 'status' -RawJson '"FAIL"')
+      [void](Repair-ReceiptChain -Root $root -Order $order -From $at)
+    } },
+  @{ name = 'failed-claim-ownership'; expect = 'status|returnedRows'; apply = {
+      param($root)
+      $target = '06-claim-release-ownership.json'
+      $chain = Get-ClashReceiptChain -Root $root -Exclude @('EVIDENCE-MANIFEST.json', '06-complete-unverified.json')
+      $order = @($chain.order)
+      $at = [array]::IndexOf($order, $target)
+      if ($at -lt 0) { throw 'the ownership receipt is not in the run chain' }
+      [void](Set-JsonScalarField -Path (Join-Path $root $target) -Name 'status' -RawJson '"STOP"')
+      [void](Set-JsonScalarField -Path (Join-Path $root $target) -Name 'returnedRows' -RawJson '0')
+      [void](Repair-ReceiptChain -Root $root -Order $order -From $at)
+    } }
+)
+$m23Missed = @()
+$m23Results = @()
+foreach ($attack in $m23Attacks) {
+  $root = New-FinalizationRun
+  try {
+    & $attack.apply $root
+    $ev = $null
+    try { $ev = Test-ClashDeploymentEvidence -Root $root -Approved $script:probeApproved } catch { $ev = $null }
+    $text = ''
+    if ($null -ne $ev) { $text = (@($ev.problems) -join ' ') }
+    $refused = ($null -ne $ev) -and (-not $ev.ok)
+    $m23Results += ('{0}={1}' -f $attack.name, $refused)
+    if (-not $refused -or ($text -notmatch [string]$attack.expect)) { $m23Missed += [string]$attack.name }
+    # the CONSUMER must refuse it too, on the sealed run the producer would have built
+    if ($null -ne $ev -and $ev.ok) {
+      $pub = Invoke-CompletionProbe -Root $root
+      $consumer = $null
+      if ($pub.ok) { try { $consumer = Test-ClashRunCompletion -RunPath $root -Approved $script:probeApproved } catch { $consumer = $null } }
+      if (($null -eq $consumer) -or $consumer.ok) { $m23Missed += ([string]$attack.name + '[consumer]') }
+    }
+  }
+  catch { $m23Missed += ([string]$attack.name + '[threw]') }
+  finally { Remove-FinalizationRun -Root $root }
+}
+Add-Case 'completionRejectsUnapprovedAndContradictoryEvidence' (
+  $null -ne $m23Positive -and $m23Positive.ok -and
+  @($m23Missed).Count -eq 0 -and
+  @($m23Results).Count -eq $m23Attacks.Count) @{
+  positiveControl = $(if ($null -ne $m23Positive) { [string]$m23Positive.ok } else { 'threw' })
+  attacks         = (@($m23Results) -join ' ')
+  missed          = (@($m23Missed) -join ',')
+  note = 'R23/C22-M1: a nested unapproved migration receipt, an undeclared PASS receipt, an undeclared FAIL receipt, a FAIL applied receipt and a failed claim-ownership record are all refused, with valid graph links'
 }
 
 # ---- 149: the validators themselves - removed checks must be DETECTED -------

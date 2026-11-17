@@ -6,6 +6,8 @@ a-broken-bootstrap-prints-no-pass-lines
 a-broken-bootstrap-prints-no-pass-summary
 a-ca-certificate-is-mandatory
 a-claim-collision-is-classified-by-sqlstate-and-stops
+a-comment-before-begin-is-accepted
+a-comment-inside-a-wrapper-header-stays-accepted
 a-finalised-run-is-never-re-finalised-and-a-doubt-marker-blocks-publicat
 a-finalization-failure-never-claims-a-rollback-and-never-invites-a-re-ru
 a-framed-report-still-has-to-satisfy-the-declared-contract
@@ -18,8 +20,10 @@ a-rejected-run-cannot-leave-a-pass-receipt-on-disk
 a-rejected-seal-says-why-the-null-root-is-an-explicit-problem
 a-report-that-does-not-hold-never-produces-a-pass-phase-receipt
 a-script-scope-trap-writes-a-receipt-and-exits-nonzero
+a-second-begin-is-rejected
 a-serialization-failure-writes-a-fail-document
 a-skipped-section-cannot-pass
+a-statement-after-commit-is-rejected
 a-typed-field-record-keeps-missing-and-null-apart
 a-verdict-renders-a-collection-as-a-collection
 accepts-a-unc-path
@@ -42,6 +46,7 @@ all-wrapper-scaffolding-lints-clean
 an-equal-total-substitution-is-caught-as-a-missing-assertion
 an-equal-total-substitution-is-caught-as-an-unlisted-assertion
 an-equal-total-substitution-makes-the-suite-exit-nonzero
+an-executable-statement-before-begin-is-rejected
 an-incomplete-report-stops-with-wording-that-does-not-imply-a-rollback
 an-unhandled-runner-exception-still-writes-a-receipt-and-seals
 assertion-inventory-every-assertion-has-a-stable-identifier
@@ -113,9 +118,10 @@ every-named-argument-is-a-declared-parameter-or-a-reviewed-cmdlet-parame
 every-original-sha256-matches-disk
 every-phase-emits-a-receipt
 every-wrapper-body-is-byte-identical-to-its-normalised-source
+every-wrapper-envelope-has-exactly-one-transaction-and-nothing-executabl
 evidence-files-are-created-exclusively-createnew
 exactly-111-original-migrations
-exactly-159-declared-case-names
+exactly-161-declared-case-names
 exactly-two-migrations-needed-normalisation
 executed-source-is-the-variant
 five-powershell-tools-plus-the-adapter-library
@@ -341,6 +347,10 @@ round-22-the-applied-receipt-has-one-location-shared-by-writer-and-verif
 round-22-the-chain-covers-every-receipt-and-genesis-is-never-an-interior
 round-22-the-wrapper-body-is-extracted-and-compared-whole-not-searched-f
 round-22-write-evidence-hashes-exactly-the-bytes-it-writes-crlf-normalis
+round-23-a-receipt-the-protocol-does-not-declare-is-refused
+round-23-applied-and-claim-ownership-receipts-are-validated-not-merely-c
+round-23-every-receipt-must-carry-the-status-its-type-allows
+round-23-the-planner-verifies-the-wrapper-envelope-not-only-the-extracte
 run-evidence-is-hash-chained-and-sealed
 runner-executes-step-0-itself-on-every-fresh-run
 sanitises-in-memory-before-encoding
@@ -402,7 +412,7 @@ the-executed-null-fixture-is-the-audit-four-bytes
 the-exit-code-loss-is-asserted-not-assumed
 the-extractor-refuses-a-drifted-region-instead-of-probing-something-else
 the-getter-builds-an-explicit-flat-list
-the-harness-asserts-exactly-159
+the-harness-asserts-exactly-161
 the-harness-builds-its-fixtures-in-the-real-psql-envelope
 the-harness-checks-the-executed-count
 the-harness-executes-the-committed-gate-2-block-and-forbids-a-suffix-cou

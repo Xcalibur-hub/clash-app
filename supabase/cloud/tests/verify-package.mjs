@@ -36,8 +36,8 @@ const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
-const EXPECTED_CASES = 159;
-const EXPECTED_ASSERTIONS = 519;
+const EXPECTED_CASES = 161;
+const EXPECTED_ASSERTIONS = 529;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -496,6 +496,58 @@ for (const e of entries) {
   if (sha(body.trim()) !== sha(normalise(src).trim())) bodyMismatch.push(key);
 }
 check('every wrapper body is byte-identical to its normalised source', bodyMismatch.length === 0, bodyMismatch.slice(0, 5).join(','));
+
+// Round 23 (C22-H1): the wrapper ENVELOPE, not only its body.
+// Round 22 compared the text between begin; and the ledger insert, which is why a
+// line added inside the body, a rewritten ledger token and text after commit; were
+// refused. Nothing looked at what PRECEDES begin;, so a statement inserted before
+// the transaction passed with every digest rebound. The rule below is total: exactly
+// one statement-level begin;, exactly one statement-level commit; that must be the
+// last non-blank line, exactly one ledger insert between them, and only comments or
+// blank lines before begin;.
+function wrapperEnvelopeProblems(text) {
+  const problems = [];
+  const lines = String(text).replace(/\r\n/g, '\n').split('\n');
+  const begin = []; const commit = []; const insert = [];
+  lines.forEach((line, i) => {
+    if (/^\s*begin\s*;\s*$/i.test(line)) begin.push(i);
+    if (/^\s*commit\s*;\s*$/i.test(line)) commit.push(i);
+    if (/^\s*insert\s+into\s+supabase_migrations\.schema_migrations/i.test(line)) insert.push(i);
+  });
+  if (begin.length !== 1) problems.push(`${begin.length} statement-level begin; line(s)`);
+  if (commit.length !== 1) problems.push(`${commit.length} statement-level commit; line(s)`);
+  if (insert.length !== 1) problems.push(`${insert.length} ledger insert statement(s)`);
+  if (problems.length) return problems;
+  if (insert[0] <= begin[0]) problems.push('ledger row before the transaction');
+  if (commit[0] <= insert[0]) problems.push('transaction closed before the ledger row');
+  for (let i = commit[0] + 1; i < lines.length; i += 1) {
+    if (lines[i].trim()) { problems.push('executable content after commit;'); break; }
+  }
+  for (let i = 0; i < begin[0]; i += 1) {
+    if (!lines[i].trim() || /^\s*--/.test(lines[i])) continue;
+    problems.push(`executable content before begin; (line ${i + 1})`);
+    break;
+  }
+  return problems;
+}
+const envelopeKeys = entries.map((e) => String(e.index).padStart(3, '0'));
+const envelopeBad = envelopeKeys.filter((k) => wrapperEnvelopeProblems(bodies[k]).length > 0);
+check('every wrapper envelope has exactly one transaction and nothing executable outside it',
+  envelopeBad.length === 0, envelopeBad.slice(0, 5).join(','));
+{
+  // negative controls against the SAME function the package check uses above
+  const sample = bodies[envelopeKeys[0]];
+  check('an executable statement before begin; is rejected',
+    wrapperEnvelopeProblems('select 1;\n' + sample).length > 0);
+  check('a comment before begin; is accepted',
+    wrapperEnvelopeProblems('-- reviewed 2026-11-15\n' + sample).length === 0);
+  check('a statement after commit; is rejected',
+    wrapperEnvelopeProblems(sample.replace(/commit;\s*$/, 'commit;\nselect 2;\n')).length > 0);
+  check('a second begin; is rejected',
+    wrapperEnvelopeProblems(sample.replace('\nbegin;\n', '\nbegin;\nbegin;\n')).length > 0);
+  check('a comment inside a wrapper header stays accepted',
+    wrapperEnvelopeProblems(sample.replace('\nbegin;\n', '\n-- audit note\nbegin;\n')).length === 0);
+}
 
 hdr(10, 'PowerShell structural lint (lexer, not quote counting)');
 // PowerShell is not SQL: strings, here-strings and comments are lexically
@@ -3084,6 +3136,45 @@ if (sectionsRun !== EXPECTED_SECTIONS) {
 if (pass === 0) {
   failures.push('no assertion produced a result');
   console.log('  FAIL  no assertion produced a result');
+}
+
+// ---- Round 23 (C22-H1 / C22-M1): the two admission boundaries --------------
+{
+  const nativeSrc = read(join(CLOUD, 'tools', 'lib', 'clash-native.ps1'));
+  const envelopeFn = (() => {
+    const start = nativeSrc.indexOf('function Get-ClashWrapperEnvelopeProblem');
+    if (start < 0) { return ''; }
+    const next = nativeSrc.indexOf('\nfunction ', start + 1);
+    return nativeSrc.slice(start, next < 0 ? nativeSrc.length : next);
+  })();
+  const planner = (() => {
+    const start = nativeSrc.indexOf('function Test-ClashPackageIntegrity');
+    const next = nativeSrc.indexOf('\nfunction ', start + 1);
+    return start < 0 ? '' : nativeSrc.slice(start, next < 0 ? nativeSrc.length : next);
+  })();
+  const verifier = (() => {
+    const start = nativeSrc.indexOf('function Test-ClashDeploymentEvidence');
+    const next = nativeSrc.indexOf('\nfunction ', start + 1);
+    return start < 0 ? '' : nativeSrc.slice(start, next < 0 ? nativeSrc.length : next);
+  })();
+  check('Round 23: the planner verifies the wrapper envelope, not only the extracted body',
+    /\$envelopeProblem = Get-ClashWrapperEnvelopeProblem -Text \$wrapperNorm/.test(planner) &&
+    /executable content before its begin;/.test(envelopeFn) &&
+    /executable content after its commit;/.test(envelopeFn) &&
+    /statement-level begin; line\(s\)/.test(envelopeFn));
+  check('Round 23: a receipt the protocol does not declare is refused',
+    /function Get-ClashDeclaredReceiptNames/.test(nativeSrc) &&
+    /Test-ClashReceiptInventory -Root \$Root -Approved \$approved/.test(verifier) &&
+    /is not a receipt this protocol declares/.test(nativeSrc) &&
+    /nested inside 03-migrations/.test(nativeSrc));
+  check('Round 23: every receipt must carry the status its type allows',
+    /function Test-ClashReceiptSemantics/.test(nativeSrc) &&
+    /cannot hold a receipt that does not say/.test(nativeSrc) &&
+    /Test-ClashReceiptSemantics -Root \$Root -Approved \$approved/.test(verifier));
+  check('Round 23: applied and claim-ownership receipts are validated, not merely chained',
+    /an applied migration that did not commit cannot support a completed deployment/.test(nativeSrc) &&
+    /no .* exists: releasing the exclusive-writer claim must be PROVEN/.test(nativeSrc) &&
+    /returnedRows/.test(nativeSrc));
 }
 
 // ---- Round 22: the four root causes, asserted at the source ----------------
