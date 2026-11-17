@@ -1389,7 +1389,7 @@ function Test-ClashDeploymentEvidence {
   # ---------------------------------------------------------- 00-baseline ----
   $baseName = '00-baseline.json'
   $baseRoot = Get-ClashJsonRoot -Path (Join-Path $Root $baseName) -Label 'deployment baseline receipt' -Kind @('object')
-  if (-not $baseRoot['ok']) { $problems.Add($baseRoot['problem']) }
+  if (-not $baseRoot['ok']) { $problems.Add(('{0} root: {1}' -f $baseName, [string]$baseRoot['problem'])) }
   else {
     $base = $baseRoot['value']
     Assert-ClashReceiptHeader -Object $base -Label $baseName -Name $baseName -Problems $problems -AdapterKind 'object'
@@ -1422,7 +1422,7 @@ function Test-ClashDeploymentEvidence {
   $intName = '01-integrity.json'
   $intRoot = Get-ClashJsonRoot -Path (Join-Path $Root $intName) -Label 'package integrity receipt' -Kind @('object')
   $wrappersChecked = -1
-  if (-not $intRoot['ok']) { $problems.Add($intRoot['problem']) }
+  if (-not $intRoot['ok']) { $problems.Add(('{0} root: {1}' -f $intName, [string]$intRoot['problem'])) }
   else {
     $integrity = $intRoot['value']
     Assert-ClashReceiptHeader -Object $integrity -Label $intName -Name $intName -Problems $problems
@@ -1445,19 +1445,19 @@ function Test-ClashDeploymentEvidence {
 
   # ------------------------------------ 02-preflight / 04-postflight / 05-storage
   $preflight = Test-ClashReportReceipt -Root $Root -Name '02-preflight.json' -ContractName '00_preflight.sql' -GatingExpected 19 -InfoExpected 2
-  foreach ($p in @($preflight['problems'])) { $problems.Add($p) }
+  foreach ($p in @($preflight['problems'])) { $problems.Add(('02-preflight.json: ' + [string]$p)) }
   if ($preflight['ok']) { $receiptsValidated++ }
   $postflight = Test-ClashReportReceipt -Root $Root -Name '04-postflight.json' -ContractName '90_verify.sql' -GatingExpected 19 -InfoExpected 0
-  foreach ($p in @($postflight['problems'])) { $problems.Add($p) }
+  foreach ($p in @($postflight['problems'])) { $problems.Add(('04-postflight.json: ' + [string]$p)) }
   if ($postflight['ok']) { $receiptsValidated++ }
   $storage = Test-ClashReportReceipt -Root $Root -Name '05-storage.json' -ContractName '95_storage_config.sql' -GatingExpected 6 -InfoExpected 1
-  foreach ($p in @($storage['problems'])) { $problems.Add($p) }
+  foreach ($p in @($storage['problems'])) { $problems.Add(('05-storage.json: ' + [string]$p)) }
   if ($storage['ok']) { $receiptsValidated++ }
 
   # ----------------------------------------------------- 06-claim-release ----
   $relName = '06-claim-release.json'
   $relRoot = Get-ClashJsonRoot -Path (Join-Path $Root $relName) -Label 'claim release receipt' -Kind @('object')
-  if (-not $relRoot['ok']) { $problems.Add($relRoot['problem']) }
+  if (-not $relRoot['ok']) { $problems.Add(('{0} root: {1}' -f $relName, [string]$relRoot['problem'])) }
   else {
     $release = $relRoot['value']
     Assert-ClashReceiptHeader -Object $release -Label $relName -Name $relName -Problems $problems
@@ -1477,7 +1477,7 @@ function Test-ClashDeploymentEvidence {
   foreach ($name in $names) {
     $relName = [string]$name
     $root = Get-ClashJsonRoot -Path (Join-Path $Root $relName) -Label ('migration receipt ' + $relName) -Kind @('object')
-    if (-not $root['ok']) { $problems.Add($root['problem']); continue }
+    if (-not $root['ok']) { $problems.Add(('{0} root: {1}' -f $relName, [string]$root['problem'])); continue }
     $doc = $root['value']
     $label = $relName
     Assert-ClashReceiptHeader -Object $doc -Label $label -Name $relName -Problems $problems
@@ -2082,7 +2082,7 @@ function Publish-ClashCompletion {
     # Every problem is rendered with its length, so an empty entry (a null that
     # reached the list) is visible as such instead of as a blank between separators.
     $evidenceSample = @(@($evidence.problems) | Select-Object -First 12 | ForEach-Object {
-        '#{0}#{1}' -f ([string]$_).Length, [string]$_ })
+        '#{0}#{1}#{2}' -f ([string]$_).Length, $(if ($null -eq $_) { 'null' } else { 'str' }), [string]$_ })
     throw ('completion refused: the deployment evidence does not satisfy the contract ({0} problem(s)): {1}. Nothing was published.' -f @($evidence.problems).Count, ($evidenceSample -join '; '))
   }
 
