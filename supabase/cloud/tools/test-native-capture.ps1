@@ -1201,7 +1201,7 @@ function Get-PreflightGateBlock {
     "if (-not `$pfReport.ok)"                                      = 1
     "'02-preflight-fail.json'"                                     = 1
     "'02-preflight-rows.json'"                                     = 1
-    'preflight\00_preflight.sql'                                   = 1
+    'preflight/00_preflight.sql'                                   = 1
   }
   $problems = @()
   foreach ($marker in @($required.Keys)) {
@@ -2645,6 +2645,10 @@ function New-FinalizationRun {
     $doc['stderrChars'] = 0
     $doc['stderrExcerpt'] = ''
     $doc['ledgerReadBack'] = 'MATCH'
+    # Add-Receipt ALWAYS writes prevReceiptSha - 'GENESIS' when the run has no
+    # earlier receipt to chain from - so the fixture writes it for every ordinal.
+    # A fixture that omitted it on the first receipt was accepted by the old
+    # consumer and refused by the new one, which is the point of the rule.
     if ($i -gt 1) {
       # the predecessor is the receipt before this one, by its on-disk digest: the
       # validator re-derives the link, so a fixture with a decorative chain would
@@ -2652,6 +2656,7 @@ function New-FinalizationRun {
       $previousLeaf = '{0:D3}-{1}.json' -f ($i - 1), ('20260101{0:D6}' -f ($i - 1))
       $doc['prevReceiptSha'] = (Get-NormalizedSha256 -Path (Join-Path $root ('03-migrations/' + $previousLeaf)))
     }
+    else { $doc['prevReceiptSha'] = 'GENESIS' }
     [void](Write-Evidence -Path (Join-Path $root ('03-migrations/' + $leaf)) -Text ($doc | ConvertTo-Json -Depth 6))
   }
 
