@@ -1,11 +1,11 @@
 # ============================================================================
-# CLASH - Windows offline validation (Round 11)
+# CLASH - Windows offline validation (Rounds 11-20)
 #
 # WHY THIS FILE EXISTS
 # --------------------
 # Every round before this one was validated on Linux, where Windows PowerShell
 # 5.1 does not exist. `tests/verify-package.mjs` proves the package statically
-# (425 assertions, a real lexer, a structural lint) and that is worth having, but
+# (494 assertions, a real lexer, a structural lint) and that is worth having, but
 # it cannot execute the one runtime the package ships for. Round 10 shipped a
 # defect of exactly that shape: in `tools/test-native-capture.ps1` a membership
 # test was written as
@@ -39,8 +39,8 @@
 # FAIL-CLOSED
 # -----------
 # Each gate is its own step, so a non-zero exit stops every later gate. Nothing
-# here treats silence as success: the adapter gate asserts 135/135 executed cases
-# through the package's own validator, and the suite gate asserts 467 passed /
+# here treats silence as success: the adapter gate asserts 150/150 executed cases
+# through the package's own validator, and the suite gate asserts 494 passed /
 # 0 failed / machine summary agreement, not merely "no output and exit 0".
 #
 # DIAGNOSTICS
@@ -163,14 +163,14 @@ jobs:
           Write-Host ('PARSE OK ' + $files.Count + ' files; negative control reported ' + $probeErrors.Count + ' error(s)') }
           catch { Write-Host ('::error::CLASH-PARSE-GATE ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
 
-      - name: Native adapter self-test - 135 cases on this runtime
+      - name: Native adapter self-test - 150 cases on this runtime
         shell: cmd
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
           -ExecutionPolicy Bypass -File supabase/cloud/tools/test-native-capture.ps1
           -OutFile supabase/cloud/evidence-adapter/ci-adapter-selftest.json
 
-      - name: Verify the adapter receipt with the package's own gate (PASS, 135/135, adapter 5.1.0)
+      - name: Verify the adapter receipt with the package's own gate (PASS, 150/150, adapter 5.2.0)
         shell: cmd
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
@@ -178,12 +178,12 @@ jobs:
           $lib = 'supabase/cloud/tools/lib/clash-native.ps1';
           $receipt = 'supabase/cloud/evidence-adapter/ci-adapter-selftest.json'; . $lib;
           $identity = Get-ClashAdapterIdentity;
-          if ([string]$identity.version -ne '5.1.0') { throw ('REFUSED: adapter version is ' + $identity.version + ', expected 5.1.0') };
+          if ([string]$identity.version -ne '5.2.0') { throw ('REFUSED: adapter version is ' + $identity.version + ', expected 5.2.0') };
           if ([string]$identity.id -ne 'clash-native-adapter') { throw ('REFUSED: adapter id is ' + $identity.id) };
           $r = Assert-AdapterSelfTest -ReceiptPath $receipt -AdapterPath $lib;
-          if ([int]$r.casesExecuted -ne 135) { throw ('REFUSED: the receipt records ' + $r.casesExecuted + ' executed case(s), 135 are required') };
+          if ([int]$r.casesExecuted -ne 150) { throw ('REFUSED: the receipt records ' + $r.casesExecuted + ' executed case(s), 150 are required') };
           if ([string]$r.powerShell -notmatch '^5\.1\.') { throw ('REFUSED: the receipt was produced on ' + $r.powerShell) };
-          Write-Host ('ADAPTER RECEIPT OK cases=' + $r.casesExecuted + '/135 powerShell=' + $r.powerShell + ' receiptSha256=' + $r.receiptSha256) }
+          Write-Host ('ADAPTER RECEIPT OK cases=' + $r.casesExecuted + '/150 powerShell=' + $r.powerShell + ' receiptSha256=' + $r.receiptSha256) }
           catch { Write-Host ('::error::CLASH-ADAPTER-RECEIPT ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
 
       - name: Offline manifest verification (111 originals, wrappers, checksums, git clean)
@@ -192,7 +192,7 @@ jobs:
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
           -ExecutionPolicy Bypass -File supabase/cloud/tools/check-manifest.ps1
 
-      - name: Offline Node package suite through the adapter (467 assertions)
+      - name: Offline Node package suite through the adapter (494 assertions)
         shell: cmd
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
@@ -213,7 +213,7 @@ jobs:
           Write-Host ('MANIFEST RECEIPT OK entries=' + $d.entries + ' checksumFiles=' + $d.checksumFiles) }
           catch { Write-Host ('::error::CLASH-MANIFEST-RECEIPT ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
 
-      - name: Verify the suite receipt (467/467, machine summary agreed, adapter 5.1.0)
+      - name: Verify the suite receipt (494/494, machine summary agreed, adapter 5.2.0)
         shell: cmd
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
@@ -222,13 +222,13 @@ jobs:
           if ($receipts.Count -ne 1) { throw ('expected exactly 1 test-run receipt, found ' + $receipts.Count) };
           $d = [System.IO.File]::ReadAllText($receipts[0].FullName) | ConvertFrom-Json;
           if ([string]$d.status -ne 'PASS') { throw ('REFUSED: suite receipt status is ' + $d.status) };
-          if ([int]$d.passLines -ne 467) { throw ('REFUSED: ' + $d.passLines + ' assertion(s) passed, 467 are required') };
+          if ([int]$d.passLines -ne 494) { throw ('REFUSED: ' + $d.passLines + ' assertion(s) passed, 494 are required') };
           if ([int]$d.failLines -ne 0) { throw ('REFUSED: ' + $d.failLines + ' assertion(s) failed') };
-          if ([int]$d.assertionsExecuted -ne 467) { throw ('REFUSED: ' + $d.assertionsExecuted + ' assertion(s) executed, 467 are required') };
+          if ([int]$d.assertionsExecuted -ne 494) { throw ('REFUSED: ' + $d.assertionsExecuted + ' assertion(s) executed, 494 are required') };
           if (-not $d.machineReadable) { throw 'REFUSED: the suite summary line did not agree with its own PASS/FAIL counts' };
-          if ([string]$d.adapter.version -ne '5.1.0') { throw ('REFUSED: the suite ran on adapter ' + $d.adapter.version) };
+          if ([string]$d.adapter.version -ne '5.2.0') { throw ('REFUSED: the suite ran on adapter ' + $d.adapter.version) };
           if ([string]$d.outcome -ne 'SUCCEEDED') { throw ('REFUSED: native outcome was ' + $d.outcome) };
-          Write-Host ('SUITE RECEIPT OK 467/467 failures=0 machineReadable=' + $d.machineReadable + ' adapter=' + $d.adapter.version) }
+          Write-Host ('SUITE RECEIPT OK 494/494 failures=0 machineReadable=' + $d.machineReadable + ' adapter=' + $d.adapter.version) }
           catch { Write-Host ('::error::CLASH-SUITE-RECEIPT ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
 
       - name: Publish receipt state as annotations (always runs, never fails the job)

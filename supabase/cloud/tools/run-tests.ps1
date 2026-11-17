@@ -52,17 +52,14 @@ $r = Invoke-NativeProcess -FilePath $nodePath -Arguments @($testScript) -Timeout
 $passLines = ([regex]::Matches($r.stdOut, '(?m)^  PASS  ')).Count
 $failLines = ([regex]::Matches($r.stdOut, '(?m)^  FAIL  ')).Count
 $summary   = ($r.stdOut -split "`r?`n" | Where-Object { $_ -match '^\d+ passed, \d+ failed$' } | Select-Object -Last 1)
-$machine   = $null
-$machineLine = ($r.stdOut -split "`r?`n" | Where-Object { $_ -match '^CLASH-TEST-SUMMARY ' } | Select-Object -Last 1)
-if ($machineLine) {
-  try { $machine = ($machineLine.Substring('CLASH-TEST-SUMMARY '.Length) | ConvertFrom-Json) }
-  catch { $machine = $null }
-}
-$countsAgree = ($null -ne $machine -and
-                [int]$machine.passed -eq $passLines -and
-                [int]$machine.failed -eq $failLines -and
-                [int]$machine.total -eq ($passLines + $failLines) -and
-                [int]$machine.passed -gt 0)
+
+# RC09: the machine-readable summary is AUTHORITATIVE evidence, so it is parsed by
+# the adapter's typed reader rather than by [int] casts here. The old code cast
+# untrusted text ({passed:1.4} became 1, "12" became 12), took the LAST summary line
+# (so a second summary could mask an earlier failure) and accepted a summary whose
+# own total disagreed with passed+failed.
+$machine = Test-ClashSuiteSummary -StdOut $r.stdOut -PassLines $passLines -FailLines $failLines
+$countsAgree = $machine.ok -and ($machine.failed -eq 0) -and ($machine.passed -gt 0)
 
 Write-Host ''
 if (-not [string]::IsNullOrWhiteSpace($r.stdErr)) {
@@ -87,7 +84,8 @@ $receipt = [ordered]@{
   failLines    = $failLines
   summary      = $(if ($summary) { [string]$summary } else { '<no summary line>' })
   machineReadable = $countsAgree
-  machineSummary  = $machine
+  machineProblems = @($machine.problems)
+  machineSummary  = [ordered]@{ passed = [int]$machine.passed; failed = [int]$machine.failed; total = [int]$machine.total }
   assertionsExecuted = ($passLines + $failLines)
   status       = $(if ($ok) { 'PASS' } else { 'FAIL' })
   stderrExcerpt = (Get-NativeErrorExcerpt $r 600)
@@ -108,6 +106,7 @@ if (-not $ok) {
   }
   elseif (-not $countsAgree) {
     Write-Host 'The suite output does not agree with its own summary line: the run was truncated or interleaved. Treat as FAIL.' -ForegroundColor Red
+    foreach ($problem in @($machine.problems)) { Write-Host ('  summary problem: {0}' -f $problem) -ForegroundColor Red }
   }
   Write-Host 'OFFLINE TESTS FAILED' -ForegroundColor Red
   exit 1

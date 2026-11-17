@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **467 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **494 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -43,7 +43,7 @@ test layers unvalidated. Its source findings are addressed here.
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 240 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
 | **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 467 assertions, including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 494 assertions (467 at Round 19), including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -201,7 +201,7 @@ deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
 `-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
 the contract rather than an accident of the host.
 
-Adapter `5.1.0` (was `4.7.0`), native self-test 135 cases (was 75): completion is
+Adapter `5.1.0` at that time (was `4.7.0`; now `5.2.0`, native self-test 135 -> 150 cases, §1r): completion is
 now a commit protocol rather than a receipt the runner wrote before sealing (see
 §1n), and sixteen cases execute it against real directories - the success path,
 a refused seal publication, an injected seal write failure, the committed
@@ -344,6 +344,47 @@ Still unproven, and stated as such: `deploy.ps1` has never run against a
 database. The finalization protocol is proven against real files on a real
 PowerShell 5.1 runtime, not against a real deployment.
 
+### 1r. Round 20 (audit of `c265eae`) - systemic validation (RC01-RC11)
+
+Rounds 3-19 each closed one finding by adding a check beside the old one. The
+Round 20 audit attacked the eleven *classes* those checks shared: it built 704
+adversarial mutations of the package, the evidence directory and the receipts,
+and recorded 32 invalid acceptances. The repair is structural - no defect is
+closed by a new special case; each is closed by removing the place where the
+question could be answered twice.
+
+| # | Class (and the mutation that exposed it) | Why it was accepted | Fix |
+|---|---|---|---|
+| RC01 | a case record was read by truthiness, `-ne` and casts | `$passed -ne $true` on an **array** filters instead of comparing, so `[true, "PASS"]` and `"false"` both survived; a `PASS` string, a `1` and a missing key were all "not false" | one reader, `Get-ClashCasePassedProblem`: present -> kind must be `boolean` -> value must be `$true`. The receipt validator and the harness inventory both call it, and the executed case `casePassedRequiresJsonBooleanTrue` runs 14 non-boolean spellings through it |
+| RC02 | completion was authorised by counting files, and the deployment evidence was never described as a contract | a phase receipt with `status: FAIL`, a migration receipt that said `ROLLED-BACK`, and a required receipt that was simply absent all still completed, because the checks lived in the *producer* or in *one* consumer | one deployment evidence contract, `Test-ClashDeploymentEvidence`, naming all six phase receipts and the per-migration receipts; the producer validates its own candidate **before** it publishes the intent, and the consumer validates the published directory again, independently of the seal. Counters must agree with the receipts actually present, and a required phase may only record `PASS`. Cases: `deploymentEvidenceRejectsFailedPhase`, `...RejectsContradictoryCounters`, `...RequiresEveryMigration` |
+| RC03 | three implementations of "is the package intact" | the runner compared a handful of hashes, `check-manifest.ps1` had its own loop and the suite had a third; a tree that was consistent with itself but not with `manifest.json`, or that gained a file, satisfied all three | one planner, `Test-ClashPackageIntegrity`, consumed by the runner, the checker and the tests; exact membership in both directions, strict record parsing (`<64 lowercase hex>  <relative path>`, no blanks, no duplicates, no case-only aliases, no backslashes), and manifest order/identity/wrapper relationships. The suite proves tampering, an unreadable line and manifest drift are refused, and the mutation case proves a weakened validator is caught |
+| RC04 | git gate 0 trusted a capture that never ran | a failed `git` invocation and an empty HEAD both produced "not a 40-hex string" -> the *same* stop message, and the job-level check only looked at the manifest | gate 0 requires a **successful** capture (`Test-NativeSuccess`) and a `^[0-9a-f]{40}$` HEAD in both the runner and the checker; a launch failure now stops with its own outcome and excerpt. Delimited `# ---- rc04-baseline-begin/end` so the executed case runs the real block |
+| RC05 | the psql report's `actual` cell was never checked | the parser proved the row was *shaped* like a row and compared only `expected` with the SQL constant, so `POST /x -> 200` rendering `500` passed | `Get-ClashReportActualProblem` requires the actual cell to equal the declared expectation, to be an integer when the expectation is numeric, and to be non-empty for `INFO` rows. Case `reportActualCellMustSatisfyExpected` |
+| RC06 | evidence paths were joined, not contained | `Add-Receipt -ReceiptPath '03-migrations/../../../../x.json'` and an absolute path both wrote outside the run directory | every evidence path goes through `Resolve-ClashContainedPath` (rejects `..` segments, absolute/UNC, and roots that escape) before it is used. Case `containedPathRejectsEscape` |
+| RC07 | exclusions compared base names | `-notcontains $_.Name` excluded *every* file called `02-preflight.json`, including one planted in `03-migrations/`, so a forged receipt was invisible to the sealer; hidden files were never enumerated at all | one candidate enumerator (`Get-ClashSealedFileCandidates`, `-File -Force`) shared by the sealer and the verifier, with exclusions matched as exact relative paths. Case `hiddenEvidenceIsSealedAndUnsealedDetected` |
+| RC08 | the executed SQL was re-opened by pathname | gate 4 hashed the wrapper, then psql opened the same path: the window between the check and the use was open (TOCTOU) | the bytes are copied to a `FileShare]::Read` snapshot under the run directory that the shell never writes, hashed *there*, and executed from that snapshot; no hashed pathname is executed. Case `packageIntegrityRejectsTamperedTree` covers the copy source |
+| RC09 | the suite summary was parsed by string surgery | `passed=467` in the header and `passed=1` on the summary line both "agreed" with a `passed/failed/total` triple computed from different lines | `Test-ClashSuiteSummary` demands exactly one summary line, typed integers, `passed+failed=total`, and agreement with the printed `N passed, M failed`; the launcher reports the failure with the numbers it saw. Case `suiteSummaryRequiresTypedIntegers` |
+| RC10 | seal metadata was compared as strings | `"bytes": "1234"` and `"sealedUtc": "yesterday"` compared unequal to their string forms and equal to their numeric ones depending on the path | seal entries carry typed `bytes` (JSON integer, compared with the real length) and a parseable `sealedUtc`; a mismatch reports both sides. Case `sealEntriesAreContainedAndSized` |
+| RC11 | an object was read by one representation only | `Get-ClashProperty` handled `PSCustomObject` but not `IDictionary`, so a record built by the harness could be read as "missing" and pass a contract | one field reader handles both representations and returns `present`/`kind`/`value` explicitly; the readers that decide authority use it, not `.PSObject.Properties`. Case `jsonFieldReadsBothObjectRepresentations` |
+
+Two properties of the repair are worth stating, because they are what makes it
+systemic rather than another layer:
+
+1. **One answer per question.** Integrity, evidence, case outcome, path
+   containment, seal enumeration and summary parsing each have exactly one
+   implementation, and every consumer calls it. A future change that weakens a
+   rule now changes it for the runner, the checker and the tests at once.
+2. **The validators are themselves mutated.** Case 150 copies the adapter to a
+   temporary directory six times, deletes one real check per copy (RC01 boolean
+   kind, RC01 value, RC02 phase status, RC03 membership, RC05 actual cell, RC06
+   parent segment), and requires the suite to reject every mutant. A test that
+   passes because it tests nothing fails there.
+
+Still unproven after this round: the validators prove *files*, not signatures;
+concurrency and crash-consistency are not exercised; the seal hashes
+text-normalised content and not raw bytes; `deploy.ps1` has still never run
+against a database.
+
 ## 2. Layout
 
 ```
@@ -364,7 +405,7 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (467 assertions)
+tests/verify-package.mjs       offline test suite (494 assertions)
 checksums.sha256               240 files: 111 originals + 129 package files
 evidence/                      run artefacts (git-ignored, append-only)
 evidence-adapter/              adapter self-test receipts (git-ignored, append-only)

@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '5.1.0'
+$script:ClashAdapterVersion = '5.2.0'
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -155,6 +155,22 @@ function Get-ClashJsonField {
   param($Object, [Parameter(Mandatory = $true)][string]$Name)
   $field = @{ present = $false; kind = 'missing'; value = $null }
   if ($null -eq $Object) { return $field }
+  # RC11: there is ONE object representation in this package, not two. ConvertFrom-Json
+  # produces a PSCustomObject, but a caller can also hand this reader a hashtable (a
+  # fixture, a receipt assembled in memory, a record built by another function). A
+  # hashtable's KEY is not a PSObject property, so the previous version answered
+  # 'missing' for a field that Get-ClashJsonKind -Value on the very same container
+  # classified as living in a JSON object. Two accessors that disagree about the same
+  # document are a validation bypass waiting to happen, so dictionaries are read
+  # through Contains/index exactly like PSCustomObjects are read through Properties.
+  if ($Object -is [System.Collections.IDictionary]) {
+    if (-not $Object.Contains($Name)) { return $field }
+    $dictValue = $Object[$Name]
+    $field['present'] = $true
+    $field['kind']    = Get-ClashJsonKind -Value $dictValue
+    $field['value']   = $dictValue
+    return $field
+  }
   $prop = $Object.PSObject.Properties[$Name]
   if ($null -eq $prop) { return $field }
   $field['present'] = $true
@@ -805,7 +821,7 @@ function Add-Receipt {
   param(
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][string]$Name,
-    [hashtable]$Fields = @{},
+    $Fields = @{},
     [string]$PrevSha = ''
   )
   $obj = [ordered]@{
@@ -818,7 +834,9 @@ function Add-Receipt {
 
   $path = Join-Path $Root $Name
   $res  = Write-EvidenceOrFallback -Path $path -Text ($obj | ConvertTo-Json -Depth 8) -Label $Name
-  $status = $(if ($Fields.ContainsKey('status')) { $Fields.status } else { '-' })
+  # .Contains works on a Hashtable and on an OrderedDictionary alike, so a caller may
+  # pass either representation (RC11: one object representation, not two).
+  $status = $(if ($Fields.Contains('status')) { $Fields['status'] } else { '-' })
   $line = ('TERMINAL RECEIPT {0} status={1} sha256={2} path={3} fallback={4}' -f `
       $Name, $status, $(if ($res.sha256) { $res.sha256 } else { '<none>' }), $(if ($res.path) { $res.path } else { '<none>' }), $res.fallback)
   Write-Host $line
@@ -839,24 +857,99 @@ function Add-Receipt {
 # artefacts are excluded from the sealed set. The completion marker is NOT part
 # of the seal - it binds the seal's hash instead, which is what keeps the two
 # from depending on each other.
+# RC06: `Join-Path $Root $rel` is string concatenation, not containment. A relative
+# path of '..\outside.txt' resolved to a file OUTSIDE the evidence root, an absolute
+# path replaced the root entirely, and 'C:x' or a UNC path did the same. Every path
+# that arrives from a JSON document is resolved here, and the result must be inside
+# the root or the path is rejected with a reason.
+function Resolve-ClashContainedPath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][string]$Relative,
+    [string]$Label = 'path'
+  )
+  $record = @{ ok = $false; path = $null; relative = ''; problem = '' }
+  if ($Relative.StartsWith('/') -or $Relative.StartsWith([string][char]92) -or ($Relative -match '^[A-Za-z]:')) {
+    $record['problem'] = ('{0} "{1}" is an absolute or UNC path; evidence paths must be relative to the run root' -f $Label, $Relative)
+    return $record
+  }
+  if ($Relative.Contains(':')) {
+    $record['problem'] = ('{0} "{1}" carries a stream or drive separator; evidence paths must be relative to the run root' -f $Label, $Relative)
+    return $record
+  }
+  # Segment by segment, so a parent reference cannot hide behind a separator that
+  # the regex of a previous round did not model. An empty or '.' segment means the
+  # path is not normalised, and '..' is refused outright.
+  $segments = @($Relative -split '[/\\]')
+  foreach ($segment in $segments) {
+    if ($segment -ceq '..') {
+      $record['problem'] = ('{0} "{1}" contains a parent-directory segment and can escape the evidence root' -f $Label, $Relative)
+      return $record
+    }
+    if (($segment -ceq '.') -or ($segment.Length -eq 0)) {
+      $record['problem'] = ('{0} "{1}" is not a normalised relative path' -f $Label, $Relative)
+      return $record
+    }
+  }
+  $sep = [System.IO.Path]::DirectorySeparatorChar
+  $rootFull = [System.IO.Path]::GetFullPath($Root)
+  while (($rootFull.Length -gt 3) -and ($rootFull.EndsWith('\') -or $rootFull.EndsWith('/'))) {
+    $rootFull = $rootFull.Substring(0, $rootFull.Length - 1)
+  }
+  $candidate = ''
+  try { $candidate = [System.IO.Path]::GetFullPath((Join-Path $rootFull $Relative)) }
+  catch {
+    $record['problem'] = ('{0} "{1}" is not a resolvable path: {2}' -f $Label, $Relative, (Protect-Text $_.Exception.Message))
+    return $record
+  }
+  $prefix = $rootFull + [string]$sep
+  if (-not $candidate.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $record['problem'] = ('{0} "{1}" resolves outside the evidence root' -f $Label, $Relative)
+    return $record
+  }
+  $record['ok'] = $true
+  $record['path'] = $candidate
+  $record['relative'] = $Relative
+  return $record
+}
+
+# RC07: exclusions are exact RELATIVE paths. They used to be matched against the
+# file NAME anywhere in the tree, so an attacker's '03-migrations/EVIDENCE-MANIFEST.json'
+# or a second '06-complete.json' in a subdirectory vanished from the sealed set
+# without a word, and a '.tmp' suffix was excluded on the same basis.
 function Get-ClashSealExclusions {
   return @('EVIDENCE-MANIFEST.json', '06-complete.json', '06-complete-unverified.json')
+}
+
+# RC07: the sealed set and the "is anything unsealed?" scan must be enumerated by
+# ONE function, with hidden and system files included, so the two can never
+# disagree about what is in the run directory.
+function Get-ClashSealedFileCandidates {
+  param([Parameter(Mandatory = $true)][string]$Root)
+  $excluded = @(Get-ClashSealExclusions)
+  $rows = @()
+  foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force)) {
+    $rel = ([string]$file.FullName).Substring($Root.Length).TrimStart('\', '/')
+    if ($excluded -ccontains $rel) { continue }
+    $rows += [ordered]@{ relative = $rel; path = [string]$file.FullName; bytes = [long]$file.Length }
+  }
+  return @($rows | Sort-Object { $_.relative })
 }
 
 function Seal-Evidence {
   param([Parameter(Mandatory = $true)][string]$Root, [string]$SealName = 'EVIDENCE-MANIFEST.json')
 
-  $excluded = @(Get-ClashSealExclusions)
-  $files = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
-      Where-Object { ($excluded -notcontains $_.Name) -and (-not $_.Name.EndsWith('.tmp')) } |
-      Sort-Object FullName)
+  # RC07: the sealed set comes from ONE enumeration (exact relative-path
+  # exclusions, hidden files included), which is the same enumeration the verifier
+  # uses for its "anything unsealed?" scan.
+  $files = @(Get-ClashSealedFileCandidates -Root $Root)
   $rows = @()
   $chain = 'GENESIS'
   foreach ($f in $files) {
-    $rel  = $f.FullName.Substring($Root.Length).TrimStart('\', '/')
-    $h    = Get-NormalizedSha256 -Path $f.FullName
-    $item = [ordered]@{ path = $rel; bytes = $f.Length; sha256 = $h; chain = (Get-TextSha256 -Text ($chain + '|' + $rel + '|' + $h)) }
-    $chain = $item.chain
+    $rel  = [string]$f['relative']
+    $h    = Get-NormalizedSha256 -Path ([string]$f['path'])
+    $item = [ordered]@{ path = $rel; bytes = [long]$f['bytes']; sha256 = $h; chain = (Get-TextSha256 -Text ($chain + '|' + $rel + '|' + $h)) }
+    $chain = [string]$item['chain']
     $rows += $item
   }
   $seal = [ordered]@{
@@ -951,7 +1044,11 @@ function Test-EvidenceSeal {
     }
     if ($seen.ContainsKey($rel)) { $problems.Add(('the seal lists {0} twice' -f $rel)) }
     $seen[$rel] = $true
-    $full = Join-Path $Root $rel
+    # RC06: the entry path is resolved WITH containment, so '..\outside.txt' or
+    # 'C:\windows\win.ini' is a rejection instead of a read outside the run.
+    $contained = Resolve-ClashContainedPath -Root $Root -Relative $rel -Label 'seal entry path'
+    if (-not $contained['ok']) { $problems.Add($contained['problem']); continue }
+    $full = [string]$contained['path']
     if (-not (Test-Path -LiteralPath $full)) { $problems.Add(('{0} is sealed but missing from disk' -f $rel)); continue }
     if (Test-Path -LiteralPath $full -PathType Container) { $problems.Add(('{0} is sealed but is a directory' -f $rel)); continue }
     $entryShaField = Get-ClashJsonField -Object $entry -Name 'sha256'
@@ -964,6 +1061,23 @@ function Test-EvidenceSeal {
     try { $actual = Get-NormalizedSha256 -Path $full }
     catch { $problems.Add(('{0} could not be read: {1}' -f $rel, (Protect-Text $_.Exception.Message))); continue }
     if ($actual -cne $claim) { $problems.Add(('{0} hash is {1}, the seal says {2}' -f $rel, $actual, $claim)) }
+    # RC10: the byte count is part of the entry, and it used to be recorded and
+    # never read - a seal entry could claim -999 bytes or "12" and still verify.
+    $entryBytesField = Get-ClashJsonField -Object $entry -Name 'bytes'
+    if (-not (Test-ClashIntegerValue $entryBytesField['value'])) {
+      $problems.Add(('the seal entry {0} records its size as {1}; it must be a JSON integer' -f $rel, (Format-ClashFieldValue -Value $entryBytesField['value'])))
+    }
+    elseif ([long]$entryBytesField['value'] -lt 0) {
+      $problems.Add(('the seal entry {0} records a negative size ({1})' -f $rel, $entryBytesField['value']))
+    }
+    else {
+      $onDisk = -1
+      try { $onDisk = [long](Get-Item -LiteralPath $full -Force).Length } catch { $onDisk = -1 }
+      if ($onDisk -lt 0) { $problems.Add(('{0} could not be measured on disk' -f $rel)) }
+      elseif ($onDisk -ne [long]$entryBytesField['value']) {
+        $problems.Add(('{0} is {1} byte(s) on disk, the seal records {2}' -f $rel, $onDisk, $entryBytesField['value']))
+      }
+    }
     $chain = Get-TextSha256 -Text ($chain + '|' + $rel + '|' + $claim)
     $entryChainField = Get-ClashJsonField -Object $entry -Name 'chain'
     if (-not (Test-ClashJsonKind -Value $entryChainField['value'] -Kind 'string')) {
@@ -987,6 +1101,26 @@ function Test-EvidenceSeal {
   elseif ([int]$sealCountField['value'] -ne $entries.Count) {
     $problems.Add(('the seal says {0} file(s) but lists {1}' -f $sealCountField['value'], $entries.Count))
   }
+  # RC10: the seal's own metadata is typed as well. A seal whose adapter identity
+  # is ["clash-native-adapter/5.2.0"] or whose sealedUtc is not a timestamp cannot
+  # be compared with a marker, so it is rejected here rather than coerced later.
+  $sealAdapterField = Get-ClashJsonField -Object $seal -Name 'adapter'
+  if (-not (Test-ClashJsonKind -Value $sealAdapterField['value'] -Kind 'string')) {
+    $problems.Add(('the seal adapter is {0}; it must be a JSON string' -f (Format-ClashFieldValue -Value $sealAdapterField['value'])))
+  }
+  elseif ([string]::IsNullOrWhiteSpace([string]$sealAdapterField['value'])) {
+    $problems.Add('the seal records an empty adapter identity')
+  }
+  $sealedUtcField = Get-ClashJsonField -Object $seal -Name 'sealedUtc'
+  $sealedUtcOk = $false
+  if (Test-ClashJsonKind -Value $sealedUtcField['value'] -Kind 'string') {
+    $sealedUtcParsed = [datetime]::MinValue
+    $sealedUtcOk = [datetime]::TryParse([string]$sealedUtcField['value'], [System.Globalization.CultureInfo]::InvariantCulture,
+      [System.Globalization.DateTimeStyles]::RoundtripKind, [ref]$sealedUtcParsed)
+  }
+  if (-not $sealedUtcOk) {
+    $problems.Add(('the seal sealedUtc is {0}; it must be a parseable ISO-8601 timestamp' -f (Format-ClashFieldValue -Value $sealedUtcField['value'])))
+  }
   foreach ($required in @($Require)) {
     if ([string]::IsNullOrWhiteSpace($required)) { continue }
     $hit = @($entries | Where-Object {
@@ -996,28 +1130,899 @@ function Test-EvidenceSeal {
     if ($hit -ne 1) { $problems.Add(('required evidence {0} appears {1} time(s) in the seal' -f $required, $hit)) }
   }
   # Anything present but unsealed means evidence was written after the seal - the
-  # exact shape of R15-C1 - so it is reported rather than ignored.
-  $excluded = @(Get-ClashSealExclusions)
-  foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File)) {
-    if ($excluded -contains $file.Name) { continue }
-    if ($file.Name.EndsWith('.tmp')) { continue }
-    $rel = $file.FullName.Substring($Root.Length).TrimStart('\', '/')
+  # exact shape of R15-C1 - so it is reported rather than ignored. RC07: the scan
+  # uses the SAME enumeration as the seal (hidden files included, exclusions by
+  # exact relative path), so a hidden file or a '.tmp' can no longer hide.
+  foreach ($file in @(Get-ClashSealedFileCandidates -Root $Root)) {
+    $rel = [string]$file['relative']
     if (-not $seen.ContainsKey($rel)) { $problems.Add(('{0} exists in the run but is not sealed' -f $rel)) }
   }
   return [ordered]@{ ok = ($problems.Count -eq 0); problems = @($problems); fileCount = $entries.Count; chainHead = $chain; sha256 = $sha }
 }
 
+# ============================================================================
+# TYPED DOCUMENT BOUNDARY (RC01-RC11)
+#
+# One place where an untrusted JSON field becomes a decision. Everything below
+# follows the same three steps and nothing else may replace them:
+#
+#   1. read the field with Get-ClashJsonField   -> present / kind / value
+#   2. test the KIND                             -> a string is not a boolean,
+#                                                   ["x"] is not "x", 6.0 is not 6
+#   3. compare the VALUE                         -> -ceq / -cne on strings,
+#                                                   -cne $true on booleans, exact
+#                                                   integer arithmetic on numbers
+#
+# There is no truthiness, no [int] cast of untrusted text, no -ne on an array (PS
+# filters instead of comparing) and no comparison that a null guard can skip.
+# "Assert-" below means "append a problem if this assertion does not hold": these
+# functions never throw, never convert and never repair.
+# ============================================================================
+
+function New-ClashFieldProblem {
+  param([string]$Label, [string]$Field, $Value, [string]$Expected)
+  return ('{0}.{1} is {2}; it must be {3}' -f $Label, $Field, (Format-ClashFieldValue -Value $Value), $Expected)
+}
+
+# A JSON string that is present, of kind string, and not blank unless allowed.
+function Assert-ClashTextField {
+  param($Object, [string]$Label, [string]$Field, $Problems, [switch]$AllowEmpty)
+  $f = Get-ClashJsonField -Object $Object -Name $Field
+  if (-not $f['present']) { $Problems.Add((New-ClashFieldProblem $Label $Field '<missing>' 'a JSON string')) ; return '' }
+  if ($f['kind'] -cne 'string') { $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) 'a JSON string')) ; return '' }
+  $text = [string]$f['value']
+  if (-not $AllowEmpty -and [string]::IsNullOrWhiteSpace($text)) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) 'a non-empty JSON string'))
+    return ''
+  }
+  return $text
+}
+
+# A JSON string that must equal an exact literal (ordinal, case sensitive).
+function Assert-ClashStringEquals {
+  param($Object, [string]$Label, [string]$Field, [string]$Expected, $Problems)
+  $f = Get-ClashJsonField -Object $Object -Name $Field
+  if (-not $f['present']) { $Problems.Add((New-ClashFieldProblem $Label $Field '<missing>' ('the string "{0}"' -f $Expected))) ; return }
+  if ($f['kind'] -cne 'string') { $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) ('the string "{0}"' -f $Expected))) ; return }
+  if ([string]$f['value'] -cne $Expected) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) ('the string "{0}"' -f $Expected)))
+  }
+}
+
+# A JSON boolean. -RequireTrue demands the exact boolean true.
+function Assert-ClashBooleanField {
+  param($Object, [string]$Label, [string]$Field, $Problems, [switch]$RequireTrue)
+  $f = Get-ClashJsonField -Object $Object -Name $Field
+  if (-not $f['present']) { $Problems.Add((New-ClashFieldProblem $Label $Field '<missing>' 'a JSON boolean')) ; return }
+  if ($f['kind'] -cne 'boolean') { $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) 'a JSON boolean')) ; return }
+  if ($RequireTrue -and ($f['value'] -cne $true)) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) 'the JSON boolean true'))
+  }
+}
+
+# A JSON integer in [Min, Max]; -Expect pins one exact value.
+function Assert-ClashIntegerField {
+  param($Object, [string]$Label, [string]$Field, $Problems, $Min = $null, $Max = $null, [long]$Expect = 0, [switch]$ExpectSet)
+  $f = Get-ClashJsonField -Object $Object -Name $Field
+  $bounds = 'a JSON integer'
+  if (($null -ne $Min) -and ($null -ne $Max)) { $bounds = ('a JSON integer between {0} and {1}' -f $Min, $Max) }
+  elseif ($null -ne $Min) { $bounds = ('a JSON integer of at least {0}' -f $Min) }
+  elseif ($null -ne $Max) { $bounds = ('a JSON integer of at most {0}' -f $Max) }
+  if (-not $f['present']) { $Problems.Add((New-ClashFieldProblem $Label $Field '<missing>' $bounds)) ; return }
+  if (-not (Test-ClashIntegerValue $f['value'])) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) $bounds))
+    return
+  }
+  $v = [long]$f['value']
+  if (($null -ne $Min) -and ($v -lt [long]$Min)) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) $bounds))
+    return
+  }
+  if (($null -ne $Max) -and ($v -gt [long]$Max)) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) $bounds))
+    return
+  }
+  if ($ExpectSet -and ($v -ne $Expect)) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) ('the JSON integer {0}' -f $Expect)))
+  }
+}
+
+# 64 lowercase hex characters.
+function Assert-ClashHexField {
+  param($Object, [string]$Label, [string]$Field, $Problems)
+  $f = Get-ClashJsonField -Object $Object -Name $Field
+  if (-not (Test-ClashSha256Text $f['value'])) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) 'a 64-character lowercase hex digest'))
+  }
+}
+
+# A JSON array whose items are all strings and whose length is at least MinCount.
+function Assert-ClashStringArrayField {
+  param($Object, [string]$Label, [string]$Field, $Problems, [int]$MinCount = 1)
+  $f = Get-ClashJsonField -Object $Object -Name $Field
+  if ($f['kind'] -cne 'array') {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) ('a JSON array of at least {0} string(s)' -f $MinCount)))
+    return @()
+  }
+  $items = @($f['value'])
+  if ($items.Count -lt $MinCount) {
+    $Problems.Add((New-ClashFieldProblem $Label $Field ($f['value']) ('a JSON array of at least {0} string(s)' -f $MinCount)))
+  }
+  foreach ($item in $items) {
+    if (-not ($item -is [string])) {
+      $Problems.Add((New-ClashFieldProblem $Label $Field $item 'a JSON array of plain strings'))
+      return $items
+    }
+  }
+  return $items
+}
+
+# The header every receipt written by Add-Receipt carries.
+function Assert-ClashReceiptHeader {
+  param($Object, [string]$Label, [string]$Name, $Problems, [string]$AdapterKind = 'string')
+  Assert-ClashStringEquals -Object $Object -Label $Label -Field 'receipt' -Expected $Name -Problems $Problems
+  $utc = Assert-ClashTextField -Object $Object -Label $Label -Field 'utc' -Problems $Problems
+  if ($utc.Length -gt 0) {
+    $parsed = [datetime]::MinValue
+    $okUtc = [datetime]::TryParse($utc, [System.Globalization.CultureInfo]::InvariantCulture,
+      [System.Globalization.DateTimeStyles]::RoundtripKind, [ref]$parsed)
+    if (-not $okUtc) { $Problems.Add((New-ClashFieldProblem $Label 'utc' $utc 'a parseable ISO-8601 timestamp')) }
+  }
+  if ($AdapterKind -ceq 'object') {
+    $af = Get-ClashJsonField -Object $Object -Name 'adapter'
+    if (-not (Test-ClashJsonKind -Value $af['value'] -Kind 'object')) {
+      $Problems.Add((New-ClashFieldProblem $Label 'adapter' $af['value'] 'a JSON object (the adapter proof)'))
+    }
+  }
+  else {
+    [void](Assert-ClashTextField -Object $Object -Label $Label -Field 'adapter' -Problems $Problems)
+  }
+  $prev = Get-ClashJsonField -Object $Object -Name 'prevReceiptSha'
+  if ($prev['kind'] -cne 'string') {
+    $Problems.Add((New-ClashFieldProblem $Label 'prevReceiptSha' $prev['value'] 'a JSON string (a digest or GENESIS)'))
+  }
+  elseif (([string]$prev['value'] -cne 'GENESIS') -and (-not (Test-ClashSha256Text $prev['value']))) {
+    $Problems.Add((New-ClashFieldProblem $Label 'prevReceiptSha' $prev['value'] 'GENESIS or a 64-character lowercase hex digest'))
+  }
+}
+
+# The three verification receipts share one schema, so they share one validator.
+# Everything a verdict depends on is typed, and the internal arithmetic of the
+# receipt must hold on its own: a receipt that says rows=21 while its own counters
+# sum to 19 is not evidence, whatever its status line says.
+function Test-ClashReportReceipt {
+  param([Parameter(Mandatory = $true)][string]$Root, [Parameter(Mandatory = $true)][string]$Name, [Parameter(Mandatory = $true)][string]$ContractName, [Parameter(Mandatory = $true)][int]$GatingExpected, [Parameter(Mandatory = $true)][int]$InfoExpected)
+
+  $problems = New-Object System.Collections.Generic.List[string]
+  $path = Join-Path $Root $Name
+  $root = Get-ClashJsonRoot -Path $path -Label ('phase receipt ' + $Name) -Kind @('object')
+  if (-not $root['ok']) {
+    $problems.Add($root['problem'])
+    return [ordered]@{ ok = $false; problems = @($problems); status = '' }
+  }
+  $doc = $root['value']
+  $label = $Name
+  Assert-ClashReceiptHeader -Object $doc -Label $label -Name $Name -Problems $problems
+  $status = Assert-ClashTextField -Object $doc -Label $label -Field 'status' -Problems $problems
+  if (($status.Length -gt 0) -and ($status -cne 'PASS')) {
+    $problems.Add((New-ClashFieldProblem $label 'status' $status 'PASS: a required phase cannot authorise completion with any other status'))
+  }
+  $outcome = Assert-ClashTextField -Object $doc -Label $label -Field 'outcome' -Problems $problems
+  if (($outcome.Length -gt 0) -and ($outcome -cne 'SUCCEEDED')) {
+    $problems.Add((New-ClashFieldProblem $label 'outcome' $outcome 'SUCCEEDED'))
+  }
+  Assert-ClashIntegerField -Object $doc -Label $label -Field 'exitCode' -Problems $problems -Expect 0 -ExpectSet
+  Assert-ClashBooleanField -Object $doc -Label $label -Field 'timedOut' -Problems $problems
+  $timedOut = (Get-ClashJsonField -Object $doc -Name 'timedOut')['value']
+  if (Test-ClashJsonKind -Value $timedOut -Kind 'boolean' -and $timedOut -ceq $true) {
+    $problems.Add((New-ClashFieldProblem $label 'timedOut' $timedOut 'the JSON boolean false'))
+  }
+  Assert-ClashIntegerField -Object $doc -Label $label -Field 'rows' -Problems $problems -Min 0
+  Assert-ClashIntegerField -Object $doc -Label $label -Field 'passRows' -Problems $problems -Min 0 -Expect $GatingExpected -ExpectSet
+  Assert-ClashIntegerField -Object $doc -Label $label -Field 'failRows' -Problems $problems -Min 0 -Expect 0 -ExpectSet
+  Assert-ClashIntegerField -Object $doc -Label $label -Field 'infoRows' -Problems $problems -Min 0 -Expect $InfoExpected -ExpectSet
+  Assert-ClashIntegerField -Object $doc -Label $label -Field 'gatingExpected' -Problems $problems -Expect $GatingExpected -ExpectSet
+  Assert-ClashIntegerField -Object $doc -Label $label -Field 'infoExpected' -Problems $problems -Expect $InfoExpected -ExpectSet
+  Assert-ClashIntegerField -Object $doc -Label $label -Field 'footerRows' -Problems $problems -Min 0
+  Assert-ClashBooleanField -Object $doc -Label $label -Field 'captureComplete' -Problems $problems -RequireTrue
+  Assert-ClashBooleanField -Object $doc -Label $label -Field 'headerSeen' -Problems $problems -RequireTrue
+  Assert-ClashBooleanField -Object $doc -Label $label -Field 'separatorSeen' -Problems $problems -RequireTrue
+  Assert-ClashBooleanField -Object $doc -Label $label -Field 'footerSeen' -Problems $problems -RequireTrue
+  Assert-ClashStringEquals -Object $doc -Label $label -Field 'reportContract' -Expected $ContractName -Problems $problems
+  $listed = Assert-ClashStringArrayField -Object $doc -Label $label -Field 'problems' -Problems $problems -MinCount 0
+  if (@($listed).Count -gt 0) {
+    $problems.Add(('{0}.problems lists {1} problem(s): {2}' -f $label, @($listed).Count, (@($listed) -join '; ')))
+  }
+  # internal arithmetic: the counters must describe the same report
+  $rowsField = Get-ClashJsonField -Object $doc -Name 'rows'
+  $passField = Get-ClashJsonField -Object $doc -Name 'passRows'
+  $failField = Get-ClashJsonField -Object $doc -Name 'failRows'
+  $infoField = Get-ClashJsonField -Object $doc -Name 'infoRows'
+  $footField = Get-ClashJsonField -Object $doc -Name 'footerRows'
+  if ((Test-ClashIntegerValue $rowsField['value']) -and (Test-ClashIntegerValue $passField['value']) -and
+      (Test-ClashIntegerValue $failField['value']) -and (Test-ClashIntegerValue $infoField['value'])) {
+    $sum = [long]$passField['value'] + [long]$failField['value'] + [long]$infoField['value']
+    if ([long]$rowsField['value'] -ne $sum) {
+      $problems.Add(('{0}.rows is {1} but its own counters sum to {2}' -f $label, $rowsField['value'], $sum))
+    }
+  }
+  if ((Test-ClashIntegerValue $rowsField['value']) -and (Test-ClashIntegerValue $footField['value'])) {
+    if ([long]$rowsField['value'] -ne [long]$footField['value']) {
+      $problems.Add(('{0}.footerRows is {1} but the receipt parsed {2} row(s)' -f $label, $footField['value'], $rowsField['value']))
+    }
+  }
+  return [ordered]@{ ok = ($problems.Count -eq 0); problems = @($problems); status = $status }
+}
+
+# Every per-migration receipt the runner writes is named 03-migrations/<NNN>-<version>.json.
+function Get-ClashMigrationReceiptNames {
+  param([Parameter(Mandatory = $true)][string]$Root)
+  $dir = Join-Path $Root '03-migrations'
+  $names = @()
+  if (-not (Test-Path -LiteralPath $dir)) { return @() }
+  if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
+  foreach ($file in @(Get-ChildItem -LiteralPath $dir -File -Force)) {
+    $leaf = [string]$file.Name
+    if ($leaf -notmatch '\.json$') { continue }
+    $names += ('03-migrations/' + $leaf)
+  }
+  return @($names | Sort-Object)
+}
+
+# RC02: ONE deployment-evidence contract, validated by the producer BEFORE it
+# publishes anything and independently by every consumer.
+#
+# The old contract required five files to exist and to match their sealed hashes.
+# Existence is not evidence: Codex sealed a run whose required phase receipts each
+# recorded status FAIL - and both the real producer and the real consumer accepted
+# it, because both asked only "is it there and is it unchanged?". This function
+# asks what each receipt SAYS.
+function Test-ClashDeploymentEvidence {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [int]$ExpectedMigrationCount = 0
+  )
+
+  $problems = New-Object System.Collections.Generic.List[string]
+  $receiptsValidated = 0
+
+  # ---------------------------------------------------------- 00-baseline ----
+  $baseName = '00-baseline.json'
+  $baseRoot = Get-ClashJsonRoot -Path (Join-Path $Root $baseName) -Label 'deployment baseline receipt' -Kind @('object')
+  if (-not $baseRoot['ok']) { $problems.Add($baseRoot['problem']) }
+  else {
+    $base = $baseRoot['value']
+    Assert-ClashReceiptHeader -Object $base -Label $baseName -Name $baseName -Problems $problems -AdapterKind 'object'
+    $baseStatus = Assert-ClashTextField -Object $base -Label $baseName -Field 'status' -Problems $problems
+    if (($baseStatus.Length -gt 0) -and ($baseStatus -cne 'BASELINE')) {
+      $problems.Add((New-ClashFieldProblem $baseName 'status' $baseStatus 'BASELINE'))
+    }
+    [void](Assert-ClashTextField -Object $base -Label $baseName -Field 'projectRef' -Problems $problems)
+    [void](Assert-ClashTextField -Object $base -Label $baseName -Field 'repoHead' -Problems $problems)
+    # the adapter certification travels with the run as a proof object
+    $proofField = Get-ClashJsonField -Object $base -Name 'adapter'
+    $proof = $proofField['value']
+    if (Test-ClashJsonKind -Value $proof -Kind 'object') {
+      Assert-ClashHexField -Object $proof -Label ($baseName + '.adapter') -Field 'receiptSha256' -Problems $problems
+      Assert-ClashHexField -Object $proof -Label ($baseName + '.adapter') -Field 'adapterSha256' -Problems $problems
+      Assert-ClashIntegerField -Object $proof -Label ($baseName + '.adapter') -Field 'casesExecuted' -Problems $problems -Min 1
+      $psv = Assert-ClashTextField -Object $proof -Label ($baseName + '.adapter') -Field 'powerShell' -Problems $problems
+      if (($psv.Length -gt 0) -and ($psv -notmatch '^5\.1\.')) {
+        $problems.Add((New-ClashFieldProblem ($baseName + '.adapter') 'powerShell' $psv 'a PowerShell 5.1 version string'))
+      }
+      $executedField = Get-ClashJsonField -Object $proof -Name 'casesExecuted'
+      if ((Test-ClashIntegerValue $executedField['value']) -and ([long]$executedField['value'] -lt 1)) {
+        $problems.Add((New-ClashFieldProblem ($baseName + '.adapter') 'casesExecuted' $executedField['value'] 'at least 1 executed case'))
+      }
+    }
+    $receiptsValidated++
+  }
+
+  # --------------------------------------------------------- 01-integrity ----
+  $intName = '01-integrity.json'
+  $intRoot = Get-ClashJsonRoot -Path (Join-Path $Root $intName) -Label 'package integrity receipt' -Kind @('object')
+  $wrappersChecked = -1
+  if (-not $intRoot['ok']) { $problems.Add($intRoot['problem']) }
+  else {
+    $integrity = $intRoot['value']
+    Assert-ClashReceiptHeader -Object $integrity -Label $intName -Name $intName -Problems $problems
+    $intStatus = Assert-ClashTextField -Object $integrity -Label $intName -Field 'status' -Problems $problems
+    if (($intStatus.Length -gt 0) -and ($intStatus -cne 'PASS')) {
+      $problems.Add((New-ClashFieldProblem $intName 'status' $intStatus 'PASS: no migration may be executed on an unproven package'))
+    }
+    Assert-ClashIntegerField -Object $integrity -Label $intName -Field 'filesVerified' -Problems $problems -Min 1
+    Assert-ClashIntegerField -Object $integrity -Label $intName -Field 'checksumEntries' -Problems $problems -Min 1
+    Assert-ClashIntegerField -Object $integrity -Label $intName -Field 'wrappersChecked' -Problems $problems -Min 1
+    Assert-ClashHexField -Object $integrity -Label $intName -Field 'packageTreeHash' -Problems $problems
+    $intProblems = Assert-ClashStringArrayField -Object $integrity -Label $intName -Field 'problems' -Problems $problems -MinCount 0
+    if (@($intProblems).Count -gt 0) {
+      $problems.Add(('{0}.problems lists {1} problem(s): {2}' -f $intName, @($intProblems).Count, (@($intProblems) -join '; ')))
+    }
+    $wrapField = Get-ClashJsonField -Object $integrity -Name 'wrappersChecked'
+    if (Test-ClashIntegerValue $wrapField['value']) { $wrappersChecked = [long]$wrapField['value'] }
+    $receiptsValidated++
+  }
+
+  # ------------------------------------ 02-preflight / 04-postflight / 05-storage
+  $preflight = Test-ClashReportReceipt -Root $Root -Name '02-preflight.json' -ContractName '00_preflight.sql' -GatingExpected 19 -InfoExpected 2
+  foreach ($p in @($preflight['problems'])) { $problems.Add($p) }
+  if ($preflight['ok']) { $receiptsValidated++ }
+  $postflight = Test-ClashReportReceipt -Root $Root -Name '04-postflight.json' -ContractName '90_verify.sql' -GatingExpected 19 -InfoExpected 0
+  foreach ($p in @($postflight['problems'])) { $problems.Add($p) }
+  if ($postflight['ok']) { $receiptsValidated++ }
+  $storage = Test-ClashReportReceipt -Root $Root -Name '05-storage.json' -ContractName '95_storage_config.sql' -GatingExpected 6 -InfoExpected 1
+  foreach ($p in @($storage['problems'])) { $problems.Add($p) }
+  if ($storage['ok']) { $receiptsValidated++ }
+
+  # ----------------------------------------------------- 06-claim-release ----
+  $relName = '06-claim-release.json'
+  $relRoot = Get-ClashJsonRoot -Path (Join-Path $Root $relName) -Label 'claim release receipt' -Kind @('object')
+  if (-not $relRoot['ok']) { $problems.Add($relRoot['problem']) }
+  else {
+    $release = $relRoot['value']
+    Assert-ClashReceiptHeader -Object $release -Label $relName -Name $relName -Problems $problems
+    $relStatus = Assert-ClashTextField -Object $release -Label $relName -Field 'status' -Problems $problems
+    if (($relStatus.Length -gt 0) -and ($relStatus -cne 'PASS')) {
+      $problems.Add((New-ClashFieldProblem $relName 'status' $relStatus 'PASS: the claim is released only by an owned, successful delete'))
+    }
+    Assert-ClashBooleanField -Object $release -Label $relName -Field 'released' -Problems $problems -RequireTrue
+    [void](Assert-ClashTextField -Object $release -Label $relName -Field 'runId' -Problems $problems)
+    $receiptsValidated++
+  }
+
+  # ------------------------------------------------ per-migration receipts ----
+  $names = @(Get-ClashMigrationReceiptNames -Root $Root)
+  $indices = @{}
+  $versions = @{}
+  foreach ($name in $names) {
+    $relName = [string]$name
+    $root = Get-ClashJsonRoot -Path (Join-Path $Root $relName) -Label ('migration receipt ' + $relName) -Kind @('object')
+    if (-not $root['ok']) { $problems.Add($root['problem']); continue }
+    $doc = $root['value']
+    $label = $relName
+    Assert-ClashReceiptHeader -Object $doc -Label $label -Name $relName -Problems $problems
+    $mstatus = Assert-ClashTextField -Object $doc -Label $label -Field 'status' -Problems $problems
+    if (($mstatus.Length -gt 0) -and ($mstatus -cne 'PASS')) {
+      $problems.Add((New-ClashFieldProblem $label 'status' $mstatus 'PASS: a migration that did not verifiably commit cannot be part of a completed deployment'))
+    }
+    $outcome = Assert-ClashTextField -Object $doc -Label $label -Field 'outcome' -Problems $problems
+    if (($outcome.Length -gt 0) -and ($outcome -cne 'COMMITTED')) {
+      $problems.Add((New-ClashFieldProblem $label 'outcome' $outcome 'COMMITTED'))
+    }
+    Assert-ClashIntegerField -Object $doc -Label $label -Field 'index' -Problems $problems -Min 1
+    $versionText = Assert-ClashTextField -Object $doc -Label $label -Field 'version' -Problems $problems
+    if (($versionText.Length -gt 0) -and ($versionText -notmatch '^\d{14}$')) {
+      $problems.Add((New-ClashFieldProblem $label 'version' $versionText 'a 14-digit migration version'))
+    }
+    Assert-ClashHexField -Object $doc -Label $label -Field 'wrapperSha256' -Problems $problems
+    Assert-ClashHexField -Object $doc -Label $label -Field 'executedSha256' -Problems $problems
+    Assert-ClashStringEquals -Object $doc -Label $label -Field 'ledgerReadBack' -Expected 'MATCH' -Problems $problems
+    $token = Assert-ClashTextField -Object $doc -Label $label -Field 'expectedToken' -Problems $problems
+    if (($token.Length -gt 0) -and ($token -notmatch '^sha256:[0-9a-f]{64}$')) {
+      $problems.Add((New-ClashFieldProblem $label 'expectedToken' $token 'sha256:<64 lowercase hex>'))
+    }
+    # the file name, the recorded index and the recorded version must agree
+    $leafName = Split-Path -Leaf $relName
+    $indexField = Get-ClashJsonField -Object $doc -Name 'index'
+    if (Test-ClashIntegerValue $indexField['value']) {
+      $expectedLeaf = ('{0:D3}-{1}.json' -f [int]$indexField['value'], $versionText)
+      if ($versionText.Length -gt 0 -and $leafName -cne $expectedLeaf) {
+        $problems.Add(('{0} is named "{1}" but records index {2} version {3}; the receipt name must describe its own migration' -f $relName, $leafName, $indexField['value'], $versionText))
+      }
+      $idx = [int]$indexField['value']
+      if ($indices.ContainsKey($idx)) { $problems.Add(('{0} repeats migration index {1} (already used by {2})' -f $relName, $idx, $indices[$idx])) }
+      else { $indices[$idx] = $relName }
+    }
+    if ($versionText.Length -gt 0) {
+      if ($versions.ContainsKey($versionText)) { $problems.Add(('{0} repeats migration version {1} (already used by {2})' -f $relName, $versionText, $versions[$versionText])) }
+      else { $versions[$versionText] = $relName }
+    }
+    $receiptsValidated++
+  }
+
+  # The receipt count is declared by the sealed integrity receipt, and it must
+  # describe exactly the receipts that are present: 1..N with no gap, no repeat and
+  # no extra file. A run that recorded 110 of 111 migrations is not a deployment.
+  $declared = $wrappersChecked
+  if ($declared -lt 0) { $declared = 0 }
+  if ($ExpectedMigrationCount -gt 0) {
+    if ([long]$ExpectedMigrationCount -ne [long]$declared) {
+      $problems.Add(('the integrity receipt records {0} migration(s) but this run expected {1}' -f $declared, $ExpectedMigrationCount))
+    }
+    $declared = $ExpectedMigrationCount
+  }
+  if (@($names).Count -ne $declared) {
+    $problems.Add(('the run holds {0} per-migration receipt(s) but its integrity receipt records {1} executed migration(s)' -f @($names).Count, $declared))
+  }
+  if ($declared -lt 1) {
+    $problems.Add('the deployment evidence records no executed migration at all')
+  }
+  else {
+    for ($i = 1; $i -le $declared; $i++) {
+      if (-not $indices.ContainsKey($i)) { $problems.Add(('no per-migration receipt exists for index {0} of {1}' -f $i, $declared)) }
+    }
+  }
+
+  return [ordered]@{
+    ok                = ($problems.Count -eq 0)
+    problems          = @($problems)
+    receiptsValidated = $receiptsValidated
+    migrationCount    = @($names).Count
+    declaredCount     = $declared
+  }
+}
+
+# RC09: the suite's machine-readable summary is authoritative evidence, so it is
+# parsed once, typed, and compared with the PASS/FAIL lines that were printed. The
+# old gate used [int] casts on untrusted text ({passed:1.4} became 1, "12" passed)
+# and took the LAST summary line, so a later summary could mask an earlier failure.
+function Test-ClashSuiteSummary {
+  param([string]$StdOut, [int]$PassLines, [int]$FailLines)
+
+  $problems = New-Object System.Collections.Generic.List[string]
+  $lines = @()
+  foreach ($line in ([string]$StdOut -split "`r?`n")) {
+    if ($line -match '^CLASH-TEST-SUMMARY ') { $lines += $line.Substring('CLASH-TEST-SUMMARY '.Length) }
+  }
+  if ($lines.Count -eq 0) {
+    $problems.Add('the suite printed no CLASH-TEST-SUMMARY line, so its counts are unproven')
+    return [ordered]@{ ok = $false; problems = @($problems); passed = -1; failed = -1; total = -1 }
+  }
+  if ($lines.Count -gt 1) {
+    $problems.Add(('the suite printed {0} CLASH-TEST-SUMMARY line(s); exactly one is authoritative and a second cannot be reconciled' -f $lines.Count))
+    return [ordered]@{ ok = $false; problems = @($problems); passed = -1; failed = -1; total = -1 }
+  }
+  $doc = $null
+  try { $doc = $lines[0] | ConvertFrom-Json }
+  catch {
+    $problems.Add(('the suite summary line is not readable JSON: {0}' -f (Protect-Text $_.Exception.Message)))
+    return [ordered]@{ ok = $false; problems = @($problems); passed = -1; failed = -1; total = -1 }
+  }
+  if (-not (Test-ClashJsonKind -Value $doc -Kind 'object')) {
+    $problems.Add(('the suite summary is {0}; it must be a JSON object' -f (Format-ClashFieldValue -Value $doc)))
+    return [ordered]@{ ok = $false; problems = @($problems); passed = -1; failed = -1; total = -1 }
+  }
+  foreach ($field in @('passed', 'failed', 'total')) {
+    Assert-ClashIntegerField -Object $doc -Label 'CLASH-TEST-SUMMARY' -Field $field -Problems $problems -Min 0
+  }
+  $passedF = Get-ClashJsonField -Object $doc -Name 'passed'
+  $failedF = Get-ClashJsonField -Object $doc -Name 'failed'
+  $totalF = Get-ClashJsonField -Object $doc -Name 'total'
+  if ((Test-ClashIntegerValue $passedF['value']) -and (Test-ClashIntegerValue $failedF['value']) -and (Test-ClashIntegerValue $totalF['value'])) {
+    $p = [long]$passedF['value']
+    $f = [long]$failedF['value']
+    $t = [long]$totalF['value']
+    if ($t -ne ($p + $f)) { $problems.Add(('the suite summary says total={0} but passed+failed={1}' -f $t, ($p + $f))) }
+    if ($p -ne [long]$PassLines) { $problems.Add(('the suite summary says passed={0} but {1} PASS line(s) were printed' -f $p, $PassLines)) }
+    if ($f -ne [long]$FailLines) { $problems.Add(('the suite summary says failed={0} but {1} FAIL line(s) were printed' -f $f, $FailLines)) }
+  }
+  $reportedPassed = -1
+  $reportedFailed = -1
+  $reportedTotal = -1
+  if (Test-ClashIntegerValue $passedF['value']) { $reportedPassed = [int]$passedF['value'] }
+  if (Test-ClashIntegerValue $failedF['value']) { $reportedFailed = [int]$failedF['value'] }
+  if (Test-ClashIntegerValue $totalF['value']) { $reportedTotal = [int]$totalF['value'] }
+  return [ordered]@{ ok = ($problems.Count -eq 0); problems = @($problems); passed = $reportedPassed; failed = $reportedFailed; total = $reportedTotal }
+}
+
+# ============================================================================
+# RC03: ONE package-integrity planner
+#
+# deploy.ps1 (Gate 1), check-manifest.ps1 and the tests each carried their own
+# reading of checksums.sha256 and manifest.json. They disagreed: the runner
+# accepted a list of 200 well-formed lines and silently skipped the rest, the
+# checker failed on an unreadable line, and neither enforced membership, order,
+# uniqueness or the identity relationships the manifest claims. A file whose
+# checksum line was deleted and whose bytes were then changed passed both.
+#
+# This is now the only implementation. It answers one question - "is this tree
+# exactly the package the manifest describes?" - and every caller consumes its
+# verdict. Nothing here repairs, defaults or skips.
+# ============================================================================
+
+# The exact member set: every file under supabase/cloud except the checksum file
+# itself, the generated attribute file and the two runtime evidence homes, plus
+# every original migration under supabase/migrations. Declared exclusions are
+# exact relative paths, never basenames.
+function Get-ClashPackageMemberSet {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepoRoot,
+    [Parameter(Mandatory = $true)][string]$CloudRoot
+  )
+  $members = @()
+  $cloudPrefix = 'supabase/cloud/'
+  $excludedDirs = @('evidence', 'evidence-adapter')
+  $excludedFiles = @('checksums.sha256', 'generated/.gitattributes')
+  foreach ($file in @(Get-ChildItem -LiteralPath $CloudRoot -Recurse -File -Force)) {
+    $rel = ([string]$file.FullName).Substring($CloudRoot.Length).TrimStart('\', '/').Replace('\', '/')
+    $head = @($rel -split '/')[0]
+    if ($excludedDirs -ccontains $head) { continue }
+    if ($excludedFiles -ccontains $rel) { continue }
+    $members += ($cloudPrefix + $rel)
+  }
+  $migrationsDir = Join-Path (Split-Path -Parent $CloudRoot) 'migrations'
+  if (Test-Path -LiteralPath $migrationsDir -PathType Container) {
+    foreach ($file in @(Get-ChildItem -LiteralPath $migrationsDir -File -Force)) {
+      $leaf = [string]$file.Name
+      if ($leaf -notmatch '\.sql$') { continue }
+      $members += ('supabase/migrations/' + $leaf)
+    }
+  }
+  return @($members | Sort-Object)
+}
+
+# checksums.sha256, read strictly. A line this parser cannot read is a problem,
+# never a skip; a repeated path is a problem; a path that is absolute, escapes the
+# repository, uses a backslash or differs only by case from another entry is a
+# problem too, because Windows would resolve both to the same file.
+function Read-ClashChecksumFile {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$RepoRoot,
+    $Problems
+  )
+
+  $entries = @{}
+  $order = @()
+  $seenLower = @{}
+  if (-not (Test-Path -LiteralPath $Path)) {
+    $Problems.Add('checksums.sha256 is missing')
+    return [ordered]@{ ok = $false; count = 0; entries = $entries; order = $order }
+  }
+  if (Test-Path -LiteralPath $Path -PathType Container) {
+    $Problems.Add('checksums.sha256 is a directory')
+    return [ordered]@{ ok = $false; count = 0; entries = $entries; order = $order }
+  }
+  $lineNo = 0
+  $problemsBefore = $Problems.Count
+  foreach ($line in [System.IO.File]::ReadAllLines($Path)) {
+    $lineNo++
+    if ($line.Length -eq 0) { continue }
+    if ([string]::IsNullOrWhiteSpace($line)) {
+      $Problems.Add(('checksums.sha256 line {0} is blank; a checksum list has no empty records' -f $lineNo))
+      continue
+    }
+    $m = [regex]::Match($line, '^([0-9a-f]{64})  ([^ ].*)$')
+    if (-not $m.Success) {
+      $Problems.Add(('checksums.sha256 line {0} is not "<64 lowercase hex>  <relative path>": {1}' -f $lineNo, (Protect-Text $line)))
+      continue
+    }
+    $digest = [string]$m.Groups[1].Value
+    $relText = [string]$m.Groups[2].Value
+    $contained = Resolve-ClashContainedPath -Root $RepoRoot -Relative $relText -Label 'checksums.sha256 entry'
+    if (-not $contained['ok']) { $Problems.Add($contained['problem']); continue }
+    if ($relText.Contains('\')) {
+      $Problems.Add(('checksums.sha256 line {0} names "{1}" with a backslash; entries are forward-slash relative paths' -f $lineNo, $relText))
+      continue
+    }
+    if ($entries.ContainsKey($relText)) {
+      $Problems.Add(('checksums.sha256 lists {0} twice (lines are position {1} and {2})' -f $relText, $entries[$relText].line, $lineNo))
+      continue
+    }
+    $lower = $relText.ToLowerInvariant()
+    if ($seenLower.ContainsKey($lower)) {
+      $Problems.Add(('checksums.sha256 lists {0} which differs from {1} only by case; Windows resolves both to one file' -f $relText, $seenLower[$lower]))
+      continue
+    }
+    $seenLower[$lower] = $relText
+    $entries[$relText] = [ordered]@{ sha256 = $digest; line = $lineNo }
+    $order += $relText
+  }
+  return [ordered]@{ ok = ($Problems.Count -eq $problemsBefore); count = @($order).Count; entries = $entries; order = $order }
+}
+
+# The whole package proof. Returns a verdict record; it never throws and never
+# writes. Every field a caller needs is in the record, so no caller needs to
+# re-read either file.
+function Test-ClashPackageIntegrity {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepoRoot,
+    [string]$CloudRoot = '',
+    [switch]$SkipFileHashes
+  )
+
+  $problems = New-Object System.Collections.Generic.List[string]
+  if ([string]::IsNullOrWhiteSpace($CloudRoot)) { $CloudRoot = Join-Path (Join-Path $RepoRoot 'supabase') 'cloud' }
+
+  $members = @(Get-ClashPackageMemberSet -RepoRoot $RepoRoot -CloudRoot $CloudRoot)
+  $sumPath = Join-Path $CloudRoot 'checksums.sha256'
+  $sums = Read-ClashChecksumFile -Path $sumPath -RepoRoot $RepoRoot -Problems $problems
+  $checksumEntries = @($sums.order)
+  $sumMap = $sums.entries
+
+  # ---- exact membership, both directions
+  foreach ($member in $members) {
+    if (-not $sumMap.ContainsKey($member)) { $problems.Add(('package member {0} has no checksum entry' -f $member)) }
+  }
+  foreach ($listed in $checksumEntries) {
+    if ($members -cnotcontains $listed) { $problems.Add(('checksums.sha256 lists {0}, which is not a package member' -f $listed)) }
+  }
+
+  # ---- digests
+  $verified = 0
+  $treeRows = @()
+  foreach ($listed in $checksumEntries) {
+    $contained = Resolve-ClashContainedPath -Root $RepoRoot -Relative $listed -Label 'checksum entry'
+    if (-not $contained['ok']) { continue }
+    $full = [string]$contained['path']
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+      $problems.Add(('checksum entry {0} has no file on disk' -f $listed))
+      continue
+    }
+    $claim = [string]$sumMap[$listed].sha256
+    if (-not $SkipFileHashes) {
+      $actual = ''
+      try { $actual = Get-NormalizedSha256 -Path $full }
+      catch {
+        $problems.Add(('{0} could not be read: {1}' -f $listed, (Protect-Text $_.Exception.Message)))
+        continue
+      }
+      if ($actual -cne $claim) {
+        $problems.Add(('{0} is {1} but checksums.sha256 says {2}' -f $listed, $actual, $claim))
+        continue
+      }
+      $verified++
+      $treeRows += ($actual + '  ' + $listed)
+    }
+  }
+  $treeHash = ''
+  if ($treeRows.Count -gt 0) { $treeHash = Get-TextSha256 -Text ($treeRows -join "`n") }
+
+  # ---- manifest: shape, order, identity relationships
+  $manifestPath = Join-Path $CloudRoot 'manifest.json'
+  $manifestRoot = Get-ClashJsonRoot -Path $manifestPath -Label 'package manifest' -Kind @('object')
+  $entryCount = 0
+  if (-not $manifestRoot['ok']) { $problems.Add($manifestRoot['problem']) }
+  else {
+    $manifest = $manifestRoot['value']
+    $projectRef = Assert-ClashTextField -Object $manifest -Label 'manifest.json' -Field 'project_ref' -Problems $problems
+    if (($projectRef.Length -gt 0) -and ($projectRef -notmatch '^[a-z0-9]{20}$')) {
+      $problems.Add((New-ClashFieldProblem 'manifest.json' 'project_ref' $projectRef 'a 20-character Supabase project ref'))
+    }
+    [void](Assert-ClashTextField -Object $manifest -Label 'manifest.json' -Field 'builder' -Problems $problems)
+    [void](Assert-ClashTextField -Object $manifest -Label 'manifest.json' -Field 'built_at_utc' -Problems $problems)
+    Assert-ClashIntegerField -Object $manifest -Label 'manifest.json' -Field 'total' -Problems $problems -Min 1
+
+    $entriesField = Get-ClashJsonField -Object $manifest -Name 'entries'
+    if ($entriesField['kind'] -cne 'array') {
+      $problems.Add((New-ClashFieldProblem 'manifest.json' 'entries' ($entriesField['value']) 'a JSON array of migration entries'))
+    }
+    else {
+      $entries = @($entriesField['value'])
+      $entryCount = $entries.Count
+      $totalField = Get-ClashJsonField -Object $manifest -Name 'total'
+      if ((Test-ClashIntegerValue $totalField['value']) -and ([long]$totalField['value'] -ne [long]$entryCount)) {
+        $problems.Add(('manifest.json total is {0} but it lists {1} entries' -f $totalField['value'], $entryCount))
+      }
+      $expectedEntries = 0
+      foreach ($name in $members) { if ($name -match '^supabase/migrations/.*\.sql$') { $expectedEntries++ } }
+      if ($entryCount -ne $expectedEntries) {
+        $problems.Add(('manifest.json lists {0} migration(s) but the package holds {1} original migration file(s)' -f $entryCount, $expectedEntries))
+      }
+      $seenVersions = @{}
+      $position = 0
+      foreach ($entry in $entries) {
+        $position++
+        $label = ('manifest entries[{0}]' -f ($position - 1))
+        if (-not (Test-ClashJsonKind -Value $entry -Kind 'object')) {
+          $problems.Add((New-ClashFieldProblem $label '' $entry 'a JSON object'))
+          continue
+        }
+        Assert-ClashIntegerField -Object $entry -Label $label -Field 'index' -Problems $problems -Expect $position -ExpectSet
+        $version = Assert-ClashTextField -Object $entry -Label $label -Field 'version' -Problems $problems
+        if (($version.Length -gt 0) -and ($version -notmatch '^\d{14}$')) {
+          $problems.Add((New-ClashFieldProblem $label 'version' $version 'a 14-digit migration version'))
+        }
+        if ($version.Length -gt 0) {
+          if ($seenVersions.ContainsKey($version)) { $problems.Add(('{0} repeats version {1} (already used by entries[{2}])' -f $label, $version, $seenVersions[$version])) }
+          else { $seenVersions[$version] = ($position - 1) }
+        }
+        $name = Assert-ClashTextField -Object $entry -Label $label -Field 'name' -Problems $problems
+        $file = Assert-ClashTextField -Object $entry -Label $label -Field 'file' -Problems $problems
+        $expectedFile = ('supabase/migrations/{0}_{1}.sql' -f $version, $name)
+        if (($file.Length -gt 0) -and ($version.Length -gt 0) -and ($name.Length -gt 0) -and ($file -cne $expectedFile)) {
+          $problems.Add((New-ClashFieldProblem $label 'file' $file ('the string "{0}"' -f $expectedFile)))
+        }
+        Assert-ClashHexField -Object $entry -Label $label -Field 'sha256' -Problems $problems
+        Assert-ClashIntegerField -Object $entry -Label $label -Field 'bytes' -Problems $problems -Min 1
+        Assert-ClashHexField -Object $entry -Label $label -Field 'executedSha256' -Problems $problems
+        Assert-ClashHexField -Object $entry -Label $label -Field 'normalizedSha256' -Problems $problems
+        Assert-ClashHexField -Object $entry -Label $label -Field 'wrapperSha256' -Problems $problems
+        Assert-ClashBooleanField -Object $entry -Label $label -Field 'statementsStored' -Problems $problems -RequireTrue
+        [void](Assert-ClashTextField -Object $entry -Label $label -Field 'ledgerName' -Problems $problems)
+        $mode = Assert-ClashTextField -Object $entry -Label $label -Field 'mode' -Problems $problems
+        if (($mode.Length -gt 0) -and (@('direct', 'diverged') -cnotcontains $mode)) {
+          $problems.Add((New-ClashFieldProblem $label 'mode' $mode 'either "direct" or "diverged"'))
+        }
+        $normalisation = Assert-ClashTextField -Object $entry -Label $label -Field 'normalisation' -Problems $problems
+        if (($normalisation.Length -gt 0) -and (@('none', 'strip-begin-commit') -cnotcontains $normalisation)) {
+          $problems.Add((New-ClashFieldProblem $label 'normalisation' $normalisation 'either "none" or "strip-begin-commit"'))
+        }
+        $wrapperPath = Assert-ClashTextField -Object $entry -Label $label -Field 'wrapperPath' -Problems $problems
+        $expectedWrapper = ('{0:D3}_{1}.sql' -f $position, $version)
+        if (($wrapperPath.Length -gt 0) -and ($version.Length -gt 0) -and ($wrapperPath -cne $expectedWrapper)) {
+          $problems.Add((New-ClashFieldProblem $label 'wrapperPath' $wrapperPath ('the wrapper "{0}" its index and version describe' -f $expectedWrapper)))
+        }
+        $sqlPath = Assert-ClashTextField -Object $entry -Label $label -Field 'sqlPath' -Problems $problems
+        if (($sqlPath.Length -gt 0) -and ($members -cnotcontains $sqlPath)) {
+          $problems.Add((New-ClashFieldProblem $label 'sqlPath' $sqlPath 'a package member (the executed source must ship with the package)'))
+        }
+        if (($mode -ceq 'direct') -and ($sqlPath.Length -gt 0) -and ($file.Length -gt 0) -and ($sqlPath -cne $file)) {
+          $problems.Add((New-ClashFieldProblem $label 'sqlPath' $sqlPath ('the original file "{0}", because mode is direct' -f $file)))
+        }
+        $shaField = Get-ClashJsonField -Object $entry -Name 'sha256'
+        $execField = Get-ClashJsonField -Object $entry -Name 'executedSha256'
+        if ((Test-ClashSha256Text $shaField['value']) -and (Test-ClashSha256Text $execField['value'])) {
+          if (($mode -ceq 'direct') -and ([string]$shaField['value'] -cne [string]$execField['value'])) {
+            $problems.Add(('{0} is mode direct but its original and executed digests differ' -f $label))
+          }
+          if (($mode -ceq 'diverged') -and ([string]$shaField['value'] -ceq [string]$execField['value'])) {
+            $problems.Add(('{0} is mode diverged but its original and executed digests are identical' -f $label))
+          }
+        }
+
+        # ---- relationships with the bytes on disk
+        $originalAbs = Join-Path $RepoRoot ($file.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+        $executedAbs = Join-Path $RepoRoot ($sqlPath.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+        $wrapperAbs = Join-Path (Join-Path $CloudRoot 'generated') ([string]$wrapperPath)
+        if (-not $SkipFileHashes) {
+          if (-not (Test-Path -LiteralPath $originalAbs -PathType Leaf)) { $problems.Add(('{0}: original {1} is missing' -f $label, $file)) }
+          elseif ((Get-NormalizedSha256 -Path $originalAbs) -cne [string]$shaField['value']) { $problems.Add(('{0}: original {1} does not match the manifest digest' -f $label, $file)) }
+          if (-not (Test-Path -LiteralPath $executedAbs -PathType Leaf)) { $problems.Add(('{0}: executed source {1} is missing' -f $label, $sqlPath)) }
+          elseif ((Get-NormalizedSha256 -Path $executedAbs) -cne [string]$execField['value']) { $problems.Add(('{0}: executed source {1} does not match the manifest digest' -f $label, $sqlPath)) }
+        }
+        if (-not (Test-Path -LiteralPath $wrapperAbs -PathType Leaf)) {
+          $problems.Add(('{0}: wrapper {1} is missing' -f $label, $wrapperPath))
+        }
+        else {
+          $wrapperRel = 'supabase/cloud/generated/' + [string]$wrapperPath
+          $wrapperShaField = Get-ClashJsonField -Object $entry -Name 'wrapperSha256'
+          if (-not $SkipFileHashes) {
+            $wrapperActual = Get-NormalizedSha256 -Path $wrapperAbs
+            if ($wrapperActual -cne [string]$wrapperShaField['value']) {
+              $problems.Add(('{0}: wrapper {1} does not match the manifest digest' -f $label, $wrapperPath))
+            }
+          }
+          if (-not $sumMap.ContainsKey($wrapperRel)) {
+            $problems.Add(('{0}: wrapper {1} has no checksum entry' -f $label, $wrapperRel))
+          }
+          elseif ([string]$sumMap[$wrapperRel].sha256 -cne [string]$wrapperShaField['value']) {
+            $problems.Add(('{0}: wrapper {1} digest disagrees with checksums.sha256' -f $label, $wrapperRel))
+          }
+          # The wrapper is the artefact that actually executes, so its shape is part
+          # of the package proof: one transaction, a trailing commit, a ledger insert
+          # that precedes that commit, the version literal and the identity token.
+          $wrapperText = ''
+          try { $wrapperText = [System.IO.File]::ReadAllText($wrapperAbs) }
+          catch { $problems.Add(('{0}: wrapper {1} could not be read' -f $label, $wrapperPath)) }
+          if ($wrapperText.Length -gt 0) {
+            if (([regex]::Matches($wrapperText, '(?m)^begin;\s*$')).Count -ne 1) { $problems.Add(('{0}: wrapper {1} must contain exactly one top-level begin;' -f $label, $wrapperPath)) }
+            if ($wrapperText -notmatch '(?m)^commit;\s*$') { $problems.Add(('{0}: wrapper {1} has no trailing commit' -f $label, $wrapperPath)) }
+            $insertAt = $wrapperText.IndexOf('insert into supabase_migrations.schema_migrations')
+            if ($insertAt -lt 0) { $problems.Add(('{0}: wrapper {1} has no ledger insert' -f $label, $wrapperPath)) }
+            elseif ($insertAt -gt $wrapperText.LastIndexOf('commit;')) { $problems.Add(('{0}: wrapper {1} inserts into the ledger after its commit' -f $label, $wrapperPath)) }
+            if (($version.Length -gt 0) -and ($wrapperText -notmatch [regex]::Escape("'$version'"))) { $problems.Add(('{0}: wrapper {1} does not carry its ledger version literal' -f $label, $wrapperPath)) }
+            $normField = Get-ClashJsonField -Object $entry -Name 'normalizedSha256'
+            if ((Test-ClashSha256Text $normField['value']) -and ($wrapperText -notmatch [regex]::Escape(('sha256:' + [string]$normField['value'])))) {
+              $problems.Add(('{0}: wrapper {1} does not carry its normalised identity token' -f $label, $wrapperPath))
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return [ordered]@{
+    ok              = ($problems.Count -eq 0)
+    problems        = @($problems)
+    memberCount     = @($members).Count
+    checksumEntries = @($checksumEntries).Count
+    verifiedFiles   = $verified
+    entryCount      = $entryCount
+    packageTreeHash = $treeHash
+    checksums       = $sumMap
+  }
+}
+
+# RC08: "hash the wrapper, then execute the wrapper by pathname" is a
+# time-of-check / time-of-use gap. Anything that can write the file between the two
+# calls - another process, a sync client, a build in the same directory - makes the
+# runner execute bytes that were never verified, while the receipt records the hash
+# of the bytes that were.
+#
+# The file is therefore read ONCE. The digest is computed from those bytes, the same
+# bytes are written to a private snapshot inside the run directory, the snapshot's
+# digest is verified independently from disk, and the snapshot is then opened with a
+# sharing mode that refuses every concurrent writer for as long as the child runs.
+# The caller must dispose the returned stream in a finally block.
+function New-VerifiedSqlSnapshot {
+  param(
+    [Parameter(Mandatory = $true)][string]$SourcePath,
+    [Parameter(Mandatory = $true)][string]$TargetPath,
+    [Parameter(Mandatory = $true)][string]$ExpectedSha256,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  $record = @{ ok = $false; path = $null; sha256 = ''; bytes = 0; stream = $null; problem = '' }
+  if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
+    $record['problem'] = ('{0}: the source file is missing' -f $Label)
+    return $record
+  }
+  if (Test-Path -LiteralPath $TargetPath) {
+    $record['problem'] = ('{0}: the snapshot target already exists, and evidence is never overwritten' -f $Label)
+    return $record
+  }
+  $bytes = $null
+  try { $bytes = [System.IO.File]::ReadAllBytes($SourcePath) }
+  catch {
+    $record['problem'] = ('{0}: the source file could not be read: {1}' -f $Label, (Protect-Text $_.Exception.Message))
+    return $record
+  }
+  $written = -1
+  try {
+    $writer = New-Object System.IO.FileStream($TargetPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    try {
+      $writer.Write($bytes, 0, $bytes.Length)
+      $writer.Flush($true)
+      $written = [int]$bytes.Length
+    }
+    finally { $writer.Dispose() }
+  }
+  catch {
+    $record['problem'] = ('{0}: the snapshot could not be written: {1}' -f $Label, (Protect-Text $_.Exception.Message))
+    return $record
+  }
+  $actual = ''
+  try { $actual = Get-NormalizedSha256 -Path $TargetPath }
+  catch {
+    $record['problem'] = ('{0}: the snapshot could not be read back: {1}' -f $Label, (Protect-Text $_.Exception.Message))
+    return $record
+  }
+  if ($actual -cne $ExpectedSha256) {
+    $record['problem'] = ('{0}: digest is {1}, the reviewed bytes were {2}' -f $Label, $actual, $ExpectedSha256)
+    $record['sha256'] = $actual
+    return $record
+  }
+  $held = $null
+  try {
+    # FileShare::Read denies every writer for the lifetime of this handle.
+    $held = New-Object System.IO.FileStream($TargetPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+  }
+  catch {
+    $record['problem'] = ('{0}: the snapshot could not be locked: {1}' -f $Label, (Protect-Text $_.Exception.Message))
+    return $record
+  }
+  $record['ok'] = $true
+  $record['path'] = $TargetPath
+  $record['sha256'] = $actual
+  $record['bytes'] = $written
+  $record['stream'] = $held
+  return $record
+}
+
 # The evidence a completed run must have sealed. Declared once: the runner
 # demands it (Publish-ClashCompletion) and every consumer requires it, so the
 # producer and the consumer cannot drift apart.
+# RC02: the required evidence is no longer "the five files that happened to exist
+# when this list was written". A completed deployment must carry the baseline, the
+# package integrity proof, the preflight, one receipt for EVERY executed migration,
+# the postflight, the storage report, the claim release and the finalization intent.
+# -Root adds the per-migration receipts that are actually present, so the seal and
+# the intent describe the same set the evidence validator checks.
 function Get-ClashCompletionRequiredEvidence {
-  return @(
+  param([string]$Root = '')
+  $required = @(
+    '00-baseline.json'
+    '01-integrity.json'
     '02-preflight.json'
     '04-postflight.json'
     '05-storage.json'
     '06-claim-release.json'
     '06-finalization-intent.json'
   )
+  if (-not [string]::IsNullOrWhiteSpace($Root)) {
+    foreach ($name in @(Get-ClashMigrationReceiptNames -Root $Root)) { $required += [string]$name }
+  }
+  return $required
 }
 
 # ------------------------------------------------------- completion protocol --
@@ -1043,9 +2048,10 @@ function Get-ClashCompletionRequiredEvidence {
 function Publish-ClashCompletion {
   param(
     [Parameter(Mandatory = $true)][string]$Root,
-    [hashtable]$Fields = @{},
+    $Fields = @{},
     [string[]]$RequiredEvidence = @(),
-    [string]$PrevSha = ''
+    [string]$PrevSha = '',
+    [int]$ExpectedMigrationCount = 0
   )
 
   $marker = Join-Path $Root '06-complete.json'
@@ -1062,11 +2068,27 @@ function Publish-ClashCompletion {
   }
 
   $protocol = 'clash-completion/2'
+
+  # RC02: the PRODUCER runs the same deployment-evidence contract the consumer runs,
+  # before it publishes anything at all. A phase receipt that records status FAIL,
+  # a missing migration, a preflight that claims 19 gating rows while its own
+  # counters sum to 17, an integrity proof that did not pass - each of those used to
+  # seal cleanly and be accepted by both halves of the contract.
+  if (@($RequiredEvidence).Count -eq 0) {
+    $RequiredEvidence = @(Get-ClashCompletionRequiredEvidence -Root $Root)
+  }
+  $evidence = Test-ClashDeploymentEvidence -Root $Root -ExpectedMigrationCount $ExpectedMigrationCount
+  if (-not $evidence.ok) {
+    $evidenceSample = @($evidence.problems)
+    if ($evidenceSample.Count -gt 6) { $evidenceSample = @($evidenceSample[0..5]) }
+    throw ('completion refused: the deployment evidence does not satisfy the contract ({0} problem(s)): {1}. Nothing was published.' -f @($evidence.problems).Count, ($evidenceSample -join '; '))
+  }
+
   # writerRunId is part of the authoritative contract: the consumer checks it
   # against the sealed claim-release receipt. A caller that cannot supply it must
   # not be able to publish a marker at all.
   $writerRunId = ''
-  if ($Fields.ContainsKey('writerRunId')) { $writerRunId = [string]$Fields['writerRunId'] }
+  if ($Fields.Contains('writerRunId')) { $writerRunId = [string]$Fields['writerRunId'] }
   if ([string]::IsNullOrWhiteSpace($writerRunId)) {
     throw 'completion refused: the marker requires writerRunId, which is verified against the sealed 06-claim-release.json. Nothing was published.'
   }
@@ -1270,11 +2292,27 @@ function Test-ClashRunCompletion {
 
   # The seal is the anchor: it is verified first, and every authoritative marker
   # field is then compared against it.
-  $check = Test-EvidenceSeal -Root $RunPath -Require @(Get-ClashCompletionRequiredEvidence)
+  $check = Test-EvidenceSeal -Root $RunPath -Require @(Get-ClashCompletionRequiredEvidence -Root $RunPath)
   if (-not $check.ok) {
     $shown = @($check.problems)
     if ($shown.Count -gt 6) { $shown = @($shown[0..5]) }
     foreach ($p in $shown) { $problems.Add(('seal: {0}' -f $p)) }
+  }
+
+  # RC05/RC02: the consumer validates the DEPLOYMENT EVIDENCE as well as the seal.
+  # The two are independent checks: the seal proves the bytes did not change, this
+  # proves the bytes do not describe a failed deployment. Sharing one incomplete
+  # predicate between producer and consumer is what let Codex seal three required
+  # phased receipts with status FAIL and have both sides accept them.
+  $evidence = Test-ClashDeploymentEvidence -Root $RunPath
+  if (-not $evidence.ok) {
+    $evidenceProblems = @($evidence.problems)
+    $evidenceShown = $evidenceProblems
+    if ($evidenceShown.Count -gt 6) { $evidenceShown = @($evidenceShown[0..5]) }
+    foreach ($p in $evidenceShown) { $problems.Add(('deployment evidence: {0}' -f $p)) }
+    if ($evidenceProblems.Count -gt 6) {
+      $problems.Add(('deployment evidence: {0} more problem(s) were not shown' -f ($evidenceProblems.Count - 6)))
+    }
   }
 
   # C18-C1: the marker ROOT is validated on its own, so an unparsable, empty,
@@ -1452,7 +2490,7 @@ function Test-ClashRunCompletion {
           $sealEntriesField = Get-ClashJsonField -Object $sealDocument -Name 'files'
           $sealEntries = @()
           if ($sealEntriesField['kind'] -ceq 'array') { $sealEntries = @($sealEntriesField['value']) }
-          foreach ($must in @(Get-ClashCompletionRequiredEvidence)) {
+          foreach ($must in @(Get-ClashCompletionRequiredEvidence -Root $RunPath)) {
             if (-not $seenDeclared.ContainsKey($must)) {
               $problems.Add(('the sealed intent does not declare the required evidence {0}' -f $must))
             }
@@ -1909,6 +2947,29 @@ function Test-VerifyReportSeparator {
 # infoRows, gatingExpected, infoExpected, missing, unexpected, duplicates,
 # malformed, problems, outcome, nativeOk, captureComplete, headerSeen,
 # separatorSeen, footerSeen, footerRows, envelopeProblems.
+# RC05: what the 'actual' column is allowed to say, given the expectation the SQL
+# declares. One function so the three contracts cannot each invent a rule.
+function Get-ClashReportActualProblem {
+  param([string]$Expected, [string]$Actual, [bool]$IsInfo)
+  if ($IsInfo) {
+    if ([string]::IsNullOrWhiteSpace($Actual)) { return 'the actual cell is empty; an INFO row must still render the fact it reports' }
+    return ''
+  }
+  if ($Expected -match '^>=(\d+)$') {
+    $floor = [int]$Matches[1]
+    $parsed = 0
+    if (-not [int]::TryParse($Actual, [ref]$parsed)) {
+      return ('the actual cell ''{0}'' is not an integer, so it cannot be compared with the declared ''{1}''' -f $Actual, $Expected)
+    }
+    if ($parsed -lt $floor) { return ('the actual value {0} does not satisfy the declared ''{1}''' -f $parsed, $Expected) }
+    return ''
+  }
+  if ($Actual -cne $Expected) {
+    return ('the actual cell ''{0}'' disagrees with the declared expectation ''{1}''; a PASS row must render the value it claims' -f $Actual, $Expected)
+  }
+  return ''
+}
+
 function Test-VerifyReport {
   param(
     [Parameter(Mandatory = $true)]$Result,
@@ -2118,8 +3179,14 @@ function Test-VerifyReport {
       $ord      = [int]$first
       $name     = ([string]$fields[1]).Trim()
       $expected = ([string]$fields[2]).Trim()
+      # RC05: the actual cell is read and kept. The parser used to throw it away and
+      # trust the status cell, so a report that rendered 'PASS' beside a blank or
+      # contradictory actual value was accepted - the status column is produced BY
+      # the SQL from this column, so a status that disagrees with its own actual is
+      # a rewritten report, not a passing check.
+      $actual = ([string]$fields[3]).Trim()
       if ($byOrd.Contains($ord)) { $duplicates += $ord; continue }
-      $byOrd[$ord] = [ordered]@{ ord = $ord; name = $name; expected = $expected; status = $status }
+      $byOrd[$ord] = [ordered]@{ ord = $ord; name = $name; expected = $expected; actual = $actual; status = $status }
       $order += $ord
       if ($status -eq 'PASS') { $passRows++ }
       elseif ($status -eq 'FAIL') { $failRows++ }
@@ -2204,6 +3271,14 @@ function Test-VerifyReport {
     }
     if ([string]$row.expected -ne [string]$d.expected) {
       $problems += ("check {0}: expected text '{1}' is not the declared '{2}'" -f $ord, $row.expected, $d.expected)
+    }
+    # RC05: the ACTUAL cell must satisfy the declared expectation, using the same
+    # rule the SQL renders the status with: '>=N' means an integer of at least N,
+    # anything else means the exact expected text. An INFO row carries prose, so it
+    # only has to be non-empty.
+    $actualProblem = Get-ClashReportActualProblem -Expected ([string]$d.expected) -Actual ([string]$row.actual) -IsInfo ([bool]$d.info)
+    if ($actualProblem.Length -gt 0) {
+      $problems += ("check {0} ({1}): {2}" -f $ord, $d.name, $actualProblem)
     }
     if ([bool]$d.info) {
       if ([string]$row.status -ne 'INFO') { $problems += ("check {0} ({1}) rendered {2}; the contract requires INFO" -f $ord, $d.name, $row.status) }
@@ -2385,6 +3460,22 @@ $script:ClashSelfTestRequiredCases = @(
   'completionRejectsScalarRootMarker',
   'completionRejectsMalformedRootMarker',
   'completionRejectsMissingRootMarker',
+  # Round 20 (RC01-RC11): the systemic validation boundary, executed.
+  'casePassedRequiresJsonBooleanTrue',
+  'deploymentEvidenceRejectsFailedPhase',
+  'deploymentEvidenceRejectsContradictoryCounters',
+  'deploymentEvidenceRequiresEveryMigration',
+  'packageIntegrityRejectsTamperedTree',
+  'packageIntegrityRejectsUnreadableChecksumLine',
+  'packageIntegrityRejectsManifestDrift',
+  'gateBaselineRequiresProvenGitCapture',
+  'reportActualCellMustSatisfyExpected',
+  'containedPathRejectsEscape',
+  'sealEntriesAreContainedAndSized',
+  'hiddenEvidenceIsSealedAndUnsealedDetected',
+  'jsonFieldReadsBothObjectRepresentations',
+  'suiteSummaryRequiresTypedIntegers',
+  'mutatedValidatorIsDetectedByTheSuite',
   'jsonRootStatesAreValidated',
   'completionAcceptsValidObjectRoot',
   'evidenceSealRejectsNullRoot',
@@ -2492,6 +3583,30 @@ function Get-CaseEntry {
   # as everywhere else: a case record that happened to be an array must arrive as
   # an array, so the caller's shape check sees the truth (C17-C1 class)
   return ,$p.Value
+}
+
+# RC01 (C19-C1): the ONE reading of a case record's pass/fail authority.
+#
+# The previous check was `if ($passed -ne $true) { problem }`. On an array,
+# PowerShell's -ne is a FILTER: `[false,true] -ne $true` returns @($false), which
+# is truthy, so the rejection never fired; 1, "true", [true], [true,true] and []
+# all certified too. A test receipt is authoritative evidence, so the field is now
+# read as a field - present, then KIND, then VALUE - and only a JSON boolean true
+# passes. Every consumer of a case record goes through this function, so the
+# adapter validator and the harness cannot drift apart.
+function Get-ClashCasePassedProblem {
+  param($Entry, [Parameter(Mandatory = $true)][string]$Name, [string]$Context = 'case')
+  $field = Get-ClashJsonField -Object $Entry -Name 'passed'
+  if (-not $field['present']) {
+    return ("{0} '{1}' records no passed field" -f $Context, $Name)
+  }
+  if ($field['kind'] -cne 'boolean') {
+    return ("{0} '{1}' records passed as {2}; only a JSON boolean true certifies a case" -f $Context, $Name, (Format-ClashFieldValue -Value $field['value']))
+  }
+  if ($field['value'] -cne $true) {
+    return ("{0} '{1}' is not recorded as passed (passed = {2})" -f $Context, $Name, (Format-ClashFieldValue -Value $field['value']))
+  }
+  return ''
 }
 
 # ------------------------------------------------------ adapter self-test ---
@@ -2606,8 +3721,16 @@ function Test-SelfTestReceipt {
     foreach ($name in $required) {
       $entry = Get-CaseEntry -Cases $cases -Name $name
       if ($null -eq $entry) { continue }
-      $passed = Get-DocumentProperty -Object $entry -Name 'passed' -Default $null
-      if ($passed -ne $true) { $problems += ("case '{0}' is not recorded as passed" -f $name) }
+      # RC01: a case record must be an OBJECT carrying a JSON boolean true. The
+      # shape of the record is decided here, before its authority is read, so a
+      # record that is a string, a number, null or an ARRAY can never satisfy the
+      # inventory. Get-ClashCasePassedProblem is the single implementation.
+      if (-not (Test-ClashJsonKind -Value $entry -Kind 'object')) {
+        $problems += ("case '{0}' is recorded as {1}; a case record must be a JSON object with passed = true" -f $name, (Format-ClashFieldValue -Value $entry))
+        continue
+      }
+      $passedProblem = Get-ClashCasePassedProblem -Entry $entry -Name $name
+      if ($passedProblem.Length -gt 0) { $problems += $passedProblem }
     }
     if ($names.Count -ne $required.Count) {
       $problems += ('receipt records {0} case(s), the inventory requires {1}' -f $names.Count, $required.Count)

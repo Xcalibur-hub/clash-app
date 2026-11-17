@@ -35,9 +35,9 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
-const EXPECTED_SECTIONS = 28;
-const EXPECTED_CASES = 135;
-const EXPECTED_ASSERTIONS = 467;
+const EXPECTED_SECTIONS = 29;
+const EXPECTED_CASES = 150;
+const EXPECTED_ASSERTIONS = 494;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -266,9 +266,14 @@ check('receipt written for the runner exception path',
 // neither the run directory nor the fallback can be written. A bare
 // [void](Write-EvidenceOrFallback ...) is exactly the pattern the audit found.
 const requiredReceipts = (deploy.match(/\[void\]\(Write-RequiredReceipt/g) || []).length;
+// RC02: the four per-migration outcome receipts now go through New-PhaseReceipt, so
+// they carry the standard header, join the run's hash chain and inherit the same
+// "a receipt that cannot be persisted throws" rule from Add-Receipt.
+const migrationReceipts = (deploy.match(/New-PhaseReceipt \("03-migrations\/\{0\}\.json" -f \$label\) \$receipt/g) || []).length;
 check('per-migration outcome receipts survive an unwritable run directory',
-  requiredReceipts >= 5 && !/Write-EvidenceJson/.test(deploy),
-  `${requiredReceipts} required receipts`);
+  requiredReceipts >= 1 && migrationReceipts === 4 && /receipt persistence failed for/.test(lib) &&
+  !/Write-EvidenceJson/.test(deploy),
+  `${requiredReceipts} required receipts, ${migrationReceipts} chained migration receipts`);
 check('a receipt that cannot be persisted throws instead of returning an empty hash',
   /function Write-RequiredReceipt/.test(deploy) && /throw \('required receipt could not be persisted/.test(deploy) &&
   /function Add-Receipt/.test(lib) && /receipt persistence failed for/.test(lib) &&
@@ -283,15 +288,19 @@ check('the exception message is sanitised before printing', /RUNNER EXCEPTION: \
 check('every phase emits a receipt', (deploy.match(/New-PhaseReceipt /g) || []).length >= 8);
 
 // F5: integrity is enforced, not merely computed
-const digestCmp = deploy.indexOf('$actualWrapperSha -ne $e.wrapperSha256');
-const execCall = deploy.indexOf("-Arguments ($common + @('-f', $wrapperAbs))");
+const snapshotCall = deploy.indexOf('New-VerifiedSqlSnapshot -SourcePath $wrapperAbs');
+const execCall = deploy.indexOf("-Arguments ($common + @('-f', [string]$snapshot.path))");
 const integrityGate = deploy.indexOf("New-PhaseReceipt '01-integrity.json'");
 const firstDb = deploy.indexOf("'02-preflight.json'");
-check('wrapper digest compared against the manifest', digestCmp > 0);
-check('digest comparison precedes execution', digestCmp > 0 && execCall > digestCmp, `cmp@${digestCmp} exec@${execCall}`);
+check('wrapper bytes are verified against the manifest digest', /ExpectedSha256 \(\[string\]\$e\.wrapperSha256\)/.test(deploy));
+check('digest comparison precedes execution', snapshotCall > 0 && execCall > snapshotCall, `snap@${snapshotCall} exec@${execCall}`);
+check('RC08: the runner never executes a wrapper pathname it hashed and put back',
+  !/\$common \+ @\('-f', \$wrapperAbs\)/.test(deploy) && !/-f', \$bootstrapAbs/.test(deploy));
 check('full package verified before the first database write', integrityGate > 0 && firstDb > integrityGate);
 check('ledger read-back must equal the expected token', /probeVal -ne \$expectedTok/.test(deploy));
-check('wrapper digest is also cross-checked against checksums', /\$expected\[\$sumRel\] -ne \$actualWrapperSha/.test(deploy));
+check('RC03: the wrapper digest is also cross-checked against checksums, once, in the shared planner',
+  /wrapper \{1\} digest disagrees with checksums\.sha256/.test(lib) &&
+  /Test-ClashPackageIntegrity -RepoRoot \$repoRoot/.test(deploy));
 
 // F4: classify, never narrate. Round 8 (R3) removed COMMITTED_WITH_ERROR: a row
 // present with the expected token is a COMMITTED transaction, whatever the exit
@@ -313,13 +322,13 @@ check('runner executes step 0 itself on every fresh run',
   /000_ledger_bootstrap\.sql/.test(deploy) && /gate 3b: step 0/.test(deploy) &&
   /\$bootOutcome = \$\(if \(\$ledgerAbsent\)/.test(deploy));
 check('step 0 digest is verified before it executes',
-  deploy.indexOf("$expected[$bootstrapRel] -ne $bootSha") > 0 &&
-  deploy.indexOf("$expected[$bootstrapRel] -ne $bootSha") < deploy.indexOf("-f', $bootstrapAbs)"));
+  deploy.indexOf('-ExpectedSha256 $bootExpected') > 0 &&
+  deploy.indexOf('-ExpectedSha256 $bootExpected') < deploy.indexOf("-f', [string]$bootSnapshot.path)"));
 check('step 0 is proven to leave an empty ledger',
   /created a ledger that is not empty/.test(deploy) && /bootstrap-recheck/.test(deploy));
 check('step 0 ordering: ledger proof, then bootstrap, then migrations',
   deploy.indexOf("'03-ledger.json'") < deploy.indexOf("'03b-bootstrap.json'") &&
-  deploy.indexOf("'03b-bootstrap.json'") < deploy.indexOf("-f', $wrapperAbs)"));
+  deploy.indexOf("'03b-bootstrap.json'") < deploy.indexOf("-f', [string]$snapshot.path)"));
 check('no blind retry loop', !/while\s*\(.*\)\s*\{[^}]*Invoke-NativeProcess/.test(deploy));
 check('no backfill script remains', !existsSync(join(toolsDir, 'backfill-ledger.ps1')));
 
@@ -577,6 +586,11 @@ hdr(12, 'cross-file function resolution (catches a typo a parser cannot)');
     'Get-Date', 'Join-Path', 'New-Item', 'New-Object', 'Out-Null', 'Remove-Item',
     'Resolve-Path', 'Select-Object', 'Set-StrictMode', 'Sort-Object', 'Split-Path',
     'Test-Path', 'Where-Object', 'Write-Host', 'Group-Object',
+    // Round 20: reviewed for RC03/RC06/RC08/RC04. Get-Item measures a sealed file's
+    // real size; Copy-Item/Move-Item build the adversarial package trees and
+    // duplicate-receipt fixtures in the TEMP directory; Invoke-Expression runs the
+    // extracted gate-0 baseline block so it is executed, not merely read.
+    'Get-Item', 'Copy-Item', 'Move-Item', 'Invoke-Expression',
   ]);
   const allPs = [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1'];
   const codeAll = allPs.map((f) => psLex(read(join(CLOUD, f))).code).join('\n');
@@ -607,7 +621,7 @@ hdr(13, 'parameter-name resolution (typos in -Named arguments)');
     'Encoding', 'Raw', 'ArgumentList', 'TypeName', 'ForegroundColor', 'ErrorAction',
     'Object', 'InputObject', 'Property', 'ExpandProperty', 'First',
     'Leaf', 'Parent', 'Version', 'Last', 'Descending',
-    'Filter', 'PathType',
+    'Filter', 'PathType', 'Destination',
   ]);
   const allPs = [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1'];
   const codeAll = allPs.map((f) => psLex(read(join(CLOUD, f))).code).join('\n');
@@ -646,9 +660,14 @@ hdr(14, 'package-test invocation contract (Round 3 item 5)');
     suiteSrc.includes("'CLASH-TEST-SUMMARY ' + JSON.stringify"));
   check('launcher detects the same PASS/FAIL prefix',
     launcherSrc.includes("'(?m)^  PASS  '") && launcherSrc.includes("'(?m)^  FAIL  '"));
+  // RC09: the launcher no longer parses the summary itself - it delegates to the
+  // adapter's typed reader - so the prefix and the JSON parse are asserted where
+  // they now live, and the delegation is asserted where it happens.
   check('launcher detects the same summary prefix',
-    launcherSrc.includes("'^CLASH-TEST-SUMMARY '"));
-  check('launcher parses the summary as JSON', /ConvertFrom-Json/.test(launcherSrc));
+    launcherSrc.includes('Test-ClashSuiteSummary -StdOut') && lib.includes("'^CLASH-TEST-SUMMARY '"));
+  check('launcher parses the summary as JSON',
+    /Test-ClashSuiteSummary/.test(launcherSrc) && /ConvertFrom-Json/.test(lib) &&
+    /function Test-ClashSuiteSummary/.test(lib));
   check('launcher requires agreement between counts and summary', /countsAgree/.test(launcherSrc));
 
   // same rules, applied to synthetic output
@@ -1204,7 +1223,7 @@ hdr(19, 'deployment recovery safety - R1-R4 adversarial regressions (Round 8)');
     /throw \('required receipt could not be persisted/.test(deployCode) &&
     /if \(-not \$res\.ok\) \{\s*\n\s*throw \('receipt persistence failed/.test(lib));
   check('R4: every JSON receipt in the migration loop is required',
-    (deployCode.match(/\[void\]\(Write-RequiredReceipt/g) || []).length >= 5 &&
+    (deployCode.match(/New-PhaseReceipt \("03-migrations\/\{0\}\.json" -f \$label\) \$receipt/g) || []).length === 4 &&
     !/\[void\]\(Write-EvidenceOrFallback -Path \(Join-Path \$run \("03-migrations/.test(deployCode));
   check('R4: the fallback writer returns a structured failure and names it',
     /ok = \$false; path = \$null/.test(lib) && /NO RECEIPT POSSIBLE/.test(lib));
@@ -2084,8 +2103,12 @@ hdr(23, 'report envelope - strict psql parsing (Round 13 / R12-C1)');
     selfTest.includes("($short -join ' | ')"));
 
   // -------------------------------------------------- the sibling parsers ------
+  // RC03: the strict reader lives in the adapter now, and BOTH callers use it, so
+  // there is one definition of "an unreadable line is a failure" instead of two.
   check('the manifest checker treats an unreadable checksum line as a failure',
-    /is not '<sha256>  <path>'/.test(manifestTool) &&
+    /is not "<64 lowercase hex>  <relative path>"/.test(lib) &&
+    /Test-ClashPackageIntegrity -RepoRoot \$repoRoot -CloudRoot \$cloudRoot/.test(manifestTool) &&
+    !/Test-ClashPackageIntegrity/.test(manifestTool.split('function Fail')[1].split('$integrity =')[0]) &&
     !/if \(\$parts\.Count -ne 2\) \{ continue \}/.test(manifestTool));
   check('the receipt validator rejects a case recorded with no body',
     /is present but has no body/.test(libCode));
@@ -2497,7 +2520,13 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
   check('the seal excludes the completion artifacts, so the marker cannot be sealed into itself',
     /function Get-ClashSealExclusions/.test(libCode) &&
     /'EVIDENCE-MANIFEST\.json', '06-complete\.json', '06-complete-unverified\.json'/.test(libCode) &&
-    /Get-ClashSealExclusions/.test(libCode.slice(libCode.indexOf('function Seal-Evidence'), libCode.indexOf('function Test-EvidenceSeal'))));
+    // RC07: exclusions are exact relative paths applied by ONE enumeration, and the
+    // sealer and the verifier both consume it, so neither can disagree about what
+    // is in the run directory (or silently skip a hidden file).
+    /function Get-ClashSealedFileCandidates/.test(libCode) &&
+    /Get-ClashSealedFileCandidates -Root \$Root/.test(libCode.slice(libCode.indexOf('function Seal-Evidence'), libCode.indexOf('function Test-EvidenceSeal'))) &&
+    /Get-ClashSealedFileCandidates -Root \$Root/.test(libCode.slice(libCode.indexOf('function Test-EvidenceSeal'), libCode.indexOf('function Get-ClashCompletionRequiredEvidence'))) &&
+    /Get-ChildItem -LiteralPath \$Root -Recurse -File -Force/.test(libCode));
   check('publication is atomic: a scratch file then a move that cannot overwrite',
     (libCode.match(/\[System\.IO\.File\]::Move\(/g) || []).length === 2 &&
     !/Write-EvidenceJson -Path \(Join-Path \$Root \$SealName\)/.test(libCode) &&
@@ -2548,8 +2577,10 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
     })());
   check('the required evidence is declared once and used by producer and consumer',
     /function Get-ClashCompletionRequiredEvidence/.test(libCode) &&
-    /Test-EvidenceSeal -Root \$RunPath -Require @\(Get-ClashCompletionRequiredEvidence\)/.test(libCode) &&
-    /\$completionRequired = @\(Get-ClashCompletionRequiredEvidence\)/.test(deployCode) &&
+    /'00-baseline\.json'/.test(libCode) && /'01-integrity\.json'/.test(libCode) &&
+    /Get-ClashMigrationReceiptNames -Root \$Root/.test(libCode) &&
+    /Test-EvidenceSeal -Root \$RunPath -Require @\(Get-ClashCompletionRequiredEvidence -Root \$RunPath\)/.test(libCode) &&
+    /\$completionRequired = @\(Get-ClashCompletionRequiredEvidence -Root \$run\)/.test(deployCode) &&
     !/'02-preflight\.json'\s*\r?\n\s*'04-postflight\.json'/.test(deployCode));
   check('the producer will not report success for a marker its consumer rejects',
     (() => {
@@ -2763,6 +2794,160 @@ hdr(28, 'document roots are validated, never assumed (Round 19 / C18-C1)');
   check('the README documents C18-C1 and the root contract',
     readmeText.includes('C18-C1') && /literal null/.test(readmeText) &&
     /root/i.test(readmeText) && /C17-C1/.test(readmeText));
+}
+
+hdr(29, 'systemic validation boundary: RC01-RC11 (Round 20)');
+{
+  // The Codex audit of c265eae recorded 32 invalid acceptances across 704
+  // adversarial mutations and eleven defect classes. Every assertion below is a
+  // STRUCTURAL invariant behind one of them; the executing proof of each is a case
+  // in tools/test-native-capture.ps1 (135-149) running the real validator on real
+  // artefacts.
+  const libRaw = read(join(toolsDir, 'lib/clash-native.ps1'));
+  const deploySrc = read(join(toolsDir, 'deploy.ps1'));
+  const manifestSrc = read(join(toolsDir, 'check-manifest.ps1'));
+  const ledgerSrc = read(join(toolsDir, 'check-ledger.ps1'));
+  const launcherSrc = read(join(toolsDir, 'run-tests.ps1'));
+  const readmeText = lf(read(join(CLOUD, 'README.md')));
+
+  // RC01: one reading of a case record, kind-then-value, and no loose comparison
+  // anywhere in the package.
+  check('RC01: a case record is read as present -> kind -> value, once',
+    /function Get-ClashCasePassedProblem/.test(libRaw) &&
+    /if \(-not \$field\['present'\]\)/.test(libRaw) &&
+    /if \(\$field\['kind'\] -cne 'boolean'\)/.test(libRaw) &&
+    /if \(\$field\['value'\] -cne \$true\)/.test(libRaw) &&
+    (libRaw.match(/function Get-ClashCasePassedProblem/g) || []).length === 1);
+  check('RC01: no -ne \$true comparison on a case record survives in CODE',
+    // comments may describe the old defect; executable code may not contain it
+    !/Get-DocumentProperty -Object \$entry -Name 'passed'/.test(psLex(libRaw + selfTest).code) &&
+    !/Get-ClashProperty -Object \$entry -Name 'passed'/.test(psLex(libRaw + selfTest).code) &&
+    !/\$passed -ne \$true/.test(psLex(libRaw + selfTest).code) &&
+    !/\$passed\s+-ne\s+\$true/.test(psLex(selfTest).code));
+  check('RC01: both the receipt validator and the harness inventory use it',
+    /\$passedProblem = Get-ClashCasePassedProblem -Entry \$entry -Name \$name/.test(libRaw) &&
+    /Get-ClashCasePassedProblem -Entry \$entry -Name \$n -Context 'case'/.test(selfTest));
+
+  // RC02: one deployment-evidence contract, validated by the producer BEFORE it
+  // publishes and independently by the consumer.
+  check('RC02: the deployment-evidence contract names every required receipt',
+    /function Test-ClashDeploymentEvidence/.test(libRaw) &&
+    ['00-baseline.json', '01-integrity.json', '02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json']
+      .every((n) => new RegExp(`'${n.replace(/\./g, '\\.')}'`).test(libRaw)) &&
+    /Get-ClashMigrationReceiptNames/.test(libRaw));
+  check('RC02: a required phase receipt may only record status PASS',
+    /a required phase cannot authorise completion with any other status/.test(libRaw));
+  check('RC02: the producer refuses to publish on invalid evidence',
+    (() => {
+      const body = libRaw.slice(libRaw.indexOf('function Publish-ClashCompletion'), libRaw.indexOf('function Test-ClashRunCompletion'));
+      return body.indexOf('$evidence = Test-ClashDeploymentEvidence') > 0 &&
+        body.indexOf('$evidence = Test-ClashDeploymentEvidence') < body.indexOf('$intentSha = Add-Receipt');
+    })());
+  check('RC02: the consumer validates the evidence independently of the seal',
+    /deployment evidence: \{0\}/.test(libRaw) &&
+    /Test-ClashDeploymentEvidence -Root \$RunPath/.test(libRaw));
+  check('RC02: every executed migration must have its own PASS/COMMITTED receipt',
+    /no per-migration receipt exists for index/.test(libRaw) &&
+    /a migration that did not verifiably commit cannot be part of a completed deployment/.test(libRaw) &&
+    /Assert-ClashStringEquals -Object \$doc -Label \$label -Field 'ledgerReadBack' -Expected 'MATCH'/.test(libRaw) &&
+    /-Field 'outcome' -Problems \$problems/.test(libRaw) && /-cne 'COMMITTED'/.test(libRaw));
+  check('RC02: the producer states how many migrations it ran', /-ExpectedMigrationCount \$entries\.Count/.test(deploySrc));
+
+  // RC03: one integrity planner, exact membership, strict parsing.
+  check('RC03: the checksum reader rejects unreadable, blank, duplicate and aliased records',
+    /is not "<64 lowercase hex>  <relative path>"/.test(libRaw) &&
+    /a checksum list has no empty records/.test(libRaw) &&
+    /lists \{0\} twice/.test(libRaw) && /differs from \{1\} only by case/.test(libRaw) &&
+    /with a backslash; entries are forward-slash relative paths/.test(libRaw));
+  check('RC03: membership is exact in both directions',
+    /has no checksum entry/.test(libRaw) && /which is not a package member/.test(libRaw));
+  check('RC03: manifest order, identity and wrapper relationships are enforced',
+    /repeats version/.test(libRaw) && /is not the declared/.test(libRaw) &&
+    /the wrapper "\{0\}" its index and version describe/.test(libRaw) &&
+    /does not carry its normalised identity token/.test(libRaw) &&
+    /must contain exactly one top-level begin;/.test(libRaw));
+  check('RC03: the runner, the checker and the tests all consume the single planner',
+    /Test-ClashPackageIntegrity -RepoRoot \$repoRoot -CloudRoot \$cloudRoot/.test(deploySrc) &&
+    /Test-ClashPackageIntegrity -RepoRoot \$repoRoot -CloudRoot \$cloudRoot/.test(manifestSrc) &&
+    /packageIntegrityRejectsTamperedTree/.test(selfTest) &&
+    !/\$expected\.Count -lt 200/.test(deploySrc) && !/Count -lt 200/.test(manifestSrc));
+
+  // RC04: gate 0 needs PROVEN captures.
+  check('RC04: gate 0 requires a successful capture and a 40-hex HEAD',
+    /if \(-not \(Test-NativeSuccess \$gitHead\)\)/.test(deploySrc) &&
+    /-notmatch '\^\[0-9a-f\]\{40\}\$'/.test(deploySrc) &&
+    /if \(-not \(Test-NativeSuccess \$gitDirty\)\)/.test(deploySrc) &&
+    /-notmatch '\^\[0-9a-f\]\{40\}\$'/.test(manifestSrc));
+
+  // RC05: the actual cell is validated against the declared expectation.
+  check('RC05: the actual cell must satisfy the declared expectation',
+    /function Get-ClashReportActualProblem/.test(libRaw) &&
+    /disagrees with the declared expectation/.test(libRaw) &&
+    /is not an integer, so it cannot be compared with the declared/.test(libRaw) &&
+    /the actual cell is empty; an INFO row must still render/.test(libRaw));
+
+  // RC06/RC07/RC08: containment, exact exclusions, snapshot execution.
+  check('RC06: evidence paths are resolved with containment',
+    /function Resolve-ClashContainedPath/.test(libRaw) &&
+    /parent-directory segment/.test(libRaw) && /resolves outside the evidence root/.test(libRaw) &&
+    /absolute or UNC path/.test(libRaw) &&
+    !/Resolve-ClashContainedPath/.test(libRaw.split('function Resolve-ClashContainedPath')[0]));
+  check('RC07: hidden files are enumerated and exclusions are exact relative paths',
+    /Get-ChildItem -LiteralPath \$Root -Recurse -File -Force/.test(libRaw) &&
+    /function Get-ClashSealedFileCandidates/.test(libRaw) &&
+    !/\(-\$excluded -notcontains \$_.Name\)/.test(libRaw) && !/\$excluded -contains \$file\.Name/.test(libRaw));
+  check('RC08: the executed SQL is a locked snapshot, never a re-opened pathname',
+    /function New-VerifiedSqlSnapshot/.test(libRaw) &&
+    /FileShare\]::Read/.test(libRaw) &&
+    /-f', \[string\]\$snapshot\.path/.test(deploySrc) &&
+    /-f', \[string\]\$bootSnapshot\.path/.test(deploySrc));
+
+  // RC09/RC10/RC11
+  check('RC09: the suite summary is typed, unique and cross-checked',
+    /function Test-ClashSuiteSummary/.test(libRaw) &&
+    /printed \{0\} CLASH-TEST-SUMMARY line\(s\)/.test(libRaw) &&
+    /the suite summary says passed=/.test(libRaw) &&
+    /Test-ClashSuiteSummary -StdOut \$r\.stdOut/.test(launcherSrc));
+  check('RC10: seal byte counts and metadata are typed and compared',
+    /records its size as \{1\}; it must be a JSON integer/.test(libRaw) &&
+    /byte\(s\) on disk, the seal records/.test(libRaw) &&
+    /the seal sealedUtc is \{0\}/.test(libRaw));
+  check('RC11: one object representation: the field reader handles dictionaries too',
+    /if \(\$Object -is \[System\.Collections\.IDictionary\]\)/.test(libRaw) &&
+    /if \(-not \$Object\.Contains\(\$Name\)\) \{ return \$field \}/.test(libRaw));
+
+  // the executed adversarial matrix and the mutation tests exist
+  const rcCases = ['casePassedRequiresJsonBooleanTrue', 'deploymentEvidenceRejectsFailedPhase',
+    'deploymentEvidenceRejectsContradictoryCounters', 'deploymentEvidenceRequiresEveryMigration',
+    'packageIntegrityRejectsTamperedTree', 'packageIntegrityRejectsUnreadableChecksumLine',
+    'packageIntegrityRejectsManifestDrift', 'gateBaselineRequiresProvenGitCapture',
+    'reportActualCellMustSatisfyExpected', 'containedPathRejectsEscape',
+    'sealEntriesAreContainedAndSized', 'hiddenEvidenceIsSealedAndUnsealedDetected',
+    'jsonFieldReadsBothObjectRepresentations', 'suiteSummaryRequiresTypedIntegers',
+    'mutatedValidatorIsDetectedByTheSuite'];
+  check('all fifteen RC01-RC11 cases are executed and in the shared inventory',
+    rcCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest) && libRaw.includes(`'${n}'`)));
+  check('the mutation harness drops six real checks and requires each to be detected',
+    (selfTest.match(/@\{ name = 'rc\d\d-[a-z-]+'; old = "/g) || []).length === 6 &&
+    /\$occurrences -ne 1/.test(selfTest) &&
+    /\$rcMutantMissed \+= \$name/.test(selfTest) &&
+    /restore the pristine definitions/.test(selfTest));
+  check('no mutant is ever written inside the package',
+    /\$rcMutationRoot = Join-Path \(\[System\.IO\.Path\]::GetTempPath\(\)\)/.test(selfTest) &&
+    /\[System\.IO\.File\]::WriteAllText\(\$mutantPath, \$libText\.Replace\(\$old, \$new\)\)/.test(selfTest) &&
+    !/WriteAllText\(\$adapterPath/.test(selfTest));
+  check('no validator reads a variable it was not given (dynamic-scope defects)',
+    // two real defects found while reviewing this round: Read-ClashChecksumFile
+    // used the CALLER's $RepoRoot and New-PackageTreeCopy the caller's $cloudRoot,
+    // which is $null at script scope under Set-StrictMode 2.
+    /function Read-ClashChecksumFile \{[\s\S]{0,200}?\[Parameter\(Mandatory = \$true\)\]\[string\]\$RepoRoot/.test(libRaw) &&
+    /Read-ClashChecksumFile -Path \$sumPath -RepoRoot \$RepoRoot -Problems \$problems/.test(libRaw) &&
+    /function New-PackageTreeCopy \{[\s\S]{0,120}?\[string\]\$CloudRoot/.test(selfTest) &&
+    !/Copy-Item -Path \(Join-Path \$cloudRoot /.test(selfTest) &&
+    /^\$packageRoot = Split-Path -Parent \$pluginRoot$/m.test(selfTest));
+  check('the README documents RC01-RC11 and the evidence contract',
+    readmeText.includes('RC01') && readmeText.includes('RC11') &&
+    /deployment evidence/i.test(readmeText) && /mutation/i.test(readmeText));
 }
 
 {

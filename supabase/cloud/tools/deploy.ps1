@@ -193,7 +193,9 @@ foreach ($d in @('00-baseline', '01-gates', '02-ledger', '03-migrations', '04-po
   New-Item -ItemType Directory -Path (Join-Path $run $d) -Force | Out-Null
 }
 
-function New-PhaseReceipt([string]$Name, [hashtable]$Fields) {
+function New-PhaseReceipt([string]$Name, $Fields = @{}) {
+  # RC02: every receipt, including the 111 per-migration receipts, carries the same
+  # header and joins the same hash chain.
   $script:chain = Add-Receipt -Root $run -Name $Name -Fields $Fields -PrevSha $script:chain
 }
 
@@ -241,11 +243,33 @@ if (-not (Test-NativeSuccess $psqlVersion)) {
   Stop-Run ("psql --version did not succeed ({0}); {1}" -f (Get-NativeOutcomeLabel $psqlVersion), (Get-NativeErrorExcerpt $psqlVersion)) '00-baseline-fail.json'
 }
 
+# RC04: gate 0 recorded the git captures without requiring them to succeed; empty
+# stdout from a failed capture read as a clean baseline. Both must be proven.
+# ---- rc04-baseline-begin
+$gitHeadText = ''
+if (Test-NativeSuccess $gitHead) { $gitHeadText = ([string]$gitHead.stdOut).Trim() }
+if (-not (Test-NativeSuccess $gitHead)) {
+  Stop-Run ("the git baseline capture did not complete ({0}); {1}. No commit was proven, so nothing may be executed." -f `
+      (Get-NativeOutcomeLabel $gitHead), (Get-NativeErrorExcerpt $gitHead)) '00-baseline-git.json'
+}
+if ($gitHeadText -notmatch '^[0-9a-f]{40}$') {
+  Stop-Run ("the git baseline could not be captured: rev-parse HEAD {0} and returned '{1}'. A run without a proven baseline commit cannot be evidence of anything." -f `
+      (Get-NativeOutcomeLabel $gitHead), $gitHeadText) '00-baseline-git.json'
+}
+if (-not (Test-NativeSuccess $gitDirty)) {
+  Stop-Run ("git status of supabase/migrations did not complete ({0}); {1}. An unreadable status is not a clean tree." -f `
+      (Get-NativeOutcomeLabel $gitDirty), (Get-NativeErrorExcerpt $gitDirty)) '00-baseline-git.json'
+}
+if (-not [string]::IsNullOrWhiteSpace([string]$gitDirty.stdOut)) {
+  Stop-Run ("supabase/migrations is dirty: {0}" -f ([string]$gitDirty.stdOut).Trim()) '00-baseline-dirty.json'
+}
+# ---- rc04-baseline-end
+
 New-PhaseReceipt '00-baseline.json' @{
   status            = 'BASELINE'
   psqlPath          = $psqlPath
   psqlVersion       = $psqlVersion.stdOut.Trim()
-  repoHead          = $gitHead.stdOut.Trim()
+  repoHead          = $gitHeadText
   migrationsDirty   = $gitDirty.stdOut.Trim()
   projectRef        = $policy.projectRef
   connectionMode    = $policy.mode
@@ -262,64 +286,33 @@ New-PhaseReceipt '00-baseline.json' @{
   manifestBuilder   = $manifest.builder
   manifestBuiltUtc  = $manifest.built_at_utc
 }
-if (-not [string]::IsNullOrWhiteSpace($gitDirty.stdOut)) {
-  Stop-Run ("supabase/migrations is dirty: {0}" -f $gitDirty.stdOut.Trim()) '00-baseline-dirty.json'
-}
 
 # ------------------------------------- gate 1: full package integrity (offline)
 # Nothing touches the database until every byte the runner will execute has been
 # compared with the digest the manifest/checksums declare.
-$expected = @{}
-foreach ($line in [System.IO.File]::ReadAllLines($sumPath)) {
-  if ([string]::IsNullOrWhiteSpace($line)) { continue }
-  $parts = $line -split '\s{2}', 2
-  if ($parts.Count -ne 2) { continue }
-  $expected[$parts[1].Replace('\', '/')] = $parts[0]
-}
-if ($expected.Count -lt 200) {
-  Stop-Run ("checksums.sha256 lists {0} files; the package should list far more. Rebuild." -f $expected.Count) '01-integrity-fail.json'
-}
-
-$integrityProblems = @()
-$verifiedFiles = 0
-$treeRows = @()
-foreach ($rel in @($expected.Keys | Sort-Object)) {
-  $abs = Join-Path $repoRoot ($rel.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
-  if (-not (Test-Path -LiteralPath $abs)) { $integrityProblems += "missing $rel"; continue }
-  $h = Get-NormalizedSha256 -Path $abs
-  if ($h -ne $expected[$rel]) { $integrityProblems += "digest mismatch $rel" }
-  else { $verifiedFiles++ }
-  $treeRows += ($h + '  ' + $rel)
-}
-
-# manifest cross-check: originals, executed sources, wrapper digests
-foreach ($e in $entries) {
-  $orig = Join-Path $repoRoot $e.file
-  $exec = Join-Path $repoRoot $e.sqlPath
-  $wrap = Join-Path $genDir $e.wrapperPath
-  if (-not (Test-Path -LiteralPath $orig)) { $integrityProblems += "missing original $($e.file)"; continue }
-  if (-not (Test-Path -LiteralPath $exec)) { $integrityProblems += "missing executed source $($e.sqlPath)"; continue }
-  if (-not (Test-Path -LiteralPath $wrap)) { $integrityProblems += "missing wrapper $($e.wrapperPath)"; continue }
-  if ((Get-NormalizedSha256 -Path $orig) -ne $e.sha256)         { $integrityProblems += "original changed $($e.file)" }
-  if ((Get-NormalizedSha256 -Path $exec) -ne $e.executedSha256) { $integrityProblems += "executed source changed $($e.sqlPath)" }
-  if ((Get-NormalizedSha256 -Path $wrap) -ne $e.wrapperSha256)  { $integrityProblems += "wrapper changed $($e.wrapperPath)" }
-  $relSum = 'supabase/cloud/generated/' + $e.wrapperPath
-  if (-not $expected.ContainsKey($relSum)) { $integrityProblems += "wrapper absent from checksums $relSum" }
-  elseif ($expected[$relSum] -ne $e.wrapperSha256) { $integrityProblems += "wrapper digest disagrees with checksums $relSum" }
-}
-$treeHash = Get-TextSha256 -Text ($treeRows -join "`n")
+#
+# RC03: this gate, check-manifest.ps1 and the CI steps each parsed the package
+# differently, so "PASS" meant three different things. One proof, three consumers.
+$integrity = Test-ClashPackageIntegrity -RepoRoot $repoRoot -CloudRoot $cloudRoot
+$treeHash = [string]$integrity.packageTreeHash
 
 New-PhaseReceipt '01-integrity.json' @{
-  status          = $(if ($integrityProblems.Count -eq 0) { 'PASS' } else { 'FAIL' })
-  filesVerified   = $verifiedFiles
-  checksumEntries = $expected.Count
+  status          = $(if ($integrity.ok) { 'PASS' } else { 'FAIL' })
+  filesVerified   = [int]$integrity.verifiedFiles
+  checksumEntries = [int]$integrity.checksumEntries
+  packageMembers  = [int]$integrity.memberCount
   packageTreeHash = $treeHash
-  wrappersChecked = $entries.Count
-  problems        = @($integrityProblems)
+  wrappersChecked = [int]$integrity.entryCount
+  problems        = @($integrity.problems)
 }
-if ($integrityProblems.Count -gt 0) {
-  Stop-Run ("package integrity failed ({0} problem(s)): {1}" -f $integrityProblems.Count, (($integrityProblems | Select-Object -First 6) -join '; ')) '01-integrity-fail.json'
+if (-not $integrity.ok) {
+  $integrityProblems = @($integrity.problems)
+  $integrityShown = $integrityProblems
+  if ($integrityShown.Count -gt 6) { $integrityShown = @($integrityShown[0..5]) }
+  Stop-Run ("package integrity failed ({0} problem(s)): {1}" -f $integrityProblems.Count, ($integrityShown -join '; ')) '01-integrity-fail.json'
 }
+Write-Host ("INTEGRITY members={0} checksums={1} verified={2} migrations={3}" -f `
+    $integrity.memberCount, $integrity.checksumEntries, $integrity.verifiedFiles, $integrity.entryCount)
 
 # Round 9 (B3): VERBOSITY=verbose makes psql put the SQLSTATE into every ERROR
 # line, so Get-PgSqlState has something real to extract for claim collisions and
@@ -327,22 +320,13 @@ if ($integrityProblems.Count -gt 0) {
 $common = @('-X', '-q', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose')
 
 # --------------------------------------------------- gate 2: preflight SQL ---
-# Round 14 (R13-C1): this gate counted lines ending in '| PASS' and '| FAIL' and
-# refused only when FAIL > 0 or PASS < 1. Any text ending in '| PASS' therefore
-# passed it: the independent audit fed the gate
-#     THIS IS NOT A PREFLIGHT REPORT | PASS
-# with exit 0 and complete capture, and the receipt said PASS, no STOP was taken
-# and the run advanced to the ledger gate. A report the runner cannot read is not
-# evidence, whatever its suffix says.
+# Round 14 (R13-C1): this gate counted lines ending in '| PASS' and refused only
+# when FAIL > 0 or PASS < 1, so any text ending in '| PASS' passed it.
 #
 # Gate 2 now asks the same question gate 5 asks: is this EXACTLY the report that
-# preflight\00_preflight.sql renders? Test-VerifyReport holds the declared
-# contract for '00_preflight.sql' - 21 checks (19 gating, 2 INFO), each with its
-# ordinal, name, expected text and status, arriving in order, framed by the
-# header, the dashed separator and the '(21 rows)' footer. Anything else is a
-# problem, and the phase receipt takes its status from that verdict rather than
-# from the exit code alone (a rendered-FAIL or INFO-only report can no longer
-# leave a PASS receipt behind).
+# preflight\00_preflight.sql renders - 21 checks (19 gating, 2 INFO) with their
+# declared ordinals, names, expected and actual cells, in order, inside the
+# header/separator/footer envelope? The receipt takes its status from that verdict.
 $pf = Invoke-NativeProcess -FilePath $psqlPath `
         -Arguments ($common + @('-f', (Join-Path $cloudRoot 'preflight\00_preflight.sql'))) `
         -Environment $policy.env -TimeoutSeconds $PreflightTimeoutSeconds
@@ -472,17 +456,30 @@ $bootstrapAbs = Join-Path $genDir '000_ledger_bootstrap.sql'
 if (-not (Test-Path -LiteralPath $bootstrapAbs)) {
   Stop-Run 'step 0 missing: generated/000_ledger_bootstrap.sql' '03b-bootstrap-missing.json'
 }
-$bootSha = Get-NormalizedSha256 -Path $bootstrapAbs
-if ($expected[$bootstrapRel] -ne $bootSha) {
+# RC03/RC08: the digest comes from the one integrity verdict; the executed bytes
+# are a locked snapshot of the verified bytes.
+$bootExpected = ''
+if ($integrity.checksums.ContainsKey($bootstrapRel)) { $bootExpected = [string]$integrity.checksums[$bootstrapRel].sha256 }
+$bootSnapshot = New-VerifiedSqlSnapshot -SourcePath $bootstrapAbs `
+                  -TargetPath (Join-Path $run '02-ledger\000_ledger_bootstrap.sql') `
+                  -ExpectedSha256 $bootExpected -Label 'step 0 ledger bootstrap'
+if (-not $bootSnapshot.ok) {
   New-PhaseReceipt '03b-bootstrap-digest.json' @{
-    status = 'STOP'; expected = $expected[$bootstrapRel]; actual = $bootSha
+    status = 'STOP'; expected = $bootExpected; actual = [string]$bootSnapshot.sha256
     rule = 'step 0 bytes changed after review'
   }
-  Stop-Run ("step 0 digest mismatch: expected {0}, found {1}. Nothing was executed." -f $expected[$bootstrapRel], $bootSha) '03b-bootstrap-digest-stop.json'
+  Stop-Run ("step 0 digest mismatch or snapshot failure: {0}. Nothing was executed." -f $bootSnapshot.problem) '03b-bootstrap-digest-stop.json'
 }
+$bootSha = [string]$bootSnapshot.sha256
 
-$boot = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-f', $bootstrapAbs)) `
+$boot = $null
+try {
+  $boot = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-f', [string]$bootSnapshot.path)) `
           -Environment $policy.env -TimeoutSeconds $PreflightTimeoutSeconds
+}
+finally {
+  if ($null -ne $bootSnapshot.stream) { try { $bootSnapshot.stream.Dispose() } catch { } }
+}
 [void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap.out') -Text $boot.stdOut)
 [void](Write-Evidence -Path (Join-Path $run '02-ledger\bootstrap.err') -Text $boot.stdErr)
 if (-not (Test-NativeSuccess $boot)) {
@@ -581,25 +578,32 @@ foreach ($e in $entries) {
     Stop-Run ("wrapper missing for index {0}: {1}" -f $e.index, $wrapperRel) ("{0}-missing.json" -f $label)
   }
 
-  # F5: the digest that will execute must equal the digest that was reviewed,
-  # immediately before execution - and it must equal the checksum entry too.
-  $actualWrapperSha = Get-NormalizedSha256 -Path $wrapperAbs
-  if ($actualWrapperSha -ne $e.wrapperSha256) {
+  # F5 + RC08: the wrapper is read once, digested, snapshotted into the run and
+  # locked against writers while psql runs.
+  $snapshotRel = '03-migrations/{0}.sql' -f $label
+  $snapshotAbs = Join-Path $run ($snapshotRel.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+  $snapshot = New-VerifiedSqlSnapshot -SourcePath $wrapperAbs -TargetPath $snapshotAbs `
+                -ExpectedSha256 ([string]$e.wrapperSha256) -Label ('wrapper ' + $wrapperRel)
+  if (-not $snapshot.ok) {
     New-PhaseReceipt ("{0}-digest-detail.json" -f $label) @{
-      status = 'STOP'; version = $e.version; expected = $e.wrapperSha256; actual = $actualWrapperSha
-      rule = 'wrapper bytes changed after review; refusing to execute'
+      status = 'STOP'; version = $e.version; expected = $e.wrapperSha256; actual = [string]$snapshot.sha256
+      rule = 'wrapper bytes changed after review, or the snapshot could not be verified and locked; refusing to execute'
+      detail = [string]$snapshot.problem
     }
-    Stop-Run ("wrapper digest mismatch for {0}: expected {1}, found {2}. Nothing was executed." -f $e.version, $e.wrapperSha256, $actualWrapperSha) ("{0}-digest.json" -f $label)
+    Stop-Run ("wrapper digest mismatch for {0}: {1}. Nothing was executed." -f $e.version, $snapshot.problem) ("{0}-digest.json" -f $label)
   }
-  $sumRel = 'supabase/cloud/generated/' + $wrapperRel
-  if ($expected[$sumRel] -ne $actualWrapperSha) {
-    Stop-Run ("wrapper digest disagrees with checksums.sha256 for {0}." -f $wrapperRel) ("{0}-checksum.json" -f $label)
-  }
+  $actualWrapperSha = [string]$snapshot.sha256
 
   Write-Host ("[{0:D3}/111] {1} ({2})  wrapper={3}" -f $e.index, $e.version, $e.mode, $actualWrapperSha.Substring(0, 12))
 
-  $mig = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-f', $wrapperAbs)) `
-           -Environment $policy.env -TimeoutSeconds $MigrationTimeoutSeconds
+  $mig = $null
+  try {
+    $mig = Invoke-NativeProcess -FilePath $psqlPath -Arguments ($common + @('-f', [string]$snapshot.path)) `
+             -Environment $policy.env -TimeoutSeconds $MigrationTimeoutSeconds
+  }
+  finally {
+    if ($null -ne $snapshot.stream) { try { $snapshot.stream.Dispose() } catch { } }
+  }
   [void](Write-Evidence -Path (Join-Path $run ("03-migrations\{0}.out" -f $label)) -Text $mig.stdOut)
   [void](Write-Evidence -Path (Join-Path $run ("03-migrations\{0}.err" -f $label)) -Text $mig.stdErr)
 
@@ -645,20 +649,20 @@ foreach ($e in $entries) {
       $receipt.outcome = 'UNKNOWN'
       $receipt.status  = 'UNPROVEN'
       $receipt.ledgerReadBack = 'PROBE FAILED'
-      [void](Write-RequiredReceipt -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
+      New-PhaseReceipt ("03-migrations/{0}.json" -f $label) $receipt
       Stop-Run ("migration {0} exited 0 but the ledger read-back could not be performed ({1}). Outcome UNKNOWN; do not assume the row is present." -f $e.version, (Get-NativeOutcomeLabel $probe)) ("{0}-unproven.json" -f $label)
     }
     if (-not $rowPresent -or $probeVal -ne $expectedTok) {
       $receipt.outcome = 'LEDGER_MISMATCH'
       $receipt.status  = 'FAIL'
       $receipt.ledgerReadBack = ("expected {0} got '{1}'" -f $expectedTok, $probeVal)
-      [void](Write-RequiredReceipt -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
+      New-PhaseReceipt ("03-migrations/{0}.json" -f $label) $receipt
       Stop-Run ("migration {0} exited 0 but the ledger row does not match: expected {1}, found '{2}'." -f $e.version, $expectedTok, $probeVal) ("{0}-ledger-mismatch.json" -f $label)
     }
     $receipt.outcome = 'COMMITTED'
     $receipt.ledgerReadBack = 'MATCH'
     $receipt.status = 'PASS'
-    [void](Write-RequiredReceipt -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
+    New-PhaseReceipt ("03-migrations/{0}.json" -f $label) $receipt
     New-PhaseReceipt ("{0}-applied.json" -f $label) @{
       status = 'PASS'; version = $e.version; outcome = 'COMMITTED'
       wrapperSha256 = $actualWrapperSha; ledgerReadBack = 'MATCH'; exitCode = 0
@@ -690,7 +694,7 @@ foreach ($e in $entries) {
     default              { 'the transaction outcome is NOT established: a connection loss, a timeout or an unreadable probe cannot prove that the original backend will not still commit. Treat this version as UNKNOWN and require human review.' }
   }
   $receipt.status = 'FAIL'
-  [void](Write-RequiredReceipt -Path (Join-Path $run ("03-migrations\{0}.json" -f $label)) -Label ("{0}.json" -f $label) -Text ($receipt | ConvertTo-Json -Depth 8))
+  New-PhaseReceipt ("03-migrations/{0}.json" -f $label) $receipt
   New-PhaseReceipt ("{0}-failed.json" -f $label) @{
     status = 'FAIL'; version = $e.version; outcome = $receipt.outcome
     exitCode = $mig.exitCode; timedOut = $mig.timedOut
@@ -848,9 +852,10 @@ New-PhaseReceipt '06-claim-release.json' @{ status = 'PASS'; runId = $runId; rel
 # The required evidence is declared ONCE, in the adapter, and the consumer
 # requires the same list. A runner that demanded less than the consumer verifies
 # would publish a marker the consumer rejects.
-$completionRequired = @(Get-ClashCompletionRequiredEvidence)
+$completionRequired = @(Get-ClashCompletionRequiredEvidence -Root $run)
 try {
-  $completion = Publish-ClashCompletion -Root $run -PrevSha $script:chain -RequiredEvidence $completionRequired -Fields @{
+  # RC02: the producer states how many migrations it ran; the evidence must match.
+  $completion = Publish-ClashCompletion -Root $run -PrevSha $script:chain -RequiredEvidence $completionRequired -ExpectedMigrationCount $entries.Count -Fields @{
     appliedThisRun  = $applied
     freshOnly       = $true
     writerRunId     = $runId
