@@ -388,10 +388,11 @@ the eleven classes - and not merely the thirty-two reproductions - were addresse
 every one of them is a second implementation, a second answer or an unstated
 dependency, which is exactly what the classes were about.
 
-Workflow run `44034780269` on `3bffd1645e4663b8331e8f5de1699b92b35f2945`,
-Windows PowerShell `5.1.20348.5773`, 14 of 14 steps green: 150 of 150 native
-cases, 496 of 496 offline assertions in 29 sections, manifest `PASS` with 111
-entries and 240 checksummed files, adapter `5.2.0`.
+Workflow run `44034780269` on `3bffd1645e4663b8331e8f5de1699b92b35f2945` (the
+code) and run `44035545230` on `0dfe28af9b5f543eb831798eb680621ae417194f` (this
+document), Windows PowerShell `5.1.20348.5773`, 14 of 14 steps green in both:
+150 of 150 native cases, 496 of 496 offline assertions in 29 sections, manifest
+`PASS` with 111 entries and 240 checksummed files, adapter `5.2.0`.
 
 | # | Found by | Class | What it was | Fix |
 |---|---|---|---|---|
