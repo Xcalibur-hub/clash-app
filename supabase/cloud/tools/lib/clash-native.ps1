@@ -1297,7 +1297,8 @@ function Test-ClashReportReceipt {
   $path = Join-Path $Root $Name
   $root = Get-ClashJsonRoot -Path $path -Label ('phase receipt ' + $Name) -Kind @('object')
   if (-not $root['ok']) {
-    $problems.Add($root['problem'])
+    $problems.Add(('{0} root: ok=[{1}] state=[{2}] kind=[{3}] problem=[{4}]' -f $Name,
+        [string]$root['ok'], [string]$root['state'], [string]$root['kind'], [string]$root['problem']))
     return [ordered]@{ ok = $false; problems = @($problems); status = '' }
   }
   $doc = $root['value']
@@ -1477,7 +1478,11 @@ function Test-ClashDeploymentEvidence {
   foreach ($name in $names) {
     $relName = [string]$name
     $root = Get-ClashJsonRoot -Path (Join-Path $Root $relName) -Label ('migration receipt ' + $relName) -Kind @('object')
-    if (-not $root['ok']) { $problems.Add(('{0} root: {1}' -f $relName, [string]$root['problem'])); continue }
+    if (-not $root['ok']) {
+      $problems.Add(('{0} root: ok=[{1}] state=[{2}] kind=[{3}] problem=[{4}]' -f $relName,
+          [string]$root['ok'], [string]$root['state'], [string]$root['kind'], [string]$root['problem']))
+      continue
+    }
     $doc = $root['value']
     $label = $relName
     Assert-ClashReceiptHeader -Object $doc -Label $label -Name $relName -Problems $problems
