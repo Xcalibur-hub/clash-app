@@ -1798,6 +1798,20 @@ function Test-ClashReceiptSemantics {
     '06-finalization-intent.json'   = 'FINALIZING'
     '06-complete.json'              = 'COMPLETE'
   }
+  # Receipts whose status is ALREADY owned by a dedicated validator: the baseline,
+  # the integrity gate, the three report contracts, the claim release, the applied
+  # receipts and the ownership record. The rule below does not restate theirs - two
+  # guards on one field make a mutation control unable to isolate either of them, and
+  # a second copy of a rule is a second place for it to drift.
+  $ownedElsewhere = @(
+    '00-baseline.json'
+    '01-integrity.json'
+    '02-preflight.json'
+    '04-postflight.json'
+    '05-storage.json'
+    '06-claim-release.json'
+    '06-claim-release-ownership.json'
+  )
   foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -Filter '*.json')) {
     $rel = ([string]$file.FullName).Substring($rootFull.Length).TrimStart([char]92, [char]47).Replace([char]92, '/')
     if ($rel -ceq 'EVIDENCE-MANIFEST.json') { continue }
@@ -1809,6 +1823,7 @@ function Test-ClashReceiptSemantics {
       continue
     }
     $doc = $docRoot['value']
+    if (($ownedElsewhere -ccontains $rel) -or ($rel -clike '03-migrations/*') -or ($rel -clike '*-applied.json')) { continue }
     $statusField = Get-ClashJsonField -Object $doc -Name 'status'
     if ($statusField['kind'] -ceq 'missing') { continue }
     $expected = 'PASS'
