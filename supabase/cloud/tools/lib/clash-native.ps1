@@ -1665,6 +1665,11 @@ function Test-ClashDeploymentEvidence {
       $problems.Add(('no per-migration receipt exists for index {0} of {1}: the approved migration {2} ({3}) must be recorded at {4}' -f $entry.index, $approvedEntries.Count, $entry.index, $entry.version, $relName))
       continue
     }
+    # A validator decides; it does not crash. An unexpected exception inside this
+    # receipt (a malformed document, a path the runtime refuses) is a REFUSAL with the
+    # reason recorded, never an exception that escapes into a caller that only asked
+    # "may this run be considered complete?".
+    try {
     $migRoot = Get-ClashJsonRoot -Path (Join-Path $Root $relName) -Label ('migration receipt ' + $relName) -Kind @('object')
     if (-not $migRoot['ok']) {
       $problems.Add(('{0} root: ok=[{1}] state=[{2}] kind=[{3}] problem=[{4}]' -f $relName,
@@ -1756,6 +1761,10 @@ function Test-ClashDeploymentEvidence {
       }
     }
     $receiptsValidated++
+    }
+    catch {
+      $problems.Add(('{0}: the receipt could not be evaluated: {1}' -f $relName, (Protect-Text ([string]$_.Exception.Message))))
+    }
   }
 
   # Anything in 03-migrations that the approved inventory does not name is extra
@@ -1804,7 +1813,7 @@ function Test-ClashDeploymentEvidence {
     ok                = ($problems.Count -eq 0)
     problems          = @($problems)
     receiptsValidated = $receiptsValidated
-    migrationCount    = @($names).Count
+    migrationCount    = @($presentNames).Count
     declaredCount     = $declared
   }
 }

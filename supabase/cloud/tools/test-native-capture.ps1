@@ -1308,7 +1308,9 @@ function Get-VerificationGateBlock {
   $startAt = -1
   $endAt   = -1
   for ($i = 0; $i -lt $lines.Count; $i++) {
-    if ($startAt -lt 0 -and $lines[$i] -match '^\$vf = Invoke-NativeProcess -FilePath \$psqlPath') {
+    # Round 21 (RC08/M1): the postflight gate no longer spawns psql directly - it
+    # executes a locked, already-hashed snapshot. The probe follows the call.
+    if ($startAt -lt 0 -and $lines[$i] -match '^\$vf = Invoke-LockedSqlInput -RepoRelative') {
       $startAt = $i
       continue
     }
@@ -1657,6 +1659,13 @@ function Invoke-VerificationGateProbe {
           }
         }
         return $script:r12Queue[$index]
+      }
+      # Round 21 (RC08/M1): the gate consumes a locked snapshot. The lock itself is
+      # proven by the sqlSnapshotIsLockedBeforeItIsHashed case; here the call has to
+      # behave like the native call it replaces so the gate logic is unchanged.
+      function Invoke-LockedSqlInput {
+        param($RepoRelative, $SnapshotRelative, $Label, $Arguments, $Environment, $TimeoutSeconds)
+        return (Invoke-NativeProcess -FilePath 'psql.exe' -Arguments $Arguments -Environment $Environment -TimeoutSeconds $TimeoutSeconds)
       }
       function Write-Evidence {
         param($Path, $Text)
@@ -3327,9 +3336,14 @@ $c16SealSha = [string](Get-DocumentProperty -Object (Get-DocumentProperty -Objec
     'seal.chainHead'   = $zero64
   })
 $c16After = $null
-try { $c16After = Test-ClashRunCompletion -RunPath $c16Root -Approved $script:probeApproved } catch { $c16After = $null }
+# A consumer that throws is a case failure, never a harness abort: the message is
+# kept so the case says WHY it refused, and every read below is null-guarded.
+$c16Threw = ''
+try { $c16After = Test-ClashRunCompletion -RunPath $c16Root -Approved $script:probeApproved }
+catch { $c16After = $null; $c16Threw = (Protect-Text ([string]$_.Exception.Message)) }
 $c16Problems = ''
 if ($null -ne $c16After) { $c16Problems = (@($c16After.problems) -join ' ') }
+$c16SealUnchanged = ($null -ne $c16After) -and ([string]$c16After.sealSha256 -ceq $c16SealSha)
 $c16SealStillVerifies = $null
 try { $c16SealStillVerifies = Test-EvidenceSeal -Root $c16Root } catch { $c16SealStillVerifies = $null }
 Add-Case 'completionRejectsCodexChainMutation' (
@@ -3339,12 +3353,13 @@ Add-Case 'completionRejectsCodexChainMutation' (
   $c16Problems -match 'prevReceiptSha' -and
   $c16Problems -match 'chain head' -and
   $null -ne $c16SealStillVerifies -and $c16SealStillVerifies.ok -and
-  [string]$c16After.sealSha256 -ceq $c16SealSha) @{
+  $c16SealUnchanged) @{
   acceptedBeforeMutation = $(if ($null -ne $c16Before) { $c16Before.ok } else { 'null' })
   acceptedAfterMutation  = $(if ($null -ne $c16After) { $c16After.ok } else { 'null' })
   problems = $c16Problems
+  consumerThrew = $c16Threw
   sealStillVerifies = $(if ($null -ne $c16SealStillVerifies) { $c16SealStillVerifies.ok } else { 'null' })
-  sealShaUnchanged = ([string]$c16After.sealSha256 -ceq $c16SealSha)
+  sealShaUnchanged = $c16SealUnchanged
   note = 'C16-C1 reproduction: two marker fields changed, seal untouched, consumer now refuses'
 }
 Remove-FinalizationRun -Root $c16Root
