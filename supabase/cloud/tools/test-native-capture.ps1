@@ -52,6 +52,9 @@ $ErrorActionPreference = 'Stop'
 $pluginRoot  = $PSScriptRoot
 $adapterPath = Join-Path (Join-Path $pluginRoot 'lib') 'clash-native.ps1'
 $packageRoot = Split-Path -Parent $pluginRoot
+# Round 21: the approved inventory the tests judge against is the package manifest,
+# read here from the PACKAGE and never from a run directory.
+$script:approvedManifestPath = Join-Path $packageRoot 'manifest.json'
 
 $script:cases           = [ordered]@{}
 $script:problems        = @()
@@ -124,7 +127,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 150
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 156
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -2488,6 +2491,47 @@ function New-ReportReceiptBody {
   }
 }
 
+# Round 21 (R20-H1): the fixture's APPROVED inventory. It is declared here, in the
+# harness, and handed to the validator as an input - exactly the trust position the
+# package manifest has in production. It is never read back out of the run directory
+# it describes, which is the whole point of the contract.
+function New-ProbeApprovedInventory {
+  param([int]$Count = 3, [string]$ProjectRef = 'kgaqejgubjemdecifzew')
+  $hex = ('a' * 64)
+  $entries = @()
+  for ($i = 1; $i -le $Count; $i++) {
+    $version = '20260101{0:D6}' -f $i
+    $entries += [ordered]@{
+      index            = $i
+      version          = $version
+      name             = ('probe_{0}' -f $i)
+      mode             = 'direct'
+      normalisation    = 'none'
+      ledgerName       = ('probe_{0}' -f $i)
+      wrapperPath      = ('{0:D3}_{1}.sql' -f $i, $version)
+      sha256           = $hex
+      executedSha256   = $hex
+      normalizedSha256 = $hex
+      wrapperSha256    = $hex
+      bytes            = 1234
+      receipt          = ('03-migrations/{0:D3}-{1}.json' -f $i, $version)
+      expectedToken    = ('sha256:' + $hex)
+    }
+  }
+  return @{
+    ok             = $true
+    problems       = @()
+    entries        = @($entries)
+    count          = $Count
+    projectRef     = $ProjectRef
+    sourceCommit   = ('c' * 40)
+    manifestSha256 = $hex
+    path           = '<probe approved inventory>'
+  }
+}
+$script:probeApproved = New-ProbeApprovedInventory -Count 3
+$script:probeApproved1 = New-ProbeApprovedInventory -Count 1
+
 function New-FinalizationRun {
   param(
     [string[]]$Evidence = @('00-baseline.json', '01-integrity.json', '02-preflight.json', '04-postflight.json', '05-storage.json', '06-claim-release.json'),
@@ -2508,7 +2552,8 @@ function New-FinalizationRun {
         receiptSha256 = $hex
         adapterSha256 = $hex
         powerShell    = '5.1.0'
-        casesExecuted = 135
+        casesExecuted = @(Get-ClashSelfTestInventory).Count
+        adapterVersion = $script:ClashAdapterVersion
         ranUtc        = '2026-11-15T00:00:00.0000000Z'
       }
       $doc['status'] = 'BASELINE'
@@ -2572,6 +2617,13 @@ function New-FinalizationRun {
     $doc['stderrChars'] = 0
     $doc['stderrExcerpt'] = ''
     $doc['ledgerReadBack'] = 'MATCH'
+    if ($i -gt 1) {
+      # the predecessor is the receipt before this one, by its on-disk digest: the
+      # validator re-derives the link, so a fixture with a decorative chain would
+      # prove nothing.
+      $previousLeaf = '{0:D3}-{1}.json' -f ($i - 1), ('20260101{0:D6}' -f ($i - 1))
+      $doc['prevReceiptSha'] = (Get-NormalizedSha256 -Path (Join-Path $root ('03-migrations/' + $previousLeaf)))
+    }
     [void](Write-Evidence -Path (Join-Path $root ('03-migrations/' + $leaf)) -Text ($doc | ConvertTo-Json -Depth 6))
   }
 
@@ -2701,7 +2753,7 @@ function Invoke-CompletionProbe {
     }
 
     try {
-      $State.result = Publish-ClashCompletion -Root $Root -PrevSha $script:probePrevSha -RequiredEvidence $Required -Fields $Fields
+      $State.result = Publish-ClashCompletion -Root $Root -PrevSha $script:probePrevSha -RequiredEvidence $Required -Approved $script:probeApproved -Fields $Fields
       $State.ok = $true
     }
     catch {
@@ -2789,6 +2841,7 @@ function Invoke-CompletionTailProbe {
   # deploy.ps1 states how many migrations it ran as $entries.Count; the fixture run
   # holds three migration receipts, so the probe hands the region three entries.
   $entries     = @('001', '002', '003')
+  $approved    = $script:probeApproved
   $runId       = 'probe-run-id'
   $treeHash    = 'probe-tree-hash'
   $bootOutcome = 'CREATED'
@@ -2848,7 +2901,7 @@ if ($null -ne $finProbe -and (-not $finProbe.ok) -and ([string]$finProbe.threw -
 $finDoc   = Read-RunDocument -Path (Join-Path $finRoot '06-complete.json')
 $finSeal  = Read-RunDocument -Path (Join-Path $finRoot 'EVIDENCE-MANIFEST.json')
 $finCheck = $null
-try { $finCheck = Test-ClashRunCompletion -RunPath $finRoot } catch { $finCheck = $null }
+try { $finCheck = Test-ClashRunCompletion -RunPath $finRoot -Approved $script:probeApproved } catch { $finCheck = $null }
 $finIdentity = '{0}/{1}' -f (Get-ClashAdapterIdentity).id, (Get-ClashAdapterIdentity).version
 # Read once, behind a null guard: StrictMode raises on a property of $null.
 $finChainHead = $(if ($null -ne $finCheck) { [string]$finCheck.sealChain } else { '' })
@@ -2915,7 +2968,7 @@ try {
   $sealAfterCorrupt = Test-EvidenceSeal -Root $finRoot
 } catch { }
 $checkAfterCorrupt = $null
-try { $checkAfterCorrupt = Test-ClashRunCompletion -RunPath $finRoot } catch { $checkAfterCorrupt = $null }
+try { $checkAfterCorrupt = Test-ClashRunCompletion -RunPath $finRoot -Approved $script:probeApproved } catch { $checkAfterCorrupt = $null }
 Add-Case 'completionMarkerExcludedFromSeal' (
   -not $sealHasMarker -and
   $markerCorrupt -and
@@ -2958,7 +3011,7 @@ $dRoot = New-FinalizationRun
 $dProbe = Invoke-CompletionProbe -Root $dRoot
 $dMarker = Test-Path -LiteralPath (Join-Path $dRoot '06-complete.json')
 $dCheck = $null
-try { $dCheck = Test-ClashRunCompletion -RunPath $dRoot } catch { $dCheck = $null }
+try { $dCheck = Test-ClashRunCompletion -RunPath $dRoot -Approved $script:probeApproved } catch { $dCheck = $null }
 Add-Case 'completionRefusesDoubtMarker' (
   (-not $dProbe.ok) -and
   $dProbe.threw -match 'could not verify' -and
@@ -2978,7 +3031,7 @@ $sProbe = Invoke-CompletionProbe -Root $sRoot
 $sMarker = Test-Path -LiteralPath (Join-Path $sRoot '06-complete.json')
 $sIntent = Test-Path -LiteralPath (Join-Path $sRoot '06-finalization-intent.json')
 $sCheck = $null
-try { $sCheck = Test-ClashRunCompletion -RunPath $sRoot } catch { $sCheck = $null }
+try { $sCheck = Test-ClashRunCompletion -RunPath $sRoot -Approved $script:probeApproved } catch { $sCheck = $null }
 $sCompleteClaims = 0
 foreach ($f in @(Get-ChildItem -LiteralPath $sRoot -Recurse -File -Filter '*.json')) {
   $raw = ''
@@ -3007,7 +3060,7 @@ $wMarker = Test-Path -LiteralPath (Join-Path $wRoot '06-complete.json')
 $wSeal = $false
 foreach ($f in @(Get-ChildItem -LiteralPath $wRoot -File)) { if ($f.Name -like 'EVIDENCE-MANIFEST.json*') { $wSeal = $true } }
 $wCheck = $null
-try { $wCheck = Test-ClashRunCompletion -RunPath $wRoot } catch { $wCheck = $null }
+try { $wCheck = Test-ClashRunCompletion -RunPath $wRoot -Approved $script:probeApproved } catch { $wCheck = $null }
 Add-Case 'completionSealWriteFailureLeavesNoMarker' (
   (-not $wProbe.ok) -and
   $wProbe.threw -match 'CLASH-PROBE-INJECTED-WRITE-FAILURE' -and
@@ -3026,7 +3079,7 @@ $tCompleteLines = @($tProbe.output | Where-Object { $_ -match '^TERMINAL RECEIPT
 $tFailReceipt = Read-RunDocument -Path (Join-Path $tRoot '06-finalize-fail.json')
 $tMarker = Test-Path -LiteralPath (Join-Path $tRoot '06-complete.json')
 $tValidated = $null
-try { $tValidated = Test-ClashRunCompletion -RunPath $tRoot } catch { $tValidated = $null }
+try { $tValidated = Test-ClashRunCompletion -RunPath $tRoot -Approved $script:probeApproved } catch { $tValidated = $null }
 Add-Case 'completionTailDoesNotAnnounceOnSealFailure' (
   [string]$tProbe.bindError -eq '' -and
   [string]$tProbe.threw -ne '' -and
@@ -3056,7 +3109,7 @@ $okProbe = Invoke-CompletionTailProbe -Root $okRoot
 $okCompleteLines = @($okProbe.output | Where-Object { $_ -match '^TERMINAL RECEIPT: COMPLETE' })
 $okDoc = Read-RunDocument -Path (Join-Path $okRoot '06-complete.json')
 $okCheck = $null
-try { $okCheck = Test-ClashRunCompletion -RunPath $okRoot } catch { $okCheck = $null }
+try { $okCheck = Test-ClashRunCompletion -RunPath $okRoot -Approved $script:probeApproved } catch { $okCheck = $null }
 Add-Case 'completionTailAnnouncesOnlyAfterMarker' (
   [string]$okProbe.bindError -eq '' -and
   [string]$okProbe.threw -eq '' -and
@@ -3082,7 +3135,7 @@ $xRoot = New-FinalizationRun
 $xProbe = Invoke-CompletionProbe -Root $xRoot
 [void](Write-Evidence -Path (Join-Path $xRoot '99-runner-exception.json') -Text '{"status":"EXCEPTION"}')
 $xCheck = $null
-try { $xCheck = Test-ClashRunCompletion -RunPath $xRoot } catch { $xCheck = $null }
+try { $xCheck = Test-ClashRunCompletion -RunPath $xRoot -Approved $script:probeApproved } catch { $xCheck = $null }
 $xProblems = ''
 if ($null -ne $xCheck) { $xProblems = (@($xCheck.problems) -join ' ') }
 Add-Case 'completionValidatorRejectsExceptionBesideMarker' (
@@ -3103,7 +3156,7 @@ $mProbe = Invoke-CompletionProbe -Root $mRoot
 $mTarget = Join-Path $mRoot '02-preflight.json'
 [System.IO.File]::WriteAllText($mTarget, '{"status":"PASS","edited":true}')
 $mCheck = $null
-try { $mCheck = Test-ClashRunCompletion -RunPath $mRoot } catch { $mCheck = $null }
+try { $mCheck = Test-ClashRunCompletion -RunPath $mRoot -Approved $script:probeApproved } catch { $mCheck = $null }
 $mProblems = ''
 if ($null -ne $mCheck) { $mProblems = (@($mCheck.problems) -join ' ') }
 Add-Case 'completionValidatorRejectsTamperedEvidence' (
@@ -3137,7 +3190,7 @@ if ($null -ne $trSeal) {
   }
 }
 $trCheck = $null
-try { $trCheck = Test-ClashRunCompletion -RunPath $trRoot } catch { $trCheck = $null }
+try { $trCheck = Test-ClashRunCompletion -RunPath $trRoot -Approved $script:probeApproved } catch { $trCheck = $null }
 $trProblems = ''
 if ($null -ne $trCheck) { $trProblems = (@($trCheck.problems) -join ' ') }
 Add-Case 'completionValidatorRejectsTruncatedSeal' (
@@ -3156,7 +3209,7 @@ $cProbe = Invoke-CompletionProbe -Root $cRoot
 [System.IO.File]::WriteAllText((Join-Path $cRoot 'EVIDENCE-MANIFEST.json'), 'this is not json {')
 $cCheck = $null
 $cThrew = ''
-try { $cCheck = Test-ClashRunCompletion -RunPath $cRoot } catch { $cThrew = Protect-Text $_.Exception.Message }
+try { $cCheck = Test-ClashRunCompletion -RunPath $cRoot -Approved $script:probeApproved } catch { $cThrew = Protect-Text $_.Exception.Message }
 $cProblems = ''
 if ($null -ne $cCheck) { $cProblems = (@($cCheck.problems) -join ' ') }
 Add-Case 'completionValidatorReportsUnreadableSeal' (
@@ -3174,7 +3227,7 @@ $uRoot = New-FinalizationRun
 $uProbe = Invoke-CompletionProbe -Root $uRoot
 [void](Write-Evidence -Path (Join-Path $uRoot '06-written-after-seal.json') -Text '{"late":true}')
 $uCheck = $null
-try { $uCheck = Test-ClashRunCompletion -RunPath $uRoot } catch { $uCheck = $null }
+try { $uCheck = Test-ClashRunCompletion -RunPath $uRoot -Approved $script:probeApproved } catch { $uCheck = $null }
 $uProblems = ''
 if ($null -ne $uCheck) { $uProblems = (@($uCheck.problems) -join ' ') }
 Add-Case 'completionValidatorRejectsUnsealedEvidence' (
@@ -3191,7 +3244,7 @@ $rRoot = New-FinalizationRun -Evidence @('02-preflight.json', '05-storage.json',
 $rProbe = Invoke-CompletionProbe -Root $rRoot
 $rMarker = Test-Path -LiteralPath (Join-Path $rRoot '06-complete.json')
 $rCheck = $null
-try { $rCheck = Test-ClashRunCompletion -RunPath $rRoot } catch { $rCheck = $null }
+try { $rCheck = Test-ClashRunCompletion -RunPath $rRoot -Approved $script:probeApproved } catch { $rCheck = $null }
 Add-Case 'completionRefusesMissingRequiredEvidence' (
   (-not $rProbe.ok) -and
   $rProbe.threw -match '04-postflight\.json' -and
@@ -3213,7 +3266,7 @@ foreach ($f in @(Get-ChildItem -LiteralPath $nRoot -Recurse -File -Filter '*.jso
 }
 $nIntent = Read-RunDocument -Path (Join-Path $nRoot '06-finalization-intent.json')
 $nAccepted = $null
-try { $nAccepted = Test-ClashRunCompletion -RunPath $nRoot } catch { $nAccepted = $null }
+try { $nAccepted = Test-ClashRunCompletion -RunPath $nRoot -Approved $script:probeApproved } catch { $nAccepted = $null }
 Add-Case 'completionIntentNeverClaimsComplete' (
   [string]$nProbe.threw -ne '' -and
   $nClaimants.Count -eq 0 -and
@@ -3266,7 +3319,7 @@ $probeComment = 'local fixture; no SQL was executed'
 $c16Root = New-FinalizationRun
 $c16Pub  = Invoke-CompletionProbe -Root $c16Root
 $c16Before = $null
-try { $c16Before = Test-ClashRunCompletion -RunPath $c16Root } catch { $c16Before = $null }
+try { $c16Before = Test-ClashRunCompletion -RunPath $c16Root -Approved $script:probeApproved } catch { $c16Before = $null }
 $c16Marker = Read-RunDocument -Path (Join-Path $c16Root '06-complete.json')
 $c16SealSha = [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $c16Marker -Name 'seal' -Default $null) -Name 'sha256' -Default '')
 [void](Set-CompletionMarkerField -Root $c16Root -Mutation @{
@@ -3274,7 +3327,7 @@ $c16SealSha = [string](Get-DocumentProperty -Object (Get-DocumentProperty -Objec
     'seal.chainHead'   = $zero64
   })
 $c16After = $null
-try { $c16After = Test-ClashRunCompletion -RunPath $c16Root } catch { $c16After = $null }
+try { $c16After = Test-ClashRunCompletion -RunPath $c16Root -Approved $script:probeApproved } catch { $c16After = $null }
 $c16Problems = ''
 if ($null -ne $c16After) { $c16Problems = (@($c16After.problems) -join ' ') }
 $c16SealStillVerifies = $null
@@ -3301,7 +3354,7 @@ $pRoot = New-FinalizationRun
 $pPub  = Invoke-CompletionProbe -Root $pRoot
 [void](Set-CompletionMarkerField -Root $pRoot -Mutation @{ 'prevReceiptSha' = $zero64 })
 $pCheck = $null
-try { $pCheck = Test-ClashRunCompletion -RunPath $pRoot } catch { $pCheck = $null }
+try { $pCheck = Test-ClashRunCompletion -RunPath $pRoot -Approved $script:probeApproved } catch { $pCheck = $null }
 $pProblems = ''
 if ($null -ne $pCheck) { $pProblems = (@($pCheck.problems) -join ' ') }
 Add-Case 'completionRejectsWrongPrevReceiptShaOnly' (
@@ -3319,7 +3372,7 @@ $hRoot = New-FinalizationRun
 $hPub  = Invoke-CompletionProbe -Root $hRoot
 [void](Set-CompletionMarkerField -Root $hRoot -Mutation @{ 'seal.chainHead' = $zero64 })
 $hCheck = $null
-try { $hCheck = Test-ClashRunCompletion -RunPath $hRoot } catch { $hCheck = $null }
+try { $hCheck = Test-ClashRunCompletion -RunPath $hRoot -Approved $script:probeApproved } catch { $hCheck = $null }
 $hProblems = ''
 if ($null -ne $hCheck) { $hProblems = (@($hCheck.problems) -join ' ') }
 Add-Case 'completionRejectsWrongSealChainHeadOnly' (
@@ -3338,7 +3391,7 @@ $iRoot = New-FinalizationRun
 $iPub  = Invoke-CompletionProbe -Root $iRoot
 Remove-Item -LiteralPath (Join-Path $iRoot '06-finalization-intent.json') -Force
 $iCheck = $null
-try { $iCheck = Test-ClashRunCompletion -RunPath $iRoot } catch { $iCheck = $null }
+try { $iCheck = Test-ClashRunCompletion -RunPath $iRoot -Approved $script:probeApproved } catch { $iCheck = $null }
 $iProblems = ''
 if ($null -ne $iCheck) { $iProblems = (@($iCheck.problems) -join ' ') }
 Add-Case 'completionRejectsMissingIntent' (
@@ -3359,7 +3412,7 @@ $t2Pub  = Invoke-CompletionProbe -Root $t2Root
     'seal.fileCount'  = 'six'
   })
 $t2Check = $null
-try { $t2Check = Test-ClashRunCompletion -RunPath $t2Root } catch { $t2Check = $null }
+try { $t2Check = Test-ClashRunCompletion -RunPath $t2Root -Approved $script:probeApproved } catch { $t2Check = $null }
 $t2Problems = ''
 if ($null -ne $t2Check) { $t2Problems = (@($t2Check.problems) -join ' ') }
 Add-Case 'completionRejectsMisTypedMarker' (
@@ -3383,7 +3436,7 @@ $m2Sha  = [string](Get-DocumentProperty -Object (Get-DocumentProperty -Object $m
     'seal.sha256'     = $m2Sha.ToUpperInvariant()
   })
 $m2Check = $null
-try { $m2Check = Test-ClashRunCompletion -RunPath $m2Root } catch { $m2Check = $null }
+try { $m2Check = Test-ClashRunCompletion -RunPath $m2Root -Approved $script:probeApproved } catch { $m2Check = $null }
 $m2Problems = ''
 if ($null -ne $m2Check) { $m2Problems = (@($m2Check.problems) -join ' ') }
 Add-Case 'completionRejectsMalformedHashFields' (
@@ -3406,7 +3459,7 @@ $cbRoot = New-FinalizationRun
 $cbPub  = Invoke-CompletionProbe -Root $cbRoot -PrevSha $zero64
 $cbDoubt = Test-Path -LiteralPath (Join-Path $cbRoot '06-complete-unverified.json')
 $cbCheck = $null
-try { $cbCheck = Test-ClashRunCompletion -RunPath $cbRoot } catch { $cbCheck = $null }
+try { $cbCheck = Test-ClashRunCompletion -RunPath $cbRoot -Approved $script:probeApproved } catch { $cbCheck = $null }
 $cbProblems = ''
 if ($null -ne $cbCheck) { $cbProblems = (@($cbCheck.problems) -join ' ') }
 Add-Case 'completionRejectsIntentChainBreak' (
@@ -3431,7 +3484,7 @@ $drRoot = New-FinalizationRun
 $drPub  = Invoke-CompletionProbe -Root $drRoot
 Remove-Item -LiteralPath (Join-Path $drRoot '04-postflight.json') -Force
 $drCheck = $null
-try { $drCheck = Test-ClashRunCompletion -RunPath $drRoot } catch { $drCheck = $null }
+try { $drCheck = Test-ClashRunCompletion -RunPath $drRoot -Approved $script:probeApproved } catch { $drCheck = $null }
 $drProblems = ''
 if ($null -ne $drCheck) { $drProblems = (@($drCheck.problems) -join ' ') }
 Add-Case 'completionRejectsPostSealEvidenceLoss' (
@@ -3449,7 +3502,7 @@ $w2Root = New-FinalizationRun
 $w2Pub  = Invoke-CompletionProbe -Root $w2Root
 [void](Set-CompletionMarkerField -Root $w2Root -Mutation @{ 'writerRunId' = 'someone-elses-run' })
 $w2Check = $null
-try { $w2Check = Test-ClashRunCompletion -RunPath $w2Root } catch { $w2Check = $null }
+try { $w2Check = Test-ClashRunCompletion -RunPath $w2Root -Approved $script:probeApproved } catch { $w2Check = $null }
 $w2Problems = ''
 if ($null -ne $w2Check) { $w2Problems = (@($w2Check.problems) -join ' ') }
 Add-Case 'completionRejectsContradictoryWriterRunId' (
@@ -3467,7 +3520,7 @@ $s2Root = New-FinalizationRun
 $s2Pub  = Invoke-CompletionProbe -Root $s2Root
 [void](Set-CompletionMarkerField -Root $s2Root -Mutation @{ 'seal.name' = 'OTHER-MANIFEST.json' })
 $s2Check = $null
-try { $s2Check = Test-ClashRunCompletion -RunPath $s2Root } catch { $s2Check = $null }
+try { $s2Check = Test-ClashRunCompletion -RunPath $s2Root -Approved $script:probeApproved } catch { $s2Check = $null }
 $s2Problems = ''
 if ($null -ne $s2Check) { $s2Problems = (@($s2Check.problems) -join ' ') }
 Add-Case 'completionRejectsUnknownSealName' (
@@ -3484,7 +3537,7 @@ $a2Root = New-FinalizationRun
 $a2Pub  = Invoke-CompletionProbe -Root $a2Root
 [void](Set-CompletionMarkerField -Root $a2Root -Mutation @{ 'adapter' = 'other-adapter/9.9.9' })
 $a2Check = $null
-try { $a2Check = Test-ClashRunCompletion -RunPath $a2Root } catch { $a2Check = $null }
+try { $a2Check = Test-ClashRunCompletion -RunPath $a2Root -Approved $script:probeApproved } catch { $a2Check = $null }
 $a2Problems = ''
 if ($null -ne $a2Check) { $a2Problems = (@($a2Check.problems) -join ' ') }
 Add-Case 'completionRejectsForeignAdapter' (
@@ -3579,14 +3632,14 @@ function Invoke-MarkerTypeProbe {
   $root = New-FinalizationRun
   $pub  = Invoke-CompletionProbe -Root $root
   $before = $null
-  try { $before = Test-ClashRunCompletion -RunPath $root } catch { $before = $null }
+  try { $before = Test-ClashRunCompletion -RunPath $root -Approved $script:probeApproved } catch { $before = $null }
   $sealBefore = ''
   if ($null -ne $before) { $sealBefore = [string]$before.sealSha256 }
   [void](Set-JsonScalarField -Path (Join-Path $root '06-complete.json') -Name $Field -RawJson $RawJson)
   $rawDoc = Read-RunDocument -Path (Join-Path $root '06-complete.json')
   $fieldRecord = Get-ClashJsonField -Object $rawDoc -Name $Field
   $check = $null
-  try { $check = Test-ClashRunCompletion -RunPath $root } catch { $check = $null }
+  try { $check = Test-ClashRunCompletion -RunPath $root -Approved $script:probeApproved } catch { $check = $null }
   $problems = ''
   if ($null -ne $check) { $problems = (@($check.problems) -join ' ') }
   $seal = $null
@@ -3709,7 +3762,7 @@ $c17Prev = [string](Get-DocumentProperty -Object $c17Doc -Name 'prevReceiptSha' 
     'seal'           = @($c17SealDoc)
   })
 $c17Check = $null
-try { $c17Check = Test-ClashRunCompletion -RunPath $c17Root } catch { $c17Check = $null }
+try { $c17Check = Test-ClashRunCompletion -RunPath $c17Root -Approved $script:probeApproved } catch { $c17Check = $null }
 $c17Problems = ''
 if ($null -ne $c17Check) { $c17Problems = (@($c17Check.problems) -join ' ') }
 Add-Case 'completionRejectsArrayTypedMarkerFields' (
@@ -3741,7 +3794,7 @@ $b1Count = Get-DocumentProperty -Object $b1Seal -Name 'fileCount' -Default 0
     'seal.chainHead' = @($b1Head)
   })
 $b1Check = $null
-try { $b1Check = Test-ClashRunCompletion -RunPath $b1Root } catch { $b1Check = $null }
+try { $b1Check = Test-ClashRunCompletion -RunPath $b1Root -Approved $script:probeApproved } catch { $b1Check = $null }
 $b1Problems = ''
 if ($null -ne $b1Check) { $b1Problems = (@($b1Check.problems) -join ' ') }
 Add-Case 'completionRejectsArrayTypedSealBlockFields' (
@@ -3762,7 +3815,7 @@ $r1Root = New-FinalizationRun
 $r1Pub  = Invoke-CompletionProbe -Root $r1Root
 [System.IO.File]::WriteAllText((Join-Path $r1Root '06-complete.json'), '[{"protocol":"clash-completion/2"}]')
 $r1Check = $null
-try { $r1Check = Test-ClashRunCompletion -RunPath $r1Root } catch { $r1Check = $null }
+try { $r1Check = Test-ClashRunCompletion -RunPath $r1Root -Approved $script:probeApproved } catch { $r1Check = $null }
 $r1Problems = ''
 if ($null -ne $r1Check) { $r1Problems = (@($r1Check.problems) -join ' ') }
 Add-Case 'completionRejectsCollectionRootMarker' (
@@ -3841,7 +3894,7 @@ $i1Path = Join-Path $i1Root '06-finalization-intent.json'
 [void](Set-JsonScalarField -Path $i1Path -Name 'receipt' -RawJson '["06-finalization-intent.json"]')
 [void](Set-JsonFileRegex -Path $i1Path -Pattern '("requiredEvidence"[ \t]*:[ \t]*\[)' -Replacement '"requiredEvidence": "05-storage.json", "declaredEvidence": [')
 $i1Check = $null
-try { $i1Check = Test-ClashRunCompletion -RunPath $i1Root } catch { $i1Check = $null }
+try { $i1Check = Test-ClashRunCompletion -RunPath $i1Root -Approved $script:probeApproved } catch { $i1Check = $null }
 $i1Problems = ''
 if ($null -ne $i1Check) { $i1Problems = (@($i1Check.problems) -join ' ') }
 Add-Case 'completionRejectsCollectionValuedIntent' (
@@ -3864,7 +3917,7 @@ $q1Path = Join-Path $q1Root '06-claim-release.json'
 [void](Set-JsonScalarField -Path $q1Path -Name 'released' -RawJson '[true]')
 [void](Set-JsonScalarField -Path $q1Path -Name 'runId'    -RawJson '["probe-run-id"]')
 $q1Check = $null
-try { $q1Check = Test-ClashRunCompletion -RunPath $q1Root } catch { $q1Check = $null }
+try { $q1Check = Test-ClashRunCompletion -RunPath $q1Root -Approved $script:probeApproved } catch { $q1Check = $null }
 $q1Problems = ''
 if ($null -ne $q1Check) { $q1Problems = (@($q1Check.problems) -join ' ') }
 Add-Case 'completionRejectsCollectionValuedClaimRelease' (
@@ -3909,7 +3962,7 @@ function Invoke-RootStateProbe {
   $root = New-FinalizationRun
   $pub  = Invoke-CompletionProbe -Root $root
   $before = $null
-  try { $before = Test-ClashRunCompletion -RunPath $root } catch { $before = $null }
+  try { $before = Test-ClashRunCompletion -RunPath $root -Approved $script:probeApproved } catch { $before = $null }
   $path = Join-Path $root $File
   if ($Delete) { Remove-Item -LiteralPath $path -Force }
   else { [System.IO.File]::WriteAllText($path, $Text) }
@@ -3917,7 +3970,7 @@ function Invoke-RootStateProbe {
   if (Test-Path -LiteralPath $path -PathType Leaf) { $bytes = @([System.IO.File]::ReadAllBytes($path)).Length }
   $rootVerdict = Get-ClashJsonRoot -Path $path -Label 'probe document' -Kind @('object')
   $check = $null
-  try { $check = Test-ClashRunCompletion -RunPath $root } catch { $check = $null }
+  try { $check = Test-ClashRunCompletion -RunPath $root -Approved $script:probeApproved } catch { $check = $null }
   $problems = ''
   if ($null -ne $check) { $problems = (@($check.problems) -join ' ') }
   return @{
@@ -4075,7 +4128,7 @@ $posRoot = New-FinalizationRun
 $posPub  = Invoke-CompletionProbe -Root $posRoot
 $posRootVerdict = Get-ClashJsonRoot -Path (Join-Path $posRoot '06-complete.json') -Label 'completion marker' -Kind @('object')
 $posCheck = $null
-try { $posCheck = Test-ClashRunCompletion -RunPath $posRoot } catch { $posCheck = $null }
+try { $posCheck = Test-ClashRunCompletion -RunPath $posRoot -Approved $script:probeApproved } catch { $posCheck = $null }
 Add-Case 'completionAcceptsValidObjectRoot' (
   $posPub.ok -and
   $posRootVerdict['ok'] -and ($posRootVerdict['state'] -ceq 'object') -and
@@ -4276,7 +4329,7 @@ foreach ($attack in $rc02Attacks) {
   $run = New-FinalizationRun
   [void](Set-EvidenceFieldRaw -Path (Join-Path $run ([string]$attack.file)) -Name ([string]$attack.field) -RawJson ([string]$attack.raw))
   $evidence = $null
-  try { $evidence = Test-ClashDeploymentEvidence -Root $run } catch { $evidence = $null }
+  try { $evidence = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $evidence = $null }
   $probe = Invoke-CompletionProbe -Root $run
   $marker = Test-Path -LiteralPath (Join-Path $run '06-complete.json')
   $rejectedByConsumer = ($null -ne $evidence) -and (-not $evidence.ok) -and (@($evidence.problems).Count -ge 1)
@@ -4291,10 +4344,10 @@ foreach ($attack in $rc02Attacks) {
 }
 $rc02Positive = $null
 $rc02PosRoot = New-FinalizationRun
-try { $rc02Positive = Test-ClashDeploymentEvidence -Root $rc02PosRoot } catch { $rc02Positive = $null }
+try { $rc02Positive = Test-ClashDeploymentEvidence -Root $rc02PosRoot -Approved $script:probeApproved } catch { $rc02Positive = $null }
 $rc02PosProbe = Invoke-CompletionProbe -Root $rc02PosRoot
 $rc02PosCheck = $null
-try { $rc02PosCheck = Test-ClashRunCompletion -RunPath $rc02PosRoot } catch { $rc02PosCheck = $null }
+try { $rc02PosCheck = Test-ClashRunCompletion -RunPath $rc02PosRoot -Approved $script:probeApproved } catch { $rc02PosCheck = $null }
 Remove-FinalizationRun -Root $rc02PosRoot
 Add-Case 'deploymentEvidenceRejectsFailedPhase' (
   @($rc02Attacks).Count -eq 12 -and
@@ -4324,7 +4377,7 @@ foreach ($attack in $rc02cAttacks) {
   $run = New-FinalizationRun
   [void](Set-EvidenceFieldRaw -Path (Join-Path $run ([string]$attack.file)) -Name ([string]$attack.field) -RawJson ([string]$attack.raw))
   $evidence = $null
-  try { $evidence = Test-ClashDeploymentEvidence -Root $run } catch { $evidence = $null }
+  try { $evidence = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $evidence = $null }
   $missed = -not (($null -ne $evidence) -and (-not $evidence.ok))
   if ($missed) { $rc02cMissed += [string]$attack.name }
   Remove-FinalizationRun -Root $run
@@ -4340,30 +4393,30 @@ $rc02mMissed = @()
 $run = New-FinalizationRun
 Remove-Item -LiteralPath (Join-Path $run '03-migrations\002-20260101000002.json') -Force
 $ev = $null
-try { $ev = Test-ClashDeploymentEvidence -Root $run } catch { $ev = $null }
+try { $ev = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $ev = $null }
 if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'no per-migration receipt exists for index 2'))) { $rc02mMissed += 'missing-receipt' }
 Remove-FinalizationRun -Root $run
 $run = New-FinalizationRun
 [void](Set-EvidenceFieldRaw -Path (Join-Path $run '03-migrations\003-20260101000003.json') -Name 'outcome' -RawJson '"UNKNOWN"')
 $ev = $null
-try { $ev = Test-ClashDeploymentEvidence -Root $run } catch { $ev = $null }
+try { $ev = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $ev = $null }
 if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'outcome'))) { $rc02mMissed += 'unknown-outcome' }
 Remove-FinalizationRun -Root $run
 $run = New-FinalizationRun
 [void](Set-EvidenceFieldRaw -Path (Join-Path $run '01-integrity.json') -Name 'wrappersChecked' -RawJson '5')
 $ev = $null
-try { $ev = Test-ClashDeploymentEvidence -Root $run } catch { $ev = $null }
+try { $ev = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $ev = $null }
 if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'integrity receipt records 5'))) { $rc02mMissed += 'declared-count' }
 Remove-FinalizationRun -Root $run
 $run = New-FinalizationRun
 Move-Item -LiteralPath (Join-Path $run '03-migrations\003-20260101000003.json') -Destination (Join-Path $run '03-migrations\001-20260101000003.json') -Force
 $ev = $null
-try { $ev = Test-ClashDeploymentEvidence -Root $run } catch { $ev = $null }
+try { $ev = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $ev = $null }
 if (-not (($null -ne $ev) -and (-not $ev.ok) -and ((@($ev.problems) -join ' ') -match 'repeats migration index 1|is named'))) { $rc02mMissed += 'duplicate-index' }
 Remove-FinalizationRun -Root $run
 $run = New-FinalizationRun
 $evPos = $null
-try { $evPos = Test-ClashDeploymentEvidence -Root $run } catch { $evPos = $null }
+try { $evPos = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $evPos = $null }
 if (-not (($null -ne $evPos) -and $evPos.ok)) { $rc02mMissed += 'positive-control' }
 Remove-FinalizationRun -Root $run
 Add-Case 'deploymentEvidenceRequiresEveryMigration' (
@@ -4725,6 +4778,318 @@ Add-Case 'suiteSummaryRequiresTypedIntegers' (
   note = 'RC09: 1.4 used to become 1 through an [int] cast, and the LAST summary line won'
 }
 
+# ===========================================================================
+# Round 21 (Codex Round 20 findings): R20-H1, M1, M2, M3, M4 and the RC01
+# residual, each proven against INDEPENDENTLY sourced expectations.
+# ===========================================================================
+
+# ---- 151: R20-H1 - the expected inventory comes from the PACKAGE ----------
+$invReal = $null
+try { $invReal = Get-ClashApprovedInventory } catch { $invReal = $null }
+$invProblemsSeen = @()
+$invMutations = @(
+  @{ name = 'duplicate-version';  apply = { param($d) $d.entries[1].version = $d.entries[0].version };   expect = 'repeats approved version' },
+  @{ name = 'foreign-wrapper';    apply = { param($d) $d.entries[5].wrapperPath = '999_20260101000000.sql' }; expect = 'wrapper' },
+  @{ name = 'total-mismatch';     apply = { param($d) $d.total = 110 };                                     expect = 'total is' },
+  @{ name = 'foreign-ledger';     apply = { param($d) $d.entries[7].ledgerName = 'someone_elses_name' };    expect = 'ledger identity' },
+  @{ name = 'missing-executed';   apply = { param($d) $d.entries[9].PSObject.Properties.Remove('executedSha256') }; expect = 'executedSha256' }
+)
+$invMissed = @()
+$invRefusals = @()
+foreach ($mut in $invMutations) {
+  $doc = $null
+  try {
+    $doc = [System.IO.File]::ReadAllText($script:approvedManifestPath) | ConvertFrom-Json
+    & $mut.apply $doc
+    $tempManifest = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-approved-' + [guid]::NewGuid().ToString('N').Substring(0, 10) + '.json')
+    [void](Write-Evidence -Path $tempManifest -Text ($doc | ConvertTo-Json -Depth 8))
+    $bad = $null
+    try { $bad = Get-ClashApprovedInventory -ManifestPath $tempManifest } catch { $bad = $null }
+    Remove-Item -LiteralPath $tempManifest -Force -ErrorAction SilentlyContinue
+    $text = ''
+    if ($null -ne $bad) { $text = (@($bad.problems) -join ' ') }
+    $invRefusals += ('{0}={1}' -f $mut.name, (-not ($null -ne $bad -and $bad.ok)))
+    if ($null -eq $bad -or $bad.ok -or ($text -notmatch [regex]::Escape([string]$mut.expect))) { $invMissed += [string]$mut.name }
+  }
+  catch { $invMissed += ([string]$mut.name + '[threw]') }
+}
+$invOrdered = $true
+$invPosition = 0
+$invReceiptNames = $true
+if ($null -ne $invReal) {
+  foreach ($entry in @($invReal.entries)) {
+    $invPosition++
+    if ([int]$entry.index -ne $invPosition) { $invOrdered = $false }
+    if ([string]$entry.receipt -notmatch '^03-migrations/\d{3}-\d{14}\.json$') { $invReceiptNames = $false }
+  }
+}
+Add-Case 'approvedInventoryIsTheOnlySourceOfExpectedMigrations' (
+  $null -ne $invReal -and [bool]$invReal.ok -and
+  [int]$invReal.count -eq 111 -and
+  [string]$invReal.projectRef -match '^[a-z0-9]{20}$' -and
+  [string]$invReal.sourceCommit -match '^[0-9a-f]{40}$' -and
+  [string]$invReal.manifestSha256 -match '^[0-9a-f]{64}$' -and
+  $invOrdered -and $invReceiptNames -and
+  @($invMissed).Count -eq 0 -and @($invRefusals).Count -eq $invMutations.Count) @{
+  approved            = $(if ($null -ne $invReal) { [int]$invReal.count } else { -1 })
+  projectRef          = $(if ($null -ne $invReal) { [string]$invReal.projectRef } else { '' })
+  manifestSha256      = $(if ($null -ne $invReal) { [string]$invReal.manifestSha256 } else { '' })
+  mutatedManifests    = (@($invRefusals) -join ' ')
+  missed              = (@($invMissed) -join ',')
+  note = 'R20-H1: the manifest is the approved inventory; a mutated manifest is refused with its reason'
+}
+
+# ---- 152: R20-H1 - a SELF-CONSISTENT but unapproved run is refused --------
+$approvalAttacks = @(
+  @{ name = 'wrapper-digest';    file = '03-migrations/001-20260101000001.json'; field = 'wrapperSha256';  raw = ('"' + ('b' * 64) + '"');     expect = 'wrapperSha256' },
+  @{ name = 'executed-digest';   file = '03-migrations/001-20260101000001.json'; field = 'executedSha256'; raw = ('"' + ('b' * 64) + '"');     expect = 'executedSha256' },
+  @{ name = 'ledger-token';      file = '03-migrations/002-20260101000002.json'; field = 'expectedToken';  raw = ('"sha256:' + ('b' * 64) + '"'); expect = 'expectedToken' },
+  @{ name = 'foreign-version';   file = '03-migrations/002-20260101000002.json'; field = 'version';        raw = '"20990101000000"';            expect = 'version' },
+  @{ name = 'broken-predecessor';file = '03-migrations/003-20260101000003.json'; field = 'prevReceiptSha'; raw = ('"' + ('b' * 64) + '"');     expect = 'chains from' },
+  @{ name = 'foreign-project';   file = '00-baseline.json';                      field = 'projectRef';     raw = '"zzzzzzzzzzzzzzzzzzzz"';      expect = 'projectRef' },
+  @{ name = 'reduced-proof';     file = '00-baseline.json';                      field = 'adapter';        raw = 'null';                        expect = 'adapter' }
+)
+$approvalPositive = $null
+$approvalPositiveRoot = New-FinalizationRun
+try { $approvalPositive = Test-ClashDeploymentEvidence -Root $approvalPositiveRoot -Approved $script:probeApproved } catch { $approvalPositive = $null }
+Remove-FinalizationRun -Root $approvalPositiveRoot
+$approvalMissed = @()
+$approvalRefusals = @()
+foreach ($attack in $approvalAttacks) {
+  $run = New-FinalizationRun
+  try {
+    $path = Join-Path $run ([string]$attack.file).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+    if ([string]$attack.field -ceq 'adapter') {
+      # a reduced certification proof: the proof object is replaced by null
+      $doc = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
+      $doc.adapter = $null
+      [void](Write-Evidence -Path $path -Text (($doc | ConvertTo-Json -Depth 6)))
+    }
+    else {
+      [void](Set-EvidenceFieldRaw -Path $path -Name ([string]$attack.field) -RawJson ([string]$attack.raw))
+    }
+    $ev = $null
+    try { $ev = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved } catch { $ev = $null }
+    $text = ''
+    if ($null -ne $ev) { $text = (@($ev.problems) -join ' ') }
+    $refused = ($null -ne $ev) -and (-not $ev.ok) -and ($text.Length -gt 0)
+    $approvalRefusals += ('{0}={1}' -f $attack.name, $refused)
+    if (-not $refused -or ($text -notmatch [regex]::Escape([string]$attack.expect))) { $approvalMissed += [string]$attack.name }
+  }
+  catch { $approvalMissed += ([string]$attack.name + '[threw]') }
+  finally { Remove-FinalizationRun -Root $run }
+}
+# the extra sealed STOPPED receipt: the run stays internally consistent and gains
+# one more receipt that says the deployment did not complete
+$stopRun = New-FinalizationRun
+$stopRefused = $false
+try {
+  $stopDoc = New-EvidenceReceiptHeader -Name '03-migrations/999-stop.json'
+  $stopDoc['status'] = 'STOPPED'
+  $stopDoc['reason'] = 'a stop recorded beside a complete evidence set'
+  [void](Write-Evidence -Path (Join-Path $stopRun '03-migrations\999-stop.json') -Text ($stopDoc | ConvertTo-Json -Depth 5))
+  $stopEv = $null
+  try { $stopEv = Test-ClashDeploymentEvidence -Root $stopRun -Approved $script:probeApproved } catch { $stopEv = $null }
+  $stopText = ''
+  if ($null -ne $stopEv) { $stopText = (@($stopEv.problems) -join ' ') }
+  $stopRefused = ($null -ne $stopEv) -and (-not $stopEv.ok) -and
+                 (($stopText -match 'not an approved migration receipt') -or ($stopText -match 'did not complete'))
+}
+catch { $stopRefused = $false }
+finally { Remove-FinalizationRun -Root $stopRun }
+Add-Case 'completionRejectsSelfConsistentButUnapprovedEvidence' (
+  ($null -ne $approvalPositive) -and $approvalPositive.ok -and
+  @($approvalMissed).Count -eq 0 -and
+  $stopRefused) @{
+  positiveControl = $(if ($null -ne $approvalPositive) { [string]$approvalPositive.ok } else { 'threw' })
+  attacks         = (@($approvalRefusals) -join ' ')
+  extraStopped    = $stopRefused
+  missed          = (@($approvalMissed) -join ',')
+  note = 'R20-H1: eight attacks that a self-consistent set used to pass; the unmutated run still passes'
+}
+
+# ---- 153: R20-M1 - the snapshot is locked BEFORE it is hashed -------------
+$raceDir = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-race-' + [guid]::NewGuid().ToString('N').Substring(0, 12))
+New-Item -ItemType Directory -Path $raceDir -Force | Out-Null
+$raceSource = Join-Path $raceDir 'source.sql'
+[void](Write-Evidence -Path $raceSource -Text "select 1;`n")
+$raceTarget = Join-Path $raceDir 'snapshot.sql'
+$raceExpected = Get-NormalizedSha256 -Path $raceSource
+$raceChild = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$raceWriter = Join-Path $raceDir 'mutate.ps1'
+[void](Write-Evidence -Path $raceWriter -Text ('try { [System.IO.File]::WriteAllText(''' + $raceTarget + ''', "select 666;`n"); Write-Output "WROTE" } catch { Write-Output ("DENIED " + $_.Exception.GetType().Name) }'))
+$raceMover = Join-Path $raceDir 'replace.ps1'
+[void](Write-Evidence -Path $raceMover -Text ('try { [System.IO.File]::WriteAllText(''' + (Join-Path $raceDir 'other.sql') + ''', "select 999;`n"); Move-Item -LiteralPath ''' + (Join-Path $raceDir 'other.sql') + ''' -Destination ''' + $raceTarget + ''' -Force; Write-Output "MOVED" } catch { Write-Output ("DENIED " + $_.Exception.GetType().Name) }'))
+$raceSnap = $null
+try { $raceSnap = New-VerifiedSqlSnapshot -SourcePath $raceSource -TargetPath $raceTarget -ExpectedSha256 $raceExpected -Label 'race probe' } catch { $raceSnap = $null }
+$raceWriteOut = ''
+$raceMoveOut = ''
+$raceHashHeld = ''
+$raceDenied = $false
+$raceMoveDenied = $false
+$raceHashStable = $false
+if ($null -ne $raceSnap -and $raceSnap.ok) {
+  $w = Invoke-NativeProcess -FilePath $raceChild -Arguments @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $raceWriter) -Environment @{} -TimeoutSeconds 120
+  $raceWriteOut = (([string]$w.stdOut) + [string]$w.stdErr).Trim()
+  $raceDenied = ($raceWriteOut -match 'DENIED')
+  $m = Invoke-NativeProcess -FilePath $raceChild -Arguments @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $raceMover) -Environment @{} -TimeoutSeconds 120
+  $raceMoveOut = (([string]$m.stdOut) + [string]$m.stdErr).Trim()
+  $raceMoveDenied = ($raceMoveOut -match 'DENIED')
+  try { $raceHashHeld = Get-NormalizedSha256FromStream -Stream $raceSnap.stream } catch { $raceHashHeld = '<unreadable>' }
+  $raceHashStable = ($raceHashHeld -ceq $raceExpected)
+  try { $raceSnap.stream.Dispose() } catch { }
+}
+# positive control: with the handle released, the same child write SUCCEEDS
+$raceAfter = ''
+if ($null -ne $raceSnap -and $raceSnap.ok) {
+  $a = Invoke-NativeProcess -FilePath $raceChild -Arguments @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $raceWriter) -Environment @{} -TimeoutSeconds 120
+  $raceAfter = (([string]$a.stdOut) + [string]$a.stdErr).Trim()
+}
+Remove-Item -LiteralPath $raceDir -Recurse -Force -ErrorAction SilentlyContinue
+Add-Case 'sqlSnapshotIsLockedBeforeItIsHashed' (
+  ($null -ne $raceSnap) -and $raceSnap.ok -and
+  $raceDenied -and $raceMoveDenied -and $raceHashStable -and
+  ($raceAfter -match 'WROTE')) @{
+  childWrite  = $raceWriteOut
+  childMove   = $raceMoveOut
+  hashHeld    = $raceHashHeld
+  afterRelease = $raceAfter
+  note = 'R20-M1: a real child process cannot mutate or replace the snapshot while the digest is being verified; it can once the handle is released'
+}
+
+# ---- 154: R20-M2 - a junction cannot redirect evidence --------------------
+$jRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-junction-' + [guid]::NewGuid().ToString('N').Substring(0, 12))
+$jOutside = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-outside-' + [guid]::NewGuid().ToString('N').Substring(0, 12))
+New-Item -ItemType Directory -Path $jRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $jOutside -Force | Out-Null
+[void](Write-Evidence -Path (Join-Path $jRoot '02-preflight.json') -Text "{`"status`":`"PASS`"}`n")
+[void](Write-Evidence -Path (Join-Path $jOutside 'audit-owned.json') -Text "{`"secret`":`"outside the evidence root`"}`n")
+$jLink = Join-Path $jRoot 'redirect'
+$jMade = $false
+try { [void](New-Item -ItemType Junction -Path $jLink -Value $jOutside -ErrorAction Stop); $jMade = $true } catch { $jMade = $false }
+$jReadable = $false
+$jResolved = $null
+$jSealThrew = $false
+$jSealText = ''
+if ($jMade) {
+  $jReadable = Test-Path -LiteralPath (Join-Path $jLink 'audit-owned.json')
+  try { $jResolved = Resolve-ClashContainedPath -Root $jRoot -Relative 'redirect/audit-owned.json' -Label 'junction probe' } catch { $jResolved = $null }
+  try { [void](Seal-Evidence -Root $jRoot); $jSealThrew = $false }
+  catch { $jSealThrew = $true; $jSealText = Protect-Text $_.Exception.Message }
+  Remove-Item -LiteralPath $jLink -Force -Recurse -ErrorAction SilentlyContinue
+}
+$jRefused = ($null -ne $jResolved) -and (-not $jResolved['ok']) -and ([string]$jResolved['problem'] -match 'reparse point')
+# positive control: with the junction gone the same tree resolves and seals
+$jCleanResolved = $null
+$jCleanSeal = $false
+try { $jCleanResolved = Resolve-ClashContainedPath -Root $jRoot -Relative '02-preflight.json' -Label 'clean probe' } catch { $jCleanResolved = $null }
+try { $clean = Seal-Evidence -Root $jRoot; $jCleanSeal = ($null -ne $clean) -and ([int]$clean.fileCount -ge 1) } catch { $jCleanSeal = $false }
+Remove-Item -LiteralPath $jRoot -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $jOutside -Recurse -Force -ErrorAction SilentlyContinue
+Add-Case 'reparsePointsCannotRedirectEvidence' (
+  $jMade -and $jReadable -and
+  $jRefused -and $jSealThrew -and
+  ($null -ne $jCleanResolved) -and $jCleanResolved['ok'] -and $jCleanSeal) @{
+  junctionMade = $jMade
+  readableThroughJunction = $jReadable
+  resolutionRefused = $(if ($null -ne $jResolved) { [string]$jResolved['problem'] } else { '<threw>' })
+  sealRefused = $jSealText
+  note = 'R20-M2: a junction inside the evidence root really does read an outside file; the policy refuses it on the file system, and the clean tree still seals'
+}
+
+# ---- 155: RC01 residual - `problems` is an array of plain strings ---------
+$problemRecords = @(
+  @{ name = 'nested-empty';    raw = '[[],[]]';       accept = $false },
+  @{ name = 'single-nested';   raw = '[[]]';          accept = $false },
+  @{ name = 'object-entry';    raw = '[{}]';          accept = $false },
+  @{ name = 'blank-entry';     raw = '["   "]';       accept = $false },
+  @{ name = 'number-entry';    raw = '[1]';           accept = $false },
+  @{ name = 'string-instead';  raw = '"none"';        accept = $false },
+  @{ name = 'empty';           raw = '[]';            accept = $true },
+  @{ name = 'real-problem';    raw = '["a real problem"]'; accept = $false }
+)
+$problemMissed = @()
+$problemResults = @()
+foreach ($pc in $problemRecords) {
+  $text = New-CaseReceiptText -TargetCase 'zeroExitWithStderr' -RawCaseRecord '{"name":"zeroExitWithStderr","passed":true}'
+  $text = $text.Replace('"problems":[]', ('"problems":' + [string]$pc.raw))
+  $doc = $null
+  try { $doc = $text | ConvertFrom-Json } catch { $doc = $null }
+  $verdict = $null
+  try { $verdict = Test-SelfTestReceipt -Document $doc -AdapterSha256 ('a' * 64) } catch { $verdict = $null }
+  $ok = ($null -ne $verdict) -and [bool]$verdict.ok
+  $problemResults += ('{0}={1}' -f $pc.name, $ok)
+  if ($ok -ne [bool]$pc.accept) { $problemMissed += [string]$pc.name }
+}
+Add-Case 'certificationProblemsMustBePlainStrings' (
+  @($problemMissed).Count -eq 0) @{
+  accepted = (@($problemResults) -join ' ')
+  missed   = (@($problemMissed) -join ',')
+  note = 'RC01 residual: [[],[]] and [[]] used to be silently ignored; the declared schema is now enforced'
+}
+
+# ---- 156: R20-M4 - the wrapper must still BE the approved original -------
+$fidRoot = New-PackageTreeCopy -Label 'm4fid' -CloudRoot $packageRoot
+$fidManifestPath = Join-Path $fidRoot 'supabase\cloud\manifest.json'
+$fidClean = $null
+try { $fidClean = Test-ClashPackageIntegrity -RepoRoot $fidRoot } catch { $fidClean = $null }
+$fidMissed = @()
+$fidResults = @()
+foreach ($attack in @(
+    @{ name = 'wrapper-body';   expect = 'does not contain the approved body' },
+    @{ name = 'ledger-name';    expect = 'does not carry its approved ledger identity' },
+    @{ name = 'declared-bytes'; expect = 'the manifest declares' })) {
+  # rebuild a pristine copy per attack, then make ONE approved-looking change and
+  # rebind every digest so that ONLY the fidelity rule can catch it
+  $pkg = New-PackageTreeCopy -Label ('m4-' + [string]$attack.name) -CloudRoot $packageRoot
+  $manifestFile = Join-Path $pkg 'supabase\cloud\manifest.json'
+  $doc = [System.IO.File]::ReadAllText($manifestFile) | ConvertFrom-Json
+  $entry = $doc.entries[0]
+  $wrapperAbs = Join-Path (Join-Path (Join-Path $pkg 'supabase') 'cloud') ('generated\' + [string]$entry.wrapperPath)
+  $wrapperText = [System.IO.File]::ReadAllText($wrapperAbs)
+  if ([string]$attack.name -ceq 'wrapper-body') {
+    $wrapperText = $wrapperText.Replace('create table', 'create unlogged table')
+  }
+  elseif ([string]$attack.name -ceq 'ledger-name') {
+    $wrapperText = $wrapperText.Replace("'" + [string]$entry.ledgerName + "'", "'someone_elses_name'")
+  }
+  elseif ([string]$attack.name -ceq 'declared-bytes') {
+    $entry.bytes = [int]$entry.bytes + 1
+  }
+  [void](Write-Evidence -Path $wrapperAbs -Text $wrapperText)
+  $entry.wrapperSha256 = Get-NormalizedSha256 -Path $wrapperAbs
+  [void](Write-Evidence -Path $manifestFile -Text ($doc | ConvertTo-Json -Depth 8))
+  # rebind checksums for every file so the digest gates pass
+  $sumPath = Join-Path $pkg 'supabase\cloud\checksums.sha256'
+  $lines = @()
+  foreach ($line in @([System.IO.File]::ReadAllLines($sumPath))) {
+    if ($line.Length -eq 0) { continue }
+    $parts = $line -split '  ', 2
+    $abs = Join-Path $pkg ($parts[1].Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    if (Test-Path -LiteralPath $abs -PathType Leaf) { $lines += ((Get-NormalizedSha256 -Path $abs) + '  ' + $parts[1]) }
+    else { $lines += $line }
+  }
+  [void](Set-ChecksumLines -RepoRoot $pkg -Lines $lines)
+  $verdict = $null
+  try { $verdict = Test-ClashPackageIntegrity -RepoRoot $pkg } catch { $verdict = $null }
+  $text = ''
+  if ($null -ne $verdict) { $text = (@($verdict.problems) -join ' ') }
+  $refused = ($null -ne $verdict) -and (-not $verdict.ok)
+  $fidResults += ('{0}={1}' -f $attack.name, $refused)
+  if (-not $refused -or ($text -notmatch [regex]::Escape([string]$attack.expect))) { $fidMissed += [string]$attack.name }
+  Remove-Item -LiteralPath $pkg -Recurse -Force -ErrorAction SilentlyContinue
+}
+Remove-Item -LiteralPath $fidRoot -Recurse -Force -ErrorAction SilentlyContinue
+Add-Case 'packageFidelityBindsEveryWrapperToItsOriginal' (
+  ($null -ne $fidClean) -and $fidClean.ok -and
+  @($fidMissed).Count -eq 0 -and
+  @($fidResults).Count -eq 3) @{
+  positiveControl = $(if ($null -ne $fidClean) { [string]$fidClean.ok } else { 'threw' })
+  attacks         = (@($fidResults) -join ' ')
+  missed          = (@($fidMissed) -join ',')
+  note = 'R20-M4: wrapper body, ledger identity and declared byte length are bound to the approved original even when every digest is rebound'
+}
+
 # ---- 149: the validators themselves - removed checks must be DETECTED -------
 # Mutation testing: each mutant drops ONE check from a COPY of the adapter. The
 # mutant is then asked the same question the suite asks, and it must ACCEPT the
@@ -4777,7 +5142,7 @@ foreach ($mutant in $rcMutants) {
         $run = New-FinalizationRun
         try {
           [void](Set-JsonScalarField -Path (Join-Path $run '02-preflight.json') -Name 'status' -RawJson '"FAIL"')
-          $evidence = Test-ClashDeploymentEvidence -Root $run
+          $evidence = Test-ClashDeploymentEvidence -Root $run -Approved $script:probeApproved
           return [bool]$evidence.ok
         }
         finally { Remove-FinalizationRun -Root $run }

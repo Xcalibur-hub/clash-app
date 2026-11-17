@@ -434,6 +434,7 @@ const list = [
   ...readdirSync(join(CLOUD, 'tools')).filter((f) => /\.(ps1|mjs)$/.test(f)).sort().map((f) => `supabase/cloud/tools/${f}`),
   ...readdirSync(join(CLOUD, 'tools/lib')).filter((f) => f.endsWith('.ps1')).sort().map((f) => `supabase/cloud/tools/lib/${f}`),
   ...readdirSync(join(CLOUD, 'tests')).filter((f) => f.endsWith('.mjs')).sort().map((f) => `supabase/cloud/tests/${f}`),
+  'supabase/cloud/tests/assertion-inventory.txt',
 ].filter((p) => existsSync(join(ROOT, p)));
 
 writeFileSync(join(CLOUD, 'checksums.sha256'),

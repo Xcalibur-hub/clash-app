@@ -314,10 +314,68 @@ if (-not $integrity.ok) {
 Write-Host ("INTEGRITY members={0} checksums={1} verified={2} migrations={3}" -f `
     $integrity.memberCount, $integrity.checksumEntries, $integrity.verifiedFiles, $integrity.entryCount)
 
+# Round 21 (R20-H1): the approved inventory is read ONCE, here, from the package
+# that just passed the integrity gate. Every later decision - the per-migration
+# receipts, the finalization intent, the published marker - is compared against
+# this list, never against whatever receipts the run happens to hold.
+$approved = Get-ClashApprovedInventory -ManifestPath (Join-Path $cloudRoot 'manifest.json')
+if (-not $approved.ok) {
+  $approvedShown = @($approved.problems)
+  if ($approvedShown.Count -gt 6) { $approvedShown = @($approvedShown[0..5]) }
+  Stop-Run ("the approved package inventory is invalid ({0} problem(s)): {1}" -f @($approved.problems).Count, ($approvedShown -join '; ')) '01-approved-inventory.json'
+}
+if ([int]$approved.count -ne [int]$integrity.entryCount) {
+  Stop-Run ("the approved inventory records {0} migration(s) but the package holds {1}" -f $approved.count, $integrity.entryCount) '01-approved-inventory.json'
+}
+New-PhaseReceipt '01b-approved.json' @{
+  status                = 'PASS'
+  approvedMigrations    = [int]$approved.count
+  approvedProjectRef    = [string]$approved.projectRef
+  approvedSourceCommit  = [string]$approved.sourceCommit
+  approvedManifestSha256 = [string]$approved.manifestSha256
+}
+Write-Host ("APPROVED migrations={0} project={1} manifest={2}" -f $approved.count, $approved.projectRef, $approved.manifestSha256)
+
 # Round 9 (B3): VERBOSITY=verbose makes psql put the SQLSTATE into every ERROR
 # line, so Get-PgSqlState has something real to extract for claim collisions and
 # probe failures. It changes error text only, never successful query output.
 $common = @('-X', '-q', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose')
+
+# Round 21 (R20-M1). Gate 4 already executes a LOCKED snapshot of each wrapper, but
+# the preflight, postflight and storage SQL were still passed to psql as raw package
+# pathnames - the same time-of-check/time-of-use gap the wrappers were fixed for.
+# One helper: snapshot the approved bytes, verify the digest through the held handle,
+# execute the snapshot, release the handle in a finally.
+function Invoke-LockedSqlInput {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepoRelative,
+    [Parameter(Mandatory = $true)][string]$SnapshotRelative,
+    [Parameter(Mandatory = $true)][string]$Label,
+    [Parameter(Mandatory = $true)][string[]]$Arguments,
+    [Parameter(Mandatory = $true)]$Environment,
+    [Parameter(Mandatory = $true)][int]$TimeoutSeconds
+  )
+  $entry = $null
+  if ($null -ne $integrity.checksums -and $integrity.checksums.ContainsKey($RepoRelative)) {
+    $entry = $integrity.checksums[$RepoRelative]
+  }
+  if ($null -eq $entry) {
+    Stop-Run ("{0} has no approved checksum entry, so it cannot be executed" -f $RepoRelative) '01-gates\input-unapproved.json'
+  }
+  $source = Join-Path $repoRoot ($RepoRelative.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+  $target = Join-Path $run ($SnapshotRelative.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+  $locked = New-VerifiedSqlSnapshot -SourcePath $source -TargetPath $target -ExpectedSha256 ([string]$entry.sha256) -Label $Label
+  if (-not $locked.ok) {
+    Stop-Run ("{0} could not be locked and verified before execution: {1}" -f $Label, $locked.problem) '01-gates\input-unverified.json'
+  }
+  try {
+    return (Invoke-NativeProcess -FilePath $psqlPath -Arguments ($Arguments + @('-f', [string]$locked.path)) `
+              -Environment $Environment -TimeoutSeconds $TimeoutSeconds)
+  }
+  finally {
+    if ($null -ne $locked.stream) { try { $locked.stream.Dispose() } catch { } }
+  }
+}
 
 # --------------------------------------------------- gate 2: preflight SQL ---
 # Round 14 (R13-C1): this gate counted lines ending in '| PASS' and refused only
@@ -327,9 +385,9 @@ $common = @('-X', '-q', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose')
 # preflight\00_preflight.sql renders - 21 checks (19 gating, 2 INFO) with their
 # declared ordinals, names, expected and actual cells, in order, inside the
 # header/separator/footer envelope? The receipt takes its status from that verdict.
-$pf = Invoke-NativeProcess -FilePath $psqlPath `
-        -Arguments ($common + @('-f', (Join-Path $cloudRoot 'preflight\00_preflight.sql'))) `
-        -Environment $policy.env -TimeoutSeconds $PreflightTimeoutSeconds
+$pf = Invoke-LockedSqlInput -RepoRelative 'supabase/cloud/preflight/00_preflight.sql' `
+        -SnapshotRelative '01-gates/preflight.sql' -Label 'preflight SQL' `
+        -Arguments $common -Environment $policy.env -TimeoutSeconds $PreflightTimeoutSeconds
 [void](Write-Evidence -Path (Join-Path $run '01-gates\preflight.out') -Text $pf.stdOut)
 [void](Write-Evidence -Path (Join-Path $run '01-gates\preflight.err') -Text $pf.stdErr)
 $pfReport = Test-VerifyReport -Result $pf -ReportName '00_preflight.sql'
@@ -706,9 +764,9 @@ foreach ($e in $entries) {
 }
 
 # --------------------------------------------------- gate 5: postflight -----
-$vf = Invoke-NativeProcess -FilePath $psqlPath `
-        -Arguments ($common + @('-f', (Join-Path $cloudRoot 'verify\90_verify.sql'))) `
-        -Environment $policy.env -TimeoutSeconds $VerifyTimeoutSeconds
+$vf = Invoke-LockedSqlInput -RepoRelative 'supabase/cloud/verify/90_verify.sql' `
+        -SnapshotRelative '04-postflight/verify.sql' -Label 'postflight SQL' `
+        -Arguments $common -Environment $policy.env -TimeoutSeconds $VerifyTimeoutSeconds
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\verify.out') -Text $vf.stdOut)
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\verify.err') -Text $vf.stdErr)
 # Round 12 (R11-C1): counting FAIL rows was not a contract. Exit 0 with zero
@@ -749,9 +807,9 @@ if (-not $vfReport.ok) {
       ($vfProblems -join '; '), (Get-NativeErrorExcerpt $vf 400)) '04-postflight-fail.json'
 }
 
-$st = Invoke-NativeProcess -FilePath $psqlPath `
-        -Arguments ($common + @('-f', (Join-Path $cloudRoot 'verify\95_storage_config.sql'))) `
-        -Environment $policy.env -TimeoutSeconds $VerifyTimeoutSeconds
+$st = Invoke-LockedSqlInput -RepoRelative 'supabase/cloud/verify/95_storage_config.sql' `
+        -SnapshotRelative '04-postflight/storage.sql' -Label 'storage SQL' `
+        -Arguments $common -Environment $policy.env -TimeoutSeconds $VerifyTimeoutSeconds
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\storage.out') -Text $st.stdOut)
 [void](Write-Evidence -Path (Join-Path $run '04-postflight\storage.err') -Text $st.stdErr)
 # Round 12 (R11-C1): storage verification had no PASS/INFO contract at all - it
@@ -855,7 +913,7 @@ New-PhaseReceipt '06-claim-release.json' @{ status = 'PASS'; runId = $runId; rel
 $completionRequired = @(Get-ClashCompletionRequiredEvidence -Root $run)
 try {
   # RC02: the producer states how many migrations it ran; the evidence must match.
-  $completion = Publish-ClashCompletion -Root $run -PrevSha $script:chain -RequiredEvidence $completionRequired -ExpectedMigrationCount $entries.Count -Fields @{
+  $completion = Publish-ClashCompletion -Root $run -PrevSha $script:chain -RequiredEvidence $completionRequired -ExpectedMigrationCount $entries.Count -Approved $approved -Fields @{
     appliedThisRun  = $applied
     freshOnly       = $true
     writerRunId     = $runId
@@ -865,7 +923,7 @@ try {
   }
   # The runner accepts the run through the SAME function a consumer uses, so the
   # two can never disagree about what a completed run looks like.
-  $consumer = Test-ClashRunCompletion -RunPath $run
+  $consumer = Test-ClashRunCompletion -RunPath $run -Approved $approved
   if (-not $consumer.ok) {
     throw ('completion refused: the published run does not pass the consumer check: {0}' -f (@($consumer.problems) -join '; '))
   }

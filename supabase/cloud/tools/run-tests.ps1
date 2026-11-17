@@ -61,13 +61,53 @@ $summary   = ($r.stdOut -split "`r?`n" | Where-Object { $_ -match '^\d+ passed, 
 $machine = Test-ClashSuiteSummary -StdOut $r.stdOut -PassLines $passLines -FailLines $failLines
 $countsAgree = $machine.ok -and ($machine.failed -eq 0) -and ($machine.passed -gt 0)
 
+# Round 21 (R20-M3): a count is not an inventory. The suite publishes the digest of
+# the identifiers it executed; the launcher computes the same digest from the
+# checked-in inventory itself and requires them to be equal. A deleted, duplicated,
+# substituted or skipped assertion changes one side and not the other, even when the
+# totals still agree.
+$inventoryPath = Join-Path $cloudRoot 'tests\assertion-inventory.txt'
+$inventoryIds = @()
+if (Test-Path -LiteralPath $inventoryPath -PathType Leaf) {
+  $inventoryIds = @([System.IO.File]::ReadAllLines($inventoryPath) | Where-Object { $_.Trim().Length -gt 0 } | ForEach-Object { $_.Trim() })
+}
+# Ordinal, exact - not culture-aware Sort-Object: the suite sorts with JavaScript's
+# code-unit order, so the digest has to match byte for byte across both runtimes.
+$inventorySorted = [string[]]$inventoryIds
+[Array]::Sort($inventorySorted, [System.StringComparer]::Ordinal)
+$inventoryOrdinal = New-Object 'System.Collections.Generic.List[string]'
+foreach ($id in $inventorySorted) {
+  if ($inventoryOrdinal.Count -eq 0 -or $inventoryOrdinal[$inventoryOrdinal.Count - 1] -cne $id) { $inventoryOrdinal.Add($id) }
+}
+$inventoryDigest = Get-TextSha256 -Text ((($inventoryOrdinal.ToArray()) -join "`n") + "`n")
+$announced = ($r.stdOut -split "`r?`n" | Where-Object { $_ -match '^CLASH-ASSERTION-INVENTORY ' } | Select-Object -Last 1)
+$announcedDigest = ''
+$announcedCount = -1
+$announcedUnique = -1
+if ($announced) {
+  try {
+    $parsedInventory = $announced.Substring('CLASH-ASSERTION-INVENTORY '.Length) | ConvertFrom-Json
+    $announcedDigest = [string]$parsedInventory.sha256
+    $announcedCount = [int]$parsedInventory.count
+    $announcedUnique = [int]$parsedInventory.unique
+  }
+  catch { $announcedDigest = '' }
+}
+$inventoryAgrees = ($announcedDigest.Length -eq 64) -and ($announcedDigest -ceq $inventoryDigest) -and
+                   ($announcedCount -eq $inventoryIds.Count) -and ($announcedUnique -eq $inventoryOrdinal.Count) -and
+                   ($inventoryOrdinal.Count -eq $inventoryIds.Count)
+if (-not $inventoryAgrees) {
+  Write-Host ("REFUSED: the assertion inventory does not describe what ran (announced {0}/{1} unique, file {2} entries, digest {3} vs {4})" -f `
+      $announcedCount, $announcedUnique, $inventoryIds.Count, $announcedDigest, $inventoryDigest) -ForegroundColor Red
+}
+
 Write-Host ''
 if (-not [string]::IsNullOrWhiteSpace($r.stdErr)) {
   Write-Host 'stderr from the suite:' -ForegroundColor Yellow
   Write-Host $r.stdErr.TrimEnd()
 }
 
-$ok = (Test-NativeSuccess $r) -and $failLines -eq 0 -and $passLines -gt 0 -and $countsAgree
+$ok = (Test-NativeSuccess $r) -and $failLines -eq 0 -and $passLines -gt 0 -and $countsAgree -and $inventoryAgrees
 $stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
 $receipt = [ordered]@{
   receipt      = 'test-run.json'
@@ -87,6 +127,14 @@ $receipt = [ordered]@{
   machineProblems = @($machine.problems)
   machineSummary  = [ordered]@{ passed = [int]$machine.passed; failed = [int]$machine.failed; total = [int]$machine.total }
   assertionsExecuted = ($passLines + $failLines)
+  assertionInventory = [ordered]@{
+    sha256        = $inventoryDigest
+    announced     = $announcedDigest
+    entries       = [int]$inventoryIds.Count
+    unique        = [int]$inventoryOrdinal.Count
+    announcedCount = [int]$announcedCount
+    agrees        = [bool]$inventoryAgrees
+  }
   status       = $(if ($ok) { 'PASS' } else { 'FAIL' })
   stderrExcerpt = (Get-NativeErrorExcerpt $r 600)
 }

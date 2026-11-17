@@ -8,7 +8,7 @@
 //   node supabase/cloud/tests/verify-package.mjs
 // ============================================================================
 
-import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, copyFileSync, cpSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { join, win32, posix, dirname, sep, resolve as absolutise } from 'node:path';
@@ -36,15 +36,37 @@ const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
-const EXPECTED_CASES = 150;
-const EXPECTED_ASSERTIONS = 496;
+const EXPECTED_CASES = 156;
+const EXPECTED_ASSERTIONS = 512;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
   sectionsRun++;
   console.log(`\n[${n}] ${title}`);
 }
+// Round 21 (R20-M3). A count is not an inventory: the independent audit deleted one
+// assertion, duplicated another and preserved the total, and both the suite and the
+// launcher reported 496/496 PASS. Every assertion therefore has a STABLE identifier
+// (a slug of its name), the expected set lives in tests/assertion-inventory.txt, and
+// the suite refuses a missing, duplicated, replaced or unlisted identifier even when
+// the totals agree. The launcher verifies the same file independently, by digest.
+const executedIds = [];
+const ASSERTION_INVENTORY_PATH = join(CLOUD, 'tests', 'assertion-inventory.txt');
+const slugId = (name) => String(name).toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 72);
+function compareAssertionInventory(executed, expected) {
+  const unique = [...new Set(executed)].sort();
+  const duplicates = executed.filter((id, i) => executed.indexOf(id) !== i);
+  const missing = expected.filter((id) => !unique.includes(id));
+  const unlisted = unique.filter((id) => !expected.includes(id));
+  const empty = executed.filter((id) => id.length === 0);
+  return {
+    unique, duplicates, missing, unlisted, empty,
+    ok: duplicates.length === 0 && empty.length === 0 && missing.length === 0 && unlisted.length === 0,
+  };
+}
 function check(name, cond, detail = '') {
+  executedIds.push(slugId(name));
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { failures.push(`${name}${detail ? ' :: ' + detail : ''}`); console.log(`  FAIL  ${name}${detail ? ' :: ' + detail : ''}`); }
 }
@@ -620,7 +642,7 @@ hdr(13, 'parameter-name resolution (typos in -Named arguments)');
     'Path', 'LiteralPath', 'ItemType', 'Force', 'Recurse', 'File', 'Depth', 'Value',
     'Encoding', 'Raw', 'ArgumentList', 'TypeName', 'ForegroundColor', 'ErrorAction',
     'Object', 'InputObject', 'Property', 'ExpandProperty', 'First',
-    'Leaf', 'Parent', 'Version', 'Last', 'Descending',
+    'Leaf', 'Parent', 'Version', 'Last', 'Descending', 'Unique',
     'Filter', 'PathType', 'Destination',
   ]);
   const allPs = [...psTools.map((f) => `tools/${f}`), 'tools/lib/clash-native.ps1'];
@@ -694,7 +716,7 @@ hdr(14, 'package-test invocation contract (Round 3 item 5)');
     /passLines -gt 0 -and \$countsAgree/.test(launcherSrc));
 }
 
-hdr(15, 'self-test integrity - a dropped or crashed case cannot pass (Round 4)');
+hdr(15, 'self-test integrity - a dropped or crashed case cannot pass (Round 4) / assertion inventory (Round 21)');
 {
   const code = (src) => psLex(src).code;
 
@@ -798,6 +820,85 @@ hdr(15, 'self-test integrity - a dropped or crashed case cannot pass (Round 4)')
   for (const [name, mutate] of Object.entries(tamper)) {
     const d = base(); mutate(d);
     check(`validator rejects: ${name}`, validate(d).length > 0);
+  }
+
+  // --- Round 21 (R20-M3): an equal-total mutation cannot pass ---------------
+  // The Round 20 audit deleted one assertion, duplicated another with a different
+  // name and shipped it: 496 assertions still ran and both the suite and the launcher
+  // printed 496/496 PASS. These controls drive the comparison with hand-built id sets
+  // so the detector is shown to fire on a deletion, a duplication and a substitution
+  // that all preserve the total.
+  const ref = ['alpha-check', 'bravo-check', 'charlie-check', 'delta-check'];
+  check('inventory control: a faithful set is accepted',
+    compareAssertionInventory(ref, ref).ok);
+  check('inventory control: a deletion at equal total is caught (deleted assertion duplicated)',
+    (() => { const c = compareAssertionInventory([...ref, 'alpha-check'].filter((_, i) => i !== 2), ref);
+             return !c.ok && c.duplicates.includes('alpha-check') && c.missing.includes('charlie-check'); })());
+  check('inventory control: a deletion at equal total is caught when it is only deleted',
+    (() => { const c = compareAssertionInventory(ref.slice(0, 3), ref);
+             return !c.ok && c.missing.join(',') === 'delta-check' && c.unlisted.length === 0; })());
+  check('inventory control: a substitution at equal total is caught',
+    (() => { const c = compareAssertionInventory([ref[0], ref[1], 'echo-check', ref[3]], ref);
+             return !c.ok && c.missing.includes('charlie-check') && c.unlisted.includes('echo-check'); })());
+  check('inventory control: an invented assertion is caught',
+    (() => { const c = compareAssertionInventory([...ref, 'foxtrot-check'], ref);
+             return !c.ok && c.unlisted.join(',') === 'foxtrot-check' && c.missing.length === 0; })());
+  const ownSource = read(fileURLToPath(import.meta.url));
+  check('the assertion-count tripwire is present and counts itself',
+    ownSource.includes('const ran = pass + failures.length + 1') &&
+    ownSource.includes('the suite runs exactly the documented number of assertions'));
+  check('inventory control: an anonymous assertion is caught',
+    (() => { const c = compareAssertionInventory([...ref, ''], ref);
+             return !c.ok && c.empty.length === 1; })());
+
+  // --- end to end: the suite itself refuses an equal-total substitution -----
+  // A throwaway copy renames one existing assertion (same number of assertions, no
+  // PASS/FAIL lost) and rebinds the copy's own checksums, so package integrity still
+  // passes there. The only detector that can fail is the inventory comparison.
+  if (!process.env.CLASH_INVENTORY_MUTATION_CHILD) {
+    const mutRoot = mkdtempSync(join(tmpdir(), 'clash-assertion-inventory-'));
+    try {
+      const mutCloud = join(mutRoot, 'supabase', 'cloud');
+      cpSync(CLOUD, mutCloud, { recursive: true });
+      cpSync(join(ROOT, 'supabase', 'migrations'), join(mutRoot, 'supabase', 'migrations'), { recursive: true });
+      mkdirSync(join(mutRoot, '.github', 'workflows'), { recursive: true });
+      copyFileSync(join(ROOT, '.github', 'workflows', 'windows-offline-validation.yml'),
+        join(mutRoot, '.github', 'workflows', 'windows-offline-validation.yml'));
+      const suiteCopy = join(mutCloud, 'tests', 'verify-package.mjs');
+      const before = read(suiteCopy);
+      // Assembled at run time so this block's own text is not a second occurrence of
+      // the anchor; the single-occurrence count below is what proves the anchor is real.
+      const anchorName = ['no', 'PASS', 'summary', 'can', 'precede', 'the', 'bootstrap'].join(' ');
+      const original = `'${anchorName}'`;
+      if (before.split(original).length - 1 !== 1) { throw new Error(`mutation anchor found ${before.split(original).length - 1} time(s): ${original}`); }
+      const substituted = `'${anchorName} after substitution'`;
+      const after = before.replace(original, substituted);
+      writeFileSync(suiteCopy, after);
+      const sumsPath = join(mutCloud, 'checksums.sha256');
+      const rel = 'supabase/cloud/tests/verify-package.mjs';
+      const rebound = lf(read(sumsPath)).split('\n').map((line) => {
+        const m = /^([0-9a-f]{64})  (.+)$/.exec(line);
+        if (!m) return line;
+        return (m[2] === rel ? sha(after) : m[1]) + '  ' + m[2];
+      }).join('\n');
+      writeFileSync(sumsPath, rebound);
+      const child = spawnSync(process.execPath, [suiteCopy], {
+        encoding: 'utf8', timeout: 600000,
+        env: { ...process.env, CLASH_INVENTORY_MUTATION_CHILD: '1' },
+      });
+      const out = child.stdout || '';
+      check('an equal-total substitution makes the suite exit nonzero', child.status !== 0, `status=${child.status}`);
+      check('an equal-total substitution is caught as a missing assertion',
+        /FAIL  assertion inventory: no expected assertion is missing/.test(out),
+        (out.match(/FAIL  assertion inventory:[^\n]*/g) || []).join(' | ').slice(0, 200));
+      check('an equal-total substitution is caught as an unlisted assertion',
+        /FAIL  assertion inventory: no unlisted assertion ran/.test(out));
+      check('the equal-total substitution keeps package integrity passing (the inventory is the detector)',
+        /PASS  checksums verify/.test(out) && /^\d+ passed, [1-9]\d* failed$/m.test(out));
+      check('the mutated suite cannot print an all-clear',
+        !/ALL OFFLINE TESTS PASSED/.test(out));
+    }
+    finally { rmSync(mutRoot, { recursive: true, force: true }); }
   }
 }
 hdr(16, 'inventory integrity - flat, unique, exact (Round 5)');
@@ -1095,7 +1196,7 @@ hdr(18, 'documentation claims match the package (Round 7)');
   const migrationCount = migFiles.length;
 
   check('the checksum set covers every original migration plus the package',
-    checksumCount === originals + (checksumCount - originals) && originals === migrationCount && checksumCount === 240,
+    checksumCount === originals + (checksumCount - originals) && originals === migrationCount && checksumCount === 241,
     `checksums=${checksumCount} originals=${originals}`);
   check('README states the real checksum file count',
     readmeText.includes(`${checksumCount} files`) || readmeText.includes(`${checksumCount} checksum files`),
@@ -1862,7 +1963,7 @@ hdr(22, 'verification report contract - the report IS the SQL (Round 12 / R11-C1
     /if \(-not \$vfReport\.ok\) \{/.test(deployCode) && /if \(-not \$stReport\.ok\) \{/.test(deployCode) &&
     /ok              = \(\$verdict -eq 'PASS'\)/.test(libCode));
   check('both STOPs precede the assertion that the claim was never released',
-    deployCode.indexOf('04-postflight-fail.json') < deployCode.indexOf("$st = Invoke-NativeProcess") &&
+    deployCode.indexOf('04-postflight-fail.json') < deployCode.indexOf("$st = Invoke-LockedSqlInput") &&
     deployCode.indexOf('05-storage-fail.json') < deployCode.indexOf('REFUSED: the claim release was reached without two proven verification reports') &&
     deployCode.indexOf('REFUSED: the claim release was reached without two proven verification reports') <
       deployCode.indexOf("delete from supabase_migrations.clash_deploy_claim") &&
@@ -2967,14 +3068,6 @@ hdr(29, 'systemic validation boundary: RC01-RC11 (Round 20)');
     /deployment evidence/i.test(readmeText) && /mutation/i.test(readmeText));
 }
 
-{
-  // Tripwire: the documented total must equal what actually ran. Adding an
-  // assertion without updating EXPECTED_ASSERTIONS fails here.
-  const ran = pass + failures.length + 1;
-  check('the suite runs exactly the documented number of assertions',
-    ran === EXPECTED_ASSERTIONS, `expected ${EXPECTED_ASSERTIONS}, ran ${ran}`);
-}
-
 if (sectionsRun !== EXPECTED_SECTIONS) {
   const message = `only ${sectionsRun} of ${EXPECTED_SECTIONS} sections ran`;
   failures.push(message);
@@ -2983,6 +3076,50 @@ if (sectionsRun !== EXPECTED_SECTIONS) {
 if (pass === 0) {
   failures.push('no assertion produced a result');
   console.log('  FAIL  no assertion produced a result');
+}
+
+// ---- Round 21 (R20-M3): the assertion inventory ---------------------------
+{
+  // The inventory assertions identify themselves, so the set they verify is the set
+  // that ran - including them. They are registered before the comparison, and the
+  // digest the launcher checks is computed from that same set.
+  const inventoryNames = [
+    'assertion inventory: every assertion has a stable identifier',
+    'assertion inventory: no two assertions share an identifier',
+    'assertion inventory: no expected assertion is missing (a deleted assertion cannot pass)',
+    'assertion inventory: no unlisted assertion ran (a substituted assertion cannot pass)',
+  ];
+  for (const name of inventoryNames) { executedIds.push(slugId(name)); }
+
+  const expectedIds = existsSync(ASSERTION_INVENTORY_PATH)
+    ? read(ASSERTION_INVENTORY_PATH).split('\n').map((l) => l.trim()).filter(Boolean)
+    : [];
+  const comparison = compareAssertionInventory(executedIds, expectedIds);
+  const report = (name, cond, detail = '') => {
+    if (cond) { pass++; console.log(`  PASS  ${name}`); }
+    else { failures.push(`${name}${detail ? ' :: ' + detail : ''}`); console.log(`  FAIL  ${name}${detail ? ' :: ' + detail : ''}`); }
+  };
+  report(inventoryNames[0], comparison.empty.length === 0, comparison.empty.length + ' empty identifier(s)');
+  report(inventoryNames[1], comparison.duplicates.length === 0, comparison.duplicates.slice(0, 8).join(','));
+  report(inventoryNames[2], comparison.missing.length === 0, comparison.missing.slice(0, 6).join(','));
+  report(inventoryNames[3], comparison.unlisted.length === 0, comparison.unlisted.slice(0, 6).join(','));
+  const digest = createHash('sha256').update(comparison.unique.join('\n') + '\n', 'utf8').digest('hex');
+  if (process.argv.includes('--write-inventory')) {
+    writeFileSync(ASSERTION_INVENTORY_PATH, comparison.unique.join('\n') + '\n');
+  }
+  console.log(`CLASH-ASSERTION-INVENTORY ${JSON.stringify({
+    count: executedIds.length, unique: comparison.unique.length, expected: expectedIds.length, sha256: digest,
+  })}`);
+}
+
+{
+  // Tripwire: the documented total must equal what actually ran. Adding an
+  // assertion without updating EXPECTED_ASSERTIONS fails here. It counts itself,
+  // and section 15 asserts that this tripwire is still present in the source - a
+  // deleted tripwire is otherwise the cheapest way to make a suite look complete.
+  const ran = pass + failures.length + 1;
+  check('the suite runs exactly the documented number of assertions',
+    ran === EXPECTED_ASSERTIONS, `expected ${EXPECTED_ASSERTIONS}, ran ${ran}`);
 }
 
 console.log(`\n${'='.repeat(60)}`);
