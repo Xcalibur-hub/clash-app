@@ -35,7 +35,42 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '5.5.0'
+$script:ClashAdapterVersion = '5.6.0'
+
+# Round 24 (F1). ONE canonical input contract for every text this package admits.
+#
+# PostgreSQL ends a -- comment at CR as well as at LF (its lexer's non_newline is
+# [^\n\r]). Every checker in this package is line-oriented on LF, so a bare CR hides
+# executable SQL inside what the checker reads as one comment line:
+#
+#     -- note<CR>select 1;
+#
+# is ONE line to a LF splitter and TWO to the server. Round 23 refused executable
+# text before begin; and after commit;, but it normalised CRLF first and left any
+# other CR in place, so the text after a bare CR was never inspected. The contract is
+# therefore stated once, here, and every producer and consumer applies it BEFORE
+# normalisation, hashing or admission:
+#
+#   * a CR is admissible only as the first half of a CRLF pair;
+#   * the Unicode line separators NEL (U+0085), LS (U+2028) and PS (U+2029) are not
+#     supported line endings and are refused rather than guessed at.
+function Get-ClashCanonicalTextProblem {
+  param([string]$Text, [string]$Label = 'text')
+
+  $raw = [string]$Text
+  if ($raw.Length -eq 0) { return '' }
+  $cr = [regex]::Match($raw, '\r(?!\n)')
+  if ($cr.Success) {
+    $line = 1
+    for ($i = 0; $i -lt $cr.Index; $i++) { if ($raw[$i] -eq [char]10) { $line++ } }
+    return ('{0} contains a bare carriage return at line {1}, offset {2}: PostgreSQL ends a -- comment at CR as well as LF, so anything after it executes while an LF-oriented checker still reads one comment line. A CR is only admissible as part of a CRLF pair' -f $Label, $line, $cr.Index)
+  }
+  $exotic = [regex]::Match($raw, '[\u0085\u2028\u2029]')
+  if ($exotic.Success) {
+    return ('{0} contains the unsupported line separator U+{1:X4} at offset {2}; this package admits LF (and CRLF, normalised to LF) only' -f $Label, [int][char]$exotic.Value[0], $exotic.Index)
+  }
+  return ''
+}
 
 # --------------------------------------------------------------- hashing ----
 function Get-TextSha256 {
@@ -780,6 +815,13 @@ function Write-Evidence {
   param([Parameter(Mandatory = $true)][string]$Path, [string]$Text = '')
 
   $clean = Protect-Text $Text
+  # Round 24 (F1): the writer never produces evidence a reader could split differently
+  # from PostgreSQL. A bare CR is refused here - before encoding and before the digest
+  # is computed - exactly as the planner refuses it in a wrapper.
+  $canonicalProblem = Get-ClashCanonicalTextProblem -Text $clean -Label 'the evidence text'
+  if ($canonicalProblem.Length -gt 0) {
+    throw ('evidence refused: {0}. Nothing was written to {1}.' -f $canonicalProblem, $Path)
+  }
   $dir   = Split-Path -Parent $Path
   if ($dir -and -not (Test-Path -LiteralPath $dir)) {
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
@@ -1227,7 +1269,7 @@ function Test-EvidenceSeal {
     $problems.Add(('the seal says {0} file(s) but lists {1}' -f $sealCountField['value'], $entries.Count))
   }
   # RC10: the seal's own metadata is typed as well. A seal whose adapter identity
-  # is ["clash-native-adapter/5.5.0"] or whose sealedUtc is not a timestamp cannot
+  # is ["clash-native-adapter/5.6.0"] or whose sealedUtc is not a timestamp cannot
   # be compared with a marker, so it is rejected here rather than coerced later.
   $sealAdapterField = Get-ClashJsonField -Object $seal -Name 'adapter'
   if (-not (Test-ClashJsonKind -Value $sealAdapterField['value'] -Kind 'string')) {
@@ -1769,6 +1811,13 @@ function Test-ClashReceiptInventory {
   foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -Filter '*.json')) {
     $rel = ([string]$file.FullName).Substring($rootFull.Length).TrimStart([char]92, [char]47).Replace([char]92, '/')
     if ($rel -ceq 'EVIDENCE-MANIFEST.json') { continue }
+    # Round 24 (F1): the canonical text contract applies to every file the run holds,
+    # not only to SQL. A receipt is evidence; evidence that two readers can split
+    # differently is not evidence.
+    $fileCanonical = ''
+    try { $fileCanonical = Get-ClashCanonicalTextProblem -Text ([System.IO.File]::ReadAllText($file.FullName)) -Label $rel }
+    catch { $fileCanonical = '' }
+    if ($fileCanonical.Length -gt 0) { $problems.Add($fileCanonical) }
     if ($declared -ccontains $rel) { continue }
     if ($rel -clike '03-migrations/*/*') {
       $problems.Add(('{0} is a receipt nested inside 03-migrations; every per-migration receipt belongs directly in 03-migrations/ and must name an approved migration' -f $rel))
@@ -1825,7 +1874,13 @@ function Test-ClashReceiptSemantics {
     $doc = $docRoot['value']
     if (($ownedElsewhere -ccontains $rel) -or ($rel -clike '03-migrations/*') -or ($rel -clike '*-applied.json')) { continue }
     $statusField = Get-ClashJsonField -Object $doc -Name 'status'
-    if ($statusField['kind'] -ceq 'missing') { continue }
+    if ($statusField['kind'] -ceq 'missing') {
+      # Round 24 (F3): "no status" was treated as "nothing to contradict". A receipt
+      # that does not state an outcome states nothing, and silence is not success: a
+      # receipt the protocol declares must carry its status.
+      $problems.Add(('{0} declares no status; a run receipt must state the outcome it records, and an absent status is not a success' -f $rel))
+      continue
+    }
     $expected = 'PASS'
     if ($typedStatus.ContainsKey($rel)) { $expected = [string]$typedStatus[$rel] }
     if (-not (Test-ClashJsonKind -Value $statusField['value'] -Kind 'string')) {
@@ -2467,6 +2522,11 @@ function Read-ClashChecksumFile {
 function Get-ClashWrapperEnvelopeProblem {
   param([string]$Text)
 
+  # Round 24 (F1): the canonical contract comes FIRST. Splitting on LF and then
+  # reading the lines is only sound if no other character can end a line for
+  # PostgreSQL; a bare CR breaks exactly that assumption.
+  $canonicalProblem = Get-ClashCanonicalTextProblem -Text $Text -Label 'the wrapper'
+  if ($canonicalProblem.Length -gt 0) { return $canonicalProblem }
   $lines = @(([string]$Text).Replace("`r`n", "`n") -split "`n")
   $beginAt = @()
   $commitAt = @()
@@ -2697,6 +2757,11 @@ function Test-ClashPackageIntegrity {
               # every Windows run reported all 111 originals as tampered.
               $originalRaw = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($originalAbs))
               if ($originalRaw.Length -gt 0 -and $originalRaw[0] -eq [char]0xFEFF) { $originalRaw = $originalRaw.Substring(1) }
+              # Round 24 (F1): the approved original is held to the same canonical text
+              # contract as the wrapper. A bare CR would make the server split a line the
+              # digests treat as one, so it is refused before any length or hash is used.
+              $originalCanonical = Get-ClashCanonicalTextProblem -Text $originalRaw -Label ('the approved original ' + $file)
+              if ($originalCanonical.Length -gt 0) { $problems.Add($originalCanonical) }
               $actualBytes = [long][System.Text.Encoding]::UTF8.GetByteCount($originalRaw.Replace("`r`n", "`n"))
               if ($actualBytes -ne $declaredBytes) {
                 $problems.Add(('{0}: original {1} is {2} byte(s), the manifest declares {3}' -f $label, $file, $actualBytes, $declaredBytes))
@@ -2708,6 +2773,8 @@ function Test-ClashPackageIntegrity {
             $executedText = ''
             try { $executedText = [System.IO.File]::ReadAllText($executedAbs) } catch { $executedText = '' }
             if ($executedText.Length -gt 0) {
+              $executedCanonical = Get-ClashCanonicalTextProblem -Text $executedText -Label ('the executed source ' + $file)
+              if ($executedCanonical.Length -gt 0) { $problems.Add($executedCanonical) }
               $executedText = $executedText.Replace("`r`n", "`n")
               if ($executedText.Length -gt 0 -and $executedText[0] -eq [char]0xFEFF) { $executedText = $executedText.Substring(1) }
               $bodyText = $executedText
@@ -4604,7 +4671,8 @@ $script:ClashSelfTestRequiredCases = @(
   'receiptChainRejectsBrokenAndExemptedLinks',
   'wrapperBodyIsTheApprovedBodyExactly',
   'wrapperEnvelopeRejectsContentOutsideTheTransaction',
-  'completionRejectsUnapprovedAndContradictoryEvidence'
+  'completionRejectsUnapprovedAndContradictoryEvidence',
+  'wrapperEnvelopeRejectsBareCarriageControls'
 )
 
 # Returns a FLAT sequence of case-name strings.

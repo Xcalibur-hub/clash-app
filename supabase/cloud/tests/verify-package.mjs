@@ -36,8 +36,8 @@ const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
-const EXPECTED_CASES = 161;
-const EXPECTED_ASSERTIONS = 529;
+const EXPECTED_CASES = 162;
+const EXPECTED_ASSERTIONS = 531;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -505,7 +505,26 @@ check('every wrapper body is byte-identical to its normalised source', bodyMisma
 // one statement-level begin;, exactly one statement-level commit; that must be the
 // last non-blank line, exactly one ledger insert between them, and only comments or
 // blank lines before begin;.
+function canonicalTextProblem(text, label = 'text') {
+  const bare = /\r(?!\n)/.exec(text);
+  if (bare) {
+    const line = text.slice(0, bare.index).split('\n').length;
+    return `${label} contains a bare carriage return at line ${line}, offset ${bare.index}: `
+      + 'PostgreSQL ends a -- comment at CR as well as LF, so anything after it executes while an '
+      + 'LF-oriented checker still reads one comment line; a CR is only admissible inside a CRLF pair';
+  }
+  const exotic = /[\u0085\u2028\u2029]/.exec(text);
+  if (exotic) {
+    const code = exotic[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+    return `${label} contains the unsupported line separator U+${code} at offset ${exotic.index}`;
+  }
+  return '';
+}
 function wrapperEnvelopeProblems(text) {
+  // Round 24 (F1): the canonical contract first. Splitting on LF and reading the lines
+  // is only sound if no other character can end a line for PostgreSQL.
+  const canonical = canonicalTextProblem(String(text));
+  if (canonical) { return [canonical]; }
   const problems = [];
   const lines = String(text).replace(/\r\n/g, '\n').split('\n');
   const begin = []; const commit = []; const insert = [];
@@ -547,6 +566,29 @@ check('every wrapper envelope has exactly one transaction and nothing executable
     wrapperEnvelopeProblems(sample.replace('\nbegin;\n', '\nbegin;\nbegin;\n')).length > 0);
   check('a comment inside a wrapper header stays accepted',
     wrapperEnvelopeProblems(sample.replace('\nbegin;\n', '\n-- audit note\nbegin;\n')).length === 0);
+  // Round 24 (F1): PostgreSQL ends a -- comment at CR as well as LF. A bare CR between
+  // the comment and a statement therefore hides executable SQL from an LF splitter.
+  check('a bare CR cannot hide a statement behind a line comment',
+    wrapperEnvelopeProblems('-- note\rselect 1;\n' + sample).length > 0);
+  check('a bare CR inside the body is refused as well',
+    wrapperEnvelopeProblems(sample.replace('\nbegin;\n', '\nbegin;\nselect 1;\r-- tail\n')).length > 0);
+  check('the CRLF form of the same wrapper stays accepted',
+    wrapperEnvelopeProblems(sample.replace(/\n/g, '\r\n')).length === 0);
+  check('an unsupported line separator (U+2028) is refused',
+    wrapperEnvelopeProblems('-- note\u2028select 1;\n' + sample).length > 0);
+}
+{
+  // The canonical contract is a property of the PACKAGE, not only of the check: every
+  // committed wrapper and every approved original must be canonical LF text.
+  const canonicalBad = [];
+  for (const e of entries) {
+    for (const p of [join(GEN, e.wrapperPath), join(ROOT, e.sqlPath)]) {
+      const problem = canonicalTextProblem(read(p), p.replace(ROOT + '/', ''));
+      if (problem) { canonicalBad.push(problem); }
+    }
+  }
+  check('every committed wrapper and approved original is canonical LF text',
+    canonicalBad.length === 0, canonicalBad.slice(0, 2).join('; '));
 }
 
 hdr(10, 'PowerShell structural lint (lexer, not quote counting)');
@@ -3088,6 +3130,10 @@ hdr(29, 'systemic validation boundary: RC01-RC11 (Round 20)');
     'mutatedValidatorIsDetectedByTheSuite'];
   check('all fifteen RC01-RC11 cases are executed and in the shared inventory',
     rcCases.every((n) => new RegExp(`^Add-Case '${n}'`, 'm').test(selfTest) && libRaw.includes(`'${n}'`)));
+  check('the Round 24 behaviour mutations preserve every source literal and change only the guard',
+    (selfTest.match(/@\{ name = 'r24-[a-z-]+'; old = ["']/g) || []).length === 4 &&
+    /\$rcMutants\)\.Count -eq 10/.test(selfTest) &&
+    /r24-cr-guard/.test(libRaw) === false);
   check('the mutation harness drops six real checks and requires each to be detected',
     (selfTest.match(/@\{ name = 'rc\d\d-[a-z-]+'; old = "/g) || []).length === 6 &&
     /\$occurrences -ne 1/.test(selfTest) &&
@@ -3138,44 +3184,17 @@ if (pass === 0) {
   console.log('  FAIL  no assertion produced a result');
 }
 
-// ---- Round 23 (C22-H1 / C22-M1): the two admission boundaries --------------
-{
-  const nativeSrc = read(join(CLOUD, 'tools', 'lib', 'clash-native.ps1'));
-  const envelopeFn = (() => {
-    const start = nativeSrc.indexOf('function Get-ClashWrapperEnvelopeProblem');
-    if (start < 0) { return ''; }
-    const next = nativeSrc.indexOf('\nfunction ', start + 1);
-    return nativeSrc.slice(start, next < 0 ? nativeSrc.length : next);
-  })();
-  const planner = (() => {
-    const start = nativeSrc.indexOf('function Test-ClashPackageIntegrity');
-    const next = nativeSrc.indexOf('\nfunction ', start + 1);
-    return start < 0 ? '' : nativeSrc.slice(start, next < 0 ? nativeSrc.length : next);
-  })();
-  const verifier = (() => {
-    const start = nativeSrc.indexOf('function Test-ClashDeploymentEvidence');
-    const next = nativeSrc.indexOf('\nfunction ', start + 1);
-    return start < 0 ? '' : nativeSrc.slice(start, next < 0 ? nativeSrc.length : next);
-  })();
-  check('Round 23: the planner verifies the wrapper envelope, not only the extracted body',
-    /\$envelopeProblem = Get-ClashWrapperEnvelopeProblem -Text \$wrapperNorm/.test(planner) &&
-    /executable content before its begin;/.test(envelopeFn) &&
-    /executable content after its commit;/.test(envelopeFn) &&
-    /statement-level begin; line\(s\)/.test(envelopeFn));
-  check('Round 23: a receipt the protocol does not declare is refused',
-    /function Get-ClashDeclaredReceiptNames/.test(nativeSrc) &&
-    /Test-ClashReceiptInventory -Root \$Root -Approved \$approved/.test(verifier) &&
-    /is not a receipt this protocol declares/.test(nativeSrc) &&
-    /nested inside 03-migrations/.test(nativeSrc));
-  check('Round 23: every receipt must carry the status its type allows',
-    /function Test-ClashReceiptSemantics/.test(nativeSrc) &&
-    /cannot hold a receipt that does not say/.test(nativeSrc) &&
-    /Test-ClashReceiptSemantics -Root \$Root -Approved \$approved/.test(verifier));
-  check('Round 23: applied and claim-ownership receipts are validated, not merely chained',
-    /an applied migration that did not commit cannot support a completed deployment/.test(nativeSrc) &&
-    /no .* exists: releasing the exclusive-writer claim must be PROVEN/.test(nativeSrc) &&
-    /returnedRows/.test(nativeSrc));
-}
+// ---- Round 24 (F2): behaviour, not source text ------------------------------
+// Round 23 asserted that certain strings appear in the adapter. A string can appear
+// while the behaviour it describes is gone, so those four checks are replaced by:
+//   * executable Node checks of the Node validator (bare CR, CRLF, U+2028, package
+//     canonicality) - section 9 above;
+//   * executable Windows PowerShell 5.1 checks of the real PowerShell validators -
+//     cases wrapperEnvelopeRejectsBareCarriageControls and
+//     completionRejectsUnapprovedAndContradictoryEvidence;
+//   * four behaviour mutations (r24-*) whose source literals are preserved and whose
+//     only difference is the guard that refuses the attack - case
+//     mutatedValidatorIsDetectedByTheSuite must detect each of them.
 
 // ---- Round 22: the four root causes, asserted at the source ----------------
 {

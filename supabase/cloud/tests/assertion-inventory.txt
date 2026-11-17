@@ -1,5 +1,7 @@
 111-numbered-wrappers
 112-generated-files-step-0-111
+a-bare-cr-cannot-hide-a-statement-behind-a-line-comment
+a-bare-cr-inside-the-body-is-refused-as-well
 a-broken-bootstrap-exits-nonzero
 a-broken-bootstrap-names-the-failure
 a-broken-bootstrap-prints-no-pass-lines
@@ -49,6 +51,7 @@ an-equal-total-substitution-makes-the-suite-exit-nonzero
 an-executable-statement-before-begin-is-rejected
 an-incomplete-report-stops-with-wording-that-does-not-imply-a-rollback
 an-unhandled-runner-exception-still-writes-a-receipt-and-seals
+an-unsupported-line-separator-u-2028-is-refused
 assertion-inventory-every-assertion-has-a-stable-identifier
 assertion-inventory-no-expected-assertion-is-missing-a-deleted-assertion
 assertion-inventory-no-two-assertions-share-an-identifier
@@ -110,6 +113,7 @@ each-wrapper-ends-with-commit
 each-wrapper-inserts-a-ledger-row
 each-wrapper-opens-with-one-begin
 every-called-function-is-defined-or-a-reviewed-cmdlet
+every-committed-wrapper-and-approved-original-is-canonical-lf-text
 every-defined-helper-is-used-somewhere
 every-inventory-case-is-implemented-in-the-harness
 every-manifest-reader-validates-the-manifest-root-first
@@ -121,7 +125,7 @@ every-wrapper-body-is-byte-identical-to-its-normalised-source
 every-wrapper-envelope-has-exactly-one-transaction-and-nothing-executabl
 evidence-files-are-created-exclusively-createnew
 exactly-111-original-migrations
-exactly-161-declared-case-names
+exactly-162-declared-case-names
 exactly-two-migrations-needed-normalisation
 executed-source-is-the-variant
 five-powershell-tools-plus-the-adapter-library
@@ -347,10 +351,6 @@ round-22-the-applied-receipt-has-one-location-shared-by-writer-and-verif
 round-22-the-chain-covers-every-receipt-and-genesis-is-never-an-interior
 round-22-the-wrapper-body-is-extracted-and-compared-whole-not-searched-f
 round-22-write-evidence-hashes-exactly-the-bytes-it-writes-crlf-normalis
-round-23-a-receipt-the-protocol-does-not-declare-is-refused
-round-23-applied-and-claim-ownership-receipts-are-validated-not-merely-c
-round-23-every-receipt-must-carry-the-status-its-type-allows
-round-23-the-planner-verifies-the-wrapper-envelope-not-only-the-extracte
 run-evidence-is-hash-chained-and-sealed
 runner-executes-step-0-itself-on-every-fresh-run
 sanitises-in-memory-before-encoding
@@ -395,6 +395,7 @@ the-completion-consumer-cannot-skip-its-authoritative-block
 the-completion-consumer-gates-every-authoritative-field-on-its-json-kind
 the-consumer-rejects-an-exception-a-doubt-marker-and-unsealed-evidence
 the-consumer-verifies-every-authoritative-marker-field
+the-crlf-form-of-the-same-wrapper-stays-accepted
 the-declared-contract-equals-the-sql-ord-name-and-expected-text-row-for-
 the-declared-gating-info-counts-are-the-ones-the-sql-renders-19-0-and-6-
 the-defect-is-documented-where-the-fix-is-not-in-the-readme-only
@@ -412,7 +413,7 @@ the-executed-null-fixture-is-the-audit-four-bytes
 the-exit-code-loss-is-asserted-not-assumed
 the-extractor-refuses-a-drifted-region-instead-of-probing-something-else
 the-getter-builds-an-explicit-flat-list
-the-harness-asserts-exactly-161
+the-harness-asserts-exactly-162
 the-harness-builds-its-fixtures-in-the-real-psql-envelope
 the-harness-checks-the-executed-count
 the-harness-executes-the-committed-gate-2-block-and-forbids-a-suffix-cou
@@ -470,6 +471,7 @@ the-renderer-still-emits-19-7-identities-the-contract-is-compared-to-thi
 the-required-evidence-is-declared-once-and-used-by-producer-and-consumer
 the-root-contract-is-declared-once-and-names-every-state
 the-root-states-are-executed-against-a-valid-published-fixture
+the-round-24-behaviour-mutations-preserve-every-source-literal-and-chang
 the-runner-accepts-its-own-run-through-the-consumer-contract
 the-runner-claims-the-writer-before-the-first-wrapper-and-releases-it-af
 the-runner-is-fresh-only-and-refuses-a-non-empty-ledger

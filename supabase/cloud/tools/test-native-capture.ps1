@@ -127,7 +127,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 161
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 162
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -5473,7 +5473,7 @@ Add-Case 'wrapperEnvelopeRejectsContentOutsideTheTransaction' (
   note = 'R23/C22-H1: a statement before begin;, a statement after commit; and a second begin; are refused with every digest coherent, while a comment before begin; and the pristine copy are accepted'
 }
 
-# ---- 161-162: R23/C22-M1 - no unapproved or contradictory receipt ---------
+# ---- 161: R23/C22-M1 + R24/F3 - no unapproved or contradictory receipt -----
 # Adds one receipt to a writer-built run and re-chains the rest, so the graph stays
 # valid and only the inventory/semantic rule can refuse it. This is the audit's own
 # method: a coherent graph of receipts the protocol does not permit.
@@ -5522,6 +5522,10 @@ $m23Attacks = @(
   @{ name = 'undeclared-failed-receipt'; expect = 'is not a receipt this protocol declares|status "FAIL"'; apply = {
       param($root)
       [void](Add-CoherentReceipt -Root $root -Name '04-supplement.json' -After '04-postflight.json' -Fields ([ordered]@{ status = 'FAIL'; note = 'a second opinion the protocol never asked for' }))
+    } },
+  @{ name = 'declared-receipt-without-status'; expect = 'declares no status'; apply = {
+      param($root)
+      [void](Add-CoherentReceipt -Root $root -Name '03b-schema.json' -After '02-preflight.json' -Fields ([ordered]@{ observed = 'ledger=version;claim=claim_key' }))
     } },
   @{ name = 'failed-applied-receipt'; expect = 'status'; apply = {
       param($root)
@@ -5576,8 +5580,89 @@ Add-Case 'completionRejectsUnapprovedAndContradictoryEvidence' (
   positiveControl = $(if ($null -ne $m23Positive) { [string]$m23Positive.ok } else { 'threw' })
   attacks         = (@($m23Results) -join ' ')
   missed          = (@($m23Missed) -join ',')
-  note = 'R23/C22-M1: a nested unapproved migration receipt, an undeclared PASS receipt, an undeclared FAIL receipt, a FAIL applied receipt and a failed claim-ownership record are all refused, with valid graph links'
+  note = 'R23/C22-M1 + R24/F3: a nested unapproved migration receipt, an undeclared PASS receipt, an undeclared FAIL receipt, a declared receipt with no status, a FAIL applied receipt and a failed claim-ownership record are all refused, with valid graph links'
 }
+
+# ---- 162: R24/F1 - the canonical text contract ------------------------------
+# PostgreSQL ends a -- comment at CR as well as LF, but every checker here splits on
+# LF. `-- note<CR>select 1;` is therefore one comment line to the checker and a
+# comment plus a statement to the server: the Round 23 envelope refused executable
+# text before begin; and after commit;, and still admitted this. Each control below
+# keeps every digest coherent (wrapper, manifest entry, all checksums).
+$c24Missed = @()
+$c24Results = @()
+$c24Positive = $null
+$c24Root = New-PackageTreeCopy -Label 'r24cr' -CloudRoot $packageRoot
+try { $c24Positive = Test-ClashPackageIntegrity -RepoRoot $c24Root } catch { $c24Positive = $null }
+Remove-Item -LiteralPath $c24Root -Recurse -Force -ErrorAction SilentlyContinue
+if (-not (($null -ne $c24Positive) -and $c24Positive.ok)) { $c24Missed += 'positive-control' }
+
+foreach ($attack in @(
+    @{ name = 'bare-cr-comment-injection'; expect = 'bare carriage return'; accept = $false;
+       mutate = { param($t) ("-- audit note`rselect 1;`n" + $t) } },
+    @{ name = 'bare-cr-inside-body'; expect = 'bare carriage return'; accept = $false;
+       mutate = { param($t) $t.Replace("`nbegin;`n", "`nbegin;`nselect 0;`r-- tail`n") } },
+    @{ name = 'bare-cr-after-commit'; expect = 'bare carriage return'; accept = $false;
+       mutate = { param($t) ($t.TrimEnd() + "`rselect 2;`n") } },
+    @{ name = 'exotic-line-separator'; expect = 'unsupported line separator'; accept = $false;
+       mutate = { param($t) ("-- note" + [char]0x2028 + "select 1;`n" + $t) } },
+    @{ name = 'lf-control'; expect = ''; accept = $true;
+       mutate = { param($t) $t } },
+    @{ name = 'crlf-control'; expect = ''; accept = $true;
+       mutate = { param($t) $t.Replace("`n", "`r`n") } })) {
+  $pkg = New-PackageTreeCopy -Label ('r24-' + [string]$attack.name) -CloudRoot $packageRoot
+  try {
+    $manifestFile = Join-Path $pkg 'supabase\cloud\manifest.json'
+    $doc = [System.IO.File]::ReadAllText($manifestFile) | ConvertFrom-Json
+    $entry = $doc.entries[0]
+    $wrapperRel = 'supabase/cloud/generated/' + [string]$entry.wrapperPath
+    $wrapperAbs = Join-Path $pkg ($wrapperRel.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+    $text = [System.IO.File]::ReadAllText($wrapperAbs).Replace("`r`n", "`n")
+    $text = & $attack.mutate $text
+    [void](Set-PackageFileAndRebind -RepoRoot $pkg -Relative $wrapperRel -Text $text)
+    $doc = [System.IO.File]::ReadAllText($manifestFile) | ConvertFrom-Json
+    $doc.entries[0].wrapperSha256 = Get-NormalizedSha256 -Path $wrapperAbs
+    [System.IO.File]::WriteAllText($manifestFile, ($doc | ConvertTo-Json -Depth 8))
+    [void](Set-PackageFileAndRebind -RepoRoot $pkg -Relative 'supabase/cloud/manifest.json' -Text ([System.IO.File]::ReadAllText($manifestFile)))
+    $verdict = $null
+    try { $verdict = Test-ClashPackageIntegrity -RepoRoot $pkg } catch { $verdict = $null }
+    $textOut = ''
+    if ($null -ne $verdict) { $textOut = (@($verdict.problems) -join ' ') }
+    $accepted = ($null -ne $verdict) -and $verdict.ok
+    $c24Results += ('{0}={1}' -f $attack.name, $accepted)
+    if ([bool]$attack.accept) {
+      if (-not $accepted) { $c24Missed += ([string]$attack.name + '[refused]') }
+    }
+    else {
+      if ($accepted -or ($textOut -notmatch [regex]::Escape([string]$attack.expect))) { $c24Missed += [string]$attack.name }
+    }
+  }
+  catch { $c24Missed += ([string]$attack.name + '[threw]') }
+  finally { Remove-Item -LiteralPath $pkg -Recurse -Force -ErrorAction SilentlyContinue }
+}
+# The writer enforces the same contract: evidence text with a bare CR is refused
+# before it can reach disk, so a run cannot manufacture evidence the server would
+# split differently from the checker.
+$c24WriterPath = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-cr-writer-' + [guid]::NewGuid().ToString('N').Substring(0, 12) + '.txt')
+$c24WriterThrew = ''
+$c24WriterWritten = $false
+try { [void](Write-Evidence -Path $c24WriterPath -Text ("ok`rbad`n")) } catch { $c24WriterThrew = [string]$_.Exception.Message }
+$c24WriterWritten = Test-Path -LiteralPath $c24WriterPath
+$c24WriterAcceptedLf = $false
+try { [void](Write-Evidence -Path $c24WriterPath -Text ("ok`nbad`n")); $c24WriterAcceptedLf = (Test-Path -LiteralPath $c24WriterPath) } catch { $c24WriterAcceptedLf = $false }
+Add-Case 'wrapperEnvelopeRejectsBareCarriageControls' (
+  @($c24Missed).Count -eq 0 -and
+  @($c24Results).Count -eq 6 -and
+  $c24WriterThrew -match 'bare carriage return' -and
+  (-not $c24WriterWritten) -and
+  $c24WriterAcceptedLf) @{
+  positiveControl = $(if ($null -ne $c24Positive) { [string]$c24Positive.ok } else { 'threw' })
+  attacks         = (@($c24Results) -join ' ')
+  missed          = (@($c24Missed) -join ',')
+  writerRefusal   = $c24WriterThrew
+  note = 'R24/F1: a bare CR before begin;, inside the body and after commit; is refused, as is U+2028; LF and CRLF forms are accepted; the writer refuses bare CR before writing anything'
+}
+if (Test-Path -LiteralPath $c24WriterPath) { Remove-Item -LiteralPath $c24WriterPath -Force -ErrorAction SilentlyContinue }
 
 # ---- 149: the validators themselves - removed checks must be DETECTED -------
 # Mutation testing: each mutant drops ONE check from a COPY of the adapter. The
@@ -5591,6 +5676,15 @@ $rcMutants = @(
   @{ name = 'rc03-membership'; old = "if (-not `$sumMap.ContainsKey(`$member)) {"; new = 'if ($false -and $false) {' },
   @{ name = 'rc05-actual-cell'; old = "if (`$Actual -cne `$Expected) {"; new = 'if ($false) {' },
   @{ name = 'rc06-parent-segment'; old = "if (`$segment -ceq '..') {"; new = 'if ($false) {' }
+  # ---- Round 24 (F2): behaviour mutations that preserve every source literal ----
+  # Each one keeps the message strings exactly as shipped and changes only the guard,
+  # so a test that merely looked for the text would still pass while the defence was
+  # gone. The harness asks the same question the suite asks and requires the mutant to
+  # ACCEPT the input the pristine validator refuses.
+  @{ name = 'r24-cr-guard'; old = "if (`$canonicalProblem.Length -gt 0) { return `$canonicalProblem }"; new = 'if ($false) { return $canonicalProblem }' }
+  @{ name = 'r24-prefix-guard'; old = "if (`$line -match '^[ \t]*--') { continue }"; new = 'if ($true) { continue }' }
+  @{ name = 'r24-inventory-guard'; old = 'if ($declared -ccontains $rel) { continue }'; new = 'if ($true) { continue }' }
+  @{ name = 'r24-applied-status'; old = "if ((`$appliedStatus.Length -gt 0) -and (`$appliedStatus -cne 'PASS')) {"; new = 'if ($false) {' }
 )
 $rcMutationRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-mutants-' + [guid]::NewGuid().ToString('N').Substring(0, 12))
 New-Item -ItemType Directory -Path $rcMutationRoot -Force | Out-Null
@@ -5652,6 +5746,47 @@ foreach ($mutant in $rcMutants) {
         $problem = Get-ClashReportActualProblem -Expected '2' -Actual 'X' -IsInfo $false
         return ([string]$problem).Length -eq 0
       }
+      if ($Name -ceq 'r24-cr-guard' -or $Name -ceq 'r24-prefix-guard') {
+        # A minimal but structurally real wrapper: one transaction, the ledger insert
+        # and commit;, with a comment-only header. The attack text is the F1 injection
+        # (a bare CR behind a comment) or an executable prefix line.
+        $probeWrapper = "-- header`nbegin;`nselect 1;`ninsert into supabase_migrations.schema_migrations (version, name, statements, created_by)`nvalues (`n  '20260101000001',`n  'probe_1',`n  array['sha256:" + ('a' * 64) + "'],`n  'clash-cloud-wrapper-v1'`n);`n`ncommit;`n"
+        $pristine = Get-ClashWrapperEnvelopeProblem -Text $probeWrapper
+        if ($pristine.Length -ne 0) { throw ('the probe wrapper is not admissible under the pristine validator: ' + $pristine) }
+        if ($Name -ceq 'r24-cr-guard') {
+          $attacked = "-- audit note`rselect 1;`n" + $probeWrapper
+        }
+        else {
+          $attacked = "select 1;`n" + $probeWrapper
+        }
+        return ([string](Get-ClashWrapperEnvelopeProblem -Text $attacked)).Length -eq 0
+      }
+      if ($Name -ceq 'r24-inventory-guard') {
+        $probeRoot = New-FinalizationRun
+        try {
+          $before = @(Test-ClashReceiptInventory -Root $probeRoot -Approved $script:probeApproved)
+          if ($before.Count -ne 0) { throw ('the fixture run already has inventory problems: ' + ($before -join '; ')) }
+          [void](Add-CoherentReceipt -Root $probeRoot -Name '04-unexpected.json' -After '04-postflight.json' -Fields ([ordered]@{ status = 'PASS' }))
+          $after = @(Test-ClashReceiptInventory -Root $probeRoot -Approved $script:probeApproved)
+          return ($after.Count -eq 0)
+        }
+        finally { Remove-FinalizationRun -Root $probeRoot }
+      }
+      if ($Name -ceq 'r24-applied-status') {
+        $probeRoot = New-FinalizationRun
+        try {
+          $target = '002-20260101000002-applied.json'
+          $probeChain = Get-ClashReceiptChain -Root $probeRoot -Exclude @('EVIDENCE-MANIFEST.json', '06-complete-unverified.json')
+          $probeOrder = @($probeChain.order)
+          $probeAt = [array]::IndexOf($probeOrder, $target)
+          if ($probeAt -lt 0) { throw 'the applied receipt is not in the fixture chain' }
+          [void](Set-JsonScalarField -Path (Join-Path $probeRoot $target) -Name 'status' -RawJson '"FAIL"')
+          [void](Repair-ReceiptChain -Root $probeRoot -Order $probeOrder -From $probeAt)
+          $probeEvidence = Test-ClashDeploymentEvidence -Root $probeRoot -Approved $script:probeApproved
+          return [bool]$probeEvidence.ok
+        }
+        finally { Remove-FinalizationRun -Root $probeRoot }
+      }
       if ($Name -ceq 'rc06-parent-segment') {
         # A path whose only defect is an unnormalised parent segment: it RESOLVES
         # inside the root, so containment alone accepts it. Only the '..' rule
@@ -5671,12 +5806,12 @@ foreach ($mutant in $rcMutants) {
 Remove-Item -LiteralPath $rcMutationRoot -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $rc03FixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
 Add-Case 'mutatedValidatorIsDetectedByTheSuite' (
-  @($rcMutants).Count -eq 6 -and
+  @($rcMutants).Count -eq 10 -and
   @($rcMutantMissed).Count -eq 0 -and
-  @($rcMutantResults).Count -eq 6) @{
+  @($rcMutantResults).Count -eq 10) @{
   results = (@($rcMutantResults) -join ' ')
   missed = (@($rcMutantMissed) -join ' ')
-  note = 'each mutant drops one check; if the suite still passed, that check would be decorative'
+  note = 'each mutant drops one check; if the suite still passed, that check would be decorative (six RC01-RC11 guards and four Round 24 admission guards)'
 }
 
 # ===========================================================================
