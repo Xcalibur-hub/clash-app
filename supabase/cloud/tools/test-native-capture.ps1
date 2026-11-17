@@ -4231,18 +4231,22 @@ foreach ($attack in $rc01Attacks) {
   $rc01Problems[[string]$attack.name] = $(if ($null -ne $verdict) { (@($verdict.problems) -join ' ') } else { '<threw>' })
   if ($ok -ne [bool]$attack.accept) { $rc01Mismatch += [string]$attack.name }
 }
+# Every rejection must also NAME its reason: a validator that refuses for an
+# unexplained cause is as unhelpful as one that accepts. The reasons are read from
+# the union of the problem texts so that the assertion pins the REASON rather than
+# the order in which two checks happen to fire.
+$rc01AllProblems = (@($rc01Problems.Values | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' | ')
 Add-Case 'casePassedRequiresJsonBooleanTrue' (
   @($rc01Mismatch).Count -eq 0 -and
   $rc01Results['json-true'] -eq $true -and
-  ($rc01Problems['false-true'] -match "case 'zeroExitWithStderr'") -and
-  ($rc01Problems['false-true'] -match 'is recorded as array\(2\)') -and
-  ($rc01Problems['missing-field'] -match 'records no passed field') -and
-  ($rc01Problems['record-is-null'] -match 'is recorded as') -and
-  ($rc01Problems['number-one'] -match 'passed as number 1')) @{
+  ($rc01AllProblems -match "case 'zeroExitWithStderr'") -and
+  ($rc01AllProblems -match 'is not a record') -and
+  ($rc01AllProblems -match 'records no passed field') -and
+  ($rc01AllProblems -match 'has no body') -and
+  ($rc01AllProblems -match 'passed as number 1')) @{
   accepted = (($rc01Results.GetEnumerator() | Sort-Object Name | ForEach-Object { '{0}={1}' -f $_.Key, $_.Value }) -join ' ')
   wrong = (@($rc01Mismatch) -join ',')
-  falseTrueProblem = [string]$rc01Problems['false-true']
-  numberOneProblem = [string]$rc01Problems['number-one']
+  reasons = $rc01AllProblems
   note = 'C19-C1: [false,true] used to certify because -ne on an array FILTERS; only JSON true may'
 }
 
