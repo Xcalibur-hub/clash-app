@@ -380,10 +380,60 @@ systemic rather than another layer:
    parent segment), and requires the suite to reject every mutant. A test that
    passes because it tests nothing fails there.
 
-Still unproven after this round: the validators prove *files*, not signatures;
-concurrency and crash-consistency are not exercised; the seal hashes
-text-normalised content and not raw bytes; `deploy.ps1` has still never run
-against a database.
+### 1r-bis. Verification record - green on Windows PowerShell 5.1
+
+The matrix above was written before the runtime ran it, and the runtime then found
+nine defects **in the repair**. They are listed because they are the evidence that
+the eleven classes - and not merely the thirty-two reproductions - were addressed:
+every one of them is a second implementation, a second answer or an unstated
+dependency, which is exactly what the classes were about.
+
+Workflow run `44034780269` on `3bffd1645e4663b8331e8f5de1699b92b35f2945`,
+Windows PowerShell `5.1.20348.5773`, 14 of 14 steps green: 150 of 150 native
+cases, 496 of 496 offline assertions in 29 sections, manifest `PASS` with 111
+entries and 240 checksummed files, adapter `5.2.0`.
+
+| # | Found by | Class | What it was | Fix |
+|---|---|---|---|---|
+| 1 | case 144 (bind error) | RC11 | `$root = Get-ClashJsonRoot …` assigned a *record* to a typed `[string]$Root` parameter; the record stringified to `System.Collections.Hashtable` and every field read empty | the record keeps its own name (`$docRoot`, `$migRoot`); a suite assertion now fails on any `$root = Get-ClashJsonRoot` assignment |
+| 2 | case 91 (bind error) | RC01/RC10 | `if (Test-ClashJsonKind … -and $timedOut …)` handed `-and` to the command as a parameter, so the check never ran and the case aborted | every operand of `-and`/`-or` is parenthesised; a suite assertion fails on any command used as a bare operand |
+| 3 | case 76 (seal miss) | RC07 | seal entries kept the platform separator (`03-migrations\001-…`), so the required evidence `03-migrations/001-…` matched nothing - the same base-name/relative-path confusion, in the sealer | seal entry paths are normalised to `/`, the form every other name in the package uses |
+| 4 | case 76 (bind error) | RC06 | `Resolve-ClashContainedPath -Relative ''` raised a *binding* error: an empty path is a verdict to be reported, not a call to be refused | `[AllowEmptyString()]`; the empty path returns its problem like every other |
+| 5 | case 76 | RC02 | the finalization intent recorded the **caller's** required-evidence list, so a caller with six names and a run with three migration receipts published an intent the consumer had to reject: no run could ever be finalized | the declared set is derived from the run; a caller's names widen the check and are included, never substituted |
+| 6 | case 76 | RC07 | the consumer compared each declared evidence name with `$_.Name`, so every migration receipt looked absent | the same relative-path enumeration as the seal |
+| 7 | case 83 | RC10 | the tail probe did not define `$entries`, which the committed region reads; under StrictMode the region aborted before announcing anything | the probe defines every variable the region reads |
+| 8 | case 150 | - | the rc06 mutant was judged on `..\escape.txt`, which the containment check refuses as well, so deleting the parent-segment rule went **undetected**: the mutation test was decorative for that check | the fixture is `sub\..\ok.txt`, which resolves *inside* the root and is refused only by the `..` rule |
+| 9 | case 135 | RC01 | the assertion pinned the wording of a branch that does not fire for a null record | the case asserts the four distinct *reasons* a record is refused, read from the union of the problem texts |
+
+Three notes on what a green run does and does not mean:
+
+1. It means the runtime layer is now part of the proof. The PowerShell 5.1 parser
+   gate, the 150 executed native cases and the 496 offline assertions all ran on
+   the declared runtime, in that order, and the receipts were verified by the
+   package's own gates rather than by the workflow.
+2. It does not mean the database was exercised: `deploy.ps1` has still never run
+   against a live project. `psql` behaviour, the Supabase CLI, DNS/TLS and
+   IPv4/IPv6 reachability are **NOT ASSESSED**.
+3. Neither does it mean the evidence is trustworthy against a hostile writer (see
+   residual risks).
+
+**Residual risks (unchanged, carried):**
+
+- duplicate JSON keys collapse at parse time - `ConvertFrom-Json` keeps the last
+  value, so a marker, seal or intent that names a key twice is indistinguishable
+  from one that names it correctly;
+- no signatures: a privileged writer can replace a *consistent* artifact set, and
+  the seal proves consistency, not authorship;
+- crash and concurrency consistency are not exercised - the commit protocol is an
+  exclusive create followed by a rename, proven against one process on one host;
+- the seal hashes text-normalised content (LF), not raw bytes, so line-ending
+  differences are invisible to it;
+- the adapter's syntax evidence is the package lexer plus a tree-sitter parse, not
+  `powershell -File` on every construct; the runtime cases are what close that gap
+  for the paths they execute;
+- strict framing rejects unmodelled `psql` output: a new client version that
+  changes the envelope stops the run rather than being misread, which is the
+  intended trade.
 
 ## 2. Layout
 
