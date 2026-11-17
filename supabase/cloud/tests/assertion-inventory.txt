@@ -279,6 +279,8 @@ r2-no-resume-machinery-survives-in-the-runner
 r2-rollback-md-no-longer-promises-a-resume
 r2-the-ledger-gate-runs-before-the-first-wrapper-can-execute
 r2-the-runner-is-fresh-only-and-stops-on-any-non-empty-ledger
+r20-h1-the-default-approved-inventory-is-the-manifest-beside-the-adapter
+r20-h1-the-publisher-certifies-its-own-output-against-the-approved-packa
 r3-mirror-absence-after-a-connection-loss-timeout-or-partial-capture-is-
 r3-mirror-only-a-script-error-with-a-successful-read-back-proves-a-rollb
 r3-no-unconditional-rolled-back-proven-assignment-remains

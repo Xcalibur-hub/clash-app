@@ -2271,7 +2271,11 @@ function Get-ClashApprovedInventory {
 
   $record = @{ ok = $false; problems = @(); entries = @(); count = 0; projectRef = ''; sourceCommit = ''; manifestSha256 = ''; path = '' }
   if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
-    $ManifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'manifest.json'
+    # $PSScriptRoot is <cloud>/tools/lib, so the manifest beside the adapter is TWO
+    # levels up. One level up is <cloud>/tools, which has no manifest - a default
+    # that made every implicit call report 'the approved package manifest is
+    # missing' while the real manifest sat one directory higher.
+    $ManifestPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'manifest.json'
   }
   $record['path'] = $ManifestPath
   if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
@@ -2727,7 +2731,12 @@ function Publish-ClashCompletion {
   # The publisher accepts its own output only if the CONSUMER accepts it. A
   # marker the consumer would reject is never reported as a successful
   # finalization, whatever the publisher believes it wrote.
-  $selfCheck = Test-ClashRunCompletion -RunPath $Root
+  # Round 21 (R20-H1): the publisher's self-check runs against the APPROVED package
+  # it was told to deploy. Without -Approved the consumer fell back to the manifest
+  # beside the adapter and refused runs whose approved inventory was supplied by the
+  # caller - a producer that certifies its own output against a different contract
+  # than the one it was invoked with is exactly the hole this round closes.
+  $selfCheck = Test-ClashRunCompletion -RunPath $Root -Approved $Approved
   if (-not $selfCheck.ok) {
     $shown = @($selfCheck.problems)
     if ($shown.Count -gt 6) { $shown = @($shown[0..5]) }

@@ -37,7 +37,7 @@ const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
 const EXPECTED_CASES = 156;
-const EXPECTED_ASSERTIONS = 512;
+const EXPECTED_ASSERTIONS = 514;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -2648,6 +2648,11 @@ hdr(26, 'completion finalization - one commit point, no circular seal (Round 16 
       ].map(at);
       return seq.every((v, i) => v > 0 && (i === 0 || v > seq[i - 1]));
     })());
+  check('R20-H1: the publisher certifies its own output against the approved package it was given',
+    libCode.includes('$selfCheck = Test-ClashRunCompletion -RunPath $Root -Approved $Approved') &&
+    libCode.includes('Test-ClashDeploymentEvidence -Root $Root -ExpectedMigrationCount $ExpectedMigrationCount -Approved $Approved'));
+  check('R20-H1: the default approved inventory is the manifest beside the adapter, not one level short',
+    /\$ManifestPath = Join-Path \(Split-Path -Parent \(Split-Path -Parent \$PSScriptRoot\)\) 'manifest\.json'/.test(libCode));
   check('a finalised run is never re-finalised and a doubt marker blocks publication',
     /already exists\. A finalised run is never re-finalised/.test(libCode) &&
     /a previous finalization could not verify what it published/.test(libCode) &&
