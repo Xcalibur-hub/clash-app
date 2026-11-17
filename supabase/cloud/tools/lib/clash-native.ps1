@@ -2504,6 +2504,10 @@ function Test-ClashRunCompletion {
           $declared = @($declaredRaw)
           if ($declared.Count -eq 0) { $problems.Add('the sealed intent declares no required evidence') }
           $seenDeclared = @{}
+          # A declared entry is a RELATIVE path ('03-migrations/001-...json'), not a
+          # leaf name: comparing it with $_.Name made every migration receipt look
+          # absent and refused every finalization (the RC07 class, in the consumer).
+          $runFiles = @(Get-ClashSealedFileCandidates -Root $RunPath)
           foreach ($entry in $declared) {
             if (-not ($entry -is [string]) -or [string]::IsNullOrWhiteSpace([string]$entry)) {
               $problems.Add(('the sealed intent declares a required evidence entry that is not a name: {0}' -f (Format-ClashFieldValue $entry)))
@@ -2514,7 +2518,7 @@ function Test-ClashRunCompletion {
               continue
             }
             $seenDeclared[[string]$entry] = $true
-            $hits = @(Get-ChildItem -LiteralPath $RunPath -Recurse -File | Where-Object { $_.Name -ceq [string]$entry }).Count
+            $hits = @($runFiles | Where-Object { [string]$_['relative'] -ceq [string]$entry }).Count
             if ($hits -lt 1) { $problems.Add(('the sealed intent requires {0} but no such file exists in the run' -f $entry)) }
           }
           $sealEntriesField = Get-ClashJsonField -Object $sealDocument -Name 'files'
