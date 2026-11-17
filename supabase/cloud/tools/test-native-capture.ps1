@@ -73,7 +73,10 @@ trap {
         adapterSha256      = $script:adapterShaFinal
         casesExecuted      = @($script:cases.Keys).Count
         cases              = $script:cases
-        problems           = @(('unexpected exception: ' + $message), 'no PASS may be inferred from this receipt')
+        # What was ALREADY discovered travels with the exception: a refusal that is
+        # only visible in a job log is invisible here, because the log host is not
+        # reachable from every network and only annotations are.
+        problems           = @(@(('unexpected exception: ' + $message)) + @($script:problems | Select-Object -First 6) + @('no PASS may be inferred from this receipt'))
         exception          = $message
       }
       $target = $script:outFileFinal
@@ -2590,6 +2593,9 @@ function Set-CompletionMarkerField {
   param([string]$Root, [hashtable]$Mutation)
 
   $path = Join-Path $Root '06-complete.json'
+  # A refused finalization publishes no marker. Mutating one that does not exist is
+  # a recorded case failure, never an unhandled exception that aborts the harness.
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return '' }
   $doc  = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
   foreach ($key in @($Mutation.Keys)) {
     $parts = ([string]$key) -split '\.'
@@ -2826,6 +2832,9 @@ function Invoke-CompletionTailProbe {
 # ---- 76: the success path publishes a marker that an independent reader accepts
 $finRoot  = New-FinalizationRun
 $finProbe = Invoke-CompletionProbe -Root $finRoot
+if ($null -ne $finProbe -and (-not $finProbe.ok) -and ([string]$finProbe.threw -ne '')) {
+  $script:problems += ('the completion probe refused: ' + [string]$finProbe.threw)
+}
 $finDoc   = Read-RunDocument -Path (Join-Path $finRoot '06-complete.json')
 $finSeal  = Read-RunDocument -Path (Join-Path $finRoot 'EVIDENCE-MANIFEST.json')
 $finCheck = $null
