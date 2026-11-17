@@ -2079,8 +2079,10 @@ function Publish-ClashCompletion {
   }
   $evidence = Test-ClashDeploymentEvidence -Root $Root -ExpectedMigrationCount $ExpectedMigrationCount
   if (-not $evidence.ok) {
-    $evidenceSample = @($evidence.problems)
-    if ($evidenceSample.Count -gt 6) { $evidenceSample = @($evidenceSample[0..5]) }
+    # Every problem is rendered with its length, so an empty entry (a null that
+    # reached the list) is visible as such instead of as a blank between separators.
+    $evidenceSample = @(@($evidence.problems) | Select-Object -First 12 | ForEach-Object {
+        '#{0}#{1}' -f ([string]$_).Length, [string]$_ })
     throw ('completion refused: the deployment evidence does not satisfy the contract ({0} problem(s)): {1}. Nothing was published.' -f @($evidence.problems).Count, ($evidenceSample -join '; '))
   }
 
