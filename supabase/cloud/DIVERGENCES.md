@@ -155,11 +155,21 @@ receipts are hash-chained and sealed. `deploy.ps1` also refuses to run without a
 PASS adapter self-test receipt bound to the adapter's sha256, because the adapter's
 runtime behaviour cannot be proven by static analysis.
 
-Connection policy (D-5b): `-ProjectRef` is mandatory and the host must belong to
-it (`db.<ref>.supabase.co:5432`, or `aws-…pooler.supabase.com:6543` with user
-`postgres.<ref>`); `PGSSLMODE` is forced to `verify-full`, a CA certificate is
-mandatory, and `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because each can
-redirect the connection behind the approved host name.
+Connection policy (D-5b, corrected in Round 25): `-ProjectRef` is mandatory and the
+host must belong to it - `db.<ref>.supabase.co:5432`, or the shared pooler
+`aws-…pooler.supabase.com` with user `postgres.<ref>`. The pooler port selects the
+pooling mode, so 5432 is **session** mode and 6543 is **transaction** mode, the
+latter accepted only with `-AllowTransactionMode`. Through Round 24 the policy
+accepted only 6543 and the README called it "the session pooler", which inverted
+the contract: the endpoint with session semantics was refused and the endpoint the
+package's own rationale warned about was the only one permitted. The pooler host
+cannot be derived from the project ref (its cluster index is not part of the region
+name), so it must be confirmed from the project's Connect dialog with
+`-ConfirmedPoolerHost`; the policy checks the shape and the confirmation binds it to
+what Supabase actually issued. `PGSSLMODE` is forced to `verify-full`, a CA
+certificate is mandatory, the psql client must report PostgreSQL 17, and
+`PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because each can redirect the
+connection behind the approved host name.
 
 ---
 

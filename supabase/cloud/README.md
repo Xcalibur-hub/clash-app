@@ -28,7 +28,7 @@ Source commit: **`9569391e0950956682c522d2d118bc8a711169d2`**
 | **F6** fail-open gates | gates returned rows a caller could ignore; name-only checks | Every gate ends with a `DO` block that **RAISEs** on any FAIL (exit non-zero under `ON_ERROR_STOP`); verification compares **per-migration sha256** and **exact RPC signatures** |
 | **F7** credentials | connection URL passed as an argument | No credential in argv; connection comes from the child environment; every artefact passes a redactor before it is created (§1b) |
 | **F8** unsafe recovery | "just re-run the backfill" | No backfill, no retry, **no resume** (Round 8). The runner is fresh-only: it requires an empty ledger and stops on a gap, a mismatch, an extra row, a malformed row or any recorded version at all |
-| **F9** no tests | none | `tests/verify-package.mjs`: **531 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
+| **F9** no tests | none | `tests/verify-package.mjs`: **540 offline assertions** incl. failure injection, a PowerShell lexer and function/parameter resolution (§1b) |
 
 ## 1b. Round 2 corrections (independent re-audit of `68246b5`)
 
@@ -42,8 +42,8 @@ test layers unvalidated. Its source findings are addressed here.
 | **F4** — "Wrapper transaction rolled back; ledger unchanged" asserted for *every* nonzero exit | Outcomes are classified from evidence, never narrated: `COMMITTED` (row present with the expected token), `ROLLED_BACK_PROVEN` (Round 8: psql exit 3 **and** a fresh read-back showing the row absent), `LEDGER_MISMATCH`, `UNKNOWN` (connection loss, timeout, incomplete capture, unreadable probe) | `deploy.ps1` gate 4, `Test-RollbackProvable` |
 | **F5** — `$actualSha` computed and never compared before execution | `manifest.json` now carries `wrapperSha256` per entry. The runner compares the bytes on disk with it **immediately before** spawning psql, cross-checks the same value against `checksums.sha256`, and verifies **all 241 files** plus the 111 originals and executed sources before the first database write | `build-package.mjs`, `deploy.ps1` gates 1 and 4 |
 | **F7** — raw stderr written to the final evidence path, then rewritten redacted; `WriteAllText` overwrites; `Write-Stop` printed an unsanitised reason | Output never reaches disk raw: `Write-Evidence` sanitises **then** encodes, and creates every file with `FileMode::CreateNew` (an existing path is an error, never an overwrite). STOP stores and prints the same sanitised string. Receipts are hash-chained (`prevReceiptSha`) and the run is sealed (`EVIDENCE-MANIFEST.json`) | `clash-native.ps1`, `deploy.ps1` |
-| **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or `aws-…pooler.supabase.com` (port 6543, user `postgres.<ref>`); `PGSSLMODE` is forced to **verify-full** and a **CA certificate is mandatory**; `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name | `Resolve-ExecutionPolicy` |
-| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 531 assertions (467 at Round 19), including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
+| **F7** — arbitrary host/port accepted, any `PGSSLMODE` retained, `require` default | `-ProjectRef` is mandatory; the host must be `db.<ref>.supabase.co` (port 5432) or the shared pooler `aws-…pooler.supabase.com` (port **5432** = session mode, or **6543** = transaction mode only with `-AllowTransactionMode`) with user `postgres.<ref>`; a pooler host cannot be derived from the project ref, so it must also be confirmed with `-ConfirmedPoolerHost` from the project's Connect dialog; `PGSSLMODE` is forced to **verify-full**, a **CA certificate is mandatory**, the client must be PostgreSQL **17**, and `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` are refused because they can redirect the connection behind the approved name (§4.2) | `Resolve-ExecutionPolicy` |
+| **Round 2** — 0 of 67 package tests observed; wrappers/SQL unvalidated | The suite is now 540 assertions (531 before Round 25), including a real PowerShell lexer (comments/here-strings/strings removed, then bracket balance) and two-direction fixtures proving the lexer distinguishes prose from code. **Still offline only** — it proves the package, not the hosted database | `tests/verify-package.mjs` |
 
 ### 1c. Round 3 (audit of `68246b5`) - the regression, executed
 
@@ -201,7 +201,7 @@ deployment. The psql child environment therefore pins `LC_ALL=C` (alongside the
 `-X` that already ignores `~/.psqlrc`), and the parser's environment is part of
 the contract rather than an accident of the host.
 
-Adapter `5.1.0` at that time (was `4.7.0`; now `5.6.0`, native self-test 135 -> 162 cases, §1r): completion is
+Adapter `5.1.0` at that time (was `4.7.0`; now `5.7.0`, native self-test 135 -> 173 cases, §1r): completion is
 now a commit protocol rather than a receipt the runner wrote before sealing (see
 §1n), and sixteen cases execute it against real directories - the success path,
 a refused seal publication, an injected seal write failure, the committed
@@ -392,7 +392,9 @@ Workflow run `44034780269` on `3bffd1645e4663b8331e8f5de1699b92b35f2945` (the
 code) and run `44035545230` on `0dfe28af9b5f543eb831798eb680621ae417194f` (this
 document), Windows PowerShell `5.1.20348.5773`, 14 of 14 steps green in both:
 162 of 162 native cases, 531 of 531 offline assertions in 29 sections, manifest
-`PASS` with 111 entries and 241 checksummed files, adapter `5.6.0`.
+`PASS` with 111 entries and 241 checksummed files, adapter `5.6.0`. (Round 25 moved
+the live figures to 173 native cases, 539 offline assertions and adapter `5.7.0`;
+this record stays as it was run.)
 
 Every push re-verifies this text rather than trusting the citation: step 10
 refuses a dirty tree and any checksummed file that disagrees with
@@ -462,8 +464,8 @@ tools/build-package.mjs        regenerates every artefact deterministically
 tools/check-manifest.ps1       offline integrity proof (originals, wrappers, checksums, git)
 tools/check-ledger.ps1         READ-ONLY ledger audit (SELECT only)
 tools/deploy.ps1               sequential runner, stop-on-first-failure, fresh-only (no resume)
-tests/verify-package.mjs       offline test suite (531 assertions)
-tests/assertion-inventory.txt  the 531 assertion identifiers that must run (Round 21,
+tests/verify-package.mjs       offline test suite (540 assertions)
+tests/assertion-inventory.txt  the 540 assertion identifiers that must run (Round 21,
                                R20-M3): a count is not an inventory, so a deleted,
                                duplicated, substituted or skipped assertion is caught
                                at equal totals - by the suite and, by digest, by
@@ -506,6 +508,36 @@ $env:PGPASSWORD = '<postgres password>'      # or: $env:PGPASSFILE = 'C:\secure\
 
 Do **not** set `PGSSLMODE`: the runner forces `verify-full` and records the value
 it overrode. Download the Supabase CA (`prod-ca-2021.crt`) and pass its path.
+
+The client is pinned: `psql --version` must report PostgreSQL **17**, or the run is
+refused before any evidence is written. Pass `-Psql` with the full path rather than
+relying on `PATH` - several installers put an older `psql` (pgAdmin ships its own
+libpq) ahead of the real one:
+
+```powershell
+.\deploy.ps1 ... -Psql 'C:\Program Files\PostgreSQL\17\bin\psql.exe'
+```
+
+How the CA is verified, and what the recorded digest is: `verify-full` makes libpq
+validate the chain to that CA **and** the hostname - that is the only thing that
+authenticates the server, and the package never substitutes a certificate
+fingerprint for it. `caCertSha256` in the receipts is the SHA-256 of **the file's
+bytes** (tamper-evidence for the input), not the certificate's fingerprint. To
+identify the certificate itself, print its own fingerprint and compare that to an
+out-of-band CA value:
+
+```powershell
+$b64  = (Get-Content -Raw C:\certs\prod-ca-2021.crt) -replace '-----(BEGIN|END) CERTIFICATE-----','' -replace '\s',''
+$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 (,[Convert]::FromBase64String($b64))
+$cert.Subject; $cert.Issuer; $cert.NotAfter
+([BitConverter]::ToString($cert.GetCertHash('SHA256')) -replace '-','').ToLower()
+```
+
+**Do not compare the CA's fingerprint with the server's leaf certificate** (and do
+not pin the leaf): they are different certificates, they can never match, and the
+leaf is rotated. Compare a CA against a CA and let `verify-full` do the rest. If
+the file is DER rather than PEM, load it with
+`New-Object ... X509Certificate2 (, [System.IO.File]::ReadAllBytes($path))`.
 
 ### 4.1 Order, mandatory
 
@@ -563,13 +595,56 @@ Step 0 is create-only and is **not** counted in the 111. The operator does not
 run it by hand: leaving it to a human was one of the unvalidated steps Round 2
 named, so the runner owns it and records its digest and read-back.
 
-Prefer the **direct** connection (port 5432): a transaction-mode pooler can break
-the multi-statement DDL in this set. If the direct host does not resolve from the
-deployment host (a project without the IPv4 add-on resolves `db.<ref>.supabase.co`
-to IPv6 only), the package accepts the session pooler instead -
-`aws-<n>-<region>.pooler.supabase.com:6543` with user `postgres.<ref>` - and
-nothing else. A HostNotFound or an IPv6 route failure is a network problem, not a
-package problem: fix connectivity rather than loosening the policy.
+### 4.2 Connection modes
+
+Supabase publishes four endpoints and the **port selects the pooling mode**. This
+package accepts exactly three of them and refuses the fourth:
+
+| Mode | Host:port | User | Policy |
+|---|---|---|---|
+| **Direct** - preferred | `db.<ref>.supabase.co:5432` | `postgres` | accepted |
+| **Shared pooler, session** | `<pooler-host>:5432` | `postgres.<ref>` | accepted |
+| **Shared pooler, transaction** | `<pooler-host>:6543` | `postgres.<ref>` | accepted **only** with `-AllowTransactionMode` |
+| Dedicated pooler | `db.<ref>.supabase.co:6543` | `postgres` | refused (transaction mode only; Supabase recommends direct for migrations) |
+
+Port **6543 is transaction mode**, not session mode: Supabase removed session mode
+from 6543 on 2025-02-28, and session mode has been 5432 since. Session state - `SET`,
+session-level advisory locks, `LISTEN`/`NOTIFY`, temporary tables - does not survive
+a transaction boundary under 6543, so choosing it is a decision that is recorded,
+not a default that is fallen into.
+
+**The pooler host cannot be derived from the project ref.** It is
+`aws-[INDEX]-[REGION].pooler.supabase.com`, where the index is a pooler cluster
+index, not part of the region name, and a region can have more than one. Copy it
+from the project's **Connect** dialog and pass it twice - once as the host, once as
+the confirmation the policy demands:
+
+```powershell
+$pooler = '<paste the host from Connect>'
+.\check-ledger.ps1 -ProjectRef <ref> -CaCert C:\certs\prod-ca-2021.crt `
+                   -PgHost $pooler -PgPort 5432 -PgUser postgres.<ref> `
+                   -ConfirmedPoolerHost $pooler
+```
+
+The policy can only check the shape of that host; the server is what actually
+matches the tenant to the project, and a wrong-region host fails authentication
+("Tenant or user not found") rather than connecting somewhere else. Confirmation is
+what stops a guessed host from becoming evidence.
+
+**Which mode does this set need?** Direct, or session mode: they are equivalent for
+this workload, and Supabase recommends the direct connection for migrations. The set
+is also transaction-mode compatible by static analysis - every wrapper is a single
+explicit transaction with nothing outside it, there are no `SET` statements, no
+temporary tables, no cursors, no prepared statements and no session-level advisory
+locks (only `pg_advisory_xact_lock`), and the writer claim is a row rather than a
+session lock. That is why 6543 is *permitted* with explicit consent instead of
+forbidden; it is not the default because a pooler in the path is one more thing
+between the evidence and the database.
+
+An IPv4-only deployment host with no IPv4 add-on must use the shared pooler: the
+direct endpoint is IPv6-only, and the add-on **replaces** the AAAA record with an A
+record rather than adding one. A HostNotFound or an IPv6 route failure is a network
+problem, not a package problem: fix connectivity rather than loosening the policy.
 
 Note for auditors: `node tests/verify-package.mjs` is itself a native child
 process. Run it from `cmd.exe`, or use `tools\run-tests.ps1`, which is what the
@@ -596,7 +671,7 @@ Stop, record, do not retry, do not repair, do not "make it pass":
 | S11 | A step would edit `supabase/migrations/`, disable triggers, bypass RLS, set `session_replication_role` or change ownership |
 | S12 | No adapter self-test receipt, or one that fails validation: failed verdict, non-empty problems, missing/incomplete/duplicated cases, `casesExecuted` disagreement, different adapter hash or version, non-PowerShell-5.1, or missing the executed `NativeCommandError` regression cases |
 | S13 | A wrapper's digest on disk differs from the manifest at execution time |
-| S14 | Connection policy violated (host not belonging to the project, wrong port/user for the mode, `PGSSLMODE` forced, CA certificate missing, `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` set) |
+| S14 | Connection policy violated (host not belonging to the project, wrong port/user for the mode, a pooler host that was not confirmed from the Connect dialog, transaction mode without `-AllowTransactionMode`, `PGSSLMODE` forced, CA certificate missing, a psql that is not 17.x, `PGHOSTADDR`/`PGSERVICE`/`PGOPTIONS` set) |
 
 There is **no automatic retry and no automatic recovery**. A re-run is a new
 attempt folder, and it is allowed to continue only if the ledger proof in §3

@@ -48,6 +48,11 @@
                    verify-full, and a CA certificate is required. PGHOSTADDR /
                    PGSERVICE / PGOPTIONS are refused because they can redirect
                    the connection behind the approved name.
+    Round 25       Connection modes follow Supabase's ports: direct 5432,
+                   session pooler 5432, transaction pooler 6543 only with
+                   -AllowTransactionMode. A pooler host cannot be derived from
+                   the ref, so -ConfirmedPoolerHost must match the Connect
+                   dialog. psql must report PostgreSQL 17 (README section 4.2).
     Round 2        The native adapter must be certified on this runtime by
                    tools\test-native-capture.ps1 first; deploy refuses otherwise.
 
@@ -70,6 +75,8 @@ param(
   [string]$PgUser = 'postgres',
   [string]$PgDatabase = 'postgres',
   [string]$CaCert,
+  [string]$ConfirmedPoolerHost,
+  [switch]$AllowTransactionMode,
   [string]$AdapterSelfTestReceipt,
   [string]$Psql = 'psql',
   [int]$PreflightTimeoutSeconds = 300,
@@ -155,6 +162,17 @@ try {
 catch { Stop-Refused ("'{0}' not found on PATH." -f $Psql) }
 if ([string]::IsNullOrWhiteSpace($psqlPath)) { Stop-Refused ("could not resolve the full path of '{0}'." -f $Psql) }
 
+# Round 25: the client is pinned to 17 like the server is, by the adapter's one
+# banner parser, before any evidence directory exists (README section 4.2).
+$psqlVersion = Invoke-NativeProcess -FilePath $psqlPath -Arguments @('--version') -TimeoutSeconds 30
+if (-not (Test-NativeSuccess $psqlVersion)) {
+  Stop-Refused ("psql --version did not succeed ({0}); {1}" -f (Get-NativeOutcomeLabel $psqlVersion), (Get-NativeErrorExcerpt $psqlVersion))
+}
+$psqlMajor = Get-ClashPsqlMajorVersion -Text ([string]$psqlVersion.stdOut)
+if ($psqlMajor -ne 17) {
+  Stop-Refused ("psql at '{0}' reported '{1}'. PostgreSQL 17 is required; pass -Psql with the full path of a 17.x psql (for example -Psql 'C:\Program Files\PostgreSQL\17\bin\psql.exe')." -f $psqlPath, ([string]$psqlVersion.stdOut).Trim())
+}
+
 # C18-C1: the manifest ROOT is validated before any field is read out of it. A
 # null, empty, array or malformed manifest must refuse explicitly, not fall
 # through to a zero-entry message.
@@ -176,7 +194,8 @@ if ($staleEntries.Count -gt 0) {
 
 # ------------------------------------------------- enforcement: TLS + project
 try { $policy = Resolve-ExecutionPolicy -ProjectRef $ProjectRef -PgHost $PgHost -PgPort $PgPort `
-        -PgUser $PgUser -PgDatabase $PgDatabase -CaCert $CaCert }
+        -PgUser $PgUser -PgDatabase $PgDatabase -CaCert $CaCert `
+        -ConfirmedPoolerHost $ConfirmedPoolerHost -AllowTransactionMode:$AllowTransactionMode }
 catch { Stop-Refused $_.Exception.Message }
 
 try { $adapterProof = Assert-AdapterSelfTest -ReceiptPath $AdapterSelfTestReceipt -AdapterPath $adapterPath }
@@ -234,15 +253,11 @@ try {
 }
 catch { $gitPath = $null }
 
-$psqlVersion = Invoke-NativeProcess -FilePath $psqlPath -Arguments @('--version') -TimeoutSeconds 30
+# Round 25: psql was probed and gated at the refusal stage; this records what it saw.
 $gitHead = New-NotRunResult 'git not found on PATH'
 if ($gitPath) { $gitHead = Invoke-NativeProcess -FilePath $gitPath -Arguments @('-C', $repoRoot, 'rev-parse', 'HEAD') -TimeoutSeconds 30 }
 $gitDirty = New-NotRunResult 'git not found on PATH'
 if ($gitPath) { $gitDirty = Invoke-NativeProcess -FilePath $gitPath -Arguments @('-C', $repoRoot, 'status', '--porcelain', '--', 'supabase/migrations') -TimeoutSeconds 60 }
-if (-not (Test-NativeSuccess $psqlVersion)) {
-  Stop-Run ("psql --version did not succeed ({0}); {1}" -f (Get-NativeOutcomeLabel $psqlVersion), (Get-NativeErrorExcerpt $psqlVersion)) '00-baseline-fail.json'
-}
-
 # RC04: gate 0 recorded the git captures without requiring them to succeed; empty
 # stdout from a failed capture read as a clean baseline. Both must be proven.
 # ---- rc04-baseline-begin
@@ -269,10 +284,13 @@ New-PhaseReceipt '00-baseline.json' @{
   status            = 'BASELINE'
   psqlPath          = $psqlPath
   psqlVersion       = $psqlVersion.stdOut.Trim()
+  psqlMajor         = $psqlMajor
   repoHead          = $gitHeadText
   migrationsDirty   = $gitDirty.stdOut.Trim()
   projectRef        = $policy.projectRef
   connectionMode    = $policy.mode
+  transactionMode   = $policy.transactionMode
+  poolerHostConfirmed = $policy.poolerHostConfirmed
   host              = $policy.host
   port              = $policy.port
   user              = $policy.user

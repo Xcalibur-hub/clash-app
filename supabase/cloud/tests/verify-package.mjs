@@ -36,8 +36,8 @@ const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
-const EXPECTED_CASES = 162;
-const EXPECTED_ASSERTIONS = 531;
+const EXPECTED_CASES = 173;
+const EXPECTED_ASSERTIONS = 540;
 let sectionsRun = 0;
 let pass = 0; const failures = [];
 function hdr(n, title) {
@@ -360,6 +360,38 @@ check('a CA certificate is mandatory', /A CA certificate is required for verify-
 check('host must belong to the project', /is not permitted for project/.test(lib));
 check('pooler requires postgres\.<ref>', /Pooler user must be/.test(lib));
 check('redirecting env vars are refused', /PGHOSTADDR/.test(lib) && /PGSERVICE/.test(lib) && /PGOPTIONS/.test(lib));
+
+// Round 25 (Phase 2C): the pooler contract must match Supabase's documented ports.
+// These assertions are static; the behaviour is proven natively by the adapter
+// self-test cases (policyAcceptsSessionPooler, policyRefusesTransactionModeByDefault,
+// ...), which call the real Resolve-ExecutionPolicy on Windows PowerShell 5.1.
+check('pooler session mode is port 5432', /\$PgPort -eq 5432\)\s*\{\s*\r?\n\s*\$mode = 'pooler-session'/.test(lib));
+check('pooler transaction mode is port 6543 and needs explicit consent',
+  /\$PgPort -eq 6543\)/.test(lib) && /if \(-not \$AllowTransactionMode\)/.test(lib) && /TRANSACTION mode, not session mode/.test(lib));
+{
+  const poolerDoc = read(join(CLOUD, 'README.md'));
+  check('the README maps session pooling to 5432 and transaction pooling to 6543',
+    /Shared pooler, session\*\* \| [^\n]*:5432/.test(poolerDoc) &&
+    /Shared pooler, transaction\*\* \| [^\n]*:6543/.test(poolerDoc) &&
+    /6543 is transaction mode/.test(poolerDoc));
+}
+check('the pooler port rule names both modes and the one-port message is gone',
+  !/requires port 6543, not/.test(lib) &&
+  /requires port 5432 \(session mode\) or 6543 \(transaction mode\)/.test(lib));
+check('the pooler host must be confirmed from the Connect dialog',
+  /ConfirmedPoolerHost/.test(lib) && /is not confirmed/.test(lib) && /Connect dialog/.test(lib) &&
+  /-ConfirmedPoolerHost \$ConfirmedPoolerHost/.test(deploy) && /-ConfirmedPoolerHost \$ConfirmedPoolerHost/.test(ledger));
+check('the psql client is pinned to PostgreSQL 17 in both entry points',
+  lib.includes('psql\\s*\\(PostgreSQL\\)') && deploy.includes('$psqlMajor -ne 17') && ledger.includes('$psqlMajor -ne 17'));
+check('the psql version gate runs before any evidence directory is created',
+  deploy.indexOf('Get-ClashPsqlMajorVersion') > 0 &&
+  deploy.indexOf('Get-ClashPsqlMajorVersion') < deploy.indexOf("Join-Path $cloudRoot 'evidence'"));
+check('the CA digest is the file digest, not a normalised text digest',
+  /\$caSha = Get-FileSha256 -Path \$ca/.test(lib) && !/\$caSha = Get-NormalizedSha256/.test(lib));
+check('the CA digest is never substituted for the server certificate',
+  !/thumbprint/i.test(strictText) && !/X509Certificate/.test(strictText) && !/GetCertHash/.test(strictText) &&
+  /PGSSLMODE\s*=\s*'verify-full'/.test(lib));
+
 check('projectRef is mandatory and 20-char validated', /\[Parameter\(Mandatory = \$true\)\]\[string\]\$ProjectRef/.test(deploy) && /\^\[a-z0-9\]\{20\}\$/.test(lib));
 
 // Round 2: adapter must be certified on the runtime before use

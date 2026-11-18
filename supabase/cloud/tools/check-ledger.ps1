@@ -34,6 +34,8 @@ param(
   [string]$PgUser = 'postgres',
   [string]$PgDatabase = 'postgres',
   [string]$CaCert,
+  [string]$ConfirmedPoolerHost,
+  [switch]$AllowTransactionMode,
   [string]$AdapterSelfTestReceipt,
   [string]$Psql = 'psql'
 )
@@ -63,7 +65,8 @@ if ($entries.Count -ne 111) { Stop-Refused ("manifest has {0} entries, expected 
 if ($manifest.project_ref -ne $ProjectRef) { Stop-Refused ("manifest is bound to project '{0}', not '{1}'." -f $manifest.project_ref, $ProjectRef) }
 
 try { $policy = Resolve-ExecutionPolicy -ProjectRef $ProjectRef -PgHost $PgHost -PgPort $PgPort `
-        -PgUser $PgUser -PgDatabase $PgDatabase -CaCert $CaCert }
+        -PgUser $PgUser -PgDatabase $PgDatabase -CaCert $CaCert `
+        -ConfirmedPoolerHost $ConfirmedPoolerHost -AllowTransactionMode:$AllowTransactionMode }
 catch { Stop-Refused $_.Exception.Message }
 
 if ([string]::IsNullOrWhiteSpace($AdapterSelfTestReceipt)) {
@@ -78,6 +81,18 @@ try {
   if ([string]::IsNullOrWhiteSpace($psqlPath)) { $psqlPath = [string]$psqlCmd.Source }
 }
 catch { Stop-Refused ("'{0}' not found on PATH." -f $Psql) }
+
+# Round 25: the client is pinned like the server (see deploy.ps1). A read-only
+# audit run with an unknown libpq is still an unaudited client, so the same gate
+# applies here and the same parser decides.
+$psqlVersion = Invoke-NativeProcess -FilePath $psqlPath -Arguments @('--version') -TimeoutSeconds 30
+if (-not (Test-NativeSuccess $psqlVersion)) {
+  Stop-Refused ("psql --version did not succeed ({0}); {1}" -f (Get-NativeOutcomeLabel $psqlVersion), (Get-NativeErrorExcerpt $psqlVersion))
+}
+$psqlMajor = Get-ClashPsqlMajorVersion -Text ([string]$psqlVersion.stdOut)
+if ($psqlMajor -ne 17) {
+  Stop-Refused ("psql at '{0}' reported '{1}'. PostgreSQL 17 is required; pass -Psql with the full path of a 17.x psql." -f $psqlPath, ([string]$psqlVersion.stdOut).Trim())
+}
 
 # Round 9 (B3): verbose diagnostics so a failed probe carries its SQLSTATE.
 $common = @('-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose')
@@ -165,6 +180,9 @@ $doc = [ordered]@{
   sslMode            = $policy.sslMode
   caCertSha256       = $policy.caCertSha256
   mode               = $policy.mode
+  transactionMode    = $policy.transactionMode
+  poolerHostConfirmed = $policy.poolerHostConfirmed
+  psqlMajor          = $psqlMajor
   readOnly           = $true
   statementsIssued   = 'select only'
   ledgerRows         = $check.rows

@@ -125,7 +125,7 @@ every-wrapper-body-is-byte-identical-to-its-normalised-source
 every-wrapper-envelope-has-exactly-one-transaction-and-nothing-executabl
 evidence-files-are-created-exclusively-createnew
 exactly-111-original-migrations
-exactly-162-declared-case-names
+exactly-173-declared-case-names
 exactly-two-migrations-needed-normalisation
 executed-source-is-the-variant
 five-powershell-tools-plus-the-adapter-library
@@ -257,6 +257,8 @@ outcome-label-present-rolled-back-proven
 outcome-label-present-unknown
 per-migration-outcome-receipts-survive-an-unwritable-run-directory
 pooler-requires-postgres-ref
+pooler-session-mode-is-port-5432
+pooler-transaction-mode-is-port-6543-and-needs-explicit-consent
 postflight-checks-111-ledger-rows
 postflight-has-the-cron-tripwire-trio
 postflight-verifies-per-migration-sha256
@@ -387,6 +389,8 @@ the-adapter-self-test-exercises-capture-exit-class-sqlstate-and-the-ledg
 the-adapter-validates-the-framing-characters-at-every-declared-boundary
 the-assertion-count-tripwire-is-present-and-counts-itself
 the-bootstrap-declares-both-primary-keys
+the-ca-digest-is-never-substituted-for-the-server-certificate
+the-ca-digest-is-the-file-digest-not-a-normalised-text-digest
 the-checksum-set-covers-every-original-migration-plus-the-package
 the-claim-table-is-created-by-step-0-with-a-primary-key
 the-comment-stripper-does-not-swallow-the-file
@@ -413,7 +417,7 @@ the-executed-null-fixture-is-the-audit-four-bytes
 the-exit-code-loss-is-asserted-not-assumed
 the-extractor-refuses-a-drifted-region-instead-of-probing-something-else
 the-getter-builds-an-explicit-flat-list
-the-harness-asserts-exactly-162
+the-harness-asserts-exactly-173
 the-harness-builds-its-fixtures-in-the-real-psql-envelope
 the-harness-checks-the-executed-count
 the-harness-executes-the-committed-gate-2-block-and-forbids-a-suffix-cou
@@ -449,10 +453,14 @@ the-new-cases-are-in-the-shared-inventory-the-receipt-must-match
 the-order-inside-the-protocol-is-intent-seal-verify-marker-commit-re-ver
 the-per-ord-lookaside-map-is-a-hashtable-never-an-ordereddictionary
 the-pipe-in-ord-8-is-a-value-in-both-the-sql-and-the-declaration
+the-pooler-host-must-be-confirmed-from-the-connect-dialog
+the-pooler-port-rule-names-both-modes-and-the-one-port-message-is-gone
 the-preflight-contract-counts-19-gating-checks-and-two-info-checks
 the-producer-asserts-the-kinds-it-wrote-independently-of-the-consumer
 the-producer-validates-its-own-candidate-and-published-root
 the-producer-will-not-report-success-for-a-marker-its-consumer-rejects
+the-psql-client-is-pinned-to-postgresql-17-in-both-entry-points
+the-psql-version-gate-runs-before-any-evidence-directory-is-created
 the-readme-documents-c18-c1-and-the-root-contract
 the-readme-documents-r15-c1-and-the-protocol
 the-readme-documents-rc01-rc11-and-the-evidence-contract
@@ -461,6 +469,7 @@ the-readme-documents-the-envelope
 the-readme-documents-the-framing-rule-and-the-audit-finding
 the-readme-documents-the-preflight-contract
 the-readme-documents-the-report-contract
+the-readme-maps-session-pooling-to-5432-and-transaction-pooling-to-6543
 the-receipt-is-validated-before-it-is-written
 the-receipt-records-both-counts
 the-receipt-validator-checks-the-declared-inventory-too

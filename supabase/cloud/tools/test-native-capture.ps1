@@ -127,7 +127,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 162
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 173
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -5813,6 +5813,129 @@ Add-Case 'mutatedValidatorIsDetectedByTheSuite' (
   missed = (@($rcMutantMissed) -join ' ')
   note = 'each mutant drops one check; if the suite still passed, that check would be decorative (six RC01-RC11 guards and four Round 24 admission guards)'
 }
+
+# ===========================================================================
+# Round 25: connection policy - the modes Supabase documents, executed here
+# ===========================================================================
+# Every case below calls the REAL Resolve-ExecutionPolicy against a real CA file
+# and a real environment. None of them reads the source text: a policy that says
+# the right thing in a comment and does the wrong thing in code fails these.
+$policyRef        = 'kgaqejgubjemdecifzew'
+$policyPooler     = 'aws-0-ap-south-1.pooler.supabase.com'
+$policyPoolerUser = 'postgres.' + $policyRef
+$policyCaRoot     = Join-Path ([System.IO.Path]::GetTempPath()) ('clash-policy-' + [guid]::NewGuid().ToString('n'))
+[void](New-Item -ItemType Directory -Path $policyCaRoot -Force)
+$policyCa = Join-Path $policyCaRoot 'prod-ca-2021.crt'
+# CRLF on purpose: it is what makes the file digest differ from the normalised
+# text digest, which is the distinction the last case below proves.
+[System.IO.File]::WriteAllText($policyCa, "-----BEGIN CERTIFICATE-----`r`nprobe-only`r`n-----END CERTIFICATE-----`r`n")
+
+$policySavedPassword = [Environment]::GetEnvironmentVariable('PGPASSWORD')
+$policySavedPassFile = [Environment]::GetEnvironmentVariable('PGPASSFILE')
+[void][Environment]::SetEnvironmentVariable('PGPASSWORD', 'probe-value-not-a-credential', 'Process')
+[void][Environment]::SetEnvironmentVariable('PGPASSFILE', $null, 'Process')
+
+# No splatting anywhere in this package (Round 4), so the specification is passed
+# as one hashtable and read field by field.
+function Invoke-PolicyProbe {
+  param([hashtable]$Spec)
+  $ref = ''; $pHost = ''; $pPort = 5432; $pUser = 'postgres'; $pCa = ''; $pConfirmed = ''; $pTransaction = $false
+  if ($Spec.ContainsKey('ProjectRef'))          { $ref = [string]$Spec['ProjectRef'] }
+  if ($Spec.ContainsKey('PgHost'))              { $pHost = [string]$Spec['PgHost'] }
+  if ($Spec.ContainsKey('PgPort'))              { $pPort = [int]$Spec['PgPort'] }
+  if ($Spec.ContainsKey('PgUser'))              { $pUser = [string]$Spec['PgUser'] }
+  if ($Spec.ContainsKey('CaCert'))              { $pCa = [string]$Spec['CaCert'] }
+  if ($Spec.ContainsKey('ConfirmedPoolerHost')) { $pConfirmed = [string]$Spec['ConfirmedPoolerHost'] }
+  if ($Spec.ContainsKey('AllowTransactionMode')){ $pTransaction = [bool]$Spec['AllowTransactionMode'] }
+  try {
+    $result = Resolve-ExecutionPolicy -ProjectRef $ref -PgHost $pHost -PgPort $pPort -PgUser $pUser `
+                -PgDatabase 'postgres' -CaCert $pCa -ConfirmedPoolerHost $pConfirmed -AllowTransactionMode:$pTransaction
+    return @{ ok = $true; mode = [string]$result.mode; transactionMode = [bool]$result.transactionMode;
+              poolerHostConfirmed = [bool]$result.poolerHostConfirmed; caCertSha256 = [string]$result.caCertSha256; message = '' }
+  }
+  catch {
+    return @{ ok = $false; mode = ''; transactionMode = $false; poolerHostConfirmed = $false; caCertSha256 = ''; message = [string]$_.Exception.Message }
+  }
+}
+
+$directProbe = Invoke-PolicyProbe @{ ProjectRef = $policyRef; CaCert = $policyCa }
+Add-Case 'policyAcceptsDirectConnection' ($directProbe.ok -and $directProbe.mode -eq 'direct' -and
+  (-not $directProbe.transactionMode) -and (-not $directProbe.poolerHostConfirmed)) @{
+  mode = $directProbe.mode; message = $directProbe.message }
+
+$directOn6543 = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgPort = 6543; CaCert = $policyCa }
+Add-Case 'policyRefusesDirectOnTransactionPort' ((-not $directOn6543.ok) -and
+  $directOn6543.message -match 'requires port 5432') @{ message = $directOn6543.message }
+
+$sessionProbe = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = $policyPooler; PgPort = 5432;
+  PgUser = $policyPoolerUser; ConfirmedPoolerHost = $policyPooler; CaCert = $policyCa }
+Add-Case 'policyAcceptsSessionPooler' ($sessionProbe.ok -and $sessionProbe.mode -eq 'pooler-session' -and
+  (-not $sessionProbe.transactionMode) -and $sessionProbe.poolerHostConfirmed) @{
+  mode = $sessionProbe.mode; message = $sessionProbe.message }
+
+$unconfirmed = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = $policyPooler; PgPort = 5432;
+  PgUser = $policyPoolerUser; CaCert = $policyCa }
+Add-Case 'policyRefusesUnconfirmedPoolerHost' ((-not $unconfirmed.ok) -and
+  $unconfirmed.message -match 'is not confirmed') @{ message = $unconfirmed.message }
+
+$mismatched = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = $policyPooler; PgPort = 5432;
+  PgUser = $policyPoolerUser; ConfirmedPoolerHost = 'aws-1-ap-southeast-1.pooler.supabase.com'; CaCert = $policyCa }
+Add-Case 'policyRefusesMismatchedPoolerConfirmation' ((-not $mismatched.ok) -and
+  $mismatched.message -match 'is not confirmed') @{ message = $mismatched.message }
+
+$transactionByDefault = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = $policyPooler; PgPort = 6543;
+  PgUser = $policyPoolerUser; ConfirmedPoolerHost = $policyPooler; CaCert = $policyCa }
+Add-Case 'policyRefusesTransactionModeByDefault' ((-not $transactionByDefault.ok) -and
+  $transactionByDefault.message -match 'TRANSACTION mode' -and $transactionByDefault.message -match 'AllowTransactionMode') @{
+  message = $transactionByDefault.message }
+
+$transactionChosen = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = $policyPooler; PgPort = 6543;
+  PgUser = $policyPoolerUser; ConfirmedPoolerHost = $policyPooler; CaCert = $policyCa; AllowTransactionMode = $true }
+Add-Case 'policyAcceptsTransactionModeWhenChosen' ($transactionChosen.ok -and
+  $transactionChosen.mode -eq 'pooler-transaction' -and $transactionChosen.transactionMode) @{
+  mode = $transactionChosen.mode; message = $transactionChosen.message }
+
+$unknownPort = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = $policyPooler; PgPort = 5433;
+  PgUser = $policyPoolerUser; ConfirmedPoolerHost = $policyPooler; CaCert = $policyCa }
+Add-Case 'policyRefusesUnknownPoolerPort' ((-not $unknownPort.ok) -and
+  $unknownPort.message -match '5432 \(session mode\) or 6543 \(transaction mode\)') @{ message = $unknownPort.message }
+
+$foreignUser = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = $policyPooler; PgPort = 5432;
+  PgUser = 'postgres'; ConfirmedPoolerHost = $policyPooler; CaCert = $policyCa }
+Add-Case 'policyRefusesForeignPoolerUser' ((-not $foreignUser.ok) -and
+  $foreignUser.message -match 'Pooler user must be') @{ message = $foreignUser.message }
+
+$banners = @(
+  @{ text = 'psql (PostgreSQL) 17.2';                              expect = 17 },
+  @{ text = 'psql (PostgreSQL) 17.2 (Debian 17.2-1.pgdg120+1)';    expect = 17 },
+  @{ text = 'psql (PostgreSQL) 17.0';                              expect = 17 },
+  @{ text = 'psql (PostgreSQL) 16.9';                              expect = 16 },
+  @{ text = 'psql (PostgreSQL) 9.6.24';                            expect = 9 },
+  @{ text = 'WARNING: psql major version 15, server major version 17'; expect = -1 },
+  @{ text = 'psql: error: could not connect to server';            expect = -1 },
+  @{ text = '';                                                    expect = -1 }
+)
+$bannerProblems = @()
+foreach ($b in $banners) {
+  $got = Get-ClashPsqlMajorVersion -Text $b.text
+  if ($got -ne [int]$b.expect) { $bannerProblems += ('[{0}]=>{1} (expected {2})' -f $b.text, $got, $b.expect) }
+}
+Add-Case 'psqlMajorVersionIsParsedOrRefused' ($bannerProblems.Count -eq 0) @{
+  problems = ($bannerProblems -join '; ') }
+
+$caBytes = [System.IO.File]::ReadAllBytes($policyCa)
+$caHasher = [System.Security.Cryptography.SHA256]::Create()
+try { $caExpected = (([BitConverter]::ToString($caHasher.ComputeHash($caBytes)) -replace '-', '').ToLowerInvariant()) }
+finally { if ($caHasher) { $caHasher.Dispose() } }
+$caFileDigest = Get-FileSha256 -Path $policyCa
+$caTextDigest = Get-NormalizedSha256 -Path $policyCa
+Add-Case 'caCertificateDigestIsAFileDigest' (($caFileDigest -ceq $caExpected) -and
+  ($caFileDigest -cne $caTextDigest) -and $directProbe.ok -and ($directProbe.caCertSha256 -ceq $caFileDigest)) @{
+  fileDigest = $caFileDigest; textDigest = $caTextDigest; recorded = $directProbe.caCertSha256 }
+
+[void][Environment]::SetEnvironmentVariable('PGPASSWORD', $policySavedPassword, 'Process')
+[void][Environment]::SetEnvironmentVariable('PGPASSFILE', $policySavedPassFile, 'Process')
+Remove-Item -LiteralPath $policyCaRoot -Recurse -Force -ErrorAction SilentlyContinue
 
 # ===========================================================================
 # verdict: inventory first, then the receipt, then the file on disk

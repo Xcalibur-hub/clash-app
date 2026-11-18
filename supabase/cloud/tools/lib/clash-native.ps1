@@ -35,7 +35,7 @@
 Set-StrictMode -Version 2.0
 
 $script:ClashAdapterId      = 'clash-native-adapter'
-$script:ClashAdapterVersion = '5.6.0'
+$script:ClashAdapterVersion = '5.7.0'
 
 # Round 24 (F1). ONE canonical input contract for every text this package admits.
 #
@@ -88,6 +88,21 @@ function Get-NormalizedSha256 {
   if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) { $text = $text.Substring(1) }
   $text = $text.Replace("`r`n", "`n")
   return (Get-TextSha256 -Text $text)
+}
+
+# Round 25. The digest of the FILE's bytes, with no text normalisation.
+# The normalised digest above is correct for text artifacts and is what the
+# package uses for its own files. It is the wrong function for a certificate:
+# decoding a DER file as UTF-8 is lossy (invalid sequences collapse to U+FFFD) and
+# rewriting CRLF changes the value, so the result is neither the file's digest nor
+# the certificate's fingerprint. The CA file is recorded with this function
+# instead, and the recorded value means exactly one thing: these bytes, hashed.
+function Get-FileSha256 {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $bytes = [System.IO.File]::ReadAllBytes($Path)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try { return (([BitConverter]::ToString($sha.ComputeHash($bytes)) -replace '-', '').ToLowerInvariant()) }
+  finally { if ($sha) { $sha.Dispose() } }
 }
 
 # Round 21 (R20-M1): the digest of the bytes read through an ALREADY HELD handle.
@@ -3749,7 +3764,9 @@ function Resolve-ExecutionPolicy {
     [int]$PgPort = 5432,
     [string]$PgUser = 'postgres',
     [string]$PgDatabase = 'postgres',
-    [string]$CaCert = ''
+    [string]$CaCert = '',
+    [string]$ConfirmedPoolerHost = '',
+    [switch]$AllowTransactionMode
   )
   if ($ProjectRef -notmatch '^[a-z0-9]{20}$') {
     throw ("ProjectRef '{0}' is not a 20-character Supabase project ref." -f $ProjectRef)
@@ -3757,17 +3774,43 @@ function Resolve-ExecutionPolicy {
   $direct = ('db.{0}.supabase.co' -f $ProjectRef)
   $pooler = ('^aws-[0-9]+-[a-z0-9]+-[a-z0-9]+\.pooler\.supabase\.com$')
 
+  # Round 25 (Phase 2C). The pooler's PORT selects the pooling MODE, and the two
+  # are not interchangeable. Supabase's shared pooler serves SESSION mode on 5432
+  # and TRANSACTION mode on 6543; session mode on 6543 was removed on 2025-02-28.
+  # Through Round 24 the policy accepted only 6543 and the README called it "the
+  # session pooler", so the one endpoint with session semantics was the one the
+  # policy refused, while the endpoint it forced was the one its own rationale
+  # warned about. The shape of the host is checked here; the host itself cannot be
+  # derived from the project ref (the cluster index is not part of the region
+  # name), so it must be confirmed against the project's Connect dialog.
   $mode = ''
+  $transactionMode = $false
+  $poolerHostConfirmed = $false
   if ([string]::IsNullOrWhiteSpace($PgHost)) { $PgHost = $direct }
   if ($PgHost -eq $direct) {
     $mode = 'direct'
     if ($PgPort -ne 5432) { throw ("Direct host {0} requires port 5432, not {1}." -f $PgHost, $PgPort) }
   }
   elseif ($PgHost -match $pooler) {
-    $mode = 'pooler'
-    if ($PgPort -ne 6543) { throw ("Pooler host {0} requires port 6543, not {1}." -f $PgHost, $PgPort) }
     $wantUser = 'postgres.' + $ProjectRef
     if ($PgUser -ne $wantUser) { throw ("Pooler user must be '{0}' for project '{1}', not '{2}'." -f $wantUser, $ProjectRef, $PgUser) }
+    if ([string]::IsNullOrWhiteSpace($ConfirmedPoolerHost) -or $ConfirmedPoolerHost -ne $PgHost) {
+      throw ("Pooler host '{0}' is not confirmed. Copy the pooler host verbatim from this project's Supabase Connect dialog (Session pooler for port 5432, Transaction pooler for 6543) and pass it as -ConfirmedPoolerHost. The host cannot be derived from the project ref." -f $PgHost)
+    }
+    $poolerHostConfirmed = $true
+    if ($PgPort -eq 5432) {
+      $mode = 'pooler-session'
+    }
+    elseif ($PgPort -eq 6543) {
+      if (-not $AllowTransactionMode) {
+        throw ('Pooler port 6543 is TRANSACTION mode, not session mode: session state does not survive a transaction boundary. If this workload is safe in transaction mode, choose it explicitly with -AllowTransactionMode; otherwise use the session pooler on port 5432.')
+      }
+      $mode = 'pooler-transaction'
+      $transactionMode = $true
+    }
+    else {
+      throw ("Pooler host {0} requires port 5432 (session mode) or 6543 (transaction mode), not {1}." -f $PgHost, $PgPort)
+    }
   }
   else {
     throw ("Host '{0}' is not permitted for project '{1}'. Allowed: {2} or *.pooler.supabase.com." -f $PgHost, $ProjectRef, $direct)
@@ -3787,7 +3830,12 @@ function Resolve-ExecutionPolicy {
     throw 'A CA certificate is required for verify-full TLS. Pass -CaCert or set PGSSLROOTCERT (Supabase: prod-ca-2021.crt).'
   }
   if (-not (Test-Path -LiteralPath $ca)) { throw ("CA certificate not found: {0}" -f $ca) }
-  $caSha = Get-NormalizedSha256 -Path $ca
+  # Round 25: the FILE's bytes, not a normalised text view of them. This value is
+  # tamper-evidence for the input; it is NOT the certificate's fingerprint and it
+  # is never compared with the server's certificate. Chain and hostname
+  # validation are done by libpq under verify-full, which is the only thing that
+  # actually authenticates the server.
+  $caSha = Get-FileSha256 -Path $ca
 
   if (-not $env:PGPASSWORD -and -not $env:PGPASSFILE) {
     throw 'No credential available: set PGPASSWORD or PGPASSFILE. Credentials are never passed as arguments.'
@@ -3819,6 +3867,8 @@ function Resolve-ExecutionPolicy {
   return [ordered]@{
     projectRef     = $ProjectRef
     mode           = $mode
+    transactionMode = $transactionMode
+    poolerHostConfirmed = $poolerHostConfirmed
     host           = $PgHost
     port           = $PgPort
     user           = $PgUser
@@ -3826,8 +3876,20 @@ function Resolve-ExecutionPolicy {
     sslMode        = 'verify-full'
     sslModeOverrode = $(if ($prevSsl -and $prevSsl -ne 'verify-full') { $prevSsl } else { '' })
     caCertSha256   = $caSha
+    caCertDigestKind = 'file-bytes'
     env            = $envMap
   }
+}
+
+# The client version is part of the connection contract: the preflight requires a
+# PostgreSQL 17 server, and a psql from an unknown libpq is the one component the
+# runner cannot verify afterwards. Parsed here, so the two entry points cannot
+# disagree about what "17" means. Returns -1 when the banner is not a psql banner.
+function Get-ClashPsqlMajorVersion {
+  param([string]$Text)
+  $m = [regex]::Match([string]$Text, 'psql\s*\(PostgreSQL\)\s*(\d+)')
+  if (-not $m.Success) { return -1 }
+  return [int]$m.Groups[1].Value
 }
 
 # ------------------------------------------- verification report contract ---
@@ -4672,7 +4734,18 @@ $script:ClashSelfTestRequiredCases = @(
   'wrapperBodyIsTheApprovedBodyExactly',
   'wrapperEnvelopeRejectsContentOutsideTheTransaction',
   'completionRejectsUnapprovedAndContradictoryEvidence',
-  'wrapperEnvelopeRejectsBareCarriageControls'
+  'wrapperEnvelopeRejectsBareCarriageControls',
+  'policyAcceptsDirectConnection',
+  'policyRefusesDirectOnTransactionPort',
+  'policyAcceptsSessionPooler',
+  'policyRefusesUnconfirmedPoolerHost',
+  'policyRefusesMismatchedPoolerConfirmation',
+  'policyRefusesTransactionModeByDefault',
+  'policyAcceptsTransactionModeWhenChosen',
+  'policyRefusesUnknownPoolerPort',
+  'policyRefusesForeignPoolerUser',
+  'psqlMajorVersionIsParsedOrRefused',
+  'caCertificateDigestIsAFileDigest'
 )
 
 # Returns a FLAT sequence of case-name strings.
