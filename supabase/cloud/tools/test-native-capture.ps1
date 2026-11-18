@@ -127,7 +127,7 @@ $requiredCases = @(Get-ClashSelfTestInventory)
 # Round 5: the inventory must be exactly 102 unique, non-empty strings, and that
 # is asserted before a single child process is started. A malformed inventory
 # (nested array, duplicate, blank, wrong count) ends here with a non-PASS receipt.
-$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 173
+$inventoryCheck = Assert-SelfTestInventory -Names $requiredCases -ExpectedCount 175
 if (-not $inventoryCheck.ok) {
   $reasons = @()
   foreach ($p in @($inventoryCheck.problems)) { $reasons += [string]$p }
@@ -5904,6 +5904,16 @@ $foreignUser = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = $policyPo
   PgUser = 'postgres'; ConfirmedPoolerHost = $policyPooler; CaCert = $policyCa }
 Add-Case 'policyRefusesForeignPoolerUser' ((-not $foreignUser.ok) -and
   $foreignUser.message -match 'Pooler user must be') @{ message = $foreignUser.message }
+
+$foreignHost = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = 'evil.example.com'; CaCert = $policyCa }
+Add-Case 'policyRefusesForeignHost' ((-not $foreignHost.ok) -and
+  $foreignHost.message -match 'is not permitted for project') @{ message = $foreignHost.message }
+
+# The zone is anchored: a lookalike domain that merely contains the pooler name
+# must not pass the shape check.
+$lookalike = Invoke-PolicyProbe @{ ProjectRef = $policyRef; PgHost = 'aws-0-ap-south-1.pooler.evil.com'; CaCert = $policyCa }
+Add-Case 'policyRefusesLookalikePoolerZone' ((-not $lookalike.ok) -and
+  $lookalike.message -match 'is not permitted for project') @{ message = $lookalike.message }
 
 $banners = @(
   @{ text = 'psql (PostgreSQL) 17.2';                              expect = 17 },

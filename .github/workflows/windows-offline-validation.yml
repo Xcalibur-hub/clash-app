@@ -163,14 +163,14 @@ jobs:
           Write-Host ('PARSE OK ' + $files.Count + ' files; negative control reported ' + $probeErrors.Count + ' error(s)') }
           catch { Write-Host ('::error::CLASH-PARSE-GATE ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
 
-      - name: Native adapter self-test - 173 cases on this runtime
+      - name: Native adapter self-test - 175 cases on this runtime
         shell: cmd
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
           -ExecutionPolicy Bypass -File supabase/cloud/tools/test-native-capture.ps1
           -OutFile supabase/cloud/evidence-adapter/ci-adapter-selftest.json
 
-      - name: Verify the adapter receipt with the package's own gate (PASS, 173/173, adapter 5.7.0)
+      - name: Verify the adapter receipt with the package's own gate (PASS, 175/175, adapter 5.7.0)
         shell: cmd
         run: >-
           "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive
@@ -181,9 +181,9 @@ jobs:
           if ([string]$identity.version -ne '5.7.0') { throw ('REFUSED: adapter version is ' + $identity.version + ', expected 5.7.0') };
           if ([string]$identity.id -ne 'clash-native-adapter') { throw ('REFUSED: adapter id is ' + $identity.id) };
           $r = Assert-AdapterSelfTest -ReceiptPath $receipt -AdapterPath $lib;
-          if ([int]$r.casesExecuted -ne 173) { throw ('REFUSED: the receipt records ' + $r.casesExecuted + ' executed case(s), 173 are required') };
+          if ([int]$r.casesExecuted -ne 175) { throw ('REFUSED: the receipt records ' + $r.casesExecuted + ' executed case(s), 175 are required') };
           if ([string]$r.powerShell -notmatch '^5\.1\.') { throw ('REFUSED: the receipt was produced on ' + $r.powerShell) };
-          Write-Host ('ADAPTER RECEIPT OK cases=' + $r.casesExecuted + '/173 powerShell=' + $r.powerShell + ' receiptSha256=' + $r.receiptSha256) }
+          Write-Host ('ADAPTER RECEIPT OK cases=' + $r.casesExecuted + '/175 powerShell=' + $r.powerShell + ' receiptSha256=' + $r.receiptSha256) }
           catch { Write-Host ('::error::CLASH-ADAPTER-RECEIPT ' + ($_.Exception.Message -replace '\r?\n', ' ')); exit 1 }"
 
       - name: Offline manifest verification (111 originals, wrappers, checksums, git clean)

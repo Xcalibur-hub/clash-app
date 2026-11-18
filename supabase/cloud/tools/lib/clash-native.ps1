@@ -3772,7 +3772,13 @@ function Resolve-ExecutionPolicy {
     throw ("ProjectRef '{0}' is not a 20-character Supabase project ref." -f $ProjectRef)
   }
   $direct = ('db.{0}.supabase.co' -f $ProjectRef)
-  $pooler = ('^aws-[0-9]+-[a-z0-9]+-[a-z0-9]+\.pooler\.supabase\.com$')
+  # Round 25: the old pattern allowed exactly TWO labels after the index, so it
+  # never matched a real pooler host - Supabase regions are three
+  # (ap-south-1, us-east-1, ap-southeast-1). The pooler branch was therefore
+  # unreachable, and the "IPv4 fallback" documented in earlier rounds could not
+  # have been exercised at all. 2..4 labels keeps the anchor on the fixed
+  # .pooler.supabase.com zone while accepting every published region.
+  $pooler = ('^aws-[0-9]+-[a-z0-9]+(-[a-z0-9]+){1,3}\.pooler\.supabase\.com$')
 
   # Round 25 (Phase 2C). The pooler's PORT selects the pooling MODE, and the two
   # are not interchangeable. Supabase's shared pooler serves SESSION mode on 5432
@@ -4744,6 +4750,8 @@ $script:ClashSelfTestRequiredCases = @(
   'policyAcceptsTransactionModeWhenChosen',
   'policyRefusesUnknownPoolerPort',
   'policyRefusesForeignPoolerUser',
+  'policyRefusesForeignHost',
+  'policyRefusesLookalikePoolerZone',
   'psqlMajorVersionIsParsedOrRefused',
   'caCertificateDigestIsAFileDigest'
 )

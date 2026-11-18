@@ -36,7 +36,7 @@ const read = (p) => readFileSync(p, 'utf8');
 const nsha = (p) => sha(lf(read(p)));
 
 const EXPECTED_SECTIONS = 29;
-const EXPECTED_CASES = 173;
+const EXPECTED_CASES = 175;
 const EXPECTED_ASSERTIONS = 540;
 let sectionsRun = 0;
 let pass = 0; const failures = [];

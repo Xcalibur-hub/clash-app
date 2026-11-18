@@ -125,7 +125,7 @@ every-wrapper-body-is-byte-identical-to-its-normalised-source
 every-wrapper-envelope-has-exactly-one-transaction-and-nothing-executabl
 evidence-files-are-created-exclusively-createnew
 exactly-111-original-migrations
-exactly-173-declared-case-names
+exactly-175-declared-case-names
 exactly-two-migrations-needed-normalisation
 executed-source-is-the-variant
 five-powershell-tools-plus-the-adapter-library
@@ -417,7 +417,7 @@ the-executed-null-fixture-is-the-audit-four-bytes
 the-exit-code-loss-is-asserted-not-assumed
 the-extractor-refuses-a-drifted-region-instead-of-probing-something-else
 the-getter-builds-an-explicit-flat-list
-the-harness-asserts-exactly-173
+the-harness-asserts-exactly-175
 the-harness-builds-its-fixtures-in-the-real-psql-envelope
 the-harness-checks-the-executed-count
 the-harness-executes-the-committed-gate-2-block-and-forbids-a-suffix-cou
