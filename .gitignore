@@ -1,0 +1,14 @@
+# CLASH Phase 3H Minimal Handoff .gitignore
+# Exclude sensitive files, credentials, keys, environments and local caches
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.pgpass
+*.tmp
+node_modules/
+.expo/
+scratch/

@@ -1,0 +1,86 @@
+{
+    "utc":  "2026-11-19T06:01:20.4364343Z",
+    "offline":  true,
+    "adapterSha256":  "0a54dfbfcbd76bc5b1d14a1f3d633cd598fb2f18fa8a3ebe66e483658b15d8f6",
+    "passed":  6,
+    "failed":  13,
+    "total":  19,
+    "cases":  [
+                  {
+                      "name":  "direct5432VerifyFull",
+                      "pass":  true
+                  },
+                  {
+                      "name":  "session5432VerifyFull",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "sessionDefaultPort5432",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "session6543Refused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "direct6543Refused",
+                      "pass":  true
+                  },
+                  {
+                      "name":  "arbitraryPortRefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "wrongPoolerUserRefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "differentProjectUserRefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "differentDirectHostRefused",
+                      "pass":  true
+                  },
+                  {
+                      "name":  "suffixHostRefused",
+                      "pass":  true
+                  },
+                  {
+                      "name":  "arbitraryPoolerRefused",
+                      "pass":  true
+                  },
+                  {
+                      "name":  "invalidRefRefused",
+                      "pass":  true
+                  },
+                  {
+                      "name":  "differentDatabaseRefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "missingCaRefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "nonexistentCaRefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "PGHOSTADDRRefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "PGSERVICERefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "PGOPTIONSRefused",
+                      "pass":  false
+                  },
+                  {
+                      "name":  "missingCredentialRefused",
+                      "pass":  false
+                  }
+              ]
+}

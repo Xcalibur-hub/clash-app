@@ -1,0 +1,1 @@
+offline synthetic CA placeholder; never use for a connection
