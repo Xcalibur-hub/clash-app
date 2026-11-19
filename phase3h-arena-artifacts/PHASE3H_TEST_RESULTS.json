@@ -1,0 +1,141 @@
+{
+  "harness": "semantic replay of preparation/phase3g/test-execution-policy.ps1; NOT a PowerShell 5.1 execution",
+  "extractedPoolerRegex": "\\Aaws-[0-9]+-(?:[a-z][a-z0-9]*-){2,4}[0-9]+\\.pooler\\.supabase\\.com\\z",
+  "extractedRefRegex": "\\A[a-z0-9]{20}\\z",
+  "adapterPath": "/tmp/clash-phase3h/preparation/phase3f/package/supabase/cloud/tools/lib/clash-native.ps1",
+  "passed": 26,
+  "failed": 0,
+  "total": 26,
+  "cases": [
+    {
+      "name": "direct5432VerifyFull",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "session5432VerifyFull",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sessionDefaultPort5432",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "session6543Refused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "direct6543Refused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "arbitraryPortRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "wrongPoolerUserRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "differentProjectUserRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "differentDirectHostRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "suffixHostRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "arbitraryPoolerRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "invalidRefRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "differentDatabaseRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "missingCaRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "nonexistentCaRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "multiSegmentRegionAccepted",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "unconfirmedPoolerHostRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "mismatchedPoolerConfirmationRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "twoSegmentRegionRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "lookalikePoolerZoneRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "uppercasePoolerHostRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "trailingNewlinePoolerRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "PGHOSTADDRRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "PGSERVICERefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "PGOPTIONSRefused",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "missingCredentialRefused",
+      "pass": true,
+      "detail": ""
+    }
+  ]
+}

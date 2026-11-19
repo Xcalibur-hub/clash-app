@@ -1,0 +1,78 @@
+diff --git a/preparation/phase3f/package/supabase/cloud/tools/lib/clash-native.ps1 b/preparation/phase3f/package/supabase/cloud/tools/lib/clash-native.ps1
+index 8b1e11c..8c1ffd1 100644
+--- a/preparation/phase3f/package/supabase/cloud/tools/lib/clash-native.ps1
++++ b/preparation/phase3f/package/supabase/cloud/tools/lib/clash-native.ps1
+@@ -3756,10 +3756,13 @@ function Resolve-ExecutionPolicy {
+     throw ("ProjectRef '{0}' is not a 20-character Supabase project ref." -f $ProjectRef)
+   }
+   $direct = ('db.{0}.supabase.co' -f $ProjectRef)
+-  # One DNS label: aws-INDEX-REGION. Regions have two or more word segments
+-  # followed by a numeric partition (ap-south-1, us-gov-east-1, etc.). ASCII,
+-  # case-sensitive absolute anchors also refuse trailing LF and lookalikes.
+-  $pooler = '\Aaws-[0-9]+-[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)+-[0-9]+\.pooler\.supabase\.com\z'
++  # One DNS label: aws-INDEX-REGION. Documented regions have two to four
++  # ASCII word segments followed by a numeric partition: ap-south-1,
++  # ap-southeast-1, us-east-1, us-gov-east-1. The explicit repetition bound
++  # accepts those forms and refuses two-segment-only names (aws-0-ap-south),
++  # arbitrary labels and any host outside the fixed pooler.supabase.com zone.
++  # \A/\z are absolute, case-sensitive anchors: no trailing LF, no lookalikes.
++  $pooler = '\Aaws-[0-9]+-(?:[a-z][a-z0-9]*-){2,4}[0-9]+\.pooler\.supabase\.com\z'
+ 
+   $mode = ''
+   if ([string]::IsNullOrEmpty($PgHost)) { $PgHost = $direct }
+diff --git a/preparation/phase3g/test-execution-policy.ps1 b/preparation/phase3g/test-execution-policy.ps1
+index 42d6b1f..7751839 100644
+--- a/preparation/phase3g/test-execution-policy.ps1
++++ b/preparation/phase3g/test-execution-policy.ps1
+@@ -20,6 +20,7 @@ $env:PGSSLMODE = 'disable'
+ $ref = 'kgaqejgubjemdecifzew'
+ $direct = 'db.' + $ref + '.supabase.co'
+ $pooler = 'aws-0-ap-south-1.pooler.supabase.com'
++$poolerMulti = 'aws-0-ap-southeast-1.pooler.supabase.com'
+ $cases = New-Object System.Collections.Generic.List[object]
+ function Check([string]$Name, [scriptblock]$Body) {
+   $ok = $false
+@@ -27,7 +28,8 @@ function Check([string]$Name, [scriptblock]$Body) {
+   $cases.Add([ordered]@{ name = $Name; pass = $ok })
+ }
+ function Refuses([hashtable]$Changes, [string]$Pattern) {
+-  $argsMap = @{ ProjectRef = $ref; PgHost = $pooler; PgPort = 5432; PgUser = ('postgres.' + $ref); CaCert = $ca }
++  $argsMap = @{ ProjectRef = $ref; PgHost = $pooler; PgPort = 5432;
++               PgUser = ('postgres.' + $ref); CaCert = $ca; ConfirmedPoolerHost = $pooler }
+   foreach ($key in $Changes.Keys) { $argsMap[$key] = $Changes[$key] }
+   try { $null = Resolve-ExecutionPolicy @argsMap; return $false }
+   catch { return $_.Exception.Message -match $Pattern }
+@@ -37,11 +39,11 @@ Check 'direct5432VerifyFull' {
+   $p.mode -eq 'direct' -and $p.port -eq 5432 -and $p.env.PGSSLMODE -eq 'verify-full' -and $p.sslModeOverrode -eq 'disable'
+ }
+ Check 'session5432VerifyFull' {
+-  $p = Resolve-ExecutionPolicy -ProjectRef $ref -PgHost $pooler -PgPort 5432 -PgUser ('postgres.' + $ref) -CaCert $ca
++  $p = Resolve-ExecutionPolicy -ProjectRef $ref -PgHost $pooler -PgPort 5432 -PgUser ('postgres.' + $ref) -CaCert $ca -ConfirmedPoolerHost $pooler
+   $p.mode -eq 'pooler' -and $p.port -eq 5432 -and $p.env.PGSSLMODE -eq 'verify-full' -and $p.caCertSha256 -eq (Get-NormalizedSha256 -Path $ca)
+ }
+ Check 'sessionDefaultPort5432' {
+-  $p = Resolve-ExecutionPolicy -ProjectRef $ref -PgHost $pooler -PgUser ('postgres.' + $ref) -CaCert $ca
++  $p = Resolve-ExecutionPolicy -ProjectRef $ref -PgHost $pooler -PgUser ('postgres.' + $ref) -CaCert $ca -ConfirmedPoolerHost $pooler
+   $p.port -eq 5432
+ }
+ Check 'session6543Refused' { Refuses @{ PgPort = 6543 } 'requires port 5432' }
+@@ -56,6 +58,19 @@ Check 'invalidRefRefused' { Refuses @{ ProjectRef = 'invalid' } '20-character' }
+ Check 'differentDatabaseRefused' { Refuses @{ PgDatabase = 'template1' } 'Database must' }
+ Check 'missingCaRefused' { Refuses @{ CaCert = '' } 'CA certificate is required' }
+ Check 'nonexistentCaRefused' { Refuses @{ CaCert = (Join-Path $scratch 'absent.txt') } 'certificate not found' }
++Check 'multiSegmentRegionAccepted' {
++  $p = Resolve-ExecutionPolicy -ProjectRef $ref -PgHost $poolerMulti -PgPort 5432 -PgUser ('postgres.' + $ref) -CaCert $ca -ConfirmedPoolerHost $poolerMulti
++  $p.mode -eq 'pooler' -and $p.port -eq 5432 -and $p.env.PGSSLMODE -eq 'verify-full'
++}
++Check 'unconfirmedPoolerHostRefused' {
++  try { $null = Resolve-ExecutionPolicy -ProjectRef $ref -PgHost $pooler -PgPort 5432 -PgUser ('postgres.' + $ref) -CaCert $ca; $false }
++  catch { $_.Exception.Message -match 'ConfirmedPoolerHost must exactly match' }
++}
++Check 'mismatchedPoolerConfirmationRefused' { Refuses @{ ConfirmedPoolerHost = $poolerMulti } 'ConfirmedPoolerHost must exactly match' }
++Check 'twoSegmentRegionRefused' { Refuses @{ PgHost = 'aws-0-ap-south.pooler.supabase.com' } 'not permitted' }
++Check 'lookalikePoolerZoneRefused' { Refuses @{ PgHost = ($pooler + '.evil.com') } 'not permitted' }
++Check 'uppercasePoolerHostRefused' { Refuses @{ PgHost = $pooler.ToUpperInvariant() } 'not permitted' }
++Check 'trailingNewlinePoolerRefused' { Refuses @{ PgHost = ($pooler + "`n") } 'not permitted' }
+ foreach ($variable in @('PGHOSTADDR','PGSERVICE','PGOPTIONS')) {
+   [Environment]::SetEnvironmentVariable($variable, 'synthetic-redirect')
+   $blocked = Refuses @{} ($variable + ' is set')
