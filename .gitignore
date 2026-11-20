@@ -1,0 +1,16 @@
+node_modules/
+.expo/
+dist/
+.env*
+*.log
+*.pem
+*.key
+*.p12
+*.dump
+*.backup
+private/
+evidence/
+supabase/.temp/
+supabase/.branches/
+/android/
+/ios/

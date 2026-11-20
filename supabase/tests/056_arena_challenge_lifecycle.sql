@@ -1,0 +1,196 @@
+begin;
+select no_plan();
+insert into auth.users(id) values
+ ('00000000-0000-0000-0000-00000000f301'),('00000000-0000-0000-0000-00000000f302'),('00000000-0000-0000-0000-00000000f303');
+update public.profiles set id='p2-a',handle='p2_a',name='Author' where auth_user_id='00000000-0000-0000-0000-00000000f301';
+update public.profiles set id='p2-b',handle='p2_b',name='Challenger' where auth_user_id='00000000-0000-0000-0000-00000000f302';
+update public.profiles set id='p2-c',handle='p2_c',name='Other' where auth_user_id='00000000-0000-0000-0000-00000000f303';
+insert into public.takes(id,author_id,hood,text) select 'p2-'||n,'p2-a','techtakes','Challenge source proposition' from generate_series(1,20) n;
+create function pg_temp.login(who text) returns void language sql as $$
+ select set_config('request.jwt.claims',jsonb_build_object('sub','00000000-0000-0000-0000-00000000f30'||who,'role','authenticated')::text,true)::text;
+$$;
+select pg_temp.login('2');
+set local role authenticated;
+select throws_ok($$select public.create_arena_challenge('missing','This is a sufficient counter-position.')$$,'P0002',null,'invalid Take');
+select throws_ok($$select public.create_arena_challenge('p2-1','')$$,'22023',null,'empty counter rejected');
+select throws_ok($$select public.create_arena_challenge('p2-1','fight me')$$,'22023',null,'empty fight request rejected');
+select throws_ok($$select public.create_arena_challenge('p2-1',repeat('x',501))$$,'22023',null,'oversized counter rejected');
+select throws_ok($$select public.create_arena_challenge('p2-1',repeat('!',30))$$,'22023',null,'punctuation spam rejected');
+select pg_temp.login('1');
+select throws_ok($$select public.create_arena_challenge('p2-1','This is a sufficient counter-position.')$$,'P0001',null,'self Challenge');
+reset role;
+insert into public.blocks(blocker_id,blocked_id) values('p2-a','p2-b');
+select pg_temp.login('2');
+set local role authenticated;
+select throws_ok($$select public.create_arena_challenge('p2-1','This is a sufficient counter-position.')$$,'42501',null,'author blocking challenger');
+reset role;
+delete from public.blocks where blocker_id='p2-a';
+insert into public.blocks(blocker_id,blocked_id) values('p2-b','p2-a');
+set local role authenticated;
+select throws_ok($$select public.create_arena_challenge('p2-1','This is a sufficient counter-position.')$$,'42501',null,'challenger blocking author');
+reset role;
+delete from public.blocks where blocker_id='p2-b';
+insert into public.mutes(muter_id,muted_id) values('p2-a','p2-b');
+set local role authenticated;
+select throws_ok($$select public.create_arena_challenge('p2-1','This is a sufficient counter-position.')$$,'42501',null,'author mute');
+reset role;
+delete from public.mutes where muter_id='p2-a';
+update public.takes set status='expired' where id='p2-2';
+update public.takes set expires_at=now()+interval '20 minutes' where id='p2-3';
+set local role authenticated;
+select throws_ok($$select public.create_arena_challenge('p2-2','This is a sufficient counter-position.')$$,'P0003',null,'inactive Take');
+select throws_ok($$select public.create_arena_challenge('p2-3','This is a sufficient counter-position.')$$,'P0003',null,'insufficient source lifetime');
+reset role;
+create temporary table p2_results(label text primary key,payload jsonb);
+grant all on p2_results to authenticated;
+set local role authenticated;
+insert into p2_results values('first',public.create_arena_challenge('p2-1','Companies need juniors to integrate and validate generated code.'));
+select is((select payload->>'status' from p2_results where label='first'),'PENDING','valid Challenge pending');
+select is((select payload->>'created' from p2_results where label='first'),'true','first creation truthful');
+select is((select payload->>'challengedId' from p2_results where label='first'),'p2-a','author derived from source');
+select is((select payload->>'challengerId' from p2_results where label='first'),'p2-b','challenger derived from auth');
+select is(public.create_arena_challenge('p2-1','Another retry must preserve the first counter-position.')->>'id',
+ (select payload->>'id' from p2_results where label='first'),'pending retry returns original identity');
+select is(public.create_arena_challenge('p2-1','Another retry must preserve the first counter-position.')->>'created','false','retry creates nothing');
+select throws_ok($$insert into public.arena_challenges(take_id,challenger_id,challenged_id,counter_position,expires_at)
+ values('p2-1','p2-c','p2-a','Forged counter-position.',now()+interval '1 hour')$$,'42501',null,'client cannot insert forged identity');
+select throws_ok($$update public.arena_challenges set challenger_id='p2-c'$$,'42501',null,'cannot rewrite challenger');
+select throws_ok($$update public.arena_challenges set challenged_id='p2-c'$$,'42501',null,'cannot rewrite challenged user');
+select throws_ok($$update public.arena_challenges set take_id='p2-4'$$,'42501',null,'cannot rewrite source');
+select throws_ok($$update public.arena_challenges set status='ACCEPTED'$$,'42501',null,'cannot force acceptance');
+select throws_ok($$update public.arena_challenges set clash_id='fake'$$,'42501',null,'cannot inject Clash');
+select throws_ok($$delete from public.arena_challenges$$,'42501',null,'cannot delete history');
+select throws_ok($$select public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='first'),'ACCEPT')$$,'42501',null,'challenger cannot accept');
+select throws_ok($$select public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='first'),'PASS')$$,'42501',null,'challenger cannot pass');
+select pg_temp.login('3');
+select is((select count(*)::integer from public.arena_challenges),0,'random user sees no private Challenges');
+select is(jsonb_array_length(public.list_arena_challenges('p2-1')),0,'list does not expose offers to spectators');
+select throws_ok($$select public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='first'),'ACCEPT')$$,'42501',null,'random user cannot accept');
+select pg_temp.login('1');
+select throws_ok($$select public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='first'),'CANCEL')$$,'42501',null,'author cannot cancel as challenger');
+reset role;
+select is((select count(*)::integer from public.notifications where id like 'challenge_received_%' and recipient_id='p2-a'),1,'retry sends one received notification');
+select is((select count(*)::integer from public.rate_limit_events where actor_id='p2-b' and action='arena_challenge_create'),1,'retry consumes one throttle');
+select throws_ok($$insert into public.arena_challenges(take_id,challenger_id,challenged_id,counter_position,expires_at)
+ values('p2-1','p2-b','p2-a','Database duplicate offer.',now()+interval '1 hour')$$,'23505',null,'database pending-pair uniqueness');
+select throws_ok($$update public.arena_challenges set counter_position='Changed source statement.'$$,'23514',null,'server identity guard');
+select throws_ok($$update public.takes set author_id='p2-c' where id='p2-1'$$,'23514',null,'challenged source author frozen');
+select pg_temp.login('3');
+set local role authenticated;
+insert into p2_results values('competing',public.create_arena_challenge('p2-1','Another challenger can provide a separate counter-position.'));
+select pg_temp.login('1');
+select is(jsonb_array_length(public.list_arena_challenges('p2-1',null,null,1)),1,'retrieval obeys page bound');
+insert into p2_results values('accepted',public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='first'),'ACCEPT'));
+select is((select payload->>'status' from p2_results where label='accepted'),'ACCEPTED','author accepts');
+select is(public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='first'),'ACCEPT')->>'roomId',
+ (select payload->>'roomId' from p2_results where label='accepted'),'accept retry returns canonical room');
+select is(public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='first'),'ACCEPT')->>'created','false','accept retry creates nothing');
+select is(public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='competing'),'ACCEPT')->>'status','CANCELLED','incompatible offer non-actionable');
+select pg_temp.login('2');
+select throws_ok($$select public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='first'),'CANCEL')$$,'P0003',null,'accepted cannot be cancelled');
+select throws_ok($$select public.create_arena_challenge('p2-1','A new offer cannot overlap an accepted active duel.')$$,'P0006',null,'cannot challenge active duel');
+reset role;
+select is((select count(*)::integer from public.clashes where take_id='p2-1'),1,'exactly one Clash');
+select is((select count(*)::integer from public.arena_rooms where clash_id=(select payload->>'clashId' from p2_results where label='accepted')),1,'exactly one canonical Room');
+select is((select challenger_id from public.clashes where take_id='p2-1'),'p2-b','canonical Fighter B');
+select is((select duel_key::text from public.clashes where take_id='p2-1'),(select payload->>'id' from p2_results where label='first'),'Challenge ID reused as duel key');
+select is((select count(*)::integer from public.arena_room_participants where room_id=(select payload->>'roomId' from p2_results where label='accepted') and role='debater'),2,'two canonical fighters');
+select ok((select array_agg(profile_id order by profile_id)=array['p2-a','p2-b'] from public.arena_room_participants where room_id=(select payload->>'roomId' from p2_results where label='accepted')),'source author and challenger are fighters');
+select is((select count(*)::integer from public.notifications where id like 'challenge_accepted_%' and recipient_id='p2-b'),1,'one accepted notification');
+select is((select entity_id from public.notifications where id like 'challenge_accepted_%' and recipient_id='p2-b'),(select payload->>'roomId' from p2_results where label='accepted'),'accepted notification deep-links Room');
+select throws_ok($$update public.arena_challenges set status='PENDING',clash_id=null,resolved_at=null where status='ACCEPTED'$$,'23514',null,'terminal state immutable even for privileged writes');
+select lives_ok('set constraints all immediate','accepted graph satisfies all Phase 1 checks');
+set constraints all deferred;
+select pg_temp.login('1');
+select is(public.clash_view((select payload->>'clashId' from p2_results where label='accepted'))->>'sideBText','Companies need juniors to integrate and validate generated code.','canonical Clash exposes accepted counter-position');
+select pg_temp.login('2');
+set local role authenticated;
+insert into p2_results values('passed',public.create_arena_challenge('p2-4','Passing does not require reputation or a duel.'));
+insert into p2_results values('cancelled',public.create_arena_challenge('p2-5','Pending offers can be cancelled by their challenger.'));
+select is(public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='cancelled'),'CANCEL')->>'status','CANCELLED','own pending cancellation');
+select pg_temp.login('1');
+select is(public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='passed'),'PASS')->>'status','PASSED','author passes');
+select throws_ok($$select public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='passed'),'ACCEPT')$$,'P0003',null,'passed cannot accept');
+select is(public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='cancelled'),'ACCEPT')->>'status','CANCELLED','cancelled cannot accept');
+reset role;
+select is((select count(*)::integer from public.clashes where take_id in ('p2-4','p2-5')),0,'pass and cancel create no Clash');
+select is((select count(*)::integer from public.reputation_events where profile_id='p2-a'),0,'pass never penalizes author');
+insert into public.arena_challenges(id,take_id,challenger_id,challenged_id,counter_position,created_at,expires_at)
+values('00000000-0000-0000-0000-00000000f310','p2-6','p2-b','p2-a','This historical offer has already expired.',now()-interval '3 hours',now()-interval '1 hour');
+set local role authenticated;
+select is(public.resolve_arena_challenge('00000000-0000-0000-0000-00000000f310','ACCEPT')->>'status','EXPIRED','server expires before accept');
+select is(public.resolve_arena_challenge('00000000-0000-0000-0000-00000000f310','PASS')->>'status','EXPIRED','expired cannot pass as pending');
+reset role;
+select is((select status::text from public.arena_challenges where take_id='p2-6'),'EXPIRED','expiry persisted without rollback');
+select is((select count(*)::integer from public.clashes where take_id='p2-6'),0,'expired creates no Clash');
+-- Simulate failure at the final notification write: all earlier creation rolls back.
+select pg_temp.login('2');
+set local role authenticated;
+insert into p2_results values('atomic',public.create_arena_challenge('p2-7','Acceptance failures must roll back the whole graph.'));
+reset role;
+create function pg_temp.reject_accept_notification() returns trigger language plpgsql as $$begin raise exception 'injected failure' using errcode='P0001'; end$$;
+create trigger p2_injected_failure before insert on public.notifications for each row
+when(new.kind='challenge_accepted') execute function pg_temp.reject_accept_notification();
+select pg_temp.login('1');
+set local role authenticated;
+select throws_ok($$select public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='atomic'),'ACCEPT')$$,'P0001',null,'final notification failure rolls back accept');
+reset role;
+drop trigger p2_injected_failure on public.notifications;
+select is((select status::text from public.arena_challenges where take_id='p2-7'),'PENDING','failed accept remains pending');
+select is((select count(*)::integer from public.clashes where take_id='p2-7'),0,'failed accept leaves no orphan Clash');
+select is((select count(*)::integer from public.arena_daily_topics where title='Challenge source proposition'),1,'failed accept leaves no orphan Room/topic');
+select ok(not has_function_privilege('authenticated','public.create_arena_duel(text,text,uuid)','execute'),'Phase 1 creation remains private');
+select ok(not has_function_privilege('authenticated','public.expire_arena_take_challenges(text)','execute'),'expiry helper private');
+select ok(not has_function_privilege('anon','public.create_arena_challenge(text,text)','execute'),'anonymous creation denied');
+select ok(not has_function_privilege('authenticated','public.clash_view_phase1(text)','execute'),'private view helper denied');
+-- Visibility changes after creation must be rechecked at acceptance.
+insert into public.blocks(blocker_id,blocked_id) values('p2-b','p2-a');
+set local role authenticated;
+select throws_ok($$select public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='atomic'),'ACCEPT')$$,'42501',null,'new block prevents acceptance');
+select is(jsonb_array_length(public.list_arena_challenges('p2-7')),0,'blocked pending offer hidden from author');
+reset role;
+delete from public.blocks where blocker_id='p2-b';
+update public.takes set status='removed' where id='p2-8';
+select pg_temp.login('2');
+set local role authenticated;
+select throws_ok($$select public.create_arena_challenge('p2-8','A removed Take cannot receive a Challenge.')$$,'P0003',null,'moderated source rejected');
+insert into p2_results values('removed',public.create_arena_challenge('p2-9','This source will be removed before acceptance.'));
+reset role;
+update public.takes set status='removed' where id='p2-9';
+select pg_temp.login('1');
+set local role authenticated;
+select is(public.resolve_arena_challenge((select (payload->>'id')::uuid from p2_results where label='removed'),'ACCEPT')->>'status','EXPIRED','removed source makes offer non-actionable');
+reset role;
+insert into public.arena_challenges(take_id,challenger_id,challenged_id,counter_position,created_at,expires_at)
+ values('p2-10','p2-b','p2-a','Lazy expiry is authoritative when listing offers.',now()-interval '3 hours',now()-interval '1 hour');
+set local role authenticated;
+select is(public.list_arena_challenges('p2-10')->0->>'status','EXPIRED','reads persist lazy expiry');
+reset role;
+select is((select status::text from public.arena_challenges where take_id='p2-10'),'EXPIRED','lazy expiry stored');
+-- Keyset pagination is bounded and has no duplicate boundary row.
+select pg_temp.login('2');
+set local role authenticated;
+insert into p2_results values('page',public.create_arena_challenge('p2-11','A paginated counter-position from the challenger.'));
+select pg_temp.login('3');
+insert into p2_results values('page-other',public.create_arena_challenge('p2-11','A separate counter-position on the paginated Take.'));
+select pg_temp.login('1');
+insert into p2_results values('page-first',public.list_arena_challenges('p2-11',null,null,1)->0);
+select is(jsonb_array_length(public.list_arena_challenges('p2-11',
+ (select (payload->>'createdAt')::timestamptz from p2_results where label='page-first'),
+ (select (payload->>'id')::uuid from p2_results where label='page-first'),1)),1,'next page returns remaining Challenge');
+select isnt(public.list_arena_challenges('p2-11',
+ (select (payload->>'createdAt')::timestamptz from p2_results where label='page-first'),
+ (select (payload->>'id')::uuid from p2_results where label='page-first'),1)->0->>'id',
+ (select payload->>'id' from p2_results where label='page-first'),'cursor boundary not duplicated');
+reset role;
+delete from public.rate_limit_events where actor_id='p2-b' and action='arena_challenge_create';
+insert into public.rate_limit_events(actor_id,action) select 'p2-b','arena_challenge_create' from generate_series(1,10);
+select pg_temp.login('2');
+set local role authenticated;
+select throws_ok($$select public.create_arena_challenge('p2-12','An eleventh hourly offer must be throttled.')$$,'P0001',null,'creation uses existing atomic rate limiter');
+select is(public.create_arena_challenge('p2-7','An existing pending retry bypasses the exhausted throttle.')->>'created','false','pending retry survives saturated throttle');
+reset role;
+select is((select count(*)::integer from public.arena_challenges where take_id='p2-12'),0,'rate failure leaves no offer');
+-- Existing Phase 1 suite covers legacy/group/message/outcome compatibility.
+select * from finish();
+rollback;

@@ -1,0 +1,21 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const babel=require('@babel/core');
+test('production Room text remeasures on font-scale change while preserving scaling, props and ref',()=>{
+  let fontScale=1;
+  const module={exports:{}};
+  const code=babel.transformSync(fs.readFileSync('components/liveArena/ArenaRoomText.tsx','utf8'),{filename:'ArenaRoomText.tsx',babelrc:false,configFile:false,presets:['@babel/preset-typescript',['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code;
+  const load=name=>name==='react'?{forwardRef:fn=>fn}:name==='react-native'?{Text:'NativeText',useWindowDimensions:()=>({fontScale})}:{jsx:(type,props,key)=>({type,props,key})};
+  new Function('require','module','exports',code)(load,module,module.exports);
+  const ref={},style={fontSize:16},props={children:'Complete readable text',style,accessibilityLabel:'QA text'};
+  const normal=module.exports.ArenaRoomText(props,ref);fontScale=1.3;
+  const enlarged=module.exports.ArenaRoomText(props,ref);
+  assert.notEqual(normal.key,enlarged.key);
+  assert.equal(enlarged.props.allowFontScaling,undefined);
+  assert.equal(enlarged.props.maxFontSizeMultiplier,undefined);
+  assert.equal(enlarged.props.children,props.children);
+  assert.equal(enlarged.props.style,style);
+  assert.equal(enlarged.props.ref,ref);
+  assert.equal(enlarged.props.accessibilityLabel,'QA text');
+});

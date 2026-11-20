@@ -1,0 +1,306 @@
+import React from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ExploreDiscoveryCard } from '../explore/ExploreDiscoveryCard';
+import { WorldDropsShelf } from './WorldDropsShelf';
+import { analytics } from '../../services/analytics';
+import {
+  fetchPlayHome,
+  type PlayChallengeCard,
+  type PlayHome,
+  type PlayTreasureCard,
+} from '../../services/playService';
+import { partitionPlayChallenges, partitionPlayTreasures } from '../../utils/playRails';
+import { space, typeScale, useThemeColors } from '../../theme';
+import { timeLeftLabel } from '../../utils/format';
+import { tap as hapticTap } from '../../utils/haptics';
+import { useClock } from '../../hooks/useClock';
+import { useAuth } from '../../store/AuthProvider';
+import { useRetryableRead } from '../../hooks/useRetryableRead';
+import { ReadFeedback } from '../shared/ReadFeedback';
+import { SignalEntry } from './signal/SignalEntry';
+
+type PlayTab = 'challenges' | 'treasure';
+
+function Rail({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}): React.JSX.Element | null {
+  const t = useThemeColors();
+  if (!children || (Array.isArray(children) && children.length === 0)) return null;
+  return (
+    <View style={styles.railBlock}>
+      <Text allowFontScaling={false} style={[styles.section, { color: t.textPrimary }]}>
+        {title}
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+        {children}
+      </ScrollView>
+    </View>
+  );
+}
+
+function ChallengeTile({
+  item,
+  now,
+  onPress,
+}: {
+  item: PlayChallengeCard;
+  now: number;
+  onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <ExploreDiscoveryCard
+      kind="CHALLENGE"
+      title={item.title}
+      subtitle={`${item.challengeType}${item.countryCode ? ` · ${item.countryCode}` : ''}`}
+      meta={`${item.entryCount} entries · ${timeLeftLabel(item.endsAt, now)}`}
+      mediaUrl={item.coverUrl}
+      accent="#24362E"
+      width={220}
+      height={260}
+      onPress={onPress}
+    />
+  );
+}
+
+function TreasureTile({
+  item,
+  now,
+  onPress,
+}: {
+  item: PlayTreasureCard;
+  now: number;
+  onPress: () => void;
+}): React.JSX.Element {
+  const gifts =
+    item.giftsRemaining == null ? 'Unlimited gifts' : `${item.giftsRemaining} gifts left`;
+  return (
+    <ExploreDiscoveryCard
+      kind="TREASURE"
+      title={item.title}
+      subtitle={item.clue}
+      meta={`${gifts} · ${timeLeftLabel(item.endsAt, now)}`}
+      mediaUrl={item.coverUrl}
+      accent="#2A2438"
+      width={240}
+      height={270}
+      onPress={onPress}
+    />
+  );
+}
+
+export function PlayHomePanel(): React.JSX.Element {
+  const t = useThemeColors();
+  const router = useRouter();
+  const now = useClock(30_000);
+  const [tab, setTab] = React.useState<PlayTab>('challenges');
+  const { user } = useAuth();
+  const read = useRetryableRead(fetchPlayHome, user?.id ?? 'guest');
+  const home: PlayHome | null = read.data;
+  const loading = read.status === 'loading', error = read.status !== 'ready';
+
+  React.useEffect(() => {
+    analytics.track('play_opened', { realm: 'explore', source: 'explore' });
+  }, []);
+
+  const openChallenge = (id: string) => {
+    analytics.track('challenge_opened', { realm: 'explore', source: 'explore' });
+    router.push(`/explore/challenge/${id}` as never);
+  };
+
+  const openTreasure = (id: string) => {
+    analytics.track('treasure_opened', { realm: 'explore', source: 'explore' });
+    router.push(`/explore/treasure/${id}` as never);
+  };
+
+  const challengeRails = home ? partitionPlayChallenges(home.challenges, now) : null;
+  const treasureRails = home ? partitionPlayTreasures(home.treasures, now) : null;
+
+  return (
+    <View style={styles.root}>
+      <View style={styles.titleRow}>
+        <Text allowFontScaling={false} style={[styles.kicker, { color: t.textMuted }]}>
+          PLAY
+        </Text>
+        <Pressable
+          onPress={() => {
+            hapticTap();
+            router.push('/explore/play/my' as never);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="My Play"
+        >
+          <Text allowFontScaling={false} style={[styles.myPlay, { color: t.textMuted }]}>
+            My Play
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={[styles.tabs, { backgroundColor: t.surfaceElevated, borderColor: t.border }]}>
+        {(
+          [
+            ['challenges', 'CHALLENGES'],
+            ['treasure', 'TREASURE'],
+          ] as const
+        ).map(([id, label]) => {
+          const on = tab === id;
+          return (
+            <Pressable
+              key={id}
+              onPress={() => {
+                hapticTap();
+                setTab(id);
+              }}
+              style={[styles.tab, on && { backgroundColor: t.textPrimary }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={label}
+            >
+              <Text
+                allowFontScaling={false}
+                style={[styles.tabLabel, { color: on ? t.background : t.textMuted }]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <SignalEntry />
+      <WorldDropsShelf />
+
+      <ReadFeedback status={read.status} subject="Play" retry={read.retry} />
+
+      {!loading && !error && tab === 'challenges' ? (
+        <>
+          {(home?.challenges.length ?? 0) === 0 ? (
+            <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+              No active challenges right now. Check back soon.
+            </Text>
+          ) : null}
+          <Rail title="Featured">
+            {challengeRails?.featured.map((c) => (
+              <ChallengeTile key={c.id} item={c} now={now} onPress={() => openChallenge(c.id)} />
+            ))}
+          </Rail>
+          <Rail title="Ending Soon">
+            {challengeRails?.endingSoon.map((c) => (
+              <ChallengeTile key={c.id} item={c} now={now} onPress={() => openChallenge(c.id)} />
+            ))}
+          </Rail>
+          <Rail title="Global">
+            {challengeRails?.global.map((c) => (
+              <ChallengeTile key={c.id} item={c} now={now} onPress={() => openChallenge(c.id)} />
+            ))}
+          </Rail>
+          <Rail title="Country">
+            {challengeRails?.country.map((c) => (
+              <ChallengeTile key={c.id} item={c} now={now} onPress={() => openChallenge(c.id)} />
+            ))}
+          </Rail>
+          <Rail title="Creator-hosted">
+            {challengeRails?.creator.map((c) => (
+              <ChallengeTile key={c.id} item={c} now={now} onPress={() => openChallenge(c.id)} />
+            ))}
+          </Rail>
+          <Rail title="Joined">
+            {challengeRails?.joined.map((c) => (
+              <ChallengeTile key={c.id} item={c} now={now} onPress={() => openChallenge(c.id)} />
+            ))}
+          </Rail>
+        </>
+      ) : null}
+
+      {!loading && !error && tab === 'treasure' ? (
+        <>
+          {(home?.treasures.length ?? 0) === 0 ? (
+            <Text allowFontScaling={false} style={{ color: t.textMuted }}>
+              No treasure hunts right now. New clues drop soon.
+            </Text>
+          ) : null}
+          <Rail title="Featured">
+            {treasureRails?.featured.map((h) => (
+              <TreasureTile key={h.id} item={h} now={now} onPress={() => openTreasure(h.id)} />
+            ))}
+          </Rail>
+          <Rail title="Ending Soon">
+            {treasureRails?.endingSoon.map((h) => (
+              <TreasureTile key={h.id} item={h} now={now} onPress={() => openTreasure(h.id)} />
+            ))}
+          </Rail>
+          <Rail title="Global">
+            {treasureRails?.global.map((h) => (
+              <TreasureTile key={h.id} item={h} now={now} onPress={() => openTreasure(h.id)} />
+            ))}
+          </Rail>
+          <Rail title="Country">
+            {treasureRails?.country.map((h) => (
+              <TreasureTile key={h.id} item={h} now={now} onPress={() => openTreasure(h.id)} />
+            ))}
+          </Rail>
+          <Rail title="Creator-hosted">
+            {treasureRails?.creator.map((h) => (
+              <TreasureTile key={h.id} item={h} now={now} onPress={() => openTreasure(h.id)} />
+            ))}
+          </Rail>
+          <Rail title="In Progress">
+            {treasureRails?.inProgress.map((h) => (
+              <TreasureTile key={h.id} item={h} now={now} onPress={() => openTreasure(h.id)} />
+            ))}
+          </Rail>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { gap: space.sm },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  kicker: {
+    fontFamily: typeScale.caption.fontFamily,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+  },
+  myPlay: {
+    fontFamily: typeScale.caption.fontFamily,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tabs: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    gap: 2,
+    padding: 3,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  tab: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  tabLabel: {
+    fontFamily: typeScale.caption.fontFamily,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  section: {
+    fontFamily: typeScale.section.fontFamily,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  railBlock: { gap: 8 },
+  rail: { gap: 8, paddingRight: space.md },
+});

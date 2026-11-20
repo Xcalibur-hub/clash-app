@@ -1,0 +1,4 @@
+# Every other reviewed text deployment input uses the LF checksum convention.
+* text eol=lf
+# Keep frozen migration snapshots byte-identical across Git checkouts.
+/supabase/migrations/*.sql -text

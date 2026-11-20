@@ -1,0 +1,34 @@
+begin;
+select no_plan();
+insert into auth.users(id) values
+ ('00000000-0000-0000-0000-000000005001'),
+ ('00000000-0000-0000-0000-000000005002');
+update public.profiles set coins=137 where auth_user_id='00000000-0000-0000-0000-000000005001';
+update public.profiles set coins=23 where auth_user_id='00000000-0000-0000-0000-000000005002';
+select ok(not has_table_privilege('anon','public.profiles','select'),'no anonymous full-row grant');
+select ok(not has_table_privilege('authenticated','public.profiles','select'),'no authenticated full-row grant');
+select ok(not has_function_privilege('anon','public.get_my_profile()','execute'),'own profile RPC denies anonymous');
+set local role anon;
+select lives_ok($$select id,handle,name,avatar_tint,bio,home_hood,reputation,rank,streak from public.profiles$$,'public identity projection works');
+select throws_ok($$select * from public.profiles$$,'42501',null,'anonymous full-row REST projection denied');
+select throws_ok($$select auth_user_id from public.profiles$$,'42501',null,'auth linkage denied');
+select throws_ok($$select coins from public.profiles$$,'42501',null,'balances denied');
+select throws_ok($$select role,moderated_hoods from public.profiles$$,'42501',null,'authority denied');
+select throws_ok($$select public.get_my_profile()$$,'42501',null,'anonymous direct RPC denied');
+reset role;
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000005001","role":"authenticated"}',true);
+set local role authenticated;
+select is((select coins from public.get_my_profile()),137,'caller can read own balance');
+select is((select count(*)::integer from public.get_my_profile()),1,'only one caller-derived row');
+select throws_ok($$select coins from public.profiles$$,'42501',null,'authenticated balance enumeration denied');
+select throws_ok($$select id from public.profiles where auth_user_id is not null$$,'42501',null,'auth linkage filter probing denied');
+select throws_ok($$update public.profiles set role='admin' where id=public.my_profile_id()$$,'42501',null,'role escalation denied');
+select throws_ok($$update public.profiles set coins=999 where id=public.my_profile_id()$$,'42501',null,'balance escalation denied');
+select lives_ok($$update public.profiles set bio='Own profile remains editable' where id=public.my_profile_id()$$,'editable whitelist preserved');
+reset role;
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000005002","role":"authenticated"}',true);
+set local role authenticated;
+select is((select coins from public.get_my_profile()),23,'switching caller does not expose previous balance');
+reset role;
+select * from finish();
+rollback;

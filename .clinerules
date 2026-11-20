@@ -1,0 +1,6 @@
+# Cline Execution Rules for CLASH 2.0
+- Always refer to `CLASH_SPEC.md` for product specs and visual design tokens.
+- Execute strictly one Phase at a time from Section 38. Never start Phase N+1 until Phase N compiles and runs without errors.
+- Always use TypeScript with zero `any` types.
+- Test and verify the app compiles with `npx expo start` after every major component or screen addition.
+- Keep components modular (max 150 lines per file). Never generate monolithic screens.

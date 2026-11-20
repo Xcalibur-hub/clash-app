@@ -1,0 +1,18 @@
+begin;
+select no_plan();
+select is((select count(*)::integer from public.arena_interests),7,'small catalogue');
+select is((select count(*)::integer from public.arena_interest_hoods),7,'all existing Hoods mapped');
+select is((select count(*)::integer from unnest(enum_range(null::public.hood_id)) h where not exists(select 1 from public.arena_interest_hoods m where m.hood=h)),0,'no unmapped Hood');
+select ok(not has_table_privilege('anon','public.arena_interests','select'),'anonymous catalogue access denied');
+select ok(not has_table_privilege('authenticated','public.arena_interests','insert'),'users cannot create interests');
+select ok(not has_table_privilege('authenticated','public.arena_interest_hoods','update'),'users cannot rewrite mappings');
+set local role authenticated;
+select is((select count(*)::integer from public.arena_interests),7,'signed in catalogue readable');
+select is((select interest_id from public.arena_interest_hoods where hood='techtakes'),'technology','existing tech ID compatible');
+reset role;
+update public.arena_interests set active=false where id='technology';
+set local role authenticated;
+select is((select count(*)::integer from public.arena_interest_hoods where hood='techtakes'),0,'inactive mapping hidden');
+reset role;
+select * from finish();
+rollback;

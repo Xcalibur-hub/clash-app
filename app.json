@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "CLASH",
+    "slug": "clash",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "scheme": "clash",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#08080B",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.clash.v2",
+      "infoPlist": {
+        "UIUserInterfaceStyle": "Dark",
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+      }
+    },
+    "android": {
+      "package": "com.clash.v2",
+      "userInterfaceStyle": "dark",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CLASH uses your location once when you publish a World Drop, and stores only an approximate area — never your exact position or continuous tracking."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "42a42aa6-4434-4db2-9383-7b059984985c"
+      }
+    }
+  }
+}

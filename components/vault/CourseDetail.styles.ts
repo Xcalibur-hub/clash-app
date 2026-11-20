@@ -1,0 +1,51 @@
+import { StyleSheet } from 'react-native';
+import { layout, radius, space, typeScale } from '../../theme';
+
+export const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  content: { paddingHorizontal: layout.screenX, gap: space.sm },
+  head: { gap: space.md, marginBottom: space.md },
+  hero: {
+    minHeight: 260,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+    paddingHorizontal: space.lg,
+    paddingBottom: space.xl,
+    paddingTop: space.lg,
+    gap: 6,
+    borderRadius: 14,
+  },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.42)' },
+  kicker: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(250,250,248,0.75)',
+    letterSpacing: 1,
+    zIndex: 1,
+  },
+  title: {
+    fontFamily: typeScale.display.fontFamily,
+    fontSize: 34,
+    lineHeight: 36,
+    fontWeight: '800',
+    letterSpacing: -1.1,
+    color: '#FAFAF8',
+    zIndex: 1,
+  },
+  byline: { ...typeScale.meta },
+  body: { ...typeScale.body },
+  progress: { ...typeScale.caption, letterSpacing: 0.4 },
+  lesson: {
+    flexDirection: 'row',
+    gap: space.md,
+    alignItems: 'center',
+    paddingVertical: space.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  lessonIndex: { ...typeScale.caption, letterSpacing: 1, width: 28 },
+  lessonText: { flex: 1, gap: 2 },
+  lessonTitle: { ...typeScale.label, fontWeight: '600' },
+  lessonMeta: { ...typeScale.caption },
+});

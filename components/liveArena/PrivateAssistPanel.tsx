@@ -1,0 +1,130 @@
+import React from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useAuth } from '../../store/AuthProvider';
+import { useMediaPicker, type PickedMedia } from '../../hooks/useMediaPicker';
+import { useThemeColors, space } from '../../theme';
+import type { ArenaDuel } from '../../utils/arenaDuelPayload';
+import { incorporatePrivateAssist, listPrivateAssists, privateAssistMediaUrl, reportPrivateAssist, respondPrivateAssist,
+  sendPrivateAssist, uploadPrivateAssistMedia, type PrivateAssist } from '../../services/arenaAssistService';
+import { privateAssistPrivacyLabel } from '../../utils/spectatorPresentation';
+import { MediaViewer } from '../shared/MediaViewer';
+
+export function PrivateAssistPanel({ roomId, duel, disabled, onPublished, initiallyOpen = false, initialSide = 'A' }: {
+  initialSide?: 'A'|'B'; initiallyOpen?: boolean; roomId: string; duel: ArenaDuel; disabled: boolean; onPublished: () => Promise<void>;
+}): React.JSX.Element | null {
+  const {user}=useAuth();
+  return <PrivateAssistBody key={`${roomId}:${user?.id??'guest'}`} roomId={roomId} duel={duel} disabled={disabled} onPublished={onPublished} initiallyOpen={initiallyOpen} initialSide={initialSide}/>;
+}
+function PrivateAssistBody({ roomId, duel, disabled, onPublished, initiallyOpen = false, initialSide = 'A' }: {
+  initialSide?: 'A'|'B'; initiallyOpen?: boolean; roomId: string; duel: ArenaDuel; disabled: boolean; onPublished: () => Promise<void>;
+}): React.JSX.Element | null {
+  const t=useThemeColors(), {user}=useAuth(), picker=useMediaPicker();
+  const account=user?.id;
+  const fighter=['fighter_a','fighter_b'].includes(duel.viewerRelationship);
+  const [open,setOpen]=React.useState(initiallyOpen),[side,setSide]=React.useState<'A'|'B'>(initialSide);
+  const [body,setBody]=React.useState(''),[picked,setPicked]=React.useState<PickedMedia|null>(null);
+  const [uploaded,setUploaded]=React.useState<string|null>(null),[rows,setRows]=React.useState<PrivateAssist[]>([]);
+  const [error,setError]=React.useState<string|null>(null),[busy,setBusy]=React.useState(false),[notice,setNotice]=React.useState('');
+  const alive=React.useRef(true);
+  const inFlight=React.useRef(false);
+  React.useEffect(()=>{alive.current=true;return ()=>{alive.current=false;};},[]);
+  React.useEffect(()=>{
+    if (!open || !fighter || !account) return;
+    let active=true;
+    const load=async()=>{try{const next=await listPrivateAssists(account,roomId);if(active){setRows(next);setError(null);}}catch{if(active){setRows([]);setError('Private inbox unavailable. Retry or reopen.');}}};
+    void load();const timer=setInterval(()=>void load(),15000);
+    return ()=>{active=false;clearInterval(timer);};
+  },[open,fighter,account,roomId]);
+  if (!account || duel.viewerRelationship==='staff') return null;
+  const action=async(fn:()=>Promise<void>,refresh=true)=>{
+    if(inFlight.current)return;inFlight.current=true;setBusy(true);setError(null);setNotice('');
+    try{await fn();if(alive.current && fighter && refresh){const next=await listPrivateAssists(account,roomId);if(alive.current)setRows(next);}}
+    catch{if(alive.current)setError('Assist could not update. Check access or try again.');}
+    finally{inFlight.current=false;if(alive.current)setBusy(false);}
+  };
+  const button=(label:string,fn:()=>void,locked=false)=><Pressable key={label} accessibilityRole="button" accessibilityLabel={label} disabled={locked||busy} onPress={fn} style={{minHeight:44,minWidth:44,justifyContent:'center',padding:10,opacity:locked||busy?0.45:1}}><Text style={{color:t.textPrimary}}>{label}</Text></Pressable>;
+  return <View style={[styles.panel,{borderColor:t.border,backgroundColor:t.surfaceElevated}]}>
+    <Pressable accessibilityRole="button" accessibilityState={{expanded:open}} accessibilityLabel={fighter?'Toggle private assist inbox':'Toggle private assist composer'} onPress={()=>setOpen(v=>!v)} style={styles.header}>
+      <View style={styles.headerCopy}>
+        <Text style={[styles.eyebrow,{color:t.textMuted}]}>PRIVATE ASSIST · NOT A VOTE</Text>
+        <Text style={[styles.headerTitle,{color:t.textPrimary}]}>{fighter?'Your private inbox':'Send a private assist'}</Text>
+        <Text style={[styles.headerHint,{color:t.textSecondary}]}>{fighter?'Only you can read assists addressed to you':'Private to one fighter · never posted in the Crowd'}</Text>
+      </View>
+      <Text style={[styles.expand,{color:t.textPrimary}]}>{open?'−':'+'}</Text>
+    </Pressable>
+    {open?<>
+      {!fighter ? <View style={[styles.privacyChip,{borderColor:t.border,backgroundColor:t.surface}]}>
+        <Text accessibilityLiveRegion="polite" style={[styles.privacyChipText,{color:t.textPrimary}]}>
+          {privateAssistPrivacyLabel(side === 'A' ? duel.fighterA.name : duel.fighterB.name, side)}
+        </Text>
+      </View> : null}
+      <Text style={[styles.notice,{color:t.textSecondary}]}>{fighter?'Accepting keeps it private until you explicitly publish it as your argument.':'Only the selected fighter can read this. Not judging and not Crowd chat.'}</Text>
+      {fighter?<ScrollView style={{maxHeight:240}}>
+        {rows.length===0&&!error?<Text style={{color:t.textMuted}}>No private assists yet.</Text>:null}
+        {rows.map(row=><View key={row.id} style={{paddingVertical:10,borderBottomWidth:1,borderColor:t.border,gap:4}}>
+          <Text style={[styles.statusPill,{color:t.textMuted}]}>
+            {row.status === 'PENDING' ? 'Pending · private' : row.status === 'ACCEPTED' ? 'Accepted · still private' : row.status === 'REJECTED' ? 'Rejected' : row.status}
+            {row.mediaId ? ` · ${row.mediaKind ?? 'attachment'}` : ''}
+            {row.publishedMessageId ? ' · Published once' : ''}
+          </Text>
+          <Text style={{color:t.textPrimary}}>{row.body}</Text>
+          {row.mediaKind?<AssistAttachment account={account} assist={row}/>:null}
+          {row.status==='PENDING'?<View style={{flexDirection:'row'}}>{button('Accept',()=>void action(()=>respondPrivateAssist(account,row.id,'ACCEPTED')),disabled)}{button('Reject',()=>void action(()=>respondPrivateAssist(account,row.id,'REJECTED')),disabled)}</View>:null}
+          {row.status==='ACCEPTED'&&!row.publishedMessageId?button('Publish as my argument',()=>void action(async()=>{await incorporatePrivateAssist(account,roomId,row);await onPublished();}),disabled):null}
+          {button('Report and hide',()=>void action(()=>reportPrivateAssist(account,row.id)))}
+        </View>)}
+        {rows.length>=30?button('Load older assists',()=>void action(async()=>{const older=await listPrivateAssists(account,roomId,rows.at(-1));if(alive.current)setRows(current=>[...current,...older.filter(a=>!current.some(b=>b.id===a.id))]);},false)):null}
+      </ScrollView>:<>
+        <Text style={[styles.recipientLabel,{color:t.textMuted}]}>Who receives this private assist</Text>
+        <View style={styles.sideRow}>{(['A','B'] as const).map(option=><Pressable key={option} accessibilityRole="button" accessibilityState={{selected:side===option}} accessibilityLabel={`Private assist to Fighter ${option}, ${option === 'A' ? duel.fighterA.name : duel.fighterB.name}`} disabled={disabled||busy} onPress={()=>setSide(option)} style={[styles.sideChoice,{borderColor:side===option?t.textPrimary:t.border,backgroundColor:side===option?t.background:'transparent',opacity:disabled||busy?0.45:1}]}><Text style={[styles.sideLabel,{color:t.textPrimary}]}>{side===option?'✓  ':''}Fighter {option}{'\n'}{option === 'A' ? duel.fighterA.name : duel.fighterB.name}</Text></Pressable>)}</View>
+        <TextInput accessibilityLabel="Private assist text" value={body} onChangeText={setBody} maxLength={500} multiline editable={!disabled&&!busy} style={{color:t.textPrimary,minHeight:55,borderWidth:1,borderColor:t.border,borderRadius:12,padding:10}} placeholder="A source, thought or helpful counterpoint" placeholderTextColor={t.textMuted}/>
+        <View style={{flexDirection:'row',flexWrap:'wrap'}}>{button('Attach photo',()=>void action(async()=>{const p=await picker.pickImage();if(p&&alive.current){setPicked(p);setUploaded(null);}}),disabled)}{button('Attach video',()=>void action(async()=>{const p=await picker.pickVideo();if(p&&alive.current){setPicked(p);setUploaded(null);}}),disabled)}</View>
+        {picked?<Text style={{color:t.textMuted}}>Private {picked.kind} attached · only the chosen fighter can open it</Text>:null}
+        {button('Send privately',()=>void action(async()=>{let id=uploaded;if(picked&&!id){id=await uploadPrivateAssistMedia(account,picked);if(alive.current)setUploaded(id);}await sendPrivateAssist(account,roomId,side,body,id);if(alive.current){setBody('');setPicked(null);setUploaded(null);setNotice('Private assist sent to ' + (side === 'A' ? duel.fighterA.name : duel.fighterB.name) + '. Only that fighter can read it.');}}),disabled||(!body.trim()&&!picked))}
+      </>}
+      {disabled?<Text style={{color:t.textMuted}}>Assist submissions and responses are closed for this Clash.</Text>:null}
+      {busy?<Text style={{color:t.textMuted}}>Updating…</Text>:null}
+      {notice?<Text accessibilityLiveRegion="polite" style={{color:t.textMuted}}>{notice}</Text>:null}
+      {error?<Text accessibilityRole="alert" style={{color:t.textPrimary}}>{error}</Text>:null}
+    </>:null}
+  </View>;
+}
+function AssistAttachment({account,assist}:{account:string;assist:PrivateAssist}): React.JSX.Element|null {
+  const t=useThemeColors();
+  const [url,setUrl]=React.useState<string|null>(null);
+  const [failed,setFailed]=React.useState(false);
+  const alive=React.useRef(true);
+  React.useEffect(()=>{alive.current=true;return ()=>{alive.current=false;};},[]);
+  return <>
+    <Pressable accessibilityRole="button" accessibilityLabel="View private attachment" style={{minHeight:44,justifyContent:'center'}} onPress={()=>void privateAssistMediaUrl(account,assist).then(u=>{if(alive.current){setUrl(u);setFailed(false);}}).catch(()=>{if(alive.current)setFailed(true);})}><Text style={{color:t.textPrimary}}>View private {assist.mediaKind}</Text></Pressable>
+    {failed?<Text accessibilityRole="alert" style={{color:t.textPrimary}}>Private attachment unavailable. Try again.</Text>:null}
+    <MediaViewer visible={Boolean(url)} uri={url} kind={assist.mediaKind??'image'} onClose={()=>setUrl(null)}/>
+  </>;
+}
+
+const styles = StyleSheet.create({
+  panel: {
+    marginHorizontal: space.sm,
+    marginVertical: space.xs,
+    marginBottom: space.md,
+    padding: space.md,
+    paddingBottom: space.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    gap: space.sm,
+  },
+  header: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  headerCopy: { flex: 1, gap: 3 },
+  eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
+  headerTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
+  headerHint: { fontSize: 12, lineHeight: 17 },
+  expand: { fontSize: 23, fontWeight: '500', minWidth: 32, textAlign: 'center' },
+  notice: { fontSize: 12, lineHeight: 18 },
+  privacyChip: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
+  privacyChipText: { fontSize: 13, fontWeight: '700' },
+  recipientLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },
+  statusPill: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  sideRow: { flexDirection: 'row', gap: space.sm },
+  sideChoice: { flex: 1, minHeight: 52, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+  sideLabel: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+});

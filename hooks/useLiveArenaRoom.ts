@@ -1,0 +1,1040 @@
+﻿import { currentUserId } from '../services/supabaseClient';
+import { acquireOfficialRequest, confirmOfficialRequest } from '../services/officialRequestStore';
+import { compareOfficial, drainOfficialGap, type OfficialCursor } from '../utils/officialRecovery';
+import { createReactionQueue } from '../utils/reactionOptimism';
+import { createRoomReactionBridge } from '../utils/roomReactionBridge';
+import { recoverOverflowAfterRefresh } from '../utils/overflowRecovery';
+import { createArenaTranscriptStore } from '../utils/arenaTranscriptStore';
+import { useFocusEffect } from 'expo-router';
+import React from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
+import {
+  fetchEvidence,
+  fetchOfficialPage,
+  fetchEvidenceVisibility,
+  fetchMessage,
+  fetchVisibleMessageIds,
+  fetchMindshiftStats,
+  fetchRoom,
+  markEvidenceUseful,
+  postClashMediaReshare,
+  postMessage,
+  reactMessage,
+  recordFinalStance,
+  submitArgumentVote,
+  submitEvidence,
+  submitSideVote,
+  subscribeRoomMessages,
+  upgradeSpectator,
+  type ArenaAuthor,
+  type ArenaEvidence,
+  type ArenaMessage,
+  type ArenaMindshiftStats,
+  type ArenaRoom,
+  type PostArenaMessageInput,
+  type Stance,
+  type SubmitArenaEvidenceInput,
+} from '../services/liveArenaService';
+import { errorText, SupabaseError } from '../services/supabaseClient';
+import { showNotice, useClash } from '../store';
+import {
+  createTranscriptUpdater,
+  isCurrentScope,
+  isLiveRoomSession,
+  resolveSendResolution,
+  type RoomSession,
+} from '../utils/transcriptOrdering.ts';
+import { mergeMessagesById } from '../utils/liveRoomThread';
+
+/** How many arguments one page of the thread carries. */
+const PAGE = 40;
+/** Coalesce realtime INSERT ids before hydrating. */
+const HYDRATE_DEBOUNCE_MS = 280;
+/** Periodic rollup refresh for reactions/reply counts (not every INSERT). */
+const RECONCILE_MS = 30_000;
+/** Rows checked per interval; rotates through long loaded threads. */
+const VISIBILITY_BATCH = 100;
+
+export interface LiveArenaRoomController {
+  room: ArenaRoom | null;
+  /** Newest first â€” render in an inverted list. */
+  messages: ArenaMessage[];
+  evidence: ArenaEvidence[];
+  stats: ArenaMindshiftStats | null;
+  loading: boolean;
+  /** Set only when the room itself could not be read. */
+  error: string | null;
+  /** True while the thread is unreadable (not a member) but the room loaded. */
+  threadLocked: boolean;
+  refreshing: boolean;
+  sending: boolean;
+  loadingOlder: boolean;
+  hasOlder: boolean;
+  /** True after a capacity rejection on upgrade â€” user stays spectator. */
+  roomFullOnUpgrade: boolean;
+  refresh: () => Promise<void>;
+  /** Result-only read: no thread recovery, heartbeat, pulse or mutation. */
+  refreshResult: () => Promise<void>;
+  loadOlder: () => Promise<void>;
+  /** Optimistic; rolls the placeholder back and surfaces a notice on failure. */
+  send: (input: Omit<PostArenaMessageInput, 'roomId'>) => Promise<boolean>;
+  react: (messageId: string, emoji?: string) => Promise<void>;
+  addEvidence: (input: Omit<SubmitArenaEvidenceInput, 'roomId'>) => Promise<boolean>;
+  markUseful: (evidenceId: string) => Promise<void>;
+  voteSide: (side: 'AGREE' | 'DISAGREE') => Promise<boolean>;
+  voteArgument: (messageId: string) => Promise<boolean>;
+  recordFinal: (stance: Stance) => Promise<boolean>;
+  /** Spectator â†’ debater in-place. Refreshes room state on success. */
+  upgradeToDebater: (stance: Stance) => Promise<boolean>;
+}
+
+/** Newest-first merge that keeps one row per id â€” an optimistic echo never doubles. */
+function mergeMessages(
+  current: readonly ArenaMessage[],
+  incoming: readonly ArenaMessage[],
+): ArenaMessage[] {
+  return mergeMessagesById(current, incoming);
+}
+
+/** Row-level-security refusals read as 42501; the thread is members-only. */
+function isMembershipRefusal(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '42501'
+  );
+}
+
+/**
+ * Everything one live room needs: the room card, the thread, the evidence rail,
+ * a realtime subscription and the writes.
+ *
+ * The thread is deliberately refreshed rather than patched when realtime fires.
+ * A `postgres_changes` row carries no author card and no reaction rollup, and
+ * synthesising one on the client would mean the app inventing content the server
+ * never sent â€” so an INSERT is treated as a hint to re-read the newest page.
+ *
+ * A non-member can still load a SETTLED room (the result is public), so a
+ * refused message read marks the thread locked instead of failing the screen.
+ */
+const EMPTY_MESSAGES: ArenaMessage[] = [];
+Object.freeze(EMPTY_MESSAGES);
+
+export function useLiveArenaRoom(
+  roomId: string,
+  viewerAuthor: ArenaAuthor | null = null,
+): LiveArenaRoomController {
+  const { dispatch } = useClash();
+  const [room, setRoom] = React.useState<ArenaRoom | null>(null);
+  const [transcript] = React.useState(createArenaTranscriptStore);
+  const rawMessages = React.useSyncExternalStore(transcript.subscribe, transcript.getSnapshot, transcript.getSnapshot);
+  // Imperative owner transition, not a functional React state setter.
+  const updateMessages = transcript.update;
+  const [evidence, setEvidence] = React.useState<ArenaEvidence[]>([]);
+  const [stats, setStats] = React.useState<ArenaMindshiftStats | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [threadLocked, setThreadLocked] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [loadingOlder, setLoadingOlder] = React.useState(false);
+  const [hasOlder, setHasOlder] = React.useState(true);
+  const [roomFullOnUpgrade, setRoomFullOnUpgrade] = React.useState(false);
+
+  const mounted = React.useRef(false);
+  const accessGeneration = React.useRef(0);
+  const sessionRef = React.useRef<RoomSession>({ roomId, generation: 0 });
+  // Never publish a prior occupancy's rows under a new roomId before layout clears.
+  const messages = sessionRef.current.roomId === roomId ? rawMessages : EMPTY_MESSAGES;
+  const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const authorRef = React.useRef<ArenaAuthor | null>(viewerAuthor);
+  const messagesRef = transcript.messagesRef;
+  const evidenceRef = React.useRef<ArenaEvidence[]>([]);
+  evidenceRef.current=evidence;
+  const evidenceVisibilityCursor=React.useRef(0);
+  const roomRef = React.useRef<ArenaRoom | null>(room);
+  const visibilityCursor = React.useRef(0);
+  const messageCursor = React.useRef<OfficialCursor | null>(null);
+  const initialCoverage = React.useRef<{ cursor: OfficialCursor | null; ids: string[];
+    older?: OfficialCursor | null; hasOlder?: boolean } | null>(null);
+  const evidenceCursor = React.useRef<OfficialCursor | null>(null);
+  const olderEvidence = React.useRef<OfficialCursor | null>(null);
+  /** Raw older-page boundary; survives when every admitted row is individually excluded. */
+  const messageOlderAnchor = React.useRef<OfficialCursor | null>(null);
+  const evidenceHasOlder = React.useRef(false);
+  const messageHasOlder = React.useRef(true);
+  const recovering = React.useRef(false);
+  const olderBusy = React.useRef<symbol | null>(null);
+  const refreshBusy = React.useRef<symbol | null>(null);
+  const loadCounts = React.useRef({ initial: 0, refresh: 0 });
+  const sendBusy = React.useRef<symbol | null>(null);
+  const evidenceBusy = React.useRef<symbol | null>(null);
+  authorRef.current = viewerAuthor;
+  roomRef.current = room;
+
+  const liveSession = React.useCallback(
+    (session: RoomSession): boolean => isLiveRoomSession(mounted.current, session, sessionRef.current),
+    [],
+  );
+
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // Passive cleanup denotes a real detach/replay, unlike Suspense layout hiding.
+      boundRoomId.current = null;
+      accessGeneration.current++;
+      sessionRef.current = { roomId: sessionRef.current.roomId, generation: accessGeneration.current };
+      visibilityBarrier.reset();
+      reactionSnapshots.current.resetReactionWrites();
+      initialCoverage.current = null;
+      messageOlderAnchor.current = null;
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    };
+  }, []);
+
+  const notify = React.useCallback(
+    (caught: unknown) => {
+      dispatch(showNotice(roomRef.current?.roomMode === 'DUEL'
+        ? 'That action could not be completed. Please try again.' : errorText(caught)));
+    },
+    [dispatch],
+  );
+
+  const clearPrivateThread = React.useCallback(() => {
+    accessGeneration.current++;
+    const generation = accessGeneration.current;
+    sessionRef.current = { roomId: sessionRef.current.roomId, generation };
+    recovering.current = false;
+    olderBusy.current = null;
+    refreshBusy.current = null;
+    loadCounts.current = { initial: 0, refresh: 0 };
+    evidenceBusy.current = null;
+    visibilityBarrier.reset();
+    reactionSnapshots.current.resetReactionWrites();
+    initialCoverage.current = null;
+    messageOlderAnchor.current = null;
+    sendBusy.current = null;
+    setSending(false);
+    setLoading(false);
+    setRefreshing(false);
+    setLoadingOlder(false);
+    updateMessages(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
+    setEvidence(current => isCurrentScope(mounted.current, generation, accessGeneration.current) ? [] : current);
+    setStats(null);
+    setThreadLocked(true);
+    setHasOlder(false);
+  }, []);
+
+  const reactionSnapshots = React.useRef(transcript.reactions);
+  const visibilityBarrier = transcript.visibility;
+  const reactionQueue = React.useRef<ReturnType<typeof createRoomReactionBridge> | null>(null);
+  if (!reactionQueue.current) reactionQueue.current = createRoomReactionBridge({
+    snapshots: reactionSnapshots.current,
+    read: async id => (await fetchMessage(id))?.reactions ?? null,
+    toggle: reactMessage,
+    write: (id, reactions) => {
+      const generation = accessGeneration.current;
+      const currentWrite = reactionSnapshots.current.beginReactionWrite(id);
+      const remove = reactions === null ? visibilityBarrier.mark([id]) : null;
+      updateMessages(current => {
+        if (!isCurrentScope(mounted.current, generation, accessGeneration.current)) return current;
+        if (remove) return remove(current);
+        if (!currentWrite()) return current;
+        return reactions === null ? current
+          : current.map(row => row.id === id ? { ...row, reactions } : row);
+      });
+    },
+    onError: notify,
+  });
+
+  /**
+   * Lightweight INSERT hydrate: fetch only the new message id(s).
+   * Full newest-page reconcile runs on a slow timer / reconnect â€” not every post.
+   */
+  const hydrateInserted = React.useCallback(async (ids: string[], session = sessionRef.current): Promise<void> => {
+    if (ids.length === 0) return;
+    if (!liveSession(session)) return;
+    const visibilityEpoch = visibilityBarrier.epoch();
+    const snapshot = reactionSnapshots.current.beginSnapshot();
+    try {
+      const unique = [...new Set(ids)].slice(0, 12);
+      const rows = await Promise.all(
+        unique.map((id) => fetchMessage(id).catch(() => null)),
+      );
+      if (!liveSession(session)) return;
+      const next = rows.filter((row): row is ArenaMessage => row != null);
+      if (next.length === 0) return;
+      setThreadLocked(false);
+      const authorized = visibilityBarrier.admit(next, visibilityEpoch);
+      if (authorized.length === 0) return;
+      updateMessages(createTranscriptUpdater(authorized, snapshot, reactionSnapshots.current, visibilityBarrier,
+        () => liveSession(session)));
+    } catch (caught) {
+      if (!liveSession(session)) return;
+      if (isMembershipRefusal(caught)) clearPrivateThread();
+    }
+  }, [clearPrivateThread, liveSession]);
+
+  /**
+   * Gap-aware + newest-page reconcile after reconnect / periodic drift repair.
+   */
+  const refreshThread = React.useCallback(async (session = sessionRef.current): Promise<void> => {
+    if (!liveSession(session) || recovering.current) return;
+    recovering.current = true;
+    let snapshot = 0;
+    const threadEpoch = visibilityBarrier.epoch();
+    const generation = session.generation;
+    const stillHere = (): boolean => liveSession(session);
+    try {
+      await reactionQueue.current?.reconcile();
+      if (!stillHere()) return;
+      const initial = initialCoverage.current;
+      if (initial && !messageCursor.current) {
+        // A rejected initial window must be re-read even after it falls outside
+        // the newest page. At most one retained page, in batches of 12 existing
+        // per-message reads; rejection/failure leaves the obligation for later.
+        for (let batch = 0; initial.ids.length && batch < 4; batch++) {
+          const ids = initial.ids.slice(0, 12);
+          const epoch = visibilityBarrier.epoch();
+          const readSnapshot = reactionSnapshots.current.beginSnapshot();
+          const rows = await Promise.all(ids.map(id => fetchMessage(id)));
+          if (!stillHere()) return;
+          if (!visibilityBarrier.allows(epoch)) return;
+          const admitted = visibilityBarrier.admit(rows.filter((row): row is ArenaMessage => row !== null), epoch);
+          const missing = ids.filter((_id, index) => rows[index] === null);
+          const remove = missing.length ? visibilityBarrier.mark(missing) : null;
+          const apply = createTranscriptUpdater(admitted, readSnapshot, reactionSnapshots.current, visibilityBarrier,
+            stillHere);
+          updateMessages(current => {
+            if (!stillHere()) return current;
+            const next = apply(current);
+            return remove ? remove(next) : next;
+          });
+          if (!stillHere()) return;
+          initial.ids.splice(0, ids.length);
+        }
+        if (initial.ids.length) return;
+        if (!initial.cursor) {
+          // An initially empty rejected response still needs a fresh accepted
+          // page before the empty bootstrap boundary can be acknowledged.
+          const epoch = visibilityBarrier.epoch();
+          const readSnapshot = reactionSnapshots.current.beginSnapshot();
+          const page = await fetchOfficialPage(session.roomId, 'message');
+          if (!stillHere()) return;
+          if (!visibilityBarrier.allows(epoch)) return;
+          const admitted = visibilityBarrier.admit(page, epoch);
+          updateMessages(createTranscriptUpdater(admitted, readSnapshot, reactionSnapshots.current, visibilityBarrier,
+            stillHere));
+          if (!stillHere()) return;
+          if (!messageOlderAnchor.current) {
+            messageHasOlder.current = page.length >= PAGE;
+            if (page.at(-1)?.preciseCreatedAt) messageOlderAnchor.current = page.at(-1) as OfficialCursor;
+            setHasOlder(messageHasOlder.current || evidenceHasOlder.current);
+          }
+          initial.cursor = page[0] as OfficialCursor ?? { id: '', preciseCreatedAt: '1970-01-01T00:00:00.000000Z' };
+        }
+        messageCursor.current = initial.cursor;
+        if (!messageOlderAnchor.current && initial.older) {
+          messageOlderAnchor.current = initial.older;
+          messageHasOlder.current = initial.hasOlder ?? true;
+          setHasOlder(messageHasOlder.current || evidenceHasOlder.current);
+        }
+        initialCoverage.current = null;
+      }
+      if (messageCursor.current) await drainOfficialGap(messageCursor.current,
+        async cursor => {
+          snapshot = reactionSnapshots.current.beginSnapshot();
+          return (await fetchOfficialPage(session.roomId,'message',cursor,'newer')) as (ArenaMessage & OfficialCursor)[];
+        },
+        (rows,cursor) => {
+          if (!stillHere()) return false;
+          if (!visibilityBarrier.allows(threadEpoch)) return false;
+          // Admission, owner publication and cursor coverage are synchronous.
+          // React only reads the resulting immutable owner snapshot.
+          const admittedRows = visibilityBarrier.admit(rows,threadEpoch);
+          setThreadLocked(false);
+          updateMessages(createTranscriptUpdater<ArenaMessage>(admittedRows, snapshot, reactionSnapshots.current, visibilityBarrier,
+            stillHere));
+          if (!stillHere()) return false;
+          messageCursor.current=cursor;
+          return true;
+        },
+        stillHere);
+      if (!stillHere()) return;
+      if (roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) await drainOfficialGap(evidenceCursor.current,
+        async cursor => (await fetchOfficialPage(session.roomId,'evidence',cursor,'newer')) as (ArenaEvidence & OfficialCursor)[],
+        (rows,cursor) => {
+          if (!stillHere()) return;
+          setEvidence(old => stillHere()
+            ? [...new Map([...old,...rows].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)) : old);
+          evidenceCursor.current=cursor;
+        },
+        stillHere);
+      if (!stillHere()) return;
+      // Rollup refresh never advances the gap cursor past unseen rows.
+      if(messageCursor.current) {
+        const freshEpoch = visibilityBarrier.epoch();
+        const freshSnapshot = reactionSnapshots.current.beginSnapshot();
+        const fresh=await fetchOfficialPage(session.roomId,'message');
+        if(!stillHere()) return;
+        const admittedFresh = visibilityBarrier.admit(fresh,freshEpoch);
+        updateMessages(createTranscriptUpdater(admittedFresh, freshSnapshot, reactionSnapshots.current, visibilityBarrier,
+          stillHere));
+        await recoverOverflowAfterRefresh({
+          queue: reactionQueue.current!,
+          isLoaded: (id) => messagesRef.current.some((row) => row.id === id),
+          loadedIds: messagesRef.current.map((row) => row.id),
+          active: stillHere,
+          generation,
+          currentGeneration: () => sessionRef.current.generation,
+        });
+        if (!stillHere()) return;
+      }
+      if(roomRef.current?.roomMode==='DUEL' && evidenceCursor.current) {
+        const fresh=await fetchOfficialPage(session.roomId,'evidence');
+        if(!stillHere()) return;
+        setEvidence(old => stillHere()
+          ? [...new Map([...old,...fresh].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)) : old);
+      }
+    } catch (caught) {
+      if (!stillHere()) return;
+      if (isMembershipRefusal(caught) || (caught as {code?:string})?.code==='account_changed') clearPrivateThread();
+      else setError('Transcript could not update. Try again.');
+    } finally {
+      // Clear only while this occupancy is still current. A superseded Room A
+      // must not release Room B's lock; an unmount of the same occupancy may.
+      if (session.generation === sessionRef.current.generation
+        && session.roomId === sessionRef.current.roomId) {
+        recovering.current = false;
+      }
+    }
+  }, [clearPrivateThread, liveSession]);
+
+  /** Phase/result refresh is independent of message traffic. */
+  const refreshRoomState = React.useCallback(async (session = sessionRef.current): Promise<void> => {
+    if (!liveSession(session)) return;
+    try {
+      const next = await fetchRoom(session.roomId);
+      if (!liveSession(session)) return;
+      setRoom(next);
+      setError(null);
+      if (next.status === 'SETTLED' || next.viewer?.finalStance) {
+        const nextStats = await fetchMindshiftStats(session.roomId).catch(() => null);
+        if (liveSession(session)) setStats(nextStats);
+      } else if (liveSession(session)) {
+        setStats(null);
+      }
+    } catch (caught) {
+      if (liveSession(session) && isMembershipRefusal(caught)) {
+        clearPrivateThread();
+        setRoom(null);
+        setError('This room is unavailable.');
+      }
+      // Periodic drift repair is best-effort; explicit refresh still surfaces errors.
+    }
+  }, [clearPrivateThread, liveSession]);
+
+  /** Eventually evict messages hidden by moderation or a new block/mute. */
+  const reconcileVisibility = React.useCallback(async (session = sessionRef.current): Promise<void> => {
+    if (!liveSession(session)) return;
+    const evidenceIds=evidenceRef.current.map(row=>row.id);
+    const startEvidence=evidenceIds.length ? evidenceVisibilityCursor.current % evidenceIds.length : 0;
+    const checkedEvidence=[...evidenceIds.slice(startEvidence),...evidenceIds.slice(0,startEvidence)].slice(0,100);
+    evidenceVisibilityCursor.current=startEvidence+checkedEvidence.length;
+    try {
+      if(checkedEvidence.length && roomRef.current?.roomMode==='DUEL') {
+        const visible=new Set(await fetchEvidenceVisibility(session.roomId,checkedEvidence));
+        if(!liveSession(session)) return;
+        const checked=new Set(checkedEvidence);
+        setEvidence(old => liveSession(session)
+          ? old.filter(row=>!checked.has(row.id)||visible.has(row.id)) : old);
+      }
+    } catch(caught) { if(liveSession(session) && isMembershipRefusal(caught)) clearPrivateThread(); return; }
+    const ids = messagesRef.current
+      .filter((message) => !message.pending)
+      .map((message) => message.id);
+    if (ids.length === 0) return;
+    const start = visibilityCursor.current % ids.length;
+    const checked = [...ids.slice(start), ...ids.slice(0, start)].slice(0, VISIBILITY_BATCH);
+    visibilityCursor.current = (start + checked.length) % ids.length;
+    try {
+      const visible = await fetchVisibleMessageIds(session.roomId, checked);
+      if (!liveSession(session)) return;
+      const remove = visibilityBarrier.mark(checked.filter((id) => !visible.includes(id)));
+      updateMessages((current) => liveSession(session)
+        ? remove(current) : current);
+    } catch (caught) {
+      if (liveSession(session) && isMembershipRefusal(caught)) clearPrivateThread();
+    }
+  }, [clearPrivateThread, liveSession]);
+
+  const load = React.useCallback(
+    async (mode: 'initial' | 'refresh', session = sessionRef.current): Promise<void> => {
+      if (!liveSession(session)) return;
+      loadCounts.current[mode]++;
+      if (mode === 'initial') setLoading(true);
+      else setRefreshing(true);
+      const snapshot = reactionSnapshots.current.beginSnapshot();
+      const visibilityEpoch = visibilityBarrier.epoch();
+      try {
+        const next = await fetchRoom(session.roomId);
+        if (!liveSession(session)) return;
+        setRoom(next);
+        setError(null);
+
+        // The thread and the rail are members-only; a settled room is still
+        // worth rendering for its public result when they are refused.
+        const [thread, rail] = await Promise.all([
+          fetchOfficialPage(session.roomId, 'message').catch((caught: unknown) => {
+            if (isMembershipRefusal(caught)) return 'locked' as const;
+            throw caught;
+          }),
+          (next.roomMode==='DUEL' ? fetchOfficialPage(session.roomId,'evidence') : fetchEvidence(session.roomId)).catch((caught: unknown) => {
+            if (isMembershipRefusal(caught)) return 'locked' as const;
+            throw caught;
+          }),
+        ]);
+        if (!liveSession(session)) return;
+
+        if (thread === 'locked' || rail === 'locked') {
+          clearPrivateThread();
+          return;
+        } else {
+          setThreadLocked(false);
+          const accepted = visibilityBarrier.allows(visibilityEpoch);
+          const bootstrap = !messageCursor.current && !initialCoverage.current;
+          // Retain an obligation until publication succeeds, including a thrown
+          // transition/notification. Accepted coverage is never silently lost.
+          if (bootstrap) initialCoverage.current = { cursor: thread[0] as OfficialCursor ?? null,
+            ids: [...new Set(thread.slice(0, PAGE).map(row => row.id))],
+            older: thread.at(-1) as OfficialCursor ?? null, hasOlder: thread.length >= PAGE };
+          const admittedThread = visibilityBarrier.admit(thread, visibilityEpoch);
+          updateMessages(createTranscriptUpdater(admittedThread, snapshot, reactionSnapshots.current, visibilityBarrier,
+            () => liveSession(session)));
+          if (!liveSession(session)) return;
+          if (accepted && bootstrap) {
+            messageCursor.current = thread[0]?.preciseCreatedAt ? thread[0] as OfficialCursor : { id: '', preciseCreatedAt: '1970-01-01T00:00:00.000000Z' };
+            initialCoverage.current = null;
+          }
+          if (accepted && !messageOlderAnchor.current && !initialCoverage.current) {
+            messageHasOlder.current = thread.length >= PAGE;
+            setHasOlder(messageHasOlder.current);
+            if (thread.at(-1)?.preciseCreatedAt) messageOlderAnchor.current = thread.at(-1) as OfficialCursor;
+          }
+        }
+        setEvidence(old => !liveSession(session) ? old
+          : mode==='initial' || next.roomMode!=='DUEL' ? rail : [...new Map([...old,...rail].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)));
+        if(next.roomMode==='DUEL') {
+          if (!evidenceCursor.current) evidenceCursor.current=rail[0]?.preciseCreatedAt ? rail[0] as OfficialCursor : {id:'',preciseCreatedAt:'1970-01-01T00:00:00.000000Z'};
+          if(mode==='initial' || !olderEvidence.current) {
+            olderEvidence.current=rail.at(-1)?.preciseCreatedAt ? rail.at(-1) as OfficialCursor : null;
+            evidenceHasOlder.current=rail.length>=PAGE;
+          }
+          setHasOlder(messageHasOlder.current || evidenceHasOlder.current);
+        }
+
+        // Mindshift opens after the verdict (or once the viewer has recorded a
+        // final stance); before that the RPC refuses and there is nothing to show.
+        if (next.status === 'SETTLED' || next.viewer?.finalStance) {
+          try {
+            const s = await fetchMindshiftStats(session.roomId);
+            if (liveSession(session)) setStats(s);
+          } catch {
+            if (liveSession(session)) setStats(null);
+          }
+        } else if (liveSession(session)) {
+          setStats(null);
+        }
+      } catch (caught) {
+        if (!liveSession(session)) return;
+        if (isMembershipRefusal(caught)) {
+          clearPrivateThread();
+          setRoom(null);
+        }
+        setError(errorText(caught));
+      } finally {
+        if (!liveSession(session)) return;
+        loadCounts.current[mode]--;
+        setLoading(loadCounts.current.initial > 0);
+        setRefreshing(loadCounts.current.refresh > 0 || refreshBusy.current !== null);
+      }
+    },
+    [clearPrivateThread, liveSession],
+  );
+
+  const resultReadBusy = React.useRef(false);
+  const refreshResult = React.useCallback(async (): Promise<void> => {
+    const session = sessionRef.current;
+    if (resultReadBusy.current || session.roomId !== roomId || !liveSession(session)) return;
+    resultReadBusy.current = true;
+    try {
+      const owner = await currentUserId();
+      if (!liveSession(session)) return;
+      const next = await fetchRoom(session.roomId);
+      if (await currentUserId() === owner && liveSession(session)) { setRoom(next); setError(null); }
+    } catch (caught) {
+      if (liveSession(session)) {
+        if (isMembershipRefusal(caught)) { clearPrivateThread(); setRoom(null); }
+        throw caught;
+      }
+    } finally { resultReadBusy.current = false; }
+  }, [clearPrivateThread, liveSession, roomId]);
+
+  const refresh = React.useCallback(async () => {
+    const session = sessionRef.current;
+    if (session.roomId !== roomId || !liveSession(session) || refreshBusy.current) return;
+    const owner = Symbol('arena-refresh');
+    refreshBusy.current = owner;
+    setRefreshing(true);
+    try {
+      await refreshThread(session);
+      if (!liveSession(session)) return;
+      await load('refresh', session);
+    } finally {
+      if (refreshBusy.current === owner) {
+        refreshBusy.current = null;
+        if (liveSession(session)) setRefreshing(loadCounts.current.refresh > 0);
+      }
+    }
+  }, [load, refreshThread, liveSession, roomId]);
+  useFocusEffect(React.useCallback(()=>{
+    const session = sessionRef.current;
+    if (session.roomId === roomId) void refreshThread(session);
+    return undefined;
+  },[refreshThread, roomId]));
+
+  const loadRef = React.useRef(load);
+  loadRef.current = load;
+  const boundRoomId = React.useRef<string | null>(null);
+
+  // Pre-paint session switch: never expose Room A rows under Room B's identity.
+  // Only begin a session when the roomId prop changes (or on first mount) — not
+  // when `load` identity churns during Suspense retries.
+  React.useLayoutEffect(() => {
+    if (boundRoomId.current === roomId) return;
+    mounted.current = true;
+    boundRoomId.current = roomId;
+    accessGeneration.current++;
+    const generation = accessGeneration.current;
+    const session: RoomSession = { roomId, generation };
+    sessionRef.current = session;
+    recovering.current = false;
+    olderBusy.current = null;
+    refreshBusy.current = null;
+    loadCounts.current = { initial: 0, refresh: 0 };
+    evidenceBusy.current = null;
+    visibilityBarrier.reset();
+    reactionSnapshots.current.resetReactionWrites();
+    initialCoverage.current = null;
+    messageOlderAnchor.current = null;
+    sendBusy.current = null;
+    setSending(false);
+    setLoadingOlder(false);
+    setRoomFullOnUpgrade(false);
+    setRoom(null);
+    updateMessages([]);
+    setEvidence([]);
+    setStats(null);
+    setThreadLocked(false);
+    setHasOlder(true);
+    messageHasOlder.current = true;
+    evidenceHasOlder.current = false;
+    setLoading(true);
+    setRefreshing(false);
+    setError(null);
+    visibilityCursor.current = 0;
+    messageCursor.current = null;
+    evidenceCursor.current = null;
+    olderEvidence.current = null;
+    void loadRef.current('initial', session);
+  }, [roomId]);
+
+  // Realtime: hydrate only the inserted ids (coalesced). Full reconcile is slow-path.
+  React.useEffect(() => {
+    const pending = new Set<string>();
+    const flush = (): void => {
+      const ids = [...pending];
+      pending.clear();
+      const session = sessionRef.current;
+      if (session.roomId === roomId) void hydrateInserted(ids, session);
+    };
+    const scheduleHydrate = (id: string): void => {
+      pending.add(id);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      refreshTimer.current = setTimeout(flush, HYDRATE_DEBOUNCE_MS);
+    };
+    const unsubscribe = subscribeRoomMessages(roomId, (event) => {
+      scheduleHydrate(event.id);
+    }, connected => {
+      const session = sessionRef.current;
+      if (connected && session.roomId === roomId && liveSession(session)) {
+        void refreshThread(session); void refreshRoomState(session);
+      }
+    });
+    let reconciling = false;
+    const reconcileAll = async (): Promise<void> => {
+      if (reconciling) return;
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session)) return;
+      reconciling = true;
+      try {
+        await Promise.allSettled([
+          refreshThread(session),
+          refreshRoomState(session),
+          reconcileVisibility(session),
+        ]);
+      } finally {
+        reconciling = false;
+      }
+    };
+    const reconcile = setInterval(() => {
+      void reconcileAll();
+    }, RECONCILE_MS);
+    return () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      clearInterval(reconcile);
+      unsubscribe();
+    };
+  }, [hydrateInserted, reconcileVisibility, refreshRoomState, refreshThread, roomId, liveSession]);
+
+  // Coming back from the background: gap-fetch missed messages, then refresh room.
+  React.useEffect(() => {
+    let previous = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (status: AppStateStatus) => {
+      const wasAway = previous !== 'active';
+      previous = status;
+      if (status === 'active' && wasAway) {
+        const session = sessionRef.current;
+        if (session.roomId !== roomId || !liveSession(session)) return;
+        void refreshThread(session);
+        void load('refresh', session);
+        void reconcileVisibility(session);
+      }
+    });
+    return () => subscription.remove();
+  }, [load, reconcileVisibility, refreshThread, roomId, liveSession]);
+
+  const loadOlder = React.useCallback(async (): Promise<void> => {
+    const session = sessionRef.current;
+    if (session.roomId !== roomId || !liveSession(session)
+      || olderBusy.current || loadingOlder || !hasOlder || threadLocked) return;
+    const owner = Symbol('arena-older');
+    olderBusy.current = owner;
+    setLoadingOlder(true);
+    try {
+      const oldestVisible = messagesRef.current.filter(m=>!m.pending).at(-1);
+      const anchorAtStart = messageOlderAnchor.current;
+      const olderCursor = anchorAtStart ?? (oldestVisible?.preciseCreatedAt
+        ? oldestVisible as OfficialCursor
+        : null);
+      if(messageHasOlder.current && olderCursor?.preciseCreatedAt) {
+        const snapshot = reactionSnapshots.current.beginSnapshot();
+        const pageEpoch = visibilityBarrier.epoch();
+        const page = await fetchOfficialPage(session.roomId,'message', olderCursor);
+        if (!liveSession(session) || olderBusy.current !== owner) return;
+        const accepted = visibilityBarrier.allows(pageEpoch);
+        const admittedPage = visibilityBarrier.admit(page,pageEpoch);
+        updateMessages(createTranscriptUpdater(admittedPage, snapshot, reactionSnapshots.current, visibilityBarrier,
+          () => liveSession(session)));
+        if (!liveSession(session) || olderBusy.current !== owner) return;
+        // A rejected or failed transition acknowledges no boundary/exhaustion.
+        if (messageOlderAnchor.current === anchorAtStart && accepted) {
+          messageHasOlder.current = page.length >= PAGE;
+          if (page.at(-1)?.preciseCreatedAt) messageOlderAnchor.current = page.at(-1) as OfficialCursor;
+        }
+      }
+      if(evidenceHasOlder.current && olderEvidence.current) {
+        const page=await fetchOfficialPage(session.roomId,'evidence',olderEvidence.current);
+        if(!liveSession(session) || olderBusy.current !== owner) return;
+        evidenceHasOlder.current=page.length>=PAGE;
+        if(page.length) olderEvidence.current=page.at(-1) as OfficialCursor;
+        setEvidence(old => liveSession(session)
+          ? [...new Map([...old,...page].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)) : old);
+      }
+      if (liveSession(session)) setHasOlder(messageHasOlder.current || evidenceHasOlder.current);
+    } catch(caught) {
+      if (liveSession(session)) {
+        if(isMembershipRefusal(caught)) clearPrivateThread();
+        else setError('Earlier transcript could not load. Try again.');
+      }
+    } finally {
+      if (olderBusy.current === owner) {
+        olderBusy.current = null;
+        if (liveSession(session)) setLoadingOlder(false);
+      }
+    }
+  }, [clearPrivateThread, hasOlder, liveSession, loadingOlder, roomId, threadLocked]);
+
+  const send = React.useCallback(
+    async (input: Omit<PostArenaMessageInput, 'roomId'>): Promise<boolean> => {
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session) || sendBusy.current) return false;
+      const owner = Symbol('arena-send');
+      sendBusy.current = owner;
+      const sendGeneration = session.generation;
+      const ownsSend = (): boolean => sendBusy.current === owner;
+      const active = (): boolean => ownsSend() && liveSession(session);
+      let placeholderId: string | undefined;
+      try {
+        const account=await currentUserId();
+        if(!account || !active()) return false;
+        const requestKey = roomRef.current?.roomMode==='DUEL'
+          ? await acquireOfficialRequest(account,roomId,'message',input) : undefined;
+        if(!active()) return false;
+        const temporaryId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        placeholderId = temporaryId;
+        const isReshare = Boolean(input.reshareSourceMessageId);
+        const placeholder: ArenaMessage = {
+          id: temporaryId,
+          roomId,
+          kind: isReshare || input.gif ? 'gif' : input.media ? 'media' : 'text',
+          body: input.body,
+          parentMessageId: input.parentMessageId ?? null,
+          createdAt: Date.now(),
+          mediaUrl: input.gif?.url ?? input.media?.url ?? null,
+          mediaKind: isReshare || input.gif ? 'gif' : (input.media?.kind ?? null),
+          gifProvider: input.gif?.provider ?? null,
+          gifExternalId: input.gif?.externalId ?? null,
+          isOwn: true,
+          author: authorRef.current,
+          reactions: [],
+          replyCount: 0,
+          argumentVotes: null,
+          pending: true,
+        };
+        setSending(true);
+        const snapshot = reactionSnapshots.current.beginSnapshot();
+        const sendVisibilityEpoch = visibilityBarrier.epoch();
+        updateMessages((current) => active() ? mergeMessages(current, [placeholder]) : current);
+        const posted = input.reshareSourceMessageId
+          ? await postClashMediaReshare(
+              roomId,
+              input.reshareSourceMessageId,
+              input.parentMessageId ?? null,
+              input.body,
+              authorRef.current, requestKey, account,
+            )
+          : await postMessage({ ...input, roomId, requestKey, expectedAccountId:account }, authorRef.current);
+        if (requestKey) await confirmOfficialRequest(account,roomId,'message',requestKey).catch(()=>{});
+        const resolution = resolveSendResolution({ mounted: mounted.current, sentGeneration: sendGeneration, currentGeneration: accessGeneration.current });
+        if (!ownsSend() || !resolution.applyRow) return false;
+        const admittedPost = visibilityBarrier.admit([posted], sendVisibilityEpoch);
+        updateMessages(createTranscriptUpdater(admittedPost, snapshot, reactionSnapshots.current, visibilityBarrier,
+          () => isCurrentScope(mounted.current, sendGeneration, accessGeneration.current), temporaryId));
+        return true;
+      } catch (caught) {
+        if (active()) {
+          if (placeholderId) updateMessages((current) => isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)
+            ? current.filter((message) => message.id !== placeholderId) : current);
+          notify(caught);
+        }
+        return false;
+      } finally {
+        if (ownsSend()) {
+          sendBusy.current = null;
+          if (isCurrentScope(mounted.current, sendGeneration, accessGeneration.current)) setSending(false);
+        }
+      }
+    },
+    [notify, roomId, sending, liveSession],
+  );
+
+  const react = React.useCallback(
+    (messageId: string, emoji = 'ðŸ”¥'): Promise<void> => {
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session)) return Promise.resolve();
+      const viewer = authorRef.current?.id;
+      // Protect this message the moment the tap happens, and release the guard
+      // only when the mutation actually settles (success or repaired failure).
+      reactionSnapshots.current.beginMutation(messageId);
+      const active = () => liveSession(session) && authorRef.current?.id === viewer;
+      return reactionQueue.current!.enqueue(messageId, emoji, active).finally(() => {
+        reactionSnapshots.current.finishMutation(messageId);
+      });
+    },
+    [liveSession, roomId],
+  );
+
+  const addEvidence = React.useCallback(
+    async (input: Omit<SubmitArenaEvidenceInput, 'roomId'>): Promise<boolean> => {
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session) || evidenceBusy.current) return false;
+      const owner = Symbol('arena-evidence');
+      evidenceBusy.current = owner;
+      const active = () => liveSession(session) && evidenceBusy.current === owner;
+      try {
+        const account=await currentUserId();
+        if(!account || !active()) return false;
+        const requestKey=roomRef.current?.roomMode==='DUEL' ? await acquireOfficialRequest(account,roomId,'evidence',input) : undefined;
+        if(!active()) return false;
+        const created=await submitEvidence({...input,roomId,requestKey,expectedAccountId:account});
+        if(requestKey) await confirmOfficialRequest(account,roomId,'evidence',requestKey).catch(()=>{});
+        if(!active()) return false;
+        setEvidence(old => liveSession(session)
+          ? [...new Map([...old,created].map(row=>[row.id,row])).values()].sort((a,b)=>compareOfficial(b,a)) : old);
+        return true;
+      } catch(caught) { if(active()) notify(caught); return false; }
+      finally { if (evidenceBusy.current === owner) evidenceBusy.current = null; }
+    },
+    [notify, roomId, liveSession],
+  );
+
+  const markUseful = React.useCallback(
+    async (evidenceId: string): Promise<void> => {
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session)) return;
+      try {
+        const result = await markEvidenceUseful(evidenceId);
+        if (!liveSession(session)) return;
+        setEvidence((current) =>
+          !liveSession(session) ? current : current.map((item) =>
+            item.id === result.evidenceId
+              ? { ...item, usefulCount: result.usefulCount, viewerMarkedUseful: result.marked }
+              : item,
+          ),
+        );
+      } catch (caught) {
+        if (liveSession(session)) notify(caught);
+      }
+    },
+    [notify, roomId, liveSession],
+  );
+
+  const voteSide = React.useCallback(
+    async (side: 'AGREE' | 'DISAGREE'): Promise<boolean> => {
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session)) return false;
+      try {
+        await submitSideVote(session.roomId, side);
+        if (!liveSession(session)) return false;
+        setRoom((current) =>
+          liveSession(session) && current && current.viewer
+            ? { ...current, viewer: { ...current.viewer, hasSideVote: true } }
+            : current,
+        );
+        return true;
+      } catch (caught) {
+        if (liveSession(session)) notify(caught);
+        return false;
+      }
+    },
+    [notify, roomId, liveSession],
+  );
+
+  const voteArgument = React.useCallback(
+    async (messageId: string): Promise<boolean> => {
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session)) return false;
+      try {
+        await submitArgumentVote(session.roomId, messageId);
+        if (!liveSession(session)) return false;
+        setRoom((current) =>
+          liveSession(session) && current && current.viewer
+            ? { ...current, viewer: { ...current.viewer, hasArgumentVote: true } }
+            : current,
+        );
+        return true;
+      } catch (caught) {
+        if (liveSession(session)) notify(caught);
+        return false;
+      }
+    },
+    [notify, roomId, liveSession],
+  );
+
+  const recordFinal = React.useCallback(
+    async (stance: Stance): Promise<boolean> => {
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session)) return false;
+      try {
+        const result = await recordFinalStance(session.roomId, stance);
+        if (!liveSession(session)) return false;
+        setRoom((current) =>
+          liveSession(session) && current && current.viewer
+            ? {
+                ...current,
+                viewer: {
+                  ...current.viewer,
+                  finalStance: result.finalStance,
+                  finalRecordedAt: result.finalRecordedAt,
+                },
+              }
+            : current,
+        );
+        try {
+          const s = await fetchMindshiftStats(session.roomId);
+          if (liveSession(session)) setStats(s);
+        } catch {
+          /* the aggregate is best-effort; the stance is already recorded */
+        }
+        return true;
+      } catch (caught) {
+        if (liveSession(session)) notify(caught);
+        return false;
+      }
+    },
+    [notify, roomId, liveSession],
+  );
+
+  const upgradeToDebater = React.useCallback(
+    async (stance: Stance): Promise<boolean> => {
+      const session = sessionRef.current;
+      if (session.roomId !== roomId || !liveSession(session)) return false;
+      try {
+        setRoomFullOnUpgrade(false);
+        await upgradeSpectator(session.roomId, stance);
+        if (!liveSession(session)) return false;
+        const next = await fetchRoom(session.roomId);
+        if (!liveSession(session)) return false;
+        setRoom(next);
+        return true;
+      } catch (caught) {
+        if (!liveSession(session)) return false;
+        if (
+          caught instanceof SupabaseError &&
+          (caught.code === 'P0009' || /room is full/i.test(caught.message))
+        ) {
+          if (mounted.current) setRoomFullOnUpgrade(true);
+          dispatch(showNotice('This room filled up while you were watching.'));
+          return false;
+        }
+        notify(caught);
+        return false;
+      }
+    },
+    [dispatch, notify, roomId, liveSession],
+  );
+
+  return {
+    room,
+    messages,
+    evidence,
+    stats,
+    loading,
+    error,
+    threadLocked,
+    refreshing,
+    sending,
+    loadingOlder,
+    hasOlder,
+    roomFullOnUpgrade,
+    refresh,
+    refreshResult,
+    loadOlder,
+    send,
+    react,
+    addEvidence,
+    markUseful,
+    voteSide,
+    voteArgument,
+    recordFinal,
+    upgradeToDebater,
+  };
+}
+
+
+
+
+

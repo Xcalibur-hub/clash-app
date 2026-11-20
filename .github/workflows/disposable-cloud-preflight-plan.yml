@@ -1,0 +1,26 @@
+name: Disposable cloud preflight preparation (offline only)
+on:
+  workflow_dispatch:
+    inputs:
+      project_ref:
+        description: New disposable project reference (no credentials; plan only)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  offline-plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    container: node:22.11.0-bookworm-slim
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Offline policy regressions
+        run: node --test cloud/preflight.test.mjs
+      - name: Read-only preflight plan (no connection capability invoked)
+        env:
+          DISPOSABLE_PROJECT_REF: ${{ inputs.project_ref }}
+        run: node cloud/workflow-plan.mjs

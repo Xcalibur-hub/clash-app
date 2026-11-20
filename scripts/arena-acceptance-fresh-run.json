@@ -1,0 +1,85 @@
+{
+  "//": "TEMPLATE ONLY — incomplete by design. Every null must be filled from a freshly authorized run. This file must never contain credentials, gateway PIDs, personal paths or identifiers from a spent run.",
+  "schemaVersion": 1,
+  "purpose": "Fresh-run controller configuration template for ONE authorized Samsung A50 Arena acceptance run.",
+  "mustNotContain": [
+    "credentials, API keys, tokens, OTP material",
+    "gateway or process PIDs",
+    "absolute user-specific paths",
+    "identifiers from the 5 November 2026 run (frozen fixtures or spent approvals)"
+  ],
+  "supersedes": null,
+  "priorRunReuse": "forbidden",
+  "manifest": {
+    "path": null,
+    "sha256": null
+  },
+  "target": {
+    "project": null,
+    "db": null,
+    "system": null,
+    "network": null
+  },
+  "authorization": {
+    "approved": false,
+    "runId": null,
+    "issuedAt": null,
+    "expiresAt": null,
+    "budget": {
+      "fixture": 1,
+      "spectator": 2,
+      "official": 4,
+      "crowd": 4,
+      "ballot": 2,
+      "settle": 2,
+      "closeActors": 1
+    },
+    "attemptCaps": {
+      "spectator": 2,
+      "official": 4,
+      "crowd": 4,
+      "ballot": 4,
+      "settle": 2,
+      "closeActors": 1
+    }
+  },
+  "operations": {
+    "readOnly": ["preflight", "status", "snapshot"],
+    "authRecovery": ["load-recover"],
+    "fixture": ["create", "accept", "gateway"],
+    "inDuel": [
+      "official-A-OPEN", "official-B-OPEN", "official-A-FINAL", "official-B-FINAL",
+      "crowd-D-OPEN", "crowd-D-FINAL", "watch-D", "ballot-D"
+    ],
+    "postClose": ["settle-first", "settle-idempotency", "close-actors"],
+    "denied": {
+      "broadcast": "Not required for Arena acceptance. Kept denied rather than added to make the command count match the controller's 19."
+    },
+    "deniedCount": 1,
+    "note": "close-actors is NOT read-only: it closes actor sessions and drops loaded credentials, so it is a mutation and carries its own budget."
+  },
+  "actors": {
+    "A": { "recovery": "link+otp", "allowance": 1 },
+    "B": { "recovery": "link+otp", "allowance": 1 },
+    "C": { "recovery": "none", "allowance": 0 },
+    "D": { "recovery": "link+otp", "allowance": 1 }
+  },
+  "device": {
+    "serialSuppliedAtRuntime": true,
+    "packageId": "com.clash.v2.dev",
+    "maxControlMinutes": 40
+  },
+  "journal": {
+    "path": null,
+    "durable": true
+  },
+  "stopConditions": [
+    "any step failure",
+    "server clock drift > 5s",
+    "journal write failure",
+    "fenced controller session",
+    "ambiguous device focus",
+    "any write outside its phase window",
+    "authorization expiry"
+  ]
+}

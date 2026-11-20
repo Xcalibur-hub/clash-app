@@ -1,0 +1,404 @@
+{
+  "policy": "text-debate-beta; new admission closed; existing authorization still required",
+  "functions": [
+    {
+      "signature": "public.create_vault(text,text)",
+      "name": "create_vault",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "2a76179cd5ba6b13019f30efec434232"
+    },
+    {
+      "signature": "public.create_vault_drop(text,text,vault_drop_access,text)",
+      "name": "create_vault_drop",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "2bf9b7850b2afb7ae4d5f11b0d8c7a13"
+    },
+    {
+      "signature": "public.publish_vault_drop(text)",
+      "name": "publish_vault_drop",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "c2190e57424587b3ce55512c5c84c9c3"
+    },
+    {
+      "signature": "public.create_collection(text,text,text)",
+      "name": "create_collection",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "37cfd4be025de167e66766e5190898fd"
+    },
+    {
+      "signature": "public.add_drop_to_collection(text,text)",
+      "name": "add_drop_to_collection",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "77272450d1d22afd52c166730930f412"
+    },
+    {
+      "signature": "public.create_creator_service(text,text,vault_service_category,vault_service_delivery,vault_offer_access,bigint,text,text,text)",
+      "name": "create_creator_service",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "388dc813cc8ed5afce27432a810fb8b1"
+    },
+    {
+      "signature": "public.create_creator_course(text,text,vault_offer_access,bigint,text,text)",
+      "name": "create_creator_course",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "e08b85d42f2468fe1a5464e7dd80e52d"
+    },
+    {
+      "signature": "public.create_creator_product(text,text,vault_product_type,vault_offer_access,bigint,text,text,text,vault_inventory_mode,integer)",
+      "name": "create_creator_product",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "ec0039ce4b62c2a9ef0065f64a34050c"
+    },
+    {
+      "signature": "public.create_course_lesson(text,text,text,vault_lesson_content,text,text,vault_offer_access,boolean)",
+      "name": "create_course_lesson",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "b5e88de072ca41b46ad35ea8c8ed477e"
+    },
+    {
+      "signature": "public.create_vault_community(text,text,vault_community_access,boolean,text,text)",
+      "name": "create_vault_community",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "f62ed1ea911345ae5833047f7f53ff25"
+    },
+    {
+      "signature": "public.create_creator_world_drop(text,text,world_drop_type,world_drop_reward,text,text,double precision,double precision,text,timestamp with time zone)",
+      "name": "create_creator_world_drop",
+      "capability": "creator",
+      "condition": "true",
+      "bodyMd5": "82b0809bd5c2248528a075d9e72b14c6"
+    },
+    {
+      "signature": "public.create_arena_crew(text,text,text,arena_crew_join_mode,text[])",
+      "name": "create_arena_crew",
+      "capability": "groups",
+      "condition": "true",
+      "bodyMd5": "0d65f9b5857ffb66c94971385236a9d7"
+    },
+    {
+      "signature": "public.request_arena_crew_join(text)",
+      "name": "request_arena_crew_join",
+      "capability": "groups",
+      "condition": "true",
+      "bodyMd5": "326f6d38b1f8d15458e860481a2889ba"
+    },
+    {
+      "signature": "public.invite_to_arena_crew(text,text)",
+      "name": "invite_to_arena_crew",
+      "capability": "groups",
+      "condition": "true",
+      "bodyMd5": "ed9633afbbed47b52b744a489caa2344"
+    },
+    {
+      "signature": "public.join_arena_crew(text)",
+      "name": "join_arena_crew",
+      "capability": "groups",
+      "condition": "not exists(select 1 from public.arena_crew_memberships where crew_id=p_crew_id and profile_id=public.my_profile_id() and left_at is null)",
+      "bodyMd5": "69e71f5e043c5505c4fe64a8f159cdd0"
+    },
+    {
+      "signature": "public.respond_arena_crew_invite(text,boolean)",
+      "name": "respond_arena_crew_invite",
+      "capability": "groups",
+      "condition": "p_accept is distinct from false",
+      "bodyMd5": "2e0358446306d1eec525ca067fd2ab44"
+    },
+    {
+      "signature": "public.decide_arena_crew_join_request(text,boolean)",
+      "name": "decide_arena_crew_join_request",
+      "capability": "groups",
+      "condition": "p_approve is distinct from false",
+      "bodyMd5": "499251f4b03d1347e602ef10dfc3460d"
+    },
+    {
+      "signature": "public.request_creator_service(text,text)",
+      "name": "request_creator_service",
+      "capability": "commerce",
+      "condition": "true",
+      "bodyMd5": "24348a9541c61ef54e67ae996def396c"
+    },
+    {
+      "signature": "public.vault_grant_test_subscription(text,text,integer)",
+      "name": "vault_grant_test_subscription",
+      "capability": "commerce",
+      "condition": "true",
+      "bodyMd5": "e939fe13304070570c31ca4274ec516a"
+    },
+    {
+      "signature": "public.vault_community_touch(text,text)",
+      "name": "vault_community_touch",
+      "capability": "commerce",
+      "condition": "not exists(select 1 from public.vault_community_memberships where community_id=p_community_id and profile_id=p_profile_id)",
+      "bodyMd5": "9d6882ec73670b054277fd599c8cda9b"
+    },
+    {
+      "signature": "public.start_creator_ai_conversation(text)",
+      "name": "start_creator_ai_conversation",
+      "capability": "ai",
+      "condition": "true",
+      "bodyMd5": "fd818b06562d66e9b49cc78986a42373"
+    },
+    {
+      "signature": "public.add_creator_ai_knowledge(creator_ai_knowledge_kind,text,text,text,creator_ai_access)",
+      "name": "add_creator_ai_knowledge",
+      "capability": "ai",
+      "condition": "true",
+      "bodyMd5": "5f71f87d2ed1ca10f1790c48d10bb791"
+    },
+    {
+      "signature": "public.start_digital_creator_session(text,text)",
+      "name": "start_digital_creator_session",
+      "capability": "ai",
+      "condition": "true",
+      "bodyMd5": "7c8ff34e6b6d7036ccaab95ad77844ff"
+    },
+    {
+      "signature": "public.set_creator_digital_version(text,text,text,text,text,boolean,boolean,boolean,boolean,text)",
+      "name": "set_creator_digital_version",
+      "capability": "ai",
+      "condition": "true",
+      "bodyMd5": "6a11d3aa8292e92f7446996dede785e5"
+    },
+    {
+      "signature": "public.upsert_creator_ai_profile(text,text,text,text,creator_ai_access,jsonb,boolean,text)",
+      "name": "upsert_creator_ai_profile",
+      "capability": "ai",
+      "condition": "p_enabled is distinct from false or not exists(select 1 from public.creator_ai_profiles where creator_id=public.my_profile_id())",
+      "bodyMd5": "37c189d0c12fc0e7ec3a51b3c3694e3f"
+    },
+    {
+      "signature": "public.create_world_drop(text,text,text,double precision,double precision)",
+      "name": "create_world_drop",
+      "capability": "world",
+      "condition": "true",
+      "bodyMd5": "e0d5ab5df337f416991da093d768df44"
+    },
+    {
+      "signature": "public.claim_world_drop(text)",
+      "name": "claim_world_drop",
+      "capability": "world",
+      "condition": "true",
+      "bodyMd5": "a00af8712d3d30ae309663fb25520f74"
+    },
+    {
+      "signature": "public.host_explore_challenge(text,text,explore_challenge_type,text,text,timestamp with time zone,timestamp with time zone,explore_reward_type)",
+      "name": "host_explore_challenge",
+      "capability": "play",
+      "condition": "true",
+      "bodyMd5": "f96357f082a7e0ee47eddcfa6fc39c66"
+    },
+    {
+      "signature": "public.host_explore_treasure(text,text,explore_treasure_type,text,text,text,timestamp with time zone,timestamp with time zone,explore_reward_type,jsonb,integer,jsonb)",
+      "name": "host_explore_treasure",
+      "capability": "play",
+      "condition": "true",
+      "bodyMd5": "6bf93faf71e08cf781b0982f5d27bebf"
+    },
+    {
+      "signature": "public.join_challenge(text)",
+      "name": "join_challenge",
+      "capability": "play",
+      "condition": "not exists(select 1 from public.explore_challenge_participants where challenge_id=p_challenge_id and profile_id=public.my_profile_id())",
+      "bodyMd5": "8cdf39bb5c606f582e2374bff41262fd"
+    },
+    {
+      "signature": "public.submit_challenge_entry(text,text,text)",
+      "name": "submit_challenge_entry",
+      "capability": "play",
+      "condition": "not exists(select 1 from public.explore_challenge_participants where challenge_id=p_challenge_id and profile_id=public.my_profile_id())",
+      "bodyMd5": "46fac11272ee3e39b87f5ecef4bd1b85"
+    },
+    {
+      "signature": "public.join_treasure_hunt(text)",
+      "name": "join_treasure_hunt",
+      "capability": "play",
+      "condition": "not exists(select 1 from public.explore_treasure_progress where hunt_id=p_hunt_id and profile_id=public.my_profile_id())",
+      "bodyMd5": "0e13e7905d5d2645576c8b6fb8b0c1fc"
+    },
+    {
+      "signature": "public.submit_treasure_answer(text,text,text)",
+      "name": "submit_treasure_answer",
+      "capability": "play",
+      "condition": "not exists(select 1 from public.explore_treasure_progress where hunt_id=p_hunt_id and profile_id=public.my_profile_id())",
+      "bodyMd5": "fe959603de47daa6a34c86ed7f684ddc"
+    },
+    {
+      "signature": "public.complete_content_clue(text,text,text)",
+      "name": "complete_content_clue",
+      "capability": "play",
+      "condition": "not exists(select 1 from public.explore_treasure_progress where hunt_id=p_hunt_id and profile_id=public.my_profile_id())",
+      "bodyMd5": "535ad817ced1a9386def8b461637dcd8"
+    },
+    {
+      "signature": "public.create_advertiser(text,text)",
+      "name": "create_advertiser",
+      "capability": "sponsorship",
+      "condition": "true",
+      "bodyMd5": "2518bd4e1ef1e8f585aff95d9a6c616a"
+    },
+    {
+      "signature": "public.activate_advertiser(text)",
+      "name": "activate_advertiser",
+      "capability": "sponsorship",
+      "condition": "true",
+      "bodyMd5": "45ed82fe88d73f7fbe10115dee781eb4"
+    },
+    {
+      "signature": "public.create_sponsor_campaign(text,text,text,sponsor_campaign_type,text,timestamp with time zone,timestamp with time zone)",
+      "name": "create_sponsor_campaign",
+      "capability": "sponsorship",
+      "condition": "true",
+      "bodyMd5": "9b5aa76108ecaf5e339052a7b991673f"
+    },
+    {
+      "signature": "public.assign_creator_to_campaign(text,text,commission_type,integer)",
+      "name": "assign_creator_to_campaign",
+      "capability": "sponsorship",
+      "condition": "true",
+      "bodyMd5": "c82d944c1a86ba3912c7e01a66a1990b"
+    },
+    {
+      "signature": "public.create_campaign_referral_link(text,text,timestamp with time zone)",
+      "name": "create_campaign_referral_link",
+      "capability": "sponsorship",
+      "condition": "true",
+      "bodyMd5": "f679a29e8f2f3da98aadceb89403cd60"
+    },
+    {
+      "signature": "public.create_campaign_coupon(text,text,text,timestamp with time zone,timestamp with time zone,integer)",
+      "name": "create_campaign_coupon",
+      "capability": "sponsorship",
+      "condition": "true",
+      "bodyMd5": "17fef98c40542180f639f794da9a0c97"
+    },
+    {
+      "signature": "public.set_sponsor_campaign_status(text,sponsor_campaign_status)",
+      "name": "set_sponsor_campaign_status",
+      "capability": "sponsorship",
+      "condition": "upper(p_status::text)='ACTIVE'",
+      "bodyMd5": "3d7ede0a5d09c5a978bc4bbb3fc833e8"
+    },
+    {
+      "signature": "public.create_media_upload(media_kind,text,media_visibility)",
+      "name": "create_media_upload",
+      "capability": "media",
+      "condition": "true",
+      "bodyMd5": "980aa105e3cc0f3ceafacbd09a583806"
+    },
+    {
+      "signature": "public.create_arena_question(hood_id,text,text,text,text,text,text,text,uuid)",
+      "name": "create_arena_question",
+      "capability": "media",
+      "condition": "true",
+      "bodyMd5": "3aee324ba88d6f7cf34347d21d493df8"
+    },
+    {
+      "signature": "public.create_prediction_game(hood_id,text,text[],timestamp with time zone)",
+      "name": "create_prediction_game",
+      "capability": "media",
+      "condition": "true",
+      "bodyMd5": "96272c1bc87fed9abd5eee7d4dfe1ade"
+    },
+    {
+      "signature": "public.submit_prediction(text,text)",
+      "name": "submit_prediction",
+      "capability": "media",
+      "condition": "true",
+      "bodyMd5": "a18f53a43a78d1063399caaa43696b26"
+    },
+    {
+      "signature": "public.create_take(hood_id,text,text,text,text)",
+      "name": "create_take",
+      "capability": "media",
+      "condition": "p_media_object_id is not null or p_media_url is not null or p_media_poster_url is not null",
+      "bodyMd5": "3ae3f7eef0ff78f1c78756fab76bb1fb"
+    },
+    {
+      "signature": "public.create_comment(text,text,text,text,text,text,text)",
+      "name": "create_comment",
+      "capability": "media",
+      "condition": "p_media_object_id is not null or p_media_url is not null or p_gif_provider is not null or p_gif_external_id is not null",
+      "bodyMd5": "7c30864e5f15ee83fd4f3effc3b3d193"
+    },
+    {
+      "signature": "public.set_creator_product_status(text,vault_offer_status)",
+      "name": "set_creator_product_status",
+      "capability": "creator",
+      "condition": "upper(p_status::text) is distinct from 'ARCHIVED'",
+      "bodyMd5": "a4c81b1f88dd2c8cd9b71c8a5a78552d"
+    },
+    {
+      "signature": "public.set_creator_course_status(text,vault_offer_status)",
+      "name": "set_creator_course_status",
+      "capability": "creator",
+      "condition": "upper(p_status::text) is distinct from 'ARCHIVED'",
+      "bodyMd5": "efccc3fb756147c0359a6f6e8c4dc48a"
+    },
+    {
+      "signature": "public.set_creator_service_status(text,vault_offer_status)",
+      "name": "set_creator_service_status",
+      "capability": "creator",
+      "condition": "upper(p_status::text) is distinct from 'ARCHIVED'",
+      "bodyMd5": "596c87d3c365d507239725b2a3f9258b"
+    },
+    {
+      "signature": "public.set_course_lesson_status(text,vault_offer_status)",
+      "name": "set_course_lesson_status",
+      "capability": "creator",
+      "condition": "upper(p_status::text) is distinct from 'ARCHIVED'",
+      "bodyMd5": "f39b466f401b38ab89850e5a691cceb6"
+    },
+    {
+      "signature": "public.set_creator_world_drop_status(text,world_drop_status)",
+      "name": "set_creator_world_drop_status",
+      "capability": "creator",
+      "condition": "p_status::text='PUBLISHED'",
+      "bodyMd5": "3cec02294baa2fa510fb1e52375ab9ea"
+    },
+    {
+      "signature": "public.set_vault_community_status(text,vault_community_status)",
+      "name": "set_vault_community_status",
+      "capability": "creator",
+      "condition": "upper(p_status::text)='ACTIVE'",
+      "bodyMd5": "08836d399b2328b457d2cf0bb081ed35"
+    },
+    {
+      "signature": "public.follow_arena_crew(text)",
+      "name": "follow_arena_crew",
+      "capability": "groups",
+      "condition": "not exists(select 1 from public.arena_crew_follows where crew_id=p_crew_id and profile_id=public.my_profile_id())",
+      "bodyMd5": "ef93e94549f91bb513e87b9228af79f0"
+    },
+    {
+      "signature": "public.join_arena_group_topic(text,take_stance,arena_participant_role)",
+      "name": "join_arena_group_topic",
+      "capability": "groups",
+      "condition": "not exists(select 1 from public.arena_room_participants where topic_id=p_topic_id and profile_id=public.my_profile_id())",
+      "bodyMd5": "484c5afd4fc2f5222628ba06c455a8ce"
+    },
+    {
+      "signature": "public.create_world_mission(text,text,text,timestamp with time zone,timestamp with time zone,world_mission_status)",
+      "name": "create_world_mission",
+      "capability": "world",
+      "condition": "true",
+      "bodyMd5": "512b5d0b61f55c5b6918ebf5d6404d97"
+    },
+    {
+      "signature": "public.create_arena_daily_topic(text,text,hood_id,timestamp with time zone,timestamp with time zone,timestamp with time zone,timestamp with time zone,arena_topic_status)",
+      "name": "create_arena_daily_topic",
+      "capability": "groups",
+      "condition": "true",
+      "bodyMd5": "2052a4b2d6f5c0106c0f0e7487fb25a2"
+    }
+  ]
+}

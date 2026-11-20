@@ -1,0 +1,13 @@
+# Local execution evidence and scratch never belong in the deployment commit.
+evidence/
+evidence-adapter/
+scratch/
+*.log
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.pgpass

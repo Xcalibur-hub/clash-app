@@ -1,0 +1,88 @@
+begin;
+select no_plan();
+create extension if not exists dblink with schema extensions;
+select extensions.dblink_connect('az-one','host=127.0.0.1 port=5432 user=postgres password=postgres dbname='||current_database());
+select extensions.dblink_connect('az-two','host=127.0.0.1 port=5432 user=postgres password=postgres dbname='||current_database());
+select extensions.dblink_exec('az-one',$remote$
+do $fixture$ begin
+ delete from takes where id='authz-race-take';
+ delete from arena_daily_topics where title='Authorization race fixture';
+ delete from profiles where id in('az-race-a','az-race-b','az-race-s');
+ delete from auth.users where id in('00000000-0000-0000-0000-00000000a711','00000000-0000-0000-0000-00000000a712','00000000-0000-0000-0000-00000000a713');
+ insert into auth.users(id) values('00000000-0000-0000-0000-00000000a711'),('00000000-0000-0000-0000-00000000a712'),('00000000-0000-0000-0000-00000000a713');
+ update profiles set id='az-race-a',handle='az_race_a',name='Race A' where auth_user_id='00000000-0000-0000-0000-00000000a711';
+ update profiles set id='az-race-b',handle='az_race_b',name='Race B' where auth_user_id='00000000-0000-0000-0000-00000000a712';
+ update profiles set id='az-race-s',handle='az_race_s',name='Race spectator' where auth_user_id='00000000-0000-0000-0000-00000000a713';
+ insert into takes(id,author_id,hood,text,is_runtime_fixture) values('authz-race-take','az-race-a','techtakes','Authorization race fixture',true);
+ perform create_arena_duel('authz-race-take','az-race-b','00000000-0000-0000-0000-00000000a720');
+end $fixture$;
+$remote$);
+select extensions.dblink_exec('az-two',$remote$
+create function pg_temp.attempt(p_action text) returns text language plpgsql as $fn$
+declare r text; c text;
+begin
+ r:=current_setting('az.room'); c:=current_setting('az.clash');
+ if p_action='post' then perform post_arena_room_message(r,'Race argument');
+ elsif p_action='watch' then perform watch_arena_room(r);
+ elsif p_action='judge' then perform submit_judgement(c,'A'); end if;
+ return 'ok'; exception when others then return sqlstate;
+end $fn$;
+$remote$);
+select * from extensions.dblink('az-two',$remote$select set_config('az.room',r.id,false),set_config('az.clash',c.id,false) from arena_rooms r join clashes c on c.id=r.clash_id where c.take_id='authz-race-take'$remote$) as x(room_setting text,clash_setting text);
+select extensions.dblink_exec('az-two','set role authenticated');
+select * from extensions.dblink('az-two',$remote$select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000a711","role":"authenticated"}',false)$remote$) as x(claims text);
+select extensions.dblink_exec('az-one','begin');
+select extensions.dblink_exec('az-one',$remote$update takes set status='removed' where id='authz-race-take'$remote$);
+select is(extensions.dblink_send_query('az-two',$remote$select pg_temp.attempt('post')$remote$),1,'removed source versus official post queued');
+select pg_sleep(0.1);
+select is(extensions.dblink_is_busy('az-two'),1,'removed source versus official post waits on authoritative lock');
+select extensions.dblink_exec('az-one','commit');
+select is((select code from extensions.dblink_get_result('az-two') as x(code text)),'42501','removed source versus official post rechecks committed visibility');
+select * from extensions.dblink_get_result('az-two') as x(code text);
+select extensions.dblink_exec('az-one',$remote$update takes set status='active' where id='authz-race-take'$remote$);
+select * from extensions.dblink('az-two',$remote$select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000a713","role":"authenticated"}',false)$remote$) as x(claims text);
+select extensions.dblink_exec('az-one','begin');
+select extensions.dblink_exec('az-one',$remote$update takes set status='removed' where id='authz-race-take'$remote$);
+select is(extensions.dblink_send_query('az-two',$remote$select pg_temp.attempt('watch')$remote$),1,'removed source versus new watch queued');
+select pg_sleep(0.1);
+select is(extensions.dblink_is_busy('az-two'),1,'removed source versus new watch waits on authoritative lock');
+select extensions.dblink_exec('az-one','commit');
+select is((select code from extensions.dblink_get_result('az-two') as x(code text)),'42501','removed source versus new watch rechecks committed visibility');
+select * from extensions.dblink_get_result('az-two') as x(code text);
+select extensions.dblink_exec('az-one',$remote$update takes set status='active' where id='authz-race-take'$remote$);
+select extensions.dblink_exec('az-one','begin');
+select extensions.dblink_exec('az-one',$remote$do $x$ begin perform 1 from clashes where take_id='authz-race-take' for update; insert into mutes(muter_id,muted_id) values('az-race-s','az-race-a'); end $x$$remote$);
+select is(extensions.dblink_send_query('az-two',$remote$select pg_temp.attempt('watch')$remote$),1,'mute committed during watch lock wait queued');
+select pg_sleep(0.1);
+select is(extensions.dblink_is_busy('az-two'),1,'mute committed during watch lock wait waits on authoritative lock');
+select extensions.dblink_exec('az-one','commit');
+select is((select code from extensions.dblink_get_result('az-two') as x(code text)),'42501','mute committed during watch lock wait rechecks committed visibility');
+select * from extensions.dblink_get_result('az-two') as x(code text);
+select extensions.dblink_exec('az-one',$remote$
+delete from mutes where muter_id='az-race-s';
+update clashes set opens_at=now()-interval '26 minutes',closes_at=now()+interval '4 minutes' where take_id='authz-race-take';
+update arena_rooms set opens_at=now()-interval '26 minutes',closes_at=now()+interval '4 minutes',status='JUDGING' where clash_id in(select id from clashes where take_id='authz-race-take');
+update arena_daily_topics set opens_at=now()-interval '26 minutes',final_arguments_at=now()-interval '6 minutes',judging_at=now()-interval '1 minute',closes_at=now()+interval '4 minutes' where id in(select topic_id from arena_rooms where clash_id in(select id from clashes where take_id='authz-race-take'));
+$remote$);
+select extensions.dblink_exec('az-one','begin');
+select extensions.dblink_exec('az-one',$remote$do $x$ begin perform 1 from clashes where take_id='authz-race-take' for update; insert into blocks(blocker_id,blocked_id) values('az-race-b','az-race-s'); end $x$$remote$);
+select is(extensions.dblink_send_query('az-two',$remote$select pg_temp.attempt('judge')$remote$),1,'reverse block versus known-ID judgement queued');
+select pg_sleep(0.1);
+select is(extensions.dblink_is_busy('az-two'),1,'reverse block versus known-ID judgement waits on authoritative lock');
+select extensions.dblink_exec('az-one','commit');
+select is((select code from extensions.dblink_get_result('az-two') as x(code text)),'42501','reverse block versus known-ID judgement rechecks committed visibility');
+select * from extensions.dblink_get_result('az-two') as x(code text);
+select is((select count(*)::int from arena_room_messages where room_id in(select id from arena_rooms where clash_id in(select id from clashes where take_id='authz-race-take'))),0,'queued rejected posts leave no official rows');
+select is((select count(*)::int from judgements where clash_id in(select id from clashes where take_id='authz-race-take')),0,'queued rejected judgement leaves no ballot');
+select is((select count(*)::int from arena_room_participants where profile_id='az-race-s'),0,'queued rejected watch leaves no membership');
+select extensions.dblink_exec('az-one',$remote$
+delete from takes where id='authz-race-take';
+delete from arena_daily_topics where title='Authorization race fixture';
+delete from rate_limit_events where actor_id in('az-race-a','az-race-b','az-race-s');
+delete from profiles where id in('az-race-a','az-race-b','az-race-s');
+delete from auth.users where id in('00000000-0000-0000-0000-00000000a711','00000000-0000-0000-0000-00000000a712','00000000-0000-0000-0000-00000000a713');
+$remote$);
+select extensions.dblink_disconnect('az-one');
+select extensions.dblink_disconnect('az-two');
+select * from finish();
+rollback;

@@ -1,0 +1,893 @@
+import React from 'react';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import MapView, {
+  Circle,
+  type Region,
+  PROVIDER_DEFAULT,
+  PROVIDER_GOOGLE,
+} from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WorldDropMarker, WorldClusterMarker } from '../../components/world/WorldDropMarker';
+import { WorldDropPreview } from '../../components/world/WorldDropPreview';
+import { WorldMapUnavailable } from '../../components/world/WorldMapUnavailable';
+import { WorldMissionBeacon } from '../../components/world/WorldMissionBeacon';
+import { Notice } from '../../components/shared/Notice';
+import { BackIcon, LocateIcon, PlusIcon, WorldIcon } from '../../components/shared/icons';
+import {
+  WORLD_MAP_STYLE_DARK,
+  WORLD_MAP_STYLE_LIGHT,
+} from '../../components/world/worldMapStyle';
+import { useClock } from '../../hooks/useClock';
+import { useRequireAuth } from '../../hooks/useRequireAuth';
+import type { ReadStatus } from '../../hooks/useRetryableRead';
+import { analytics } from '../../services/analytics';
+import {
+  getForegroundPermission,
+  getOneShotLocation,
+  requestForegroundPermission,
+} from '../../services/locationService';
+import { errorText } from '../../services/supabaseClient';
+import {
+  fetchActiveMissions,
+  fetchMissionDrops,
+  fetchNearbyWorldDrops,
+  fetchRecentWorldDrops,
+  type WorldDrop,
+  type WorldMission,
+} from '../../services/worldService';
+import { showNotice, useClash } from '../../store';
+import { radius, space, typeScale, useTheme, useThemeColors } from '../../theme';
+import { clusterWorldDrops, regionMovedSignificantly } from '../../utils/worldCluster';
+import { tap as hapticTap } from '../../utils/haptics';
+import { isWorldNativeMapAvailable } from '../../utils/worldNativeMapAvailability';
+
+type WorldFilter = 'nearby' | 'recent' | 'mission';
+
+const FILTERS: readonly { key: WorldFilter; label: string }[] = [
+  { key: 'nearby', label: 'Map area' },
+  { key: 'recent', label: 'Recent' },
+  { key: 'mission', label: 'Missions' },
+];
+
+/** Initial map viewport only; never interpreted as the viewer's location. */
+const FALLBACK_REGION: Region = {
+  latitude: 15.4909,
+  longitude: 73.8278,
+  latitudeDelta: 0.12,
+  longitudeDelta: 0.12,
+};
+
+const NEARBY_ZOOM: Region = {
+  ...FALLBACK_REGION,
+  latitudeDelta: 0.08,
+  longitudeDelta: 0.08,
+};
+
+/** Estimated preview card height for gentle camera offset (not aggressive zoom). */
+const PREVIEW_CAMERA_BIAS = 0.16;
+
+/**
+ * World map — CONTENT markers only.
+ * Location is requested only after a deliberate recenter tap. No live people or continuous watch.
+ */
+export default function WorldScreen(): React.JSX.Element {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const requireAuth = useRequireAuth();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      analytics.track('world_opened', { realm: 'world' });
+    }, []),
+  );
+  const { dispatch } = useClash();
+  const { scheme } = useTheme();
+  const t = useThemeColors();
+  const now = useClock(30_000);
+  const mapRef = React.useRef<MapView | null>(null);
+  // A later filter, map-area search, or recenter invalidates earlier requests.
+  const discoveryRequest = React.useRef(0);
+  // Mission chrome survives discovery-mode changes, but never an unmount.
+  const missionRequest = React.useRef(0);
+  const firstFocus = React.useRef(true);
+  const latestDiscovery = React.useRef<{ mode: WorldFilter; centre: Region }>({
+    mode: 'recent',
+    centre: FALLBACK_REGION,
+  });
+  const light = scheme === 'light';
+
+  const [missions, setMissions] = React.useState<WorldMission[]>([]);
+  const [missionStatus, setMissionStatus] = React.useState<ReadStatus>('loading');
+  const [dropsError, setDropsError] = React.useState(false);
+  const [drops, setDrops] = React.useState<WorldDrop[]>([]);
+  const [filter, setFilter] = React.useState<WorldFilter>('recent');
+  const [region, setRegion] = React.useState<Region>(FALLBACK_REGION);
+  const [queryOrigin, setQueryOrigin] = React.useState<Region>(FALLBACK_REGION);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [searching, setSearching] = React.useState(false);
+  const [showSearchArea, setShowSearchArea] = React.useState(false);
+  // No position is read and no permission dialog appears when World opens.
+  const [locationDenied, setLocationDenied] = React.useState(true);
+  const [privacyOpen, setPrivacyOpen] = React.useState(false);
+  const [viewerDot, setViewerDot] = React.useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Read the latest selection on focus without retriggering the focus effect
+  // whenever the viewer pans or switches discovery filters.
+  latestDiscovery.current = { mode: filter, centre: region };
+
+  const primaryMission = missions[0] ?? null;
+  const selected = React.useMemo(
+    () => (selectedId ? drops.find((d) => d.id === selectedId) ?? null : null),
+    [drops, selectedId],
+  );
+
+  const floatBg = light ? 'rgba(255,255,255,0.94)' : 'rgba(30,30,34,0.94)';
+  const floatBorder = light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
+
+  // Close preview if the selected Drop vanished after a refresh (expire/block).
+  React.useEffect(() => {
+    if (selectedId && !drops.some((d) => d.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [drops, selectedId]);
+
+  const mapItems = React.useMemo(
+    () => clusterWorldDrops(drops, region),
+    [drops, region],
+  );
+
+  const loadMissions = React.useCallback(async (): Promise<WorldMission[]> => {
+    return fetchActiveMissions();
+  }, []);
+
+  const refreshMissions = React.useCallback(async (): Promise<void> => {
+    const request = ++missionRequest.current;
+    setMissionStatus('loading');
+    try {
+      const active = await loadMissions();
+      if (request !== missionRequest.current) return;
+      setMissions(active);
+      setMissionStatus('ready');
+    } catch (error) {
+      if (request !== missionRequest.current) return;
+      setMissionStatus('error');
+      dispatch(showNotice(errorText(error)));
+    }
+  }, [dispatch, loadMissions]);
+
+  const loadDropsFor = React.useCallback(
+    async (mode: WorldFilter, centre: { latitude: number; longitude: number }): Promise<WorldDrop[]> => {
+      if (mode === 'recent') {
+        return fetchRecentWorldDrops(40);
+      }
+      if (mode === 'mission') {
+        const active = (await fetchActiveMissions())[0];
+        return active ? fetchMissionDrops(active.id, 40) : [];
+      }
+      return fetchNearbyWorldDrops(
+        { latitude: centre.latitude, longitude: centre.longitude },
+        25,
+        40,
+      );
+    },
+    [],
+  );
+
+  const bootstrap = React.useCallback(async (): Promise<void> => {
+    const request = ++discoveryRequest.current;
+    setLoading(true);
+    setDropsError(false);
+    // Independent reads: a failed Mission request must not hide recent Drops.
+    void refreshMissions();
+    try {
+      // Browsing is permission-free. Only the recenter button requests GPS.
+      // In particular, an already-granted OS permission is not consent to
+      // automatically transmit the viewer's location when this screen opens.
+      const recentDrops = await loadDropsFor('recent', FALLBACK_REGION);
+      if (request !== discoveryRequest.current) return;
+      setDrops(recentDrops);
+    } catch (error) {
+      if (request === discoveryRequest.current) {
+        setDropsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
+    } finally {
+      if (request === discoveryRequest.current) setLoading(false);
+    }
+  }, [dispatch, refreshMissions, loadDropsFor]);
+
+  // Expo Router can retain this screen while another route is in front of it.
+  // Refresh on return; don't keep showing old results after blocks, expiry,
+  // or account-level policy changes while World was out of focus.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        void bootstrap();
+      } else {
+        const request = ++discoveryRequest.current;
+        const { mode, centre } = latestDiscovery.current;
+        setSelectedId(null);
+        setDrops([]);
+        // One-shot location is not a live position: never reuse its dot
+        // after leaving and returning to World.
+        setViewerDot(null);
+        setLocationDenied(true);
+        setLoading(false);
+        setSearching(true);
+        setDropsError(false);
+        void refreshMissions();
+        void loadDropsFor(mode, centre)
+          .then((result) => {
+            if (request === discoveryRequest.current) {
+              setDrops(result);
+              setQueryOrigin(centre);
+              // A pan during the refresh still needs its own area search.
+              setShowSearchArea(regionMovedSignificantly(centre, latestDiscovery.current.centre));
+            }
+          })
+          .catch((error) => {
+            if (request === discoveryRequest.current) {
+              setDropsError(true);
+              dispatch(showNotice(errorText(error)));
+            }
+          })
+          .finally(() => {
+            if (request === discoveryRequest.current) setSearching(false);
+          });
+      }
+      return () => {
+        // Invalidate requests on blur as well as unmount. Do not cancel or
+        // implicitly start a new GPS permission request.
+        discoveryRequest.current += 1;
+        missionRequest.current += 1;
+      };
+    }, [bootstrap, dispatch, loadDropsFor, refreshMissions]),
+  );
+
+  // A query's centre is where the request began, not necessarily where the
+  // viewer is looking when its response arrives. Keep the latest camera
+  // position in a ref so even a pan before React re-renders is respected.
+  const recordQueryOrigin = (centre: Region): void => {
+    setQueryOrigin(centre);
+    setShowSearchArea(regionMovedSignificantly(centre, latestDiscovery.current.centre));
+  };
+
+  const onFilterChange = async (next: WorldFilter): Promise<void> => {
+    hapticTap();
+    const request = ++discoveryRequest.current;
+    setFilter(next);
+    setSelectedId(null);
+    // Do not display the previous mode's markers while the new query is pending.
+    setDrops([]);
+    setLoading(false);
+    setSearching(true);
+    setDropsError(false);
+    const requestRegion = region;
+    try {
+      const result = await loadDropsFor(next, { latitude: requestRegion.latitude, longitude: requestRegion.longitude });
+      if (request !== discoveryRequest.current) return;
+      setDrops(result);
+      recordQueryOrigin(requestRegion);
+    } catch (error) {
+      if (request === discoveryRequest.current) {
+        setDropsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
+    } finally {
+      if (request === discoveryRequest.current) setSearching(false);
+    }
+  };
+
+  const searchThisArea = async (): Promise<void> => {
+    hapticTap();
+    const request = ++discoveryRequest.current;
+    setFilter('nearby');
+    setSelectedId(null);
+    setDrops([]);
+    setLoading(false);
+    setSearching(true);
+    setDropsError(false);
+    const requestRegion = region;
+    try {
+      const result = await loadDropsFor('nearby', { latitude: requestRegion.latitude, longitude: requestRegion.longitude });
+      if (request !== discoveryRequest.current) return;
+      setDrops(result);
+      recordQueryOrigin(requestRegion);
+      setSelectedId(null);
+    } catch (error) {
+      if (request === discoveryRequest.current) {
+        setDropsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
+    } finally {
+      if (request === discoveryRequest.current) setSearching(false);
+    }
+  };
+
+  const recenter = async (): Promise<void> => {
+    hapticTap();
+    const request = ++discoveryRequest.current;
+    // This action supersedes startup/filter loading even if permission is denied.
+    setLoading(false);
+    setSearching(false);
+    let permission: Awaited<ReturnType<typeof getForegroundPermission>>;
+    try {
+      permission = await getForegroundPermission();
+      if (request !== discoveryRequest.current) return;
+      if (permission !== 'granted') {
+        permission = await requestForegroundPermission();
+        if (request !== discoveryRequest.current) return;
+      }
+      if (permission !== 'granted') {
+        setLocationDenied(true);
+        dispatch(showNotice('Location permission is needed to recenter.'));
+        return;
+      }
+      const point = await getOneShotLocation();
+      if (request !== discoveryRequest.current) return;
+      const next: Region = {
+        latitude: point.latitude,
+        longitude: point.longitude,
+        latitudeDelta: NEARBY_ZOOM.latitudeDelta,
+        longitudeDelta: NEARBY_ZOOM.longitudeDelta,
+      };
+      setViewerDot({ latitude: point.latitude, longitude: point.longitude });
+      setLocationDenied(false);
+      setRegion(next);
+      mapRef.current?.animateToRegion(next, 550);
+      setFilter('nearby');
+      setSelectedId(null);
+      setDrops([]);
+      setLoading(false);
+      setSearching(true);
+      setDropsError(false);
+      const result = await loadDropsFor('nearby', point);
+      if (request !== discoveryRequest.current) return;
+      setDrops(result);
+      recordQueryOrigin(next);
+    } catch (error) {
+      if (request === discoveryRequest.current) {
+        setDropsError(true);
+        dispatch(showNotice(errorText(error)));
+      }
+    } finally {
+      if (request === discoveryRequest.current) setSearching(false);
+    }
+  };
+
+  const zoomToCluster = (latitude: number, longitude: number): void => {
+    hapticTap();
+    const next: Region = {
+      latitude,
+      longitude,
+      latitudeDelta: Math.max(region.latitudeDelta * 0.45, 0.02),
+      longitudeDelta: Math.max(region.longitudeDelta * 0.45, 0.02),
+    };
+    setRegion(next);
+    mapRef.current?.animateToRegion(next, 420);
+  };
+
+  const selectDrop = (drop: WorldDrop): void => {
+    hapticTap();
+    setSelectedId(drop.id);
+    // Gentle bias so the marker sits above the floating preview — no aggressive zoom.
+    const next: Region = {
+      latitude: drop.approxLat - region.latitudeDelta * PREVIEW_CAMERA_BIAS,
+      longitude: drop.approxLng,
+      latitudeDelta: region.latitudeDelta,
+      longitudeDelta: region.longitudeDelta,
+    };
+    mapRef.current?.animateToRegion(next, 280);
+  };
+
+  const participate = (): void => {
+    if (!primaryMission) {
+      dispatch(showNotice('No active Mission this week.'));
+      return;
+    }
+    if (!requireAuth()) return;
+    hapticTap();
+    router.push(`/world/compose?missionId=${primaryMission.id}`);
+  };
+
+  const openDrop = (drop: WorldDrop): void => {
+    router.push(`/world/drop/${drop.id}`);
+  };
+
+  const nativeMap = isWorldNativeMapAvailable(Platform.OS);
+  const provider = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+  const mapStyle = light ? WORLD_MAP_STYLE_LIGHT : WORLD_MAP_STYLE_DARK;
+  const bottomPad = insets.bottom + space.md;
+  const midBottom = (selected ? 300 : 120) + insets.bottom;
+
+  return (
+    <View style={[styles.root, { backgroundColor: t.background }]}>
+      {nativeMap ? (
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFill}
+          provider={provider}
+          initialRegion={FALLBACK_REGION}
+          customMapStyle={mapStyle}
+          userInterfaceStyle={light ? 'light' : 'dark'}
+          showsUserLocation={false}
+          showsMyLocationButton={false}
+          showsCompass={false}
+          showsPointsOfInterest={false}
+          toolbarEnabled={false}
+          moveOnMarkerPress={false}
+          onRegionChangeComplete={(next) => {
+            latestDiscovery.current.centre = next;
+            setRegion(next);
+            setShowSearchArea(regionMovedSignificantly(queryOrigin, next));
+          }}
+          onPress={() => setSelectedId(null)}
+        >
+          {mapItems.map((item) => {
+            if (item.kind === 'cluster') {
+              return (
+                <WorldClusterMarker
+                  key={item.id}
+                  id={item.id}
+                  latitude={item.latitude}
+                  longitude={item.longitude}
+                  count={item.count}
+                  onPress={() => zoomToCluster(item.latitude, item.longitude)}
+                />
+              );
+            }
+            return (
+              <WorldDropMarker
+                key={item.id}
+                drop={item.drop}
+                selected={item.drop.id === selectedId}
+                onPress={selectDrop}
+              />
+            );
+          })}
+          {viewerDot ? (
+            <Circle
+              center={viewerDot}
+              radius={140}
+              strokeWidth={1}
+              strokeColor={light ? 'rgba(17,17,19,0.22)' : 'rgba(255,255,255,0.28)'}
+              fillColor={light ? 'rgba(17,17,19,0.06)' : 'rgba(255,255,255,0.07)'}
+            />
+          ) : null}
+        </MapView>
+      ) : (
+        <View style={[styles.fallbackBody, { paddingTop: insets.top + 64 }]}>
+          <WorldMapUnavailable
+            missions={missions}
+            drops={drops}
+            missionStatus={missionStatus}
+            dropStatus={loading || searching ? 'loading' : dropsError ? 'error' : 'ready'}
+            onRetryMissions={() => { void refreshMissions(); }}
+            onRetryDrops={() => { void onFilterChange(filter); }}
+            now={now}
+            onOpenDrop={openDrop}
+            onParticipate={participate}
+          />
+        </View>
+      )}
+
+      {/* Top floating World bar — not a conventional nav header */}
+      <View style={[styles.topChrome, { paddingTop: insets.top + space.sm }]} pointerEvents="box-none">
+        <View
+          style={[
+            styles.topBar,
+            {
+              backgroundColor: floatBg,
+              borderColor: floatBorder,
+              shadowColor: t.shadowColor,
+            },
+          ]}
+        >
+          <Pressable
+            onPress={() => {
+              hapticTap();
+              if (router.canGoBack()) router.back();
+              else router.replace('/(tabs)/explore');
+            }}
+            style={styles.barIcon}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            hitSlop={8}
+          >
+            <BackIcon size={20} color={t.textPrimary} />
+          </Pressable>
+
+          <Text allowFontScaling={false} style={[styles.brand, { color: t.textPrimary }]}>
+            World
+          </Text>
+
+          <View style={styles.barActions}>
+            <Pressable
+              onPress={() => {
+                hapticTap();
+                setPrivacyOpen((v) => !v);
+              }}
+              style={styles.barIcon}
+              accessibilityRole="button"
+              accessibilityLabel="World privacy"
+              hitSlop={8}
+            >
+              <WorldIcon size={18} color={t.textSecondary} />
+            </Pressable>
+            {nativeMap ? (
+              <Pressable
+                onPress={() => void recenter()}
+                style={styles.barIcon}
+                accessibilityRole="button"
+                accessibilityLabel="Use my location to recenter map"
+                hitSlop={8}
+              >
+                <LocateIcon size={18} color={t.textPrimary} />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
+        {privacyOpen ? (
+          <Text
+            allowFontScaling={false}
+            style={[
+              styles.privacy,
+              {
+                color: t.textSecondary,
+                backgroundColor: floatBg,
+                borderColor: floatBorder,
+              },
+            ]}
+          >
+            {nativeMap
+              ? 'World shows approximate areas where content was posted, not live people. Opening World never reads your location. Tap the locate icon to request one-time foreground access.'
+              : 'World shows approximate areas where content was posted, not live people. Opening World never reads your location. The street map is unavailable in this Android build.'}
+          </Text>
+        ) : null}
+
+        {nativeMap && primaryMission ? (
+          <WorldMissionBeacon
+            mission={primaryMission}
+            now={now}
+            onPress={() => {
+              void onFilterChange('mission');
+            }}
+          />
+        ) : null}
+
+        {nativeMap && locationDenied ? (
+          <Text
+            allowFontScaling={false}
+            style={[
+              styles.banner,
+              {
+                color: t.textSecondary,
+                backgroundColor: floatBg,
+                borderColor: floatBorder,
+              },
+            ]}
+          >
+            Location not in use — browse Recent or Map area, or tap locate to opt in.
+          </Text>
+        ) : null}
+      </View>
+
+      {nativeMap ? (
+        <View style={[styles.midChrome, { bottom: midBottom }]} pointerEvents="box-none">
+          {showSearchArea && filter === 'nearby' ? (
+            <Pressable
+              onPress={() => void searchThisArea()}
+              style={[
+                styles.searchArea,
+                {
+                  backgroundColor: light ? '#111113' : '#F5F5F7',
+                  shadowColor: t.shadowColor,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Search this area"
+            >
+              <Text
+                allowFontScaling={false}
+                style={[styles.searchAreaText, { color: light ? '#F5F5F7' : '#111113' }]}
+              >
+                {searching ? 'Searching…' : 'Search this area'}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {!loading && !searching && drops.length === 0 ? (
+            <View
+              style={[
+                styles.empty,
+                {
+                  backgroundColor: floatBg,
+                  borderColor: floatBorder,
+                  shadowColor: t.shadowColor,
+                },
+              ]}
+            >
+              <Text allowFontScaling={false} style={[styles.emptyTitle, { color: t.textPrimary }]}>
+                {filter === 'nearby' ? 'No Drops in this area' : filter === 'mission' ? (primaryMission ? 'No Mission Drops yet' : 'No active Mission') : 'No recent Drops yet'}
+              </Text>
+              <Text allowFontScaling={false} style={[styles.emptyBody, { color: t.textSecondary }]}>
+                {filter === 'nearby'
+                  ? 'Try another part of the map or browse recent Drops.'
+                  : filter === 'mission'
+                    ? (primaryMission ? 'This Mission is waiting for its first Drop.' : 'Browse recent Drops or explore the map.')
+                    : 'Explore the map or join a Mission to get things started.'}
+              </Text>
+              <View style={styles.emptyActions}>
+                <Pressable
+                  onPress={() => void onFilterChange(filter === 'recent' ? 'nearby' : 'recent')}
+                  style={[styles.emptyCta, { backgroundColor: light ? '#111113' : '#F5F5F7' }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={filter === 'recent' ? 'Explore map area' : 'Browse recent Drops'}
+                >
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.emptyCtaText, { color: light ? '#F5F5F7' : '#111113' }]}
+                  >
+                    {filter === 'recent' ? 'Explore map area' : 'Browse recent'}
+                  </Text>
+                </Pressable>
+                {primaryMission ? (
+                  <Pressable
+                    onPress={participate}
+                    style={[styles.emptySecondary, { borderColor: t.border }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Join this week's Mission"
+                  >
+                    <Text allowFontScaling={false} style={[styles.emptyCtaText, { color: t.textPrimary }]}>
+                      Join Mission
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      <View style={[styles.bottomChrome, { paddingBottom: bottomPad }]} pointerEvents="box-none">
+        {selected ? (
+          <WorldDropPreview
+            drop={selected}
+            onView={openDrop}
+            onDismiss={() => setSelectedId(null)}
+          />
+        ) : (
+          <View style={styles.controls}>
+            {nativeMap ? (
+              <View
+                style={[
+                  styles.filters,
+                  {
+                    backgroundColor: floatBg,
+                    borderColor: floatBorder,
+                    shadowColor: t.shadowColor,
+                  },
+                ]}
+              >
+                {FILTERS.map((item) => {
+                  const active = filter === item.key;
+                  return (
+                    <Pressable
+                      key={item.key}
+                      onPress={() => void onFilterChange(item.key)}
+                      style={[
+                        styles.filter,
+                        active && {
+                          backgroundColor: light ? '#111113' : 'rgba(255,255,255,0.14)',
+                        },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={item.label}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          styles.filterText,
+                          { color: active ? (light ? '#F5F5F7' : t.textPrimary) : t.textMuted },
+                          active && styles.filterTextOn,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.filtersSpacer} />
+            )}
+
+            <Pressable
+              onPress={participate}
+              style={[
+                styles.create,
+                {
+                  backgroundColor: light ? '#111113' : '#F5F5F7',
+                  shadowColor: t.shadowColor,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Create World Drop"
+            >
+              <PlusIcon size={20} color={light ? '#F5F5F7' : '#111113'} strokeWidth={2.4} />
+            </Pressable>
+          </View>
+        )}
+      </View>
+
+      {loading ? (
+        <View style={[styles.loading, { backgroundColor: light ? 'rgba(244,243,239,0.28)' : 'rgba(9,9,11,0.35)' }]} pointerEvents="none">
+          <ActivityIndicator color={t.textPrimary} />
+        </View>
+      ) : null}
+
+      <Notice offset={0} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  fallbackBody: { flex: 1 },
+  filtersSpacer: { flex: 1 },
+  topChrome: {
+    position: 'absolute',
+    left: space.md,
+    right: space.md,
+    gap: space.sm,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    paddingHorizontal: 6,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  brand: {
+    ...typeScale.section,
+    flex: 1,
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  barActions: { flexDirection: 'row', alignItems: 'center' },
+  barIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  privacy: {
+    ...typeScale.meta,
+    padding: space.sm,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  banner: {
+    ...typeScale.meta,
+    paddingHorizontal: space.sm,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  midChrome: {
+    position: 'absolute',
+    left: space.md,
+    right: space.md,
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  searchArea: {
+    paddingHorizontal: space.md,
+    paddingVertical: 11,
+    borderRadius: radius.pill,
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  searchAreaText: { ...typeScale.label, fontWeight: '600' },
+  empty: {
+    alignItems: 'center',
+    gap: 6,
+    padding: space.md,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    maxWidth: 320,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  emptyTitle: { ...typeScale.label, fontWeight: '600' },
+  emptyBody: { ...typeScale.meta, textAlign: 'center' },
+  emptyActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.xs, marginTop: 4 },
+  emptyCta: {
+    paddingHorizontal: space.md,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+  },
+  emptySecondary: {
+    paddingHorizontal: space.md,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  emptyCtaText: { ...typeScale.meta, fontWeight: '600' },
+  bottomChrome: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: space.md,
+    gap: space.sm,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+  },
+  filters: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  filter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+  },
+  filterText: { ...typeScale.meta },
+  filterTextOn: { fontWeight: '600' },
+  create: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  loading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

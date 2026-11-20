@@ -1,0 +1,586 @@
+/**
+ * Canonical Duel — immersive full-screen Clash event.
+ * Official arguments on Stage; Crowd is a separate live layer.
+ * No permanent Arguments | Crowd | Evidence tab bar.
+ */
+import React from 'react';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import type { ArenaEvidence, ArenaMessage, ArenaRoom } from '../../services/liveArenaService';
+import { layout, space, typeScale, useThemeColors } from '../../theme';
+import { duelAtmosphereMood } from '../../utils/arenaAtmosphere';
+import { assistAvailability } from '../../utils/arenaAssist';
+import { duelArgumentPreview, duelLatestMoment, duelPresentation, duelTranscript } from '../../utils/duelPresentation';
+import { press as hapticPress, tap as hapticTap } from '../../utils/haptics';
+import { BackIcon } from '../shared/icons';
+import { PressableScale } from '../shared/PressableScale';
+import { ArenaAtmosphere } from './ArenaAtmosphere';
+import { ArgumentHistorySheet } from './ArgumentHistorySheet';
+import { ClashMoreSheet } from './ClashMoreSheet';
+import { DuelDevPanel } from './DuelDevPanel';
+import { DuelEntrance } from './DuelEntrance';
+import { DuelRoomOutcome } from './DuelRoomOutcome';
+import { DuelPersonalResult } from './DuelPersonalResult';
+import { DuelPhaseCountdown } from './DuelPhaseCountdown';
+import { ImmersiveClash } from './ImmersiveClash';
+import { softFill } from './liveArenaStyles';
+import type { LiveRoomMessageProps } from './LiveRoomMessage';
+import { useArenaCrowd } from '../../hooks/useArenaCrowd';
+import { PrivateAssistPanel } from './PrivateAssistPanel';
+import { ArenaSheet } from '../arena/ui/ArenaSheet';
+import { ArenaButton } from '../arena/ui/ArenaPrimitives';
+import { useDuelReactionBurst } from './useDuelReactionBurst';
+import type { CrowdMessage } from '../../utils/arenaCrowd';
+import { useAuth } from '../../store/AuthProvider';
+import { fetchClashFollowState, setClashFollow } from '../../services/clashFollowService';
+
+type Actions = Pick<
+  LiveRoomMessageProps,
+  | 'onReply'
+  | 'onExpressiveReply'
+  | 'onReact'
+  | 'onOpenProfile'
+  | 'onReport'
+  | 'onMarkEvidence'
+  | 'onReportEvidence'
+>;
+
+interface Props extends Actions {
+  room: ArenaRoom;
+  messages: readonly ArenaMessage[];
+  evidence: readonly ArenaEvidence[];
+  paddingTop: number;
+  paddingBottom: number;
+  spectatorCount: number | null;
+  loading: boolean;
+  refreshing: boolean;
+  loadingOlder: boolean;
+  hasOlder: boolean;
+  threadLocked: boolean;
+  error: string | null;
+  composer: React.ReactNode;
+  /** Opens the existing auth flow when a signed-out viewer tries to follow. */
+  onRequireAuth?: () => void;
+  onBack: () => void;
+  onReturn: () => void;
+  onRefresh: () => Promise<void>;
+  onRefreshResult?: () => Promise<void>;
+  onLoadOlder: () => Promise<void>;
+  onJudge: (side: 'A' | 'B') => Promise<void>;
+  onWatch: () => Promise<void>;
+  onReportCrowd?: (message: CrowdMessage) => void;
+  /** One eligible live Clash from the route's existing discovery read. */
+  nextClash?: { clashId: string; title: string } | null;
+  nextBusy?: boolean;
+  nextNotice?: string | null;
+  onOpenNext?: () => void;
+}
+
+function DuelLoadingBones(): React.JSX.Element {
+  const t = useThemeColors();
+  const bone = softFill(t);
+  return (
+    <View style={styles.bones} accessibilityLabel="Loading Clash transcript">
+      <View style={[styles.boneLine, { backgroundColor: bone, width: '88%' }]} />
+      <View style={[styles.boneLine, { backgroundColor: bone, width: '64%' }]} />
+      <View style={[styles.boneBlock, { backgroundColor: bone }]} />
+    </View>
+  );
+}
+
+/** Official Stage and independently authorized public Crowd within one event. */
+export function DuelRoomExperience(props: Props): React.JSX.Element {
+  const { fontScale } = useWindowDimensions();
+  const { room, messages } = props;
+  const duel = room.duel!;
+  const account = useAuth().user?.id ?? null;
+  const [following, setFollowing] = React.useState(false);
+  const [followBusy, setFollowBusy] = React.useState(false);
+  const [followError, setFollowError] = React.useState<string | null>(null);
+  // Generation token: a slow mount read must never overwrite a newer toggle.
+  const followRequest = React.useRef(0);
+  const followInFlight = React.useRef(false);
+
+  React.useEffect(() => {
+    let active = true;
+    setFollowing(false);
+    setFollowError(null);
+    const request = ++followRequest.current;
+    // A new Clash/account scope must not inherit the previous busy state, and a
+    // completion from the previous scope is ignored by the token check below.
+    setFollowBusy(false);
+    followInFlight.current = false;
+    if (!account || !duel.clashId) return () => { active = false; };
+    void fetchClashFollowState(account, duel.clashId, () => active)
+      .then((value) => { if (active && followRequest.current === request) setFollowing(value); })
+      .catch(() => { if (active && followRequest.current === request) setFollowing(false); });
+    return () => { active = false; };
+  }, [account, duel.clashId]);
+
+  /** Optimistic only because the rollback restores the last server-known value. */
+  const toggleFollow = (): void => {
+    if (!duel.clashId) return;
+    if (!account) { props.onRequireAuth?.(); return; }
+    if (followBusy || followInFlight.current) return;
+    const request = ++followRequest.current;
+    followInFlight.current = true;
+    const next = !following;
+    setFollowing(next);
+    setFollowBusy(true);
+    setFollowError(null);
+        hapticTap();
+    void setClashFollow(account, duel.clashId, next)
+      .catch(() => {
+        if (followRequest.current === request) setFollowing(!next);
+        if (followRequest.current === request) setFollowError('Could not save your follow. Try again.');
+      })
+      .finally(() => { followInFlight.current = false; if (followRequest.current === request) setFollowBusy(false); });
+  };
+  const cancelled = duel.status === 'cancelled';
+  const crowd = useArenaCrowd(props.threadLocked || cancelled ? null : room.roomId);
+  React.useEffect(() => { if (props.refreshing) void crowd.refresh(); },[props.refreshing,crowd.refresh]);
+  const t = useThemeColors();
+  const presentation = duelPresentation(duel, room.phase);
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [moreOpen, setMoreOpen] = React.useState(false);
+  const viewerScope = room.roomId + ':' + crowd.identityVersion;
+  const [backing, setBacking] = React.useState<{scope:string;side:'A'|'B'|null}|null>(null);
+  const backingSide = backing?.scope === viewerScope ? backing.side : null;
+  const [resultOpen, setResultOpen] = React.useState(false);
+  const [watching, setWatching] = React.useState(false);
+  const [watchError, setWatchError] = React.useState(false);
+  const [entrance, setEntrance] = React.useState(true);
+  const entranceKey = `entrance:${room.clashId ?? room.roomId}`;
+  const finishEntrance = React.useCallback(() => setEntrance(false), []);
+  const [assistOpen, setAssistOpen] = React.useState(false);
+  React.useEffect(() => { setAssistOpen(false); setResultOpen(false); }, [room.roomId, duel.viewerRelationship, crowd.identityVersion]);
+  const [keyboardOpen, setKeyboardOpen] = React.useState(false);
+  const joining = React.useRef(false);
+
+  // Android keeps a stale navigation-bar inset while the keyboard is up, so the
+  // bottom inset collapses instead of double-padding the composer.
+  const bottomInset = keyboardOpen ? 0 : props.paddingBottom;
+
+  const transcript = React.useMemo(
+    () => duelTranscript(duel, messages),
+    [duel, messages],
+  );
+  const moment = React.useMemo(
+    () => duelLatestMoment(duel, messages),
+    [duel, messages],
+  );
+
+  const proposition = duel.sourceText?.trim() || room.topic.title;
+  const reactionBurst = useDuelReactionBurst(moment.message);
+  const live =
+    duel.status === 'open' &&
+    (room.phase === 'open' || room.phase === 'final_arguments');
+  // Terminal states must never read as live: RESULT for settled, CLOSED for
+  // cancelled. Live phases keep their explicit labels.
+  const terminal: 'settled' | 'cancelled' | null =
+    duel.status === 'settled' ? 'settled' : duel.status === 'cancelled' ? 'cancelled' : null;
+  const statusLabel = live
+    ? 'LIVE'
+    : terminal === 'settled'
+      ? 'RESULT'
+      : terminal === 'cancelled'
+        ? 'CLOSED'
+        : presentation.stage.toUpperCase();
+  // Phase must stay readable while the Clash is live: OPEN and FINAL are both
+  // "LIVE", so the header carries a short phase chip alongside it.
+  const phaseLabel = live
+    ? room.phase === 'final_arguments'
+      ? 'FINAL'
+      : 'OPEN'
+    : undefined;
+  const atmosphereMood = duelAtmosphereMood(duel, room.phase);
+  const judgingFocus = room.phase === 'judging' && duel.status === 'open';
+  const showOutcome =
+    room.phase === 'judging' ||
+    room.phase === 'closed' ||
+    duel.status !== 'open' ||
+    duel.hasJudged;
+
+  React.useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+
+  const canBack =
+    duel.viewerRelationship === 'spectator' &&
+    duel.status === 'open' &&
+    (room.phase === 'open' || room.phase === 'final_arguments');
+
+  // Assists stay private to one fighter; the UI only mirrors the server rules.
+  const assist = assistAvailability({
+    viewerRelationship: duel.viewerRelationship,
+    status: duel.status,
+    phase: room.phase,
+    threadLocked: props.threadLocked,
+  });
+
+  const retry = (
+    <Pressable
+      disabled={props.refreshing}
+      accessibilityRole="button"
+      accessibilityLabel="Try again"
+      style={styles.action}
+      onPress={() => void props.onRefresh()}
+    >
+      <Text style={[styles.retryText, { color: t.textPrimary }]}>Try again</Text>
+    </Pressable>
+  );
+
+  const outcomeTopic =
+    duel.sourceText?.trim() && duel.sourceText.trim() !== room.topic.title
+      ? `${room.topic.title} — ${duel.sourceText.trim()}`
+      : (duel.sourceText?.trim() || room.topic.title);
+
+  if (props.threadLocked) {
+    return (
+      <View
+        style={[styles.root, { backgroundColor: t.background }]}
+        collapsable={false}
+        testID={`arena-room:${room.roomId}:${duel.clashId}:${duel.status}:${room.phase}`}
+      >
+        <ArenaAtmosphere mood={atmosphereMood} energy={0.15} />
+        <View style={[styles.top, styles.layer, { paddingTop: props.paddingTop }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={styles.backHit}
+            onPress={props.onBack}
+          >
+            <BackIcon size={20} color={t.textPrimary} />
+          </Pressable>
+        </View>
+        <View style={[styles.locked, styles.layer]}>
+          <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>Watch this Clash</Text>
+          <Text style={[styles.emptyBody, { color: t.textSecondary }]}>
+            {presentation.canWatch
+              ? duel.status === 'settled'
+                ? 'Enter to review the historical Stage and official transcript. This Clash is read-only.'
+                : 'Enter as a spectator to follow the Clash. Watching does not make you a fighter.'
+              : 'This Clash is available to members.'}
+          </Text>
+          {moment.message && presentation.canWatch && (moment.message.body ?? '').trim() ? (
+            <View style={styles.gatePreview}>
+              <Text style={[styles.gatePreviewMeta, { color: t.textMuted }]}>
+                LATEST ARGUMENT · {moment.side === 'A' ? 'FIGHTER A' : moment.side === 'B' ? 'FIGHTER B' : 'STAGE'}
+              </Text>
+              <Text numberOfLines={3} style={[styles.gatePreviewBody, { color: t.textPrimary }]}>
+                {duelArgumentPreview(moment.message.body ?? '', 180).preview}
+              </Text>
+            </View>
+          ) : null}
+          {presentation.canWatch ? (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Watch this Clash as a spectator"
+              disabled={watching}
+              style={[styles.primaryAction, { borderColor: t.borderStrong }]}
+              onPress={() => {
+                if (joining.current) return;
+                hapticPress();
+                joining.current = true;
+                setWatching(true);
+                setWatchError(false);
+                void props
+                  .onWatch()
+                  .catch(() => setWatchError(true))
+                  .finally(() => {
+                    joining.current = false;
+                    setWatching(false);
+                  });
+              }}
+            >
+              <Text style={[styles.primaryActionText, { color: t.textPrimary }]}>
+                {watching ? 'Entering…' : 'Watch Clash'}
+              </Text>
+            </PressableScale>
+          ) : null}
+          {watchError ? (
+            <Text accessibilityRole="alert" style={[styles.emptyBody, { color: t.textSecondary }]}>
+              Couldn't enter this Clash.
+            </Text>
+          ) : null}
+          {retry}
+        </View>
+      </View>
+    );
+  }
+
+  if (props.loading && transcript.length === 0) {
+    return (
+      <View style={[styles.root, { backgroundColor: t.background }]}>
+        <View style={[styles.top, { paddingTop: props.paddingTop }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={styles.backHit}
+            onPress={props.onBack}
+          >
+            <BackIcon size={20} color={t.textPrimary} />
+          </Pressable>
+        </View>
+        <View style={styles.locked}>
+          <DuelLoadingBones />
+        </View>
+      </View>
+    );
+  }
+
+  if (props.error && transcript.length === 0) {
+    return (
+      <View style={[styles.root, { backgroundColor: t.background }]}>
+        <View style={[styles.top, { paddingTop: props.paddingTop }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={styles.backHit}
+            onPress={props.onBack}
+          >
+            <BackIcon size={20} color={t.textPrimary} />
+          </Pressable>
+        </View>
+        <View style={styles.locked}>
+          <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
+            Couldn't load the Clash.
+          </Text>
+          {retry}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[styles.root, { backgroundColor: t.background }]}
+      collapsable={false}
+      testID={`arena-room:${room.roomId}:${duel.clashId}:${duel.status}:${room.phase}`}
+    >
+      {duel.status === 'open' && room.phase !== 'closed' ? <ArenaAtmosphere
+        mood={atmosphereMood}
+        energy={
+          judgingFocus ? 0.08 : live ? 0.38 : atmosphereMood === 'verdict' ? 0.28 : 0.18
+        }
+      /> : null}
+
+      <KeyboardAvoidingView
+        style={[styles.root, styles.layer]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // Android hide events can retain a nonzero avoidance offset. Disable
+        // avoidance when hidden so the Stage regains its full height.
+        enabled={Platform.OS === 'ios' || keyboardOpen}
+      >
+        <ImmersiveClash
+          duel={duel}
+          proposition={proposition}
+          live={live}
+          terminal={terminal}
+          statusLabel={statusLabel}
+          phaseLabel={phaseLabel}
+          viewerScope={viewerScope}
+          eventHint={presentation.hint}
+          onViewResult={duel.status !== 'open' || room.phase === 'closed' ? () => setResultOpen(true) : undefined}
+          spectatorCount={crowd.context?.spectatorCount ?? props.spectatorCount}
+          reactionBurst={reactionBurst}
+          canReact={live && !props.threadLocked && Boolean(account) && Boolean(room.viewer) && (duel.viewerRelationship === 'fighter_a' || duel.viewerRelationship === 'fighter_b')}
+          onReact={props.onReact}
+          crowd={crowd}
+          crowdUnavailableReason={cancelled ? 'Crowd chat is unavailable because this Clash was cancelled.' : undefined}
+          onReportCrowd={props.onReportCrowd}
+          focusSide={moment.side}
+          latestMessage={moment.message}
+          paddingTop={props.paddingTop}
+          judgingFocus={judgingFocus || Boolean(duel.verdict)}
+          condensed={keyboardOpen}
+          backingSide={backingSide}
+          onBackSide={(side) =>
+            setBacking(prev => ({scope:viewerScope,side:prev?.scope === viewerScope && prev.side === side ? null : side}))
+          }
+          canBack={canBack}
+          onBack={props.onBack}
+          onOpenProfile={props.onOpenProfile}
+          onViewHistory={() => setHistoryOpen(true)}
+          onMore={() => setMoreOpen(true)}
+          roleLabel={presentation.role}
+          following={following}
+          followBusy={followBusy}
+          followError={followError}
+          onToggleFollow={duel.status === 'open' || following ? toggleFollow : undefined}
+          crowdPaddingBottom={
+            keyboardOpen ? space.xs : Math.max(bottomInset, space.sm)
+          }
+          stageFooter={
+            <>
+            <DuelPhaseCountdown room={room} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 }}><ArenaButton key={`transcript:${fontScale}`} label="Transcript" variant="tertiary" onPress={() => setHistoryOpen(true)} />{assist !== 'hidden' ? <ArenaButton key={`assist:${fontScale}`} label={assist === 'inbox' ? 'Assist inbox' : 'Private assist'} variant="tertiary" disabled={assist === 'closed'} onPress={() => setAssistOpen(true)} /> : null}</View>
+            {assist !== 'hidden' ? <Text style={[styles.assistNote, { color: t.textMuted }]}>{assist === 'closed' ? 'Assists are closed for this Clash.' : 'Private assists go to one fighter only — never posted in the Crowd.'}</Text> : null}
+            {showOutcome ? (
+              <View style={styles.outcome}>
+                <DuelRoomOutcome
+                  key={duel.clashId}
+                  duel={duel}
+                  phase={room.phase}
+                  roomId={room.roomId}
+                  topicTitle={outcomeTopic}
+                  onJudge={props.onJudge}
+                  onRefreshResult={props.onRefreshResult}
+                  onReview={() => setHistoryOpen(true)}
+                  onReturn={props.onReturn}
+                  nextClash={props.nextClash ?? null}
+                  nextBusy={props.nextBusy ?? false}
+                  nextNotice={props.nextNotice ?? null}
+                  onOpenNext={props.onOpenNext}
+                />
+              </View>
+            ) : null}
+            </>
+          }
+          fighterComposer={
+            presentation.canPublish ? (
+              <View
+                style={{
+                  paddingHorizontal: layout.screenX,
+                  paddingBottom: Math.max(bottomInset, space.sm),
+                }}
+              >
+                {props.composer}
+              </View>
+            ) : null
+          }
+        />
+      </KeyboardAvoidingView>
+
+      {assistOpen ? <ArenaSheet title="Private assists" onClose={() => setAssistOpen(false)}><PrivateAssistPanel initiallyOpen initialSide={backingSide ?? 'A'} roomId={room.roomId} duel={duel} disabled={assist === 'closed'} onPublished={props.onRefresh} /></ArenaSheet> : null}
+      {resultOpen ? <ArenaSheet title="Official result" onClose={() => setResultOpen(false)}>
+        {duel.status === 'settled' ? <DuelPersonalResult clashId={duel.clashId} /> : null}
+        <DuelRoomOutcome revealMotion duel={duel} phase={room.phase} roomId={room.roomId} topicTitle={outcomeTopic} onJudge={props.onJudge} onRefreshResult={props.onRefreshResult} onReview={() => {setResultOpen(false);setHistoryOpen(true);}} onReturn={props.onReturn} nextClash={props.nextClash ?? null} nextBusy={props.nextBusy ?? false} nextNotice={props.nextNotice ?? null} onOpenNext={props.onOpenNext} />
+      </ArenaSheet> : null}
+      <ArgumentHistorySheet
+        visible={historyOpen}
+        duel={duel}
+        messages={transcript}
+        onClose={() => setHistoryOpen(false)}
+      />
+      <ClashMoreSheet
+        visible={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        onArgumentHistory={() => setHistoryOpen(true)}
+        onShare={() => {
+          void Share.share({
+            message: `CLASH — ${proposition}\n${duel.fighterA.name} vs ${duel.fighterB.name}`,
+          }).catch(() => undefined);
+        }}
+        onReport={
+          props.onReport
+            ? () => {
+                const target = moment.message;
+                if (target) props.onReport?.(target);
+              }
+            : undefined
+        }
+      >
+        <DuelDevPanel room={room} />
+      </ClashMoreSheet>
+      <DuelEntrance
+        duel={duel}
+        proposition={proposition}
+        phase={room.phase}
+        momentKey={entranceKey}
+        active={entrance}
+        onDone={finishEntrance}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  layer: { zIndex: 1 },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingHorizontal: layout.screenX,
+    paddingBottom: space.xs,
+    minHeight: 44,
+  },
+  backHit: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  locked: {
+    flex: 1,
+    paddingHorizontal: layout.screenX,
+    paddingTop: space.xl,
+    gap: space.sm,
+  },
+  emptyTitle: {
+    ...typeScale.label,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  emptyBody: {
+    ...typeScale.body,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  primaryAction: {
+    minHeight: 44,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  primaryActionText: { ...typeScale.label, fontSize: 14, fontWeight: '700' },
+  action: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: space.sm,
+    paddingRight: space.sm,
+  },
+  retryText: { ...typeScale.label, fontSize: 14, fontWeight: '600' },
+  gatePreview: { borderLeftWidth: 2, paddingLeft: 10, gap: 4 },
+  gatePreviewMeta: {
+    ...typeScale.caption,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  gatePreviewBody: { ...typeScale.body, fontSize: 14, lineHeight: 20 },
+  assistNote: {
+    ...typeScale.caption,
+    fontSize: 11,
+    lineHeight: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+  bones: { gap: space.sm, width: '100%', paddingTop: space.md },
+  boneLine: { height: 14, borderRadius: 6 },
+  boneBlock: { height: 72, borderRadius: 8, marginVertical: space.xs },
+  outcome: {
+    paddingHorizontal: layout.screenX,
+    paddingBottom: space.sm,
+  },
+});

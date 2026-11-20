@@ -1,0 +1,120 @@
+-- ============================================================================
+-- CLASH cloud wrapper — step 9 of 119
+-- version           : 20260926200000
+-- ledger name       : take_creation_rpc
+-- mode              : direct
+-- executed source   : supabase/migrations/20260926200000_take_creation_rpc.sql
+-- executed sha256   : d83cd2110c97c943ff72f89292db3c6e44551328c8b62f060d74bbf1db08ad28
+-- normalisation     : none
+-- normalized sha256 : d83cd2110c97c943ff72f89292db3c6e44551328c8b62f060d74bbf1db08ad28
+--
+-- ATOMICITY: the migration SQL and its ledger row are committed together.
+-- A server-side error before COMMIT aborts the transaction, so neither the
+-- schema change nor its ledger row survives. A connection lost around COMMIT
+-- can leave the outcome unknown, which is why the runner classifies it from
+-- the ledger instead of claiming a rollback.
+--
+-- CONCURRENCY (Round 8): the ledger insert has NO conflict clause. If a row for
+-- this version already exists, the insert raises unique_violation, the whole
+-- transaction aborts and no statement of the migration survives. An
+-- 'on conflict do nothing' would have skipped the row while re-executing the
+-- migration body - the one case the read-back could not detect.
+-- ============================================================================
+begin;
+
+-- ============================================================================
+-- CLASH 2.0 · 0009 — take creation RPC (server authority + media integration)
+-- ----------------------------------------------------------------------------
+-- Moves Take creation behind one SECURITY DEFINER RPC so the author is always
+-- derived from the session (never a client id), the 24-hour window and status
+-- stay server-owned, and a Take can only reference a *completed, public* media
+-- object the caller actually owns.
+--
+-- media_url stays the rendering convenience (the public URL the client derives
+-- via getPublicMediaUrl); media_object_id is the authority reference. Seed/demo
+-- Takes with a raw media_url and no media_object_id remain valid (backwards
+-- compatible), and the `takes_media_complete` check still guards media_kind.
+-- ============================================================================
+
+-- ── 1. Reference a completed media object from a Take ────────────────────────
+alter table public.takes
+  add column if not exists media_object_id text references public.media_objects (id);
+
+-- ── 2. Server-authoritative Take creation ────────────────────────────────────
+create or replace function public.create_take(
+  p_hood public.hood_id,
+  p_text text,
+  p_media_object_id text default null,
+  p_media_url text default null
+)
+returns setof public.takes
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_author text := public.my_profile_id();
+  v_text   text := trim(p_text);
+  v_media  public.media_objects%rowtype;
+  v_id     text;
+  v_row    public.takes%rowtype;
+begin
+  if v_author is null then
+    raise exception 'sign in to drop a take' using errcode = '42501';
+  end if;
+
+  if v_text = '' or char_length(v_text) > 180 then
+    raise exception 'a take must be 1-180 characters' using errcode = 'P0003';
+  end if;
+
+  if p_media_object_id is not null then
+    select * into v_media from public.media_objects where id = p_media_object_id;
+    if not found then
+      raise exception 'media not found' using errcode = 'P0002';
+    end if;
+    if v_media.owner_id <> v_author then
+      raise exception 'not your media' using errcode = 'P0001';
+    end if;
+    if v_media.status <> 'ready' then
+      raise exception 'media is not ready' using errcode = 'P0004';
+    end if;
+    if v_media.visibility <> 'public' then
+      raise exception 'arena takes must use public media' using errcode = 'P0005';
+    end if;
+    if p_media_url is null then
+      raise exception 'media url is required' using errcode = 'P0003';
+    end if;
+  end if;
+
+  v_id := 'take_' || lower(substr(md5(random()::text || clock_timestamp()::text), 1, 16));
+
+  insert into public.takes (id, author_id, hood, text, media_object_id, media_kind, media_url)
+  values (
+    v_id,
+    v_author,
+    p_hood,
+    v_text,
+    p_media_object_id,
+    case when p_media_object_id is not null then v_media.media_kind else null end,
+    p_media_url
+  )
+  returning * into v_row;
+
+  return next v_row;
+end;
+$$;
+
+-- ── 3. Privileges: authenticated only; never anon/public ────────────────────
+grant execute on function public.create_take(public.hood_id, text, text, text) to authenticated;
+revoke execute on function public.create_take(public.hood_id, text, text, text) from public, anon;
+
+
+insert into supabase_migrations.schema_migrations (version, name, statements, created_by)
+values (
+  '20260926200000',
+  'take_creation_rpc',
+  array['sha256:d83cd2110c97c943ff72f89292db3c6e44551328c8b62f060d74bbf1db08ad28'],
+  'clash-cloud-wrapper-v1'
+);
+
+commit;

@@ -1,0 +1,2 @@
+# Generated wrappers must stay byte-identical so ledger sha256 checks hold.
+*.sql -text
